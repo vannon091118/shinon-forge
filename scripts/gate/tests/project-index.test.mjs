@@ -26,6 +26,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
@@ -805,6 +806,76 @@ test('Mount: ein scheiternder Worker wird protokolliert und im Host wiederholt',
   } finally {
     quiet.restore();
   }
+});
+
+// ══ Indexdateien (Plan §10) ══════════════════════════════════════════════════
+//
+// Plan §10 nennt fuenf Angaben je Datei — path, language, size, mtime, sha256 —
+// und sagt: „SHA wird nicht fuer jeden unveraenderten Start erneut unnoetig
+// berechnet."
+//
+// Dieses Schema nennt Groesse und Hash `bytes` und `digest`: §10 nennt die
+// ANGABEN, kein SQL. Die Tests pinnen deshalb die Bedeutung und nicht die
+// Schreibweise — Groesse und mtime gegen das Dateisystem, der Digest als sha256
+// des ROHEN Inhalts. Dass der Digest nicht dem redigierten Text folgt, ist kein
+// Detail: er entscheidet, ob sich eine Datei geaendert hat.
+
+test('Indexdatei: path, language, Groesse, mtime und sha256 stimmen Zeile fuer Zeile', () => {
+  const project = fixtureProject('dateizeile');
+  const { file } = fixtureIndex(project, 'dateizeile');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, {});
+
+  const stored = rows(db, 'select path, language, bytes, mtime_ms, digest from files order by path');
+  assert.ok(stored.length > 0, 'der Index ist nicht leer — sonst bewiese der Test nichts');
+  for (const row of stored) {
+    const absolute = join(project, row.path);
+    const info = statSync(absolute);
+    assert.equal(row.language, bundle.languageOf(row.path) ?? 'text', `${row.path}: Sprache`);
+    assert.equal(row.bytes, info.size, `${row.path}: Groesse`);
+    assert.equal(row.mtime_ms, Math.round(info.mtimeMs), `${row.path}: mtime`);
+    assert.equal(
+      row.digest,
+      createHash('sha256').update(readFileSync(absolute)).digest('hex'),
+      `${row.path}: sha256 des rohen Inhalts`,
+    );
+  }
+
+  // Die Gegenprobe mit ausgeschriebenem Wert: der Digest ist der der Rohdatei,
+  // nicht der des redigierten Textes.
+  const secretPath = 'src/config.mjs';
+  writeFileSync(join(project, secretPath), `export const key = '${CANARY.anthropic}';\n`);
+  bundle.updateIndex(db, project, {});
+  assert.equal(
+    one(db, 'select digest from files where path = ?', secretPath).digest,
+    createHash('sha256').update(readFileSync(join(project, secretPath))).digest('hex'),
+    'der Digest folgt dem rohen Inhalt, nicht dem redigierten',
+  );
+  db.close();
+});
+
+test('Indexdatei: ein unveraenderter Start berechnet keinen SHA erneut', () => {
+  const project = fixtureProject('shalauf');
+  const { file } = fixtureIndex(project, 'shalauf');
+  const db = bundle.openIndex(file);
+  const first = bundle.updateIndex(db, project, {});
+  assert.equal(first.hashed, first.files, 'der erste Lauf liest jede Datei');
+
+  const second = bundle.updateIndex(db, project, {});
+  assert.equal(second.hashed, 0, 'unveraendert heisst: keine Datei wird gelesen, also auch kein SHA');
+  assert.equal(second.written, 0, 'und nichts wird neu geschrieben');
+  assert.equal(second.unchanged, second.files, 'jede Datei wird ueber mtime und Groesse als unveraendert erkannt');
+
+  // mtime allein geaendert, Inhalt gleich: genau DIESE Datei wird gelesen, um
+  // ihren SHA zu vergleichen — und danach nur aufgefrischt, nicht neu indiziert.
+  const target = join(project, 'src/b.mjs');
+  const fresh = new Date(Date.now() + 5000);
+  utimesSync(target, fresh, fresh);
+  const third = bundle.updateIndex(db, project, {});
+  assert.equal(third.hashed, 1, 'nur die Datei mit neuer mtime wird gelesen');
+  assert.equal(third.rehashed, 1, 'gleicher SHA: nur auffrischen');
+  assert.equal(third.written, 0, 'gleicher SHA: kein Neuindizieren');
+  db.close();
 });
 
 // ══ Secret Protection (Plan §13) ═════════════════════════════════════════════

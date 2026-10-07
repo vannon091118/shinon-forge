@@ -73,5 +73,18 @@
     "result": "BESTAETIGT",
     "verdict": "WRITE",
     "evidence": "GEMESSEN: legacyHits laeuft jetzt rekursiv ueber jedes Paketverzeichnis (Endungen .js/.mjs/.cjs/.yml/.yaml, ohne node_modules) statt ueber die drei festen Dateinamen, und zusaetzlich ueber profiles/<name>/package.json. MUTATIONSPROBE: eine Datei packages/project-index/assets/probe-legacy.js mit dem Legacy-String wird gefunden ('[\"packages/project-index/assets/probe-legacy.js\"]'), nach dem Entfernen ist die Liste leer; die alte feste Liste ({index.js, client.js, cordis.patch.yml}) haette genau diese Datei NICHT geprueft. Bestand: 0 Treffer ueber alle 14 Pakete und alle Profile, dsh-test bleibt bei 72/72, gate:full bleibt bei 18 Gates PASS. Der Anlass ist kein Zufall: dieses Paket legt seinen Kern in einem Unterverzeichnis ab, sonst waere der Worker nicht moeglich — die Luecke war also mit dem Fix schon offen."
+  },
+  {
+    "id": "project-index-datei-angaben-nach-plan-10",
+    "claim": "Die Indexdatei fuehrt die fuenf Angaben aus Plan §10 fuer jede Zeile — path, language, size, mtime, sha256 —, und fuer eine unveraenderte Datei wird kein SHA erneut berechnet.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "§10 nennt die ANGABEN, kein SQL. Zu pruefen ist deshalb die Bedeutung: Groesse und mtime gegen das Dateisystem, der Digest als sha256 des ROHEN Inhalts, und der zweite Lauf ohne Lesen.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN. (1) SPALTEN: `create table files(path text primary key, language text not null, bytes integer not null, mtime_ms integer not null, digest text not null, indexed_at_ms integer not null)` — Groesse und Hash heissen `bytes` und `digest`, die ANGABEN sind vollzaehlig (Abweichung B: Schreibweise, nicht Inhalt). (2) LIVE-AUDIT gegen den echten Index dieses Repos: 168 Zeilen vor dem Lauf, davon 3 abweichend — genau die Dateien, die seit dem letzten Lauf geaendert wurden (Docs/probes/secret-protection.json, packages/project-index/assets/index-core.js, profiles/shinon/cordis.yml). Nach einem Lauf: 171 Dateien betrachtet, 165 unveraendert, 5 gelesen, 1 nur aufgefrischt, 4 neu geschrieben, 1 als credential-datei abgewiesen; danach 170 Zeilen mit 0 Abweichungen — language, Groesse, mtime (Math.round der mtime) und digest stimmen fuer JEDE Zeile mit statSync und sha256 des rohen Inhalts ueberein. (3) DER SHA WIRD NICHT ERNEUT BERECHNET: der zweite Lauf desselben Bestands meldet hashed 0, rehashed 0, written 0, unchanged 170 — keine Datei wird gelesen. Wird nur die mtime einer Datei gesetzt, wird genau DIESE gelesen (hashed 1), ihr gleicher SHA aufgefrischt (rehashed 1) und nichts neu indiziert (written 0). (4) VERTRAG STATT MESSUNG: zwei Abnahmetests pinnen beide Zusagen (31 Tests in project-index.test.mjs, 31 gruen; Gesamtlauf 222 gruen). MUTATIONSPROBEN: gekuerzter Digest → der Zeilentest wird rot; 'unveraendert' immer verneint → vier Tests werden rot (Inkrement, Gate, Zeitstempel, §10). (5) DER DIGEST FOLGT DEM ROHEN INHALT, nicht dem redigierten: sonst saehe ein Lauf eine Aenderung nicht, die nur einen bereits ersetzten Wert betrifft — der Test prueft das an einer Datei mit ausgeschriebenem Wert. (6) GRENZE: `path` ist relativ zur Projektwurzel gespeichert, nicht absolut; mtime ist auf Millisekunden gerundet, ein Wechsel innerhalb derselben Millisekunde bei gleicher Groesse bliebe damit unsichtbar (die Luecke ist in §11 als verify=all adressiert).",
+    "evidence_note": "Zaehlungen, Spaltennamen und Wahrheitswerte; kein Dateiinhalt und kein Wert."
   }
 ]
