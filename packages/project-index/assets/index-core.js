@@ -1002,3 +1002,224 @@ export function searchChunks(db, query, limit = 10) {
     return [];
   }
 }
+
+// ══ Der MAX-Kontext (Plan §14/§15) ═══════════════════════════════════════════
+//
+// Diese Sektion ist die fehlende Haelfte zwischen Index und Enhancer: der Index
+// weiss alles ueber das Projekt, der Enhancer kennt den Kontextvertrag — aber
+// niemand machte aus einem ROHTEXT relevanten Kontext. Der naheliegende Weg ist
+// gemessen der falsche: die Chunks dieses Repos sind 978903 Zeichen (≈ 244726
+// Token bei 4 Zeichen je Token), das Budget aus §14 erlaubt 6000. Ein Resolver,
+// der nicht rangiert, kann das Budget nicht halten — er kann nur zufaellig
+// klein sein. Und die Volltextsuche allein ist nicht selektiv: das haeufigste
+// Symbol dieses Repos ('apply') liefert 10 Dateien mit 31 Treffern.
+//
+// DREI EIGENSCHAFTEN, die keine Geschmacksfrage sind:
+//
+//   1. NUR DER INDEX IST DIE QUELLE. Kein Dateisystemzugriff in dieser Sektion.
+//      Der Index traegt redigierten Text (Plan §13), die Platte den Rohinhalt —
+//      ein Resolver, der die Datei nachliest, umgeht den Secret-Schutz.
+//   2. DAS BUDGET IST HART. Was nicht hineinpasst, wird an der Zeilengrenze
+//      abgeschnitten; danach ist Schluss, statt die naechste Datei halb
+//      anzufangen. Ein halber Kontext verspricht mehr, als er traegt.
+//   3. DIE RANGFOLGE IST DATEN. `CONTEXT_PRIORITIES` haelt die Ordnung aus §14,
+//      und ein Gleichstand entscheidet der Pfad — zwei Laeufe liefern dieselbe
+//      Ausgabe, sonst waere der Kontext nicht nachpruefbar.
+//   4. DAS BUDGET FOLGT DEM RANG. Jeder Kandidat darf so viel nehmen, wie sein
+//      Rang am verbleibenden Gesamtrang ausmacht. Ohne diese Aufteilung frisst
+//      die erste grosse Datei das ganze Budget: live gemessen fiel bei einem
+//      Prompt, der ZWEI Pfade nennt, der zweite heraus — genau der Bezug, den
+//      der Nutzer ausdruecklich genannt hat.
+
+/** Rangfolge aus Plan §14 — als Daten, damit die Ordnung pruefbar ist. */
+export const CONTEXT_PRIORITIES = { path: 100, symbol: 60, dependency: 40, touch: 30, fts: 10 };
+
+/** Das harte Kontextbudget (Plan §14: „max. 6000 Tokens Code-Kontext"). */
+export const DEFAULT_CONTEXT_BUDGET = 6000;
+
+/** Zeichen je Token — eine Schaetzung, kein Tokenizer; gemessen ist die Groessenordnung. */
+export const CHARS_PER_TOKEN = 4;
+
+/** Obergrenze der Symbolnamen im Kontext: der Vertrag ist eine Liste, kein Datenbankauszug. */
+export const MAX_CONTEXT_SYMBOLS = 200;
+
+/** Obergrenze der Volltextbegriffe je Abfrage. */
+export const MAX_FTS_TERMS = 8;
+
+/** Ein Pfadvergleich ohne Locale: derselbe Rechner, dieselbe Reihenfolge. */
+const byPath = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** Token-Schaetzung eines Textes. */
+export function estimateTokens(text) {
+  return Math.ceil(String(text ?? '').length / CHARS_PER_TOKEN);
+}
+
+/**
+ * Die Bezugsworte eines Rohtexts: Wortgrenzen auf den Zeichen, die in Pfaden,
+ * Symbolen und Paketnamen vorkommen. Keine Sprachheuristik — was nicht als
+ * Token im Index steht, kann auch nicht treffen.
+ */
+export function promptTokens(prompt) {
+  const text = typeof prompt === 'string' ? prompt : '';
+  const seen = new Set();
+  const tokens = [];
+  for (const raw of text.split(/[^A-Za-z0-9_./@-]+/)) {
+    const token = raw.replace(/^\.\//, '').replace(/[.,;:]+$/, '');
+    if (token === '' || !/[A-Za-z0-9]/.test(token) || seen.has(token)) continue;
+    seen.add(token);
+    tokens.push(token);
+  }
+  return tokens;
+}
+
+/**
+ * Kandidaten mit Rang. Jede Stufe aus §14 hat ihre Quelle:
+ *
+ *   exakter Pfad    die Dateitabelle; ein Name ohne Verzeichnis zaehlt schwaecher
+ *   exaktes Symbol  die Symboltabelle, nur referenzierbare Arten
+ *   Paket/Modul     Kanten der Art 'dependency'
+ *   Touch           Touches in beide Richtungen
+ *   Volltext        FTS5 zuletzt und mit dem niedrigsten Rang
+ *
+ * Die Reihenfolge entsteht aus den RANGEN, nicht aus der Abfragereihenfolge:
+ * eine spaetere Stufe kann einen frueheren Kandidaten nur bestaetigen.
+ */
+export function rankContextCandidates(db, prompt) {
+  const tokens = promptTokens(prompt);
+  const scores = new Map();
+  const rank = (path, score, kind) => {
+    const before = scores.get(path);
+    if (before === undefined || score > before.score) scores.set(path, { path, score, kind });
+  };
+
+  const paths = db.prepare('select path from files').all().map((row) => row.path);
+  const known = new Set(paths);
+  const byBase = new Map();
+  for (const path of [...paths].sort(byPath)) {
+    const base = path.slice(path.lastIndexOf('/') + 1);
+    if (!byBase.has(base)) byBase.set(base, path);
+  }
+
+  const symbolPaths = db.prepare('select path, kind from symbols where name = ? order by path');
+  const dependencyPaths = db.prepare("select distinct target, path from edges where kind = 'dependency' and (target = ? or target like '%/' || ?) order by path");
+  const hitTerms = [];
+
+  for (const token of tokens) {
+    if (known.has(token)) rank(token, CONTEXT_PRIORITIES.path, 'path');
+    else if (byBase.has(token)) rank(byBase.get(token), CONTEXT_PRIORITIES.path - 10, 'path-basename');
+
+    for (const row of symbolPaths.all(token)) {
+      if (!REFERENCABLE_KINDS.has(row.kind)) continue;
+      rank(row.path, CONTEXT_PRIORITIES.symbol, 'symbol');
+      // Ein Symbolname ist der Begriff, den FTS5 wirklich findet: Pfade stehen
+      // nicht im Dateiinhalt, Symbole schon.
+      if (!hitTerms.includes(token) && hitTerms.length < MAX_FTS_TERMS) hitTerms.push(token);
+    }
+    for (const row of dependencyPaths.all(token, token)) rank(row.path, CONTEXT_PRIORITIES.dependency, 'dependency');
+  }
+
+  // Touches in beide Richtungen — aber nur von Kandidaten, die schon tragen.
+  // Ein Touch ist eine Verstaerkung, kein Einstieg: sonst zoege jede Kante die
+  // halbe Dateitabelle nach.
+  const touched = db.prepare('select target from touches where path = ? order by target');
+  const touching = db.prepare('select path from touches where target = ? order by path');
+  for (const candidate of [...scores.values()]) {
+    if (candidate.score < CONTEXT_PRIORITIES.dependency) continue;
+    for (const row of touched.all(candidate.path)) rank(row.target, CONTEXT_PRIORITIES.touch, 'touch');
+    for (const row of touching.all(candidate.path)) rank(row.path, CONTEXT_PRIORITIES.touch, 'touch');
+  }
+
+  if (hitTerms.length > 0) {
+    const query = hitTerms.map((term) => `"${term.replace(/"/g, '')}"`).join(' OR ');
+    for (const hit of searchChunks(db, query, 20)) rank(hit.path, CONTEXT_PRIORITIES.fts, 'fts');
+  }
+
+  return [...scores.values()].sort((a, b) => b.score - a.score || byPath(a.path, b.path));
+}
+
+/**
+ * An der Zeilengrenze schneiden. Ein Kontext, der mitten in einer Zeile endet,
+ * ist ein halber Ausdruck; ein ganzer Zeilenrest ist wenigstens lesbar.
+ */
+function cutAtLine(text, room) {
+  if (room <= 0) return '';
+  if (text.length <= room) return text;
+  const cut = text.slice(0, room);
+  const lastBreak = cut.lastIndexOf('\n');
+  return lastBreak === -1 ? cut : cut.slice(0, lastBreak + 1);
+}
+
+/**
+ * Aus einem Rohtext den MAX-Kontext bauen (Plan §14). Gibt IMMER die Form des
+ * Kontextvertrags zurueck, auch wenn nichts traf: ein leerer Kontext ist eine
+ * Auskunft, ein geworfener Fehler waere ein kaputter Agentenschritt.
+ *
+ * `project` kommt vom Aufrufer — der Resolver kennt nur den Index, nicht den
+ * Projektnamen; eine Ableitung aus dem Dateipfad waere eine zweite Wahrheit.
+ */
+export function resolveContext(db, options = {}) {
+  const prompt = typeof options.prompt === 'string' ? options.prompt : '';
+  // Eine unbrauchbare Grenze (NaN, nichts gesetzt) faellt auf den Default zurueck;
+  // eine Grenze kleiner als null wird zu null. Sie auf den Default zu heben waere
+  // fail-open: der Aufrufer bekaeme mehr Projektinhalt, als er erlaubt hat.
+  const budget = Math.max(0, Number.isFinite(options.budgetTokens) ? options.budgetTokens : DEFAULT_CONTEXT_BUDGET);
+  const project = typeof options.project === 'string' ? options.project : '';
+  const charBudget = budget * CHARS_PER_TOKEN;
+
+  const ranked = rankContextCandidates(db, prompt);
+  const chunksOf = db.prepare('select body from chunks where path = ? order by start_line');
+  const files = [];
+  let used = 0;
+  // `charsLeft` sind die Zeichen, die noch frei sind — inklusive der Trennzeile,
+  // die die naechste Datei kostet. Alle Rechnungen bleiben in GANZEN Zeichen:
+  // die Grenze aus §14 ist in Token angegeben, gerechnet wird in Zeichen.
+  let charsLeft = charBudget;
+  let scoreLeft = ranked.reduce((sum, candidate) => sum + candidate.score, 0);
+  for (const candidate of ranked) {
+    const allowance = scoreLeft <= 0 ? 0 : Math.floor(charsLeft * (candidate.score / scoreLeft));
+    scoreLeft -= candidate.score;
+    const room = Math.min(allowance, charsLeft - (files.length === 0 ? 0 : 1));
+    if (room <= 0) continue;
+    const text = chunksOf.all(candidate.path).map((row) => row.body).join('\n');
+    if (text === '') continue;
+    const content = cutAtLine(text, room);
+    if (content === '') continue;
+    files.push({ path: candidate.path, content });
+    used += content.length;
+    charsLeft = charBudget - used - files.length;
+  }
+
+  const included = files.map((file) => file.path);
+  const symbols = [];
+  const touches = new Set();
+  const dependencies = new Set();
+  if (included.length > 0) {
+    const marks = included.map(() => '?').join(', ');
+    for (const row of db.prepare(`select distinct name, kind from symbols where path in (${marks}) order by name`).all(...included)) {
+      if (!REFERENCABLE_KINDS.has(row.kind)) continue;
+      symbols.push(row.name);
+      if (symbols.length >= MAX_CONTEXT_SYMBOLS) break;
+    }
+    const known = new Set(included);
+    for (const row of db.prepare(`select path, target from touches where path in (${marks}) or target in (${marks})`).all(...included, ...included)) {
+      if (!known.has(row.path)) touches.add(row.path);
+      if (!known.has(row.target)) touches.add(row.target);
+    }
+    for (const row of db.prepare(`select distinct target from edges where kind = 'dependency' and path in (${marks}) order by target`).all(...included)) {
+      dependencies.add(row.target);
+    }
+  }
+
+  return {
+    project,
+    files,
+    symbols,
+    // `constraints` bleibt leer, und das ist eine benannte Luecke: Plan §9 fuehrt
+    // keine Constraint-Quelle im Index (Regeln stehen in AGENTS.md, nicht in
+    // einer Tabelle). Ein erfundener Eintrag waere schlimmer als ein leerer —
+    // der Enhancer wuerde eine Regel behaupten, die niemand geprueft hat.
+    constraints: [],
+    touches: [...touches].sort(byPath),
+    dependencies: [...dependencies].sort(byPath),
+  };
+}
