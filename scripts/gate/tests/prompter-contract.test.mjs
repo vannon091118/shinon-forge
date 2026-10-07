@@ -852,3 +852,107 @@ test('Konfiguration: unbekannte Werte werden schema-seitig abgelehnt', () => {
     assert.throws(() => bundle.Config({ [key]: value }), new RegExp(key), `${key}=${value}`);
   }
 });
+
+// ── 11. Einheitlicher Eingang: nur der Mensch wird veredelt ───────────────
+
+/**
+ * Eine vom Harness erzeugte `role: 'user'`-Nachricht. Solche Nachrichten reisen
+ * durch denselben Seam wie die Nutzereingabe — gemessen in DSH 0.2.0-rc.2 gibt
+ * es dafuer mindestens zwanzig Produzenten. Der Unterschied ist `source.kind`.
+ */
+const harnessMessage = (kind, text = 'Kontext des Harness') => ({
+  id: `h-${kind}`,
+  role: 'user',
+  content: [{ type: 'text', text }],
+  source: { kind },
+});
+
+test('Eingang: erzeugter Harness-Kontext wird nicht veredelt und nicht ersetzt', async () => {
+  // Eine Zeile pro gemessener Herkunft. Die Freigabe-Antwort ist darunter die
+  // schaerfste: eine umformulierte Zustimmung ist eine geaenderte Entscheidung,
+  // keine Stilfrage. Geprueft wird deshalb nicht nur 'kein Aufruf', sondern
+  // dass der Text WORT FUER WORT unberuehrt bleibt.
+  const cases = [
+    { kind: 'user-approval', text: 'ja' },
+    { kind: 'time-context', text: '<current_time>2026-10-07T20:00:00Z</current_time>' },
+    { kind: 'tmux-context', text: '<terminal>letzte Ausgabe</terminal>' },
+    { kind: 'agent-instructions', text: '# Projektregeln\nImmer Tests schreiben.' },
+    { kind: 'repeat-tool-reminder', text: 'Du rufst dasselbe Werkzeug wiederholt auf.' },
+    { kind: 'ptc-mode', text: 'programmatic tool calling aktiv' },
+    { kind: 'hooks-codex', text: 'blocked by PostToolUse hook' },
+    { kind: 'cordis-host-runner', text: 'Befehl aus dem Host-Runner' },
+  ];
+  for (const { kind, text } of cases) {
+    const llm = fakeLlm(reply(goodResult()));
+    const { ctx, records, dispose } = connect({ ...route }, { llm });
+    const claimed = [harnessMessage(kind, text)];
+    const before = JSON.stringify(claimed);
+    const downstream = { kind: 'enter', messages: claimed };
+
+    const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
+
+    assert.equal(decision, downstream, `${kind}: die Entscheidung bleibt die des Loops`);
+    assert.equal(llm.calls.length, 0, `${kind}: kein Modellaufruf fuer Harness-Text`);
+    assert.equal(records.length, 0, `${kind}: kein Datensatz — es wurde nichts entschieden`);
+    assert.equal(JSON.stringify(claimed), before, `${kind}: der Text bleibt unberuehrt`);
+    dispose();
+  }
+});
+
+test('Eingang: der Mensch wird gefunden, auch wenn Harness-Kontext hinter ihm steht', async () => {
+  const human = userMessage('mach  das  schnell');
+  const context = harnessMessage('time-context', '<current_time>20:00</current_time>');
+  const llm = fakeLlm(reply(goodResult({ enhancedPrompt: 'Mach das schnell.' })));
+  const { ctx, records, dispose } = connect({ ...route }, { llm });
+  const claimed = [human, context];
+
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(llm.calls.length, 1, 'genau ein Aufruf — fuer den Menschen');
+  assert.equal(llm.calls[0].messages[0].content[0].text, 'mach  das  schnell', 'das Modell sieht die Nutzereingabe, nicht den Kontext');
+  assert.equal(decision.messages[0].content[0].text, 'Mach das schnell.', 'ersetzt wird die Nutzernachricht');
+  assert.equal(decision.messages[1], context, 'der Harness-Kontext bleibt dasselbe Objekt');
+  assert.equal(records[0].outcome, 'accepted');
+  dispose();
+});
+
+test('Eingang: alle Wege der Oberflaeche sind menschlich und werden veredelt', async () => {
+  // Gemessen in DSH 0.2.0-rc.2: der API-Session-Controller setzt fuer einen
+  // Prompt source { kind: 'user', rpcId, clientTimeZone } und schickt ihn je
+  // nach Modus auf followup() (Send/Enter, Warteschlange) oder steer();
+  // Headless, SDK, ACP und der Goal-Befehl setzen { kind: 'user' }.
+  const cases = [
+    { name: 'UI Send/Enter (API-Prompt)', source: { kind: 'user', rpcId: 'r-1', clientTimeZone: 'UTC' } },
+    { name: 'Warteschlange -> steer', source: { kind: 'user', rpcId: 'r-2' } },
+    { name: 'headless / SDK / ACP', source: { kind: 'user' } },
+  ];
+  for (const { name, source } of cases) {
+    const llm = fakeLlm(reply(goodResult()));
+    const { ctx, records, dispose } = connect({ ...route }, { llm });
+    const claimed = [{ id: 'm-1', role: 'user', content: [{ type: 'text', text: 'mach  das  schnell' }], source }];
+
+    const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+    assert.equal(llm.calls.length, 1, name);
+    assert.equal(records[0].outcome, 'accepted', name);
+    assert.equal(decision.messages[0].content[0].text, 'Mach das schnell.', name);
+    dispose();
+  }
+});
+
+test('Eingang: eine Nachricht ohne Herkunft gilt nicht als Nutzereingabe', async () => {
+  // Fail-closed: lieber nicht veredeln als fremden Text umschreiben. Der Seam
+  // traegt `source` verpflichtend; fehlt es trotzdem, ist die Nachricht nicht
+  // als menschlich ausgewiesen.
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect({ ...route }, { llm });
+  const claimed = [{ id: 'm-1', role: 'user', content: [{ type: 'text', text: 'wer bin ich' }] }];
+  const downstream = { kind: 'enter', messages: claimed };
+
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
+
+  assert.equal(decision, downstream);
+  assert.equal(llm.calls.length, 0);
+  assert.equal(records.length, 0);
+  dispose();
+});

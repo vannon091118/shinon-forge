@@ -40,6 +40,21 @@ import { readFileSync } from 'node:fs';
  *      hält. Prüfbar sind die Fähigkeitsliste, der erzeugte Text und die
  *      Annahme-Regeln — nicht der Gehorsam eines Modells.
  *
+ * WER IST DER MENSCH? — der zweite Fund, der nicht geraten ist. Der Seam
+ * liefert NICHT nur Nutzereingaben: Werkzeug-Kontexte, Zeit- und Terminal-Kontext,
+ * Instruktionen, Erinnerungen und die ANTWORT AUF EINE FREIGABE reisen ebenfalls
+ * als `role: 'user'`-Nachricht durch denselben Batch. Gemessen in DSH 0.2.0-rc.2
+ * tragen mindestens zwanzig Produzenten `role: 'user'` mit fremder Herkunft
+ * (`user-approval`, `time-context`, `tmux-context`, `agent-instructions`, `ptc-mode`,
+ * `hooks-codex`, `hooks-claude-code`, `repeat-tool-reminder`, `session-reference`,
+ * `session-title-llm`, `cordis-host-runner` …). Die Menschen erkennt man an
+ * `source.kind === 'user'`; genau diesen Test benutzt DSH selbst (der
+ * API-Session-Controller raeumt Datei-Uploads damit auf, und der UI-Weg setzt
+ * `{ kind: 'user', rpcId, clientTimeZone }`). Ohne diese Pruefung wuerde der
+ * Enhancer den Harness-Kontext fuer die Nutzereingabe halten, ihn veredeln und —
+ * schlimmer — ersetzen. Eine umformulierte Freigabe-Antwort („ja") ist keine
+ * Stilfrage, sondern eine geaenderte Entscheidung.
+ *
  * CAPABILITY-ISOLATION (die eigentliche Sicherheitsgrenze): der One-Shot-Child
  * bekommt **kein `tools`-Feld**. Es gibt keinen Werkzeugkatalog, den man
  * einschränken könnte — die Liste ist leer, weil sie nicht existiert. Damit
@@ -272,16 +287,23 @@ export function loadContext(path) {
 }
 
 /**
- * Den zu verbessernden Prompt aus der Nutzlast holen: die letzte
+ * Den zu verbessernden Prompt aus der Nutzlast holen: die letzte MENSCHLICHE
  * Nutzer-Nachricht mit Text. Gibt die Nachricht MIT zurück, weil sie später
  * ueber ihre Identitaet wiedergefunden werden muss — ueber einen Index zu
  * raten waere ein stiller Fehler.
+ *
+ * `source.kind === 'user'` ist der Unterschied zwischen Eingabe und Harness:
+ * der Batch eines Schritts besteht oft AUSSCHLIESSLICH aus erzeugtem Kontext
+ * (Zeit, Terminal, Instruktionen, Erinnerungen, Werkzeug-Feedback). Ohne den
+ * Test waere die jeweils letzte Nachricht irgendein Harness-Text — und der
+ * wuerde veredelt und ersetzt. Fremde Herkunft heisst deshalb: nicht anfassen.
  */
 export function readPrompt(payload) {
   const messages = Array.isArray(payload?.messages) ? payload.messages : [];
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message?.role !== 'user') continue;
+    if (message.source?.kind !== 'user') continue;
     const blocks = Array.isArray(message.content) ? message.content : [];
     const text = blocks
       .filter((block) => block?.type === 'text' && typeof block.text === 'string')
