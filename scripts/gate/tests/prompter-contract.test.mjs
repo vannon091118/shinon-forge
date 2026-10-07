@@ -223,6 +223,24 @@ test('Modus-Vertrag: kein Modus darf eine Anforderung aendern', () => {
   assert.equal(bundle.MODE_CAPABILITIES.MAX.allows.length > bundle.MODE_CAPABILITIES.MID.allows.length, true);
 });
 
+test('Modus-Vertrag: der Aufstieg ist genau das, was Plan §6 je Modus nennt', () => {
+  // Die Deltas sind die einzige Quelle des Aufstiegs; MODE_CAPABILITIES wird
+  // daraus gebaut. Exakt geprueft, weil ein stiller Wegfall sich sonst hinter
+  // "MAX kann mehr als MID" versteckt — so fehlte `dependencies.use`, obwohl
+  // Plan §6 die Abhaengigkeiten als MAX-Erweiterung nennt und der Kontext sie
+  // schon trug.
+  assert.deepEqual(bundle.MODE_DELTAS.MIN, ['spelling', 'grammar', 'punctuation', 'structure.minimal']);
+  assert.deepEqual(bundle.MODE_DELTAS.MID, ['instructions.clarify', 'order.improve', 'constraints.explicit', 'ambiguity.reduce']);
+  assert.deepEqual(bundle.MODE_DELTAS.MAX, [
+    'context.project',
+    'references.code',
+    'constraints.existing',
+    'dependencies.use',
+    'touches.known',
+    'uncertainties.name',
+  ]);
+});
+
 test('Modus-Vertrag: jeder erlaubte Schritt steht im erzeugten Prompt', () => {
   for (const mode of bundle.MODES) {
     const policy = bundle.POLICIES[mode];

@@ -74,7 +74,7 @@ export const REQUIREMENT_OPERATIONS = ['requirement.add', 'requirement.remove', 
 
 const MIN_OPS = ['spelling', 'grammar', 'punctuation', 'structure.minimal'];
 const MID_OPS = ['instructions.clarify', 'order.improve', 'constraints.explicit', 'ambiguity.reduce'];
-const MAX_OPS = ['context.project', 'references.code', 'constraints.existing', 'touches.known', 'uncertainties.name'];
+const MAX_OPS = ['context.project', 'references.code', 'constraints.existing', 'dependencies.use', 'touches.known', 'uncertainties.name'];
 
 /** Was jede Operation bedeutet — die einzige Quelle für die System-Prompts. */
 export const OPERATION_LABELS = {
@@ -89,6 +89,7 @@ export const OPERATION_LABELS = {
   'context.project': 'den gelieferten Projektkontext beruecksichtigen',
   'references.code': 'Code-Referenzen nennen, aber nur aufloesbare',
   'constraints.existing': 'bestehende Constraints beruecksichtigen',
+  'dependencies.use': 'relevante Abhaengigkeiten beruecksichtigen',
   'touches.known': 'bekannte Touches beruecksichtigen',
   'uncertainties.name': 'Unsicherheiten benennen',
   'requirement.add': 'eine Anforderung hinzufuegen',
@@ -98,18 +99,32 @@ export const OPERATION_LABELS = {
 };
 
 /**
- * Der Modus-Vertrag. MID enthält MIN, MAX enthält MID — der Aufstieg ist eine
- * Erweiterung, kein anderer Modus. Aufgebaut per Spread, damit die
- * Teilmengen-Kette nicht durch eine Textänderung brechen kann.
+ * Was ein Modus gegenüber dem vorigen hinzufügt — die einzige Quelle des
+ * Aufstiegs.
+ *
+ * MAX nennt sechs Erweiterungen (Plan §6): Projektkontext, Code-Referenzen,
+ * bestehende Constraints, relevante Abhängigkeiten, bekannte Touches und
+ * Unsicherheiten. `dependencies.use` fehlte hier, obwohl ContextSchema die
+ * Abhängigkeiten längst trug und `contextTokens` sie zur Referenz-Auflösung
+ * nutzte: der Vertrag untertrieb damit, was der Modus darf.
  */
-export const MODE_CAPABILITIES = {
-  MIN: { allows: [...MIN_OPS], forbids: [...REQUIREMENT_OPERATIONS] },
-  MID: { allows: [...MIN_OPS, ...MID_OPS], forbids: [...REQUIREMENT_OPERATIONS] },
-  MAX: { allows: [...MIN_OPS, ...MID_OPS, ...MAX_OPS], forbids: [...REQUIREMENT_OPERATIONS] },
-};
-
-/** Was ein Modus gegenüber dem vorigen hinzufügt. */
 export const MODE_DELTAS = { MIN: [...MIN_OPS], MID: [...MID_OPS], MAX: [...MAX_OPS] };
+
+/** Alle Fähigkeiten bis einschließlich `mode`. */
+function allowsUpTo(mode) {
+  const last = MODES.indexOf(mode);
+  return MODES.slice(0, last + 1).flatMap((step) => MODE_DELTAS[step]);
+}
+
+/**
+ * Der Modus-Vertrag. MID erbt MIN, MAX erbt MID — der Aufstieg ist per
+ * Konstruktion eine Teilmengen-Kette, kein handgeschriebenes Nebeneinander,
+ * das durch eine Textänderung brechen könnte.
+ */
+export const MODE_CAPABILITIES = Object.fromEntries(MODES.map((mode) => [
+  mode,
+  { allows: allowsUpTo(mode), forbids: [...REQUIREMENT_OPERATIONS] },
+]));
 
 /** Intent-Klassen (Plan §16) — Vokabular des Resultatvertrags. */
 export const INTENT_CLASSES = ['CHAT', 'LOOKUP', 'TRANSFORM', 'MULTI_STEP_TASK', 'LONG_RUNNING_GOAL'];
