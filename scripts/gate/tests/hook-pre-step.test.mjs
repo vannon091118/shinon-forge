@@ -7,19 +7,17 @@
  * DSH-Ablauf erhalten bleibt."
  *
  * Deshalb wird hier NICHT gegen einen selbstgebauten Fake-Host geprüft, sondern
- * gegen die echten Bausteine der installierten DSH-Version:
- *
- *   - der Listener wird über die echte apply()-Schnittstelle des Pakets
- *     registriert (das Paket wird isoliert geladen, aber mit dem ECHTEN
- *     Schemastery aus der DSH-Installation),
- *   - der Waterfall läuft über einen echten Cordis-Context (`ctx.waterfall`),
- *     also über dieselbe Mechanik, die @deepseek-ai/dsh-agent-loop für
- *     `agent/pre-step` benutzt,
- *   - die Default-Entscheidung des Downstream ist die des echten Loops:
- *     { kind: 'enter', messages: [...] }, und `next()` darf sie nicht verändern.
+ * gegen die echten Bausteine der installierten DSH-Version: das Bundle wird über
+ * seine echte apply()-Schnittstelle registriert (mit dem ECHTEN Schemastery der
+ * DSH-Installation, nicht gestubbt), und der Waterfall läuft über einen echten
+ * Cordis-Context — also über dieselbe Mechanik, die
+ * @deepseek-ai/dsh-agent-loop für `agent/pre-step` benutzt.
  *
  * Wäre die Waterfall-Semantik falsch verstanden (falscher Rückgabewert, kein
  * next(), doppeltes next()), würden diese Tests fehlschlagen.
+ *
+ * Aufbau: die Tests sind der Vertrag. Jeder Test benennt eine Zusage und deckt
+ * ihre Fälle als Tabelle ab, statt Fälle zu wiederholen.
  *
  * Läuft mit `node --test` (CI: .github/workflows/commit-guard.yml). Kein
  * node_modules im Repo, kein Netz, kein Modell. `dsh` muss im PATH liegen —
@@ -33,7 +31,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
-import { findForbidden } from '../../lib/source-scan.mjs';
+import { codeOnly, findForbidden } from '../../lib/source-scan.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/hook/', import.meta.url));
 const INDEX_FILE = join(PACKAGE_DIR, 'index.js');
@@ -42,352 +40,284 @@ const root = dshRoot();
 assert.ok(root !== null, 'dsh muss im PATH liegen (dshRoot() ist null) — wie beim Profiltest');
 const require = createRequire(join(root, 'package.json'));
 
-const CORDIS_FILE = require.resolve('@deepseek-ai/cordis');
-const SCHEMASTERY_FILE = require.resolve('@deepseek-ai/schemastery');
-
 /**
  * Das Bundle isoliert laden: Kopie im Temp-Verzeichnis plus ein
  * node_modules-Eintrag, der das ECHTE Schemastery der DSH-Installation
  * weiterreicht. Die Kopie ist nötig, weil das Repo kein node_modules hat; das
- * echte Schemastery ist nötig, weil die Config-Defaults geprüft werden sollen
- * und nicht wegstubbt werden dürfen.
+ * echte Schemastery ist nötig, weil die Config-Defaults geprüft werden.
  */
 async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-hook-test-'));
   cpSync(PACKAGE_DIR, join(work, 'pkg'), { recursive: true });
-  const stub = join(work, 'pkg/node_modules/@deepseek-ai/schemastery');
-  mkdirSync(stub, { recursive: true });
+  const shim = join(work, 'pkg/node_modules/@deepseek-ai/schemastery');
+  mkdirSync(shim, { recursive: true });
   writeFileSync(
-    join(stub, 'package.json'),
+    join(shim, 'package.json'),
     JSON.stringify({ name: '@deepseek-ai/schemastery', version: '0.0.0-test-shim', type: 'module', exports: { '.': './index.js' } }),
   );
-  writeFileSync(
-    join(stub, 'index.js'),
-    `export { default } from ${JSON.stringify(pathToFileURL(SCHEMASTERY_FILE).href)};\n`,
-  );
+  writeFileSync(join(shim, 'index.js'), `export { default } from ${JSON.stringify(pathToFileURL(require.resolve('@deepseek-ai/schemastery')).href)};\n`);
   return import(pathToFileURL(join(work, 'pkg/index.js')).href);
 }
 
 const bundle = await loadBundle();
-const { Context } = await import(pathToFileURL(CORDIS_FILE).href);
+const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
 
-/** Bundle-Ausgaben stumm schalten, Rückgabe trotzdem einsammeln. */
+/** Bundle-Ausgaben stumm schalten. */
 function quiet(fn) {
-  const log = console.log;
-  const warn = console.warn;
-  const error = console.error;
-  console.log = () => {};
-  console.warn = () => {};
-  console.error = () => {};
+  const saved = { log: console.log, warn: console.warn, error: console.error };
+  console.log = console.warn = console.error = () => {};
   try {
     return fn();
   } finally {
-    console.log = log;
-    console.warn = warn;
-    console.error = error;
+    Object.assign(console, saved);
   }
 }
 
 /** Vollständige Waterfall-Nutzlast, wie der echte Loop sie fährt. */
-function stepPayload({ sessionId = 'sess-1', turn = 1, step = 1, messages = [{ role: 'user', content: 'hallo' }] } = {}) {
-  return { agent: { session: { id: sessionId } }, messages, turn, step, signal: new AbortController().signal };
-}
-
-/**
- * Das echte Bundle an einen echten Cordis-Context hängen und die
- * Trace-Emission mitzählen.
- */
-function connect(config = {}) {
-  const ctx = new Context();
-  const traces = [];
-  // Echter Kanal-Empfänger auf demselben Dispatcher — keine Attrappe.
-  ctx.on(bundle.TRACE_CHANNEL, (envelope, step) => traces.push({ envelope, step }));
-  // Durch das echte Schema: so wirken in jedem Test die echten Defaults.
-  const resolved = bundle.Config(config);
-  const dispose = quiet(() => bundle.apply(ctx, resolved));
-  return { ctx, traces, dispose, config: resolved };
-}
-
-/** Den Waterfall so fahren, wie der Loop ihn fährt (Default-Downstream des Loops). */
-function dispatch(ctx, payload, downstream) {
-  return ctx.waterfall(bundle.PRE_STEP_EVENT, payload, downstream);
-}
+const stepPayload = ({ sessionId = 'sess-1', turn = 1, step = 1, messages = [{ role: 'user', content: 'hallo' }] } = {}) => ({
+  agent: { session: { id: sessionId } },
+  messages,
+  turn,
+  step,
+  signal: new AbortController().signal,
+});
 
 /** Der Default-Downstream aus @deepseek-ai/dsh-agent-loop (dieselbe Form). */
-function loopDefault(claimed, context) {
-  return () => Promise.resolve({ kind: 'enter', messages: context === undefined ? claimed : [...claimed, context] });
-}
+const loopDefault = (claimed, context) => () =>
+  Promise.resolve({ kind: 'enter', messages: context === undefined ? claimed : [...claimed, context] });
 
-// ── 1. Registrierung und kontrollierte Weitergabe (die Gate-Bedingung) ────────
-
-test('hook-pre-step: der Hook läuft auf dem echten Waterfall und reicht durch', async () => {
-  const { ctx, dispose } = connect();
-  const payload = stepPayload();
-  let calls = 0;
-  const downstream = { kind: 'enter', messages: payload.messages };
-
-  const decision = await dispatch(ctx, payload, () => {
-    calls += 1;
-    return Promise.resolve(downstream);
-  });
-
-  assert.equal(calls, 1, 'next() muss genau einmal aufgerufen werden');
-  assert.equal(decision, downstream, 'die Entscheidung muss unverändert (identisch) zurückkommen');
-  dispose();
-});
-
-test('hook-pre-step: die Default-Entscheidung des echten Loops bleibt erhalten', async () => {
-  const { ctx, dispose } = connect();
-  const claimed = [{ role: 'user', content: 'hallo' }];
-  const context = { role: 'system', content: 'kontext' };
-  const expected = { kind: 'enter', messages: [...claimed, context] };
-
-  const decision = await dispatch(ctx, stepPayload({ messages: claimed }), loopDefault(claimed, context));
-
-  assert.deepEqual(decision, expected, 'der Hook darf die Schritt-Messages nicht verändern');
-  assert.equal(decision.kind, 'enter');
-  assert.equal(decision.messages.length, 2);
-  dispose();
-});
-
-test('hook-pre-step: ohne Kontext-Nachricht kommt der Schritt unverändert an', async () => {
-  const { ctx, dispose } = connect();
-  const claimed = [{ role: 'user', content: 'hallo' }];
-
-  const decision = await dispatch(ctx, stepPayload({ messages: claimed }), loopDefault(claimed, undefined));
-
-  assert.deepEqual(decision, { kind: 'enter', messages: claimed });
-  dispose();
-});
-
-test('hook-pre-step: jeder Schritt wird korreliert und emittiert', async () => {
-  const { ctx, traces, dispose } = connect({ clock: '2026-10-07T00:00:00.000Z' });
-  const claimed = [{ role: 'user', content: 'hallo' }];
-
-  await dispatch(ctx, stepPayload({ sessionId: 'sess-1', turn: 2, step: 3, messages: claimed }), loopDefault(claimed, undefined));
-
-  assert.equal(traces.length, 1, 'genau ein Trace-Datensatz');
-  const { envelope, step } = traces[0];
-  assert.deepEqual(Object.keys(envelope).sort(), [...bundle.ENVELOPE_FIELDS].sort());
-  assert.equal(envelope.contract, bundle.CONTRACT);
-  assert.equal(envelope.event_type, bundle.TRACE_EVENT_TYPE);
-  assert.equal(envelope.session_id, 'sess-1');
-  assert.equal(envelope.source, 'dsh');
-  assert.equal(envelope.timestamp, '2026-10-07T00:00:00.000Z');
-  assert.ok(envelope.trace_id.startsWith('tr-'));
-  assert.equal(step.turn, 2);
-  assert.equal(step.step, 3);
-  assert.equal(step.message_count, 1);
-  dispose();
-});
-
-test('hook-pre-step: derselbe Schritt trägt dieselbe Spur, ein anderer nicht', async () => {
-  const { ctx, traces, dispose } = connect({ clock: '2026-10-07T00:00:00.000Z' });
-  const claimed = [{ role: 'user', content: 'hallo' }];
-
-  await dispatch(ctx, stepPayload({ turn: 1, step: 1, messages: claimed }), loopDefault(claimed, undefined));
-  await dispatch(ctx, stepPayload({ turn: 1, step: 1, messages: claimed }), loopDefault(claimed, undefined));
-  await dispatch(ctx, stepPayload({ turn: 1, step: 2, messages: claimed }), loopDefault(claimed, undefined));
-
-  const [first, second, third] = traces.map((entry) => entry.envelope.trace_id);
-  assert.equal(first, second, 'identischer Schritt → identische Spur');
-  assert.notEqual(first, third, 'anderer Schritt → andere Spur');
-  dispose();
-});
-
-// ── 2. Deterministische Policy: ablehnen statt durchreichen ──────────────────
-
-test('hook-pre-step: verdict=block lehnt ab, ohne den Downstream zu starten', async () => {
-  const { ctx, traces, dispose } = connect({ verdict: 'block' });
-  const claimed = [{ role: 'user', content: 'hallo' }];
-  let calls = 0;
-
-  const decision = await dispatch(ctx, stepPayload({ messages: claimed }), () => {
-    calls += 1;
-    return Promise.resolve({ kind: 'enter', messages: claimed });
-  });
-
-  assert.deepEqual(decision, { kind: 'reject' });
-  assert.equal(calls, 0, 'eine Absage darf next() nicht aufrufen');
-  assert.ok(bundle.DECISION_KINDS.includes(decision.kind), 'nur Entscheidungen, die DSH kennt');
-  assert.equal(traces.length, 1, 'der abgelehnte Schritt bleibt korreliert');
-  dispose();
-});
-
-// ── 3. Vertragsverletzung: Host-Schutz vs. fail-closed ───────────────────────
-
-test('hook-pre-step: verletzte Nutzlast wird standardmäßig durchgereicht (Host-Schutz)', async () => {
-  const { ctx, traces, dispose } = connect();
-  const broken = { messages: 'kein Array' };
-  const downstream = { kind: 'enter', messages: [] };
-
-  const decision = await dispatch(ctx, broken, () => Promise.resolve(downstream));
-
-  assert.equal(decision, downstream, 'die Beobachtung darf den Host nie blockieren');
-  assert.equal(traces.length, 0, 'fail-closed für den Datensatz: kein Trace aus ungültiger Nutzlast');
-  dispose();
-});
-
-test('hook-pre-step: onContractViolation=reject kehrt das bewusst um', async () => {
-  const { ctx, dispose } = connect({ onContractViolation: 'reject' });
-  let calls = 0;
-
-  const decision = await dispatch(ctx, { messages: [] }, () => {
-    calls += 1;
-    return Promise.resolve({ kind: 'enter', messages: [] });
-  });
-
-  assert.deepEqual(decision, { kind: 'reject' });
-  assert.equal(calls, 0);
-  dispose();
-});
-
-test('hook-pre-step: jede Vertragsverletzung wird erkannt', () => {
-  const full = bundle.readStep(stepPayload());
-  assert.deepEqual(bundle.stepIssues(full), []);
-
-  const cases = [
-    ['session_id', { agent: { session: {} }, messages: [], turn: 1, step: 1, signal: new AbortController().signal }],
-    ['turn', { agent: { session: { id: 's' } }, messages: [], step: 1, signal: new AbortController().signal }],
-    ['step', { agent: { session: { id: 's' } }, messages: [], turn: 1, signal: new AbortController().signal }],
-    ['messages', { agent: { session: { id: 's' } }, turn: 1, step: 1, signal: new AbortController().signal }],
-    ['signal', { agent: { session: { id: 's' } }, messages: [], turn: 1, step: 1 }],
-    ['session_id, turn, step, messages, signal', undefined],
-  ];
-  for (const [expected, payload] of cases) {
-    assert.deepEqual(bundle.stepIssues(bundle.readStep(payload)), expected.split(', '), `Feld ${expected}`);
-  }
-});
-
-// ── 4. Lifecycle: Dispose, Neustart, Fehlerisolation ─────────────────────────
-
-test('hook-pre-step: nach dispose läuft der Hook nicht mehr', async () => {
-  const { ctx, dispose } = connect();
-  dispose();
-
-  const downstream = { kind: 'enter', messages: [] };
-  const decision = await dispatch(ctx, stepPayload(), () => Promise.resolve(downstream));
-
-  assert.equal(decision, downstream, 'ohne Listener ist der Waterfall der reine Durchlauf');
-});
-
-test('hook-pre-step: Neustart nach dispose registriert genau einen Listener', async () => {
+/** Das echte Bundle an einen echten Cordis-Context hängen. */
+function connect(config = {}, { breakSink = false } = {}) {
   const ctx = new Context();
   const traces = [];
-  ctx.on(bundle.TRACE_CHANNEL, (envelope) => traces.push(envelope));
-
-  const first = quiet(() => bundle.apply(ctx, bundle.Config({})));
-  first();
-  const second = quiet(() => bundle.apply(ctx, bundle.Config({ clock: '2026-10-07T00:00:00.000Z' })));
-  const claimed = [{ role: 'user', content: 'hallo' }];
-  await dispatch(ctx, stepPayload({ messages: claimed }), loopDefault(claimed, undefined));
-  second();
-
-  assert.equal(traces.length, 1, 'kein doppelter Listener nach dem Neustart');
-});
-
-test('hook-pre-step: eine werfende Emission bricht den Schritt nicht', async () => {
-  const { ctx, dispose } = connect();
-  const claimed = [{ role: 'user', content: 'hallo' }];
-  // Ein fehlerhafter Empfänger am Trace-Kanal darf den Harness nicht treffen.
-  ctx.on(bundle.TRACE_CHANNEL, () => {
-    throw new Error('Empfänger kaputt');
-  });
-  const downstream = { kind: 'enter', messages: claimed };
-
-  const decision = await dispatch(ctx, stepPayload({ messages: claimed }), () => Promise.resolve(downstream));
-
-  assert.equal(decision, downstream, 'Fail-open für den Host gilt auch bei Fehlern in der Korrelation');
-  dispose();
-});
-
-test('hook-pre-step: preStepEnabled=false registriert bewusst nichts', async () => {
-  const { ctx, dispose } = connect({ preStepEnabled: false });
-  const downstream = { kind: 'enter', messages: [] };
-
-  const decision = await dispatch(ctx, stepPayload(), () => Promise.resolve(downstream));
-
-  assert.equal(decision, downstream);
-  dispose();
-});
-
-test('hook-pre-step: ohne agent.pre-step in observeEvents wird nicht registriert', async () => {
-  const { ctx, dispose } = connect({ observeEvents: ['session.created'] });
-  const downstream = { kind: 'enter', messages: [] };
-
-  const decision = await dispatch(ctx, stepPayload(), () => Promise.resolve(downstream));
-
-  assert.equal(decision, downstream);
-  dispose();
-});
-
-test('hook-pre-step: fehlende Registrierungsfläche wird gemeldet, nicht verschwiegen', () => {
-  let reported = false;
-  const original = console.error;
-  console.error = (line) => {
-    if (String(line).includes('ctx.on fehlt')) reported = true;
-  };
-  try {
-    const dispose = bundle.apply({}, bundle.Config({}));
-    assert.equal(typeof dispose, 'function');
-  } finally {
-    console.error = original;
+  ctx.on(bundle.TRACE_CHANNEL, (envelope, step) => traces.push({ envelope, step }));
+  if (breakSink) {
+    ctx.on(bundle.TRACE_CHANNEL, () => {
+      throw new Error('Empfänger kaputt');
+    });
   }
-  assert.ok(reported, 'Regel C: ein fehlender Hook-Punkt ist ein Befund, kein stiller Ausfall');
+  const resolved = bundle.Config(config);
+  const dispose = quiet(() => bundle.apply(ctx, resolved));
+  return { ctx, traces, config: resolved, dispose };
+}
+
+/** Den Waterfall so fahren, wie der Loop ihn fährt. */
+const dispatch = (ctx, payload, downstream) => ctx.waterfall(bundle.PRE_STEP_EVENT, payload, downstream);
+
+const claimed = [{ role: 'user', content: 'hallo' }];
+
+// ── Zusage: registriert wird nur, was in observeEvents steht ─────────────────
+
+test('Registrierung: nur der Waterfall-Name in observeEvents hängt den Hook ein', async () => {
+  const cases = [
+    { name: 'Default', config: {}, registered: true },
+    { name: 'explizit genannt', config: { observeEvents: ['agent/pre-step'] }, registered: true },
+    { name: 'leere Liste', config: { observeEvents: [] }, registered: false },
+    { name: 'nur fremde Events', config: { observeEvents: ['session.created'] }, registered: false },
+  ];
+  for (const { name, config, registered } of cases) {
+    const { ctx, traces, dispose } = connect(config);
+    await dispatch(ctx, stepPayload(), loopDefault(claimed, undefined));
+    assert.equal(traces.length, registered ? 1 : 0, name);
+    dispose();
+  }
 });
 
-// ── 5. Konfiguration (echtes Schemastery, echte Defaults) ────────────────────
+// ── Zusage: der normale DSH-Ablauf bleibt erhalten ───────────────────────────
 
-test('hook-pre-step: die Config-Defaults erhalten den normalen DSH-Ablauf', () => {
+test('Durchreichen: die Entscheidung des Downstream kommt unverändert zurück', async () => {
+  const cases = [
+    { name: 'Loop-Default mit Kontext', claimed, context: { role: 'system', content: 'ctx' } },
+    { name: 'Loop-Default ohne Kontext', claimed, context: undefined },
+    { name: 'leerer Schritt', claimed: [], context: undefined },
+  ];
+  for (const { name, claimed: admitted, context } of cases) {
+    const { ctx, dispose } = connect();
+    const expected = { kind: 'enter', messages: context === undefined ? admitted : [...admitted, context] };
+    let calls = 0;
+    const decision = await dispatch(ctx, stepPayload({ messages: admitted }), () => {
+      calls += 1;
+      return Promise.resolve(expected);
+    });
+    assert.equal(calls, 1, `${name}: next() genau einmal`);
+    assert.equal(decision, expected, `${name}: die Entscheidung muss identisch sein`);
+    dispose();
+  }
+});
+
+// ── Zusage: jeder Schritt wird korreliert ────────────────────────────────────
+
+test('Korrelation: ein Schritt erzeugt genau einen Datensatz mit allen acht Vertragsfeldern', async () => {
+  const { ctx, traces, dispose } = connect({ clock: '2026-10-07T00:00:00.000Z' });
+  await dispatch(ctx, stepPayload({ sessionId: 'sess-1', turn: 2, step: 3 }), loopDefault(claimed, undefined));
+
+  assert.equal(traces.length, 1);
+  const { envelope, step } = traces[0];
+  assert.deepEqual(
+    Object.keys(envelope).sort(),
+    ['contract', 'event_id', 'event_type', 'payload_ref', 'session_id', 'source', 'timestamp', 'trace_id'],
+  );
+  assert.deepEqual(
+    { ...envelope, event_id: '<id>', payload_ref: '<ref>', trace_id: '<trace>' },
+    {
+      contract: bundle.CONTRACT,
+      event_type: bundle.TRACE_EVENT_TYPE,
+      session_id: 'sess-1',
+      source: 'dsh',
+      timestamp: '2026-10-07T00:00:00.000Z',
+      event_id: '<id>',
+      payload_ref: '<ref>',
+      trace_id: '<trace>',
+    },
+  );
+  assert.match(envelope.event_id, /^evt-[0-9a-f]{12}$/);
+  assert.match(envelope.payload_ref, /^pl-[0-9a-f]{12}$/);
+  assert.match(envelope.trace_id, /^tr-[0-9a-f]{12}$/);
+  assert.deepEqual(step, { session_id: 'sess-1', turn: 2, step: 3, message_count: 1, has_signal: true });
+  dispose();
+});
+
+test('Korrelation: die Spur folgt der Schritt-Identität, nicht der Uhr', async () => {
+  const { ctx, traces, dispose } = connect({ clock: '2026-10-07T00:00:00.000Z' });
+  await dispatch(ctx, stepPayload({ turn: 1, step: 1 }), loopDefault(claimed, undefined));
+  await dispatch(ctx, stepPayload({ turn: 1, step: 1 }), loopDefault(claimed, undefined));
+  await dispatch(ctx, stepPayload({ turn: 1, step: 2 }), loopDefault(claimed, undefined));
+  await dispatch(ctx, stepPayload({ sessionId: 'sess-2', turn: 1, step: 1 }), loopDefault(claimed, undefined));
+
+  const [a, b, c, d] = traces.map((entry) => entry.envelope.trace_id);
+  assert.equal(a, b, 'identischer Schritt → identische Spur');
+  assert.notEqual(a, c, 'anderer Schritt → andere Spur');
+  assert.notEqual(a, d, 'andere Session → andere Spur');
+  dispose();
+});
+
+// ── Zusage: ablehnen ist eine Entscheidung, kein Fehler ──────────────────────
+
+test('Absage: beide policy-Wege lehnen ab, ohne den Downstream zu starten', async () => {
+  const cases = [
+    { name: 'verdict=block', config: { verdict: 'block' }, payload: stepPayload(), traces: 1 },
+    { name: 'Vertragsverletzung + reject', config: { onContractViolation: 'reject' }, payload: { messages: [] }, traces: 0 },
+  ];
+  for (const { name, config, payload, traces: expectedTraces } of cases) {
+    const { ctx, traces, dispose } = connect(config);
+    let calls = 0;
+    const decision = await dispatch(ctx, payload, () => {
+      calls += 1;
+      return Promise.resolve({ kind: 'enter', messages: [] });
+    });
+    assert.deepEqual(decision, { kind: 'reject' }, name);
+    assert.equal(calls, 0, `${name}: eine Absage ruft next() nicht auf`);
+    assert.equal(traces.length, expectedTraces, `${name}: nur ein vertragsgemäßer Schritt wird korreliert`);
+    dispose();
+  }
+});
+
+// ── Zusage: die Beobachtung darf den Host nie blockieren ─────────────────────
+
+test('Host-Schutz: kein Fehler im Hook bricht den Schritt', async () => {
+  const cases = [
+    { name: 'verletzte Nutzlast (Default: pass)', config: {}, payload: { messages: 'kein Array' }, breakSink: false },
+    { name: 'werfender Trace-Empfänger', config: {}, payload: stepPayload(), breakSink: true },
+  ];
+  for (const { name, config, payload, breakSink } of cases) {
+    const { ctx, dispose } = connect(config, { breakSink });
+    const expected = { kind: 'enter', messages: claimed };
+    const decision = await dispatch(ctx, payload, () => Promise.resolve(expected));
+    assert.equal(decision, expected, name);
+    dispose();
+  }
+});
+
+// ── Zusage: Lifecycle ───────────────────────────────────────────────────────
+
+test('Lifecycle: dispose meldet ab, ein zweites apply hängt genau einen Listener ein', async () => {
+  const { ctx, traces, dispose } = connect({ clock: '2026-10-07T00:00:00.000Z' });
+  await dispatch(ctx, stepPayload(), loopDefault(claimed, undefined));
+  assert.equal(traces.length, 1);
+
+  dispose();
+  const afterDispose = traces.length;
+  await dispatch(ctx, stepPayload(), loopDefault(claimed, undefined));
+  assert.equal(traces.length, afterDispose, 'nach dispose läuft der Hook nicht mehr');
+
+  const second = quiet(() => bundle.apply(ctx, bundle.Config({ clock: '2026-10-07T00:00:00.000Z' })));
+  await dispatch(ctx, stepPayload(), loopDefault(claimed, undefined));
+  assert.equal(traces.length, afterDispose + 1, 'kein Doppel-Listener nach dem Neustart');
+  second();
+});
+
+// ── Zusage: der Nutzlast-Vertrag ist vollständig und benannt ─────────────────
+
+test('Nutzlast: jede fehlende Vertragsangabe wird benannt', () => {
+  const signal = new AbortController().signal;
+  const cases = [
+    { name: 'vollständig', payload: { agent: { session: { id: 's' } }, messages: [], turn: 1, step: 1, signal }, issues: [] },
+    { name: 'ohne Session', payload: { agent: { session: {} }, messages: [], turn: 1, step: 1, signal }, issues: ['session_id'] },
+    { name: 'ohne turn', payload: { agent: { session: { id: 's' } }, messages: [], step: 1, signal }, issues: ['turn'] },
+    { name: 'ohne step', payload: { agent: { session: { id: 's' } }, messages: [], turn: 1, signal }, issues: ['step'] },
+    { name: 'messages kein Array', payload: { agent: { session: { id: 's' } }, messages: 'x', turn: 1, step: 1, signal }, issues: ['messages'] },
+    { name: 'ohne signal', payload: { agent: { session: { id: 's' } }, messages: [], turn: 1, step: 1 }, issues: ['signal'] },
+    { name: 'leere Nutzlast', payload: undefined, issues: ['session_id', 'turn', 'step', 'messages', 'signal'] },
+  ];
+  for (const { name, payload, issues } of cases) {
+    assert.deepEqual(bundle.stepIssues(bundle.readStep(payload)), issues, name);
+  }
+});
+
+// ── Zusage: Konfiguration ───────────────────────────────────────────────────
+
+test('Konfiguration: die Defaults lassen den normalen Ablauf unangetastet', () => {
   const parsed = bundle.Config({});
-  assert.equal(parsed.verdict, 'allow', 'Default darf den Schritt nicht ablehnen');
-  assert.equal(parsed.onContractViolation, 'pass', 'Default schützt den Host');
-  assert.equal(parsed.preStepEnabled, true);
-  assert.equal(parsed.trace, true);
-  assert.ok(parsed.observeEvents.includes(bundle.PRE_STEP_EVENT), 'agent.pre-step muss beobachtet werden');
-  assert.equal(parsed.clock, '');
+  assert.deepEqual(parsed, {
+    observeEvents: ['agent/pre-step'],
+    verdict: 'allow',
+    onContractViolation: 'pass',
+    trace: true,
+    clock: '',
+  });
 });
 
-test('hook-pre-step: eine unbekannte Policy wird schema-seitig abgelehnt', () => {
-  assert.throws(() => bundle.Config({ verdict: 'vielleicht' }), /verdict/);
-  assert.throws(() => bundle.Config({ onContractViolation: 'vielleicht' }), /onContractViolation/);
+test('Konfiguration: unbekannte Policy-Werte werden schema-seitig abgelehnt', () => {
+  const cases = [
+    { key: 'verdict', value: 'vielleicht' },
+    { key: 'onContractViolation', value: 'vielleicht' },
+    { key: 'trace', value: 'vielleicht' },
+  ];
+  for (const { key, value } of cases) {
+    assert.throws(() => bundle.Config({ [key]: value }), new RegExp(key), `${key}=${value}`);
+  }
 });
 
 /**
- * Regressionstest: dieser Fehler ist der Grund, warum es diesen Test gibt.
+ * Regressionstest — der Grund, warum es diesen Test gibt.
  *
- * Vorher stand in der Registrierungsliste `agent.pre-step` (Punkt), während
- * registriert wurde auf `agent/pre-step` (Schrägstrich). Der Hook war damit
- * still ein No-op: er lud, loggte "Aktiviert", und hing an nichts. Der Test
- * pinnt beide Namen und ihre Nicht-Gleichheit.
+ * Vorher stand in der Registrierungsliste `agent.pre-step` (Punkt), während auf
+ * `agent/pre-step` (Schrägstrich) registriert wurde. Der Hook lud, loggte
+ * „Aktiviert" und hing an nichts: ein stiller No-op, der wie ein Erfolg aussah.
  */
-test('hook-pre-step: Event-Name und event_type sind getrennt und beide richtig', () => {
+test('Konfiguration: Event-Name und event_type bleiben getrennt', () => {
   assert.equal(bundle.PRE_STEP_EVENT, 'agent/pre-step', 'DSH-Waterfall-Name (Registrierung)');
   assert.equal(bundle.TRACE_EVENT_TYPE, 'agent.pre-step', 'Event-Typ-Konvention des Repos (Datensatz)');
   assert.notEqual(bundle.PRE_STEP_EVENT, bundle.TRACE_EVENT_TYPE, 'eine Verwechslung darf nicht still bleiben');
-
-  const registered = bundle.Config({});
   assert.ok(
-    registered.observeEvents.includes(bundle.PRE_STEP_EVENT),
+    bundle.Config({}).observeEvents.includes(bundle.PRE_STEP_EVENT),
     'die Registrierungsliste muss den registrierten Namen enthalten, sonst ist der Hook ein No-op',
   );
-
-  const envelope = bundle.buildStepEnvelope(bundle.readStep(stepPayload()), { clock: '2026-10-07T00:00:00.000Z' });
-  assert.equal(envelope.event_type, bundle.TRACE_EVENT_TYPE);
-  assert.ok(envelope.event_id.startsWith('evt-'), 'der Datensatz muss vom Schema akzeptiert werden');
 });
 
-// ── 6. Verantwortungsgrenze: registrieren ja, handeln nein ───────────────────
+// ── Zusage: Verantwortungsgrenze, statisch geprüft ──────────────────────────
 
-test('hook-pre-step: der Laufzeitcode enthält keine Aktion, kein Modell, kein Netz', () => {
+test('Grenze: der Laufzeitcode enthält weder Aktion noch Fremdlogik', () => {
   const source = readFileSync(INDEX_FILE, 'utf8');
-  const forbidden = ['child_process', 'writeFile', 'mkdirSync', 'rmSync', 'unlinkSync', 'execSync', 'spawn(', 'fetch(', 'process.exit', 'Math.random', 'ctx.agents', 'ctx.llm', 'ctx.shell', 'ctx.set('];
-  assert.deepEqual(findForbidden(source, forbidden, { mode: 'module' }), []);
-  assert.deepEqual(findForbidden(source, forbidden), []);
-});
-
-test('hook-pre-step: der Laufzeitcode bleibt frei von Prompt-, Goal- und Browser-Logik', () => {
-  const source = readFileSync(INDEX_FILE, 'utf8');
-  const outOfScope = ['sqlite', 'persona', 'playwright', 'puppeteer', 'goal', 'system-prompt'];
-  assert.deepEqual(findForbidden(source, outOfScope), [], 'Phase 1 ist der Entry-Point, nicht die Runtime-Schicht');
+  const cases = [
+    { name: 'Aktion, Modell, Netz, Prozess', tokens: ['child_process', 'writeFile', 'mkdirSync', 'rmSync', 'unlinkSync', 'execSync', 'spawn(', 'fetch(', 'process.exit', 'Math.random', 'ctx.agents', 'ctx.llm', 'ctx.shell', 'ctx.set('] },
+    { name: 'Prompt-, Goal- und Browser-Logik', tokens: ['sqlite', 'persona', 'playwright', 'puppeteer', 'goal', 'system-prompt'] },
+  ];
+  for (const { name, tokens } of cases) {
+    assert.deepEqual(findForbidden(source, tokens, { mode: 'module' }), [], name);
+    assert.deepEqual(findForbidden(source, tokens), [], name);
+  }
+  // Der Code muss auch wirklich registrieren — sonst beweist die Grenze nichts.
+  assert.ok(codeOnly(source).includes(`ctx.on(${'PRE_STEP_EVENT'}`), 'kein echter Listener im Laufzeitcode');
+  assert.ok(codeOnly(source).includes('return next()'), 'die Entscheidung wird nicht durchgereicht');
 });

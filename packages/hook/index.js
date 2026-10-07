@@ -24,9 +24,7 @@ import { createHash } from 'node:crypto';
  *                 dem Default-Downstream { kind: 'enter', messages }; `agent` wird
  *                 vom fused Dispatcher (@deepseek-ai/dsh-agent, `agentEvents`) in
  *                 die Nutzlast injiziert.
- *   Optionen      dsh-agent registriert denselben Seam mit { prepend: true } —
- *                 die dritte Argumentposition von ctx.on existiert also.
- *   Lifecycle     ctx.on liefert einen Disposer; apply() gibt ihn gebündelt zurück.
+ *   Lifecycle     ctx.on liefert einen Disposer; apply() gibt ihn zurück.
  *   Referenz      @deepseek-ai/dsh-hooks-claude-code bindet genau diesen Seam
  *                 app-weit und lehnt einen Schritt mit { kind: 'reject' } ab.
  *
@@ -39,52 +37,39 @@ import { createHash } from 'node:crypto';
  * verletzt, wird nie als Trace emittiert; fail-open für den HOST — die
  * Beobachtung darf den beobachteten Prozess nie blockieren. Eine Nutzlast, die
  * wir nicht verstehen, wird deshalb laut protokolliert und durchgereicht.
- * `onContractViolation: 'reject'` kehrt genau das um (fail-closed bis zum
- * Schritt) — es ist eine bewusste Einstellung, kein stiller Fallback.
+ * `onContractViolation: 'reject'` kehrt genau das um — eine bewusste
+ * Einstellung, kein stiller Fallback.
  */
 
-/** Vertragsname der von diesem Hook erzeugten Datensätze. */
+/** Vertragsname der erzeugten Datensätze. */
 export const CONTRACT = 'shinon.hook/pre-step-v1';
 
-/** Der reale Waterfall-Punkt, auf den sich dieser Hook registriert (DSH-Event-Name). */
+/** DSH-Event-Name des Waterfalls — der Registrierungsschlüssel. */
 export const PRE_STEP_EVENT = 'agent/pre-step';
 
 /**
- * Der `event_type` der erzeugten Datensätze. Bewusst NICHT identisch mit
- * `PRE_STEP_EVENT`: der DSH-Event-Name trägt einen Schrägstrich, die Event-Typen
- * des Repos tragen Punkte (`session.created`, `gate.failed`). Die beiden Namen
- * zu verwechseln hieße, sich nie zu registrieren oder jeden Datensatz zu
- * verwerfen — deshalb stehen sie hier als zwei Konstanten nebeneinander.
+ * `event_type` der erzeugten Datensätze. Bewusst NICHT identisch mit
+ * `PRE_STEP_EVENT`: DSH-Event-Namen tragen einen Schrägstrich, die Event-Typen
+ * des Repos tragen Punkte (`session.created`, `gate.failed`). Beides zu
+ * verwechseln heißt, sich nie zu registrieren oder jeden Datensatz zu
+ * verwerfen — deshalb stehen hier zwei Konstanten mit Namen nebeneinander.
  */
 export const TRACE_EVENT_TYPE = 'agent.pre-step';
 
 /** Kanal, auf dem korrelierte Schritt-Datensätze den Host verlassen. */
 export const TRACE_CHANNEL = 'shinon/hook/pre-step';
 
-/** Entscheidungsarten, die DSH tatsächlich kennt (`PreStepDecision`). */
-export const DECISION_KINDS = ['enter', 'reject'];
-
-/** Die acht Felder des Envelopes — identisch zum Envelope-Vertrag des Repos. */
-export const ENVELOPE_FIELDS = [
-  'event_id',
-  'event_type',
-  'session_id',
-  'source',
-  'timestamp',
-  'payload_ref',
-  'contract',
-  'trace_id',
-];
-
 /** Erste `length` Hex-Zeichen von sha256(text). */
-export function digest(text, length = 12) {
-  return createHash('sha256').update(String(text)).digest('hex').slice(0, length);
-}
+const digest = (text, length = 12) => createHash('sha256').update(String(text)).digest('hex').slice(0, length);
 
 /**
- * Event-Schema: Jeder erzeugte Datensatz wird gegen dieses Schema validiert.
- * `agent.pre-step` ist der reale Pfad; die neun übrigen Typen sind der in Wave 2
- * ausgelieferte Vertrag und bleiben unverändert gültig.
+ * Event-Schema: die erzeugten Datensätze und ihre acht Vertragsfelder.
+ *
+ * Das Schema IST der Envelope-Contract-Gate — es validiert und wirft
+ * `ValidationError`. Ein zusätzlicher `validateEvent()` würde nur nachprüfen,
+ * was hier schon steht; er ist entfallen, weil keine Verhaltensanforderung ihn
+ * brauchte (die Schema-Prüfung deckt Länge und Pflichtfelder ab, und `event_id`
+ * ist per Konstruktion `evt-` + 12 Hex-Zeichen).
  */
 export const EventSchema = z.object({
   event_id: z.string().min(1, 'event_id muss nicht leer sein'),
@@ -109,52 +94,41 @@ export const EventSchema = z.object({
 });
 
 /**
- * Hook-Konfiguration (Schemastery).
- * Keine erfundene Option: jede hier ist im Code unten gelesen.
+ * Hook-Konfiguration (Schemastery). Jede Option hat genau ein Verhalten;
+ * keine Option ist doppelt vorhanden.
  */
 export const Config = z.object({
-  /** Registriert den echten Waterfall-Listener auf `agent/pre-step`. */
-  preStepEnabled: z.boolean().default(true),
   /**
-   * DSH-Event-Namen, auf die dieser Hook sich registriert. Enthält die Liste
-   * `PRE_STEP_EVENT` nicht, wird bewusst nichts registriert — das ist die eine
+   * DSH-Event-Namen, auf die sich dieser Hook registriert. Enthält die Liste
+   * `agent/pre-step` nicht, wird bewusst nichts registriert — das ist die eine
    * Registrierungsbedingung, und sie wird im Log benannt.
-   *
-   * In Wave 2 standen hier neun Event-Typen, die nie registriert wurden: die
-   * Beobachtung war eine Simulation. Die neun Typen bleiben als Envelope-Vertrag
-   * des Schemas bestehen, aber diese Liste nennt jetzt nur, was wirklich hängt.
    */
   observeEvents: z.array(z.string()).default(['agent/pre-step']),
   /**
    * Deterministische Durchlass-Policy: `allow` reicht den Schritt durch,
    * `block` lehnt ihn mit `{ kind: 'reject' }` ab. Die Entscheidung kommt aus
-   * der Konfiguration, nicht aus freiem Text (Gate F).
+   * der Konfiguration, nicht aus freiem Text.
    */
   verdict: z.union([z.const('allow'), z.const('block')]).default('allow'),
   /**
    * Verhalten bei verletztem Nutzlast-Vertrag: `pass` schützt den Host (der
-   * Schritt läuft weiter, der Befund wird laut protokolliert), `reject` wählt
+   * Schritt läuft weiter, der Befund wird protokolliert), `reject` wählt
    * fail-closed und lehnt den Schritt ab.
    */
   onContractViolation: z.union([z.const('pass'), z.const('reject')]).default('pass'),
   /** Korrelierte Schritt-Datensätze auf `TRACE_CHANNEL` emittieren. */
   trace: z.boolean().default(true),
-  /** Contract-Gate für erzeugte Envelopes aktiv. */
-  contractGateEnabled: z.boolean().default(true),
-  /** Fail-closed-Verhalten des Envelope-Contract-Gates. */
-  failClosed: z.boolean().default(true),
   /** Feste Uhr für Replay/Test (ISO-8601). Leer = echte Zeit. */
   clock: z.string().default(''),
 });
 
 /**
- * Normalisiert ein rohes Event-Objekt gegen EventSchema.
+ * Normalisiert einen Datensatz gegen EventSchema.
  *
  * Schemastery 3.18.4 hat KEIN `safeParse` (das ist die Zod-API) — das Schema
- * wird aufgerufen und wirft bei Verletzung eine `ValidationError`. Der frühere
- * `EventSchema.safeParse(raw)` war deshalb toter Code: er hätte bei jedem
- * Aufruf eine TypeError geworfen, wurde aber von der Simulation nie erreicht.
- * Der zugehörige Test prüfte nur den String, nicht den Aufruf.
+ * wird aufgerufen und wirft bei Verletzung. Der frühere
+ * `EventSchema.safeParse(raw)` war toter Code, der bei jedem Aufruf eine
+ * TypeError geworfen hätte.
  */
 export function normalizeEvent(raw) {
   try {
@@ -164,27 +138,10 @@ export function normalizeEvent(raw) {
   }
 }
 
-/** Validiert einen normalisierten Event gegen den Contract-Gate. */
-export function validateEvent(event, config = { failClosed: true }) {
-  if (!event.event_id || event.event_id.length < 5) {
-    if (config.failClosed) {
-      throw new Error(`[shinon-hook] Event-ID zu kurz (${event.event_id}) — fail-closed`);
-    }
-    return false;
-  }
-  if (config.contractGateEnabled && (!event.contract || event.contract.trim() === '')) {
-    if (config.failClosed) {
-      throw new Error(`[shinon-hook] Contract fehlt für Event ${event.event_id} — fail-closed`);
-    }
-    return false;
-  }
-  return true;
-}
-
 /**
  * Die Nutzlast des Waterfalls in einen beschreibbaren Schritt-Datensatz
- * überführen. Reine Funktion, wirft nie: eine unbekannte Form wird beschrieben,
- * nicht interpretiert.
+ * überführen. Total: eine unbekannte Form wird beschrieben, nicht interpretiert,
+ * und die Funktion kann nicht werfen.
  */
 export function readStep(payload) {
   const source = payload !== null && typeof payload === 'object' ? payload : {};
@@ -196,7 +153,6 @@ export function readStep(payload) {
     turn: Number.isInteger(source.turn) ? source.turn : null,
     step: Number.isInteger(source.step) ? source.step : null,
     message_count: Array.isArray(source.messages) ? source.messages.length : null,
-    aborted: signal !== null && signal.aborted === true,
     has_signal: signal !== null,
   };
 }
@@ -222,7 +178,7 @@ export function stepIssues(step) {
  */
 export function buildStepEnvelope(step, config = {}) {
   const timestamp = typeof config.clock === 'string' && config.clock !== '' ? config.clock : new Date().toISOString();
-  const payloadRef = `pl-${digest([step.message_count, step.aborted].join('|'))}`;
+  const payloadRef = `pl-${digest([step.message_count, step.turn, step.step].join('|'))}`;
   return {
     event_id: `evt-${digest([CONTRACT, TRACE_EVENT_TYPE, step.session_id, timestamp, payloadRef].join('|'))}`,
     event_type: TRACE_EVENT_TYPE,
@@ -243,16 +199,9 @@ export function buildStepEnvelope(step, config = {}) {
  * `kind: 'enter'`-Entscheidung: die Messages gehören dem Harness, nicht uns.
  */
 async function onPreStep(ctx, config, payload, next) {
-  let step;
-  try {
-    step = readStep(payload);
-  } catch (error) {
-    // Host-Schutz: ein Fehler in unserer Auswertung darf den Schritt nicht brechen.
-    console.error(`[shinon-hook] Schritt nicht lesbar (${error?.message}) — Durchreichen`);
-    return next();
-  }
-
+  const step = readStep(payload);
   const issues = stepIssues(step);
+
   if (issues.length > 0) {
     const failClosed = config.onContractViolation === 'reject';
     console.error(
@@ -263,14 +212,9 @@ async function onPreStep(ctx, config, payload, next) {
     if (failClosed) return { kind: 'reject' };
   } else if (config.trace) {
     try {
-      const envelope = buildStepEnvelope(step, config);
-      const parsed = normalizeEvent(envelope);
-      validateEvent(parsed, {
-        failClosed: config.failClosed,
-        contractGateEnabled: config.contractGateEnabled,
-      });
+      const envelope = normalizeEvent(buildStepEnvelope(step, config));
       // Einzige Wirkung: der Datensatz. Kein State, kein Schreibzugriff.
-      if (typeof ctx?.emit === 'function') ctx.emit(TRACE_CHANNEL, parsed, step);
+      if (typeof ctx?.emit === 'function') ctx.emit(TRACE_CHANNEL, envelope, step);
     } catch (error) {
       // fail-closed für den Datensatz: ein ungültiger Envelope verlässt uns nicht.
       console.warn(`[shinon-hook] Trace verworfen (${error?.message})`);
@@ -287,36 +231,26 @@ async function onPreStep(ctx, config, payload, next) {
 }
 
 /**
- * Registriert den Hook im DSH-Kontext.
+ * Registriert den Hook im DSH-Kontext und gibt den Disposer zurück.
  *
- * Ohne `ctx.on` gibt es keine Registrierung — das wird gemeldet, nicht
- * verschwiegen (Regel C: keine stillen Fallbacks).
+ * Ohne `ctx.on` oder ohne `agent/pre-step` in `observeEvents` wird nicht
+ * registriert — das wird gemeldet, nicht verschwiegen (keine stillen Fallbacks).
  */
 export function apply(ctx, config) {
-  const disposers = [];
-  const registered = [];
-
-  console.log(`[shinon-hook] Aktiviert — verdict=${config.verdict}, trace=${config.trace ? 'an' : 'aus'}`);
-
-  const wantsPreStep = config.preStepEnabled && config.observeEvents.includes(PRE_STEP_EVENT);
-  if (wantsPreStep && typeof ctx?.on === 'function') {
-    const disposer = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, payload, next));
-    disposers.push(typeof disposer === 'function' ? disposer : () => {});
-    registered.push(PRE_STEP_EVENT);
-  }
-
-  if (registered.length > 0) {
-    console.log(`[shinon-hook] Registriert: ${registered.join(', ')}`);
-  } else if (!config.preStepEnabled) {
-    console.log('[shinon-hook] preStepEnabled=false — bewusst nicht registriert');
-  } else if (typeof ctx?.on !== 'function') {
+  if (typeof ctx?.on !== 'function') {
     console.error(`[shinon-hook] ctx.on fehlt — ${PRE_STEP_EVENT} wurde NICHT registriert (BLOCKED)`);
-  } else {
-    console.log(`[shinon-hook] ${PRE_STEP_EVENT} nicht in observeEvents — bewusst nicht registriert`);
+    return () => {};
   }
+  if (!config.observeEvents.includes(PRE_STEP_EVENT)) {
+    console.log(`[shinon-hook] ${PRE_STEP_EVENT} nicht in observeEvents — bewusst nicht registriert`);
+    return () => {};
+  }
+
+  const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, payload, next));
+  console.log(`[shinon-hook] Aktiviert — registriert auf ${PRE_STEP_EVENT} (verdict=${config.verdict}, trace=${config.trace ? 'an' : 'aus'})`);
 
   return () => {
-    for (const dispose of disposers) dispose();
+    if (typeof dispose === 'function') dispose();
     console.log('[shinon-hook] Deaktiviert — Listener abgemeldet');
   };
 }

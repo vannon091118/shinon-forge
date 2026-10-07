@@ -1,19 +1,30 @@
 #!/usr/bin/env node
 /**
- * packages/hook/test/replay.test.mjs — Replay- und Schema-Test für Wave 2.
+ * packages/hook/test/replay.test.mjs — die zwei Zusagen, die der Host-Test nicht abdeckt.
  *
- * Prüft die Replay-Fixture und die Inhalte von index.js/client.js als Text,
- * ohne die Module zu laden (kein node_modules-Abhängigkeit erforderlich).
+ * Der Verhaltensvertrag des Hooks (echter Waterfall, Durchreichen, Korrelation,
+ * Absage, Lifecycle) steht in scripts/gate/tests/hook-pre-step.test.mjs und wird
+ * dort gegen echtes Cordis gefahren. Hier bleibt nur, was dort nicht hingehört:
+ *
+ *   1. Die Replay-Fixture bleibt ein gültiges, in sich stimmiges Orakel des
+ *      Wave-2-Event-Vokabulars — sie soll nicht still verrotten.
+ *   2. Die Client-Hälfte ist ein LADBARES Cordis-Plugin. Das ist eine echte
+ *      Bruchstelle: ein Datenobjekt ohne apply() reißt den GESAMTEN Client-Boot
+ *      der Web-UI ab, weil der Loader alle Einträge in einem Promise.all mountet.
+ *      Statisch prüft das bisher niemand (siehe Probe hook-client-plugin-shape).
+ *
+ * Was hier bewusst NICHT mehr steht: String-Inspektion von index.js. Sie war
+ * implementierungsgekoppelt (sie prüfte z. B. das Vorhandensein von
+ * `EventSchema.safeParse`, einer Schemastery-API, die es nicht gibt) und
+ * bewies Verhalten nur scheinbar. Dieses Feld gehört dem ausführbaren Vertrag.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { codeOnly } from '../../../scripts/lib/source-scan.mjs';
 
 const FIXTURE = JSON.parse(readFileSync(resolve('packages/hook/fixtures/replay-session-created.json'), 'utf8'));
-const INDEX_CONTENT = readFileSync(resolve('packages/hook/index.js'), 'utf8');
-/** Laufzeitcode ohne Kommentare und Strings — Kommentare dürfen nichts beweisen. */
-const INDEX_CODE = codeOnly(INDEX_CONTENT);
 const CLIENT_CONTENT = readFileSync(resolve('packages/hook/client.js'), 'utf8');
+const CLIENT_CODE = codeOnly(CLIENT_CONTENT);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -34,87 +45,25 @@ function check(name, fn) {
 }
 
 console.log('═══════════════════════════════════════');
-console.log('  Shinon Hook — Replay & Schema Test');
+console.log('  Shinon Hook — Replay & Client-Vertrag');
 console.log('═══════════════════════════════════════\n');
 
-check('Replay-Fixture enthält 3 Events', () => {
+check('Replay-Fixture ist ein korreliertes Orakel mit 3 Events', () => {
   assert(Array.isArray(FIXTURE.events), 'events nicht als Array');
   assert(FIXTURE.events.length === 3, `erwartet 3, gefunden ${FIXTURE.events.length}`);
+  const traceIds = FIXTURE.events.map((event) => event.trace_id);
+  assert(traceIds.every((id) => typeof id === 'string' && id.startsWith('tr-') && id.length > 3), 'Trace-ID folgt nicht dem Schema tr-');
+  assert(FIXTURE.notes.some((note) => note.includes('autonom')), 'Notes erwähnen nicht "autonom"');
+  assert(FIXTURE.notes.some((note) => note.toLowerCase().includes('fail-closed')), 'Notes erwähnen nicht "fail-closed"');
 });
 
-check('Replay-Event-Pfad korreliert (Trace-IDs)', () => {
-  const traceIds = FIXTURE.events.map(e => e.trace_id);
-  assert(traceIds.every(id => id && id.length > 3), 'Trace-ID zu kurz oder leer');
-  assert(traceIds.every(id => id.startsWith('tr-')), 'Trace-ID folgt nicht Schema tr-');
-});
-
-check('Event-Schema in index.js definiert (EventSchema)', () => {
-  assert(INDEX_CONTENT.includes('export const EventSchema'), 'EventSchema Export fehlt');
-  assert(INDEX_CONTENT.includes('z.object'), 'EventSchema nicht als z.object');
-});
-
-check('Config-Schema in index.js definiert', () => {
-  assert(INDEX_CONTENT.includes('export const Config'), 'Config Export fehlt');
-  assert(INDEX_CONTENT.includes('observeEvents'), 'observeEvents nicht in Config');
-  assert(INDEX_CONTENT.includes('failClosed'), 'failClosed nicht in Config');
-  assert(INDEX_CONTENT.includes('contractGateEnabled'), 'contractGateEnabled nicht in Config');
-});
-
-check('Hook-API: normalizeEvent nutzt die echte Schemastery-API', () => {
-  assert(INDEX_CONTENT.includes('export function normalizeEvent'), 'normalizeEvent fehlt');
-  assert(INDEX_CODE.includes('EventSchema(raw)'), 'normalizeEvent ruft das Schema nicht auf');
-  // Schemastery 3.18.4 kennt kein safeParse (das ist Zod). Die frühere Fassung
-  // war damit toter Code, der bei jedem Aufruf geworfen hätte.
-  assert(!INDEX_CODE.includes('safeParse'), 'safeParse existiert in Schemastery 3.18.4 nicht');
-});
-
-check('Hook-API: validateEvent definiert (fail-closed)', () => {
-  assert(INDEX_CONTENT.includes('export function validateEvent'), 'validateEvent fehlt');
-  assert(INDEX_CONTENT.includes('failClosed'), 'failClosed-Logik nicht in validateEvent');
-  assert(INDEX_CONTENT.includes('contractGateEnabled'), 'contractGateEnabled nicht geprüft');
-});
-
-check('Apply-Funktion registriert den echten agent/pre-step-Hook', () => {
-  assert(INDEX_CONTENT.includes('export function apply'), 'apply() fehlt');
-  // Die Simulation ist ersetzt: es wird wirklich registriert, nicht protokolliert.
-  assert(INDEX_CODE.includes('ctx.on(PRE_STEP_EVENT'), 'kein echter Listener auf agent/pre-step');
-  assert(INDEX_CONTENT.includes("'agent/pre-step'"), 'Waterfall-Name fehlt');
-  assert(INDEX_CODE.includes('return next()'), 'die Entscheidung des Downstream wird nicht durchgereicht');
-  assert(INDEX_CODE.includes('kind:'), 'keine Entscheidung nach PreStepDecision');
-  assert(INDEX_CONTENT.includes('console.log'), 'Keine Protokollierung (kein Aktivierungs-Log)');
-});
-
-check('Client.js enthält ModuleLoader und Beobachter', () => {
+check('Client-Hälfte ist ein ladbares Cordis-Plugin unter der Vertrags-id', () => {
   assert(CLIENT_CONTENT.includes('__ModuleLoader__'), 'ModuleLoader fehlt');
-  assert(CLIENT_CONTENT.includes('@shinon/hook'), 'Plugin-ID nicht korrekt');
+  const id = CLIENT_CONTENT.match(/__ModuleLoader__\.load\(\s*\{\s*id:\s*['"]([^'"]+)['"]/)?.[1];
+  assert(id === '@shinon/hook', `ModuleLoader-id "${id}" ≠ "@shinon/hook"`);
+  // Die Bruchstelle: der Loader verlangt eine Funktion oder ein Objekt mit apply().
+  assert(CLIENT_CODE.includes('apply('), 'keine apply()-Methode — der Client-Boot bricht damit ab');
   assert(CLIENT_CONTENT.includes('observeEvent'), 'Client-Beobachter observeEvent fehlt');
-});
-
-check('Mindestens 3 DSH-Events angebunden', () => {
-  const eventsInIndex = [
-    'session.created',
-    'message.received',
-    'message.completed',
-    'claim.created',
-    'tool.requested',
-    'tool.completed',
-    'gate.failed',
-    'gate.passed',
-    'action.blocked',
-  ];
-  const foundInSchema = eventsInIndex.filter(e => INDEX_CONTENT.includes(`z.const('${e}')`));
-  assert(foundInSchema.length >= 3, `Nur ${foundInSchema.length} Event-Typen gefunden (erwartet ≥3)`);
-});
-
-check('Legacy-Guard: kein "dsh-mod" in Runtime-Artefakten', () => {
-  assert(!INDEX_CONTENT.includes('dsh-mod'), 'dsh-mod in index.js gefunden');
-  assert(!CLIENT_CONTENT.includes('dsh-mod'), 'dsh-mod in client.js gefunden');
-  assert(!readFileSync(resolve('packages/hook/cordis.patch.yml'), 'utf8').includes('dsh-mod'), 'dsh-mod in cordis.patch.yml gefunden');
-});
-
-check('Replay-Notes referenzieren Fail-Closed und keine autonome Aktion', () => {
-  assert(FIXTURE.notes.some(n => n.includes('autonom')), 'Notes erwähnen nicht "autonom"');
-  assert(FIXTURE.notes.some(n => n.toLowerCase().includes('fail-closed') || n.includes('Fail-closed')), 'Notes erwähnen nicht "fail-closed"');
 });
 
 console.log('\n═══════════════════════════════════════');
