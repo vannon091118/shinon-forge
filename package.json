@@ -17,6 +17,7 @@
     "verify:panel": "node scripts/panel-check.mjs",
     "build": "node scripts/build.mjs",
     "test": "node scripts/dsh-test.mjs && node scripts/validate-test.mjs && node scripts/pack-test.mjs && node scripts/dsh-profile-test.mjs",
+    "test:hook": "node packages/hook/test/replay.test.mjs && node --test scripts/gate/tests/hook-pre-step.test.mjs",
     "gate": "node scripts/gate/engine.mjs",
     "gate:local": "node scripts/gate/engine.mjs --local",
     "gate:full": "node scripts/gate/engine.mjs --full",

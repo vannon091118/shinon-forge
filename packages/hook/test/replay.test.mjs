@@ -7,9 +7,12 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { codeOnly } from '../../../scripts/lib/source-scan.mjs';
 
 const FIXTURE = JSON.parse(readFileSync(resolve('packages/hook/fixtures/replay-session-created.json'), 'utf8'));
 const INDEX_CONTENT = readFileSync(resolve('packages/hook/index.js'), 'utf8');
+/** Laufzeitcode ohne Kommentare und Strings — Kommentare dürfen nichts beweisen. */
+const INDEX_CODE = codeOnly(INDEX_CONTENT);
 const CLIENT_CONTENT = readFileSync(resolve('packages/hook/client.js'), 'utf8');
 
 function assert(condition, message) {
@@ -57,9 +60,12 @@ check('Config-Schema in index.js definiert', () => {
   assert(INDEX_CONTENT.includes('contractGateEnabled'), 'contractGateEnabled nicht in Config');
 });
 
-check('Hook-API: normalizeEvent definiert', () => {
+check('Hook-API: normalizeEvent nutzt die echte Schemastery-API', () => {
   assert(INDEX_CONTENT.includes('export function normalizeEvent'), 'normalizeEvent fehlt');
-  assert(INDEX_CONTENT.includes('EventSchema.safeParse'), 'normalizeEvent verwendet kein Schema');
+  assert(INDEX_CODE.includes('EventSchema(raw)'), 'normalizeEvent ruft das Schema nicht auf');
+  // Schemastery 3.18.4 kennt kein safeParse (das ist Zod). Die frühere Fassung
+  // war damit toter Code, der bei jedem Aufruf geworfen hätte.
+  assert(!INDEX_CODE.includes('safeParse'), 'safeParse existiert in Schemastery 3.18.4 nicht');
 });
 
 check('Hook-API: validateEvent definiert (fail-closed)', () => {
@@ -68,14 +74,14 @@ check('Hook-API: validateEvent definiert (fail-closed)', () => {
   assert(INDEX_CONTENT.includes('contractGateEnabled'), 'contractGateEnabled nicht geprüft');
 });
 
-check('Apply-Funktion registriert Observer ohne autonome Aktion', () => {
+check('Apply-Funktion registriert den echten agent/pre-step-Hook', () => {
   assert(INDEX_CONTENT.includes('export function apply'), 'apply() fehlt');
-  assert(INDEX_CONTENT.includes('observe'), 'observe nicht definiert');
-  assert(INDEX_CONTENT.includes('normalize'), 'normalize nicht definiert');
-  assert(INDEX_CONTENT.includes('validate'), 'validate nicht definiert');
-  assert(INDEX_CONTENT.includes('emit'), 'emit nicht definiert');
-  // Keine autonome Aktion: Der Observer sollte nicht handeln, nur emittieren.
-  assert(INDEX_CONTENT.includes('console.log'), 'Keine Protokollierung (kein emit-Log)');
+  // Die Simulation ist ersetzt: es wird wirklich registriert, nicht protokolliert.
+  assert(INDEX_CODE.includes('ctx.on(PRE_STEP_EVENT'), 'kein echter Listener auf agent/pre-step');
+  assert(INDEX_CONTENT.includes("'agent/pre-step'"), 'Waterfall-Name fehlt');
+  assert(INDEX_CODE.includes('return next()'), 'die Entscheidung des Downstream wird nicht durchgereicht');
+  assert(INDEX_CODE.includes('kind:'), 'keine Entscheidung nach PreStepDecision');
+  assert(INDEX_CONTENT.includes('console.log'), 'Keine Protokollierung (kein Aktivierungs-Log)');
 });
 
 check('Client.js enthält ModuleLoader und Beobachter', () => {
