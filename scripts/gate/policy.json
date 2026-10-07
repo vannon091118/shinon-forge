@@ -43,6 +43,9 @@
       },
       "persona": {
         "prefixes": ["packages/persona/", "profiles/"]
+      },
+      "events-spine": {
+        "prefixes": ["packages/events/", "Docs/contracts/events.json", "Docs/probes/events-spine.json", "profiles/"]
       }
     }
   }

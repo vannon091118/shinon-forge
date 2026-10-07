@@ -1,0 +1,9 @@
+- insert:
+    - id: shinon-events
+      name: '@shinon/events'
+      config:
+        schemaPath: './assets/event-spine.json'
+        replayPath: './assets/replay/session-created.json'
+        emitChannel: 'shinon/event'
+        defaultSessionId: ''
+        clock: ''

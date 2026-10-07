@@ -107,12 +107,14 @@ lieber laut als still falsch.
 
 ## 🧩 Plugins
 
-Sieben Bundles, jedes genau vier Dateien (`index.js`, `client.js`, `cordis.patch.yml`,
-`package.json`):
+Neun Bundles, jedes genau vier Dateien (`index.js`, `client.js`, `cordis.patch.yml`,
+`package.json`), dazu optionale `assets/`:
 
 | Bundle | Rolle |
 |---|---|
 | **@shinon/core** | Branding-Overlay: Sidebar- & Hero-Marke, Farbverlauf |
+| **@shinon/persona** | Shinon als Persona-Schicht im DSH-System-Prompt |
+| **@shinon/events** | Hook/Event-Spine: Signale beobachten, normalisieren, validieren, emittieren (Wave 2) |
 | **@shinon/locale-de** | Deutsche Sprache, Namespace `shinon` |
 | **@shinon/tooltip** | Erweiterte Tooltips |
 | **@shinon/dashboard** | Status-Panel |
@@ -132,7 +134,7 @@ Sieben Bundles, jedes genau vier Dateien (`index.js`, `client.js`, `cordis.patch
                                  │  Slots · Events · Bundles
                     ┌────────────▼────────────┐
                     │      SHINON FORGE       │   Overlay: Brand, Sprache,
-                    │   7 × @shinon/* Bundles │   UI-Schichten, Governance
+                    │   9 × @shinon/* Bundles │   UI-Schichten, Governance
                     └────────────┬────────────┘
                                  │
         ┌────────────────────────┼────────────────────────┐
@@ -157,9 +159,10 @@ Dieser Teil beschreibt den **tatsächlichen** Stand. Statusklassen:
 
 | Feature | Status | Beleg / Lücke |
 |---|---|---|
-| Namensvertrag der 7 Plugins (`@shinon/*`) | Verified | Gate: `package.json` ↔ Patch-id/name ↔ Profil-Bundle ↔ ModuleLoader-id ↔ Exports |
+| Namensvertrag aller Plugins (`@shinon/*`) | Verified | Gate: `package.json` ↔ Patch-id/name ↔ Profil-Bundle ↔ ModuleLoader-id ↔ Exports |
+| Hook/Event-Spine (Wave 2): Replay-Fixture, fail-closed, Nicht-Aktions-Grenze | Verified | 21 Events-Tests + `events-spine`-Gate + Mount im Profiltest (`dsh --dump-config`, dsh 0.2.0-rc.2); DSH-Signalverhalten: `Docs/probes/events-spine.json` (PLAN) |
 | Paket-Struktur, Syntax, Exports | Verified | Gate |
-| Distribution: `pnpm pack` → Isolat → Load für alle 7 Pakete | Verified | `npm test` → `scripts/pack-test.mjs` (28 Checks) |
+| Distribution: `pnpm pack` → Isolat → Load für alle Pakete | Verified | `npm test` → `scripts/pack-test.mjs` |
 | Patch-Schema: YAML, Struktur, Typen, required Keys | Verified | Gate + Build, Fixture je Regel in `scripts/validate-test.mjs` |
 | Ressourcen: jede Manifest-/Config-Referenz existiert und parst | Verified | Gate + Build, Fixture „fehlende Ressource“ |
 | Komposition: keine doppelten Patch-ids, Paketgraph ohne Zyklus | Verified | Gate + Build, Fixtures „doppelte ID“/„Zyklus“ |

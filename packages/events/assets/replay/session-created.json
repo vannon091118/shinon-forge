@@ -1,0 +1,160 @@
+{
+  "id": "events-spine-replay",
+  "contract": "shinon.event-spine/v1",
+  "clock": "2026-10-07T12:00:00.000Z",
+  "note": "Aufgezeichneter Event-Pfad: dieselben Signale müssen dieselben Envelopes ergeben. Die expect-Felder sind eingefroren — ändert sich die Ableitung, wird dieser Replay rot und der Vertrag muss bewusst nachgezogen werden.",
+  "steps": [
+    {
+      "signal": "shinon/session/created",
+      "payload": { "session_id": "sess-1", "cwd": "/repo" },
+      "expect": {
+        "event_id": "evt_f65ea89680b5149e",
+        "event_type": "session.created",
+        "session_id": "sess-1",
+        "source": "dsh.session",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:9db96f3e937bd507",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_a20e0329e909"
+      }
+    },
+    {
+      "signal": "session/event",
+      "payload": { "type": "message.created", "session_id": "sess-1", "text": "hallo shinon" },
+      "expect": {
+        "event_id": "evt_32bd8d7678589c37",
+        "event_type": "message.received",
+        "session_id": "sess-1",
+        "source": "dsh.message",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:0630b9cb08867d5a",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_98a7ce332bf5"
+      }
+    },
+    {
+      "signal": "shinon/message/completed",
+      "payload": { "session_id": "sess-1", "ok": true },
+      "expect": {
+        "event_id": "evt_28f917aa3a7bfbdc",
+        "event_type": "message.completed",
+        "session_id": "sess-1",
+        "source": "dsh.message",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:3a1376d2d8053678",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_f1818087c545"
+      }
+    },
+    {
+      "signal": "shinon/claim/created",
+      "payload": { "session_id": "sess-1", "claim_id": "CL-0001", "status": "unverified" },
+      "expect": {
+        "event_id": "evt_70ce02485929847d",
+        "event_type": "claim.created",
+        "session_id": "sess-1",
+        "source": "shinon.claims",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:fc217b82d0f0e24d",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_8844375fde5b"
+      }
+    },
+    {
+      "signal": "shinon/tool/requested",
+      "payload": { "session_id": "sess-1", "tool": "read_file" },
+      "expect": {
+        "event_id": "evt_104a579e7dfb4926",
+        "event_type": "tool.requested",
+        "session_id": "sess-1",
+        "source": "dsh.tool",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:0635c0e66a8beee9",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_0f4c7795a206"
+      }
+    },
+    {
+      "signal": "shinon/tool/completed",
+      "payload": { "session_id": "sess-1", "tool": "read_file", "ok": true },
+      "expect": {
+        "event_id": "evt_37edc876fd9c2554",
+        "event_type": "tool.completed",
+        "session_id": "sess-1",
+        "source": "dsh.tool",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:ea8a1f59aa225514",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_ffaa58d60f78"
+      }
+    },
+    {
+      "signal": "shinon/gate/passed",
+      "payload": { "session_id": "sess-1", "gate": "manifest" },
+      "expect": {
+        "event_id": "evt_75f0e02386cf4c25",
+        "event_type": "gate.passed",
+        "session_id": "sess-1",
+        "source": "shinon.gates",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:70d78206d9eb6ee0",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_85c170db7257"
+      }
+    },
+    {
+      "signal": "shinon/gate/failed",
+      "payload": { "session_id": "sess-1", "gate": "patch", "issues": 2 },
+      "expect": {
+        "event_id": "evt_ad0a63d9bcaeb8fc",
+        "event_type": "gate.failed",
+        "session_id": "sess-1",
+        "source": "shinon.gates",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:4e4308562ded2aaa",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_01c64ce61746"
+      }
+    },
+    {
+      "signal": "shinon/action/blocked",
+      "payload": { "session_id": "sess-1", "action": "git.push", "reason": "scope" },
+      "expect": {
+        "event_id": "evt_58f196a82e862b86",
+        "event_type": "action.blocked",
+        "session_id": "sess-1",
+        "source": "shinon.policy",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:9564a1e9194ed8bc",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_7f29246f9d9f"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "signal": "shinon/unknown/signal",
+      "payload": { "session_id": "sess-1" },
+      "reason": "UNKNOWN_SIGNAL",
+      "why": "Signal steht nicht im Vertrag — fail-closed, keine Emission."
+    },
+    {
+      "signal": "shinon/gate/passed",
+      "payload": { "session_id": "sess-1" },
+      "reason": "MISSING_PAYLOAD_KEY",
+      "why": "gate fehlt in der Nutzlast."
+    },
+    {
+      "signal": "shinon/session/created",
+      "payload": { "cwd": "/repo" },
+      "reason": "MISSING_SESSION_ID",
+      "why": "Ohne Session keine Zuordnung — der Spine rät nicht."
+    },
+    {
+      "signal": "session/event",
+      "payload": { "type": "message.deleted", "session_id": "sess-1" },
+      "reason": "UNKNOWN_SIGNAL",
+      "why": "Carrier-Typ ist nicht in der typeMap."
+    }
+  ]
+}

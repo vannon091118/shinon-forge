@@ -1,0 +1,122 @@
+{
+  "contract": "shinon.event-spine/v1",
+  "version": 1,
+  "authority": "NONE",
+  "note": "Der Spine beobachtet, normalisiert, validiert und emittiert. Er entscheidet nichts, schreibt nichts und ruft kein Modell. authority:NONE ist die DOKI-Regel: abgeleitet ist nicht autoritativ.",
+  "envelope": [
+    "event_id",
+    "event_type",
+    "session_id",
+    "source",
+    "timestamp",
+    "payload_ref",
+    "contract",
+    "trace_id"
+  ],
+  "derivation": {
+    "event_id": {
+      "prefix": "evt_",
+      "length": 16,
+      "digestOf": ["contract", "event_type", "session_id", "source", "timestamp", "payload_ref"]
+    },
+    "payload_ref": {
+      "prefix": "sha256:",
+      "length": 16,
+      "digestOf": ["payload"]
+    },
+    "trace_id": {
+      "prefix": "trc_",
+      "length": 12,
+      "digestOf": ["session_id", "event_type", "timestamp"]
+    },
+    "canonicalJson": "Objektschlüssel rekursiv sortiert, Arrays in Reihenfolge, keine Leerzeichen — gleicher Inhalt ergibt denselben Digest."
+  },
+  "session": {
+    "paths": ["session_id", "sessionId", "session.id", "session"],
+    "default": "",
+    "note": "Leer = Event wird verworfen (fail-closed). Ein Standardwert darf nur bewusst im Profil gesetzt werden."
+  },
+  "trace": {
+    "paths": ["trace_id", "traceId", "correlation_id", "correlationId"]
+  },
+  "signals": {
+    "shinon/session/created": "session.created",
+    "shinon/message/received": "message.received",
+    "shinon/message/completed": "message.completed",
+    "shinon/claim/created": "claim.created",
+    "shinon/tool/requested": "tool.requested",
+    "shinon/tool/completed": "tool.completed",
+    "shinon/gate/passed": "gate.passed",
+    "shinon/gate/failed": "gate.failed",
+    "shinon/action/blocked": "action.blocked"
+  },
+  "carrier": {
+    "signal": "session/event",
+    "verified": true,
+    "typePath": "type",
+    "typeMap": {
+      "session.created": "session.created",
+      "message.created": "message.received",
+      "message.completed": "message.completed",
+      "tool.requested": "tool.requested",
+      "tool.completed": "tool.completed"
+    },
+    "verifiedTypes": ["session.created"],
+    "note": "session/event ist der einzige im Repo belegte DSH-Event-Name. Die typeMap-Einträge außer session.created sind Kandidaten und gelten als NOT_VERIFIED, bis ein DSH-Boot sie bestätigt."
+  },
+  "events": {
+    "session.created": {
+      "source": "dsh.session",
+      "phase": "open",
+      "payload": ["session_id"]
+    },
+    "message.received": {
+      "source": "dsh.message",
+      "phase": "input",
+      "payload": ["session_id"]
+    },
+    "message.completed": {
+      "source": "dsh.message",
+      "phase": "output",
+      "payload": ["session_id"]
+    },
+    "claim.created": {
+      "source": "shinon.claims",
+      "phase": "claim",
+      "payload": ["session_id", "claim_id"]
+    },
+    "tool.requested": {
+      "source": "dsh.tool",
+      "phase": "action",
+      "payload": ["session_id", "tool"]
+    },
+    "tool.completed": {
+      "source": "dsh.tool",
+      "phase": "action",
+      "payload": ["session_id", "tool"]
+    },
+    "gate.passed": {
+      "source": "shinon.gates",
+      "phase": "verdict",
+      "payload": ["session_id", "gate"]
+    },
+    "gate.failed": {
+      "source": "shinon.gates",
+      "phase": "verdict",
+      "payload": ["session_id", "gate"]
+    },
+    "action.blocked": {
+      "source": "shinon.policy",
+      "phase": "verdict",
+      "payload": ["session_id", "action", "reason"]
+    }
+  },
+  "forbidden": [
+    "autonomous_action",
+    "decision",
+    "state_mutation",
+    "project_write",
+    "model_call",
+    "network_call"
+  ]
+}

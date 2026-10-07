@@ -17,6 +17,9 @@ importers:
       '@shinon/dashboard':
         specifier: link:../../packages/dashboard
         version: link:../../packages/dashboard
+      '@shinon/events':
+        specifier: link:../../packages/events
+        version: link:../../packages/events
       '@shinon/locale-de':
         specifier: link:../../packages/locale-de
         version: link:../../packages/locale-de

@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@shinon/core": "workspace:*",
+    "@shinon/events": "workspace:*",
     "@shinon/locale-de": "workspace:*",
     "@shinon/tooltip": "workspace:*",
     "@shinon/dashboard": "workspace:*",

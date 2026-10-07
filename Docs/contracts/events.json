@@ -1,0 +1,43 @@
+{
+  "name": "@shinon/events — Hook/Event-Spine (Wave 2)",
+  "status": "NOT_VERIFIED",
+  "note": "Gebaut und getestet: die neun Event-Pfade werden in einem Replay gegen die eingefrorene Fixture envelopegleich reproduziert, ungültige Events werden fail-closed verworfen, die Nicht-Aktions-Grenze ist statisch geprüft (npm run gate:test, 21/21). Der Mount ist belegt: dsh 0.2.0-rc.2 löst das Profil auf und listet alle Bundle-Layer inklusive shinon-events (dsh-profile-test, Exit 0). NICHT geprüft: das Verhalten gegen ein echtes, laufendes DSH-Signal, und die Carrier-Typnamen außer session.created sind Kandidaten. Genau deshalb NOT_VERIFIED statt IMPLEMENTED.",
+  "rules": [
+    {
+      "positive": "Der Spine ist datengetrieben: Envelope (8 Felder), neun Event-Typen, Signal-/Carrier-Zuordnung und Ableitungsregeln stehen in packages/events/assets/event-spine.json. Ein neuer Event-Typ ist zuerst eine Datenänderung.",
+      "forbidden": "Ein Event-Typ, der nur im Code existiert; ein Envelope-Feld, das im Vertrag fehlt; eine erfundene Quelle.",
+      "fallback": "Ist der Vertrag nicht lesbar, verbindet sich der Spine nicht und sagt das — er rät keine Typen.",
+      "error": "EVENT_CONTRACT_UNREADABLE (Warnung, kein Mount) — der Host läuft weiter.",
+      "trace": "Jedes emittierte Event trägt contract=shinon.event-spine/v1 und payload_ref auf die Nutzlast.",
+      "replay": "Das Gate prüft den Vertrag deterministisch: scripts/gate/plugins/events-spine.mjs (contractIssues).",
+      "invariant": "Envelope = {event_id, event_type, session_id, source, timestamp, payload_ref, contract, trace_id}; events.keys = die neun Typen; jeder Typ ist über Signal oder Carrier erreichbar."
+    },
+    {
+      "positive": "Ein Event, das den Contract verletzt, wird verworfen und nie emittiert. Abgewiesen werden: unbekanntes Signal, unbekannter Carrier-Typ, fehlende Session, fehlender Pflicht-Nutzlastschlüssel, Vertrags-/Quellen-/Digest-Abweichung.",
+      "forbidden": "Ein ungültiges Event mit 'best effort' zu emittieren; ein fehlendes Feld zu erfinden; einen unbekannten Typ durchzureichen.",
+      "fallback": "Verworfene Events landen mit Grund in stats.reasons und werden geloggt — sichtbar, nicht still (kein schwarzes Loch).",
+      "error": "Verwerfungsgründe: UNKNOWN_SIGNAL | UNKNOWN_EVENT_TYPE | MISSING_SESSION_ID | MISSING_PAYLOAD_KEY | ENVELOPE_FIELD | ENVELOPE_UNKNOWN_FIELD | CONTRACT_MISMATCH | SOURCE_MISMATCH | DIGEST_MISMATCH.",
+      "trace": "stats.lastDrop hält Grund, Signal und Detail; die Fixture dokumentiert je Verwerfungsfall ein why.",
+      "replay": "Die Fixture enthält vier Verwerfungsfälle; der Test fährt sie über das echte Bundle und erwartet null Emissionen.",
+      "invariant": "In der Fixture gilt: ungültige Schritte ⇒ emitted.length bleibt konstant."
+    },
+    {
+      "positive": "Die Beobachtung ist fail-open für den Host: Handler werfen nie, ein fehlendes Signal oder ein Fehler in der Nutzlast darf den beobachteten Prozess nicht blockieren.",
+      "forbidden": "Ein throw aus einem Event-Handler; process.exit; ein blockierender Aufruf in der Beobachtung.",
+      "fallback": "Ein Fehler in einem Handler wird geloggt und die Beobachtung läuft weiter.",
+      "error": "Kein Host-Fehlerpfad: der Spine hat keine eigene Fehlerdomäne über den Host.",
+      "trace": "console.warn mit Signal und Grund; die Disposer des Hosts bleiben unberührt.",
+      "replay": "Der Test ruft Handler mit unbekanntem Signal und mit fehlender Session auf, ohne dass etwas wirft.",
+      "invariant": "apply() liefert immer eine Abräumfunktion; nach dispose sind alle Handler entfernt."
+    },
+    {
+      "positive": "Der Spine beobachtet, normalisiert, validiert und emittiert — sonst nichts. Kein Modell, kein Netz, kein Dateischreiben, kein State, keine Entscheidung (authority: NONE).",
+      "forbidden": "child_process, execSync, spawn, writeFile/mkdir/rm, fetch, http, Math.random, process.exit, ctx.agents, ctx.llm, ctx.shell, ctx.set.",
+      "fallback": "Fehlt ctx.emit oder ctx.on, ist der Spine ein No-op statt eines Absturzes.",
+      "error": "EVENTS_SPINE_FORBIDDEN_CALL — das Gate lehnt den Laufzeitcode statisch ab, bevor er läuft.",
+      "trace": "scripts/gate/plugins/events-spine.mjs prüft die Token-Liste gegen packages/events/index.js.",
+      "replay": "Der Test fügt writeFileSync/execSync in den Quelltext ein und erwartet einen Befund.",
+      "invariant": "index.js enthält keinen der verbotenen Aufrufe; das Gate ist rot, sonst."
+    }
+  ]
+}

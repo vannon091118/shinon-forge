@@ -61,6 +61,29 @@ Contracts und Disziplin** — als Regeln, die unsere Bundles/`scripts` testen.
   3 geskippt; Negativtest (kaputtes Paket) → FAIL mit Exit 1; Altbestand grün
   (`npm test` 37/9/28/3, `npm run build`).
 
+## WAVE 2 — Hook/Event-Spine ✅ GEBAUT (2026-10-07)
+`packages/events/` — `@shinon/events`, der Beobachtungs-/Emissions-Spine, der den
+Zyklus aus der Analyse als erste Runtime-Schicht trägt: Signale beobachten →
+normalisieren → validieren → emittieren. Neun Event-Typen, Envelope mit acht
+Pflichtfeldern, Vertrag als Daten (`assets/event-spine.json`), Replay-Fixture
+(`assets/replay/session-created.json`).
+- **Fail-closed für Events, fail-open für den Host:** ein Event, das den Vertrag
+  verletzt, wird nie emittiert (Grund + Zähler statt stillem Durchlauf); ein
+  Handler wirft nie zurück in den beobachteten Prozess.
+- **Nicht-Autonomie ist geprüft, nicht behauptet:**
+  `scripts/gate/plugins/events-spine.mjs` lehnt Schreib-/Ausführungs-/Modell-/
+  Netzaufrufe im Laufzeitcode statisch ab.
+- **Beweis:** `npm run gate:test` 43/43 (davon 21 Events-Tests), Replay über die
+  echte `apply()`-Schnittstelle: 9 Envelopes deckungsgleich, 4 Verwerfungsfälle
+  ohne Emission. Mount belegt: `dsh --profile shinon --dump-config` (dsh
+  0.2.0-rc.2) listet den Layer `shinon-events` — `dsh-profile-test` 3/3.
+  **Nicht bewiesen:** das Verhalten gegen ein echtes, laufendes DSH-Signal
+  (der Boot belegt Auflösung und Mount, nicht die Emission) — deshalb
+  `NOT_VERIFIED` im Vertrag.
+- Offen: Carrier-Typnamen (`message.created`, `tool.requested`, …) gegen ein
+  echtes DSH bestätigen; danach `verifiedTypes` erweitern und die Probe
+  `events-spine-dsh-wiring` von `PLAN` auf `WRITE` ziehen.
+
 ## Fundament — Schichten (jede = ein sauberes 4-File-Cordis-Bundle)
 Alle als `packages/<dir>/`, automatisch von Discovery+Gate erkannt; 4-Wege-Namens-
 vertrag + `@deepseek-ai/schemastery` in peer+dev (SHARED_DEPS), sonst rot.
