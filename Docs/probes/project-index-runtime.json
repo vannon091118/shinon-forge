@@ -1,0 +1,26 @@
+[
+  {
+    "id": "project-index-runtime-sqlite",
+    "claim": "node:sqlite ist in der Runtime vorhanden und kann den persistenten Index tragen: flagfrei importierbar, FTS5 verfuegbar, Statement-API fuer run/all/get.",
+    "targets": [
+      "packages/project-index/index.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Vor dem Bau muss gemessen sein: laesst sich node:sqlite ohne Flag laden, welche Exporte gibt es, funktioniert eine FTS5-Virtual-Table mit Tokenizer, und welche SQLite-Fassung liegt darunter.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN auf Node v22.23.3 (die Runtime, in der auch `node --test` und `dsh` laufen). IMPORT: `require('node:sqlite')` gelingt OHNE Flag und ohne `--experimental-sqlite`; Node meldet nur `ExperimentalWarning: SQLite is an experimental feature and might change at any time`. EXPORTE: DatabaseSync, StatementSync, constants, backup. API-FORM (gemessen, nicht aus der Doku abgeleitet): `new DatabaseSync(':memory:')`; `db.exec(sql)` fuer DDL; `db.prepare(sql)` liefert ein Statement mit `run(...)` -> `{ lastInsertRowid, changes }`, `all()` -> Array von Zeilenobjekten, `get()` -> ein Zeilenobjekt. FTS5: `create virtual table chunks using fts5(path, body, tokenize = 'porter')` wird akzeptiert, `insert into chunks(...) values (?, ?)` laeuft, und `select path from chunks where chunks match 'apply'` liefert den erwarteten Treffer. SQLite-Fassung: 3.51.3. AUSWIRKUNG AUF DEN BAU: die Experimental-Warnung ist keine Fehlermeldung, sie steht aber auf stderr — Tests, die stderr strikt lesen, muessen das wissen. Kein Flag darf im Testlauf hinzugefuegt werden, weil die Tests denselben Runtimepfad pruefen sollen wie der Host. OFFEN: die Warnung kann in einer spaeteren Node-Fassung zu einem harten Fehler oder zu einem Flag werden; dann bricht der Vertrag und muss neu gemessen werden."
+  },
+  {
+    "id": "project-index-kein-parser-in-der-runtime",
+    "claim": "In der Runtime gibt es KEINEN JavaScript-Parser. Die Symbol- und Referenzgewinnung muss deshalb entweder eine eigene, in ihrer Reichweite gemessene Extraktion sein oder eine neue Abhaengigkeit einfuehren.",
+    "targets": [
+      "packages/project-index/index.js",
+      "Docs/probes/project-index-runtime.json"
+    ],
+    "expect": "Vor dem Bau muss geprueft sein, ob ein Parser aufloesbar ist — im Repo (es gibt kein node_modules), im installierten Harness und global. Fuer jede gefundene Moeglichkeit muss die Herkunft (echte Abhaengigkeit oder transitives Beiwerk) mitgemessen werden.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN: `require.resolve` scheitert fuer acorn, espree, meriyah, typescript, @babel/parser und esprima — alle 'nicht aufloesbar'. Im installierten Harness liegt unter @babel nur code-frame, helper-validator-identifier und runtime; ein @babel/parser ist NICHT vorhanden. Global liegen nur cline, corepack, npm und @deepseek-ai. Node selbst stellt keine Parser-API fuer Symbole bereit (kein AST-Zugang). ENTSCHEIDUNG: eigene, bewusst begrenzte Extraktion statt neuer Abhaengigkeit. Gruende, in dieser Reihenfolge: (1) das Repo haelt an vier Dateien je Paket und einem SHARED_DEPS-Eintrag (@deepseek-ai/schemastery) — ein Parser-Paket waere die erste neue Fremdabhaengigkeit und muesste in scripts/lib/repo.mjs als Vertrag gepflegt werden; (2) die Tests muessen ohne Netz laufen (pack-test installiert zwar isoliert, aber der Gate-Lauf selbst soll netzfrei bleiben); (3) der Index dient der Kontextversorgung fuer MAX, nicht der Compiler-Genauigkeit — gebraucht werden Pfade, Symbole, Abhaengigkeiten und Touches. DIE GRENZE WIRD GEMESSEN UND GEPINNT, nicht behauptet: die Extraktion wird gegen die echten Dateien dieses Repos geprueft (erwartete Symbole und Importe) und in ihrer Reichweite benannt (zeilenbasiert, keine Ausdrucksanalyse, keine bedingte Ausfuehrung, keine Makros). OFFEN: eine spaetere Phase kann einen echten Parser nachruesten; dann muss die Extraktion durch ihn ersetzt und die Zusage 'Symbole vollstaendig' neu formuliert werden — heute lautet sie ausdruecklich nur 'die genannten Formen werden erkannt'."
+  }
+]
