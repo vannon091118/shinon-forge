@@ -678,6 +678,54 @@ test('Zeitstempel: die benannte Lücke und ihr Gegenmittel verify=all', () => {
   db.close();
 });
 
+/**
+ * Die zwei Signale aus §11, die die uebrigen Faelle nicht treffen: eine GROESSE
+ * ohne mtime-Aenderung und eine mtime, die RUECKWAERTS laeuft. Beide sind echte
+ * Zeitstempel-Probleme — Kopie, Checkout, Restore — und beide gehen kaputt, wenn
+ * nur eine der beiden Angaben verglichen wird oder wenn man eine ORDNUNG
+ * annimmt statt Gleichheit. Der Vergleich muss „gleich" sein, nicht „neuer".
+ */
+test('Inkrement: die Groesse allein genuegt als Signal, und eine mtime darf rueckwaerts laufen', () => {
+  const project = fixtureProject('signale');
+  const { file } = fixtureIndex(project, 'signale');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, {});
+  const target = join(project, 'src/b.mjs');
+  const stamp = statSync(target).mtime;
+
+  // (1) Inhalt laenger, mtime zurueckgesetzt: nur die GROESSE verraet die Aenderung.
+  writeFileSync(target, ['export function bThing(value) {', '  return value;', '}', '', 'export const bZusatz = 3;', ''].join('\n'));
+  utimesSync(target, stamp, stamp);
+  const bySize = bundle.updateIndex(db, project, {});
+  assert.equal(bySize.hashed, 1, 'die mtime ist gleich, die Groesse nicht — die Datei muss gelesen werden');
+  assert.equal(bySize.written, 1, 'und neu indiziert');
+  assert.equal(rows(db, 'select count(*) as n from symbols where name = ?', 'bZusatz')[0].n, 1, 'das neue Symbol steht im Index');
+
+  // (2) mtime laeuft RUECKWAERTS, Inhalt ist gleich: Gleichheit entscheidet, nicht Ordnung.
+  const older = new Date(Date.now() - 60000);
+  utimesSync(target, older, older);
+  const backwards = bundle.updateIndex(db, project, {});
+  assert.equal(backwards.hashed, 1, 'auch eine aeltere mtime ist eine Veraenderung');
+  assert.equal(backwards.rehashed, 1, 'gleicher Inhalt: nur auffrischen');
+  assert.equal(backwards.written, 0, 'gleicher Inhalt: kein Neuindizieren');
+  assert.equal(rows(db, 'select count(*) as n from symbols where name = ?', 'bZusatz')[0].n, 1, 'die Symbole bleiben stehen');
+
+  // (3) Ein Auffrischen schreibt NUR die Dateizeile: Chunks und FTS bleiben, wie sie waren.
+  const chunksBefore = rows(db, 'select path, start_line, end_line, body from chunks where path = ? order by start_line', 'src/b.mjs');
+  const ftsBefore = one(db, `select count(*) as n from ${bundle.FTS_TABLE}`).n;
+  const fresh = new Date(Date.now() + 90000);
+  utimesSync(target, fresh, fresh);
+  const refreshed = bundle.updateIndex(db, project, {});
+  assert.equal(refreshed.rehashed, 1);
+  assert.deepEqual(
+    rows(db, 'select path, start_line, end_line, body from chunks where path = ? order by start_line', 'src/b.mjs'),
+    chunksBefore,
+    'kein Neuindizieren heisst: die Chunks sind Zeile fuer Zeile dieselben',
+  );
+  assert.equal(one(db, `select count(*) as n from ${bundle.FTS_TABLE}`).n, ftsBefore);
+  db.close();
+});
+
 // ── Zusage: das Projekt bleibt unberührt ────────────────────────────────────
 
 test('Grenze: der Lauf schreibt nichts ins Projekt', () => {
