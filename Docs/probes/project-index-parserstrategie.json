@@ -1,0 +1,27 @@
+[
+  {
+    "id": "project-index-parserstrategie-je-dateityp",
+    "claim": "Die Parser-Strategie aus Phase 7 ('Dateityp -> verfuegbarer Parser -> Symbole / Imports') ist vor dem Bau pro Dateityp gemessen: fuer JavaScript/TypeScript gibt es in dieser Runtime KEINEN Parser, fuer JSON gibt es einen eingebauten, und fuer Markdown/YAML gibt es keinen, der aus dem Paket erreichbar waere.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs",
+      "Docs/probes/project-index-parserstrategie.json"
+    ],
+    "expect": "Vor dem Bau muss gemessen sein, welcher Parser je Dateityp tatsaechlich zur Verfuegung steht — aufgeloest aus dem PAKET (dort laeuft der Code), nicht nur aus der DSH-Installation — und was ohne Parser best effort erreichbar ist.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN mit createRequire aus vier Kontexten (Paket, Profil, DSH-Installation, worker-artiger Fremdkontext) und gegen den echten Bestand dieses Repos (166 indexierbare Dateien). ERGEBNIS JE TYP. (1) JavaScript/TypeScript (.js 30, .mjs 48): KEIN Parser. acorn, espree, meriyah, typescript, @babel/parser und esprima sind an KEINER der vier Stellen aufloesbar — auch nicht aus der DSH-Installation. (2) JSON (.json 42): JSON.parse ist eingebaut und immer da; alle 42 Dateien dieses Repos parsen fehlerfrei (42/42, 0 Fehler), also traegt der eingebaute Parser die Kantengewinnung wirklich. (3) Markdown (.md 21): kein Parser (marked, gray-matter nicht aufloesbar); best effort sind Ueberschriften — gemessen 391 Ueberschriften, davon 16 INNERHALB von Code-Fences, die eine fence-bewusste Extraktion ausschliessen muss, sonst wird ein Beispiel im Dokument zur Struktur des Dokuments. (4) YAML (.yml 19, .yaml 6): kein Parser aus dem Paket. Der Bestand an Top-Level-Schluesseln ist mit 22 ueber 25 Dateien zudem so duenn, dass Schluessel als 'Symbole' keinen Indexgewinn bringen. (5) Alles andere: kein Parser, nur Text (Chunks/FTS). KONSEQUENZ FUER DEN BAU: eine Registry Sprache -> Extraktor (JavaScript/TypeScript, JSON, Markdown) mit einem generischen Text-Rueckfall; der EINE echte Parser (JSON.parse) wird wirklich benutzt. OFFEN/GRENZE: die Registry ist die Erweiterungsstelle fuer spaetere AST-Parser (Plan: 'Praezise AST-Referenzen spaeter erweitern'); heute traegt sie keine AST-Zusage."
+  },
+  {
+    "id": "project-index-keine-neue-abhaengigkeit",
+    "claim": "Ein YAML-Parser ist in der Runtime vorhanden, aber nicht benutzbar: `yaml` und `js-yaml` liegen als transitive Abhaengigkeiten in der DSH-Installation. Sie zu benutzen wuerde das Paket an eine nicht deklarierte Abhaengigkeit des Hosts binden und den Worker-Pfad zerstoeren.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "packages/project-index/package.json"
+    ],
+    "expect": "Bevor ein vorhandener Parser benutzt oder eine neue Abhaengigkeit aufgenommen wird, muss gemessen sein, ob er aus dem Paket erreichbar ist, ob er deklariert ist und ob er den Worker-Pfad ueberlebt.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, dasselbe Skript wie in der Probe daneben: aus der DSH-Installation sind `yaml` (.../node_modules/yaml/dist/index.js) und `js-yaml` (.../node_modules/js-yaml/index.js) aufloesbar, `@deepseek-ai/schemastery` ebenfalls. Aus dem PAKET (packages/project-index/package.json) und aus dem PROFIL (profiles/shinon/package.json) ist NICHTS davon aufloesbar — nur node:sqlite; im worker-artigen Fremdkontext ebenfalls nichts. Das erklaert zugleich den in Phase 6 live gefundenen Workerfehler: der Host patcht die Modulaufloesung fuer seine Bundles, ein Worker bekommt diesen Patch nicht. ENTSCHEIDUNG: keine neue Abhaengigkeit. Gruende, in dieser Reihenfolge: (1) `yaml`/`js-yaml` sind internes Beiwerk einer DSH-Fassung, nicht Teil ihrer Schnittstelle — bricht die naechste DSH-Fassung sie weg, bricht der Index; (2) das Repo haelt eine Abhaengigkeitsliste (SHARED_DEPS in scripts/lib/repo.mjs), die als Vertrag gepflegt werden muesste, und pack-test installiert je Paket isoliert (Netz); (3) eine Deklaration wuerde den Kern aus dem Worker ausschliessen, weil der Worker genau an solchen Bare-Importen scheitert. FOLGE: YAML wird als Text indexiert (Chunks + FTS), ohne Symbole; die Grenze steht im Testvertrag. Wenn eine spaetere Phase einen echten YAML-Parser braucht, ist das eine bewusste Abhaengigkeitsentscheidung dieser Phase — nicht ein Nebeneffekt."
+  }
+]
