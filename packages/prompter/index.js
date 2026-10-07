@@ -69,6 +69,9 @@ export const CONTRACT = 'shinon.prompter/result-v1';
 /** Vertragsname des MAX-Kontexts. */
 export const CONTEXT_CONTRACT = 'shinon.prompter/context-v1';
 
+/** Der Name der Markierung aus §15 — EINE Quelle fuer Renderer und Entschaerfung. */
+export const CONTEXT_TAG = 'untrusted_project_context';
+
 /** Der Waterfall-Punkt, an dem der Enhancer hängt. */
 export const PRE_STEP_EVENT = 'agent/pre-step';
 
@@ -408,22 +411,53 @@ const escapeAttribute = (value) => String(value)
   .replace(/</g, '&lt;')
   .replace(/>/g, '&gt;');
 
+/** Die Marken des Blocks, die ein Dateiinhalt nicht selbst tragen darf. */
+const TAG_MARKER = new RegExp(`</?${CONTEXT_TAG}[^>]*>`, 'g');
+const FILE_MARKER = /<\/?file(\s[^>]*)?>/g;
+
+/**
+ * Die Marken des Blocks in einem DATEIINHALT entschaerfen.
+ *
+ * §15 sagt ausdruecklich: die XML-Markierung ist KEINE Sicherheitsgrenze. Das
+ * stimmt — die Grenze ist die fehlende Faehigkeit (kein `tools`-Feld, siehe
+ * buildEnhancerRequest). Aber die Markierung ist die einzige Auskunft darueber,
+ * was Daten sind, und ein Inhalt, der die Marken SELBST traegt, hebt genau diese
+ * Auskunft auf: er schliesst den Block vorzeitig, und alles danach liest das
+ * Modell als Anweisung ausserhalb des Datenblocks. Das ist kein konstruierter
+ * Fall — gemessen am echten Index dieses Repos: der Prompt, der die Plan-Datei
+ * nennt, erzeugte ZWEI Abschluesse und 10431 Zeichen ausserhalb der Markierung.
+ *
+ * Entschaerft werden NUR die Marken des Blocks, nicht der Code: aus `a < b`
+ * wird nichts, und eine Datei, die diese Zeichenfolgen als TEXT beschreibt (wie
+ * die Plan-Datei selbst), bleibt lesbar — sie steht dann als Text im
+ * Datenblock, was sie auch ist.
+ */
+function neutralizeMarkers(text) {
+  return String(text)
+    .replace(TAG_MARKER, (match) => `&lt;${match.slice(1, -1)}&gt;`)
+    .replace(FILE_MARKER, (match) => `&lt;${match.slice(1, -1)}&gt;`);
+}
+
 /**
  * Den Kontext als `<untrusted_project_context>` rendern (Plan §15). Die
  * Markierung ist eine ANWEISUNG an das Modell, keine Grenze — die Grenze ist,
  * dass der Aufruf keine Fähigkeiten hat.
+ *
+ * Der Aufbau ist insofern belastbar, als genau EINE Region entsteht: alles aus
+ * dem Projekt liegt zwischen den beiden Marken, auch wenn ein Inhalt sie selbst
+ * enthaelt (neutralizeMarkers).
  */
 export function renderContext(context) {
-  const lines = ['<untrusted_project_context>', `<context_contract>${CONTEXT_CONTRACT}</context_contract>`, `<project>${escapeAttribute(context.project)}</project>`];
+  const lines = [`<${CONTEXT_TAG}>`, `<context_contract>${CONTEXT_CONTRACT}</context_contract>`, `<project>${escapeAttribute(context.project)}</project>`];
   for (const file of context.files) {
     lines.push(`<file path="${escapeAttribute(file.path)}">`);
-    lines.push(file.content);
+    lines.push(neutralizeMarkers(file.content));
     lines.push('</file>');
   }
   for (const [tag, values] of [['symbols', context.symbols], ['constraints', context.constraints], ['touches', context.touches], ['dependencies', context.dependencies]]) {
     if (values.length > 0) lines.push(`<${tag}>${values.map(escapeAttribute).join(', ')}</${tag}>`);
   }
-  lines.push('</untrusted_project_context>');
+  lines.push(`</${CONTEXT_TAG}>`);
   return lines.join('\n');
 }
 
