@@ -9,6 +9,17 @@
 # of loader patch entries (id-targeted config overrides, disables, and insert
 # lists; `!!js` expressions allowed).
 
+# Route des Prompt-Enhancers. Der wirksame Wert gehoert hierher, nicht ins
+# Paket: das Paket haelt nur Schema-Defaults (dort ist die Route leer, damit ein
+# kopiertes Paket nichts still kostet). Hier zeigt sie auf dieselbe Route wie
+# der Default des Agenten — agnes/agnes-2.5-flash, ohne Nutzungslimits.
+# Wirkung: pro Nutzer-Schritt ein zusaetzlicher Modellaufruf des One-Shots;
+# faellt er aus, gilt unveraendert der Roh-Prompt.
+- id: shinon-prompter
+  config:
+    provider: agnes
+    model: agnes-2.5-flash
+
 # @shinon/core owns the sidebar brand. 'sidebar.brand.mark' and
 # 'sidebar.brand.name' are single slots (exactly one occupant), so the shipped
 # official brand has to yield.

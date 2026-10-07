@@ -40,20 +40,17 @@ import { readFileSync } from 'node:fs';
  *      hält. Prüfbar sind die Fähigkeitsliste, der erzeugte Text und die
  *      Annahme-Regeln — nicht der Gehorsam eines Modells.
  *
- * WER IST DER MENSCH? — der zweite Fund, der nicht geraten ist. Der Seam
- * liefert NICHT nur Nutzereingaben: Werkzeug-Kontexte, Zeit- und Terminal-Kontext,
- * Instruktionen, Erinnerungen und die ANTWORT AUF EINE FREIGABE reisen ebenfalls
- * als `role: 'user'`-Nachricht durch denselben Batch. Gemessen in DSH 0.2.0-rc.2
- * tragen mindestens zwanzig Produzenten `role: 'user'` mit fremder Herkunft
- * (`user-approval`, `time-context`, `tmux-context`, `agent-instructions`, `ptc-mode`,
- * `hooks-codex`, `hooks-claude-code`, `repeat-tool-reminder`, `session-reference`,
- * `session-title-llm`, `cordis-host-runner` …). Die Menschen erkennt man an
- * `source.kind === 'user'`; genau diesen Test benutzt DSH selbst (der
- * API-Session-Controller raeumt Datei-Uploads damit auf, und der UI-Weg setzt
- * `{ kind: 'user', rpcId, clientTimeZone }`). Ohne diese Pruefung wuerde der
- * Enhancer den Harness-Kontext fuer die Nutzereingabe halten, ihn veredeln und —
- * schlimmer — ersetzen. Eine umformulierte Freigabe-Antwort („ja") ist keine
- * Stilfrage, sondern eine geaenderte Entscheidung.
+ * WER IST DER MENSCH? — der Seam liefert NICHT nur Nutzereingaben. Gemessen in
+ * DSH 0.2.0-rc.2 reisen mindestens zwanzig Harness-Produzenten als
+ * `role: 'user'`-Nachricht durch denselben Batch (`user-approval`,
+ * `time-context`, `agent-instructions`, `repeat-tool-reminder`, `ptc-mode` …; die
+ * Werkzeug-Kontexte kommen ueber `additionalContexts` der Werkzeuge). Die
+ * Menschen erkennt man an `source.kind === 'user'` — genau diesen Test benutzt
+ * DSH selbst (der API-Session-Controller raeumt Datei-Uploads damit auf, und der
+ * UI-Weg setzt `{ kind: 'user', rpcId, clientTimeZone }`). Ohne die Pruefung
+ * haelt der Enhancer Harness-Text fuer die Nutzereingabe und ersetzt ihn: eine
+ * umformulierte Freigabe-Antwort („ja") ist eine geaenderte Entscheidung, keine
+ * Stilfrage.
  *
  * CAPABILITY-ISOLATION (die eigentliche Sicherheitsgrenze): der One-Shot-Child
  * bekommt **kein `tools`-Feld**. Es gibt keinen Werkzeugkatalog, den man
@@ -237,6 +234,20 @@ function policyFor(mode) {
 
 /** Die drei Modus-Policies, erzeugt aus MODE_CAPABILITIES. */
 export const POLICIES = { MIN: policyFor('MIN'), MID: policyFor('MID'), MAX: policyFor('MAX') };
+
+/**
+ * Die Dienste, die dieser Host braucht. Ohne deklarierte Injektion verweigert
+ * Cordis den Zugriff auf `ctx.llm` (live gemessen im echten Boot: „cannot get
+ * property \"llm\" without inject"). Der Fehler wurde korrekt zu einem
+ * Verwerfen — der Host lief weiter und der Roh-Prompt galt —, aber der Enhancer
+ * hat nie etwas veredelt, und ohne sichtbaren Lauf waere das nicht aufgefallen.
+ * Genau so deklarieren es die mitgelieferten Hostplugins (dsh-agent-instructions
+ * exportiert `inject` neben `Config` und `apply`).
+ *
+ * Nebenwirkung, die dazugehoert: ohne `llm`-Dienst wird dieser Host gar nicht
+ * erst montiert — er kann ohne ihn nichts tun. Der Hook bleibt unabhaengig davon.
+ */
+export const inject = ['llm'];
 
 /**
  * Hook-Konfiguration (Schemastery).
@@ -533,7 +544,9 @@ async function enhanceGuarded(ctx, config, prompt, context, signal) {
     return await enhance(ctx, config, prompt, context, signal);
   } catch (error) {
     const name = error?.constructor?.name ?? 'Error';
-    console.error(`[shinon-prompter] interner Fehler (${name}) — Roh-Prompt gilt`);
+    // Der Grund bleibt kurz (INTERNAL_ERROR:<Name>), die Ursache steht im Log:
+    // ein fail-open-Pfad, der nicht sagt, WAS scheiterte, ist nicht bedienbar.
+    console.error(`[shinon-prompter] interner Fehler (${name}: ${error?.message ?? error}) — Roh-Prompt gilt`);
     return { outcome: 'rejected', reasons: [`INTERNAL_ERROR:${name}`], result: null };
   }
 }

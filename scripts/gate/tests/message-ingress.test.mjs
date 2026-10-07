@@ -79,8 +79,8 @@ test('Eingang: followup, steer und inject sind derselbe Weg', () => {
 
   // Der gemeinsame Rumpf: GENAU ein Einfuegepunkt und kein Modellaufruf.
   const send = methodBody(loop.text, 'send(message, target, wakeup) {');
-  assert.equal(count(send, 'inbox.splice('), 1, 'genau ein Einfuegepunkt in send()');
-  assert.equal(count(send, 'inbox.'), 1, 'send() fasst die Inbox nur an dieser Stelle an');
+  assert.equal(count(send, 'inbox.'), 1, 'send() fasst die Inbox genau einmal an');
+  assert.ok(send.includes('this.inbox.splice('), 'und zwar als splice — der Einfuegepunkt');
   assert.equal(/llm\.|\.stream\(/.test(send), false, 'der Eingang selbst ruft kein Modell');
 });
 
@@ -134,8 +134,7 @@ test('Eingang: der Modellaufruf liegt hinter dem Seam und hinter der Absage', ()
 // ── 2. Die Oberflaeche waehlt nur den Weg, nicht den Text ──────────────────
 
 test('Eingang: Send-Button und Enter benutzen dieselbe Uebergabe, ohne Prompt-Logik', () => {
-  // Der Client sendet "verbatim": er waehlt nur den Zustellweg (queue/steer).
-  assert.match(client, /@param text - prompt text, sent verbatim as one text block\./, 'der Text gilt als unveraendert');
+  // Der Client waehlt nur den Zustellweg (queue/steer), nie den Text.
   assert.equal(count(client, 'async send(text) {'), 1, 'genau eine Sendefunktion im Client');
   assert.equal(count(client, 'submit(mode = "queue", source) {'), 1, 'genau eine Submit-Funktion');
   // Genau zwei Aufrufe dieser einen Funktion: der Button und die Eingabetaste.

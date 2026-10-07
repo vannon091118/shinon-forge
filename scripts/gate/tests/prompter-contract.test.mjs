@@ -522,6 +522,30 @@ test('Laden: das Bundle registriert sich am echten Waterfall', async () => {
   dispose();
 });
 
+test('Laden: der Host mountet ueber Cordis und deklariert die llm-Injektion', async () => {
+  // Regression fuer einen Fehler, den NUR der echte Boot zeigt: ohne
+  // `inject: ['llm']` verweigert Cordis den Zugriff auf ctx.llm („cannot get
+  // property \"llm\" without inject"). Unser Schutz fing das korrekt ab — der
+  // Host lief weiter, der Roh-Prompt galt — aber der Enhancer veredelte nie
+  // etwas. Mit einem selbstgebauten Host-Objekt (connect()) faellt das nicht
+  // auf: dort liegt kein Cordis-Proxy zwischen Aufrufer und Dienst.
+  assert.deepEqual(bundle.inject, ['llm'], 'der Host muss den llm-Dienst deklarieren');
+
+  const ctx = new Context();
+  const llm = fakeLlm(reply(goodResult()));
+  ctx.provide('llm', llm);
+  const records = [];
+  ctx.on(bundle.DECISION_CHANNEL, (record) => records.push(record));
+  await quiet(() => ctx.plugin(bundle, { ...route }));
+  const claimed = [userMessage()];
+
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(llm.calls.length, 1, 'der Aufruf geht durch den echten Dienstzugriff');
+  assert.equal(records[0].outcome, 'accepted');
+  assert.equal(decision.messages[0].content[0].text, 'Mach das schnell.');
+});
+
 test('Laden: nach dispose und ohne passenden Event-Namen wird nicht registriert', async () => {
   for (const { name, config, disposeFirst } of [
     { name: 'nach dispose', config: { ...route }, disposeFirst: true },
