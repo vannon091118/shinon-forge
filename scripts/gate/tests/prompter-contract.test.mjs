@@ -568,6 +568,160 @@ test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async ()
   }
 });
 
+/**
+ * Das Gate dieses Blocks, Regel fuer Regel aus Plan §7. Die Tabelle ist die
+ * Zusage: jede ungueltige oder intent-veraendernde Ausgabe endet beim
+ * Roh-Prompt — und zwar mit GENAU einem Aufruf, GENAU einem Datensatz und einer
+ * benannten Ursache. Eine Zeile pro Regel, damit eine fehlende Regel auffaellt.
+ */
+test('Roh-Prompt: jede Fallback-Regel aus Plan §7 greift', async () => {
+  // `kept` unterscheidet die zwei Arten des Verwerfens: gab es keine
+  // schema-gueltige Antwort (kept: false), ist der Datensatz leer; hat das
+  // Modell geantwortet und die Policy hat sie verworfen (kept: true), bleibt die
+  // Antwort im Datensatz NACHVOLLZIEHBAR — verwendet wird sie trotzdem nicht.
+  const cases = [
+    { name: 'invalid JSON (Prosa)', behaviour: 'Ich habe den Prompt verbessert.', reason: 'NO_JSON', kept: false },
+    { name: 'invalid JSON (kaputt)', behaviour: '{"enhancedPrompt": }', reason: 'INVALID_JSON', kept: false },
+    { name: 'schema invalid (Pflichtfeld fehlt)', behaviour: reply({ enhancedPrompt: 'x' }), reason: 'SCHEMA_INVALID', kept: false },
+    { name: 'schema invalid (null statt Liste)', behaviour: reply(goodResult({ addedRequirements: null })), reason: 'SCHEMA_INVALID', kept: false },
+    { name: 'schema invalid (leerer Prompt)', behaviour: reply(goodResult({ enhancedPrompt: '' })), reason: 'SCHEMA_INVALID', kept: false },
+    { name: 'schema invalid (unbekannte Intent-Klasse)', behaviour: reply(goodResult({ intentClassification: 'VIBE' })), reason: 'SCHEMA_INVALID', kept: false },
+    { name: 'preservedIntent != true', behaviour: reply(goodResult({ preservedIntent: false })), reason: 'INTENT_NOT_PRESERVED', kept: true },
+    { name: 'addedRequirements != []', behaviour: reply(goodResult({ addedRequirements: ['mehr'] })), reason: 'ADDED_REQUIREMENTS', kept: true },
+    { name: 'removedRequirements != []', behaviour: reply(goodResult({ removedRequirements: ['weniger'] })), reason: 'REMOVED_REQUIREMENTS', kept: true },
+  ];
+  for (const { name, behaviour, reason, kept } of cases) {
+    const llm = fakeLlm(behaviour);
+    const { ctx, records, dispose } = connect({ ...route }, { llm });
+    const claimed = [userMessage()];
+    const downstream = { kind: 'enter', messages: claimed };
+
+    const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
+
+    assert.equal(decision, downstream, `${name}: der Roh-Prompt muss gelten`);
+    assert.equal(llm.calls.length, 1, `${name}: genau ein One-Shot-Aufruf`);
+    assert.equal(records.length, 1, `${name}: genau ein Datensatz`);
+    assert.equal(records[0].outcome, 'rejected', name);
+    // Nur der Praefix wird gepinnt: die Wortwahl der Bibliothek ist nicht unser Vertrag.
+    assert.ok(records[0].reasons[0].startsWith(reason), `${name}: ${records[0].reasons[0]}`);
+    assert.equal(records[0].enhancedLength > 0, kept, `${name}: nachvollziehbar, aber nicht verwendet`);
+    dispose();
+  }
+});
+
+test('Roh-Prompt: derselbe ungueltige Ausgang faellt dreimal gleich aus', async () => {
+  // Der Gate-Satz verlangt Determinismus, nicht nur Ablehnung. Dreimal gefahren,
+  // weil ein Zustand, der beim ersten Mal nicht auffaellt, beim zweiten sichtbar
+  // wird — und die Nutzlast des Roh-Prompts dabei unberuehrt bleiben muss.
+  const runs = [];
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const llm = fakeLlm(reply(goodResult({ removedRequirements: ['ohne Tests'] })));
+    const { ctx, records, dispose } = connect({ ...route }, { llm });
+    const claimed = [userMessage()];
+    const before = JSON.stringify(claimed);
+
+    const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+    assert.equal(JSON.stringify(claimed), before, 'der Roh-Prompt wird nicht mutiert');
+    runs.push(JSON.stringify([decision.messages[0].content, records[0].outcome, records[0].reasons]));
+    dispose();
+  }
+  assert.equal(new Set(runs).size, 1, `drei Laeufe, ein Ausgang: ${runs.join(' | ')}`);
+});
+
+test('Roh-Prompt: kein interner Fehler bricht den Schritt', async () => {
+  // Die Signal-Konstruktion (AbortSignal.timeout/any) steht VOR dem Aufruf und
+  // wirft bei kaputter Konfiguration — ein Fehler in UNSEREM Code. Er darf nicht
+  // zum kaputten Schritt werden: der Loop darf nie sehen, dass der Enhancer da war.
+  const cases = [
+    { name: 'timeoutMs negativ', config: { ...route, timeoutMs: -1 } },
+    { name: 'timeoutMs keine Zahl', config: { ...route, timeoutMs: NaN } },
+    { name: 'Signal des Schritts ist kein AbortSignal', config: { ...route }, payload: { signal: {} } },
+  ];
+  for (const { name, config, payload: patch } of cases) {
+    const llm = fakeLlm(reply(goodResult()));
+    const { ctx, records, dispose } = connect(config, { llm });
+    const claimed = [userMessage()];
+    const downstream = { kind: 'enter', messages: claimed };
+    const payload = { ...stepPayload(claimed), ...(patch ?? {}) };
+
+    const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, payload, () => Promise.resolve(downstream));
+
+    assert.equal(decision, downstream, `${name}: der Schritt laeuft weiter`);
+    assert.equal(records.length, 1, `${name}: genau ein Datensatz`);
+    assert.equal(records[0].outcome, 'rejected', name);
+    assert.ok(records[0].reasons[0].startsWith('INTERNAL_ERROR'), `${name}: ${records[0].reasons[0]}`);
+    dispose();
+  }
+});
+
+test('Roh-Prompt: ein Fehler des Loops bleibt der Fehler des Loops', async () => {
+  // Die Gegenprobe zum internen Fehler: wer next() mitfaengt, verschiebt den
+  // Downstream-Fehler nur und ruft den Loop ein zweites Mal.
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, dispose } = connect({ ...route }, { llm });
+  const claimed = [userMessage()];
+  let calls = 0;
+
+  await assert.rejects(
+    ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => {
+      calls += 1;
+      return Promise.reject(new Error('Loop kaputt'));
+    }),
+    /Loop kaputt/,
+  );
+  assert.equal(calls, 1, 'next() genau einmal — kein zweiter Anlauf');
+  dispose();
+});
+
+test('Roh-Prompt: ein Abbruch des Loops wird nicht zu einem Eintritt umgedeutet', async () => {
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect({ ...route }, { llm });
+  const claimed = [userMessage()];
+  const downstream = { kind: 'reject' };
+
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
+
+  assert.equal(decision, downstream, 'ohne messages wird nicht geraten');
+  assert.equal(records[0].outcome, 'rejected');
+  assert.deepEqual(records[0].reasons, ['MESSAGE_NOT_FOUND']);
+  assert.equal(records[0].enhancedLength > 0, true, 'die verworfene Antwort bleibt nachvollziehbar');
+  dispose();
+});
+
+test('Roh-Prompt: eine werfende Spur aendert die Entscheidung nicht', async () => {
+  // Die Spur ist Nebensache, die Entscheidung ist die Sache: ein Zuhoerer auf
+  // DECISION_CHANNEL darf den Schritt nicht mitreissen.
+  const llm = fakeLlm(reply(goodResult()));
+  const ctx = new Context();
+  ctx.on(bundle.DECISION_CHANNEL, () => {
+    throw new Error('Zuhoerer kaputt');
+  });
+  const host = { on: (...args) => ctx.on(...args), emit: (...args) => ctx.emit(...args), llm };
+  const dispose = quiet(() => bundle.apply(host, bundle.Config({ ...route })));
+  const claimed = [userMessage()];
+
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(decision.messages[0].content[0].text, 'Mach das schnell.', 'die uebernommene Antwort gilt trotzdem');
+  dispose();
+});
+
+test('Mindestvertrag: zusaetzliche Felder sind erlaubt, die Intent-Klasse ist geschlossen', () => {
+  // Plan §7 nennt einen MINDESTvertrag. Gemessen in Schemastery 3.18.4: ein
+  // unbekannter Schluessel laeuft durch, ein unbekannter Unions-Wert nicht.
+  // Beides ist gewollt — ein Modell, das mehr liefert, soll nicht verworfen
+  // werden; eine erfundene Intent-Klasse waere dagegen Vokabular ausserhalb des
+  // Vertrags. Der Test pinnt das, damit es nicht versehentlich hart wird.
+  const parsed = bundle.parseResult(reply({ ...goodResult(), hinweis: 'extra', confidence: 0.9 }));
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.result.enhancedPrompt, 'Mach das schnell.');
+  const rejected = bundle.parseResult(reply(goodResult({ intentClassification: 'VIBE' })));
+  assert.equal(rejected.ok, false);
+  assert.ok(rejected.reasons[0].startsWith('SCHEMA_INVALID:$.intentClassification'), rejected.reasons[0]);
+});
+
 test('Roh-Prompt: ohne Route und ohne LLM-Dienst wird gar nicht erst aufgerufen', async () => {
   const cases = [
     { name: 'ohne Route', config: { provider: '', model: '' }, withLlm: true, reason: 'NO_ROUTE' },
@@ -604,6 +758,24 @@ test('Ersetzung: nur der Text wird ersetzt, Identitaet und Fremdbloecke bleiben'
   assert.equal(replaced[1].source, original.source);
   assert.deepEqual(replaced[1].content, [image, { type: 'text', text: 'neu' }], 'der Bildblock bleibt, beide Textbloecke werden einer');
   assert.equal(messages[1], original, 'die Eingabe wird nicht mutiert');
+});
+
+test('Ersetzung: keine Nachrichtenform bringt die Ersetzung zum Werfen', () => {
+  // Die Ersetzung ist TOTAL: unbrauchbare Formen ergeben null (= Roh-Prompt)
+  // statt eines Wurfs. Genau darum braucht der Listener um sie herum keinen
+  // Schutz-Zweig — ein solcher Zweig waere ein unerreichbarer Zweig.
+  const withoutText = { id: 'm-1', role: 'user', content: [{ type: 'image', ref: 'bild-1' }] };
+  const stringContent = { id: 'm-2', role: 'user', content: 'roher Text' };
+  const cases = [
+    { name: 'messages fehlt', args: [undefined, userMessage(), 'neu'] },
+    { name: 'messages ist keine Liste', args: ['keine Liste', userMessage(), 'neu'] },
+    { name: 'Nachricht nicht in der Liste', args: [[userMessage()], { id: 'fremd' }, 'neu'] },
+    { name: 'Nachricht ohne Textblock', args: [[withoutText], withoutText, 'neu'] },
+    { name: 'content ist ein String statt Liste', args: [[stringContent], stringContent, 'neu'] },
+  ];
+  for (const { name, args } of cases) {
+    assert.equal(bundle.replacePrompt(...args), null, name);
+  }
 });
 
 test('Ersetzung: eine nicht auffindbare Nachricht fuehrt zum Roh-Prompt', async () => {

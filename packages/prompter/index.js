@@ -492,6 +492,30 @@ async function enhance(ctx, config, prompt, context, signal) {
   return { outcome: 'accepted', reasons: [], result: parsed.result };
 }
 
+/**
+ * Den One-Shot fahren, ohne dass ein Fehler in UNSEREM Code den Schritt bricht.
+ *
+ * `enhance` soll nie werfen — aber „soll" ist keine Zusage, und der Fall ist
+ * nicht theoretisch: die Signal-Konstruktion im Aufruf wirft bei kaputter
+ * Konfiguration (gemessen: `timeoutMs: -1` → RangeError ERR_OUT_OF_RANGE,
+ * `NaN` → RangeError, ein fremdes Signal → TypeError) und liegt VOR dem try des
+ * Modellaufrufs. Ein werfender Aufruf waere kein Fallback, sondern ein kaputter
+ * Nutzer-Schritt: der Loop saehe den Enhancer, den es nicht geben darf. Deshalb
+ * wird jeder solche Fall zu einem benannten Verwerfen — Roh-Prompt gilt, Grund steht.
+ *
+ * Die Grenze ist bewusst schmal: Fehler von `next()` sind NICHT unsere Fehler
+ * und werden hier nicht gefangen (siehe onPreStep).
+ */
+async function enhanceGuarded(ctx, config, prompt, context, signal) {
+  try {
+    return await enhance(ctx, config, prompt, context, signal);
+  } catch (error) {
+    const name = error?.constructor?.name ?? 'Error';
+    console.error(`[shinon-prompter] interner Fehler (${name}) — Roh-Prompt gilt`);
+    return { outcome: 'rejected', reasons: [`INTERNAL_ERROR:${name}`], result: null };
+  }
+}
+
 /** Wie der Kontext zu dieser Entscheidung stand — sichtbar, statt still. */
 function contextLabel(mode, contextState, used) {
   if (mode === 'MAX') return used ? 'used' : contextState === 'invalid' ? 'invalid' : 'missing';
@@ -532,8 +556,11 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   }
 
   const context = config.mode === 'MAX' ? runtime.context : null;
-  const outcome = await enhance(ctx, config, prompt.text, context, payload.signal);
+  const outcome = await enhanceGuarded(ctx, config, prompt.text, context, payload.signal);
   outcome.contextUsed = config.mode === 'MAX' && context !== null;
+
+  // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
+  // und darf nicht in einen zweiten next() umgedeutet werden.
   const decision = await next();
 
   const messages = outcome.outcome === 'accepted'
@@ -562,7 +589,13 @@ function report(ctx, config, record) {
     if (record.outcome === 'unavailable') console.warn(`[shinon-prompter] nicht verfuegbar (${detail}) — Roh-Prompt gilt`);
     else console.warn(`[shinon-prompter] verworfen (${detail}) — Roh-Prompt gilt`);
   }
-  if (typeof ctx?.emit === 'function') ctx.emit(DECISION_CHANNEL, record);
+  try {
+    if (typeof ctx?.emit === 'function') ctx.emit(DECISION_CHANNEL, record);
+  } catch (error) {
+    // Gemessen: ein werfender Zuhoerer kommt bis hierher durch. Die Entscheidung
+    // ist gefallen, die Spur ist Nebensache — sie darf den Schritt nicht mitreissen.
+    console.error(`[shinon-prompter] Spur nicht zustellbar (${error?.message}) — Entscheidung bleibt`);
+  }
 }
 
 /**
