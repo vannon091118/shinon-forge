@@ -66,13 +66,19 @@ const digest = (text, length = 12) => createHash('sha256').update(String(text)).
  * Event-Schema: die erzeugten Datensätze und ihre acht Vertragsfelder.
  *
  * Das Schema IST der Envelope-Contract-Gate — es validiert und wirft
- * `ValidationError`. Ein zusätzlicher `validateEvent()` würde nur nachprüfen,
- * was hier schon steht; er ist entfallen, weil keine Verhaltensanforderung ihn
- * brauchte (die Schema-Prüfung deckt Länge und Pflichtfelder ab, und `event_id`
- * ist per Konstruktion `evt-` + 12 Hex-Zeichen).
+ * `ValidationError`.
+ *
+ * `required()` trägt diese Zusage: in Schemastery sind Objekt-Schlüssel
+ * **optional**. Ohne `required()` lieferte `normalizeEvent({})` hier ein
+ * Ergebnis statt eines Fehlers — `{"payload_ref": ""}` —, ein hohler Datensatz
+ * hätte den Gate also passiert. Das ist geschlossen.
+ *
+ * `payload_ref` behält seinen `.default('')`: der Vertrag aus Wave 2 erklärt
+ * das Feld ausdrücklich als vorbelegt, und das ist eine andere Zusage als
+ * "Pflichtfeld".
  */
 export const EventSchema = z.object({
-  event_id: z.string().min(1, 'event_id muss nicht leer sein'),
+  event_id: z.string().min(1, 'event_id muss nicht leer sein').required(),
   event_type: z.union([
     z.const('session.created'),
     z.const('message.received'),
@@ -84,13 +90,13 @@ export const EventSchema = z.object({
     z.const('gate.passed'),
     z.const('action.blocked'),
     z.const('agent.pre-step'),
-  ]),
-  session_id: z.string().min(1, 'session_id muss nicht leer sein'),
-  source: z.const('dsh'),
-  timestamp: z.string().min(1, 'timestamp muss nicht leer sein'),
+  ]).required(),
+  session_id: z.string().min(1, 'session_id muss nicht leer sein').required(),
+  source: z.const('dsh').required(),
+  timestamp: z.string().min(1, 'timestamp muss nicht leer sein').required(),
   payload_ref: z.string().default(''),
-  contract: z.string().min(1, 'contract muss nicht leer sein'),
-  trace_id: z.string().min(1, 'trace_id muss nicht leer sein'),
+  contract: z.string().min(1, 'contract muss nicht leer sein').required(),
+  trace_id: z.string().min(1, 'trace_id muss nicht leer sein').required(),
 });
 
 /**

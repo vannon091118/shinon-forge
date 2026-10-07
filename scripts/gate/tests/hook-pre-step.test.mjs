@@ -177,6 +177,30 @@ test('Korrelation: ein Schritt erzeugt genau einen Datensatz mit allen acht Vert
   dispose();
 });
 
+/**
+ * Regression: Schemastery-Schlüssel sind optional, ein fehlendes Array wird
+ * still mit `[]` gefüllt. Ohne `required()` hätte `normalizeEvent({})` deshalb
+ * ein Ergebnis geliefert (`{"payload_ref":""}`) statt eines Fehlers — der
+ * Contract-Gate hätte einen hohlen Datensatz durchgelassen.
+ */
+test('Datensatz: ein unvollständiger Envelope wird abgelehnt', () => {
+  const full = bundle.buildStepEnvelope(bundle.readStep(stepPayload()), { clock: '2026-10-07T00:00:00.000Z' });
+  assert.equal(bundle.normalizeEvent(full).event_type, bundle.TRACE_EVENT_TYPE, 'der vollständige Datensatz passiert');
+
+  const cases = [
+    { name: 'leeres Objekt', envelope: {} },
+    { name: 'ohne event_id', envelope: { ...full, event_id: undefined } },
+    { name: 'ohne session_id', envelope: { ...full, session_id: undefined } },
+    { name: 'ohne contract', envelope: { ...full, contract: undefined } },
+    { name: 'ohne trace_id', envelope: { ...full, trace_id: undefined } },
+    { name: 'leere event_id', envelope: { ...full, event_id: '' } },
+    { name: 'unbekannter event_type', envelope: { ...full, event_type: 'gibt.es.nicht' } },
+  ];
+  for (const { name, envelope } of cases) {
+    assert.throws(() => bundle.normalizeEvent(envelope), /Normalisierung fehlgeschlagen/, name);
+  }
+});
+
 test('Korrelation: die Spur folgt der Schritt-Identität, nicht der Uhr', async () => {
   const { ctx, traces, dispose } = connect({ clock: '2026-10-07T00:00:00.000Z' });
   await dispatch(ctx, stepPayload({ turn: 1, step: 1 }), loopDefault(claimed, undefined));
