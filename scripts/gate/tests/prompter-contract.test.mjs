@@ -27,7 +27,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -42,10 +42,14 @@ const root = dshRoot();
 assert.ok(root !== null, 'dsh muss im PATH liegen (dshRoot() ist null) — wie beim Profiltest');
 const require = createRequire(join(root, 'package.json'));
 
+/** Verzeichnis der geladenen Paketkopie — fuer Pfade, die am Paket aufgeloest werden. */
+let bundleDir = '';
+
 /** Das Bundle isoliert laden, mit dem ECHTEN Schemastery der DSH-Installation. */
 async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-prompter-test-'));
-  cpSync(PACKAGE_DIR, join(work, 'pkg'), { recursive: true });
+  bundleDir = join(work, 'pkg');
+  cpSync(PACKAGE_DIR, bundleDir, { recursive: true });
   const shim = join(work, 'pkg/node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(
@@ -396,6 +400,46 @@ test('Kontextblock: ein Pfad mit Markup kann den Block nicht aufbrechen', () => 
   assert.ok(block.includes('<file path="a&quot;&gt;&lt;x&gt;">'), 'das Attribut ist entschaerft');
   assert.equal(block.split('<file ').length - 1, 1, 'genau ein Dateielement');
   assert.ok(block.endsWith('</untrusted_project_context>'));
+});
+
+/**
+ * Der Patch nennt `contextPath` relativ zum Paket — genau so wird es jemand
+ * eintragen. Die anderen Faelle nutzen absolute Pfade und wuerden diese Zusage
+ * nicht pruefen.
+ */
+test('Kontextvertrag: ein relativer contextPath wird am Paket aufgeloest', async () => {
+  const name = 'test-context.json';
+  writeFileSync(join(bundleDir, name), JSON.stringify(dummyContext));
+  try {
+    assert.equal(bundle.loadContext(`./${name}`).project, 'shinon-forge');
+
+    const llm = fakeLlm(reply(goodResult()));
+    const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: `./${name}` }, { llm });
+    const claimed = [userMessage()];
+
+    await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+    assert.equal(records[0].outcome, 'accepted', 'ein relativer Pfad muss bis in den Aufruf tragen');
+    assert.equal(records[0].context, 'used');
+    assert.ok(llm.calls[0].messages[0].content[1].text.includes('<file path="packages/prompter/index.js">'));
+    dispose();
+  } finally {
+    rmSync(join(bundleDir, name), { force: true });
+  }
+});
+
+test('Kontextvertrag: ein fehlender relativer Pfad sperrt MAX, statt zu raten', async () => {
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: './gibt-es-nicht.json' }, { llm });
+  const claimed = [userMessage()];
+  const downstream = { kind: 'enter', messages: claimed };
+
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
+
+  assert.equal(decision, downstream);
+  assert.equal(llm.calls.length, 0);
+  assert.deepEqual(records[0].reasons, ['CONTEXT_INVALID']);
+  dispose();
 });
 
 test('Kontextvertrag: unvollstaendige Kontexte werden abgelehnt', () => {
