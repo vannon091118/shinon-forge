@@ -47,6 +47,23 @@ export const CONTRACT = 'shinon.project-index/v1';
 /** Fassung des Schemas; ein anderer Wert macht einen vorhandenen Index ungueltig. */
 export const SCHEMA_VERSION = 1;
 
+/**
+ * Fassung der EXTRAKTION — der Grund, warum es diesen Marker gibt:
+ *
+ * Der Lauf ist inkrementell (Plan §11). Eine unveraenderte Datei wird deshalb
+ * NICHT neu geparst. Wird die Extraktion geaendert (hier: Sprachregistry mit
+ * Ueberschriften, Abhaengigkeitskanten und Prosa-Ausschluss), dann bleiben die
+ * Zeilen der unveraenderten Dateien auf dem alten Stand — gemessen im Live-Boot:
+ * nach dem Parserwechsel standen 643 Symbole im Index statt der gemessenen rund
+ * 1030, weil nur 12 Dateien neu geschrieben wurden. Ein Index, der seine eigene
+ * Herkunft nicht kennt, ist damit still falsch. Also traegt er sie: eine andere
+ * Fassung verwirft den Index und baut ihn neu auf.
+ *
+ * Erhoehen heisst: die Bedeutung des Inhalts hat sich geaendert, auch wenn die
+ * Tabellen gleich geblieben sind.
+ */
+export const INDEXER_VERSION = 2;
+
 /** Wurzel aller Indizes — ausserhalb jedes Projekts. */
 export const DEFAULT_INDEX_ROOT = join(homedir(), '.shinon', 'indexes');
 
@@ -196,8 +213,8 @@ export function listFiles(root, extensions = SOURCE_EXTENSIONS) {
 }
 
 /**
- * Symbole einer Datei: eine Zeile liefert hoechstens ein Symbol, das erste
- * passende Muster gewinnt.
+ * Symbole im Code (JavaScript/TypeScript): eine Zeile liefert hoechstens ein
+ * Symbol, das erste passende Muster gewinnt.
  *
  * Grenze, die nicht behauptet, sondern gebaut ist: Zeilen, die in einem
  * Blockkommentar stehen oder mit `//`, `/*` oder `*` beginnen, werden
@@ -206,7 +223,7 @@ export function listFiles(root, extensions = SOURCE_EXTENSIONS) {
  * Zeilen mitgefuehrt, weil die Doc-Kommentare dieses Repos sonst als Code
  * gelesen wuerden.
  */
-export function extractSymbols(text) {
+function codeSymbols(text) {
   const symbols = [];
   let inBlockComment = false;
   text.split('\n').forEach((line, index) => {
@@ -232,8 +249,8 @@ export function extractSymbols(text) {
   return symbols;
 }
 
-/** Kanten einer Datei: Importe, Requires, dynamische Importe, je Ziel einmal. */
-export function extractEdges(text) {
+/** Kanten im Code: Importe, Requires, dynamische Importe, je Ziel einmal. */
+function codeEdges(text) {
   const edges = [];
   const seen = new Set();
   text.split('\n').forEach((line) => {
@@ -248,6 +265,121 @@ export function extractEdges(text) {
   });
   return edges;
 }
+
+/** Eine Markdown-Ueberschrift: `## Titel`, abschliessende `#` erlaubt. */
+export const MARKDOWN_HEADING = /^#{1,6}\s+(.+?)\s*#*$/;
+
+/**
+ * Ueberschriften in Markdown — best effort und FENCE-BEWUSST.
+ *
+ * Warum fence-bewusst: gemessen stehen in diesem Repo 16 der 391 Ueberschriften
+ * innerhalb von Code-Fences. Sie mitzuzaehlen wuerde ein Beispiel im Dokument zur
+ * Struktur des Dokuments machen. Eine Ueberschrift ist eine definierte Form, kein
+ * Heuristikprodukt — deshalb ist sie hier ein Symbol (kind `heading`).
+ */
+function markdownSymbols(text) {
+  const symbols = [];
+  let fence = false;
+  text.split('\n').forEach((line, index) => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fence = !fence;
+      return;
+    }
+    if (fence) return;
+    const match = MARKDOWN_HEADING.exec(line);
+    if (match === null) return;
+    symbols.push({ name: match[1], kind: 'heading', line: index + 1 });
+  });
+  return symbols;
+}
+
+/** Felder, die in einer Manifest-Datei Abhaengigkeiten benennen. */
+export const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
+
+/**
+ * Kanten aus JSON — mit dem EINEN Parser, der in dieser Runtime verfuegbar ist:
+ * `JSON.parse` ist eingebaut und immer da (gemessen: 42 von 42 JSON-Dateien
+ * dieses Repos parsen fehlerfrei). Eine Datei, die nicht parst, liefert keine
+ * Kanten statt eines Abbruchs — best effort heisst auch, dass ein Fehlschlag
+ * nicht den ganzen Lauf bricht.
+ */
+function jsonEdges(text) {
+  let document;
+  try {
+    document = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (typeof document !== 'object' || document === null || Array.isArray(document)) return [];
+  const edges = [];
+  for (const field of DEPENDENCY_FIELDS) {
+    const block = document[field];
+    if (typeof block !== 'object' || block === null || Array.isArray(block)) continue;
+    for (const name of Object.keys(block).sort()) edges.push({ kind: 'dependency', target: name });
+  }
+  return edges;
+}
+
+/** Der Extraktor ohne Parser: die Datei ist Text, sie hat keine Symbole oder Kanten. */
+const textOnly = { parser: 'keiner (nur Text)', symbols: () => [], edges: () => [] };
+
+/**
+ * Die Parser-Registry: Sprache -> verfuegbarer Parser -> Symbole / Kanten.
+ *
+ * `parser` benennt, WELCHER Parser traegt. Die Zuordnung ist gemessen
+ * (Docs/probes/project-index-parserstrategie.json), nicht behauptet:
+ *
+ *   javascript/jsx/typescript/tsx  KEIN Parser. acorn, espree, meriyah,
+ *       typescript, @babel/parser und esprima sind weder im Repo noch in der
+ *       DSH-Installation aufloesbar. Also zeilenbasiert, best effort.
+ *   json  `JSON.parse` — eingebaut, immer verfuegbar; traegt die Kanten.
+ *   markdown  KEIN Parser (marked, gray-matter nicht aufloesbar); Ueberschriften
+ *       sind die best-effort-Struktur.
+ *   yaml  KEIN Parser, der aus DIESEM Paket erreichbar waere. `yaml`/`js-yaml`
+ *       liegen in der DSH-Installation als internes Beiwerk einer Fassung; sie
+ *       zu benutzen bindet das Paket an eine nicht deklarierte Abhaengigkeit und
+ *       schliesst den Worker aus. Also Text, ohne Symbolbegriff.
+ *
+ * Diese Registry ist die Erweiterungsstelle fuer spaetere AST-Parser: ein echter
+ * Parser wird hier eingetragen, der Lauf bleibt unveraendert. Heute traegt sie
+ * keine AST-Zusage.
+ */
+const codeParser = { parser: 'zeilenbasiert (kein Parser aufloesbar)', symbols: codeSymbols, edges: codeEdges };
+export const PARSERS = {
+  javascript: codeParser,
+  jsx: codeParser,
+  typescript: codeParser,
+  tsx: codeParser,
+  json: { parser: 'JSON.parse', symbols: () => [], edges: jsonEdges },
+  markdown: { parser: 'zeilenbasiert, Ueberschriften (kein Parser aufloesbar)', symbols: markdownSymbols, edges: () => [] },
+  yaml: textOnly,
+  text: textOnly,
+};
+
+/** Der Extraktor einer Sprache. Unbekannte Sprachen sind Text — ohne Zusage. */
+export function parserFor(language) {
+  return PARSERS[language] ?? textOnly;
+}
+
+/** Symbole einer Datei in ihrer Sprache (Standard: Code). */
+export function extractSymbols(text, language = 'javascript') {
+  return parserFor(language).symbols(text);
+}
+
+/** Kanten einer Datei in ihrer Sprache (Standard: Code). */
+export function extractEdges(text, language = 'javascript') {
+  return parserFor(language).edges(text);
+}
+
+/**
+ * Symbolarten, die als Referenzziele zaehlen.
+ *
+ * Prosa (Ueberschriften) und Textdateien zaehlen NICHT: der Name 'Notizen' aus
+ * einer Markdown-Ueberschrift wuerde sonst in jedem Satz, der das Wort benutzt,
+ * als Referenz auf ein Symbol gezaehlt. Ein Referenzziel ist ein Bezeichner, der
+ * im Code wieder auftauchen kann.
+ */
+export const REFERENCABLE_KINDS = new Set(['function', 'class', 'const', 'export', 'method']);
 
 /**
  * Referenzen: wo ein BEKANNTES Symbol auftaucht. Zweistufig — erst alle Symbole
@@ -307,15 +439,25 @@ export function openIndex(file) {
   db.exec('pragma journal_mode = wal');
   db.exec('create table if not exists meta(key text primary key, value text not null)');
 
-  const contract = metaValue(db, 'contract');
-  const version = metaValue(db, 'schema_version');
-  const incompatible = (contract !== null && contract !== CONTRACT) || (version !== null && version !== String(SCHEMA_VERSION));
+  const stored = {
+    contract: metaValue(db, 'contract'),
+    schema_version: metaValue(db, 'schema_version'),
+    indexer_version: metaValue(db, 'indexer_version'),
+  };
+  // Ein LEERER Index ist kein fremder Index: geprueft wird nur, was schon gebaut war.
+  const built = stored.contract !== null || stored.schema_version !== null;
+  const incompatible =
+    built &&
+    (stored.contract !== CONTRACT ||
+      stored.schema_version !== String(SCHEMA_VERSION) ||
+      stored.indexer_version !== String(INDEXER_VERSION));
   if (incompatible) {
     for (const table of [FTS_TABLE, ...PRIMARY_TABLES]) db.exec(`drop table if exists "${table}"`);
   }
 
   for (const statement of SCHEMA) db.exec(statement);
   setMeta(db, 'schema_version', String(SCHEMA_VERSION));
+  setMeta(db, 'indexer_version', String(INDEXER_VERSION));
   setMeta(db, 'contract', CONTRACT);
   return db;
 }
@@ -325,6 +467,7 @@ export function indexMeta(db) {
   return {
     contract: metaValue(db, 'contract'),
     schema_version: metaValue(db, 'schema_version'),
+    indexer_version: metaValue(db, 'indexer_version'),
     root: metaValue(db, 'root'),
     symbols_digest: metaValue(db, 'symbols_digest'),
     updated_at_ms: metaValue(db, 'updated_at_ms'),
@@ -345,16 +488,19 @@ function forgetFile(db, path) {
  */
 function indexFile(db, root, absolute, file, options) {
   const path = toProjectPath(root, absolute);
+  const language = languageOf(path) ?? 'text';
   const digest = createHash('sha256').update(file.text).digest('hex');
   forgetFile(db, path);
 
   db.prepare('insert or replace into files(path, language, bytes, mtime_ms, digest, indexed_at_ms) values (?, ?, ?, ?, ?, ?)')
-    .run(path, languageOf(path) ?? 'text', file.bytes, file.mtimeMs, digest, Date.now());
+    .run(path, language, file.bytes, file.mtimeMs, digest, Date.now());
 
+  // Die Extraktion richtet sich nach dem Dateityp (Parser-Registry), nicht nach
+  // einer Annahme: eine Markdown-Datei wird anders gelesen als ein Modul.
   const insertSymbol = db.prepare('insert or ignore into symbols(path, name, kind, line) values (?, ?, ?, ?)');
-  for (const symbol of extractSymbols(file.text)) insertSymbol.run(path, symbol.name, symbol.kind, symbol.line);
+  for (const symbol of extractSymbols(file.text, language)) insertSymbol.run(path, symbol.name, symbol.kind, symbol.line);
 
-  const edges = extractEdges(file.text);
+  const edges = extractEdges(file.text, language);
   const insertEdge = db.prepare('insert or ignore into edges(path, kind, target) values (?, ?, ?)');
   for (const edge of edges) insertEdge.run(path, edge.kind, edge.target);
 
@@ -392,25 +538,38 @@ function resolveTouches(root, entry, known) {
  * Einen Indexlauf fahren — inkrementell nach Plan §11:
  *
  *   stat -> mtime+size gleich?  ja: nicht einmal lesen (unchanged)
- *        -> sonst lesen und sha256 vergleichen
+ *        -> sonst lesen und sha256 vergleichen (hashed)
  *             gleicher Hash: nur die Dateizeile auffrischen (rehashed)
  *             neuer Hash:    neu parsen und die Primaerdaten ersetzen (written)
  *
+ * Damit ist 'kein vollstaendiger Rebuild' ZAEHLBAR statt behauptet: der Bericht
+ * nennt, wie viele Dateien gelesen (hashed) und wie viele neu geparst (written)
+ * wurden. Ein zweiter Lauf ohne Dateiaenderung hat hashed = 0 und written = 0.
+ *
+ * VERIFY (Umgang mit Zeitstempel-Problemen): `verify: 'changed'` (Standard)
+ * vertraut mtime+size und liest eine als unveraendert erkannte Datei nicht.
+ * Das hat eine benannte Luecke: ein Werkzeug, das den Inhalt bei GLEICHER Groesse
+ * aendert und die mtime zuruecksetzt, wird nicht erkannt. `verify: 'all'` liest
+ * und hasht jede Datei und schliesst diese Luecke — zum Preis eines Vollauf-Lesens.
+ *
  * Der Lauf wirft nicht wegen einer einzelnen Datei; er gibt einen Bericht
- * zurueck. Der Referenzdurchgang laeuft nur, wenn sich die Symbolmenge
- * geaendert hat (sonst nur fuer die neu geschriebenen Dateien), und die
- * Touch-Aufloesung raeumt Ziele weg, die es nicht mehr gibt.
+ * zurueck. Der Referenzdurchgang laeuft nur, wenn sich die Menge der
+ * Referenzziele geaendert hat (sonst nur fuer die neu geschriebenen Dateien), und
+ * die Touch-Aufloesung raeumt Ziele weg, die es nicht mehr gibt.
  */
 export function updateIndex(db, root, options = {}) {
   const chunkLines = options.chunkLines ?? 40;
   const maxFileBytes = options.maxFileBytes ?? 262144;
+  const verify = options.verify ?? 'changed';
   const files = listFiles(root, options.extensions ?? SOURCE_EXTENSIONS);
   const report = {
     root: resolve(root),
+    verify,
     files: files.length,
-    written: 0,
-    rehashed: 0,
     unchanged: 0,
+    hashed: 0,
+    rehashed: 0,
+    written: 0,
     skipped: 0,
     removed: 0,
     references: 0,
@@ -435,7 +594,8 @@ export function updateIndex(db, root, options = {}) {
         continue;
       }
       const before = previous.get(path);
-      if (before !== undefined && before.bytes === info.size && before.mtime_ms === Math.round(info.mtimeMs)) {
+      const untouched = before !== undefined && before.bytes === info.size && before.mtime_ms === Math.round(info.mtimeMs);
+      if (untouched && verify === 'changed') {
         report.unchanged += 1;
         continue;
       }
@@ -446,6 +606,7 @@ export function updateIndex(db, root, options = {}) {
         report.skipped += 1;
         continue;
       }
+      report.hashed += 1;
       const digest = createHash('sha256').update(file.text).digest('hex');
       if (before !== undefined && before.digest === digest) {
         db.prepare('update files set language = ?, bytes = ?, mtime_ms = ?, indexed_at_ms = ? where path = ?')
@@ -463,8 +624,16 @@ export function updateIndex(db, root, options = {}) {
       report.removed += 1;
     }
 
-    // Referenzen: die Symbolmenge entscheidet, ob ALLE Dateien neu geprueft werden.
-    const names = db.prepare('select distinct name from symbols order by name').all().map((row) => row.name);
+    // Referenzen: die Menge der Referenzziele entscheidet, ob ALLE Dateien neu
+    // geprueft werden. Referenzziel ist nur, was ein Bezeichner sein kann —
+    // Ueberschriften und Textdateien zaehlen nicht.
+    const names = [
+      ...new Set(
+        db.prepare('select distinct name, kind from symbols').all()
+          .filter((row) => REFERENCABLE_KINDS.has(row.kind))
+          .map((row) => row.name),
+      ),
+    ].sort();
     const digest = createHash('sha256').update(names.join('\n')).digest('hex').slice(0, 16);
     report.symbolsChanged = metaValue(db, 'symbols_digest') !== digest;
     const rescanned = report.symbolsChanged ? db.prepare('select path from files order by path').all().map((row) => row.path) : written.map((entry) => entry.path);
@@ -518,7 +687,7 @@ export function runIndex(options) {
   const indexRoot = resolve(options.indexRoot ?? DEFAULT_INDEX_ROOT);
   const db = openIndex(indexPath(indexRoot, root));
   try {
-    return updateIndex(db, root, { maxFileBytes: options.maxFileBytes, chunkLines: options.chunkLines });
+    return updateIndex(db, root, { maxFileBytes: options.maxFileBytes, chunkLines: options.chunkLines, verify: options.verify });
   } finally {
     db.close();
   }

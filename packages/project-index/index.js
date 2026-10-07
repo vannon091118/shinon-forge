@@ -40,6 +40,15 @@ export const Config = z.object({
   maxFileBytes: z.number().default(262144),
   /** Fenstergroesse der Chunks in Zeilen. */
   chunkLines: z.number().default(40),
+  /**
+   * Wie der Lauf Unveraendertheit feststellt:
+   *   'changed'  mtime + size; unveraenderte Dateien werden nicht gelesen.
+   *              Benannte Luecke: derselbe Inhalt bei gleicher Groesse und
+   *              zurueckgesetzter mtime bleibt unbemerkt.
+   *   'all'      jede Datei lesen und sha256 pruefen; schliesst die Luecke zum
+   *              Preis eines Vollauf-Lesens.
+   */
+  verify: z.union([z.const('changed'), z.const('all')]).default('changed'),
   /** Bericht nach dem Lauf. */
   trace: z.boolean().default(true),
   /** Lauf im Worker statt im Host (Plan §12). Aus heisst: Lauf im Host. */
@@ -49,8 +58,9 @@ export const Config = z.object({
 /** Ein Bericht in einer Zeile — die Auskunft, die der Host protokolliert. */
 function reportLine(report, stats, where) {
   return (
-    `[shinon-project-index] Lauf im ${where}: ${report.written} neu, ${report.rehashed} nur aufgefrischt, ` +
-    `${report.unchanged} unveraendert, ${report.removed} entfernt, ${report.skipped} uebersprungen, ` +
+    `[shinon-project-index] Lauf im ${where} (verify=${report.verify}): ${report.written} neu, ` +
+    `${report.rehashed} nur aufgefrischt, ${report.hashed} gelesen, ${report.unchanged} unveraendert, ` +
+    `${report.removed} entfernt, ${report.skipped} uebersprungen, ` +
     `${report.references} Referenzen, ${report.touches} Touches — ${stats?.files ?? '?'} Dateien, ` +
     `${stats?.symbols ?? '?'} Symbole, ${stats?.chunks ?? '?'} Chunks`
   );
@@ -74,6 +84,7 @@ export function apply(ctx, config) {
     indexRoot: resolve(config.indexRoot === '' ? DEFAULT_INDEX_ROOT : config.indexRoot),
     maxFileBytes: config.maxFileBytes,
     chunkLines: config.chunkLines,
+    verify: config.verify,
   };
   const file = indexPath(options.indexRoot, options.root);
 
