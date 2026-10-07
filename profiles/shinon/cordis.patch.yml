@@ -20,17 +20,29 @@
     provider: agnes
     model: agnes-2.5-flash
 
-# Task Router (Plan §16): die SCHWELLE ist eine Entscheidung, keine Konstante im
-# Code. Deshalb steht der wirksame Wert hier und nicht im Paket, wo nur der
-# Schema-Default liegt. threshold=2 heisst: MULTI_STEP_TASK (2) und
-# LONG_RUNNING_GOAL (3) sind Goal-Kandidaten, CHAT/LOOKUP/TRANSFORM (0) nie.
-# minRawLength=24 ist die Substanzgrenze: ein Zweiwortsatz, den das Modell fuer
-# einen Mehrschritt-Auftrag haelt, wird zurueckgestuft — die einzige
+# Task Router (Plan §16/§17): die SCHWELLE und die STOP-POLICY sind
+# Entscheidungen, keine Konstanten im Code. Deshalb stehen die wirksamen Werte
+# hier und nicht im Paket, wo nur die Schema-Defaults liegen.
+#
+# threshold=2: MULTI_STEP_TASK (2) und LONG_RUNNING_GOAL (3) sind
+# Goal-Kandidaten, CHAT/LOOKUP/TRANSFORM (0) nie.
+# minRawLength=24: die Substanzgrenze — ein Zweiwortsatz, den das Modell fuer
+# einen Mehrschritt-Auftrag haelt, wird zurueckgestuft. Die einzige
 # deterministische Tatsache der Entscheidung, die nicht vom Modell kommt.
+#
+# activate=true ist die Aktivierungsentscheidung aus §17 (Shinon) und die
+# bewussteste Zeile in dieser Datei: ein Kandidat erzeugt dann ein echtes
+# DSH-Goal (ctx.goals), das DSHs Round-Driver bis zur Obergrenze fortsetzt —
+# pro Runde ein vollstaendiger Agentenschritt mit Modellaufrufen. maxGoalRounds
+# ist deshalb SHINONS Stop-Policy: DSH selbst erlaubt 256 Runden
+# (defaultMaxGoalRounds). Zum Abschalten genuegt `activate: false`.
+# Ein bereits bestehendes Goal wird NIE automatisch ueberschrieben.
 - id: shinon-task-router
   config:
     threshold: 2
     minRawLength: 24
+    activate: true
+    maxGoalRounds: 6
 
 # @shinon/core owns the sidebar brand. 'sidebar.brand.mark' and
 # 'sidebar.brand.name' are single slots (exactly one occupant), so the shipped

@@ -559,6 +559,10 @@ test('Laden: das Bundle registriert sich am echten Waterfall', async () => {
   assert.equal(records[0].contract, bundle.CONTRACT);
   assert.equal(records[0].intentClassification, 'TRANSFORM');
   assert.equal(records[0].context, 'not-applicable');
+  // Die Sitzung traegt die Zuordnung fuer §17: der Task Router muss die
+  // Klassifikation einem LEBENDEN Agenten zuordnen koennen, und das geht nur
+  // ueber die Sitzung — nicht ueber die Reihenfolge der Nachrichten.
+  assert.equal(records[0].session_id, 'sess-1');
   dispose();
 });
 

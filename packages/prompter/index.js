@@ -594,11 +594,17 @@ function contextLabel(mode, contextState, used) {
 /**
  * Provenienz-Datensatz: was entschieden wurde, ohne den Prompt-Text zu kopieren.
  * Genau einer pro Schritt — auch im Randfall, damit die Spur nicht doppelt laeuft.
+ *
+ * `session_id` traegt die Zuordnung, nicht den Inhalt: der Task Router (§17) muss
+ * die Klassifikation einem LEBENDEN Agenten zuordnen, und `ctx.goals` akzeptiert
+ * nur die exakte Instanz der Registry — ueber die Sitzung ist sie eindeutig.
+ * Ohne dieses Feld waere die Zuordnung ein Raten nach Reihenfolge.
  */
-function decisionRecord(config, runtime, outcome, rawLength) {
+function decisionRecord(config, runtime, outcome, rawLength, sessionId) {
   const result = outcome.result;
   return {
     contract: CONTRACT,
+    session_id: typeof sessionId === 'string' ? sessionId : '',
     mode: config.mode,
     outcome: outcome.outcome,
     reasons: outcome.reasons,
@@ -615,12 +621,13 @@ function decisionRecord(config, runtime, outcome, rawLength) {
 async function onPreStep(ctx, config, runtime, payload, next) {
   const prompt = readPrompt(payload);
   if (prompt === null) return next();
+  const sessionId = payload?.agent?.session?.id;
 
   if (config.mode === 'MAX' && runtime.contextState !== 'loaded') {
     // MAX ohne Kontext gibt es nicht: Code-Referenzen und Touches waeren
     // erfunden. Also wird der Modus abgelehnt, nicht weichgespuelt.
     const reason = runtime.contextState === 'invalid' ? 'CONTEXT_INVALID' : 'MODE_NEEDS_CONTEXT';
-    report(ctx, config, decisionRecord(config, runtime, { outcome: 'unavailable', reasons: [reason], result: null }, prompt.text.length));
+    report(ctx, config, decisionRecord(config, runtime, { outcome: 'unavailable', reasons: [reason], result: null }, prompt.text.length, sessionId));
     return next();
   }
 
@@ -637,7 +644,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     : null;
 
   if (outcome.outcome === 'accepted' && messages !== null) {
-    report(ctx, config, decisionRecord(config, runtime, outcome, prompt.text.length));
+    report(ctx, config, decisionRecord(config, runtime, outcome, prompt.text.length, sessionId));
     return { ...decision, messages };
   }
 
@@ -646,7 +653,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   const rejected = messages === null && outcome.outcome === 'accepted'
     ? { ...outcome, outcome: 'rejected', reasons: ['MESSAGE_NOT_FOUND'] }
     : outcome;
-  report(ctx, config, decisionRecord(config, runtime, rejected, prompt.text.length));
+  report(ctx, config, decisionRecord(config, runtime, rejected, prompt.text.length, sessionId));
   return decision;
 }
 

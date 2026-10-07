@@ -31,7 +31,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -76,7 +76,16 @@ process.on('exit', () => {
 });
 const prompter = loaded.prompter;
 const router = loaded['task-router'];
-const { Context } = await import(pathToFileURL(createRequire(join(dshRoot(), 'package.json')).resolve('@deepseek-ai/cordis')).href);
+
+const dshRequire = createRequire(join(dshRoot(), 'package.json'));
+const { Context } = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/cordis')).href);
+/**
+ * Die ECHTE Goal-Domaene der installierten Fassung — fuer den API-Pin (§17:
+ * „Die tatsaechlichen API-Namen muessen aus der installierten DSH-Version
+ * geprueft werden") und fuer die echten Fehlertypen in den Attrappen.
+ */
+const goalPackage = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/dsh-goal')).href);
+const { GoalError } = goalPackage;
 
 function quiet(fn) {
   const saved = { log: console.log, warn: console.warn, error: console.error };
@@ -238,10 +247,14 @@ test('Das Etikett ist notwendig, nicht ausreichend — es kann nichts erzwingen'
   const forged = { ...strong, intentClassification: 'MULTI_STEP_TASK', goal: true, outcome: 'goal' };
   assert.equal(router.decide(forged, { threshold: 3 }).goal, false, 'ein mitgeschicktes goal-Feld aendert die Entscheidung nicht');
 
-  // Kein Goal-State, keine Mutation: die Ausfuhr des Pakets bietet keine API,
-  // die einen Goal-Zustand anlegt, startet oder stoppt (§17 baut den Anschluss).
-  const api = Object.keys(router).filter((name) => /^(start|stop|create|mutate|set|activate).*goal|^goal/i.test(name));
-  assert.deepEqual(api, [], 'der Router darf keine Goal-State-API anbieten');
+  // Und aus dem Etikett allein entsteht auch kein Goal: die Aktivierung (§17)
+  // braucht den Schalter UND einen lebenden Agenten UND einen vorhandenen
+  // Dienst. Der Default des Pakets ist aus — ein kopiertes Paket erzeugt
+  // nichts von selbst.
+  assert.equal(router.Config({}).activate, false, 'ohne Profilwert wird nicht aktiviert');
+  const host = { get: () => ({ create: () => ({ id: 'x' }) }) };
+  assert.equal(router.activateGoal(host, router.Config({}), { pending: new Map() }, strong).reason, 'ACTIVATION_DISABLED');
+  assert.equal(router.activateGoal(host, router.Config({ activate: true }), { pending: new Map() }, strong).reason, 'NO_LIVE_AGENT');
   assert.equal(router.OUTCOMES.join(','), 'goal,linear', 'und nur diese zwei Ausgaenge');
 });
 
@@ -283,22 +296,62 @@ const result = (over = {}) => JSON.stringify({
  * der Enhancer emittiert seinen validierten Datensatz auf dem echten Bus, und
  * der Router liest ihn dort.
  */
-function chain({ prompterConfig = {}, routerConfig = {}, llm } = {}) {
+function chain({ prompterConfig = {}, routerConfig = {}, llm, goals, routerFirst = false } = {}) {
   const ctx = new Context();
   const decisions = [];
   const prompterRecords = [];
   ctx.provide('llm', llm);
+  if (goals !== undefined) ctx.provide(router.GOAL_SERVICE, goals);
   ctx.on(prompter.DECISION_CHANNEL, (record) => prompterRecords.push(record));
   ctx.on(router.DECISION_CHANNEL, (decision) => decisions.push(decision));
   // Die Bundles ueber ihre apply()-Schnittstelle an den ECHTEN Context haengen:
   // derselbe Bus, derselbe Waterfall, derselbe Schemastery — und der Disposer
   // ist so der, den das Paket wirklich zurueckgibt.
-  const prompterDispose = quiet(() => prompter.apply(ctx, prompter.Config({ provider: 'test-route', model: 'test-model', ...prompterConfig })));
-  const routerDispose = quiet(() => router.apply(ctx, router.Config({ ...routerConfig })));
-  return { ctx, decisions, prompterRecords, prompterDispose, routerDispose };
+  const mountPrompter = () => quiet(() => prompter.apply(ctx, prompter.Config({ provider: 'test-route', model: 'test-model', ...prompterConfig })));
+  const mountRouter = () => quiet(() => router.apply(ctx, router.Config({ ...routerConfig })));
+  // `routerFirst` dreht die Registrierungsreihenfolge um: die Zuordnung von
+  // Agent und Absicht darf nicht an einer Reihenfolge haengen.
+  const [first, second] = (routerFirst ? [mountRouter, mountPrompter] : [mountPrompter, mountRouter]).map((mount) => mount());
+  return {
+    ctx,
+    decisions,
+    prompterRecords,
+    prompterDispose: routerFirst ? second : first,
+    routerDispose: routerFirst ? first : second,
+  };
 }
 
 const RAW = 'bitte baue die zwoelf neuen module und teste sie danach gruendlich';
+
+/**
+ * Eine Attrappe des ECHTEN Goal-Dienstes: genau die Methoden, die der Router
+ * aufruft, mit derselben Signatur (`get(agent)`, `create(agent, request)`) und
+ * den echten Fehlertypen aus der installierten Fassung.
+ */
+function fakeGoals({ current = undefined, fail = null } = {}) {
+  const calls = { get: [], create: [] };
+  return {
+    calls,
+    get(agent) {
+      calls.get.push(agent);
+      if (fail === 'get') throw new GoalError('agent nicht live', 'GOAL_AGENT_NOT_LIVE');
+      return current;
+    },
+    create(agent, request) {
+      calls.create.push({ agent, request });
+      if (fail === 'create') throw new GoalError('schon vorhanden', 'GOAL_ALREADY_EXISTS');
+      return {
+        id: 'goal-1',
+        revision: 1,
+        phase: 'active',
+        activation: 'armed',
+        objective: request.objective,
+        maxGoalRounds: request.maxGoalRounds ?? 256,
+        roundsStarted: 0,
+      };
+    },
+  };
+}
 
 test('Kette: die validierte Klassifikation des Enhancers entscheidet den Router', async () => {
   const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
@@ -317,7 +370,12 @@ test('Kette: die validierte Klassifikation des Enhancers entscheidet den Router'
   assert.equal(decision.weight, 2);
   assert.equal(decision.threshold, 2);
   assert.equal(decision.rawLength, prompterRecords[0].rawLength, 'dieselbe Laenge, die der Enhancer gemessen hat');
-  assert.deepEqual(Object.keys(decision).sort(), ['contract', 'intent', 'minRawLength', 'outcome', 'rawLength', 'reason', 'threshold', 'weight']);
+  assert.deepEqual(
+    Object.keys(decision).sort(),
+    ['activated', 'activation', 'contract', 'goalId', 'intent', 'maxGoalRounds', 'minRawLength', 'outcome', 'rawLength', 'reason', 'threshold', 'weight'],
+  );
+  assert.equal(decision.activated, false, 'ohne Schalter entsteht kein Goal');
+  assert.equal(decision.activation, 'ACTIVATION_DISABLED');
   prompterDispose();
   routerDispose();
 });
@@ -366,11 +424,11 @@ test('Der Router mutiert nichts: kein Dienst, kein State, nur ein Datensatz', as
   // Ein Host, der jede schreibende Absicht sichtbar macht. Waere hier ein
   // `set`/`provide` dabei, waere die Zusage aus §16 („Das LLM darf nicht alleine
   // Goal-State mutieren") nicht mehr geprueft, sondern nur behauptet.
-  const seen = { on: [], emit: [], set: [], provide: [] };
+  const seen = { on: [], emit: [], set: [], provide: [], handlers: new Map() };
   const host = {
     on: (name, handler) => {
       seen.on.push(name);
-      seen.handler = handler;
+      seen.handlers.set(name, handler);
       return () => seen.on.push(`dispose:${name}`);
     },
     emit: (name, payload) => seen.emit.push({ name, payload }),
@@ -378,11 +436,13 @@ test('Der Router mutiert nichts: kein Dienst, kein State, nur ein Datensatz', as
     provide: (name, value) => seen.provide.push({ name, value }),
   };
   const dispose = quiet(() => router.apply(host, router.Config({})));
-  const listener = seen.handler;
+  const listener = seen.handlers.get(router.SOURCE_CHANNEL);
 
   listener(prompterRecord({ intentClassification: 'LONG_RUNNING_GOAL', rawLength: LONG.length }));
 
-  assert.deepEqual(seen.on, [router.SOURCE_CHANNEL], 'genau ein Kanal, der Eingang');
+  // Drei Listener, jeder mit einer Aufgabe: der Wasserfall merkt Agent und
+  // Absicht vor, der Eingang entscheidet, das Lifecycle-Ereignis raeumt weg.
+  assert.deepEqual(seen.on, [router.PRE_STEP_EVENT, router.SOURCE_CHANNEL, router.DISPOSED_EVENT], 'genau diese drei Kanaele');
   assert.deepEqual(seen.set, [], 'kein Schreiben von Zustand');
   assert.deepEqual(seen.provide, [], 'kein Registrieren eines Dienstes');
   assert.equal(seen.emit.length, 1, 'genau eine Meldung');
@@ -434,4 +494,212 @@ test('Laden: nach dispose entscheidet nichts mehr', async () => {
 
   assert.equal(decisions.length, 0, 'kein Zuhoerer, keine Entscheidung');
   prompterDispose();
+});
+
+// ── d. §17: die Aktivierung ueber DSHs vorhandenen Goal-Mechanismus ────────
+
+/**
+ * §17 verlangt zwei Dinge, die man nicht glauben, sondern nachsehen kann:
+ *   (a) „Nicht selbst implementieren: while (goal.active)" — der eigene Code
+ *       enthaelt keine Schleife, keinen Timer und keinen Goal-Zustand.
+ *   (b) „Die tatsaechlichen API-Namen muessen aus der installierten DSH-Version
+ *       geprueft werden" — der Dienst, den wir aufrufen, existiert dort mit
+ *       genau diesen Methoden, und DSHs eigene Rundenobergrenze ist 256.
+ */
+test('§17: der eigene Code enthaelt keinen Goal-Mechanismus, und die aufgerufene API existiert', () => {
+  const source = readFileSync(new URL('../../../packages/task-router/index.js', import.meta.url), 'utf8');
+  // Kommentare raus: die ERKLAERUNG darf `while (goal.active)` zitieren, der
+  // Code darf es nicht enthalten. Prosa ist keine Implementierung.
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  for (const verboten of ['while (', 'for (;;', 'setInterval', 'setTimeout', 'queueMicrotask']) {
+    assert.equal(code.includes(verboten), false, `kein eigener Goal-/Schritt-Mechanismus: ${verboten}`);
+  }
+  assert.equal(code.includes('goal.active'), false, 'kein eigener Goal-Zustand');
+
+  // Der Dienstname und die Methoden, die wir wirklich aufrufen.
+  assert.equal(router.GOAL_SERVICE, 'goals', 'ctx.goals — so deklariert DSH den Dienst');
+  assert.equal(router.PRE_STEP_EVENT, 'agent/pre-step');
+  assert.ok(code.includes('ctx.get(GOAL_SERVICE)'), 'der Dienst wird ueber ctx.get gelesen (ohne Injektionszwang)');
+  const service = goalPackage.default;
+  assert.equal(typeof service?.prototype?.get, 'function', 'ctx.goals.get(agent) existiert');
+  assert.equal(typeof service?.prototype?.create, 'function', 'ctx.goals.create(agent, request) existiert');
+  assert.equal(typeof GoalError, 'function', 'GoalError ist der Fehlertyp der Domaene');
+
+  // DSHs Rundenobergrenze ist 256 — die kleinere Zahl ist SHINONS Stop-Policy.
+  const resolved = service.Config({});
+  assert.equal(resolved.defaultMaxGoalRounds, 256, 'DSHs Default, gemessen');
+  assert.ok(router.DEFAULT_MAX_GOAL_ROUNDS < resolved.defaultMaxGoalRounds, 'Shinons Policy ist die engere Grenze');
+  assert.equal(router.Config({ activate: true }).activate, true);
+  assert.equal(router.Config({}).activate, false, 'ein kopiertes Paket aktiviert nichts von selbst');
+});
+
+test('§17: ein Kandidat wird zu einem echten Goal — mit der rohen Absicht und Shinons Runde', async () => {
+  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const goals = fakeGoals();
+  const { ctx, decisions, prompterRecords, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true } });
+  const payload = stepPayload([userMessage(RAW)]);
+
+  await ctx.waterfall(prompter.PRE_STEP_EVENT, payload, loopDefault(payload.messages));
+
+  assert.equal(goals.calls.create.length, 1, 'genau ein DSH-Goal fuer einen Kandidaten');
+  assert.equal(goals.calls.create[0].agent, payload.agent, 'die EXAKTE Agenten-Instanz, keine nachgebaute Identitaet');
+  assert.equal(goals.calls.create[0].request.objective, RAW, 'die ABSICHT des Menschen — nicht der veredelte Prompt');
+  assert.equal(goals.calls.create[0].request.maxGoalRounds, router.DEFAULT_MAX_GOAL_ROUNDS, 'Shinons Stop-Policy reist mit');
+  assert.equal(prompterRecords[0].session_id, 'sess-1', 'die Zuordnung kommt aus dem Datensatz des Enhancers');
+
+  const decision = decisions[0];
+  assert.equal(decision.outcome, 'goal');
+  assert.equal(decision.activated, true);
+  assert.equal(decision.activation, 'ACTIVATED');
+  assert.equal(decision.goalId, 'goal-1');
+  assert.equal(decision.maxGoalRounds, router.DEFAULT_MAX_GOAL_ROUNDS, 'die geltende Grenze steht im Datensatz');
+  assert.deepEqual(goals.calls.get.length, 1, 'vor dem Erzeugen wird nach einem vorhandenen Goal gefragt');
+  prompterDispose();
+  routerDispose();
+});
+
+test('§17: eine vorhandene Absicht wird NIE automatisch ueberschrieben', async () => {
+  const llm = fakeLlm(result({ intentClassification: 'LONG_RUNNING_GOAL' }));
+  const goals = fakeGoals({ current: { id: 'mensch-1', revision: 7, phase: 'paused' } });
+  const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true } });
+  const payload = stepPayload([userMessage(RAW)]);
+
+  await ctx.waterfall(prompter.PRE_STEP_EVENT, payload, loopDefault(payload.messages));
+
+  assert.deepEqual(goals.calls.create, [], 'kein create, kein Ueberschreiben');
+  assert.equal(decisions[0].outcome, 'goal', 'die Entscheidung bleibt ein Kandidat');
+  assert.equal(decisions[0].activated, false);
+  assert.equal(decisions[0].activation, 'GOAL_EXISTS:paused', 'und der Grund nennt die Phase');
+  prompterDispose();
+  routerDispose();
+});
+
+test('§17: ohne Dienst, ohne Schalter oder ohne lebenden Agenten entsteht kein Goal', async () => {
+  const cases = [
+    { name: 'Dienst fehlt', goals: undefined, routerConfig: { activate: true }, activation: 'NO_GOAL_SERVICE', creates: 0 },
+    { name: 'Schalter aus', goals: fakeGoals(), routerConfig: {}, activation: 'ACTIVATION_DISABLED', creates: 0 },
+    // Der Agent ist nicht der lebende dieser Registry: DSH lehnt schon das Lesen
+    // ab, also wird gar nicht erst erzeugt.
+    { name: 'Agent nicht live', goals: fakeGoals({ fail: 'get' }), routerConfig: { activate: true }, activation: 'GOAL_ERROR:GOAL_AGENT_NOT_LIVE', creates: 0 },
+    // Hier WIRD erzeugt und DSH lehnt ab — der Versuch ist sichtbar, das Goal nicht.
+    { name: 'DSH lehnt ab', goals: fakeGoals({ fail: 'create' }), routerConfig: { activate: true }, activation: 'GOAL_ERROR:GOAL_ALREADY_EXISTS', creates: 1 },
+  ];
+  for (const { name, goals, routerConfig, activation, creates } of cases) {
+    const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+    const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig });
+    const payload = stepPayload([userMessage(RAW)]);
+
+    await ctx.waterfall(prompter.PRE_STEP_EVENT, payload, loopDefault(payload.messages));
+
+    assert.equal(decisions.length, 1, name);
+    assert.equal(decisions[0].outcome, 'goal', `${name}: die ENTSCHEIDUNG gilt unabhaengig von der Aktivierung`);
+    assert.equal(decisions[0].activated, false, name);
+    assert.equal(decisions[0].activation, activation, name);
+    assert.equal(decisions[0].goalId, '', name);
+    if (goals !== undefined) assert.equal(goals.calls.create.length, creates, `${name}: Versuche vs. Goals`);
+    prompterDispose();
+    routerDispose();
+  }
+
+  // Ohne vorgemerkten Schritt ist die Zuordnung nicht geraten: kein Goal.
+  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const goals = fakeGoals();
+  const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true } });
+  ctx.emit(prompter.DECISION_CHANNEL, { contract: prompter.CONTRACT, session_id: 'unbekannt', intentClassification: 'MULTI_STEP_TASK', rawLength: 128 });
+  assert.equal(decisions[0].activation, 'NO_LIVE_AGENT');
+  assert.deepEqual(goals.calls.create, []);
+  prompterDispose();
+  routerDispose();
+});
+
+test('§17: die Zuordnung haengt nicht an der Registrierungsreihenfolge', async () => {
+  // Der Router merkt sich Agent und Absicht am Wasserfall VOR der Entscheidung,
+  // weil der Enhancer seinen Datensatz erst nach dem Durchlauf emittiert. Diese
+  // Eigenschaft wird gemessen, statt sie anzunehmen — mit umgedrehter
+  // Reihenfolge der beiden Bundles.
+  for (const routerFirst of [false, true]) {
+    const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+    const goals = fakeGoals();
+    const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true }, routerFirst });
+    const payload = stepPayload([userMessage(RAW)]);
+
+    await ctx.waterfall(prompter.PRE_STEP_EVENT, payload, loopDefault(payload.messages));
+
+    assert.equal(decisions[0]?.activation, 'ACTIVATED', `routerFirst=${routerFirst}`);
+    assert.equal(goals.calls.create.length, 1, `routerFirst=${routerFirst}`);
+    prompterDispose();
+    routerDispose();
+  }
+});
+
+test('§17: ohne Sitzung im Datensatz wird nicht geraten', async () => {
+  const linear = fakeLlm(result({ intentClassification: 'TRANSFORM' }));
+
+  // Kontrolle: genau EINE Vormerkung — die Zuordnung ist eindeutig, also wird
+  // ein Datensatz ohne session_id angenommen.
+  const single = chain({ llm: linear, goals: fakeGoals(), routerConfig: { activate: true } });
+  const one = stepPayload([userMessage(RAW)]);
+  await single.ctx.waterfall(prompter.PRE_STEP_EVENT, one, loopDefault(one.messages));
+  single.ctx.emit(prompter.DECISION_CHANNEL, { contract: prompter.CONTRACT, intentClassification: 'MULTI_STEP_TASK', rawLength: 128 });
+  assert.equal(single.decisions[1].activation, 'ACTIVATED', 'eine eindeutige Vormerkung genuegt');
+  single.prompterDispose();
+  single.routerDispose();
+
+  // Zwei Sitzungen vorgemerkt, ein Datensatz ohne Sitzung: jede Zuordnung waere
+  // geraten — und ein geratenes Goal ist schlimmer als keines.
+  const goals = fakeGoals();
+  const many = chain({ llm: linear, goals, routerConfig: { activate: true } });
+  const first = stepPayload([userMessage(RAW)]);
+  const second = { ...stepPayload([userMessage(RAW)]), agent: { session: { id: 'sess-2' } } };
+  await many.ctx.waterfall(prompter.PRE_STEP_EVENT, first, loopDefault(first.messages));
+  await many.ctx.waterfall(prompter.PRE_STEP_EVENT, second, loopDefault(second.messages));
+  many.ctx.emit(prompter.DECISION_CHANNEL, { contract: prompter.CONTRACT, intentClassification: 'MULTI_STEP_TASK', rawLength: 128 });
+  assert.equal(many.decisions[2].outcome, 'goal', 'die Entscheidung faellt trotzdem');
+  assert.equal(many.decisions[2].activation, 'NO_LIVE_AGENT', 'aber ohne geratene Zuordnung');
+  assert.deepEqual(goals.calls.create, [], 'kein Goal aus einer Vermutung');
+  many.prompterDispose();
+  many.routerDispose();
+});
+
+test('§17: der Dienst darf SPAETER kommen — wie im echten Boot', async () => {
+  // Im echten Profil stellt DSH die Goal-Domaene erst nach unseren Layern bereit
+  // (gemessen: der Sichtbarkeitscheck beim Mounten meldete "nicht sichtbar",
+  // obwohl die Domaene aktiv ist). Deshalb wird der Dienst JE ENTSCHEIDUNG
+  // gesucht — dieser Test faehrt genau diese Reihenfolge.
+  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const goals = fakeGoals();
+  const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, routerConfig: { activate: true } });
+  // Erst hier — nach dem Mounten beider Bundles.
+  ctx.provide(router.GOAL_SERVICE, goals);
+  const payload = stepPayload([userMessage(RAW)]);
+
+  await ctx.waterfall(prompter.PRE_STEP_EVENT, payload, loopDefault(payload.messages));
+
+  assert.equal(decisions[0].activation, 'ACTIVATED', 'ein spaet bereitgestellter Dienst wird gefunden');
+  assert.equal(goals.calls.create.length, 1);
+  prompterDispose();
+  routerDispose();
+});
+
+test('§17: die Absicht ist die MENSCHLICHE Nachricht, und eine tote Sitzung ist keine Quelle', async () => {
+  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const goals = fakeGoals();
+  const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true } });
+  // Gemischter Batch wie im echten Betrieb: Harness-Kontext davor und dahinter.
+  const payload = stepPayload([
+    { id: 'h-1', role: 'user', content: [{ type: 'text', text: 'Agent instructions: du bist ein Helfer.' }], source: { kind: 'harness' } },
+    userMessage(RAW),
+    { id: 'h-2', role: 'user', content: [{ type: 'text', text: 'Kontext: 3 neue Werkzeugergebnisse' }], source: { kind: 'tool' } },
+  ]);
+
+  await ctx.waterfall(prompter.PRE_STEP_EVENT, payload, loopDefault(payload.messages));
+  assert.equal(goals.calls.create[0].request.objective, RAW, 'Harness-Text ist keine Absicht');
+
+  // Lifecycle: eine beendete Sitzung ist keine Quelle mehr.
+  ctx.emit(router.DISPOSED_EVENT, { agent: payload.agent });
+  ctx.emit(prompter.DECISION_CHANNEL, { contract: prompter.CONTRACT, session_id: 'sess-1', intentClassification: 'MULTI_STEP_TASK', rawLength: 128 });
+  assert.equal(decisions[1].activation, 'NO_LIVE_AGENT', 'nach dem Ende der Sitzung wird nicht mehr aktiviert');
+  assert.equal(goals.calls.create.length, 1, 'kein zweites Goal');
+  prompterDispose();
+  routerDispose();
 });

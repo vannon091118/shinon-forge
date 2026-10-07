@@ -1,11 +1,12 @@
 /**
  * shinon-task-router — Client-Hälfte.
  *
- * Keine autonome Aktion und KEINE eigene Policy: die Entscheidung fällt im Host
- * (`index.js`), weil sie dort nachprüfbar ist. Der Client spiegelt die geltende
- * Policy nur lesbar, damit im Browser nachvollziehbar ist, WELCHE Schwelle
- * gerade gilt — eine Anzeige, die dieselbe Zahl errät statt sie zu lesen, wäre
- * eine zweite Wahrheit.
+ * Keine autonome Aktion und KEINE eigene Policy: die Entscheidung UND die
+ * Aktivierung fallen im Host (`index.js`), weil sie dort nachprüfbar sind. Der
+ * Client spiegelt nur lesbar, damit im Browser nachvollziehbar ist, welche
+ * Schwelle gilt und ob ein Goal entstand — eine Anzeige, die dieselben Zahlen
+ * errät statt sie zu lesen, wäre eine zweite Wahrheit. Kein Goal-State hier:
+ * den führt DSH, und ihn zu duplizieren hiesse, ihm zu widersprechen.
  *
  * Kein Config-Schema hier (die Konfiguration lebt im Host), kein Goal-State:
  * §16 endet bei goal/no goal; die Goal-Anzeige gehört zur Projektion (§22).
@@ -31,7 +32,10 @@ window.__ModuleLoader__.load({
           ctx.on(DECISION_CHANNEL, (decision) => {
             mirror.last = decision ?? null;
             mirror.decisions.push(decision);
-            console.log(`[shinon-task-router-client] ${decision?.outcome ?? 'unbekannt'} (${decision?.reason ?? '—'})`);
+            // Die Aktivierung ist eine eigene Auskunft: die Entscheidung kann
+            // `goal` sein, waehrend kein Goal entstand (§17, Schalter/Agent).
+            const goal = decision?.activated === true ? `goal ${decision.goalId || '(ohne id)'}` : `kein goal (${decision?.activation ?? '—'})`;
+            console.log(`[shinon-task-router-client] ${decision?.outcome ?? 'unbekannt'} / ${goal} (${decision?.reason ?? '—'})`);
           });
         }
         window.__shinon_task_router = mirror;
