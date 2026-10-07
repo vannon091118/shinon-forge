@@ -6,11 +6,22 @@
  * duplizieren (wie Feed-the-Floors lib/commit-text.mjs, hier für Shinon).
  *
  * Zwei Regeln, beide fail-closed:
- *   1. Kein KI-Footer. Nie. Auch nicht als Co-Autor, auch nicht als Emoji-Zeile.
+ *   1. Kein KI-Footer. Nie — und in keiner Schreibweise: `with`/`by`, eine oder
+ *      mehrere Leerzeichen, Tabs, optionaler Doppelpunkt.
  *   2. Der Vannon-Trailer ist Pflicht — er ersetzt jede Maschinen-Signatur.
  *
  * Der Trailer ist bewusst ein Datenwert an EINER Stelle: ändert sich die
  * Schreibweise, ändert sich hier etwas, und CI, Hook, Gate und Tests ziehen mit.
+ *
+ * Prüfen und Tauschen benutzen dasselbe zeilenweise Prädikat
+ * (`forbiddenLabelsOf`). Daraus folgt die Invariante, die die Tests pinnen:
+ *
+ *     swapTrailer(n) !== n  ⇒  checkMessage(n).ok === false
+ *     checkMessage(n).ok    ⇒  swapTrailer(n) entfernt keine Inhaltszeile
+ *
+ * Heißt: was der lokale Hook entfernt, muss CI auch ohne Hook ablehnen. Keine
+ * Ebene repariert heimlich, was die andere durchwinkt. Signaturen sind
+ * zeilenweise — geprüft wird die Zeile, nicht der Fließtext.
  */
 
 /** Der Trailer, der jeden Commit abschließt. */
@@ -30,22 +41,60 @@ const fold = (text) => String(text).replace(/[—–]/g, '-').replace(/\s+/g, ' 
 
 export const TRAILER_FOLDED = fold(VANNON_TRAILER);
 
-/** Verbotene Footer: jede Zeile, die eine Maschine als Autor ausgibt. */
+/** Die Namen, die als KI-Autor gelten. Eine Liste, alle Regeln greifen darauf zu. */
+const AI_NAMES = 'codebuff|claude|chatgpt|chat gpt|gpt|copilot|gemini|cursor|aider|openai|anthropic|devin|codex|qwen';
+
+/** Verben, mit denen sich eine Maschine als Autor ausgibt. */
+const SIGNATURE_VERBS = 'generated|made|written|created|powered';
+
+/** Die Co-Autor-Regel als Textbaustein (Tests und Ausgabe teilen ihn). */
+export const CO_AUTHOR_RULE =
+  'co-authored-by ist verboten (auch für Menschen) — stattdessen den Vannon-Trailer verwenden';
+
+/**
+ * Verbotene Footer-Zeilen. Jede Regel wird ZEILENWEISE geprüft (`^` = Zeilen-
+ * Anfang) — dieselbe Prüfung entscheidet darüber, was der Tausch entfernt.
+ *
+ * Absichtlich tolerant: `\s+` statt eines Leerzeichens, `with`/`by` gleichwertig,
+ * optionaler Doppelpunkt. Eine Signatur, die sich durch ein Tab versteckt, ist
+ * noch dieselbe Signatur.
+ */
 export const FORBIDDEN_LINES = [
   { re: /noreply@codebuff\.com/i, label: 'Codebuff-Signatur (noreply@codebuff.com)' },
-  { re: /generated with\s+(codebuff|claude|chatgpt|chat gpt|gpt|copilot|gemini|cursor|aider|openai|anthropic|devin|codex|qwen)/i, label: 'KI-Footer „Generated with …"' },
-  { re: /(co-authored-by|co-authored by|coauthored-by)\s*:?\s*[^\n]*(codebuff|claude|anthropic|openai|copilot|gemini|cursor|gpt)/i, label: 'KI-Co-Author-Trailer' },
-  { re: /powered by\s+(chatgpt|claude|gemini|openai|anthropic)/i, label: 'KI-Signatur „powered by …"' },
-  { re: /^\s*[🤖🦊]\s*(generated|written|made|created)\s+with\b/i, label: 'KI-Emoji-Signatur' },
-  { re: /^\s*generated with\b/i, label: 'Footer „Generated with …"' },
+  {
+    re: new RegExp(`\\b(${SIGNATURE_VERBS})\\s+(with|by)\\s*:?\\s*(${AI_NAMES})`, 'i'),
+    label: 'KI-Signatur „… with/by <KI>"',
+  },
+  {
+    re: new RegExp(`(co-authored-by|co-authored by|coauthored-by)\\s*:?\\s*[^\\n]*(${AI_NAMES})`, 'i'),
+    label: 'KI-Co-Author-Trailer',
+  },
+  { re: /^[ \t]*(generated|made)[ \t]+(with|by)\b/i, label: 'Footer „Generated with/by …"' },
+  { re: /^[ \t]*[🤖🦊][ \t]*(generated|written|made|created)\b/i, label: 'KI-Emoji-Signatur' },
 ];
 
-/** Ist diese Zeile ein verbotener Footer? `#`-Kommentare bleiben unberührt. */
-export function isForbiddenFooterLine(line) {
+/**
+ * Alle Verstöße einer einzelnen Zeile. Die EINE Prüfung: `checkMessage` ruft sie
+ * für jede Zeile, `swapTrailer` entfernt genau die Zeilen mit Ergebnis > 0.
+ * `#`-Kommentarzeilen bleiben unberührt (git schneidet sie selbst ab).
+ *
+ * @returns {string[]} Verstoß-Beschreibungen (leer ⇒ Zeile ist in Ordnung).
+ */
+export function forbiddenLabelsOf(line) {
   const text = String(line ?? '');
-  if (text.trim().startsWith('#')) return false;
-  if (!ALLOW_CO_AUTHORED_BY && /^\s*co-authored-by\s*:/i.test(text)) return true;
-  return FORBIDDEN_LINES.some(({ re }) => re.test(text));
+  if (text.trim().startsWith('#')) return [];
+
+  const labels = [];
+  if (!ALLOW_CO_AUTHORED_BY && /^[ \t]*co-authored-by[ \t]*:/i.test(text)) labels.push(CO_AUTHOR_RULE);
+  for (const { re, label } of FORBIDDEN_LINES) {
+    if (re.test(text)) labels.push(`verbotener Footer: ${label}`);
+  }
+  return labels;
+}
+
+/** Ist diese Zeile ein verbotener Footer? */
+export function isForbiddenFooterLine(line) {
+  return forbiddenLabelsOf(line).length > 0;
 }
 
 /** Trägt die Nachricht den Vannon-Trailer (in den letzten drei inhaltlichen Zeilen)? */
@@ -58,19 +107,22 @@ export function hasVannonTrailer(raw) {
 }
 
 /**
- * Nachricht prüfen.
+ * Nachricht prüfen — zeilenweise, mit demselben Prädikat wie der Tausch.
  * @returns {{ ok: boolean, violations: string[], hasTrailer: boolean }}
  */
 export function checkMessage(raw) {
   const text = String(raw ?? '');
   const violations = [];
+  const seen = new Set();
 
-  for (const { re, label } of FORBIDDEN_LINES) {
-    if (re.test(text)) violations.push(`verbotener Footer: ${label}`);
+  for (const line of text.split('\n')) {
+    for (const label of forbiddenLabelsOf(line)) {
+      if (seen.has(label)) continue;
+      seen.add(label);
+      violations.push(label);
+    }
   }
-  if (!ALLOW_CO_AUTHORED_BY && /^\s*co-authored-by\s*:/im.test(text)) {
-    violations.push('co-authored-by ist verboten (auch für Menschen) — stattdessen den Vannon-Trailer verwenden');
-  }
+
   const hasTrailer = hasVannonTrailer(text);
   if (!hasTrailer) {
     violations.push(`Vannon-Trailer fehlt — erwartet als letzte Zeile: ${VANNON_TRAILER}`);

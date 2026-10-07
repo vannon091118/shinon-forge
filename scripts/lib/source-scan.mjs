@@ -53,8 +53,18 @@ export function findForbidden(source, tokens, options = {}) {
   return tokens.filter((token) => haystack.includes(token));
 }
 
-/** Pflicht-Token im Laufzeitcode finden (ohne Kommentare/Strings). */
-export function findMissing(source, tokens) {
-  const code = codeOnly(source);
-  return tokens.filter((token) => !code.includes(token));
+/**
+ * Pflicht-Token finden.
+ * @param {{ mode?: 'code' | 'module' | 'raw' }} [options]
+ *   code   — ohne Kommentare und ohne Strings (Standard: der Token muss Code sein)
+ *   module — ohne Kommentare, mit Strings; für Pflicht-Token, die selbst Strings
+ *            sind (Slot-Namen, Speicherschlüssel, Vertrags-Vorlagen)
+ *   raw    — ungefiltert
+ * Dieselbe Genauigkeits-Regel wie findForbidden — nur die andere Richtung
+ * (hier fehlen Token, dort sind welche verboten).
+ */
+export function findMissing(source, tokens, options = {}) {
+  const mode = options.mode ?? 'code';
+  const haystack = mode === 'raw' ? String(source) : mode === 'module' ? stripComments(source) : codeOnly(source);
+  return tokens.filter((token) => !haystack.includes(token));
 }
