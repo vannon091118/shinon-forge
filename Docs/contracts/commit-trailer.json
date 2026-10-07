@@ -1,7 +1,11 @@
 {
   "name": "Commit-Regeln — kein KI-Footer, Vannon-Trailer Pflicht",
-  "status": "NOT_VERIFIED",
-  "note": "Regeln, Hook-Kette, Gate-Plugin und Bereichs-Scan sind gebaut und getestet (29 Tests in scripts/gate/tests/commit-trailer.test.mjs, commit-trailer-Gate, npm run commit:guard). Der CI-Weg entscheidet den Bereich jetzt selbst (--ci → scripts/lib/ci-range.mjs) und wird nie enger. Nicht geprüft: ein echter GitHub-Actions-Lauf — der Workflow existiert, wurde aber noch nie von CI ausgeführt. Deshalb NOT_VERIFIED statt IMPLEMENTED.",
+  "status": "IMPLEMENTED",
+  "note": "Regeln, Hook-Kette, Gate-Plugin und Bereichs-Scan sind gebaut und getestet (29 Tests in scripts/gate/tests/commit-trailer.test.mjs, commit-trailer-Gate, npm run commit:guard). Der CI-Weg entscheidet den Bereich selbst (--ci → scripts/lib/ci-range.mjs) und wird nie enger. Ein echter GitHub-Actions-Lauf ist bestätigt: Run 37571432238 (push auf main, 2026-10-07) hat den Bereich 'cab7d50..c08fd96 (Push: before..after)' aufgelöst, den Commit sauber gemeldet und alle 94 Gate-Tests gefahren — grün. Lokal ebenso verifiziert: Hooks haben beim eigenen Commit gegriffen (prepare tauscht, commit-msg prüft). Offen: ein roter CI-Lauf (ein Verstoß im gepushten Bereich) ist nur offline in temporären Repos belegt, nicht in CI; und die zwei Alt-Commits vor diesem Wächter verletzen die Regel noch (sichtbar über npm run commit:guard -- --all).",
+  "evidence": [
+    "gh run list → Commit-Wächter & Persona-Runtime … Shinon Commit Guard … push … success (37571432238, 9s)",
+    "npm test / npm run gate:full / npm run build lokal grün; .githooks aktiv über core.hooksPath=.githooks"
+  ],
   "rules": [
     {
       "positive": "Jede Commit-Nachricht endet mit dem Vannon-Trailer. Lokal tauscht prepare-commit-msg verbotene Footer aus, commit-msg prüft danach fail-closed.",
