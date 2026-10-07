@@ -144,6 +144,23 @@ function fixtureProject(label) {
   return dir;
 }
 
+/**
+ * Ein Projekt, das lange genug laeuft, um den Eventloop zu beobachten: viele
+ * Dateien mit vielen Symbolen. Gemessen (150 Dateien, 30 Zeilen): der Lauf im
+ * Host dauert rund 1,6 s und bedient dabei KEINEN Timer, derselbe Lauf im
+ * Worker rund 1,9 s und laesst 187 Timer feuern.
+ */
+function bigProject(label, files = 150, lines = 30) {
+  const dir = join(workDir(label), 'projekt');
+  mkdirSync(join(dir, 'src'), { recursive: true });
+  for (let index = 0; index < files; index += 1) {
+    const body = Array.from({ length: lines }, (_, line) => `export const wert${index}_${line} = ${line};`).join('\n');
+    writeFileSync(join(dir, 'src', `datei${index}.mjs`), `${body}\n`);
+  }
+  writeFileSync(join(dir, 'package.json'), '{"name":"gross"}\n');
+  return dir;
+}
+
 /** Der Index eines Fixture-Projekts, ausserhalb des Projekts. */
 function fixtureIndex(project, label) {
   const indexRoot = join(workDir(label), 'indexes');
@@ -924,6 +941,99 @@ test('Indexdatei: ein unveraenderter Start berechnet keinen SHA erneut', () => {
   assert.equal(third.rehashed, 1, 'gleicher SHA: nur auffrischen');
   assert.equal(third.written, 0, 'gleicher SHA: kein Neuindizieren');
   db.close();
+});
+
+// ══ SQLite und Worker (Plan §12) ══════════════════════════════════════════════
+//
+// §12 hat zwei Zusagen, die man messen kann statt sie zu glauben: der Lauf im
+// Worker darf den kritischen Agent-Eventloop NICHT blockieren — und die
+// Verfuegbarkeit und Version von node:sqlite muss gegen die laufende Runtime
+// geprueft sein, nicht gegen eine Annahme im Kopf.
+
+/**
+ * Der Eventloop wird beobachtet, nicht beschrieben: ein 10-ms-Timer zaehlt
+ * waehrend des Laufs, und die groesste Luecke zwischen zwei Ticks verraet eine
+ * Blockade auch dann, wenn es davor und danach genug Ticks gibt.
+ */
+async function observeLoop(start) {
+  let ticks = 0;
+  let worst = 0;
+  let last = Date.now();
+  const timer = setInterval(() => {
+    const now = Date.now();
+    ticks += 1;
+    worst = Math.max(worst, now - last);
+    last = now;
+  }, 10);
+  const began = Date.now();
+  try {
+    return { ...(await start()), ms: Date.now() - began, ticks, worst };
+  } finally {
+    clearInterval(timer);
+  }
+}
+
+test('Worker: der Lauf laesst den Eventloop laufen, der Lauf im Host blockiert ihn', async () => {
+  const project = bigProject('eventloop');
+  const hostIndex = fixtureIndex(project, 'eventloop-host');
+  const mountIndex = join(workDir('eventloop-mount'), 'indexes');
+
+  // Der Mount ist der Weg, der im echten Host laeuft: Lauf im Worker, Bericht
+  // danach. Er wird ZUERST gemessen, damit die Messung nicht auf dem Muell des
+  // Host-Laufs sitzt (eine Speicherbereinigung im Testprozess erzeugte dort
+  // einmal eine Luecke von 271 ms — gemessen, nicht vermutet).
+  const quiet = collector();
+  let mounted;
+  try {
+    const dispose = bundle.apply({}, bundle.Config({ root: project, indexRoot: mountIndex }));
+    mounted = await observeLoop(async () => {
+      assert.ok(await quiet.waitFor('Lauf im Worker', 60000), `der Bericht muss kommen: ${quiet.lines.join(' | ')}`);
+      return { report: quiet.lines.find((line) => line.includes('Lauf im Worker')) };
+    });
+    dispose();
+    assert.ok(mounted.report.includes('neu'), 'der Bericht ist der des Laufs, nicht eines Fehlers');
+  } finally {
+    quiet.restore();
+  }
+
+  // Der Lauf im HOST ist synchron: waehrend er laeuft, bedient der Prozess
+  // keinen einzigen Timer. Das ist der Grund fuer den Worker UND die Gegenprobe:
+  // die Grenze unten vergleicht sich mit einer echten Blockade, statt eine
+  // geschaetzte Millisekundenzahl zu behaupten.
+  const host = await observeLoop(async () => bundle.runIndex({ root: project, indexRoot: hostIndex.indexRoot }));
+  assert.equal(host.ticks, 0, 'ein synchroner Lauf im Host blockiert den Eventloop vollstaendig');
+  assert.ok(host.ms > 200, `der Fixture-Lauf ist lang genug, um eine Blockade zu sehen: ${host.ms} ms`);
+
+  assert.ok(mounted.ticks >= 5, `waehrend des Laufs laeuft der Loop weiter: ${mounted.ticks} Ticks`);
+  assert.ok(
+    mounted.worst < host.ms / 2,
+    `keine Blockade: groesste Luecke ${mounted.worst} ms gegen eine Blockade von ${host.ms} ms`,
+  );
+});
+
+test('node:sqlite: Verfuegbarkeit und Version gegen die laufende Runtime geprueft', () => {
+  assert.equal(typeof DatabaseSync, 'function', 'node:sqlite liefert DatabaseSync');
+
+  const work = workDir('runtime');
+  const file = join(work, 'index.sqlite');
+  const db = bundle.openIndex(file);
+  const engine = one(db, 'select sqlite_version() as version').version;
+  db.close();
+
+  // Kein festgeschriebener Wert: die Engine muss die Version melden, die die
+  // Runtime meldet. Nennt die Runtime keine, steht diese Grenze im Protokoll —
+  // geprueft ist dann nur die Verfuegbarkeit, und das wird gesagt statt gemeint.
+  assert.match(engine, /^\d+\.\d+\.\d+/, `die Engine nennt eine Version: ${engine}`);
+  const reported = process.versions.sqlite;
+  if (reported === undefined) console.log(`[project-index] die Runtime nennt keine sqlite-Version — geprueft ist nur die Verfuegbarkeit (Engine: ${engine})`);
+  else assert.equal(engine, reported, 'die Version der Engine ist die der Runtime');
+
+  // Und die Datei IST SQLite — am Kopf geprueft, unabhaengig vom Treiber, mit
+  // einer Gegenprobe, damit der Test nicht bloss eine Konstante wiederholt.
+  assert.equal(readFileSync(file).subarray(0, 16).toString('latin1'), 'SQLite format 3\0');
+  const plain = join(work, 'keine-datenbank.txt');
+  writeFileSync(plain, 'keine Datenbank\n');
+  assert.notEqual(readFileSync(plain).subarray(0, 16).toString('latin1'), 'SQLite format 3\0', 'die Kopfprobe unterscheidet wirklich');
 });
 
 // ══ Secret Protection (Plan §13) ═════════════════════════════════════════════
