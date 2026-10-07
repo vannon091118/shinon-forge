@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Shinon commit-msg — fail-closed: kein KI-Footer, Vannon-Trailer Pflicht.
+set -e
+node scripts/commit-guard.mjs --file "$1"

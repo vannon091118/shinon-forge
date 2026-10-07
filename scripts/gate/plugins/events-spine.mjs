@@ -24,6 +24,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { findForbidden, findMissing } from '../../lib/source-scan.mjs';
 
 export const id = 'events-spine';
 
@@ -70,8 +71,9 @@ export const DROP_REASONS = [
  * eine Beobachtung, die schreibt, ausführt, Modelle ruft oder den Host beendet,
  * ist kein Spine mehr. `readFileSync` ist bewusst erlaubt (Vertrag lesen).
  */
+export const FORBIDDEN_MODULES = ['child_process'];
+
 export const FORBIDDEN_TOKENS = [
-  'child_process',
   'execSync',
   'spawn(',
   'writeFile',
@@ -217,17 +219,20 @@ export function fixtureIssues(fixture, asset, file) {
   return issues;
 }
 
-/** Laufzeitgrenze prüfen: beobachten ja, handeln nein. */
+/** Laufzeitgrenze prüfen: beobachten ja, handeln nein. Kommentare zählen nicht als Aufruf. */
 export function staticIssues(source, file) {
   const issues = [];
-  for (const token of ['ctx.on', 'ctx.emit', 'createSpine', 'validateEnvelope']) {
-    if (!source.includes(token)) issues.push(`${file}: ${token} fehlt (Spine-Kern unvollständig)`);
+  for (const token of findMissing(source, ['ctx.on', 'ctx.emit', 'createSpine', 'validateEnvelope'])) {
+    issues.push(`${file}: ${token} fehlt (Spine-Kern unvollständig)`);
   }
-  for (const field of ENVELOPE_FIELDS) {
-    if (!source.includes(field)) issues.push(`${file}: Envelope-Feld ${field} kommt im Laufzeitcode nicht vor`);
+  for (const field of findMissing(source, ENVELOPE_FIELDS)) {
+    issues.push(`${file}: Envelope-Feld ${field} kommt im Laufzeitcode nicht vor`);
   }
-  for (const token of FORBIDDEN_TOKENS) {
-    if (source.includes(token)) issues.push(`${file}: verbotener Aufruf ${token} — der Spine darf nur beobachten, normalisieren, validieren, emittieren`);
+  for (const token of findForbidden(source, FORBIDDEN_MODULES, { mode: 'module' })) {
+    issues.push(`${file}: verbotener Modulimport ${token} — der Spine darf nur beobachten, normalisieren, validieren, emittieren`);
+  }
+  for (const token of findForbidden(source, FORBIDDEN_TOKENS)) {
+    issues.push(`${file}: verbotener Aufruf ${token} — der Spine darf nur beobachten, normalisieren, validieren, emittieren`);
   }
   return issues;
 }

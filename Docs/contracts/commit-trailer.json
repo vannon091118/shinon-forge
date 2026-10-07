@@ -1,0 +1,34 @@
+{
+  "name": "Commit-Regeln — kein KI-Footer, Vannon-Trailer Pflicht",
+  "status": "NOT_VERIFIED",
+  "note": "Regeln, Hook-Kette, Gate-Plugin und Bereichs-Scan sind gebaut und getestet (29 Tests in scripts/gate/tests/commit-trailer.test.mjs, commit-trailer-Gate, npm run commit:guard). Der CI-Weg entscheidet den Bereich jetzt selbst (--ci → scripts/lib/ci-range.mjs) und wird nie enger. Nicht geprüft: ein echter GitHub-Actions-Lauf — der Workflow existiert, wurde aber noch nie von CI ausgeführt. Deshalb NOT_VERIFIED statt IMPLEMENTED.",
+  "rules": [
+    {
+      "positive": "Jede Commit-Nachricht endet mit dem Vannon-Trailer. Lokal tauscht prepare-commit-msg verbotene Footer aus, commit-msg prüft danach fail-closed.",
+      "forbidden": "Ein KI-Footer (Generated with …, Co-Authored-By: Codebuff/Claude/…, powered by …, Emoji-Signatur); co-authored-by überhaupt; ein Commit ohne Trailer.",
+      "fallback": "prepare-commit-msg entfernt die Signaturzeilen und hängt den Trailer an — idempotent, der Body bleibt unverändert.",
+      "error": "COMMIT_TRAILER_MISSING bzw. COMMIT_FOOTER_FORBIDDEN — Exit 1, mit Commit-Kurzhash und Grund je Verstoß.",
+      "trace": "scripts/lib/commit-text.mjs ist die einzige Regelquelle; Hook, Gate und CI importieren dieselbe Datei.",
+      "replay": "checkMessage und swapTrailer sind reine Funktionen: gleicher Text ⇒ gleiche Verstöße, gleicher Tausch; der Test prüft Idempotenz.",
+      "invariant": "checkMessage(eingefrorene Codebuff-Signatur).ok === false und checkMessage(Nachricht mit Trailer).ok === true."
+    },
+    {
+      "positive": "CI prüft jeden Push und Pull Request ohne Filter — jeder Commit des Bereichs wird gegen dieselben Regeln geprüft.",
+      "forbidden": "Ein paths-/branches-Filter oder eine Bedingung, die den Job überspringt; ein grüner Job bei vorhandenem Verstoß im Bereich.",
+      "fallback": "Ist der Bereich nicht auflösbar (neuer Branch mit Null-SHA, Force-Push, Shallow-Clone, unbekanntes Event, kaputte Event-Datei), prüft der Wächter die volle Historie der Spitze — mehr, nie weniger.",
+      "error": "Exit 1 mit Liste der Verstöße; der Job bleibt rot, bis die Historie sauber ist.",
+      "trace": ".github/workflows/commit-guard.yml (push/pull_request/workflow_dispatch, kein paths, kein continue-on-error) → scripts/commit-guard.mjs --ci → scripts/lib/ci-range.mjs.",
+      "replay": "Der Test baut temporäre Git-Repos und fährt --ci mit echter GitHub-Umgebung: auflösbares before ⇒ Spanne, Null-SHA ohne Kontext ⇒ volle Historie, Pull Request ⇒ Basis..Head; Exit-Codes gemessen.",
+      "invariant": "Der Workflow enthält push:, pull_request:, keinen paths-Filter und kein continue-on-error — das prüft das Gate-Plugin am Dateiinhalt. Und resolveCiRange liefert in jedem unbestimmten Fall die volle Historie statt eines Teilbereichs."
+    },
+    {
+      "positive": "Der Mechanismus selbst ist geprüft: das commit-trailer-Gate führt die eingefrorene Signatur gegen die echten Regeln aus und verlangt die Ablehnung.",
+      "forbidden": "Ein Gate, das nur die Existenz von Dateien prüft; ein Hook, der mit --fix prüft (dann wäre fail-closed eine Behauptung).",
+      "fallback": "Fehlt eine Datei der Kette, meldet das Gate sie namentlich — Regelwerk ohne Hook ist toter Text.",
+      "error": "COMMIT_GUARD_INCOMPLETE — fehlende Datei oder wirkungslose Regel.",
+      "trace": "scripts/gate/plugins/commit-trailer.mjs (ruleIssues, hookIssues, workflowIssues).",
+      "replay": "npm run gate:full führt das Plugin aus; die Tests fahren dieselben Funktionen direkt.",
+      "invariant": "commit-msg enthält kein --fix; prepare-commit-msg enthält --fix."
+    }
+  ]
+}

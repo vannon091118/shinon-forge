@@ -3,3 +3,5 @@
       name: '@shinon/persona'
       config:
         includeAugenhoehe: true
+        statePath: './assets/persona-state.json'
+        eventsChannel: 'shinon/event'

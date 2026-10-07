@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Shinon prepare-commit-msg — tauscht verbotene KI-Footer gegen den Vannon-Trailer.
+# Der Hook repariert nur; die Entscheidung trifft commit-msg (fail-closed).
+set -e
+node scripts/commit-guard.mjs --file "$1" --fix

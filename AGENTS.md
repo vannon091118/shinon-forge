@@ -75,3 +75,16 @@ Run from repo root:
   gate will flag any *other* package missing from the profile.
 - Several `package.json` files differ between the staged (git index) and working tree;
   `git status` will show both new and modified files. The live files are the working tree.
+
+## Commit rules (fail-closed)
+- Every commit message ends with the Vannon trailer:
+  `created by VANNON — Volatile Agent Needing No Other Nonsense, Never Overly Nice, Never Average Vibe`
+- Forbidden: any AI footer (`Generated with Codebuff 🤖`,
+  `Co-Authored-By: Codebuff <noreply@codebuff.com>`, Claude/ChatGPT/Copilot/Gemini/…),
+  `powered by …`, emoji signatures — and `co-authored-by:` at all.
+- Once per clone: `npm run hooks:install` (prepare-commit-msg swaps, commit-msg blocks).
+  Check with `npm run commit:guard -- --ci | --last n | --range a..b | --all`.
+- CI (`.github/workflows/commit-guard.yml`) runs on every push/PR with no filter; an
+  unresolvable range falls back to the **full** history, never to a narrower one.
+  Rules, enforcement and commands: `Docs/COMMIT-REGELN.md`. Single source of the
+  patterns and the trailer: `scripts/lib/commit-text.mjs`.

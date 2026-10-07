@@ -1,0 +1,39 @@
+name: Shinon Commit Guard
+
+# Immer. Kein paths-Filter, keine Bedingung: dieser Job läuft bei jedem Push und
+# jedem Pull Request — und auf Zuruf für ein volles Historie-Audit. Ein Wächter,
+# der nur manchmal hinsieht, ist kein Wächter.
+#
+# Fail-closed in beide Richtungen:
+#   * Jeder Commit mit KI-Footer (Codebuff und Verwandte) oder ohne Vannon-Trailer
+#     bricht den Lauf ab (Exit 1).
+#   * Lässt sich der Prüfbereich nicht bestimmen (neuer Branch, Force-Push,
+#     flacher Klon), prüft der Wächter die volle Historie — nie weniger.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  commit-guard:
+    name: Verbotene Footer + Vannon-Trailer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Volle Historie: der Wächter muss bis zur PR-Basis (und im Zweifel bis
+          # zum ersten Commit) zurücksehen können.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Commits prüfen (Bereich leitet der Wächter selbst ab)
+        run: node scripts/commit-guard.mjs --ci
+
+      - name: Regeln selbst testen (ohne Abhängigkeiten)
+        run: node --test scripts/gate/tests/*.test.mjs

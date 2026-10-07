@@ -19,6 +19,8 @@
     "gate:local": "node scripts/gate/engine.mjs --local",
     "gate:full": "node scripts/gate/engine.mjs --full",
     "gate:test": "node --test scripts/gate/tests/*.test.mjs",
+    "commit:guard": "node scripts/commit-guard.mjs",
+    "hooks:install": "node scripts/install-hooks.mjs",
     "update": "node scripts/dsh-update.mjs",
     "sync": "git fetch upstream && git merge upstream/main",
     "stages": "node scripts/stages.mjs"

@@ -1,0 +1,34 @@
+{
+  "name": "@shinon/persona — Identity, State, Voice",
+  "status": "NOT_VERIFIED",
+  "note": "Gebaut und getestet: Identity-Abschnitte im System-Prompt, Zustandsableitung aus den neun Event-Typen des Spines, Voice je Mood, Nicht-Aktions-Grenze statisch geprüft (22 Persona-Tests + persona-Gate). Der Mount ist belegt (dsh 0.2.0-rc.2 löst das Profil auf). NICHT geprüft: ein echtes Event aus einer laufenden Session — dafür fehlt in dieser Umgebung SHINON_API_KEY, und ein Promp t-Abschnitt ist erst im echten Modellaufruf sichtbar. Deshalb NOT_VERIFIED statt IMPLEMENTED.",
+  "rules": [
+    {
+      "positive": "Die Persona liest den Event-Kanal des Spines (shinon/event), leitet daraus deterministisch einen Zustand ab und schreibt ihn als System-Prompt-Abschnitt shinon:state. Der Zustand trägt genau die sechs Felder identity, stance, uncertainty, mood, capabilities, limitations.",
+      "forbidden": "Ein Zustandsfeld erfinden; einen Event-Typ ohne Übergang durchreichen; den Zustand aus dem Modell oder aus Zeit ableiten.",
+      "fallback": "Ohne lesbaren Zustandsvertrag läuft die Persona mit Baseline weiter und sagt es — sie rät keinen Mood.",
+      "error": "PERSONA_STATE_UNREADABLE (Warnung, kein Mount) — der Host läuft weiter.",
+      "trace": "assets/persona-state.json ist die Quelle; der Abschnitt trägt den Vertragsnamen shinon.persona-state/v1 als Datenkontext (JSON-Block).",
+      "replay": "deriveState ist eine reine Funktion: gleicher Zustand + gleiches Event = gleicher Folgezustand (Test über alle neun Typen).",
+      "invariant": "Object.keys(zustand) = STATE_FIELDS; jeder Mood im Vertrag hat eine Stimme."
+    },
+    {
+      "positive": "Ein Event ändert den Zustand nur über seinen dokumentierten Übergang; unbekannte Events ändern nichts.",
+      "forbidden": "Bei unbekanntem Event den Zustand ändern oder den Event weiterreichen; Events aus dem Spine erneut emittieren.",
+      "fallback": "Unbekannte Typen werden gezählt (stats.ignoredTypes) und ignoriert — sichtbar, nicht still.",
+      "error": "UNKNOWN_EVENT — kein Zustandswechsel.",
+      "trace": "stats { events, changes, ignored, ignoredTypes } im Zustandsobjekt; Verlauf der letzten maxEvents Übergänge.",
+      "replay": "Die Testreihe fährt jump session.created → claim.created → gate.failed → gate.passed → action.blocked und prüft jeden Schritt einzeln.",
+      "invariant": "Unbekanntes Event ⇒ Kontexttext bleibt byte-identisch."
+    },
+    {
+      "positive": "Die Persona handelt nicht: kein Modellaufruf, kein Tool, kein Schreibe, kein fremder State, keine Entscheidung.",
+      "forbidden": "ctx.llm, ctx.agents, ctx.tools, ctx.set, child_process, execSync, writeFile(s), fetch, http, Math.random, process.exit.",
+      "fallback": "Fehlt der System-Prompt-Service, bleibt der Zustandsabschnitt ungesetzt — die Persona wirft nicht.",
+      "error": "PERSONA_FORBIDDEN_CALL — das Gate lehnt den Laufzeitcode statisch ab, kommentar- und stringblind.",
+      "trace": "scripts/gate/plugins/persona.mjs gegen packages/persona/index.js; Prompt-Texte, die Math.random() nennen, sind Daten und kein Befund.",
+      "replay": "Der Integrationstest hängt das Bundle an einen Host, der ausschließlich on und inject kennt; jeder andere Zugriff würde werfen.",
+      "invariant": "Nach dispose kommen keine Events mehr an; zwei Hosts führen getrennte Zustände."
+    }
+  ]
+}
