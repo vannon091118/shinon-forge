@@ -23,5 +23,67 @@
     "result": "BESTAETIGT",
     "verdict": "WRITE",
     "evidence": "GEMESSEN, dasselbe Skript wie in der Probe daneben: aus der DSH-Installation sind `yaml` (.../node_modules/yaml/dist/index.js) und `js-yaml` (.../node_modules/js-yaml/index.js) aufloesbar, `@deepseek-ai/schemastery` ebenfalls. Aus dem PAKET (packages/project-index/package.json) und aus dem PROFIL (profiles/shinon/package.json) ist NICHTS davon aufloesbar — nur node:sqlite; im worker-artigen Fremdkontext ebenfalls nichts. Das erklaert zugleich den in Phase 6 live gefundenen Workerfehler: der Host patcht die Modulaufloesung fuer seine Bundles, ein Worker bekommt diesen Patch nicht. ENTSCHEIDUNG: keine neue Abhaengigkeit. Gruende, in dieser Reihenfolge: (1) `yaml`/`js-yaml` sind internes Beiwerk einer DSH-Fassung, nicht Teil ihrer Schnittstelle — bricht die naechste DSH-Fassung sie weg, bricht der Index; (2) das Repo haelt eine Abhaengigkeitsliste (SHARED_DEPS in scripts/lib/repo.mjs), die als Vertrag gepflegt werden muesste, und pack-test installiert je Paket isoliert (Netz); (3) eine Deklaration wuerde den Kern aus dem Worker ausschliessen, weil der Worker genau an solchen Bare-Importen scheitert. FOLGE: YAML wird als Text indexiert (Chunks + FTS), ohne Symbole; die Grenze steht im Testvertrag. Wenn eine spaetere Phase einen echten YAML-Parser braucht, ist das eine bewusste Abhaengigkeitsentscheidung dieser Phase — nicht ein Nebeneffekt."
+  },
+  {
+    "id": "project-index-parserregistry-traegt",
+    "claim": "Die Registry Sprache -> verfuegbarer Parser -> Symbole/Kanten traegt im echten Lauf: der eine vorhandene Parser (JSON.parse) wird benutzt, Markdown liefert Ueberschriften ohne die Beispiele in Code-Fences, YAML und unbekannte Typen bleiben Text, und Prosa ist kein Referenzziel.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Nach dem Bau muss messbar sein, was die Registry je Typ liefert — an echten Dateien dieses Repos und als Testtabelle (Formen, Gegenfaelle, kaputte Eingaben).",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN im Live-Boot (Worker) ueber 168 Dateien: 1035 Symbole = 391 heading + 346 const + 252 function + 46 method; 265 Kanten = 206 import + 44 dependency + 14 require + 1 dynamic-import; 7844 Referenzen; 593 Chunks. Die 391 Ueberschriften stimmen exakt mit der Vorabmessung ueberein (391 ausserhalb der Code-Fences, 16 innerhalb ausgeschlossen) — die Fence-Erkennung greift also wirklich. Die 44 dependency-Kanten stammen aus 17 package.json-Dateien und werden von JSON.parse gewonnen (42/42 JSON-Dateien des Repos parsen fehlerfrei), nicht geschaetzt. Die Registry benennt je Sprache, WELCHER Parser traegt (json = JSON.parse, javascript = zeilenbasiert, markdown = Ueberschriften, yaml = keiner). PROSA IST KEIN REFERENZZIEL: Referenzziel ist nur, was ein Bezeichner sein kann (function/class/const/export/method) — sonst waere das Wort Notizen aus einer Ueberschrift in jedem Satz eine Referenz auf ein Symbol; der Test prueft beide Richtungen (die Ueberschrift ist ein Symbol, steht aber nicht in references; bThing dagegen schon). MUTATIONSPROBEN: Fence-Bewusstsein entfernt -> 1 Zusage rot; YAML bekommt einen Symbolbegriff -> 1 rot; JSON-Fehler wird geworfen -> 1 rot; Kind-Filter entfernt -> 1 rot. OFFEN: der Referenzdurchgang zaehlt weiterhin lokale const-Namen mit (gemessen: haeufigste Referenzziele sind assert, id, packages, node, bundle). Das ist bewusst nicht gefiltert — ein lokaler Name ist innerhalb seiner Datei eine echte Referenz, und welche davon als Kontext taugen, entscheidet die Phase, die den MAX-Kontext baut."
+  },
+  {
+    "id": "project-index-gate-kein-rebuild",
+    "claim": "Das Gate der Phase 7 haelt woertlich: zweimaliger Indexlauf ohne Dateiaenderung erzeugt keinen vollstaendigen Rebuild.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Ein Gate muss aus Zahlen UND aus Zustand bestehen, nicht aus einer Zusicherung: der zweite Lauf darf keine Datei LESEN und keine Zeile neu schreiben.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, dreifach. (1) ZAHLEN: der Bericht traegt die Kette aus Plan §11 als Zaehler — files/unchanged/hashed/rehashed/written. Erster Lauf ueber dieses Repo: files 167, hashed 167, written 167 in 991 ms. Zweiter Lauf ohne Dateiaenderung: unchanged 167, hashed 0, rehashed 0, written 0, references 0, symbolsChanged false in 138 ms. Der NULLWERT ist der Beweis — gezaehlt wird das Lesen, nicht nur das Ergebnis. (2) ZUSTAND: der Test vergleicht einen vollstaendigen Schnappschuss ALLER Tabellen (files, symbols, edges, references, touches, chunks, die FTS-Spiegelung und die Zaehlungen) vor und nach dem zweiten Lauf Zeile fuer Zeile; nur indexed_at_ms und updated_at_ms duerfen sich als Zeitstempel des Laufs unterscheiden. Waere irgendetwas neu geschrieben worden, muesste mindestens eine Zeile abweichen; der Test verlangt zusaetzlich, dass der Schnappschuss nicht leer ist, sonst bewiese er nichts. (3) LIVE: der Boot meldet beim Wiederaufbau 168 gelesen/168 neu und im unveraenderten Fall 0 gelesen/N unveraendert. MUTATIONSPROBE: die Schwelle 'unveraendert -> weiter' entfernt -> 3 Zusagen rot, darunter genau dieses Gate. OFFEN: das Gate prueft den zweiten Lauf im SELBEN Prozess; ein Lauf nach einem Neustart ist ueber die Live-Protokolle belegt (0 gelesen), aber nicht als automatischer Test — dafuer muesste der Test einen zweiten Prozess starten."
+  },
+  {
+    "id": "project-index-zeitstempel-probleme",
+    "claim": "Plan §11 verlangt, den Umgang mit Timestamp-Problemen ueber Tests abzusichern: die Luecke von mtime+size ist als Tatsache gepinnt, und es gibt ein Gegenmittel (verify=all).",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "packages/project-index/index.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Zwei Aussagen muessen belegt sein: wo die Schwelle blind ist, und dass eine Kontrolle sie schliesst — mit ihren Kosten.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN und als Test gepinnt. DIE LUECKE: eine Datei wird bei GLEICHER Groesse inhaltlich geaendert, danach wird ihre mtime zurueckgesetzt; der Lauf meldet hashed 0 und written 0, und der neue Bezeichner steht NICHT im Index — der Test prueft alle drei Punkte. Das ist keine Vermutung, sondern eine Zeile im Vertrag: damit ist die Grenze dokumentiert statt still. DAS GEGENMITTEL: verify: 'all' liest und hasht jede Datei. Im Test: hashed = files, written 1 (genau die geaenderte), rehashed = files - 1, der neue Bezeichner steht im Index, der alte ist weg. Ein unveraenderter Baum bleibt auch mit verify=all ein Nicht-Rebuild (written 0, rehashed = files, references 0). KOSTEN, gemessen: 132 ms fuer 167 Dateien gegen 138 ms fuer den reinen stat-Lauf — auf dieser Projektgroesse ist das Hashen praktisch kostenlos, weil die Dateien im Cache liegen; auf einem grossen Projekt waere es die Summe aller Dateigroessen. POLITIK: verify ist Konfiguration des Mounts (Default 'changed'), der Bericht nennt die Politik, die ihn erzeugt hat, und die Live-Zeile zeigt sie: 'Lauf im Worker (verify=changed)'. MUTATIONSPROBE: verify=all ignoriert -> der Zeitstempel-Test rot."
+  },
+  {
+    "id": "project-index-indexer-fassung",
+    "claim": "Ein Wechsel der Extraktion erreicht unveraenderte Dateien nicht — der Index muss die Fassung seiner Extraktion kennen, sonst bleibt er still falsch.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Nach dem Parserwechsel muss gemessen werden, ob die Zeilen unveraenderter Dateien mitgezogen werden. Falls nicht, braucht der Index einen Marker und einen Wiederaufbau.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "IM LIVE-BOOT GEFUNDEN, nicht im Kopf: der erste Boot nach dem Parserwechsel meldete '12 neu, 1 nur aufgefrischt, 13 gelesen, 155 unveraendert — 168 Dateien, 643 Symbole'. 643 war FALSCH: der neue Extraktor ergibt rund 1035 Symbole, es fehlten die Ueberschriften der 21 Markdown-Dateien. Ursache ist das inkrementelle Indexing selbst (Plan §11): eine unveraenderte Datei wird nicht neu geparst, also bleiben ihre Zeilen auf dem Stand des Extraktors, der sie geschrieben hat. Ein Index ohne Herkunft ist damit still falsch — und kein Gate haette das gemerkt, weil die Zaehlungen in sich stimmig waren. FIX: INDEXER_VERSION als Metafeld; ein Index mit anderer Fassung wird verworfen und neu aufgebaut. BEWEIS: derselbe Boot nach dem Fix — '168 neu, 168 gelesen, 0 unveraendert — 168 Dateien, 1035 Symbole, 593 Chunks', Meta traegt indexer_version 2. Der Test pinnt beide Richtungen: ein Index mit fremder indexer_version wird geleert und vollstaendig neu geschrieben, und ein LEERER Index (noch nie gebaut) wird NICHT als fremd behandelt. REGEL FUER SP AETER: eine Aenderung an der Extraktion oder an der Sprache-zu-Parser-Zuordnung erhoeht INDEXER_VERSION, eine Aenderung an den Tabellen erhoeht SCHEMA_VERSION."
+  },
+  {
+    "id": "source-scan-ist-nicht-mehr-blind",
+    "claim": "Der geteilte Quelltext-Scanner (scripts/lib/source-scan.mjs) konnte Code verschlucken und damit jedes Grenz-Gate still blind machen. Er zerlegt Quelltext jetzt in einem Durchlauf und ist als Vertrag geprueft.",
+    "targets": [
+      "scripts/lib/source-scan.mjs",
+      "scripts/gate/tests/source-scan.test.mjs",
+      "packages/project-index/assets/index-core.js"
+    ],
+    "expect": "Zu belegen: der Scanner erkennt Kommentar, String, Template (mit ${...} als Code) und Regex-Literal im selben Durchlauf, verschluckt nichts ausserhalb von Literalen, und ein Test deckt genau die Faelle ab, die ihn vorher blind gemacht haben.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEFUNDEN VON EINEM TEST, nicht durch Lesen: die Kontrolle 'der Index ist wirklich SQLite' im Vertrag des Project Index schlug fehl, weil new DatabaseSync(file) nicht mehr im codeOnly-Ergebnis stand — obwohl die Datei es enthaelt. Zwei Ursachen, beide gemessen: (1) die alte Fassung entfernte erst Kommentare und dann Strings in ZWEI Durchgaengen mit je einem eigenen Muster; ein Template-Literal, das Quelltext als TEXT enthaelt (der Worker-Quelltext dieses Pakets), verschob die Anfuehrungszeichen-Paarung, und der String-Entferner schluckte echten Code; (2) Regex-Literale waren unbekannt — ein Muster wie /^\\s*(```|~~~)/ enthaelt Backticks und liess den Zustand kippen, danach galten ganze Doc-Kommentare als Strings. Zwei weitere echte Fehler fielen beim Bau auf: der Kommentar-Zustand hiess line-comment, geprueft wurde comment (ein Kommentar am DATEIENDE galt als Code — das hat der Markers-Test aufgedeckt, nicht der Index), und der Puffer wurde vor einem Zustandswechsel nicht abgeschlossen, sodass Code VOR einem Literal in den Literal-Abschnitt wanderte. FIX: ein Zustandsautomat in einem Durchlauf; ${...} ist CODE (dort kann ein verbotener Aufruf stehen), Regex-Inhalt bleibt sichtbar (lieber ein sichtbarer Fehlalarm als eine stille Luecke), und die Zerlegung ist verlustfrei (geprueft: join === Eingabe). NEUER TESTVERTRAG scripts/gate/tests/source-scan.test.mjs mit 6 Zusagen: Kommentare zaehlen nicht, String-Inhalte zaehlen nicht, verschachtelte Interpolation ist Code, die Regression 'Quelltext als Text in einem Template macht das Gate nicht blind' (am echten Paket), Kommentar am Dateiende, unfertige Literale. MUTATIONSPROBEN: Puffer-Abschluss entfernt -> 4 Zusagen rot; Kommentar am Dateiende als Code -> 1 rot. WIRKUNG: dsh-test 72/72, gate:test 206/206, gate:full 18 Gates PASS — der strengere Scanner hat in keinem anderen Paket einen neuen Befund erzeugt, aber die zuvor verdeckte Kontrolle im Index ist jetzt aussagekraeftig."
   }
 ]
