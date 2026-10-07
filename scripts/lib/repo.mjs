@@ -332,19 +332,41 @@ export function composeIssues(profileName, profile, packages) {
   return issues;
 }
 
-/** Alle Runtime-Artefakte, die den alten Namespace nicht mehr nennen dürfen. */
+/**
+ * Alle Runtime-Artefakte, die den alten Namespace nicht mehr nennen dürfen.
+ *
+ * Gesucht wird in JEDER ausgelieferten Code-/Konfigurationsdatei des Pakets, nicht
+ * nur in den vier Vertragsdateien: seit Pakete Unterverzeichnisse mitbringen
+ * (`assets/`, etwa der Kern des Project Index), wäre eine feste Dateiliste ein Tor
+ * mit offener Lücke — der Legacy-String dürfte dann genau dort stehen.
+ */
+export const LEGACY_SCAN_EXTENSIONS = ['.js', '.mjs', '.cjs', '.yml', '.yaml'];
+
+/** Alle Dateien eines Verzeichnisses, rekursiv, ohne node_modules. */
+function walkFiles(dir) {
+  const found = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules') continue;
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...walkFiles(path));
+    else if (LEGACY_SCAN_EXTENSIONS.some((extension) => entry.name.endsWith(extension))) found.push(path);
+  }
+  return found;
+}
+
 export function legacyHits(packages) {
   const hits = [];
   for (const pkg of packages) {
-    for (const file of ['index.js', 'client.js', 'cordis.patch.yml']) {
-      const path = join(pkg.base, file);
-      if (existsSync(path) && read(path).includes('dsh-mod')) hits.push(relative(ROOT, path));
+    for (const path of walkFiles(pkg.base)) {
+      if (read(path).includes('dsh-mod')) hits.push(relative(ROOT, path));
     }
   }
   if (existsSync(PROFILES_DIR)) {
     for (const profile of readdirSync(PROFILES_DIR)) {
-      const path = join(PROFILES_DIR, profile, 'cordis.patch.yml');
-      if (existsSync(path) && read(path).includes('dsh-mod')) hits.push(relative(ROOT, path));
+      for (const file of ['cordis.patch.yml', 'package.json']) {
+        const path = join(PROFILES_DIR, profile, file);
+        if (existsSync(path) && read(path).includes('dsh-mod')) hits.push(relative(ROOT, path));
+      }
     }
   }
   return hits;

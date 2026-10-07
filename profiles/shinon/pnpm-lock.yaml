@@ -35,6 +35,9 @@ importers:
       '@shinon/persona':
         specifier: link:../../packages/persona
         version: link:../../packages/persona
+      '@shinon/project-index':
+        specifier: link:../../packages/project-index
+        version: link:../../packages/project-index
       '@shinon/prompter':
         specifier: link:../../packages/prompter
         version: link:../../packages/prompter

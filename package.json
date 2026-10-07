@@ -45,6 +45,7 @@
     "@shinon/markers": "workspace:*",
     "@shinon/hook": "workspace:*",
     "@shinon/prompter": "workspace:*",
+    "@shinon/project-index": "workspace:*",
     "@shinon/codingmon": "workspace:*"
   },
   "repository": {
