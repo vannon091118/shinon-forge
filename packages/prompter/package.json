@@ -1,0 +1,31 @@
+{
+  "name": "@shinon/prompter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Interner One-Shot Prompt Enhancer: agent/pre-step -> One-Shot-Child ohne Tools -> Host-Validierung -> uebernommener oder verworfener Prompt",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "meta": {
+    "title": "Shinon Forge - Prompt Enhancer",
+    "description": "One-Shot Prompt-Veredler mit Host-Validierung und Roh-Prompt-Fallback"
+  }
+}

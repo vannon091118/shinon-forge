@@ -44,6 +44,7 @@
     "@shinon/persona": "workspace:*",
     "@shinon/markers": "workspace:*",
     "@shinon/hook": "workspace:*",
+    "@shinon/prompter": "workspace:*",
     "@shinon/codingmon": "workspace:*"
   },
   "repository": {

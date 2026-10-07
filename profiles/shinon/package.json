@@ -12,6 +12,7 @@
     "@shinon/token-usage": "link:../../packages/token-usage",
     "@shinon/tooltip": "link:../../packages/tooltip",
     "@shinon/hook": "link:../../packages/hook",
+    "@shinon/prompter": "link:../../packages/prompter",
     "@shinon/codingmon": "link:../../packages/codingmon"
   },
   "dsh": {
@@ -29,6 +30,7 @@
         "@shinon/better-errors",
         "@shinon/token-usage",
         "@shinon/hook",
+        "@shinon/prompter",
         "@shinon/codingmon"
       ]
     }
