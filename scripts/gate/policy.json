@@ -40,6 +40,9 @@
       },
       "probe-twin": {
         "prefixes": ["Docs/probes/", "packages/"]
+      },
+      "persona": {
+        "prefixes": ["packages/persona/", "profiles/"]
       }
     }
   }

@@ -6,6 +6,7 @@
     "@shinon/core": "link:../../packages/core",
     "@shinon/dashboard": "link:../../packages/dashboard",
     "@shinon/locale-de": "link:../../packages/locale-de",
+    "@shinon/persona": "link:../../packages/persona",
     "@shinon/token-usage": "link:../../packages/token-usage",
     "@shinon/tooltip": "link:../../packages/tooltip"
   },
@@ -14,6 +15,7 @@
       "bundles": [
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-web-app",
+        "@shinon/persona",
         "@shinon/core",
         "@shinon/locale-de",
         "@shinon/tooltip",

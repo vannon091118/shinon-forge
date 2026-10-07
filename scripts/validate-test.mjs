@@ -111,12 +111,18 @@ const control = fixtureRoot('control');
 {
   const gate = run('dsh-test.mjs', control);
   const build = run('build.mjs', control);
+
+  // Die Kontrolle darf keine feste Zahl erwarten: Gate-Checks und Paketanzahl
+  // wachsen mit dem Repo, und ein hartkodierter Wert schlägt dann fehl, obwohl
+  // nichts kaputt ist. Geprüft wird der Vertrag: Exit 0 und "0 fehlgeschlagen",
+  // und der Build muss ALLE Pakete liefern — die Zahl kommt aus dem Repo.
+  const pkgCount = repo.discover(repo.readRoot()).length;
   results.push({
     name: 'Kontrolle (unverändert)',
     gate,
     build,
-    expected: /Ergebnisse: 37 bestanden, 0 fehlgeschlagen/,
-    buildExpected: /✅ Artefakte: dist\/ mit 7 Paketen/,
+    expected: /Ergebnisse: \d+ bestanden, 0 fehlgeschlagen/,
+    buildExpected: new RegExp(`✅ Artefakte: dist/ mit ${pkgCount} Paketen`),
   });
 }
 

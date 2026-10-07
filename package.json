@@ -34,7 +34,8 @@
     "@shinon/dashboard": "workspace:*",
     "@shinon/openapi": "workspace:*",
     "@shinon/better-errors": "workspace:*",
-    "@shinon/token-usage": "workspace:*"
+    "@shinon/token-usage": "workspace:*",
+    "@shinon/persona": "workspace:*"
   },
   "repository": {
     "type": "git",

@@ -20,6 +20,9 @@ importers:
       '@shinon/locale-de':
         specifier: link:../../packages/locale-de
         version: link:../../packages/locale-de
+      '@shinon/persona':
+        specifier: link:../../packages/persona
+        version: link:../../packages/persona
       '@shinon/token-usage':
         specifier: link:../../packages/token-usage
         version: link:../../packages/token-usage

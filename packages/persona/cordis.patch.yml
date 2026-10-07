@@ -1,0 +1,5 @@
+- insert:
+    - id: shinon-persona
+      name: '@shinon/persona'
+      config:
+        includeAugenhoehe: true
