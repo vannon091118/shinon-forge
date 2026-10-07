@@ -55,12 +55,24 @@ export const Config = z.object({
   worker: z.boolean().default(true),
 });
 
-/** Ein Bericht in einer Zeile — die Auskunft, die der Host protokolliert. */
+/**
+ * Ein Bericht in einer Zeile — die Auskunft, die der Host protokolliert.
+ *
+ * Der Schutz steht mit im Bericht, weil er sonst unsichtbar waere: eine
+ * ausgeschlossene Datei veraendert keine Zaehlung, und eine Redaktion erst recht
+ * nicht. Wer den Lauf liest, soll sehen, dass Dateien nicht gelesen wurden und
+ * Werte ersetzt wurden — ohne dass ein Wert im Protokoll steht.
+ */
 function reportLine(report, stats, where) {
+  const protectedKinds = Object.entries(report.protectedKinds ?? {})
+    .map(([kind, count]) => `${kind}=${count}`)
+    .join(' ');
   return (
     `[shinon-project-index] Lauf im ${where} (verify=${report.verify}): ${report.written} neu, ` +
     `${report.rehashed} nur aufgefrischt, ${report.hashed} gelesen, ${report.unchanged} unveraendert, ` +
     `${report.removed} entfernt, ${report.skipped} uebersprungen, ` +
+    `Schutz: ${report.protected} nie gelesen${protectedKinds === '' ? '' : ` (${protectedKinds})`}, ` +
+    `${report.findings} Fundstellen redigiert, ` +
     `${report.references} Referenzen, ${report.touches} Touches — ${stats?.files ?? '?'} Dateien, ` +
     `${stats?.symbols ?? '?'} Symbole, ${stats?.chunks ?? '?'} Chunks`
   );
@@ -77,6 +89,10 @@ function reportLine(report, stats, where) {
  *
  * Es gibt hier noch KEINE Prompt-Wirkung; der MAX-Kontext kommt spaeter und
  * liest dieselbe Datei.
+ *
+ * Der Secret-Schutz (Plan §13) ist nicht konfigurierbar: er ist keine Option,
+ * sondern eine Eigenschaft des Index. Was er nicht schuetzt, steht als Grenze im
+ * Kern — ein Detektor mit benannten Mustern ist kein Beweis.
  */
 export function apply(ctx, config) {
   const options = {
@@ -122,7 +138,7 @@ export function apply(ctx, config) {
     start().catch((error) => console.error(`[shinon-project-index] Lauf abgebrochen (${error?.message ?? error}) — der vorige Stand bleibt stehen`));
   });
 
-  if (config.trace) console.log(`[shinon-project-index] Aktiviert — ${CONTRACT}, ${file}, Lauf nach dem Start (${config.worker ? 'Worker' : 'Host'})`);
+  if (config.trace) console.log(`[shinon-project-index] Aktiviert — ${CONTRACT}, ${file}, Lauf nach dem Start (${config.worker ? 'Worker' : 'Host'}), Schutz an (Plan §13)`);
 
   // Ein noch nicht gestarteter Lauf wird gestoppt; ein laufender schreibt zu
   // Ende, weil ein halber Index schlimmer waere als ein fertiger.

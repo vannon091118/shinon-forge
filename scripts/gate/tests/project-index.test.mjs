@@ -29,7 +29,7 @@ import assert from 'node:assert/strict';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { codeOnly, findForbidden, findMissing } from '../../lib/source-scan.mjs';
@@ -394,6 +394,10 @@ test('Lauf: Vollauf, unveränderter Lauf, aufgefrischte und geänderte Datei', (
     written: 0,
     skipped: 0,
     removed: 0,
+    protected: 0,
+    protectedKinds: {},
+    purged: 0,
+    findings: 0,
     references: 0,
     touches: 0,
     symbolsChanged: false,
@@ -618,6 +622,10 @@ test('Gate: zweimaliger Indexlauf ohne Dateiänderung erzeugt keinen vollständi
     written: 0,
     skipped: 0,
     removed: 0,
+    protected: 0,
+    protectedKinds: {},
+    purged: 0,
+    findings: 0,
     references: 0,
     touches: 0,
     symbolsChanged: false,
@@ -794,6 +802,384 @@ test('Mount: ein scheiternder Worker wird protokolliert und im Host wiederholt',
     dispose();
     assert.ok(quiet.lines.some((line) => line.includes('Worker nicht nutzbar')), 'der Workerausfall ist benannt');
     assert.ok(quiet.lines.some((line) => line.includes('(Worker)')), 'zuerst wurde der Worker versucht');
+  } finally {
+    quiet.restore();
+  }
+});
+
+// ══ Secret Protection (Plan §13) ═════════════════════════════════════════════
+//
+// Das Gate der Phase lautet wörtlich: Test-Secrets erscheinen nicht als
+// ungeschützter Secret-Inhalt im Index. Deshalb prüfen die Zusagen unten nicht
+// eine Zählung, sondern die BYTES der Indexdateien: kein Kanarienvogel darf
+// darin vorkommen — in keiner Tabelle, auch nicht in der FTS-Spiegelung und
+// nicht im WAL.
+
+/**
+ * Kanarienvögel: erfunden, aber in der FORM echter Zugangsdaten. Sie stehen in
+ * Quellen, die absichtlich so gebaut sind, dass sie wie Zugangsdaten aussehen —
+ * niemand kann sie mit einem echten Schlüssel verwechseln.
+ */
+const CANARY = {
+  dotenv: 'CANARY_DOTENV_WERT_04f2a1',
+  credentials: 'CANARY_CREDENTIALS_WERT_77b31c',
+  anthropic: 'sk-ant-canary0123456789abcdef0123456789',
+  jwt: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYW5hcnkifQ.canarysignatur0123456789',
+  connection: 'postgres://canary-nutzer:canary-passwort@localhost:5432/canary-db',
+  assigned: 'canary-zugewiesener-wert-0123456789',
+  github: 'ghp_canary0123456789012345678901',
+};
+
+/** Der Inhalt der einen Quelldatei, die einen Wert AUSGESCHRIEBEN enthält. */
+const CONFIG_LINES = [
+  'export const sauber = 0;',
+  `export const endpoint = '${CANARY.connection}';`,
+  `export const schluessel = '${CANARY.anthropic}';`,
+  `export const marke = '${CANARY.jwt}';`,
+  `SHINON_CANARY_API_KEY = '${CANARY.assigned}';`,
+  `export const zweiter = '${CANARY.github}';`,
+  '',
+];
+
+/**
+ * Ein Projekt mit beiden Sorten: Dateien, die Zugangsdaten SIND, und Dateien,
+ * die Zugangsdaten nur ENTHALTEN — plus die Gegenproben, die indexiert bleiben
+ * müssen.
+ */
+function secretProject(label) {
+  const dir = join(workDir(label), 'projekt');
+  mkdirSync(join(dir, 'src'), { recursive: true });
+  mkdirSync(join(dir, 'keys'), { recursive: true });
+  mkdirSync(join(dir, 'tief/verschachtelt'), { recursive: true });
+  mkdirSync(join(dir, '.ssh'), { recursive: true });
+
+  // Schicht 1 — diese Dateien werden nie gelesen.
+  mkdirSync(join(dir, 'settings'), { recursive: true });
+  writeFileSync(join(dir, '.env'), `SHINON_CANARY_API_KEY=${CANARY.dotenv}\n`);
+  writeFileSync(join(dir, 'tief/verschachtelt/.env.production'), `SHINON_CANARY_API_KEY=${CANARY.dotenv}\n`);
+  writeFileSync(join(dir, 'settings/.env.yaml'), `SHINON_CANARY_API_KEY: ${CANARY.dotenv}\n`);
+  writeFileSync(join(dir, '.credentials.yaml'), `refs:\n  SHINON_CANARY_API_KEY: ${CANARY.credentials}\n`);
+  writeFileSync(join(dir, 'credentials.json'), `{\n  "token": "${CANARY.credentials}"\n}\n`);
+  writeFileSync(join(dir, 'secrets.yml'), `token: ${CANARY.credentials}\n`);
+  writeFileSync(join(dir, 'keys/server.pem'), `-----BEGIN RSA PRIVATE KEY-----\n${CANARY.dotenv}\n-----END RSA PRIVATE KEY-----\n`);
+  writeFileSync(join(dir, '.ssh/id_rsa'), `${CANARY.dotenv}\n`);
+
+  // Schicht 2 — indexiert, aber der Wert wird ersetzt.
+  writeFileSync(join(dir, 'src/config.mjs'), CONFIG_LINES.join('\n'));
+
+  // Gegenproben: kein Geheimnis, und ein NAME, der nur danach klingt.
+  writeFileSync(join(dir, 'src/clean.mjs'), 'export const sauber = 1;\n// hier steht kein Geheimnis\n');
+  writeFileSync(join(dir, 'src/secrets.mjs'), 'export const liste = ["a"];\n');
+  return dir;
+}
+
+/**
+ * Die naive Messung zeigte drei Filter, nicht einen — und nur einer davon ist
+ * Phase 8. Damit der Test nicht zwei Dinge verwechselt, sind sie getrennt:
+ *
+ *   ENDUNGS_LISTE      Dateien wie `.env` oder `*.pem` werden nie BETRACHTET,
+ *                      weil `listFiles` nur Textendungen aufnimmt. Sie sind
+ *                      deshalb auch ohne Schutz nie im Index — der Grund, warum
+ *                      die Musterliste aus Plan §13 zu einem Teil redundant ist.
+ *   SCHUTZ_REGELN      Dateien MIT indexierbarer Endung, die Zugangsdaten sind.
+ *                      Genau hier lag der echte Fund: `.credentials.yaml`.
+ */
+const EXCLUDED_BY_EXTENSION = ['.env', 'tief/verschachtelt/.env.production', 'keys/server.pem', '.ssh/id_rsa'];
+const PROTECTED_LISTED = ['.credentials.yaml', 'credentials.json', 'secrets.yml', 'settings/.env.yaml', 'src/secrets.mjs'];
+const PROTECTED_TOTAL = PROTECTED_LISTED.length;
+
+/** Die Dateien, die einen Kanarienvogel tragen — für die Gegenprobe des Tests. */
+const CANARY_FILES = [...EXCLUDED_BY_EXTENSION, '.credentials.yaml', 'credentials.json', 'secrets.yml', 'settings/.env.yaml'];
+
+/** Alle Bytes im Indexverzeichnis — die Grundlage des Gates. */
+function indexBytes(indexRoot) {
+  const out = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const absolute = join(dir, entry.name);
+      if (entry.isDirectory()) walk(absolute);
+      else out.push([relative(indexRoot, absolute), readFileSync(absolute)]);
+    }
+  };
+  walk(indexRoot);
+  return out;
+}
+
+/** Wo ein Kanarienvogel im Index steht — leer heißt: nirgends. */
+function canaryHits(indexRoot, ...needles) {
+  const bytes = indexBytes(indexRoot);
+  const hits = [];
+  for (const needle of needles) {
+    for (const [name, buffer] of bytes) if (buffer.includes(needle)) hits.push(`${needle.slice(0, 12)}… in ${name}`);
+  }
+  return hits;
+}
+
+/**
+ * Die Pfadregeln treffen ganze NAMEN, nicht Präfixe.
+ *
+ * Der Grund steht in Docs/probes/secret-protection.json: `.credentials.yaml`
+ * liegt in der Wurzel dieses Repos und trägt drei echte Schlüssel — `credentials*`
+ * trifft sie nicht, weil dem Namen ein Punkt vorangeht. Die Tabelle prüft beide
+ * Richtungen, damit die Regeln weder blind noch übermäßig breit sind.
+ */
+test('Schutz: die Pfadregeln treffen Namen mit führendem Punkt und verschonen Quelltext', () => {
+  const protectedCases = [
+    ['.env', 'dotenv'],
+    ['.env.local', 'dotenv'],
+    ['src/.env', 'dotenv'],
+    ['tief/verschachtelt/.env.production', 'dotenv'],
+    ['.credentials.yaml', 'credential-datei'],
+    ['credentials.json', 'credential-datei'],
+    ['config/.credentials', 'credential-datei'],
+    ['secrets.yml', 'secret-datei'],
+    ['.secrets', 'secret-datei'],
+    ['src/secrets.mjs', 'secret-datei'],
+    ['deploy/app.key', 'schluesselmaterial'],
+    ['cert/client.p12', 'schluesselmaterial'],
+    ['.ssh/id_rsa', 'ssh-schluessel'],
+    ['.npmrc', 'dotfile-geheim'],
+    ['.netrc', 'dotfile-geheim'],
+    ['.aws/credentials', 'credential-datei'],
+    ['infra/terraform.tfstate', 'terraform-zustand'],
+  ];
+  for (const [path, kind] of protectedCases) {
+    assert.equal(bundle.protectedReason(path), kind, `${path} muss geschützt sein`);
+  }
+
+  // Die Gegenprobe gegen zu viel Schutz: diese Pfade werden indexiert. Eine
+  // Quelldatei, die Zugangsdaten VERWALTET, gehört in den Index — sonst findet
+  // der Agent die Stelle nicht, die einen Schlüssel benutzt.
+  const keptCases = ['src/config.mjs', 'src/credential-helper.mjs', 'Docs/probes/secret-protection.json', 'secrets-notes.md', 'package.json', 'config.yml', 'docs/notes.md'];
+  for (const path of keptCases) {
+    assert.equal(bundle.protectedReason(path), null, `${path} darf nicht geschützt sein`);
+  }
+  assert.ok(bundle.PROTECTED_PATH_RULES.length >= 5);
+  assert.ok(bundle.PROTECTED_PATH_RULES.every((rule) => typeof rule.kind === 'string' && rule.pattern instanceof RegExp), 'jede Regel nennt ihren Grund');
+});
+
+/**
+ * Das Gate der Phase — in beiden Schichten, geprüft an den BYTES des Index.
+ */
+test('Schutz: Test-Secrets erscheinen nicht als ungeschützter Inhalt im Index', () => {
+  const project = secretProject('schutz');
+  const { indexRoot, file } = fixtureIndex(project, 'schutz');
+
+  // Die Kanarienvögel stehen wirklich in den Quelldateien — sonst bewiese der
+  // Test nichts. Die nicht gelesenen Dateien werden hier direkt geprüft.
+  for (const path of CANARY_FILES) {
+    const text = readFileSync(join(project, path), 'utf8');
+    assert.ok(text.includes(CANARY.dotenv) || text.includes(CANARY.credentials), `${path} trägt einen Kanarienvogel`);
+  }
+  assert.ok(readFileSync(join(project, 'src/config.mjs'), 'utf8').includes(CANARY.anthropic), 'auch die indexierte Quelldatei trägt einen');
+
+  const db = bundle.openIndex(file);
+  const report = bundle.updateIndex(db, project, {});
+
+  // Die beiden Filter getrennt: die Endungsliste BETRACHTET manche Dateien nie,
+  // die Schutzregeln weisen die übrigen ab — und zwar jede mit ihrem Grund.
+  const listed = bundle.listFiles(project).map((absolute) => bundle.toProjectPath(project, absolute));
+  for (const path of EXCLUDED_BY_EXTENSION) {
+    assert.ok(!listed.includes(path), `${path} wird schon von der Endungsliste nicht betrachtet`);
+  }
+  for (const path of PROTECTED_LISTED) {
+    assert.ok(listed.includes(path), `${path} wäre ohne den Schutz indexiert worden`);
+  }
+  assert.equal(report.protected, PROTECTED_TOTAL, 'jede abgewiesene Datei wird gezählt');
+  assert.deepEqual(report.protectedKinds, { 'credential-datei': 2, 'secret-datei': 2, dotenv: 1 });
+  assert.equal(report.removed, 0, 'ausgeschlossen ist nicht entfernt — die Zähler bleiben unterscheidbar');
+
+  const paths = rows(db, 'select path from files order by path').map((row) => row.path);
+  for (const path of [...EXCLUDED_BY_EXTENSION, ...PROTECTED_LISTED]) {
+    assert.ok(!paths.includes(path), `${path} darf keine Zeile haben`);
+  }
+  assert.ok(paths.includes('src/config.mjs'), 'die Datei mit ausgeschriebenem Wert bleibt indexiert');
+  assert.ok(paths.includes('src/clean.mjs'), 'und die saubere Datei ebenfalls');
+  assert.equal(rows(db, 'select count(*) as n from chunks where path = ?', '.credentials.yaml')[0].n, 0);
+
+  // Schicht 2: die Quelldatei ist indexiert, ihr Wert ist ersetzt.
+  const body = rows(db, 'select body from chunks where path = ?', 'src/config.mjs').map((row) => row.body).join('\n');
+  assert.ok(body.includes('[REDACTED:anthropic-key]'), `der Schlüsselwert ist ersetzt: ${body}`);
+  assert.ok(body.includes('[REDACTED:connection-string]'), 'die Verbindungszeichenfolge auch');
+  assert.ok(body.includes("SHINON_CANARY_API_KEY = '"), 'der NAME bleibt stehen — er ist kein Geheimnis');
+  assert.ok(!body.includes(CANARY.assigned), 'nur der Wert verschwindet');
+  assert.ok(body.includes('export const sauber = 0;'), 'der harmlose Rest der Datei bleibt');
+
+  // Die Gegenprobe gegen zu viel Redaktion: eine saubere Datei kommt unverändert an.
+  const cleanBody = rows(db, 'select body from chunks where path = ?', 'src/clean.mjs').map((row) => row.body).join('\n');
+  assert.equal(cleanBody.trim(), readFileSync(join(project, 'src/clean.mjs'), 'utf8').trim());
+
+  // Fundstellen sind verzeichnet — Pfad, Zeile, Art. Ohne Wert.
+  const findings = bundle.secretFindings(db, 'src/config.mjs');
+  assert.ok(findings.length >= 4, `jede ausgeschriebene Stelle wird verzeichnet: ${JSON.stringify(findings)}`);
+  assert.deepEqual(Object.keys(findings[0]).sort(), ['kind', 'line', 'path']);
+  assert.equal(findings.find((finding) => finding.kind === 'connection-string').line, 2, 'die Zeile stimmt');
+  assert.equal(bundle.indexStats(db).secret_findings, report.findings, 'die Zählung stimmt mit den Zeilen überein');
+  db.close();
+
+  // DAS GATE: kein Kanarienvogel steht irgendwo im Index — in keiner Tabelle,
+  // nicht in der FTS-Spiegelung und nicht im WAL.
+  const hits = canaryHits(indexRoot, CANARY.dotenv, CANARY.credentials, CANARY.anthropic, CANARY.jwt, CANARY.connection, CANARY.assigned, CANARY.github);
+  assert.deepEqual(hits, [], `kein Kanarienvogel darf im Index stehen: ${hits.join(', ')}`);
+
+  // Und der zweite Lauf ändert daran nichts: der Wert darf auch nicht über einen
+  // Auffrischungs- oder Wiederaufbaupfad hineinkommen.
+  const again = bundle.openIndex(file);
+  bundle.updateIndex(again, project, { verify: 'all' });
+  again.close();
+  assert.deepEqual(canaryHits(indexRoot, CANARY.dotenv, CANARY.credentials, CANARY.anthropic, CANARY.jwt, CANARY.connection), []);
+});
+
+/**
+ * Das Muster, das vor dem Bau blind war.
+ *
+ * Gemessen (Docs/probes/secret-protection.json): eine Fassung mit Lookbehind auf
+ * Bezeichnerzeichen lieferte 0 Treffer, weil in `SHINON_API_KEY` vor `API_KEY`
+ * ein Unterstrich steht — blind genau für die häufigste Schreibweise. Die Tabelle
+ * hält die Formen fest, die tragen, und die Gegenfälle, die nicht tragen dürfen.
+ */
+test('Schutz: die Muster erkennen die benannten Formen und schweigen bei Beinahmen', () => {
+  const shapes = [
+    ['-----BEGIN RSA PRIVATE KEY-----', 'private-key'],
+    [CANARY.jwt, 'jwt'],
+    [CANARY.anthropic, 'anthropic-key'],
+    ['sk-or-v1-canary0123456789abcdef01234567', 'openrouter-key'],
+    ['sk-canary0123456789abcdef0123456789', 'openai-key'],
+    [CANARY.github, 'github-token'],
+    ['xoxb-canary0123456789', 'slack-token'],
+    ['AKIAIOSFODNN7EXAMPLE', 'aws-access-key-id'],
+    [`AIza${'A'.repeat(35)}`, 'google-api-key'],
+    [CANARY.connection, 'connection-string'],
+    [`Bearer ${'c'.repeat(30)}`, 'bearer-token'],
+    [`SHINON_API_KEY = '${'c'.repeat(24)}'`, 'zugewiesener-wert'],
+    [`MY_TOKEN: "${'c'.repeat(24)}"`, 'zugewiesener-wert'],
+    [`SERVICE_SECRET = "${'A'.repeat(44)}"`, 'zugewiesene-base64'],
+  ];
+  for (const [text, kind] of shapes) {
+    const kinds = bundle.findSecrets(text).map((hit) => hit.kind);
+    assert.ok(kinds.includes(kind), `${kind} muss erkannt werden: ${text} → ${kinds.join(',')}`);
+  }
+
+  const nearMisses = [
+    'sk-zu-kurz',
+    'AKIA1234567890ABC',
+    'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0',
+    "api_key = 'zu-kurz'",
+    '-----BEGIN PUBLIC KEY-----',
+    'const postgres = 1;',
+    'der Text nennt ein Token und ein Secret, aber keinen Wert',
+  ];
+  for (const text of nearMisses) {
+    assert.deepEqual(bundle.findSecrets(text), [], `kein Fund bei: ${text}`);
+  }
+
+  // Die Redaktion ist verlustfrei außerhalb der Fundstelle und ersetzt genau den
+  // Wert, nicht den Namen.
+  const { text, findings } = bundle.redactSecrets(CONFIG_LINES.join('\n'));
+  assert.equal(findings.length, 5, 'jede der fünf Stellen wird gefunden');
+  assert.equal(text.split('\n')[4], "SHINON_CANARY_API_KEY = '[REDACTED:zugewiesener-wert]';", 'nur der Wert wird ersetzt');
+  assert.equal(text.split('\n')[3], "export const marke = '[REDACTED:jwt]';", 'und die Zeile davor ebenso');
+  assert.equal(text.split('\n')[0], CONFIG_LINES[0], 'unberührte Zeilen bleiben Zeichen für Zeichen gleich');
+});
+
+/**
+ * Remediation — der Fall, der wirklich vorlag.
+ *
+ * Der Live-Index dieses Repos enthielt `.credentials.yaml` samt drei echten
+ * Schlüsseln, geschrieben von der Fassung VOR Phase 8. Weil die Datei unverändert
+ * ist, hätte der inkrementelle Lauf sie nie wieder angefasst; ein Schutz ohne
+ * Bereinigungspfad hätte die Werte für immer stehen gelassen. Der Test stellt
+ * genau diesen Zustand her und verlangt, dass der nächste Lauf ihn räumt.
+ */
+test('Schutz: ein vergifteter Index wird beim nächsten Lauf bereinigt', () => {
+  const project = secretProject('bereinigung');
+  const { indexRoot, file } = fixtureIndex(project, 'bereinigung');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, {});
+
+  // Der Zustand von vorher: beide Sorten stehen samt Inhalt in allen Tabellen,
+  // so wie es die alte Fassung geschrieben hätte. Die eine ist eine Datei, die
+  // der Lauf HEUTE noch betrachtet (`.credentials.yaml`), die andere eine, die er
+  // gar nicht mehr in der Dateiliste hat (`.env`). Beide Wege müssen räumen.
+  const poison = (path, value) => {
+    const body = `SHINON_CANARY_API_KEY=${value}\n`;
+    db.prepare('insert or replace into files(path, language, bytes, mtime_ms, digest, indexed_at_ms) values (?, ?, ?, ?, ?, ?)').run(path, 'text', body.length, 1, 'alt', 1);
+    db.prepare('insert into chunks(path, start_line, end_line, body) values (?, ?, ?, ?)').run(path, 1, 1, body);
+    db.prepare(`insert into ${bundle.FTS_TABLE}(path, body) values (?, ?)`).run(path, body);
+    db.prepare(`insert into ${bundle.SECRET_TABLE}(path, line, kind) values (?, ?, ?)`).run(path, 1, 'zugewiesener-wert');
+  };
+  poison('.credentials.yaml', CANARY.credentials);
+  poison('.env', CANARY.dotenv);
+  assert.ok(canaryHits(indexRoot, CANARY.credentials, CANARY.dotenv).length > 0, 'der vergiftete Zustand ist hergestellt');
+  db.close();
+
+  const second = bundle.openIndex(file);
+  const report = bundle.updateIndex(second, project, {});
+  assert.equal(report.protected, PROTECTED_TOTAL, 'die geschützten Dateien werden wieder erkannt');
+  // Die Zähler bleiben unterscheidbar, und das ist keine Kosmetik: eine Zeile der
+  // noch betrachteten `.credentials.yaml` räumt der SCHUTZ (protected), eine Zeile
+  // der gar nicht mehr betrachteten `.env` der Entfernungspfad (removed).
+  assert.equal(report.removed, 1, 'die Datei, die nicht mehr in der Liste steht, fällt unter die Entfernung');
+  assert.equal(report.purged, 1, 'die geschützte Datei war schon indexiert — ihr Schutz hat geräumt');
+  for (const path of ['.credentials.yaml', '.env']) {
+    assert.equal(rows(second, 'select count(*) as n from files where path = ?', path)[0].n, 0, `${path}: keine Zeile mehr`);
+    assert.equal(rows(second, 'select count(*) as n from chunks where path = ?', path)[0].n, 0, `${path}: kein Chunk mehr`);
+    assert.equal(rows(second, `select count(*) as n from ${bundle.SECRET_TABLE} where path = ?`, path)[0].n, 0, `${path}: auch der Befund verschwindet mit der Datei`);
+    assert.equal(rows(second, `select count(*) as n from ${bundle.FTS_TABLE} where path = ?`, path)[0].n, 0, `${path}: auch die Volltextspiegelung`);
+  }
+  second.close();
+  assert.deepEqual(canaryHits(indexRoot, CANARY.credentials, CANARY.dotenv), [], 'nach dem Lauf steht kein Wert mehr im Index');
+});
+
+/**
+ * Genau der Weg, der den ECHTEN Index dieses Repos bereinigt hat.
+ *
+ * Der Live-Index war von der Fassung vor Phase 8 geschrieben und stand auf einer
+ * anderen indexer_version; `openIndex` verwirft und baut neu auf. Ein Neubau der
+ * Tabellen lässt die BYTES der alten Zeilen aber in der Datei stehen — gemessen:
+ * ohne `secure_delete` und ohne einen Zusammenzug der Datei steht der Wert weiter
+ * darin, auch wenn `select` ihn nicht mehr findet. Der Test hält das fest.
+ */
+test('Schutz: ein Wiederaufbau lässt die Altdaten nicht in der Datei', () => {
+  const project = secretProject('neubau');
+  const { indexRoot, file } = fixtureIndex(project, 'neubau');
+  const poison = `SHINON_CANARY_API_KEY=${CANARY.credentials}\n`;
+  const first = bundle.openIndex(file);
+  first.prepare('insert into chunks(path, start_line, end_line, body) values (?, ?, ?, ?)').run('.credentials.yaml', 1, 1, poison);
+  first.prepare(`insert into ${bundle.FTS_TABLE}(path, body) values (?, ?)`).run('.credentials.yaml', poison);
+  // Eine fremde Fassung: genau der Zustand des Live-Index vor diesem Lauf.
+  first.prepare('update meta set value = ? where key = ?').run('1', 'indexer_version');
+  first.close();
+  assert.ok(canaryHits(indexRoot, CANARY.credentials).length > 0, 'der vergiftete Zustand ist hergestellt');
+
+  const second = bundle.openIndex(file);
+  assert.equal(bundle.indexMeta(second).indexer_version, String(bundle.INDEXER_VERSION), 'die eigene Fassung steht wieder');
+  assert.equal(bundle.indexStats(second).chunks, 0, 'und der alte Inhalt ist zeilenweise weg');
+  bundle.updateIndex(second, project, {});
+  second.close();
+  assert.deepEqual(canaryHits(indexRoot, CANARY.credentials), [], 'und er steht auch nicht mehr in den freigegebenen Seiten der Datei');
+});
+
+/**
+ * Der Schutz ist keine Option, sondern eine Eigenschaft des Index — und er steht
+ * im Protokoll, weil eine ausgeschlossene Datei keine Zählung verändert.
+ */
+test('Mount: der Bericht nennt den Schutz, und er lässt sich nicht abschalten', async () => {
+  const project = secretProject('bericht');
+  const indexRoot = join(workDir('bericht'), 'indexes');
+  const quiet = collector();
+  try {
+    const dispose = bundle.apply({}, bundle.Config({ root: project, indexRoot }));
+    assert.ok(await quiet.waitFor('Lauf im Worker'), `der Lauf muss berichten: ${quiet.lines.join(' | ')}`);
+    dispose();
+    assert.ok(quiet.lines.some((line) => line.includes('Schutz an')), 'die Aktivierung nennt den Schutz');
+    const line = quiet.lines.find((entry) => entry.includes('Schutz:'));
+    assert.ok(line !== undefined, 'der Bericht nennt den Schutz');
+    assert.ok(line.includes(`${PROTECTED_TOTAL} nie gelesen`), line);
+    assert.ok(line.includes('dotenv=1'), 'mit dem Grund je Datei');
+    assert.ok(/\d+ Fundstellen redigiert/.test(line), line);
+    assert.ok(!line.includes(CANARY.dotenv) && !line.includes(CANARY.credentials), 'aber niemals einen Wert');
+    assert.deepEqual(Object.keys(bundle.Config({})).includes('protection'), false, 'der Schutz ist keine Konfiguration');
   } finally {
     quiet.restore();
   }
