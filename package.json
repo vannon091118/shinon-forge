@@ -13,6 +13,8 @@
   ],
   "scripts": {
     "dev": "DSH_HOME=$PWD dsh --profile shinon",
+    "dev:web": "DSH_HOME=$PWD dsh --profile shinon --no-open --trusted-host localhost --trusted-host 127.0.0.1",
+    "verify:panel": "node scripts/panel-check.mjs",
     "build": "node scripts/build.mjs",
     "test": "node scripts/dsh-test.mjs && node scripts/validate-test.mjs && node scripts/pack-test.mjs && node scripts/dsh-profile-test.mjs",
     "gate": "node scripts/gate/engine.mjs",
@@ -38,7 +40,8 @@
     "@shinon/openapi": "workspace:*",
     "@shinon/better-errors": "workspace:*",
     "@shinon/token-usage": "workspace:*",
-    "@shinon/persona": "workspace:*"
+    "@shinon/persona": "workspace:*",
+    "@shinon/markers": "workspace:*"
   },
   "repository": {
     "type": "git",

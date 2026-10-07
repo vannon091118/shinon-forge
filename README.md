@@ -107,7 +107,7 @@ lieber laut als still falsch.
 
 ## 🧩 Plugins
 
-Neun Bundles, jedes genau vier Dateien (`index.js`, `client.js`, `cordis.patch.yml`,
+Zehn Bundles, jedes genau vier Dateien (`index.js`, `client.js`, `cordis.patch.yml`,
 `package.json`), dazu optionale `assets/`:
 
 | Bundle | Rolle |
@@ -115,6 +115,7 @@ Neun Bundles, jedes genau vier Dateien (`index.js`, `client.js`, `cordis.patch.y
 | **@shinon/core** | Branding-Overlay: Sidebar- & Hero-Marke, Farbverlauf |
 | **@shinon/persona** | Shinon als Persona-Schicht im DSH-System-Prompt |
 | **@shinon/events** | Hook/Event-Spine: Signale beobachten, normalisieren, validieren, emittieren (Wave 2) |
+| **@shinon/markers** | Marker-Spiegel aus `brutalord-the-feral-cycle` (Element-Marker) im **nativen Side Panel** (Wave 3) |
 | **@shinon/locale-de** | Deutsche Sprache, Namespace `shinon` |
 | **@shinon/tooltip** | Erweiterte Tooltips |
 | **@shinon/dashboard** | Status-Panel |
@@ -134,7 +135,7 @@ Neun Bundles, jedes genau vier Dateien (`index.js`, `client.js`, `cordis.patch.y
                                  │  Slots · Events · Bundles
                     ┌────────────▼────────────┐
                     │      SHINON FORGE       │   Overlay: Brand, Sprache,
-                    │   9 × @shinon/* Bundles │   UI-Schichten, Governance
+                    │  10 × @shinon/* Bundles │   UI-Schichten, Governance
                     └────────────┬────────────┘
                                  │
         ┌────────────────────────┼────────────────────────┐
@@ -161,6 +162,7 @@ Dieser Teil beschreibt den **tatsächlichen** Stand. Statusklassen:
 |---|---|---|
 | Namensvertrag aller Plugins (`@shinon/*`) | Verified | Gate: `package.json` ↔ Patch-id/name ↔ Profil-Bundle ↔ ModuleLoader-id ↔ Exports |
 | Hook/Event-Spine (Wave 2): Replay-Fixture, fail-closed, Nicht-Aktions-Grenze | Verified | 21 Events-Tests + `events-spine`-Gate + Mount im Profiltest (`dsh --dump-config`, dsh 0.2.0-rc.2); DSH-Signalverhalten: `Docs/probes/events-spine.json` (PLAN) |
+| Marker-Spiegel (Wave 3): Brutalords Regeln in Vertrag + Host, native Slots `main`/`sidebar.panellist` | Verified | 20 Marker-Tests + `markers`-Gate + Mount (Boot-Log) + `npm run verify:panel` **21/21**: Auslieferung durch die laufende DSH-Web-UI (Preload-Liste + Bundle), Panel rendert (`MARKS 0`), `m`-Modus, Klick-Marke `m1`, Nutzlast im Brutalord-Format. Offen: Engine-Render im Browser — `Docs/probes/markers-panel.json` |
 | Paket-Struktur, Syntax, Exports | Verified | Gate |
 | Distribution: `pnpm pack` → Isolat → Load für alle Pakete | Verified | `npm test` → `scripts/pack-test.mjs` |
 | Patch-Schema: YAML, Struktur, Typen, required Keys | Verified | Gate + Build, Fixture je Regel in `scripts/validate-test.mjs` |

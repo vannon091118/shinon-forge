@@ -1,0 +1,12 @@
+- insert:
+    - id: shinon-markers
+      name: '@shinon/markers'
+      config:
+        # Vertrag als Daten; die Datei liegt im Paket und wird mitgeliefert.
+        modelPath: './assets/marker-model.json'
+        # Brutalords Inbox bleibt Zugabe — der Hauptweg ist die Zwischenablage.
+        inboxUrl: 'http://127.0.0.1:9333/inbox'
+        textLimit: 200
+        markLimit: 200
+        panelLabel: 'Shinon Marker'
+        panelOrder: 30

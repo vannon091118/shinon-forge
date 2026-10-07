@@ -23,6 +23,9 @@ importers:
       '@shinon/locale-de':
         specifier: link:../../packages/locale-de
         version: link:../../packages/locale-de
+      '@shinon/markers':
+        specifier: link:../../packages/markers
+        version: link:../../packages/markers
       '@shinon/persona':
         specifier: link:../../packages/persona
         version: link:../../packages/persona

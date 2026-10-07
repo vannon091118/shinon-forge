@@ -47,6 +47,9 @@
       "events-spine": {
         "prefixes": ["packages/events/", "Docs/contracts/events.json", "Docs/probes/events-spine.json", "profiles/"]
       },
+      "markers": {
+        "prefixes": ["packages/markers/", "Docs/contracts/markers.json", "profiles/", "scripts/gate/plugins/markers.mjs", "scripts/gate/tests/markers.test.mjs"]
+      },
       "commit-trailer": {
         "prefixes": ["scripts/", ".github/", ".githooks/", "package.json", "Docs/COMMIT-REGELN.md", "Docs/contracts/commit-trailer.json", "AGENTS.md"]
       }

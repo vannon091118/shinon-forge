@@ -1,0 +1,48 @@
+{
+  "name": "Marker-Spiegel — Element-Marker aus brutalord-the-feral-cycle als DSH-Bundle",
+  "status": "IMPLEMENTED",
+  "note": "Belegt durch drei echte Läufe. (1) Mount: dsh bootet den Host-Teil, Logzeile '[shinon-markers] Spiegel geladen (shinon.marker-mirror/v1) — Quelle vannon091118/brutalord-the-feral-cycle, 8 Felder, authority NONE'. (2) Auslieferung: die laufende DSH-Web-UI (127.0.0.1:5173) liefert @shinon/markers/client.js in der Modul-Preload-Liste (79 Module) und das 10.394.248-Byte-Client-Bundle enthält den Panel-Code. (3) Rendering: scripts/panel-check.mjs führt das gebaute Artefakt in einer DOM-Umgebung aus — 21/21 grün: main- und sidebar.panellist-Slot registriert, Styles injiziert, window.__mk vorhanden, Panel rendert mit 'MARKS 0' und Bedienhinweisen, Taste m setzt __mk_on, Klick legt die Marke m1 (div#app.card) mit Selektor/Rect/Zeitstempel ab, Nutzlast '- **m1**  › div#app.card  ·  0,0 0×0\n  Selector: #app', Escape beendet den Modus. Grenze der Prüfung: die DOM-Umgebung ist jsdom, kein Chromium-Engine-Render — im Sandbox existiert kein Browser-Binary, und DSH lehnt --host 0.0.0.0 aus Sicherheitsgründen ab, die Preview läuft deshalb auf 127.0.0.1:5173. Pixel-/Layout-Verhalten im echten Browser bleibt offen (Probe markers-panel-browser, PLAN).",
+  "source": {
+    "repo": "vannon091118/brutalord-the-feral-cycle",
+    "mirrored": ["tools/preview/marker-core.js", "tools/preview/marker.js"],
+    "not_mirrored": ["tools/preview/daemon.mjs (CDP-Verbindung)", "automatischer Chrome-Neustart", "Injektion in fremde Seiten"]
+  },
+  "rules": [
+    {
+      "positive": "Der Spiegel führt dieselben Marken-Regeln wie das Original: acht Felder (id, label, selector, text, rect, href, url, ts), monotone ids (m1, m2, …), Selektor-Pfad bis 6 Stufen mit :nth-of-type, Text auf 200 Zeichen normalisiert, Rect ganzzahlig gerundet.",
+      "forbidden": "Eine Marke ohne Selektor, ohne Label, mit unlesbarer id, mit nicht-ganzzahligem Rect, über der Textgrenze, ohne URL oder mit unlesbarem Zeitstempel; ein zweites Feldmodell neben dem Vertrag.",
+      "fallback": "Fehlt die id, wird sie aus der größten vorhandenen Zahl fortgeschrieben (+1). Fehlt der Vertrag, meldet der Host das und bleibt still — fail-open für den Host, damit die Sitzung nie bricht.",
+      "error": "MISSING_SELECTOR / MISSING_LABEL / INVALID_ID / INVALID_RECT:<seite> / INVALID_TEXT / TEXT_OVER_LIMIT / SELECTOR_TOO_DEEP / INVALID_TS / MISSING_URL / DUPLICATE_ID / MARK_LIMIT / UNKNOWN_ID — je Marke gezählt in stats.reasons, nie geworfen.",
+      "trace": "packages/markers/assets/marker-model.json (Regeln) → packages/markers/index.js (normalizeMark, validateMark, nextMarkId) → scripts/gate/plugins/markers.mjs (modelIssues).",
+      "replay": "normalizeMark, validateMark, nextMarkId und renderPayload sind reine Funktionen: gleiche Eingabe ⇒ gleiches Ergebnis; die Tests fahren sie über das echte Bundle (Schemastery-Stub, Temp-Kopie).",
+      "invariant": "createMirror.add(ungültige Marke) === null und mirror.list() bleibt unverändert; validateMark(erfüllte Marke) === []."
+    },
+    {
+      "positive": "Die Nutzlast ist genau Brutalords Zeilenformat aus dem Vertrag: '- **{id}**  › {label}  ·  {x},{y} {w}×{h}{comment}' plus '  Selector: {selector}', Kommentar als '  —  {text}'. Host und Client lesen dieselben Token.",
+      "forbidden": "Ein zweites Format im Client; eine Nutzlast ohne Selektor; ein Kommentar, der nicht zur Marke gehört.",
+      "fallback": "Ist der Kommentar leer, fehlt der Kommentar-Teil der Zeile — die Zeile bleibt gültig.",
+      "error": "Nutzlast-Token ohne Vorlage bzw. Client ohne Token ⇒ Gate-Befund (Drift); kein Laufzeitfehler.",
+      "trace": "assets/marker-model.json payload.line/payload.tokens → renderPayload() im Host → LINE/COMMENT im Client.",
+      "replay": "Der Test vergleicht die gerenderte Nutzlast Zeichen für Zeichen mit dem erwarteten Original-Format (mit und ohne Kommentar).",
+      "invariant": "renderPayload(marks, {}, model) === marks.map(zeile).join('\\n') und jede Zeile enthält '  Selector: '."
+    },
+    {
+      "positive": "Der Spiegel sitzt im NATIVEN DSH-Side-Panel: Registrierung im keyed-Slot main (PANEL_ID shinon-markers) plus Einstieg in sidebar.panellist mit Icon und Reihenfolge.",
+      "forbidden": "Ein schwebendes Fremd-Panel als Ersatz; ein Panel ohne Sidebar-Einstieg (dann ist es unerreichbar); ein zweiter Speicherschlüssel neben __mk.marks/__mk.comments; Netz außerhalb der Vertrags-Inbox; innerHTML, eval, document.write.",
+      "fallback": "Ohne Panel-Slot bleibt der Marker-Modus (Taste m) und die Fenster-API window.__mk nutzbar; das Panel erscheint, sobald der Slot existiert.",
+      "error": "clientIssues meldet fehlende Slots, fehlende Vertragswerte, Fremdspeicher, Fremdnetz und DOM-Injektion namentlich.",
+      "trace": "packages/markers/client.js (ctx.slots.inject/main/sidebar.panellist) + cordis.patch.yml → Profileintrag in profiles/shinon/package.json → scripts/panel-check.mjs (npm run verify:panel).",
+      "replay": "scripts/panel-check.mjs ist reproduzierbar: Token-Flow gegen die laufende UI, Preload- und Bundle-Prüfung, dann Rendering des gebauten Artefakts (Slot-Registrierung, Panel-DOM, m-Modus, Klick-Marke, Nutzlast, Escape) — 21/21 im belegten Lauf.",
+      "invariant": "clientIssues(echter Client, echter Vertrag) === [] und jedes injizierte Verbot (innerHTML, sessionStorage, fetch('http…'), Fremdschlüssel) erzeugt mindestens einen Befund; panel-check bricht ab, wenn die UI das Bundle nicht ausliefert oder das Panel nicht rendert."
+    },
+    {
+      "positive": "Der Spiegel ist ein Beobachter: der Host liest den Vertrag, rechnet und zählt — sonst nichts. Keine Datei-Schreibzugriffe, kein Netz, kein Modell, kein Prozess-Ende, kein Zufall.",
+      "forbidden": "child_process, execSync, spawn, writeFile(Sync), mkdirSync, rmSync, unlinkSync, fetch, http.request, Math.random, process.exit, ctx.llm, ctx.agents, ctx.shell, eval — im Host.",
+      "fallback": "Ist der Vertrag nicht lesbar, gibt apply() einen leeren Disposer zurück und warnt einmal statt zu werfen.",
+      "error": "hostIssues nennt den verbotenen Aufruf namentlich (Kommentare zählen nicht als Aufruf).",
+      "trace": "scripts/lib/source-scan.mjs (codeOnly/findForbidden/findMissing) → scripts/gate/plugins/markers.mjs (hostIssues).",
+      "replay": "Der Test hängt jede verbotene Zeile an den echten Host-Code und erwartet einen Befund; ein Kommentar mit demselben Wort bleibt grün.",
+      "invariant": "hostIssues(echtes index.js) === [] und hostIssues(index.js + 'writeFileSync(...)') ≠ []."
+    }
+  ]
+}

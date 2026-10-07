@@ -7,6 +7,7 @@
     "@shinon/dashboard": "link:../../packages/dashboard",
     "@shinon/events": "link:../../packages/events",
     "@shinon/locale-de": "link:../../packages/locale-de",
+    "@shinon/markers": "link:../../packages/markers",
     "@shinon/persona": "link:../../packages/persona",
     "@shinon/token-usage": "link:../../packages/token-usage",
     "@shinon/tooltip": "link:../../packages/tooltip"
@@ -18,6 +19,7 @@
         "@deepseek-ai/dsh-web-app",
         "@shinon/persona",
         "@shinon/events",
+        "@shinon/markers",
         "@shinon/core",
         "@shinon/locale-de",
         "@shinon/tooltip",

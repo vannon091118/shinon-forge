@@ -1,0 +1,68 @@
+{
+  "contract": "shinon.marker-mirror/v1",
+  "role": "Spiegel des Element-Marker-Systems aus brutalord-the-feral-cycle: Regeln als Daten, nicht als kopierter Code.",
+  "source": {
+    "repo": "vannon091118/brutalord-the-feral-cycle",
+    "paths": [
+      "tools/preview/marker-core.js",
+      "tools/preview/marker.js",
+      "tools/preview/daemon.mjs",
+      "Docs/WORKFLOW.md"
+    ],
+    "system": "Element-Marker: per CDP injiziert, markiert DOM-Elemente, hält sich über Reloads",
+    "copied": "Regeln (Felder, Ableitung, Format, Speicher, Grenzen)",
+    "not_copied": [
+      "CDP-Verbindung und Daemon (tools/preview/daemon.mjs)",
+      "automatischer Chrome-Neustart",
+      "Injektion in fremde Seiten"
+    ]
+  },
+  "authority": "NONE",
+  "fields": [
+    { "name": "id", "type": "string", "pattern": "^m[1-9][0-9]*$", "note": "aufsteigend, nie wiederverwendet" },
+    { "name": "label", "type": "string", "note": "tag#id.class — höchstens zwei Klassen" },
+    { "name": "selector", "type": "string", "note": "stabiler CSS-Pfad, höchstens 6 Stufen" },
+    { "name": "text", "type": "string", "limitKey": "text", "note": "innerText, Whitespace normalisiert" },
+    { "name": "rect", "type": "object", "shape": ["x", "y", "w", "h"], "integer": true },
+    { "name": "href", "type": "string", "nullable": true },
+    { "name": "url", "type": "string" },
+    { "name": "ts", "type": "string", "format": "ISO-8601" }
+  ],
+  "derivation": {
+    "id": "groesste vorhandene Zahl + 1 (m1, m2, …)",
+    "selector": { "maxParts": 6, "nthOfType": true, "skipClassPrefix": "__mk", "stopAtId": true },
+    "label": { "classes": 2 },
+    "text": { "normalizeWhitespace": true },
+    "rect": { "rounded": true }
+  },
+  "payload": {
+    "line": "- **{id}**  \u203a {label}  \u00b7  {x},{y} {w}\u00d7{h}{comment}\n  Selector: {selector}",
+    "comment": "  \u2014  {text}",
+    "separator": "\n",
+    "tokens": ["**{id}**", "\u203a", "\u00b7", "{x},{y} {w}\u00d7{h}", "Selector: {selector}"]
+  },
+  "inbox": {
+    "method": "POST",
+    "path": "/inbox",
+    "body": ["text", "marks"],
+    "default": "http://127.0.0.1:9333/inbox",
+    "note": "Brutalords Inbox; in DSH ist der Chat das Ziel — Kopieren ist der Hauptweg, der POST nur Zugabe"
+  },
+  "storage": { "marksKey": "__mk.marks", "commentsKey": "__mk.comments" },
+  "keys": { "toggle": "m", "cancel": "Escape", "note": "im Eingabefeld gewinnt Escape das Feld, nicht den Modus" },
+  "limits": { "text": 200, "marks": 200, "comment": 500 },
+  "forbidden": [
+    "autonomous_action",
+    "model_call",
+    "network_write_outside_inbox",
+    "dom_at_document_start",
+    "second_storage",
+    "cdp_attach"
+  ],
+  "invariants": [
+    "Eine Marke ohne Selektor oder ohne ganzzahliges Rect existiert nicht (fail-closed, kein Raten).",
+    "Die Markenmenge wächst monoton: eine vergebene id wird nie erneut benutzt.",
+    "Das Nutzlast-Format ist Daten (payload.line) — Client und Host lesen dieselbe Vorlage.",
+    "Der Spiegel schreibt nur in den eigenen Speicher (__mk.*) und nur in die Inbox — nirgends sonst."
+  ]
+}

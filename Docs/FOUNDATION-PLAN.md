@@ -84,6 +84,45 @@ Pflichtfeldern, Vertrag als Daten (`assets/event-spine.json`), Replay-Fixture
   echtes DSH bestätigen; danach `verifiedTypes` erweitern und die Probe
   `events-spine-dsh-wiring` von `PLAN` auf `WRITE` ziehen.
 
+## WAVE 3 — Marker-Spiegel ✅ GEBAUT (2026-10-07)
+`packages/markers/` — `@shinon/markers`, der Spiegel des Element-Marker-Systems aus
+`vannon091118/brutalord-the-feral-cycle` (`tools/preview/marker-core.js` +
+`marker.js`). Gespiegelt werden die **Regeln**, nicht der Code: acht Marken-Felder
+(`id, label, selector, text, rect, href, url, ts`), monotone ids, Selektor-Pfad bis
+6 Stufen mit `:nth-of-type`, Text auf 200 Zeichen normalisiert, Brutalords
+Nutzlast-Zeilenformat, Speicherschlüssel `__mk.marks`/`__mk.comments`, Taste `m`.
+- **Nicht gespiegelt:** CDP-Verbindung, Chrome-Daemon, Injektion in fremde Seiten —
+im Vertrag als `source.not_copied` benannt und als `cdp_attach` verboten.
+- **Nativer Side Panel statt schwebendem div:** der Spiegel registriert `main`
+(keyed, `shinon-markers`) und `sidebar.panellist` — dasselbe Slot-Muster wie
+`@shinon/dashboard`, kein Fremd-Panel im DOM.
+- **Fail-closed für Marken, fail-open für den Host:** eine Marke ohne Selektor oder
+mit nicht-ganzzahligem Rect existiert nicht (Grund + Zähler in `stats.reasons`);
+ein unlesbarer Vertrag beendet den Host nicht.
+- **Nicht-Autonomie geprüft:** `scripts/gate/plugins/markers.mjs` lehnt Schreib-,
+Netz-, Modell-, Zufalls- und Prozessaufrufe im Host sowie `innerHTML`/`eval`/
+Fremdspeicher/Fremdnetz im Client statisch ab; Client und Vertrag müssen dieselben
+Nutzlast-Token tragen (keine zweite Wahrheit).
+- **Beweis:** `npm run gate:test` 117/117 (davon 20 Marker-Tests), `gate:full`
+18 Gates PASS, `npm test` (Gate 52 · Distribution 40 · Profiltest 3) und
+`npm run build` (10 Pakete, `dist/packages/markers/assets/marker-model.json`).
+Mount belegt der Profiltest (`dsh --dump-config` listet `shinon-markers`) **und**
+die Boot-Zeile `[shinon-markers] Spiegel geladen (shinon.marker-mirror/v1) —
+Quelle vannon091118/brutalord-the-feral-cycle, 8 Felder, authority NONE`.
+- **Panel belegt (`npm run verify:panel` → 21/21, Exit 0, `scripts/panel-check.mjs`):**
+Vorschau lief über die Freebuff-Preview (`dsh --profile shinon`, 127.0.0.1:5173,
+Token-Flow HTTP 200). Die UI liefert `@shinon/markers/client.js` in der
+Preload-Liste (79 Module) und das 10.394.248-Byte-Client-Bundle enthält den
+Panel-Code. Das gebaute Artefakt rendert in einer DOM-Umgebung: `main`- und
+`sidebar.panellist`-Slot registriert, Styles injiziert, Panel mit `MARKS 0`,
+Taste `m` setzt `__mk_on`, Klick legt `m1 div#app.card` ab, Nutzlast
+`- **m1**  › div#app.card  ·  0,0 0×0` + `Selector: #app`, Escape beendet.
+- Offen (ehrlich): der **Engine-Render im echten Browser** — im Sandbox fehlt
+ein Browser-Binary und die Systembibliotheken; DSH lehnt `--host 0.0.0.0`
+ausdrücklich ab (RCE-Schutz), die Preview läuft deshalb auf `127.0.0.1`. Probe
+`markers-panel-browser` steht auf `PLAN` (`Docs/probes/markers-panel.json`);
+dazu: Highlight-Rect gegen Layout-Änderungen nachziehen.
+
 ## Fundament — Schichten (jede = ein sauberes 4-File-Cordis-Bundle)
 Alle als `packages/<dir>/`, automatisch von Discovery+Gate erkannt; 4-Wege-Namens-
 vertrag + `@deepseek-ai/schemastery` in peer+dev (SHARED_DEPS), sonst rot.
