@@ -1,0 +1,46 @@
+# Shinon Forge - the canonical `shinon` profile.
+#
+# `dsh.profile.bundles` in package.json activates the currently supported
+# Shinon Forge plugins; each bundle contributes its own patch layer below.
+# OpenAPI is deliberately inactive, not accidentally broken: @shinon/openapi
+# is neither a bundle nor a dependency of this profile.
+#
+# This user layer is applied after every bundle layer - a top-level YAML array
+# of loader patch entries (id-targeted config overrides, disables, and insert
+# lists; `!!js` expressions allowed).
+
+# @shinon/core owns the sidebar brand. 'sidebar.brand.mark' and
+# 'sidebar.brand.name' are single slots (exactly one occupant), so the shipped
+# official brand has to yield.
+- id: ui-brand-official
+  disabled: true
+- id: ui-settings-general
+  name: "@deepseek-ai/dsh-client-ui-settings-general"
+  config:
+    welcomeNoticeVersion: 2026-09-28.1
+
+# Modell-Route über den pi-ai-Adapter. `apiKeyEnv` ist nur ein REFERENZNAME:
+# das Secret kommt aus der Umgebung (SHINON_API_KEY), nie aus dieser Datei.
+# Ohne gesetzte Variable bleibt die Route konfiguriert-aber-schlüssellos.
+#
+# WICHTIG: `agent-default-model` MUSS auf eine Route mit Key zeigen. Die
+# deepseek-official-Route (dsh-llm-deepseek) ist im Web-Profil gemountet, hat
+# aber ohne DEEPSEEK_API_KEY keinen Schlüssel → MISSING_CREDENTIAL. Deshalb
+# zeigt der Default auf openrouter; die Modellwahl in der UI darf ihn
+# überschreiben, aber der Startzustand muss funktionieren.
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      openrouter:
+        apiKeyEnv: SHINON_API_KEY
+        displayName: Shinon Forge (OpenRouter)
+        models:
+          - id: deepseek/deepseek-chat-v3.1
+            contextWindow: 128000
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: openrouter
+    model: deepseek/deepseek-chat-v3.1
+    reasoningEffort: high

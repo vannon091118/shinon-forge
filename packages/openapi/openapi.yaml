@@ -1,0 +1,27 @@
+openapi: 3.0.3
+info:
+  title: Shinon Forge API
+  version: 1.0.0
+  description: >
+    Stabile API-Schicht für externe Integrationen. Der Server in
+    packages/openapi ist noch ein Platzhalter; dieses Dokument beschreibt
+    den vorgesehenen Vertrag.
+paths:
+  /api/v1/status:
+    get:
+      summary: Get system status
+      responses:
+        '200':
+          description: System is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, error]
+                  version:
+                    type: string
+                  uptime:
+                    type: number

@@ -1,0 +1,9 @@
+# shinon-openapi - OpenAPI API Schicht
+- insert:
+    - id: shinon-openapi
+      name: '@shinon/openapi'
+      config:
+        enabled: true
+        port: 3000
+        host: '127.0.0.1'
+        specPath: './openapi.yaml'

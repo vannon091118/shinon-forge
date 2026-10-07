@@ -1,0 +1,25 @@
+# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; `!!js` expressions allowed).
+# Shinon Forge — headless profile layer.
+#
+# The model route goes through the pi-ai adapter; `apiKeyEnv` is only a
+# REFERENCE NAME — the secret comes from the environment (SHINON_API_KEY),
+# never from this file.
+#
+#   SHINON_API_KEY=... dsh --profile headless "task"
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      openrouter:
+        apiKeyEnv: SHINON_API_KEY
+        displayName: Shinon Forge (OpenRouter)
+        models:
+          - id: deepseek/deepseek-chat-v3.1
+            contextWindow: 128000
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: openrouter
+    model: deepseek/deepseek-chat-v3.1

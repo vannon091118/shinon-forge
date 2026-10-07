@@ -1,0 +1,6 @@
+- insert:
+    - id: shinon-locale-de
+      name: '@shinon/locale-de'
+      config:
+        defaultLocale: 'de'
+        fallbackLocale: 'en'

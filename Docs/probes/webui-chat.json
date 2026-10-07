@@ -1,0 +1,9 @@
+{
+  "id": "webui-chat-turn",
+  "claim": "Die Web-UI führt einen echten Modell-Turn aus, ohne an fehlenden Credentials zu scheitern.",
+  "targets": ["profiles/shinon/cordis.patch.yml", "llm-pi-ai", "agent-default-model"],
+  "expect": "Ein Chat-Turn in der Web-UI endet mit 'Completed' und einer echten Antwort, nicht mit MISSING_CREDENTIAL.",
+  "result": "BESTAETIGT",
+  "verdict": "WRITE",
+  "evidence": "Live geprüft 2026-10-07: Prompt 'Antworte nur mit dem Wort: WEBUI_OK' → Antwort WEBUI_OK, Status 'Completed in 5s', Usage 7.9K tok, 9.9 tok/s. Modellwahl zeigt 'DeepSeek: DeepSeek V3.1 High' (openrouter-Route)."
+}

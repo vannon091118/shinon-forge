@@ -1,0 +1,25 @@
+{
+  "name": "@shinon/core — Brand-Overlay",
+  "status": "NOT_VERIFIED",
+  "note": "Rendert die Shinon-Marke in sidebar.brand.mark/name und conversation.hero.brand.mark. Statisch geprüft; im laufenden Web-Client noch nicht gesehen.",
+  "rules": [
+    {
+      "positive": "Ist @shinon/core gemountet, besetzen die drei Single-Slots die Shinon-Marke.",
+      "forbidden": "Zwei Besetzer gleichzeitig auf einem Single-Slot — dann kollidiert die Registrierung.",
+      "fallback": "Ohne Besetzer zeigt DSH seine eigene Marke (ui-brand-official bzw. Fallback).",
+      "error": "SLOT_OCCUPIED — ein zweiter register() auf denselben Single-Slot.",
+      "trace": "ctx.slots.inject('sidebar.brand.mark', …) → register() je Slot.",
+      "replay": "Reines Rendering, kein Zustand — gleiche Mount-Reihenfolge ergibt dieselbe Marke.",
+      "invariant": "Genau ein Besetzer je Single-Slot (sidebar.brand.mark, sidebar.brand.name, conversation.hero.brand.mark)."
+    },
+    {
+      "positive": "Das Client-Bundle ist self-contained und ruft __ModuleLoader__.load({id, factory}) mit der Contract-id auf.",
+      "forbidden": "Ein top-level `import`/`export` im client.js — der Loader lädt klassische Scripts.",
+      "fallback": "Lädt das Bundle nicht, bleibt der Slot leer statt zu crashen.",
+      "error": "ModuleLoader-id ≠ @shinon/core.",
+      "trace": "git blame / Gate-Plugin contract-half.",
+      "replay": "Bundle-Inhalt ist deterministisch; kein Zufall, kein Datum.",
+      "invariant": "client.js enthält kein top-level import/export."
+    }
+  ]
+}

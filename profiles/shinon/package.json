@@ -1,0 +1,26 @@
+{
+  "name": "dsh-profile-shinon",
+  "private": true,
+  "dependencies": {
+    "@shinon/better-errors": "link:../../packages/better-errors",
+    "@shinon/core": "link:../../packages/core",
+    "@shinon/dashboard": "link:../../packages/dashboard",
+    "@shinon/locale-de": "link:../../packages/locale-de",
+    "@shinon/token-usage": "link:../../packages/token-usage",
+    "@shinon/tooltip": "link:../../packages/tooltip"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@shinon/core",
+        "@shinon/locale-de",
+        "@shinon/tooltip",
+        "@shinon/dashboard",
+        "@shinon/better-errors",
+        "@shinon/token-usage"
+      ]
+    }
+  }
+}

@@ -1,0 +1,7 @@
+- insert:
+    - id: shinon-better-errors
+      name: '@shinon/better-errors'
+      config:
+        enabled: true
+        showStackTraces: false
+        locale: 'de'

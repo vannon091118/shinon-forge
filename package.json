@@ -1,0 +1,44 @@
+{
+  "name": "@shinon/forge",
+  "version": "0.2.0",
+  "description": "Shinon Forge - Built on DSH. Forged differently.",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "DSH_HOME=$PWD dsh --profile shinon",
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/dsh-test.mjs && node scripts/validate-test.mjs && node scripts/pack-test.mjs && node scripts/dsh-profile-test.mjs",
+    "gate": "node scripts/gate/engine.mjs",
+    "gate:local": "node scripts/gate/engine.mjs --local",
+    "gate:full": "node scripts/gate/engine.mjs --full",
+    "gate:test": "node --test scripts/gate/tests/*.test.mjs",
+    "update": "node scripts/dsh-update.mjs",
+    "sync": "git fetch upstream && git merge upstream/main",
+    "stages": "node scripts/stages.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.2.1-alpha.1",
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "devDependencies": {
+    "@shinon/core": "workspace:*",
+    "@shinon/locale-de": "workspace:*",
+    "@shinon/tooltip": "workspace:*",
+    "@shinon/dashboard": "workspace:*",
+    "@shinon/openapi": "workspace:*",
+    "@shinon/better-errors": "workspace:*",
+    "@shinon/token-usage": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vannon091118/shinon-forge.git"
+  },
+  "license": "MIT"
+}

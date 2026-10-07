@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "engine": {
+    "always": [
+      "manifest",
+      "contract",
+      "patch",
+      "host-half",
+      "client-half",
+      "legacy-guard",
+      "profile"
+    ],
+    "local": [
+      "manifest",
+      "contract",
+      "patch",
+      "host-half",
+      "client-half",
+      "legacy-guard",
+      "profile"
+    ],
+    "slices": {
+      "package-drift": {
+        "prefixes": ["package.json", "packages/"]
+      },
+      "duplicate-plugin": {
+        "prefixes": ["packages/", "profiles/"]
+      },
+      "dead-package": {
+        "prefixes": ["packages/", "profiles/", "package.json"]
+      },
+      "registry": {
+        "prefixes": ["packages/", "profiles/"]
+      },
+      "contracts": {
+        "prefixes": ["Docs/", "packages/"]
+      },
+      "doctor": {
+        "prefixes": ["package.json", "packages/", "profiles/", "scripts/"]
+      },
+      "probe-twin": {
+        "prefixes": ["Docs/probes/", "packages/"]
+      }
+    }
+  }
+}

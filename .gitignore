@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# DSH runtime state — session logs, workspace state, telemetry id.
+# Never commit: contains conversation content and local paths.
+sessions/
+storages/
+.anonymous-user-id
+
+# Credentials — never commit. Public repo!
+.credentials.yaml

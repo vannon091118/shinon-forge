@@ -1,0 +1,8 @@
+- insert:
+    - id: shinon-core
+      name: '@shinon/core'
+      config:
+        brandName: 'Shinon Forge'
+        primaryColor: 'var(--dsw-alias-brand-primary)'
+        sidebarCompact: false
+        showInfoBanner: true
