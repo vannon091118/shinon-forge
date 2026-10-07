@@ -1,0 +1,77 @@
+[
+  {
+    "id": "project-index-primaerdaten-nach-plan-9",
+    "claim": "Der Index traegt genau die sechs Primaerdaten aus Plan §9 namentlich — files, symbols, edges, references, touches, chunks — plus die FTS5-Spiegelung, und er liegt ausserhalb des Repos.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "packages/project-index/index.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Messbar vor dem Abschluss: jede der sechs Tabellen existiert und zaehlt; die Volltextspiegelung ist vollstaendig (chunks_fts == chunks); der Indexpfad liegt unter der Indexwurzel und nicht im Projekt.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN. Der Test oeffnet einen frischen Index und verlangt alle sechs Tabellen namentlich und leer; `select name from sqlite_master` liefert genau: chunks, chunks_fts (+ die vier FTS-Schatten-Tabellen chunks_fts_config/-content/-data/-docsize/-idx), edges, files, meta, references, symbols, touches. Das Schema steht in der Reihenfolge von Plan §9 und ist idempotent, weil inkrementell in dieselbe Datei geschrieben wird. ECHTER LAUF gegen dieses Repo (163 Dateien): files 163, symbols 606, edges 198, references 6858, touches 34, chunks 551, chunks_fts 551 — die Spiegelung ist vollstaendig, nicht nur angelegt; Indexpfad /tmp/.../indexes/2da40892c2ddcbca/index.sqlite, also ausserhalb des Repos. LIVE im Host: '[shinon-project-index] Aktiviert — shinon.project-index/v1, /home/vannon/.shinon/indexes/2da40892c2ddcbca/index.sqlite' mit 165 Dateien, 628 Symbolen, 570 Chunks, 7479 Referenzen, 4 Touches. Der Hash ist stabil ueber Laeufe und unterscheidet Projekte; gespeichert werden relative Projektpfade, damit der Index einen Umzug ueberlebt. MUTATIONSPROBE: das Quoting der Tabelle `references` entfernt -> 10 von 16 Zusagen rot (jeder Lauf bricht). UNGEPRUEFT/offen: die Fassung ist 1; eine Aenderung an den Tabellen muss SCHEMA_VERSION erhoehen, sonst wird ein alter Index weiterbenutzt — die Vertragspruefung dafuer ist gebaut und getestet, aber noch nie im Feld ausgeloest."
+  },
+  {
+    "id": "project-index-extraktion-ist-bewusst-begrenzt",
+    "claim": "Es gibt in der Runtime keinen JavaScript-Parser; die Symbol- und Kantengewinnung ist deshalb eine eigene, zeilenbasierte Extraktion, deren Reichweite gemessen und im Test gepinnt ist.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Die Grenze muss vor dem Bau benannt und danach als Testfall festgehalten sein: welche Formen erkannt werden, was ausdruecklich NICHT zugesagt wird, und welcher Schaden entsteht, wenn ein Filter fehlt.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, und der Messwert war ein Defekt: die erste Fassung extrahierte ueber dieses Repo `for` 126-mal und `if` 71-mal als 'Methode' — `for` war damit der haeufigste 'Symbolname' des Projekts (Top-Liste: for 126, if 71, apply 27), und die Referenzsuche haette jede Schleife als Referenz auf ein Symbol gezaehlt. FIX: Sprachschluesselwoerter (RESERVED_WORDS) sind keine Symbole, und der Blockkommentar-Zustand wird ueber die Zeilen mitgefuehrt (die Doc-Kommentare dieses Repos wurden sonst als Code gelesen). MUTATIONSPROBE: den Schluesselwort-Filter entfernt -> 2 Zusagen rot. DER TEST IST DER VERTRAG: eine Tabelle deckt function/async function/class/const/export{}/Methode ab sowie die Gegenfaelle `let offen;` (kein `=`), Zeilenkommentar, Dokkommentar-Zeile mit `apply(ctx, config)` und ein zweizeiliges Blockkommentar, hinter dem ein echtes Symbol steht; dazu der gemessene Regressionstest, dass if/for/while/switch/return keine Symbole sind, waehrend PRE_STEP_EVENT bleibt. An ECHTEN Dateien: prompter/index.js liefert die Symbole enhanceGuarded, readPrompt, Config, apply und die Kanten @deepseek-ai/schemastery + node:fs. GRENZE, ausdruecklich NICHT zugesagt: kein AST, keine Auswertung von Ausdruecken, keine Makros, keine mehrzeiligen Deklarationen; ein Symbol, das hinter einem mehrzeiligen Blockkommentar beginnt, wird uebersprungen; die Muster greifen nur am Zeilenanfang. OFFEN: eine spaetere Phase kann einen echten Parser nachruesten — dann muss die Zusage 'Symbole vollstaendig' neu formuliert werden; heute lautet sie 'die genannten Formen werden erkannt'."
+  },
+  {
+    "id": "project-index-inkrementell-nach-plan-11",
+    "claim": "Der Lauf folgt Plan §11: stat -> mtime+size vergleichen -> sha256 vergleichen -> nur bei neuem Hash parsen. Ein unveraenderter Lauf liest keine Datei, ein inhaltlich gleicher Lauf parst nicht neu.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Jede Stufe der Kette muss einzeln nachweisbar sein — unveraendert, mtime beruehrt bei gleichem Inhalt, echter Inhaltswechsel, geloeschte Datei, zu grosse Datei — und der Bericht muss die Stufe benennen, die gegriffen hat.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN gegen dieses Repo: Vollauf 163 Dateien in 817 ms (written 163, references 6858); unmittelbar danach unveraendert 106 ms mit unchanged 163, written 0, references 0, symbolsChanged false — der Referenzdurchgang laeuft dann NICHT, weil sich die Symbolmenge nicht geaendert hat (Digest in meta). mtime beruehrt, Inhalt gleich: rehashed 1, written 0, Symbole unveraendert (genau der Plan-Schritt 'gleicher Hash -> keine inhaltliche Neuindizierung'). Inhaltswechsel: written 1, symbolsChanged true, references > 0, das alte Symbol verschwindet, das neue steht da. Geloeschte Datei: removed 1, Zeilen aus files/symbols/chunks/references weg UND Touches auf die geloeschte Datei bereinigt (ein Touch auf eine nicht existierende Datei ist kein Touch). Zu grosse Datei: skipped 1 und die alten Zeilen werden entfernt, damit keine veralteten Zeilen stehen bleiben. LIVE im Host sichtbar: '4 neu, 1 nur aufgefrischt, 160 unveraendert, 0 entfernt, 0 uebersprungen ... 165 Dateien'. MUTATIONSPROBEN: Hash-Vergleich entfernt (immer neu parsen) -> 1 Zusage rot; Referenzdurchgang immer vollstaendig -> 1 Zusage rot; Touch-Bereinigung entfernt -> 1 Zusage rot. OFFEN (ehrlich): die Kette vergleicht mtime+size vor dem Hash; ein Werkzeug, das die mtime zuruecksetzt, umgeht die Erkennung — der Digest wird dann nicht geprueft, weil die Datei als unveraendert gilt. Fuer diesen Fall gibt es heute keinen Test und keinen Zwang zum Vollauf."
+  },
+  {
+    "id": "project-index-lauf-im-worker-nach-plan-12",
+    "claim": "Der Index-Build blockiert den kritischen Agent-Eventloop nicht: der Lauf steht in einem Worker, mit protokolliertem Fallback in den Host.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "packages/project-index/index.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Plan §12 verlangt: 'Wenn node:sqlite / DatabaseSync verwendet wird, darf der Index-Build den kritischen Agent-Eventloop nicht blockieren.' Belegbar ist das nur mit einer Messung der Eventloop-Verzoegerung waehrend des Laufs — in beiden Wegen, und mit benannter Ursache, wenn der Worker nicht traegt.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN mit einem 10-ms-Timer, der waehrend des jeweiligen Laufs tickt: der Lauf im HOST blockierte den Eventloop vollstaendig — 1734 ms Lauf, 0 Timer-Ticks; der Lauf im WORKER (1980 ms) liess 192 Ticks zu, groesste Verzoegerung 3 ms. Das ist die Zusage aus §12 in Zahlen. DER ERSTE LIVE-LAUF HAT EINEN ECHTEN FEHLER AUFGEDECKT: '[shinon-project-index] Worker nicht nutzbar (Cannot find package \\'@deepseek-ai/schemastery\\' imported from /home/vannon/Schreibtisch/Shinon-forge/packages/project-index/index.js) — Lauf im Host'. Der Worker hat die Modulaufloesung des Hosts nicht, und der Bare-Import des Host-Pakets scheitert dort; der protokollierte Fallback tat, was er soll (Index gebaut), aber ein dauerhaft scheiternder Worker kostet pro Start einen Worker-Start und schreibt eine Fehlerzeile — das waere eine Verschlechterung gewesen. FIX: der Kern (Extraktion, Schema, Lauf, Worker) liegt jetzt ohne jede Host-Abhaengigkeit in assets/index-core.js und wird vom Worker ueber seine Datei-URL geladen; index.js ist nur noch Host-Haelfte (Config + Mount) und oeffnet keine Datenbank selbst. ZWEITER LIVE-LAUF, sichtbar: 'Aktiviert — shinon.project-index/v1, /home/vannon/.shinon/indexes/2da40892c2ddcbca/index.sqlite, Lauf nach dem Start (Worker)' und '[shinon-project-index] Lauf im Worker: 4 neu, 1 nur aufgefrischt, 160 unveraendert, 0 entfernt, 0 uebersprungen, 7479 Referenzen, 4 Touches — 165 Dateien, 628 Symbole, 570 Chunks' — kein einziges 'Worker nicht nutzbar' mehr. ABNAHMETEST: Host-Lauf und Worker-Lauf auf demselben Fixture-Projekt liefern denselben Index (Zaehlungen, Symbole, Kanten, Touches und Symbol-Digest verglichen); ein scheiternder Worker (Indexwurzel ist eine Datei) wird benannt und der Lauf im Host trotzdem versucht; ein vor dem Lauf abgeraeumter Mount schreibt nichts. PREIS, ehrlich: der Worker erkauft den freien Eventloop mit Startzeit (gemessen 3252 ms gegen 2315 ms im gleichen Laufpaar) — auf kleinen Projekten ist der Gewinn gering, auf grossen ist er der Unterschied zwischen 'Start haengt' und 'Start laeuft'. OFFEN: die Blockade-Messung ist eine Einzelmessung auf dieser Maschine; ein Test pinnt die Zahlen nicht, er pinnt die Wege (Worker traegt / Worker scheitert -> Host)."
+  },
+  {
+    "id": "project-index-bleibt-ausserhalb-des-repos",
+    "claim": "Der Lauf schreibt nichts ins Projekt und nichts ausserhalb des Indexverzeichnisses; das Projekt bleibt unberuehrt.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "packages/project-index/index.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Plan §9 verlangt den Index ausserhalb des Projekts. Beleg: der Indexpfad liegt unter der Indexwurzel, ein Projekt-Snapshot vor/nach dem Lauf ist identisch, und die Grenze ist auch statisch geprueft.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN: der Test nimmt vor und nach einem vollen Lauf einen Snapshot des Fixture-Projekts (relativer Pfad : Groesse : mtime fuer jede Datei) und verlangt Gleichheit — keine neue Datei, kein geaenderter Inhalt; der Indexpfad liegt unter der Indexwurzel und ausdruecklich nicht unter dem Projekt. Statisch: in index.js und im Kern kommen writeFileSync, appendFileSync, rmSync, unlinkSync, renameSync, child_process, fetch(, process.exit, ctx.llm, ctx.agents, ctx.shell, ctx.set( nicht vor (geprueft ueber codeOnly/module-Modus, also ohne Kommentar-Treffer), `new DatabaseSync` steht ausschliesslich im Kern, und der Kern kennt nur node:* Builtins (das ist zugleich die Bedingung dafuer, dass der Worker ihn laden kann). Nicht betreten werden .git, node_modules, dist, .cache, storages, coverage, .turbo; nicht indexiert werden unbekannte Endungen. LIVE: der Index dieses Repos liegt in /home/vannon/.shinon/indexes/2da40892c2ddcbca/index.sqlite; im Repo selbst zeigt git status nach dem Lauf nur die beabsichtigten Aenderungen. OFFEN (ehrlich): die Indexwurzel ist Standard (~/.shinon/indexes) und ueber Config aenderbar; wer sie ins Projekt legt, hebelt genau diese Zusage aus — das ist eine Konfigurationsfrage, keine Zusage des Codes, und heute prueft niemand, dass indexRoot ausserhalb von root liegt."
+  },
+  {
+    "id": "project-index-legacy-guard-deckt-unterverzeichnisse",
+    "claim": "Der Legacy-Guard deckt jetzt jedes Runtime-Artefakt eines Pakets ab, auch Unterverzeichnisse wie assets/ — vorher war die Dateiliste fest und damit genau an der Stelle offen, an der dieses Paket seinen Kern ablegt.",
+    "targets": [
+      "scripts/lib/repo.mjs",
+      "packages/project-index/assets/index-core.js"
+    ],
+    "expect": "Der Vertrag 'dsh-mod darf in keinem Runtime-Artefakt stehen' muss fuer JEDE ausgelieferte Code-/Konfigurationsdatei gelten. Zu belegen: der Scan findet eine Datei in einem Unterverzeichnis, die die alte feste Liste nicht geprueft haette, und er findet im Repo heute nichts.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN: legacyHits laeuft jetzt rekursiv ueber jedes Paketverzeichnis (Endungen .js/.mjs/.cjs/.yml/.yaml, ohne node_modules) statt ueber die drei festen Dateinamen, und zusaetzlich ueber profiles/<name>/package.json. MUTATIONSPROBE: eine Datei packages/project-index/assets/probe-legacy.js mit dem Legacy-String wird gefunden ('[\"packages/project-index/assets/probe-legacy.js\"]'), nach dem Entfernen ist die Liste leer; die alte feste Liste ({index.js, client.js, cordis.patch.yml}) haette genau diese Datei NICHT geprueft. Bestand: 0 Treffer ueber alle 14 Pakete und alle Profile, dsh-test bleibt bei 72/72, gate:full bleibt bei 18 Gates PASS. Der Anlass ist kein Zufall: dieses Paket legt seinen Kern in einem Unterverzeichnis ab, sonst waere der Worker nicht moeglich — die Luecke war also mit dem Fix schon offen."
+  }
+]

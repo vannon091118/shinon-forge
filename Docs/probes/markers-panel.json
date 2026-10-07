@@ -25,7 +25,7 @@
     "expect": "node scripts/panel-check.mjs … --jsdom-root <node_modules> endet mit Exit 0 und 21/21 grün, darunter: main- und sidebar.panellist-Slot registriert, Panel rendert '.__mk_panel' mit 'MARKS 0', Taste m setzt __mk_on, Klick legt m1 (div#app.card) ab, Nutzlast '- **m1**  › div#app.card  ·  0,0 0×0\\n  Selector: #app'.",
     "result": "BESTAETIGT",
     "verdict": "WRITE",
-    "evidence": "Lauf 2026-10-07: 21/21 grün, Exit 0. Artefakt ist dist/packages/markers/client.js (npm run build → 10 Pakete, 49 Dateien)."
+    "evidence": "Lauf 2026-10-07: 21/21 grün, Exit 0. Artefakt ist dist/packages/markers/client.js (npm run build → 10 Pakete, 49 Dateien). NACHTRAG (Phase 6): panel-check wurde NICHT neu gemessen — er braucht eine laufende Web-UI mit Token und jsdom/react in einem fremden node_modules, das hier nicht vorhanden ist. Gemessen ist der andere Weg: npm run gate:test -> 194/194, npm test -> Exit 0, npm run build -> Exit 0, gate:full -> 18 Gates PASS."
   },
   {
     "id": "markers-panel-browser",
