@@ -14,6 +14,11 @@
         # zusaetzlicher Modellaufruf entsteht.
         provider: ''
         model: ''
+        # Kontext-Quelle fuer MAX: eine JSON-Datei in der Form von ContextSchema,
+        # relativ zum Paket aufgeloest. Leer heisst: kein Kontext — dann wird MAX
+        # mit 'MODE_NEEDS_CONTEXT' abgelehnt, statt Referenzen zu erfinden.
+        # Der Project Index (Phase 4) fuellt spaeter genau diese Form.
+        contextPath: ''
         maxTokens: 1200
         temperature: 0
         timeoutMs: 15000
