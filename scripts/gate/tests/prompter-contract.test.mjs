@@ -908,6 +908,10 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     provider: '',
     model: '',
     contextPath: '',
+    // Neu mit der Naht zum Project Index: das Budget des MAX-Kontexts. Der
+    // Vorgabewert ist DERSELBE wie der des Index (`DEFAULT_CONTEXT_BUDGET`),
+    // deshalb ist er hier gepinnt und nicht nur behauptet.
+    indexBudgetTokens: 6000,
     maxTokens: 1200,
     temperature: 0,
     timeoutMs: 15000,

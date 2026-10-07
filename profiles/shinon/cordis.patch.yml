@@ -15,10 +15,19 @@
 # der Default des Agenten — agnes/agnes-2.5-flash, ohne Nutzungslimits.
 # Wirkung: pro Nutzer-Schritt ein zusaetzlicher Modellaufruf des One-Shots;
 # faellt er aus, gilt unveraendert der Roh-Prompt.
+#
+# indexBudgetTokens: das Budget des MAX-Kontexts aus dem Projektindex.
+# MAX braucht Projektkenntnis; die kommt jetzt aus ZWEI moeglichen Quellen:
+# einer Kontextdatei (contextPath, ausdrueckliche Angabe, gewinnt) oder dem
+# Index ueber `ctx.get('shinon_index_query')` — ohne Injektionszwang, damit
+# dieser Enhancer auch in einem Profil ohne Project Index laedt.
+# Der wirksame Wert steht hier und nicht im Paket (dort nur der Schema-Default),
+# und `mode` bleibt MIN: der Index macht MAX moeglich, er schaltet es nicht ein.
 - id: shinon-prompter
   config:
     provider: agnes
     model: agnes-2.5-flash
+    indexBudgetTokens: 6000
 
 # Task Router (Plan §16/§17): die SCHWELLE und die STOP-POLICY sind
 # Entscheidungen, keine Konstanten im Code. Deshalb stehen die wirksamen Werte

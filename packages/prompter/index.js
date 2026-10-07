@@ -82,6 +82,24 @@ export const DECISION_CHANNEL = 'shinon/prompter/decision';
 export const MODES = ['MIN', 'MID', 'MAX'];
 
 /**
+ * Die Abfrage-Faehigkeit des Project Index (Plan §14/§17).
+ *
+ * `ctx.get(INDEX_SERVICE)` und KEIN `inject`: der Enhancer soll auch in einem
+ * Profil ohne Project Index laden. Ein `inject` wuerde ihn dort gar nicht erst
+ * montieren — gemessen im Boot (§17: Cordis stellt Dienste in Fiber-Reihenfolge
+ * bereit, ein `inject` verzoegert den eigenen Mount auf den Dienst). Preis der
+ * Optionalitaet: die Faehigkeit kann auch UNSINNIGES liefern, und genau das
+ * prueft der Enhancer, bevor er sie benutzt (`contract` + Signatur + Schema).
+ */
+export const INDEX_SERVICE = 'shinon_index_query';
+
+/** Der Vertragsname, den die Faehigkeit fuehren muss. */
+export const INDEX_CONTRACT = 'shinon.project-index/query-v1';
+
+/** Budget des MAX-Kontexts. Derselbe Wert wie der Vorgabewert des Index (§14). */
+export const INDEX_BUDGET_TOKENS = 6000;
+
+/**
  * Operationen, die eine ANFORDERUNG ändern. Sie sind in jedem Modus verboten —
  * das ist der Unterschied zwischen „anders formuliert" und „andere Aufgabe".
  */
@@ -259,9 +277,14 @@ export const inject = ['llm'];
  * Profil, nicht aus dem Paket. Bleiben sie leer, gibt es keinen Aufrufweg — das
  * wird gemeldet (`NO_ROUTE`), nicht stillschweigend als Erfolg verbucht.
  *
- * `contextPath` ist der definierte Kontext-Input für MAX: eine JSON-Datei in der
- * Form von `ContextSchema`, relativ zum Paket aufgeloest. Leer heißt: es gibt
- * keinen Kontext, also wird MAX abgelehnt (`MODE_NEEDS_CONTEXT`).
+ * `contextPath` ist der definierte Kontext-Input fuer MAX: eine JSON-Datei in der
+ * Form von `ContextSchema`, relativ zum Paket aufgeloest. Leer heisst nicht mehr
+ * „MAX gibt es nicht": dann wird der Project Index gefragt (`INDEX_SERVICE`),
+ * und MAX gilt, wenn eine der beiden Quellen einen Kontext liefert. Der
+ * Entscheidungsdatensatz nennt, WELCHE (`context_source`). Eine konfigurierte,
+ * aber kaputte Datei sperrt MAX dagegen weiterhin (`CONTEXT_INVALID`) — eine
+ * ausdrueckliche Angabe, die nicht stimmt, darf nicht stillschweigend auf eine
+ * andere Quelle ausweichen.
  */
 export const Config = z.object({
   /** DSH-Event-Namen, auf die sich der Enhancer registriert. */
@@ -272,8 +295,13 @@ export const Config = z.object({
   provider: z.string().default(''),
   /** Modell des One-Shot-Childs (leer = nicht konfiguriert). */
   model: z.string().default(''),
-  /** Kontext-Quelle für MAX (leer = kein Kontext, MAX wird abgelehnt). */
+  /** Kontext-Quelle fuer MAX (leer = kein Kontext, MAX wird abgelehnt). */
   contextPath: z.string().default(''),
+  /**
+   * Budget des Index-Kontexts. Der Enhancer deckelt selbst — der Wert aus dem
+   * Profil gilt, das Paket hat nur einen Vorgabewert.
+   */
+  indexBudgetTokens: z.number().default(INDEX_BUDGET_TOKENS),
   /** Obergrenze der Antwort. Die Antwort ist ein JSON-Objekt, kein Aufsatz. */
   maxTokens: z.number().default(1200),
   /** Deterministisch: derselbe Prompt soll denselben Vorschlag ergeben. */
@@ -592,6 +620,84 @@ function contextLabel(mode, contextState, used) {
 }
 
 /**
+ * Die Abfrage-Faehigkeit einmal benennen, dann nicht mehr. Ein Fehler in einer
+ * OPTIONALEN Quelle darf den Schritt nicht mit Warnungen fluten — aber einmal
+ * gesagt werden muss er, sonst waere der stille Verzicht auf MAX unsichtbar.
+ */
+function warnIndex(runtime, detail) {
+  if (runtime.indexWarned) return;
+  runtime.indexWarned = true;
+  console.error(`[shinon-prompter] Index-Kontext nicht nutzbar (${detail}) — MAX bleibt gesperrt`);
+}
+
+/**
+ * Den MAX-Kontext aus dem Project Index holen.
+ *
+ * Die Faehigkeit ist OPTIONAL und ihre Antwort ist eine Behauptung, bis sie
+ * geprueft ist. Deshalb vier Richtungen, jede mit eigenem Grund:
+ *
+ *   kein Dienst        `MODE_NEEDS_CONTEXT` — es gibt keine Quelle. Das ist der
+ *                      Normalfall in einem Profil ohne Project Index, kein Fehler.
+ *   falscher Vertrag   `CONTEXT_INVALID` — wer unter diesem Namen etwas anderes
+ *                      anbietet, liefert keine Projektkenntnis.
+ *   `null`             `MODE_NEEDS_INDEX` — der Index ist noch nicht da. Eine
+ *                      eigene Ursache, weil sie sich von selbst behebt: der
+ *                      naechste Schritt hat ihn.
+ *   unbrauchbar        `CONTEXT_INVALID` — Wurf oder Formverstoss. Geprueft wird
+ *                      gegen DENSELBEN `ContextSchema` wie die Datei, damit es
+ *                      fuer MAX genau eine gueltige Form gibt.
+ */
+function indexContext(ctx, config, text, runtime) {
+  let service;
+  try {
+    service = typeof ctx?.get === 'function' ? ctx.get(INDEX_SERVICE) : undefined;
+  } catch {
+    // Ein dienstloser Kontext wirft je nach Fassung statt `undefined` zu liefern.
+    // Das ist die Abwesenheit, die hier gemeint ist — kein Grund zum Abbruch.
+    service = undefined;
+  }
+  if (service === undefined || service === null) return { context: null, source: 'none', reason: 'MODE_NEEDS_CONTEXT' };
+  if (service.contract !== INDEX_CONTRACT || typeof service.resolveContext !== 'function') {
+    warnIndex(runtime, `${INDEX_SERVICE} verletzt den Vertrag ${INDEX_CONTRACT}`);
+    return { context: null, source: 'none', reason: 'CONTEXT_INVALID' };
+  }
+
+  let raw;
+  try {
+    raw = service.resolveContext(text, { budgetTokens: config.indexBudgetTokens });
+  } catch (error) {
+    warnIndex(runtime, `${INDEX_SERVICE}: ${error?.message ?? error}`);
+    return { context: null, source: 'none', reason: 'CONTEXT_INVALID' };
+  }
+  if (raw === null || raw === undefined) return { context: null, source: 'none', reason: 'MODE_NEEDS_INDEX' };
+
+  try {
+    const context = ContextSchema(raw);
+    if (!runtime.indexSeen) {
+      runtime.indexSeen = true;
+      console.log(`[shinon-prompter] MAX-Kontext aus dem Index (${INDEX_SERVICE}, Budget ${config.indexBudgetTokens} Token)`);
+    }
+    return { context, source: 'index', reason: null };
+  } catch (error) {
+    warnIndex(runtime, `${INDEX_SERVICE}: ${error?.message ?? error}`);
+    return { context: null, source: 'none', reason: 'CONTEXT_INVALID' };
+  }
+}
+
+/**
+ * Woher der MAX-Kontext dieses Schritts kommt — genau eine Quelle, benannt.
+ *
+ * Eine konfigurierte Datei geht dem Index vor (sie ist die ausdrueckliche
+ * Angabe), eine KAPUTTE Datei sperrt MAX vollstaendig statt auf den Index
+ * auszuweichen: wer eine Quelle benennt, bekommt sie oder einen Grund.
+ */
+function maxContext(ctx, config, runtime, prompt) {
+  if (runtime.contextState === 'invalid') return { context: null, source: 'none', reason: 'CONTEXT_INVALID' };
+  if (runtime.contextState === 'loaded') return { context: runtime.context, source: 'file', reason: null };
+  return indexContext(ctx, config, prompt.text, runtime);
+}
+
+/**
  * Provenienz-Datensatz: was entschieden wurde, ohne den Prompt-Text zu kopieren.
  * Genau einer pro Schritt — auch im Randfall, damit die Spur nicht doppelt laeuft.
  *
@@ -599,8 +705,14 @@ function contextLabel(mode, contextState, used) {
  * die Klassifikation einem LEBENDEN Agenten zuordnen, und `ctx.goals` akzeptiert
  * nur die exakte Instanz der Registry — ueber die Sitzung ist sie eindeutig.
  * Ohne dieses Feld waere die Zuordnung ein Raten nach Reihenfolge.
+ *
+ * `context_source` nennt die QUELLE, die den Kontext geliefert hat (`index` |
+ * `file` | `none`), waehrend `context` sagt, wie es ihr erging. Zwei Felder, weil
+ * es zwei Fragen sind: „hat MAX einen Kontext benutzt" und „woher kam er".
+ * Ohne das zweite waere ein Indexkontext von einer Datei nicht zu unterscheiden,
+ * und die Naht nicht nachpruefbar.
  */
-function decisionRecord(config, runtime, outcome, rawLength, sessionId) {
+function decisionRecord(config, runtime, outcome, rawLength, sessionId, contextSource = 'none') {
   const result = outcome.result;
   return {
     contract: CONTRACT,
@@ -609,6 +721,7 @@ function decisionRecord(config, runtime, outcome, rawLength, sessionId) {
     outcome: outcome.outcome,
     reasons: outcome.reasons,
     context: contextLabel(config.mode, runtime.contextState, outcome.contextUsed === true),
+    context_source: contextSource,
     intentClassification: result?.intentClassification ?? null,
     uncertainties: result?.uncertainties ?? [],
     references: result?.references ?? [],
@@ -623,15 +736,20 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   if (prompt === null) return next();
   const sessionId = payload?.agent?.session?.id;
 
-  if (config.mode === 'MAX' && runtime.contextState !== 'loaded') {
+  // EINE Quelle je Schritt, einmal aufgeloest: der Beleg nennt dieselbe Quelle,
+  // die den Prompt veredelt hat. Zwei Abfragen koennten zwei Antworten geben.
+  const supplied = config.mode === 'MAX'
+    ? maxContext(ctx, config, runtime, prompt)
+    : { context: null, source: 'none', reason: null };
+
+  if (config.mode === 'MAX' && supplied.context === null) {
     // MAX ohne Kontext gibt es nicht: Code-Referenzen und Touches waeren
     // erfunden. Also wird der Modus abgelehnt, nicht weichgespuelt.
-    const reason = runtime.contextState === 'invalid' ? 'CONTEXT_INVALID' : 'MODE_NEEDS_CONTEXT';
-    report(ctx, config, decisionRecord(config, runtime, { outcome: 'unavailable', reasons: [reason], result: null }, prompt.text.length, sessionId));
+    report(ctx, config, decisionRecord(config, runtime, { outcome: 'unavailable', reasons: [supplied.reason], result: null }, prompt.text.length, sessionId));
     return next();
   }
 
-  const context = config.mode === 'MAX' ? runtime.context : null;
+  const context = supplied.context;
   const outcome = await enhanceGuarded(ctx, config, prompt.text, context, payload.signal);
   outcome.contextUsed = config.mode === 'MAX' && context !== null;
 
@@ -644,7 +762,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     : null;
 
   if (outcome.outcome === 'accepted' && messages !== null) {
-    report(ctx, config, decisionRecord(config, runtime, outcome, prompt.text.length, sessionId));
+    report(ctx, config, decisionRecord(config, runtime, outcome, prompt.text.length, sessionId, supplied.source));
     return { ...decision, messages };
   }
 
@@ -653,7 +771,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   const rejected = messages === null && outcome.outcome === 'accepted'
     ? { ...outcome, outcome: 'rejected', reasons: ['MESSAGE_NOT_FOUND'] }
     : outcome;
-  report(ctx, config, decisionRecord(config, runtime, rejected, prompt.text.length, sessionId));
+  report(ctx, config, decisionRecord(config, runtime, rejected, prompt.text.length, sessionId, supplied.source));
   return decision;
 }
 
@@ -679,7 +797,10 @@ function report(ctx, config, record) {
  * Registrierung, laut.
  *
  * Der Kontext wird EINMAL beim Mounten geladen und validiert. Ein unlesbarer
- * Kontext sperrt MAX, statt es mit halben Daten zu betreiben.
+ * Kontext sperrt MAX, statt es mit halben Daten zu betreiben. Die
+ * Index-Faehigkeit wird hier NICHT geprueft: sie wird je Schritt ueber `ctx.get`
+ * geholt (§17: Dienste erscheinen in Fiber-Reihenfolge, ein Blick beim Mounten
+ * saehe sie faelschlich als abwesend).
  */
 export function apply(ctx, config) {
   if (typeof ctx?.on !== 'function') {
@@ -708,7 +829,7 @@ export function apply(ctx, config) {
 
   const route = config.provider === '' || config.model === '' ? 'ohne Route (inaktiv)' : `${config.provider}/${config.model}`;
   const contextInfo = config.mode === 'MAX' ? `context=${contextState}` : `context=${contextState} (nur MAX nutzt ihn)`;
-  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, ${route}, ${contextInfo})`);
+  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, ${route}, ${contextInfo}, index=${INDEX_SERVICE} optional ohne inject)`);
 
   return () => {
     if (typeof dispose === 'function') dispose();

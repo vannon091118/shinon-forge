@@ -846,6 +846,10 @@ test('Mount: der Lauf startet nach dem Mount, ein abgemounteter Lauf schreibt ni
       `Aktivierung muss den Vertrag nennen: ${quiet.lines.join(' | ')}`,
     );
     assert.ok(quiet.lines.some((line) => line.includes('(Worker)')), 'der Mount startet den Worker');
+    assert.ok(
+      quiet.lines.some((line) => line.includes(`${bundle.QUERY_SERVICE} NICHT angeboten`)),
+      `der Mount nennt den Zustand der Abfrage-Faehigkeit (§14/§17): ${quiet.lines.join(' | ')}`,
+    );
 
     // Auf den Lauf warten: der Index entsteht asynchron, der Mount blockiert nicht.
     assert.ok(await quiet.waitFor('Lauf im Worker'), `der Bericht muss den Worker nennen: ${quiet.lines.join(' | ')}`);
