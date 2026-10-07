@@ -1,0 +1,25 @@
+{
+  "name": "@shinon/hook",
+  "version": "1.0.0",
+  "description": "Shinon Hook/Event Spine — Event-Beobachtung, Normalisierung und Validierung. Keine autonome Aktion.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  }
+}

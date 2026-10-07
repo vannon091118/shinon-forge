@@ -11,6 +11,9 @@ importers:
       '@shinon/better-errors':
         specifier: link:../../packages/better-errors
         version: link:../../packages/better-errors
+      '@shinon/codingmon':
+        specifier: link:../../packages/codingmon
+        version: link:../../packages/codingmon
       '@shinon/core':
         specifier: link:../../packages/core
         version: link:../../packages/core
@@ -20,6 +23,9 @@ importers:
       '@shinon/events':
         specifier: link:../../packages/events
         version: link:../../packages/events
+      '@shinon/hook':
+        specifier: link:../../packages/hook
+        version: link:../../packages/hook
       '@shinon/locale-de':
         specifier: link:../../packages/locale-de
         version: link:../../packages/locale-de

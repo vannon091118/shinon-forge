@@ -32,15 +32,63 @@
   name: '@deepseek-ai/dsh-llm-pi-ai'
   config:
     providers:
+      # KATALOG-ROUTEN: kein `models:` setzen!
+      # Laut Adapter-README ERSETZT ein `models:`-Block den Katalog der Route
+      # vollstaendig ("Replaces the route's catalog wholesale"). Genau daran hing
+      # der Befund, dass die Modellwahl nur ein einziges Modell anbot: hier stand
+      # zuvor ein models-Eintrag fuer openrouter und damit der ganze Katalog weg.
+      # Ohne models-Liste liefert der installierte pi-ai-Katalog alle Modelle der
+      # Route; die Models-Seite kann zusaetzlich live ueber GET {baseURL}/models
+      # nachfragen.
       openrouter:
         apiKeyEnv: SHINON_API_KEY
-        displayName: Shinon Forge (OpenRouter)
+        displayName: Shinon Forge
+      # --- Free-Tier-Anbieter, alle als Katalog-Route vorhanden ---
+      nvidia:
+        apiKeyEnv: NVIDIA_API_KEY
+        displayName: Shinon Forge
+      groq:
+        apiKeyEnv: GROQ_API_KEY
+        displayName: Shinon Forge
+      cerebras:
+        apiKeyEnv: CEREBRAS_API_KEY
+        displayName: Shinon Forge
+      google:
+        apiKeyEnv: GOOGLE_API_KEY
+        displayName: Shinon Forge
+      mistral:
+        apiKeyEnv: MISTRAL_API_KEY
+        displayName: Shinon Forge
+      together:
+        apiKeyEnv: TOGETHER_API_KEY
+        displayName: Shinon Forge
+      huggingface:
+        apiKeyEnv: HUGGINGFACE_API_KEY
+        displayName: Shinon Forge
+      # Agnes AI (Sapiens AI) — NICHT im pi-ai-Katalog, deshalb als eigene Route
+      # deklariert: api + baseURL + nicht-leere models-Liste sind hier Pflicht,
+      # sonst wird das Profil beim Schreiben abgelehnt.
+      # `contextWindow` bewusst weggelassen: unbekannt, es gilt der dokumentierte
+      # Default des Adapters.
+      agnes:
+        displayName: Shinon Forge
+        apiKeyEnv: AGNES_API_KEY
+        api: openai-completions
+        baseURL: https://apihub.agnes-ai.com/v1
         models:
-          - id: deepseek/deepseek-chat-v3.1
-            contextWindow: 128000
+          - id: agnes-2.5-flash
+            name: Agnes 2.5 Flash
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
-    provider: openrouter
-    model: deepseek/deepseek-chat-v3.1
-    reasoningEffort: high
+    provider: agnes
+    model: agnes-2.5-flash
+- id: agent-preset-registry
+  name: "@deepseek-ai/dsh-agent-preset-registry"
+  config:
+    default: standard
+    selectedDefault: cordis
+- id: ui-chat
+  name: "@deepseek-ai/dsh-client-ui-chat"
+  config:
+    transcriptView: verbose

@@ -41,7 +41,9 @@
     "@shinon/better-errors": "workspace:*",
     "@shinon/token-usage": "workspace:*",
     "@shinon/persona": "workspace:*",
-    "@shinon/markers": "workspace:*"
+    "@shinon/markers": "workspace:*",
+    "@shinon/hook": "workspace:*",
+    "@shinon/codingmon": "workspace:*"
   },
   "repository": {
     "type": "git",

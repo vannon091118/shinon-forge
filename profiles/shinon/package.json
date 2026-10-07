@@ -10,7 +10,9 @@
     "@shinon/markers": "link:../../packages/markers",
     "@shinon/persona": "link:../../packages/persona",
     "@shinon/token-usage": "link:../../packages/token-usage",
-    "@shinon/tooltip": "link:../../packages/tooltip"
+    "@shinon/tooltip": "link:../../packages/tooltip",
+    "@shinon/hook": "link:../../packages/hook",
+    "@shinon/codingmon": "link:../../packages/codingmon"
   },
   "dsh": {
     "profile": {
@@ -25,7 +27,9 @@
         "@shinon/tooltip",
         "@shinon/dashboard",
         "@shinon/better-errors",
-        "@shinon/token-usage"
+        "@shinon/token-usage",
+        "@shinon/hook",
+        "@shinon/codingmon"
       ]
     }
   }

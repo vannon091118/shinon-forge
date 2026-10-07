@@ -24,14 +24,16 @@ const shippedFiles = (pkg) => [
   'cordis.patch.yml',
   ...repo.resourceRefs(pkg).map(({ value }) => value.replace(/^\.\//, '')),
 ];
-const NPM_FLAGS = ['--no-audit', '--no-fund', '--loglevel=error'];
+const NPM_FLAGS = ['--no-audit', '--no-fund', '--loglevel=error', '--userconfig=/dev/null'];
 
 let passed = 0;
 let failed = 0;
 
 function run(cmd, args, cwd) {
   try {
-    execFileSync(cmd, args, { cwd, stdio: 'pipe' });
+    const env = { ...process.env };
+    delete env.npm_config_allow_scripts;
+    execFileSync(cmd, args, { cwd, stdio: 'pipe', env });
     return { ok: true };
   } catch (e) {
     const lines = String(e.stderr ?? '').split('\n').filter(Boolean);

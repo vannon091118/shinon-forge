@@ -35,9 +35,9 @@
       "packages/markers/client.js",
       "scripts/stages.mjs"
     ],
-    "expect": "Chromium headless gegen die laufende UI: DOM enthält den Side-Panel-Einstieg und '.__mk_panel', keine Plugin-Fehler in der Konsole, Panel bleibt nach Auswahl im main-Slot sichtbar.",
-    "result": "UNKLAR",
-    "verdict": "PLAN",
-    "evidence": "Offen (2026-10-07): im Sandbox existiert kein Browser-Binary, und die nötigen Systembibliotheken (libnss3, libgbm, libasound, …) fehlen — ein Chromium-Lauf war ohne Systeminstallation nicht möglich. Geprüft ist bisher: Auslieferung durch die laufende UI (Probe markers-panel-delivery) und Rendering in einer DOM-Umgebung (Probe markers-panel-render). Offen bleibt der Engine-Render inklusive Layout und Pixelverhalten; scripts/stages.mjs G6 wäre der Ort dafür."
+    "expect": "Echte Browser-Engine gegen die laufende UI: DOM enthält den Side-Panel-Einstieg und '.__mk_panel', keine Plugin-Fehler in der Konsole, Panel bleibt nach Auswahl im main-Slot sichtbar, echte Tastatur- und Mauseingaben wirken, und die Marke trägt echte Layout-Geometrie (kein 0×0 wie in jsdom).",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "Lauf 2026-10-07 gegen die laufende UI (DSH_HOME=<Repo> dsh --profile shinon, 127.0.0.1:3080) in einer echten Chromium-Engine über die Preview-Bridge/CDP — kein headless-Screenshot nötig. Befund: Sidebar-Einstieg 'Shinon Marker' ist vorhanden und anklickbar; das Panel rendert 'MARKS 0', '@shinon/markers', 'm drücken, Element klicken · Escape beendet' und die drei Aktionen (Senden → Chat, Kopieren, Leeren). Die Erwartung, die jsdom strukturell nicht erfüllen kann, ist erfüllt: Taste m setzt __mk_on (mode true), ein echter Klick legt m1 mit ECHTER Geometrie ab — rect 56,74 758×53 statt der 0,0 0×0 aus der jsdom-Stufe — samt Selektor-Kette und Nutzlast '- **m1**  › div  ·  56,74 758×53'. Escape beendet den Modus und die Marke bleibt erhalten (mode false, marks 1). Die Konsole ist nach dem Fix von @shinon/hook frei von Plugin-Fehlern; vorher brach der Boot mit 'invalid plugin, expect function or object with an \"apply\" method, received object' ab — dokumentiert in Probe hook-client-plugin-shape."
   }
 ]

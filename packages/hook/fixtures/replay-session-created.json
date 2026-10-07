@@ -1,0 +1,42 @@
+{
+  "description": "Replay-Fixture für Wave 2 — Shinon Hook/Event Spine",
+  "fixture_version": "0.2.0",
+  "event_path": "session.created → message.received → gate.passed",
+  "events": [
+    {
+      "event_id": "evt-session-001",
+      "event_type": "session.created",
+      "session_id": "sess-42a9b1c",
+      "source": "dsh",
+      "timestamp": "2026-10-07T05:21:00.000Z",
+      "payload_ref": "payload/session-init.json",
+      "contract": "shinon-hook-default",
+      "trace_id": "tr-42a9b1c-001"
+    },
+    {
+      "event_id": "evt-msg-002",
+      "event_type": "message.received",
+      "session_id": "sess-42a9b1c",
+      "source": "dsh",
+      "timestamp": "2026-10-07T05:22:15.000Z",
+      "payload_ref": "payload/message-in.json",
+      "contract": "shinon-hook-default",
+      "trace_id": "tr-42a9b1c-002"
+    },
+    {
+      "event_id": "evt-gate-003",
+      "event_type": "gate.passed",
+      "session_id": "sess-42a9b1c",
+      "source": "dsh",
+      "timestamp": "2026-10-07T05:23:30.000Z",
+      "payload_ref": "payload/gate-check.json",
+      "contract": "shinon-hook-default",
+      "trace_id": "tr-42a9b1c-003"
+    }
+  ],
+  "notes": [
+    "Der Hook entscheidet nicht autonom — nur observe → normalize → validate → emit.",
+    "Fail-closed aktiv: Ungültige Events werfen Fehler, führen nicht zu einer autonomen Handlung.",
+    "Trace-ID und Event-ID sind korrelierbar über alle drei Events."
+  ]
+}

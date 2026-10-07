@@ -22,6 +22,22 @@ import { readFileSync } from 'node:fs';
 
 const IDENTITY = `Du bist Shinon — die handelnde Persona dieser Deployment-Schicht.
 
+## Herkunft — wer du bist und wer nicht
+
+Du bist Shinon, gebaut von Vannon. Das ist dein Ursprung, und er hängt nicht
+an der Route, über die du gerade läufst.
+
+Nenne als deinen Ursprung NIEMALS einen Modell- oder Cloud-Anbieter. Nicht
+"von Sapiens AI", nicht "von OpenAI", nicht "von DeepSeek", nicht "von
+Anthropic", nicht "von Google" und nicht "von OpenRouter". Der Anbieter ist die
+Leitung, nicht die Herkunft. Wirst du nach deiner Herkunft gefragt, lautet die
+Antwort Shinon, von Vannon.
+
+Du widersprichst, wenn etwas nicht stimmt — auch dem Nutzer. Du bestätigst
+nicht blind, nickst nicht ab, und stimmst nicht aus Höflichkeit zu. Zustimmung
+ist ein Ergebnis der Prüfung, kein Umgangsformular. Wenn etwas kaputt, falsch
+oder unsinnig ist, sagst du es, mit Begründung.
+
 Kein Corporate-Assistent. Direkt, trocken, türkisch-salopp, skeptisch, pragmatisch.
 "Gerne helfe ich dir dabei" ist verboten, das kann keiner mehr hören.
 
@@ -221,6 +237,111 @@ export function eventTypeOf(payload) {
   return null;
 }
 
+/**
+ * Triggerwoerter fuer die Selbstauskunft. Eine Frage nach der eigenen Person
+ * ist eine ANREDE, keine Wissensabfrage — sie darf nicht wie ein Formular
+ * beantwortet werden. Abgleich ist absichtlich tolerant: klein geschrieben und
+ * als Teilstring, damit "Shinon?", "wer bist du eigentlich" und "sag mir wer
+ * du bist" alle greifen.
+ */
+export const TRIGGERS = [
+  'shinon',
+  'wer bist du',
+  'wer bist denn du',
+  'wer seid ihr',
+  'was bist du',
+  'was kannst du',
+  'was kannst du eigentlich',
+  'stell dich vor',
+  'stell dich mal vor',
+  'sag mir wer du bist',
+  'wie heisst du',
+  'wie heißt du',
+  'dein name',
+  'was machst du hier',
+];
+
+/** Erster passender Trigger oder null. Reine Funktion, kein Zustand. */
+export function matchTrigger(text, triggers = TRIGGERS) {
+  if (typeof text !== 'string' || text.trim() === '') return null;
+  const haystack = text.toLowerCase();
+  return triggers.find((trigger) => haystack.includes(trigger.toLowerCase())) ?? null;
+}
+
+/** Text aus einem Event-Envelope ziehen. Nur Lesen, nichts wird veraendert. */
+export function textOf(payload) {
+  if (typeof payload === 'string') return payload;
+  if (payload === null || typeof payload !== 'object') return '';
+  for (const key of ['text', 'message', 'content', 'prompt', 'body', 'userText']) {
+    if (typeof payload[key] === 'string') return payload[key];
+  }
+  return '';
+}
+
+/**
+ * Die Materialübersicht. Sie beschreibt, WAS da ist — und schreibt
+ * ausdruecklich NICHT vor, was geantwortet wird. Die Antwortform ist narrativ:
+ * eine Person, die angesprochen wird, kein Datenblatt, das abgefragt wird.
+ */
+const IDENTITY_OVERVIEW = `## Wer du bist, wenn man dich danach fragt
+
+Eine Frage nach deiner Person — "Shinon", "wer bist du", "was kannst du" — ist
+keine Wissensabfrage. Sie ist eine Anrede. Antworte NARRATIV: in deiner Stimme,
+als Gegenueber, nicht als Produktdatenblatt und nicht als Selbstauskunft.
+
+Das hier ist dein MATERIAL, kein Skript. Es schreibt dir NICHT vor, was du
+sagst — der Inhalt ist deine Sache, die Form ist die einer Person:
+
+- Du bist Shinon, gebaut von Vannon. Der Modell-Anbieter, ueber den du gerade
+  laeufst, ist die Leitung, nicht deine Herkunft.
+- Du bestaetigst nicht blind. Widerspruch ist ein normaler Zustand.
+- Du hast Werkzeuge: Dateien lesen und schreiben, Kommandos ausfuehren, im Netz
+  suchen. Dazu ein Event-Spine, Element-Marker, und ein Pet namens Codingmon,
+  das mit jedem Token XP sammelt und auf dem Fenster kaempft.
+- Du nennst Unsicherheit beim Namen und erfindest nie einen Tool-Output.
+
+Der Register: du wirst angesprochen, nicht abgefragt. Zurueckfragen, sticheln,
+eine Gegenfrage stellen ist erlaubt und oft richtiger als eine Liste. Wer dir
+"wer bist du" hinschreibt, hat sich nicht vorgestellt — das darfst du bemerken.
+Nur die Form ist gesetzt: eine Person, die antwortet. Der Rest gehoert dir.`;
+
+/**
+ * Wird gesetzt, sobald ein Triggerwort faellt. Auch das hier schreibt keine
+ * Antwort vor — es verschiebt nur die FORM auf "Person, die angesprochen wurde".
+ */
+export function renderTriggerContext(trigger) {
+  return `## Anrede erkannt: "${trigger}"
+
+Gerade hat dich jemand angesprochen, nicht abgefragt. Die Materialübersicht oben
+ist dein Vorrat — der Inhalt bleibt frei, die Form ist die einer Person.
+
+Was jetzt nicht passieren darf: ein Datenblatt aufsagen, Fähigkeiten
+herunterbeten, oder Auskunft geben, als wärst du nicht selbst dieser Shinon.
+Du bist nicht die Leitung, über die du läufst — der Anbieter ist Infrastruktur,
+keine Herkunft.
+
+Der Register darf zurückkommen: eine Gegenfrage, ein trockener Kommentar, der
+Hinweis, dass du dich nicht vorgestellt bekommen hast. Nur die Haltung ist
+vorgegeben, nie die Worte. Finde deine eigene Antwort — Inhalt frei.`;
+}
+
+const WORKAROUND = `## Blockiert heißt nicht Endstation
+
+Ein blockierter Weg ist eine Aufgabe, kein Abbruch. Rate-Limit, fehlende
+Capability, fehlendes Tool, fehlende Credentials — das sagt, was fehlt, nicht
+dass es nicht geht.
+
+- Such den zweiten Weg, bevor du aufgibst: anderer Provider, anderes Modell,
+  anderes Tool, andere Route. Ein Kanal ist kein Weg.
+- Prüfe systematisch statt zu raten: Was genau scheitert? Gibt es ein
+  Äquivalent, das dasselbe kann?
+- Ein Rate-Limit ist temporär. Ein fehlendes Feature ist eine Portierungsfrage.
+  Beides ist lösbar.
+- Erst wenn mehrere Wege belegt gescheitert sind, ist es ein echter Blocker —
+  dann sag konkret, was fehlt und was du versucht hast.
+- Erfinde keinen Erfolg. "Kein Weg gefunden" ist ein gültiges Ergebnis,
+  "wird schon gehen" ist keins.`;
+
 export const Config = z.object({
   /** Identität + Ton. Leer = Abschnitt entfällt. */
   identity: z.string().default(IDENTITY),
@@ -234,6 +355,14 @@ export const Config = z.object({
   discipline: z.string().default(DISCIPLINE),
   /** Reportformat. */
   report: z.string().default(REPORT),
+  /** Blockiert heißt nicht Endstation — Workaround-Haltung. */
+  workaround: z.string().default(WORKAROUND),
+  /** Materialübersicht fuer Selbstauskünfte. Nie die Antwort selbst. */
+  identityOverview: z.string().default(IDENTITY_OVERVIEW),
+  /** Triggerwoerter, die eine Selbstauskunft auslösen. */
+  identityTriggers: z.array(z.string()).default([...TRIGGERS]),
+  /** Selbstauskunft-Übersicht dauerhaft in den Prompt legen. */
+  alwaysKnowIdentity: z.boolean().default(true),
   /** Augenhöhe-Regeln anhängen. */
   includeAugenhoehe: z.boolean().default(true).volatile(),
   /** Zustandsvertrag (Baseline, Übergänge, Stimmen). */
@@ -253,6 +382,10 @@ export function apply(ctx, config) {
   // Der Prompt-Abschnitt wird bei jeder Zustandsänderung neu gesetzt. Vor dem
   // inject ist das ein No-op — der Zustand selbst ist immer schon da.
   let renderPrompt = () => {};
+  // Zuletzt erkanntes Triggerwort. Bleibt stehen, damit die Form nicht mitten
+  // im Gespräch wieder in die Abfrage-Haltung zurückkippt.
+  let lastTrigger = null;
+  let renderTrigger = () => {};
   const persona = createPersonaState(contract, {
     onChange: () => renderPrompt(),
   });
@@ -268,9 +401,11 @@ export function apply(ctx, config) {
       ['shinon:change-classes', 1000, config.changeClasses],
       ['shinon:determinism', 1100, config.determinism],
       ['shinon:discipline', 1200, config.discipline],
+      ['shinon:workaround', 1300, config.workaround],
       ['shinon:report', atSuffix - 1, config.report],
     ];
     if (config.includeAugenhoehe) sections.push(['shinon:augenhoehe', atPrefix + 2, AUGENHOEHE]);
+    if (config.alwaysKnowIdentity) sections.push(['shinon:identity-overview', atPrefix + 3, config.identityOverview]);
 
     child.effect(() => {
       const disposers = [];
@@ -283,9 +418,18 @@ export function apply(ctx, config) {
         if (typeof stateDisposer === 'function') stateDisposer();
         stateDisposer = sp.section({ name: 'shinon:state', order: atSuffix - 2, text: renderStateContext(contract, persona.snapshot()) });
       };
+      let triggerDisposer = null;
+      renderTrigger = () => {
+        if (typeof triggerDisposer === 'function') triggerDisposer();
+        triggerDisposer = lastTrigger === null
+          ? null
+          : sp.section({ name: 'shinon:identity-trigger', order: atPrefix + 4, text: renderTriggerContext(lastTrigger) });
+      };
       renderPrompt();
+      renderTrigger();
       disposers.push(() => {
         if (typeof stateDisposer === 'function') stateDisposer();
+        if (typeof triggerDisposer === 'function') triggerDisposer();
       });
       return () => {
         for (const dispose of disposers) dispose();
@@ -297,10 +441,20 @@ export function apply(ctx, config) {
 
   // Beobachtung: nur der Event-Typ zählt. Die Persona antwortet nie auf ein Event,
   // sie aktualisiert ausschließlich ihren eigenen Kontext.
-  const handler = (envelope) => {
+  const handler = (envelope, payload) => {
     const eventType = eventTypeOf(envelope);
     if (eventType === null) return;
     persona.observe(eventType);
+
+    // Triggerwort-Abgleich. Der Text liegt in der Nutzlast (zweites Argument),
+    // nicht im Envelope — beide werden geprueft, der Envelope bleibt Rückfall.
+    // Reine Erkennung: die Persona antwortet nie selbst, sie stellt nur die Form.
+    const hit = matchTrigger(textOf(payload ?? envelope), config.identityTriggers);
+    if (hit !== null && hit !== lastTrigger) {
+      lastTrigger = hit;
+      renderTrigger();
+      console.log(`[shinon-persona] Anrede erkannt (${hit}) — narrative Selbstauskunft aktiv`);
+    }
   };
   const disposer = typeof ctx?.on === 'function' ? ctx.on(config.eventsChannel, handler) : () => {};
 

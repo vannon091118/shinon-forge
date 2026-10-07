@@ -169,7 +169,13 @@ export function createSpine(contract, options = {}) {
   function observe(signal, payload) {
     const source = payload !== null && typeof payload === 'object' ? payload : {};
     const { eventType } = resolveEventType(signal, source);
-    if (!eventType) return drop('UNKNOWN_SIGNAL', signal, contract.carrier?.signal === signal ? 'type nicht in typeMap' : 'Signal nicht im Vertrag');
+    if (!eventType) {
+      const raw = resolvePath(source, contract.carrier?.typePath ?? 'type');
+      const detail = contract.carrier?.signal === signal
+        ? `type nicht in typeMap: ${typeof raw === 'string' ? raw : JSON.stringify(raw)}`
+        : 'Signal nicht im Vertrag';
+      return drop('UNKNOWN_SIGNAL', signal, detail);
+    }
 
     const definition = contract.events?.[eventType];
     if (!definition) return drop('UNKNOWN_EVENT_TYPE', signal, eventType);
@@ -215,15 +221,32 @@ export const Config = z.object({
 /** Signale abonnieren; nie werfen, immer abräumbar. */
 function subscribe(ctx, signal, handler, label) {
   if (typeof ctx?.on !== 'function') return () => {};
-  const guarded = (payload) => {
+  // DSH ruft Handler mitunter mit mehreren Argumenten auf — `session/event`
+  // liefert (session, event). Nur das erste durchzureichen verliert die Nutzlast.
+  const guarded = (...args) => {
     try {
-      handler(payload);
+      handler(...args);
     } catch (error) {
       console.warn(`[shinon-events] Beobachtung verworfen (${label}): ${error.message}`);
     }
   };
   const disposer = ctx.on(signal, guarded);
   return typeof disposer === 'function' ? disposer : () => {};
+}
+
+/**
+ * Carrier-Nutzlast aus den Argumenten bilden. DSH emittiert `session/event`
+ * als (session, event): der Typ steht im Event, die Session-Id in der Session.
+ * Beides wird zusammengeführt, damit der Vertrag wie vorgesehen lesen kann.
+ */
+export function carrierPayload(...args) {
+  const objects = args.filter((arg) => arg !== null && typeof arg === 'object');
+  if (objects.length === 0) return {};
+  const session = objects.length > 1 ? objects[0] : {};
+  const event = objects[objects.length - 1];
+  const merged = { ...session, ...event };
+  if (merged.session_id === undefined && typeof session?.id === 'string') merged.session_id = session.id;
+  return merged;
 }
 
 export function apply(ctx, config) {
@@ -250,7 +273,7 @@ export function apply(ctx, config) {
   const signals = Object.keys(contract.signals ?? {});
   const disposers = signals.map((signal) => subscribe(ctx, signal, (payload) => spine.observe(signal, payload), signal));
   if (contract.carrier?.signal) {
-    disposers.push(subscribe(ctx, contract.carrier.signal, (payload) => spine.observe(contract.carrier.signal, payload), contract.carrier.signal));
+    disposers.push(subscribe(ctx, contract.carrier.signal, (...args) => spine.observe(contract.carrier.signal, carrierPayload(...args)), contract.carrier.signal));
   }
 
   console.log(`[shinon-events] ${signals.length} Signale + Carrier gebunden (${contract.contract}, authority ${contract.authority})`);
