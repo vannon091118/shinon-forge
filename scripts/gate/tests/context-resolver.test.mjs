@@ -33,7 +33,7 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 
@@ -103,7 +103,11 @@ function fixture(label, over = {}) {
     'package.json': `${JSON.stringify({ name: 'fixture', dependencies: { yaml: '^2.0.0' } }, null, 2)}\n`,
     ...over,
   };
-  for (const [path, text] of Object.entries(files)) writeFileSync(join(dir, path), text);
+  for (const [path, text] of Object.entries(files)) {
+    // Auch verschachtelte Pfade: ein Modul liegt in einem Verzeichnis.
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  }
   return dir;
 }
 
@@ -137,12 +141,64 @@ test('Rangfolge: exakter Pfad vor exaktem Symbol vor Paket vor Touch vor FTS', (
     'jede Datei kommt genau einmal vor',
   );
   assert.ok(context.files[0].content.includes('bThing'), 'der Gewinner ist wirklich der genannte Pfad, nicht ein Namensvetter');
-  assert.deepEqual(core.CONTEXT_PRIORITIES, { path: 100, symbol: 60, dependency: 40, touch: 30, fts: 10 }, 'die Rangfolge ist Daten, nicht Reihenfolge im Code');
+  assert.deepEqual(
+    core.CONTEXT_PRIORITIES,
+    { path: 100, symbol: 60, module: 40, dependency: 35, touch: 30, fts: 10 },
+    'die Rangfolge ist Daten, nicht Reihenfolge im Code',
+  );
 
   // FTS ist die letzte Stufe, nicht die einzige: ohne genannten Bezug bleibt sie leer.
   const blind = core.resolveContext(db, { prompt: 'Bitte mach das besser.', project: 'fixture' });
   assert.deepEqual(blind.files, [], 'ein Prompt ohne bekannten Bezug zieht keine Zufallstreffer aus der Volltextsuche');
   db.close();
+});
+
+// ── Zusage: Paket-/Modul-Match (Plan §14, Rang 3) ───────────────────────────
+
+test('Modul: ein genanntes Verzeichnis liefert seine direkten Kinder, nicht den ganzen Baum', () => {
+  const project = fixture('modul-pfad', {
+    'packages/modulA/index.js': 'export function modulAStart() {\n  return 1;\n}\n',
+    'packages/modulA/package.json': `${JSON.stringify({ name: '@fixture/modulA', dependencies: { yaml: '^2.0.0' } }, null, 2)}\n`,
+    'packages/modulA/tief/tiefer.js': 'export const tiefer = 1;\n',
+    'packages/modulB/index.js': 'export const modulB = 1;\n',
+  });
+  const { db } = indexed(project, 'modul-pfad');
+  const context = core.resolveContext(db, { prompt: 'Pruefe packages/modulA', project: 'fixture' });
+  db.close();
+
+  assert.deepEqual(
+    paths(context),
+    ['packages/modulA/index.js', 'packages/modulA/package.json'],
+    'ein Verzeichnis liefert seine DIREKTEN Kinder — ein Unterverzeichnis zoege sonst den halben Baum herein',
+  );
+  assert.equal(paths(context).includes('packages/modulA/tief/tiefer.js'), false, 'nicht rekursiv');
+  assert.equal(paths(context).includes('packages/modulB/index.js'), false, 'und ohne Nachbarmodul');
+});
+
+/**
+ * Rang 3 aus §14 in der Form, die wirklich vorkommt: ein Paketname. Die erste
+ * Fassung lieferte hier die Manifeste derer, die das Paket BENUTZEN — also
+ * alles ausser dem Paket selbst.
+ */
+test('Modul: ein genannter Paketname liefert das Paket selbst, nicht nur seine Benutzer', () => {
+  const project = fixture('modul-name', {
+    'package.json': `${JSON.stringify({ name: 'fixture', dependencies: { '@fixture/modulA': '^1.0.0', yaml: '^2.0.0' } }, null, 2)}\n`,
+    'packages/modulA/index.js': 'export function modulAStart() {\n  return 1;\n}\n',
+    'packages/modulA/package.json': `${JSON.stringify({ name: '@fixture/modulA' }, null, 2)}\n`,
+    'packages/modulA/tief/tiefer.js': 'export const tiefer = 1;\n',
+  });
+  const { db } = indexed(project, 'modul-name');
+  const byName = core.resolveContext(db, { prompt: 'Fixe @fixture/modulA', project: 'fixture' });
+  const byBare = core.resolveContext(db, { prompt: 'Fixe modulA', project: 'fixture' });
+  db.close();
+
+  assert.deepEqual(
+    paths(byName),
+    ['packages/modulA/index.js', 'packages/modulA/package.json', 'package.json'],
+    'zuerst das Paket selbst (Rang Paket/Modul), danach das Manifest, das es benutzt',
+  );
+  assert.deepEqual(paths(byBare), paths(byName), 'der blosse Modulname meint dasselbe wie der volle Paketname');
+  assert.equal(paths(byName).includes('packages/modulA/tief/tiefer.js'), false);
 });
 
 // ── Zusage: das Budget ist hart (Plan §14) ──────────────────────────────────

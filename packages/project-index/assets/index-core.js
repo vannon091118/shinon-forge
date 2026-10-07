@@ -82,7 +82,7 @@ export const SCHEMA_VERSION = 1;
  * Erhoehen heisst: die Bedeutung des Inhalts hat sich geaendert, auch wenn die
  * Tabellen gleich geblieben sind.
  */
-export const INDEXER_VERSION = 3;
+export const INDEXER_VERSION = 4;
 
 /** Wurzel aller Indizes — ausserhalb jedes Projekts. */
 export const DEFAULT_INDEX_ROOT = join(homedir(), '.shinon', 'indexes');
@@ -515,6 +515,10 @@ function jsonEdges(text) {
   }
   if (typeof document !== 'object' || document === null || Array.isArray(document)) return [];
   const edges = [];
+  // Der EIGENE Name des Manifests, als Kante der Art `name`. Ohne ihn kann §14
+  // Rang 3 einen genannten Paketnamen nicht auf das Paket abbilden: der Index
+  // wuesste nur, WER das Paket benutzt.
+  if (typeof document.name === 'string' && document.name !== '') edges.push({ kind: 'name', target: document.name });
   for (const field of DEPENDENCY_FIELDS) {
     const block = document[field];
     if (typeof block !== 'object' || block === null || Array.isArray(block)) continue;
@@ -1064,7 +1068,21 @@ export function searchChunks(db, query, limit = 10) {
 //      der Nutzer ausdruecklich genannt hat.
 
 /** Rangfolge aus Plan §14 — als Daten, damit die Ordnung pruefbar ist. */
-export const CONTEXT_PRIORITIES = { path: 100, symbol: 60, dependency: 40, touch: 30, fts: 10 };
+export const CONTEXT_PRIORITIES = {
+  // R 1–3 aus §14 woertlich.
+  path: 100,
+  symbol: 60,
+  module: 40,
+  // Wer das Genannte BENUTZT, ist ein schwaecheres Signal als das Genannte
+  // selbst — deshalb liegt die Abhaengigkeitskante zwischen Modul und Touch.
+  dependency: 35,
+  // R 4–5 aus §14 fallen in diesem Schema zusammen: die Touches-Tabelle IST der
+  // aufgeloeste Importgraph dieses Projekts. Eine zweite Zahl fuer dieselbe
+  // Menge waere eine Stufe, die es nicht gibt.
+  touch: 30,
+  // R 6; Rang 7 (semantische Bewertung) fuehrt §14 als optional.
+  fts: 10,
+};
 
 /** Das harte Kontextbudget (Plan §14: „max. 6000 Tokens Code-Kontext"). */
 export const DEFAULT_CONTEXT_BUDGET = 6000;
@@ -1127,18 +1145,42 @@ export function rankContextCandidates(db, prompt) {
   const paths = db.prepare('select path from files').all().map((row) => row.path);
   const known = new Set(paths);
   const byBase = new Map();
+  const byDirBase = new Map();
   for (const path of [...paths].sort(byPath)) {
-    const base = path.slice(path.lastIndexOf('/') + 1);
+    const slash = path.lastIndexOf('/');
+    const base = path.slice(slash + 1);
     if (!byBase.has(base)) byBase.set(base, path);
+    if (slash === -1) continue;
+    const dir = path.slice(0, slash);
+    const dirBase = dir.slice(dir.lastIndexOf('/') + 1);
+    if (!byDirBase.has(dirBase)) byDirBase.set(dirBase, dir);
   }
 
   const symbolPaths = db.prepare('select path, kind from symbols where name = ? order by path');
   const dependencyPaths = db.prepare("select distinct target, path from edges where kind = 'dependency' and (target = ? or target like '%/' || ?) order by path");
+  const nameEdges = db.prepare("select distinct path from edges where kind = 'name' and (target = ? or target like '%/' || ?) order by path");
+  /** Die DIREKTEN Kinder eines Verzeichnisses — nicht rekursiv. */
+  const childrenOf = db.prepare("select path from files where path like ? and path not like ? order by path");
   const hitTerms = [];
 
   for (const token of tokens) {
     if (known.has(token)) rank(token, CONTEXT_PRIORITIES.path, 'path');
     else if (byBase.has(token)) rank(byBase.get(token), CONTEXT_PRIORITIES.path - 10, 'path-basename');
+
+    // Rang 3 (§14): Paket/Modul. Ein genanntes Verzeichnis, ein Verzeichnisname
+    // oder ein Paketname liefert die direkt darin liegenden Dateien. Nicht
+    // rekursiv: ein einzelner Name zoege sonst den halben Baum herein, und das
+    // Budget waere mit Zufall gefuellt.
+    const moduleDirs = new Set();
+    if (token.includes('/')) moduleDirs.add(token);
+    if (byDirBase.has(token)) moduleDirs.add(byDirBase.get(token));
+    for (const row of nameEdges.all(token, token)) {
+      const slash = row.path.lastIndexOf('/');
+      if (slash !== -1) moduleDirs.add(row.path.slice(0, slash));
+    }
+    for (const dir of moduleDirs) {
+      for (const child of childrenOf.all(`${dir}/%`, `${dir}/%/%`)) rank(child.path, CONTEXT_PRIORITIES.module, 'module');
+    }
 
     for (const row of symbolPaths.all(token)) {
       if (!REFERENCABLE_KINDS.has(row.kind)) continue;

@@ -389,6 +389,10 @@ test('Lauf: Vollauf, unveränderter Lauf, aufgefrischte und geänderte Datei', (
     rows(db, 'select kind, target from edges where path = ? order by target', 'package.json'),
     [
       { kind: 'dependency', target: '@deepseek-ai/schemastery' },
+      // Der eigene Name des Manifests ist eine Kante der Art `name`: §14
+      // Rang 3 braucht sie, um einen genannten Paketnamen auf das PAKET
+      // abzubilden statt nur auf die, die es benutzen.
+      { kind: 'name', target: 'fixture' },
       { kind: 'dependency', target: 'yaml' },
     ],
     'JSON wird mit JSON.parse gelesen: Abhaengigkeiten sind Kanten — einmal je Ziel, auch wenn sie in zwei Feldern stehen',
@@ -558,14 +562,16 @@ test('Parser: Markdown liefert Überschriften, aber nicht die Beispiele in Code-
 test('Parser: JSON wird wirklich geparst — und ein kaputtes JSON bricht nichts', () => {
   const manifest = JSON.stringify({ name: 'x', dependencies: { b: '1', a: '1' }, devDependencies: { c: '1' }, scripts: { test: 'x' } });
   assert.deepEqual(bundle.extractEdges(manifest, 'json'), [
+    { kind: 'name', target: 'x' },
     { kind: 'dependency', target: 'a' },
     { kind: 'dependency', target: 'b' },
     { kind: 'dependency', target: 'c' },
   ]);
+  assert.equal(bundle.extractEdges('{}', 'json').length, 0, 'ein Manifest ohne Namen hat keine Namenskante');
   const cases = [
     { name: 'kaputtes JSON', text: '{ "name": }', edges: [] },
     { name: 'Array', text: '[1, 2, 3]', edges: [] },
-    { name: 'ohne Abhängigkeiten', text: '{"name":"x"}', edges: [] },
+    { name: 'ohne Abhängigkeiten', text: '{"name":"x"}', edges: [{ kind: 'name', target: 'x' }] },
     { name: 'leer', text: '', edges: [] },
     { name: 'Abhängigkeitsfeld kein Objekt', text: '{"dependencies":"nein"}', edges: [] },
   ];
