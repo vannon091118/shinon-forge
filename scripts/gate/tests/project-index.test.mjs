@@ -1155,11 +1155,28 @@ function canaryHits(indexRoot, ...needles) {
 test('Schutz: die Pfadregeln treffen Namen mit führendem Punkt und verschonen Quelltext', () => {
   const protectedCases = [
     ['.env', 'dotenv'],
+    // §13 nennt `.env*` — das schliesst die Formen ein, die kein Punkt-Variante
+    // sind: `.envrc` (direnv) exportiert regelmaessig Werte.
+    ['.envrc', 'dotenv'],
+    ['.env.bak', 'dotenv'],
     ['.env.local', 'dotenv'],
     ['src/.env', 'dotenv'],
     ['tief/verschachtelt/.env.production', 'dotenv'],
     ['.credentials.yaml', 'credential-datei'],
     ['credentials.json', 'credential-datei'],
+    // Preis der Praefixregel, offen benannt: Prosa UEBER Zugangsdaten faellt
+    // mit unter den Schutz. §13 nennt `credentials*`/`secrets*` als Praefix,
+    // und die Alternative — Praefixe nach Gefuehl zu unterscheiden — waere eine
+    // Liste, die niemand nachpruefen kann. Die WIRKSAME Grenze bleibt die
+    // fehlende Faehigkeit des Enhancers, nicht der Index.
+    ['Docs/probes/secret-protection.json', 'secret-datei'],
+    ['secrets-notes.md', 'secret-datei'],
+    // §13 nennt `credentials*` als Praefix. Ein Praefixname ist genau dann ein
+    // Zugangsdatentraeger, wenn er KEIN Programm ist: `credentials-prod.yaml`
+    // traegt Werte, `credential-helper.mjs` verwaltet sie.
+    ['credentials-prod.yaml', 'credential-datei'],
+    ['secrets-prod.json', 'secret-datei'],
+    ['credentials.json.bak', 'credential-datei'],
     ['config/.credentials', 'credential-datei'],
     ['secrets.yml', 'secret-datei'],
     ['.secrets', 'secret-datei'],
@@ -1179,7 +1196,7 @@ test('Schutz: die Pfadregeln treffen Namen mit führendem Punkt und verschonen Q
   // Die Gegenprobe gegen zu viel Schutz: diese Pfade werden indexiert. Eine
   // Quelldatei, die Zugangsdaten VERWALTET, gehört in den Index — sonst findet
   // der Agent die Stelle nicht, die einen Schlüssel benutzt.
-  const keptCases = ['src/config.mjs', 'src/credential-helper.mjs', 'Docs/probes/secret-protection.json', 'secrets-notes.md', 'package.json', 'config.yml', 'docs/notes.md'];
+  const keptCases = ['src/config.mjs', 'src/credential-helper.mjs', 'package.json', 'config.yml', 'docs/notes.md'];
   for (const path of keptCases) {
     assert.equal(bundle.protectedReason(path), null, `${path} darf nicht geschützt sein`);
   }
@@ -1280,6 +1297,11 @@ test('Schutz: die Muster erkennen die benannten Formen und schweigen bei Beinahm
     [`AIza${'A'.repeat(35)}`, 'google-api-key'],
     [CANARY.connection, 'connection-string'],
     [`Bearer ${'c'.repeat(30)}`, 'bearer-token'],
+    // Cloud-Zugangsdaten, die §13 namentlich nennt und die keine eigene Form haben:
+    // der Name traegt die Aussage, der Wert ist lang und unquoted.
+    [`aws_secret_access_key = ${'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'}`, 'cloud-schluessel'],
+    [`AccountKey=${'A'.repeat(88)}==`, 'cloud-schluessel'],
+    [`DefaultEndpointsProtocol=https;AccountName=x;AccountKey=${'B'.repeat(88)}==;EndpointSuffix=core.windows.net`, 'cloud-schluessel'],
     [`SHINON_API_KEY = '${'c'.repeat(24)}'`, 'zugewiesener-wert'],
     [`MY_TOKEN: "${'c'.repeat(24)}"`, 'zugewiesener-wert'],
     [`SERVICE_SECRET = "${'A'.repeat(44)}"`, 'zugewiesene-base64'],
@@ -1294,6 +1316,11 @@ test('Schutz: die Muster erkennen die benannten Formen und schweigen bei Beinahm
     'AKIA1234567890ABC',
     'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0',
     "api_key = 'zu-kurz'",
+    // Gegenprobe gegen zu viel Redaktion: ein NAME, der nur nach Schluessel
+    // klingt, und ein Wert, der zu kurz fuer ein Geheimnis ist.
+    `const CACHE_KEY = 'user:profile:cache:schluessel'`,
+    'const ACCESS_KEY_ID = null;',
+    'accountkey: 42',
     '-----BEGIN PUBLIC KEY-----',
     'const postgres = 1;',
     'der Text nennt ein Token und ein Secret, aber keinen Wert',

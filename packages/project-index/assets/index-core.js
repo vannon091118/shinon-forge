@@ -102,6 +102,19 @@ export const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', '.cache', 'sto
 /** Endungen, die als Text indexiert werden. */
 export const SOURCE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.json', '.md', '.yml', '.yaml'];
 
+/**
+ * Endungen, die PROGRAMM heissen (Daten- und Textendungen ausgenommen).
+ *
+ * Abgeleitet statt danebengestellt: eine neue Codeendung wird oben
+ * eingetragen und gilt hier mit. Die Menge traegt eine Entscheidung aus §13 —
+ * `credentials-prod.yaml` traegt Werte, `credential-helper.mjs` VERWALTET sie,
+ * und nur das zweite gehoert in den Index.
+ */
+export const CODE_EXTENSIONS = SOURCE_EXTENSIONS.filter((extension) => !['.json', '.md', '.yml', '.yaml'].includes(extension));
+
+/** Eine Datei, die ein Programm ist. */
+const istProgramm = new RegExp(`\\.(${CODE_EXTENSIONS.map((extension) => extension.slice(1)).join('|')})$`, 'i');
+
 /** Sprache je Endung — Plan §10 nennt `language` als Feld der Indexdatei. */
 export const LANGUAGES = {
   '.js': 'javascript',
@@ -148,10 +161,16 @@ export const SECRET_TABLE = 'secret_findings';
  * mit sprechendem Namen gehoert auffindbar. Ihr Inhalt wird von Schicht 2 geprueft.
  */
 export const PROTECTED_PATH_RULES = [
-  { kind: 'dotenv', pattern: /(^|\/)\.env($|\.[\w-]+$)/i },
+  // §13 nennt `.env*` woertlich. `.envrc` (direnv) exportiert regelmaessig
+  // Werte und fiel durch das alte Muster, weil dort auf `.env` nur eine
+  // ENDUNG folgen durfte.
+  { kind: 'dotenv', pattern: /(^|\/)\.env([\w.-]*)$/i },
   { kind: 'dotenv-variante', pattern: /(^|\/)[\w.-]*\.env\.(local|development|production|test|ci|staging)$/i },
-  { kind: 'credential-datei', pattern: /(^|\/)\.?credentials?(\.[\w-]+)?$/i },
-  { kind: 'secret-datei', pattern: /(^|\/)\.?secrets?(\.[\w-]+)?$/i },
+  // Ganze Namen ohne Zusatz: `credentials`, `.credentials`, `secrets.mjs`.
+  { kind: 'credential-datei', pattern: /(^|\/)\.?credentials?(\.[\w-]+)*$/i },
+  { kind: 'credential-datei', pattern: /(^|\/)\.?credentials?[\w-]+([\w.-]*)$/i, unless: istProgramm },
+  { kind: 'secret-datei', pattern: /(^|\/)\.?secrets?(\.[\w-]+)*$/i },
+  { kind: 'secret-datei', pattern: /(^|\/)\.?secrets?[\w-]+([\w.-]*)$/i, unless: istProgramm },
   { kind: 'schluesselmaterial', pattern: /\.(pem|key|p12|pfx|jks|keystore|ppk|asc)$/i },
   { kind: 'ssh-schluessel', pattern: /(^|\/)id_(rsa|dsa|ecdsa|ed25519)/i },
   { kind: 'dotfile-geheim', pattern: /(^|\/)\.(netrc|npmrc|git-credentials|htpasswd|pgpass)$/i },
@@ -172,7 +191,10 @@ export const PROTECTED_PATH_RULES = [
  */
 export function protectedReason(path) {
   const normalized = sep === '/' ? path : path.split(sep).join('/');
-  for (const { kind, pattern } of PROTECTED_PATH_RULES) {
+  for (const { kind, pattern, unless } of PROTECTED_PATH_RULES) {
+    // `unless` ist die Gegenprobe einer Regel, nicht ein Sonderfall im Code:
+    // ein Praefixname, der ein Programm ist, wird indexiert.
+    if (unless !== undefined && unless.test(normalized)) continue;
     if (pattern.test(normalized)) return kind;
   }
   return null;
@@ -212,6 +234,16 @@ export const SECRET_PATTERNS = [
     kind: 'zugewiesene-base64',
     valueGroup: 2,
     pattern: /(?:^|[\s,{[(])(?:[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)|key|token|secret|password)\s*[:=]\s*(['"])([A-Za-z0-9+/]{40,}={0,2})\1/gi,
+  },
+  {
+    // Cloud-Zugangsdaten (Plan §13). Gemessen fehlten beide realistischen
+    // Formen: `aws_secret_access_key = …` und `AccountKey=…` in einer
+    // Azure-Verbindungszeichenfolge — dort traegt der NAME die Aussage, der
+    // Wert ist lang und unquoted. Deshalb ist die Liste der Namen absichtlich
+    // eng: ein blankes `KEY = <lang>` waere zu breit fuer Quelltext.
+    kind: 'cloud-schluessel',
+    valueGroup: 1,
+    pattern: /(?:^|[\s,;{[(])(?:[A-Za-z0-9_]*_)?(?:SECRET[_-]?ACCESS[_-]?KEY|ACCESS[_-]?KEY|ACCOUNT[_-]?KEY|STORAGE[_-]?KEY|SAS[_-]?TOKEN)\s*[:=]\s*['"]?([A-Za-z0-9+/=_.\-]{20,})/gi,
   },
 ];
 
