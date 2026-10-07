@@ -1,0 +1,44 @@
+[
+  {
+    "id": "prompter-one-shot-contract",
+    "claim": "Das Paket @shinon/prompter laedt korrekt und kann einen validierten Prompt-Resultatvertrag liefern. Der One-Shot-Child ist keine frei verfuegbare Faehigkeit des Hauptagenten.",
+    "targets": [
+      "packages/prompter/index.js",
+      "packages/prompter/cordis.patch.yml",
+      "scripts/gate/tests/prompter-contract.test.mjs",
+      "profiles/shinon/package.json",
+      "profiles/shinon/pnpm-lock.yaml"
+    ],
+    "expect": "Der Test muss ohne Netz und ohne Modell belegen: das Bundle registriert sich am echten Cordis-Waterfall agent/pre-step; der One-Shot-Aufruf traegt kein tools-Feld; ein vertragsgemasses Ergebnis ersetzt den Roh-Prompt, waehrend jede Verletzung die Entscheidung unveraendert laesst; und MAX wird ohne Project Index abgelehnt.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "VERIFIZIERTE API (installiertes DSH 0.2.0-rc.2): ctx.llm ist LlmRuntime aus @deepseek-ai/dsh-llm mit stream(options: GenerateOptions): AsyncIterable<StreamChunk>. GenerateOptions kennt genau provider, model, messages: RequestMessage[], system?, tools?, toolHistory?, temperature?, maxTokens?, stop?, signal?, sessionId?, purpose? = compaction|session-title. Der One-Shot-Fall ist in der Doku ausdruecklich vorgesehen: RequestUserInput = { role: user, content, id?: never, source?: never } und der Kommentar 'a hand-built one-shot may include identity-free user inputs'. StreamChunk liefert u.a. { type: text-delta, text }. Anbindung an agent/pre-step (Signatur in Phase 1 verifiziert: payload { agent, messages, turn, step, signal }, next(): Promise<PreStepDecision>, waterfall). ABNAHMETEST: node --test scripts/gate/tests/prompter-contract.test.mjs -> 16/16 gruen, Exit 0 (laeuft auch in npm run gate:test und damit in CI). Das Bundle wird isoliert geladen (mit dem ECHTEN Schemastery der DSH-Installation) und an einen echten Cordis-Context gehaengt; gefahren wird der echte Waterfall mit dem Default-Downstream des Loops. Der Modell-Provider ist eine Attrappe (extern, braucht Zugangsdaten); der Aufruf selbst wird gezaehlt und seine Optionen geprueft, damit die Isolation an einem echten Aufruf haengt und nicht nur im Bauplan. CAPABILITY-ISOLATION DURCH ABWESENHEIT: der Aufruf hat kein tools-Feld — es gibt keinen Katalog, den man einschraenken koennte. Dateisystem, Shell, Subprozess, Terminal, Browser, beliebige Tools und verschachtelte Agent-Steuerung fehlen damit nicht durch eine Policy, sondern durch Nichtexistenz. Ein XML-Tag waere keine Grenze, das ist eine. Kein Aufrufweg im Paket fuehrt zum Enhancer; es gibt kein Tool, das ihn exponiert. PROVENIENZ: pro Schritt genau ein Datensatz auf shinon/prompter/decision mit Ausgang, Gruenden, Intent-Klasse und Laengen — ohne den Prompt-Text zu kopieren. OFFEN (ehrlich): Die Route ist im Profil absichtlich LEER (provider/model = ''), damit Phase 2 keine stillen Zusatzkosten erzeugt. Der Enhancer haengt damit am Schritt, meldet NO_ROUTE und der Roh-Prompt gilt. Zum Aktivieren ist eine Route im Paket-Patch einzutragen; damit entsteht pro Nutzer-Schritt ein zusaetzlicher Modellaufruf — eine bewusste Entscheidung, keine Nebenwirkung. Ein echter Modellaufruf wurde NIRGENDS verifiziert: es gibt hier keinen geprueften Schluessel, und CI hat kein Netz. MAX ist bewusst nicht verfuegbar, weil der Project Index fehlt (Phase 3/4); der Modus wird mit MODE_NEEDS_INDEX abgelehnt statt weichgespuelt. Die Regel fuer Referenzen aus Plan 7 greift erst mit dem Index und ist hier untestbar; Referenzen werden deshalb nicht konsumiert, nur protokolliert."
+  },
+  {
+    "id": "dsh-hat-kein-structured-output",
+    "claim": "DSH bietet keine erzwungene Schema-Ausgabe fuer Modellantworten. Die Schema-Durchsetzung des Resultatvertrags muss deshalb host-seitig geschehen.",
+    "targets": [
+      "packages/prompter/index.js",
+      "shinon-forge-implementierungsplan.md",
+      "scripts/gate/tests/prompter-contract.test.mjs"
+    ],
+    "expect": "Vor dem Bau der Validierung muss geprueft sein, ob die installierte DSH-Version strukturierte Ausgabe anbietet. Ist sie nicht vorhanden, muss der Plan-Abschnitt 7 host-seitig umgesetzt werden: extrahieren, parsen, validieren, sonst verwerfen.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "BEFUND (2026-10-07): ueber die gesamte DSH-Installation (288 Pakete unter @deepseek-ai/dsh/node_modules/@deepseek-ai) findet sich kein json_schema, response_format, generateObject und kein structuredOutput — die Suche ueber *.js und *.d.ts liefert null Treffer. GenerateOptions (dsh-llm) kennt kein Feld fuer ein Antwortschema; StreamChunk traegt nur Bloecke. Damit ist der Satz aus Plan 7 offen und entschieden: 'Die konkrete Schema-Durchsetzung muss mit dem tatsaechlich verwendeten DSH-/Schema-System umgesetzt werden' — es gibt keines, also ist der Host die Durchsetzung. UMGESETZT: parseResult extrahiert vom ersten '{' bis zum letzten '}' (ein Zaun oder eine Vorrede ist damit nicht toedlich), JSON.parse, dann ResultSchema (Schemastery). Jede Stufe, die scheitert, ergibt einen benannten Grund (NO_JSON, INVALID_JSON, SCHEMA_INVALID) und der Roh-Prompt gilt. Danach die Annahme-Policy aus Plan 7: preservedIntent muss true sein, addedRequirements und removedRequirements muessen leer sein — sonst wird verworfen. Nebenbefund: `purpose` kennt in GenerateOptions genau zwei Werte (compaction, session-title). Ein eigener Zweck fuer den Enhancer wuerde die Typgrenze brechen, deshalb bleibt purpose ungesetzt — statt einen Wert zu erfinden."
+  },
+  {
+    "id": "schemastery-optionale-schluessel",
+    "claim": "Schemastery-Objektschluessel sind optional, und ein fehlendes z.array() wird still mit [] gefuellt. Ohne required() sieht eine weggelassene Pflichtangabe wie Compliance aus.",
+    "targets": [
+      "packages/prompter/index.js",
+      "packages/hook/index.js",
+      "scripts/gate/tests/prompter-contract.test.mjs",
+      "scripts/gate/tests/hook-pre-step.test.mjs"
+    ],
+    "expect": "Ein Vertrag mit Pflichtfeldern muss ein Objekt ohne diese Felder ablehnen. Der Nachweis muss an einem konkreten fehlenden Feld gefuehrt werden, nicht an einem falschen Typ.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "BEFUND (2026-10-07) in Schemastery 3.18.4: z.object({ a: z.string(), b: z.array(z.string()) }) akzeptiert { a: 'x' } und liefert { a: 'x', b: [] } — kein Fehler. Ein fehlendes Array wird also mit dem Wert gefuellt, der wie Einhalten aussieht. Mit .required() wirft es: '$.b missing required value', und null wird ebenfalls abgelehnt. AUSWIRKUNG 1 — @shinon/prompter: der Resultatvertrag aus Plan 7 haette einen Prompt durchgelassen, bei dem das Modell addedRequirements einfach weggelassen hat; die Luecke waere als 'nichts hinzugefuegt' durchgegangen. Gefixt: alle sieben Vertragsfelder sind required(), inklusive der Union intentClassification. AUSWIRKUNG 2 — @shinon/hook: normalizeEvent({}) lieferte {\"payload_ref\": \"\"} statt eines Fehlers. Der EventSchema genannte Contract-Gate hat damit den Vertrag, den er dokumentiert, nicht erzwungen; ein hohler Datensatz haette ihn passiert. In Phase 1 war das nicht ausloesbar, weil buildStepEnvelope immer alle acht Felder setzt — ein latenter, kein aktiver Fehler. Gefixt: die sieben Pflichtfelder sind required(); payload_ref behaelt bewusst seinen .default(''), weil der Wave-2-Vertrag das Feld ausdruecklich als vorbelegt erklaert und das eine andere Zusage ist als Pflichtfeld. BEIDE Fixes haben einen Regressionstest: 'Vertrag: ein gueltiges Ergebnis wird angenommen, jede Verletzung benannt' (prompter) und 'Datensatz: ein unvollstaendiger Envelope wird abgelehnt' (hook). OFFEN: Ob weitere Pakete desselben Musters betroffen sind, ist NICHT systematisch geprueft — die beiden hier waren die, deren Vertraege in dieser Phase angefasst wurden."
+  }
+]
