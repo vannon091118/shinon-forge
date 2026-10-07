@@ -14,6 +14,7 @@
     "@shinon/hook": "link:../../packages/hook",
     "@shinon/prompter": "link:../../packages/prompter",
     "@shinon/project-index": "link:../../packages/project-index",
+    "@shinon/task-router": "link:../../packages/task-router",
     "@shinon/codingmon": "link:../../packages/codingmon"
   },
   "dsh": {
@@ -33,6 +34,7 @@
         "@shinon/hook",
         "@shinon/prompter",
         "@shinon/project-index",
+        "@shinon/task-router",
         "@shinon/codingmon"
       ]
     }

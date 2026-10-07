@@ -41,6 +41,9 @@ importers:
       '@shinon/prompter':
         specifier: link:../../packages/prompter
         version: link:../../packages/prompter
+      '@shinon/task-router':
+        specifier: link:../../packages/task-router
+        version: link:../../packages/task-router
       '@shinon/token-usage':
         specifier: link:../../packages/token-usage
         version: link:../../packages/token-usage

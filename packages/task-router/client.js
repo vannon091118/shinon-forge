@@ -1,0 +1,45 @@
+/**
+ * shinon-task-router — Client-Hälfte.
+ *
+ * Keine autonome Aktion und KEINE eigene Policy: die Entscheidung fällt im Host
+ * (`index.js`), weil sie dort nachprüfbar ist. Der Client spiegelt die geltende
+ * Policy nur lesbar, damit im Browser nachvollziehbar ist, WELCHE Schwelle
+ * gerade gilt — eine Anzeige, die dieselbe Zahl errät statt sie zu lesen, wäre
+ * eine zweite Wahrheit.
+ *
+ * Kein Config-Schema hier (die Konfiguration lebt im Host), kein Goal-State:
+ * §16 endet bei goal/no goal; die Goal-Anzeige gehört zur Projektion (§22).
+ */
+window.__ModuleLoader__.load({
+  id: '@shinon/task-router',
+  factory(require) {
+    const PLUGIN = '@shinon/task-router';
+
+    /**
+     * Der Kanal, auf dem der Host seine Entscheidungen meldet. Als Konstante
+     * dupliziert wie im Host — bewusst: der Client lädt das Host-Modul nicht,
+     * und ein gemeinsamer Import wäre eine Kopplung, die es sonst nirgends gibt.
+     */
+    const DECISION_CHANNEL = 'shinon/task-router/decision';
+
+    return {
+      inject: [],
+      decisionChannel: DECISION_CHANNEL,
+      apply(ctx) {
+        const mirror = { plugin: PLUGIN, decisions: [], channel: DECISION_CHANNEL, last: null };
+        if (typeof ctx?.on === 'function') {
+          ctx.on(DECISION_CHANNEL, (decision) => {
+            mirror.last = decision ?? null;
+            mirror.decisions.push(decision);
+            console.log(`[shinon-task-router-client] ${decision?.outcome ?? 'unbekannt'} (${decision?.reason ?? '—'})`);
+          });
+        }
+        window.__shinon_task_router = mirror;
+        const stop = () => {
+          console.log(`[shinon-task-router-client] ${PLUGIN} gestoppt — keine Anzeige mehr aktiv`);
+        };
+        if (typeof ctx?.effect === 'function') ctx.effect(() => stop);
+      },
+    };
+  },
+});
