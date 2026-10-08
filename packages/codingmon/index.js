@@ -17,7 +17,9 @@ import z from '@deepseek-ai/schemastery';
  *      Client ein BigInt — dort sind Millionen exakt und nicht gerundet.
  *      `formatNumber` setzt Tausenderpunkte, `describeValue` nennt die
  *      Stellenzahl, damit der Sprung von zwei- auf fuenfstellig inszenierbar
- *      ist, ohne dass die Anzeige luegt.
+ *      ist, ohne dass die Anzeige luegt. Die Leiter ist bei LEVEL_CAP gedeckelt
+ *      (siehe dort), weil `Math.pow` sonst Infinity liefert und die Anzeige in
+ *      Exponentialschreibweise ausbricht.
  *   2. REGELWERK: `ELEMENTS`/`ELEMENT_CHART` (Elementarkreis),
  *      `CATEGORY` (Verteidigungsdurchgriff), `SYNERGY` (Element mal Art),
  *      `BUFFS` (Zustandslagen) und `LINEAGE` (Vererbungsbaum der zehn Linien).
@@ -73,10 +75,26 @@ export const XP_BASE = 250;
 /** Schadens-Einheit: Kraft x Faehigkeitsstaerke / 10. */
 export const POWER_UNIT = 10;
 
-/** Die Leiter als Zahl: `base * factor^(level-1)`. */
+/**
+ * DIE DECKE DER LEITER: Stufe 2000. Sie ist kein Spielgefuehl, sondern die
+ * Grenze, ab der die ANZEIGE kaputtgeht. 1,35 hoch 1999 ist rund 1e260 — noch
+ * eine endliche Number (Number.MAX_VALUE liegt bei 1,8e308), aber ab Stufe
+ * ~2363 liefert `Math.pow` Infinity und jeder Wert wird NaN. Ohne Decke stand
+ * im Panel „HP 4.721837931227852e+298" und „Stellen: 1": eine Anzeige, die
+ * luegt und niemandem etwas beweist. Mit Decke bleibt die Number-Leiter endlich
+ * (`statsAt`), und die exakte BigInt-Leiter (`statsAtExact`) druckt Ziffern.
+ * Die Decke ist Teil des Vertrags: `contract.escalation.levelCap`.
+ */
+export const LEVEL_CAP = 2000;
+
+/** Die Stufe, wie die Leiter sie zaehlt: ganzzahlig, mindestens 1, hoechstens LEVEL_CAP. */
+function cappedLevel(level) {
+  return Math.min(LEVEL_CAP, Math.max(1, Math.floor(level)));
+}
+
+/** Die Leiter als Zahl: `base * factor^(level-1)`, bei LEVEL_CAP gedeckelt. */
 export function powerAt(base, level) {
-  const steps = Math.max(0, Math.floor(level) - 1);
-  return Math.round(base * Math.pow(ESCALATION.factor, steps));
+  return Math.round(base * Math.pow(ESCALATION.factor, cappedLevel(level) - 1));
 }
 
 /**
@@ -86,14 +104,30 @@ export function powerAt(base, level) {
  * bei `powerAt`, weil BigInt ganzzahlig abschneidet.
  */
 export function powerAtExact(base, level) {
-  const steps = BigInt(Math.max(0, Math.floor(level) - 1));
+  const steps = BigInt(cappedLevel(level) - 1);
   const scaled = BigInt(Math.round(base)) * (135n ** steps);
   return scaled / (100n ** steps);
 }
 
-/** Tausenderpunkte. Nimmt Number und BigInt (ueber den Dezimaltext). */
+/**
+ * Tausenderpunkte. Nimmt Number und BigInt — und bricht NICHT in
+ * Exponentialschreibweise aus: eine Zahl ab 2^53 wird ueber ihren exakten
+ * Ganzzahlwert (BigInt) gedruckt, sonst stuende dort '4.7e+298'. Das ist der
+ * Unterschied zwischen „die Nullen zaehlen" und „die Nullen erraten".
+ */
 export function formatNumber(value) {
-  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  if (typeof value === 'bigint') return group(value.toString());
+  // Der reine Dezimaltext eines BigInt (so liegt er in JSON): „1e+300" ist
+  // KEIN Zifferntext und wird unveraendert durchgereicht, 301 Ziffern werden
+  // gruppiert.
+  if (typeof value === 'string') return /^-?\d+$/.test(value) ? group(value) : value;
+  if (typeof value !== 'number' || !Number.isFinite(value)) return String(value);
+  if (!Number.isSafeInteger(Math.round(value))) return group(BigInt(Math.round(value)).toString());
+  return group(String(Math.round(value)));
+}
+
+function group(digits) {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
 /**
@@ -109,29 +143,44 @@ export function describeValue(base, level) {
 
 /** Kumulative XP-Schwelle: XP, die man fuer `level` insgesamt braucht. */
 export function threshold(level, xpPerLevel = XP_BASE) {
-  const l = Math.max(1, Math.floor(level));
-  const steps = l - 1;
+  const steps = cappedLevel(level) - 1;
   return Math.round((xpPerLevel * (Math.pow(ESCALATION.factor, steps) - 1)) / (ESCALATION.factor - 1));
 }
 
 /** Level zu einer XP-Summe. Umkehrung von threshold. */
 export function levelFor(xp, xpPerLevel = XP_BASE) {
   let level = 1;
-  while (threshold(level + 1, xpPerLevel) <= xp) level += 1;
+  while (level < LEVEL_CAP && threshold(level + 1, xpPerLevel) <= xp) level += 1;
   return level;
 }
 
 /** Werte eines Codemons auf einer Stufe. Reine Funktion, multiplikativ. */
 export function statsAt(speciesId, level) {
   const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
-  const steps = Math.max(0, Math.floor(level) - 1);
-  const scale = Math.pow(ESCALATION.factor, steps);
+  const scale = Math.pow(ESCALATION.factor, cappedLevel(level) - 1);
   return {
     hp: Math.round(base.hp * scale),
     atk: Math.round(base.atk * scale),
     def: Math.round(base.def * scale),
     agi: Math.round(base.agi * scale),
     int: Math.round(base.int * scale),
+  };
+}
+
+/**
+ * Dieselben Werte EXAKT (BigInt, dieselbe 135/100-Leiter). Fuer die Anzeige:
+ * eine Zahl mit 299 Stellen ist in Number nicht darstellbar, und `Math.pow`
+ * liefert dort '4.7e+298' statt Ziffern. Rechnen darf weiter die schnelle
+ * Number-Fassung; ANZEIGEN muss die exakte Fassung.
+ */
+export function statsAtExact(speciesId, level) {
+  const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
+  return {
+    hp: powerAtExact(base.hp, level),
+    atk: powerAtExact(base.atk, level),
+    def: powerAtExact(base.def, level),
+    agi: powerAtExact(base.agi, level),
+    int: powerAtExact(base.int, level),
   };
 }
 
@@ -422,7 +471,7 @@ export function apply(ctx, config) {
     xpPerToken: config.xpPerToken,
     xpPerLevel: config.xpPerLevel,
     roundDelayMs: config.roundDelayMs,
-    escalation: { factor: ESCALATION.factor, xpBase: XP_BASE, milestones: MILESTONES.slice() },
+    escalation: { factor: ESCALATION.factor, xpBase: XP_BASE, levelCap: LEVEL_CAP, milestones: MILESTONES.slice() },
     species: config.species,
     speciesCount: SPECIES_IDS.length,
     abilities: ABILITIES.map((ability) => ({ ...ability })),

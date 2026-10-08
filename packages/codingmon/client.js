@@ -245,47 +245,107 @@ window.__ModuleLoader__.load({
     // Dopplung nicht auseinanderlaeuft.
     const ESCALATION = { factor: 1.35, perLevel: 'x1,35', label: 'multiplikativ je Stufe' };
     const POWER_UNIT = 10;
+    /**
+     * Die Decke der Leiter, Spiegel des Host-Vertrags (index.js, LEVEL_CAP).
+     * Ohne sie laeuft `Math.pow` ab Stufe ~2363 in Infinity und die Anzeige in
+     * Exponentialschreibweise — „HP 4.72e+298" ist keine Aussage. 1,35^1999 ist
+     * rund 1e260 und damit noch eine endliche Number.
+     */
+    const LEVEL_CAP = 2000;
+    /** Die Stufe, wie die Leiter sie zaehlt: ganzzahlig, mindestens 1, hoechstens LEVEL_CAP. */
+    const cappedLevel = (level) => Math.min(LEVEL_CAP, Math.max(1, Math.floor(level)));
 
-    /** Die Leiter als Zahl: `base * factor^(level-1)`. */
-    const powerAt = (base, level) => {
-      const steps = Math.max(0, Math.floor(level) - 1);
-      return Math.round(base * Math.pow(ESCALATION.factor, steps));
-    };
+    /** Die Leiter als Zahl: `base * factor^(level-1)`, gedeckelt. */
+    const powerAt = (base, level) => Math.round(base * Math.pow(ESCALATION.factor, cappedLevel(level) - 1));
 
     /** Dieselbe Leiter EXAKT in BigInt (Basis 135/100). Fuer den Lebenslauf. */
     const powerAtExact = (base, level) => {
-      const steps = BigInt(Math.max(0, Math.floor(level) - 1));
+      const steps = BigInt(cappedLevel(level) - 1);
       return BigInt(Math.round(base)) * (135n ** steps) / (100n ** steps);
     };
 
-    /** Tausenderpunkte. Nimmt Number und BigInt (ueber den Dezimaltext). */
-    const formatNumber = (value) => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const group = (digits) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    /**
+     * Tausenderpunkte — und KEIN Ausbruch in Exponentialschreibweise: was ueber
+     * 2^53 liegt, wird ueber seinen Ganzzahlwert (BigInt) gedruckt. Der Wert
+     * einer Number oberhalb von 2^53 ist der Wert DIESER Number; die Ziffern
+     * werden also nicht erfunden, sie sind nur nicht mehr die ganze Wahrheit —
+     * die steht in der exakten BigInt-Leiter.
+     */
+    const formatNumber = (value) => {
+      if (typeof value === 'bigint') return group(value.toString());
+      // Ein reiner Dezimaltext (so liegt der Lebenslauf in JSON) wird gruppiert,
+      // alles andere unveraendert durchgereicht — „1e+300" sind keine Ziffern.
+      if (typeof value === 'string') return /^-?\d+$/.test(value) ? group(value) : value;
+      if (typeof value !== 'number' || !Number.isFinite(value)) return String(value);
+      if (!Number.isSafeInteger(Math.round(value))) return group(BigInt(Math.round(value)).toString());
+      return group(String(Math.round(value)));
+    };
+
+    /**
+     * Ein Wert als reiner Ganzzahltext fuer Protokoll und Ablage. `String(1e300)`
+     * ergibt „1e+300" — im Meilenstein-Log stand damit „Level 2000 -> 1e+300",
+     * eine Zahl, die niemand zaehlen kann. Hier steht sie in Ziffern.
+     */
+    const exactText = (value) => {
+      if (typeof value === 'bigint') return value.toString();
+      if (typeof value !== 'number' || !Number.isFinite(value)) return String(value);
+      return BigInt(Math.round(value)).toString();
+    };
+
+    /**
+     * Die Stellenzahl — und zwar die des GANZZAHLWERTS, nicht die Laenge von
+     * „4.721837931227852e+298" (die waere 21 und damit Unsinn).
+     */
+    const digitsOf = (value) => {
+      if (typeof value === 'bigint') return String(value < 0n ? -value : value).length;
+      if (!Number.isFinite(value)) return String(value).length;
+      const whole = BigInt(Math.round(value));
+      return String(whole < 0n ? -whole : whole).length;
+    };
 
     /** Ein Wert samt Inszenierung: exakter Betrag, Text, Stellenzahl. */
     const describeValue = (base, level) => {
       const exact = powerAtExact(base, level);
-      return { exact, text: formatNumber(exact), digits: String(exact).length, safe: exact <= BigInt(Number.MAX_SAFE_INTEGER) };
+      return { exact, text: formatNumber(exact), digits: digitsOf(exact), safe: exact <= BigInt(Number.MAX_SAFE_INTEGER) };
     };
 
     /** Kumulative XP-Schwelle (multiplikativ, nicht quadratisch). */
     const threshold = (level) => {
-      const steps = Math.max(0, Math.floor(level) - 1);
+      const steps = cappedLevel(level) - 1;
       return Math.round((XP_BASE * (Math.pow(ESCALATION.factor, steps) - 1)) / (ESCALATION.factor - 1));
     };
     const levelFor = (xp) => {
       let level = 1;
-      while (threshold(level + 1) <= xp) level += 1;
+      while (level < LEVEL_CAP && threshold(level + 1) <= xp) level += 1;
       return level;
     };
     const statsAt = (speciesId, level) => {
       const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
-      const scale = Math.pow(ESCALATION.factor, Math.max(0, Math.floor(level) - 1));
+      const scale = Math.pow(ESCALATION.factor, cappedLevel(level) - 1);
       return {
         hp: Math.round(base.hp * scale),
         atk: Math.round(base.atk * scale),
         def: Math.round(base.def * scale),
         agi: Math.round(base.agi * scale),
         int: Math.round(base.int * scale),
+      };
+    };
+    /**
+     * Dieselben Werte EXAKT (BigInt, dieselbe 135/100-Leiter). Gerechnet wird
+     * mit der schnellen Number-Fassung, ANGEZEIGT mit dieser: eine Zahl mit 260
+     * Stellen ist in Number nicht darstellbar, und `Math.pow` liefert dort
+     * „4.7e+298" statt Ziffern.
+     */
+    const statsAtExact = (speciesId, level) => {
+      const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
+      return {
+        hp: powerAtExact(base.hp, level),
+        atk: powerAtExact(base.atk, level),
+        def: powerAtExact(base.def, level),
+        agi: powerAtExact(base.agi, level),
+        int: powerAtExact(base.int, level),
       };
     };
 
@@ -505,7 +565,15 @@ window.__ModuleLoader__.load({
         if (!Number.isFinite(state[key]) || state[key] < 0) state[key] = 0;
       }
       if (state.digits < 1) state.digits = 1;
-      state.loot = { ...freshState().loot, ...(state.loot ?? {}) };
+      // Die Beute wird WERT FUER WERT geprueft, nicht nur auf Existenz: ein
+      // Stand mit `{schrott:'viele'}` ergab sonst den Zaehler „viele1" und die
+      // Panel-Zeile „Schrott: 85 % — viele1 gefunden". Nur die Schluessel des
+      // Vertrags zaehlen, alles andere faellt auf 0 zurueck.
+      const rawLoot = (state.loot !== null && typeof state.loot === 'object') ? state.loot : {};
+      state.loot = Object.fromEntries(Object.entries(freshState().loot).map(([id, fallback]) => {
+        const value = rawLoot[id];
+        return [id, Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback];
+      }));
       state.milestones = Array.isArray(state.milestones) ? state.milestones : [];
       state.drops = Array.isArray(state.drops) ? state.drops : [];
       const battle = state.battle;
@@ -580,8 +648,8 @@ window.__ModuleLoader__.load({
     function celebrate(kind, before, after, label) {
       const mark = milestoneFor(before, after);
       if (mark === null) return null;
-      const digits = String(after).length;
-      store.milestones = [{ at: Date.now(), kind, mark, value: String(after), digits, label }, ...store.milestones].slice(0, 20);
+      const digits = digitsOf(after);
+      store.milestones = [{ at: Date.now(), kind, mark, value: exactText(after), digits, label }, ...store.milestones].slice(0, 20);
       note(`MEILENSTEIN ${formatNumber(mark)}+ (${kind}) — ${label}: ${formatNumber(after)} (${digits} Stellen)`);
       return mark;
     }
@@ -590,7 +658,7 @@ window.__ModuleLoader__.load({
       const before = level();
       const xpBefore = store.xp;
       store.xp += Math.max(0, Math.round(xp));
-      store.digits = Math.max(store.digits, String(store.xp).length);
+      store.digits = Math.max(store.digits, digitsOf(store.xp));
       const after = level();
       if (after > before) {
         const learned = abilitiesFor(after, store.species)
@@ -703,7 +771,7 @@ window.__ModuleLoader__.load({
       store.damageTotal += BigInt(Math.max(0, Math.round(dealt)));
       store.hits += 1;
       if (dealt > store.peakHit) store.peakHit = dealt;
-      store.digits = Math.max(store.digits, String(store.damageTotal).length);
+      store.digits = Math.max(store.digits, digitsOf(store.damageTotal));
       celebrate('lebenslauf', before, store.damageTotal, label);
       celebrate('treffer', peakBefore, store.peakHit, label);
     }
@@ -920,14 +988,16 @@ window.__ModuleLoader__.load({
         h('span', { className: '__cm_expbar-track' },
           h('span', { className: '__cm_expbar-fill', style: { width: `${pct}%` } })),
         h('span', { className: '__cm_expbar-meta' },
-          `${formatNumber(s.xp)} XP · HP ${formatNumber(Math.max(0, s.hp))}/${formatNumber(maxHp())} · ${s.wins} Siege · Beute ${s.loot.shiny} shiny`),
+          // Hoechst-HP aus der exakten Leiter: sonst stuende hier ab Stufe ~120
+          // die Exponentialschreibweise einer Zahl, die es so nicht gibt.
+          `${formatNumber(s.xp)} XP · HP ${formatNumber(Math.max(0, s.hp))}/${formatNumber(statsAtExact(s.species, lvl).hp)} · ${s.wins} Siege · Beute ${s.loot.shiny} shiny`),
       );
     }
 
     // ── Panel-Bausteine (Kopf / Werte / Arena / Liste / Bilanz) ─────────────
     /** Kopf: Figur, Spezies-Wahl (alle ZEHN erreichbar), Level und Fortschritt. */
     function PetHead({ s, lvl, onPick }) {
-      const cur = statsAt(s.species, lvl);
+      const cur = statsAtExact(s.species, lvl);
       const next = threshold(lvl + 1);
       const prev = threshold(lvl);
       const lineage = LINEAGE[s.species] ?? {};
@@ -940,7 +1010,7 @@ window.__ModuleLoader__.load({
           h('p', { className: '__cm_sub' },
             `Level ${lvl} · ${s.wins} Siege / ${s.losses} K.o. · Runde ${s.round} · ${ELEMENTS[SPECIES[s.species].family].label} · Generation ${lineage.generation ?? 1}`),
           h('p', { className: '__cm_xp' },
-            `${formatNumber(s.xp)} XP (${String(s.xp).length} Stellen) · ${formatNumber(Math.max(0, next - s.xp))} XP bis Level ${lvl + 1}`),
+            `${formatNumber(s.xp)} XP (${digitsOf(s.xp)} Stellen) · ${formatNumber(Math.max(0, next - s.xp))} XP bis Level ${lvl + 1}`),
           h(Bar, { value: s.xp - prev, max: Math.max(1, next - prev), tone: 'xp' }),
           h('label', { className: '__cm_pick' },
             h('span', null, 'Codemon'),
@@ -948,18 +1018,26 @@ window.__ModuleLoader__.load({
               value: s.species,
               onChange: (event) => onPick(event.target.value),
             }, SPECIES_IDS.map((id) => h('option', { key: id, value: id }, SPECIES[id].label)))),
-          h('p', { className: '__cm_sub' }, `HP ${Math.max(0, s.hp)}/${cur.hp}`),
+          // Ist-HP steht im Zustand (Number), Soll-HP in der exakten Leiter.
+          // Oberhalb von 2^53 koennen sich die letzten Stellen unterscheiden —
+          // die Leiter ist die Wahrheit, der Zustand ist der Spielstand.
+          h('p', { className: '__cm_sub' }, `HP ${formatNumber(Math.max(0, s.hp))}/${formatNumber(cur.hp)}`),
         ),
       );
     }
 
-    /** Werte in einer Zeile — dieselben fuenf Zahlen wie im Vertrag. */
+    /**
+     * Werte in einer Zeile — dieselben fuenf Zahlen wie im Vertrag, aber aus
+     * der EXAKTEN Leiter (BigInt) und durch `formatNumber`: in Millionenhöhe mit
+     * Trennzeichen, in Billionenhöhe immer noch als Ziffern und nicht als
+     * „4.7e+298". Der Spieler soll die Nullen zaehlen koennen, nicht raten.
+     */
     function StatsGrid({ stats }) {
       return h('div', { className: '__cm_stats' },
         [['HP', stats.hp], ['ATK', stats.atk], ['DEF', stats.def], ['AGI', stats.agi], ['INT', stats.int]]
           .map(([label, value]) => h('div', { className: '__cm_stat', key: label },
             h('span', { className: '__cm_stat-k' }, label),
-            h('span', { className: '__cm_stat-v' }, String(value)))));
+            h('span', { className: '__cm_stat-v' }, formatNumber(value)))));
     }
 
     /** Eine Seite der Arena: Figur, Name, Level, HP-Balken, Werte. */
@@ -970,7 +1048,8 @@ window.__ModuleLoader__.load({
           h('strong', null, SPECIES[speciesId].label),
           h('span', { className: '__cm_sub' }, `L${lvl}`),
           h(Bar, { value: hp, max: top, tone: side === 'enemy' ? 'enemy' : 'hp' }),
-          h('span', { className: '__cm_sub' }, `HP ${Math.max(0, hp)}/${top} · ATK ${values.atk} · DEF ${values.def}`)),
+          h('span', { className: '__cm_sub' },
+            `HP ${formatNumber(Math.max(0, hp))}/${formatNumber(top)} · ATK ${formatNumber(values.atk)} · DEF ${formatNumber(values.def)}`)),
       );
     }
 
@@ -1058,9 +1137,10 @@ window.__ModuleLoader__.load({
      * (zwei- auf fuenfstellig) ist damit der Beweis der investierten Zeit und
      * keine Behauptung: er steht als Meilenstein mit Wert und Datum im Log.
      */
-    function EscalationBlock({ s, lvl, myStats }) {
+    function EscalationBlock({ s, lvl }) {
       const next = threshold(lvl + 1);
-      const base = statsAt(s.species, 1);
+      const base = statsAtExact(s.species, 1);
+      const ladder = statsAtExact(s.species, lvl);
       const peak = Math.max(0, Math.round(s.peakHit));
       const upcoming = MILESTONES.find((mark) => BigInt(mark) > s.damageTotal) ?? null;
       return h('div', { className: '__cm_block' },
@@ -1069,10 +1149,12 @@ window.__ModuleLoader__.load({
           h('li', { key: 'threshold' },
             `Schwelle L${lvl + 1}: ${formatNumber(next)} XP (L1 ${formatNumber(threshold(1))}, L20 ${formatNumber(threshold(20))}, L50 ${formatNumber(threshold(50))})`),
           h('li', { key: 'stats' },
-            `Werte L${lvl}: HP ${formatNumber(myStats.hp)} · ATK ${formatNumber(myStats.atk)} — auf L1: HP ${formatNumber(base.hp)} · ATK ${formatNumber(base.atk)}`),
-          h('li', { key: 'hit' }, `Groesster Treffer: ${formatNumber(peak)} (${String(peak).length} Stellen)`),
+            `Werte L${lvl}: HP ${formatNumber(ladder.hp)} · ATK ${formatNumber(ladder.atk)} — auf L1: HP ${formatNumber(base.hp)} · ATK ${formatNumber(base.atk)} (exakte BigInt-Leiter)`),
+          h('li', { key: 'cap' },
+            `Decke: Level ${formatNumber(LEVEL_CAP)} — bis dahin bleibt Math.pow endlich, ab darueber rechnet nur die BigInt-Leiter`),
+          h('li', { key: 'hit' }, `Groesster Treffer: ${formatNumber(peak)} (${digitsOf(peak)} Stellen)`),
           h('li', { key: 'total' }, `Lebenslauf: ${formatNumber(s.damageTotal)} Schaden in ${formatNumber(s.hits)} Treffern (BigInt, exakt)`),
-          h('li', { key: 'digits' }, `Stellen: ${String(s.damageTotal).length}`
+          h('li', { key: 'digits' }, `Stellen: ${digitsOf(s.damageTotal)}`
             + (upcoming === null ? ' — alle Meilensteine erreicht' : ` — naechster Meilenstein ${formatNumber(upcoming)}`))),
         s.milestones.length === 0 ? null : h('ol', { className: '__cm_milestones' },
           s.milestones.slice(0, 5).map((entry, index) => h('li', { key: `${index}-${entry.at}` },
@@ -1150,11 +1232,13 @@ window.__ModuleLoader__.load({
       const s = useStore();
       const lvl = levelFor(s.xp);
       const mine = statsAt(s.species, lvl);
+      // Angezeigt wird die EXAKTE Leiter, gerechnet die schnelle Number-Fassung.
+      const exact = statsAtExact(s.species, lvl);
       const learned = abilitiesFor(lvl, s.species);
 
       return h('div', { className: '__cm_panel' },
         h(PetHead, { s, lvl, onPick: pickSpecies }),
-        h(StatsGrid, { stats: mine }),
+        h(StatsGrid, { stats: exact }),
         h(Arena, {
           s,
           lvl,
@@ -1164,7 +1248,7 @@ window.__ModuleLoader__.load({
           onStart: startBattle,
           onRest: rest,
         }),
-        h(EscalationBlock, { s, lvl, myStats: mine }),
+        h(EscalationBlock, { s, lvl }),
         h(Rulebook, { s }),
         h(DropLedger, { s }),
         h(Ledger, { s }),
@@ -1317,6 +1401,12 @@ window.__ModuleLoader__.load({
             threshold: (level) => threshold(level),
             levelFor: (xp) => levelFor(xp),
             statsAt: (speciesId, level) => statsAt(speciesId, level),
+            /** Dieselben Werte EXAKT, als Dezimaltext (JSON kennt kein BigInt). */
+            statsAtExact: (speciesId, level) => Object.fromEntries(
+              Object.entries(statsAtExact(speciesId, level)).map(([key, value]) => [key, value.toString()]),
+            ),
+            /** Die Decke der Leiter. */
+            levelCap: () => LEVEL_CAP,
             rewardFor: (level) => rewardFor(level),
             arenaFor: (level, round) => arenaFor(level, round),
             abilitiesFor: (level, speciesId) => abilitiesFor(level, speciesId).map((ability) => ability.id),
@@ -1375,6 +1465,15 @@ window.__ModuleLoader__.load({
 
         ctx.effect?.(() => () => {
           window.clearInterval(tokenTimer);
+          // Ein laufender Zug haengt an einem Timer, und der Abbau nimmt ihn mit.
+          // Sonst feuerte `settle` in ein Bundle, das es nicht mehr gibt, und der
+          // Zustand behauptete eine Sperre ohne Uhr — eine Wartezeit ohne Ende.
+          for (const timer of timers.values()) window.clearTimeout(timer);
+          timers.clear();
+          if (store.lock !== null) {
+            store.lock = null;
+            persist();
+          }
           delete window.__codingmon;
         });
 
