@@ -27,7 +27,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
@@ -362,7 +362,7 @@ test('Lauf: Vollauf, unveränderter Lauf, aufgefrischte und geänderte Datei', (
 
   const first = bundle.updateIndex(db, project, {});
   assert.equal(first.root, project);
-  assert.equal(first.verify, 'changed', 'der Bericht nennt die Politik, die ihn erzeugt hat');
+  assert.equal(first.verify, 'stamp', 'der Bericht nennt die Politik, die ihn erzeugt hat — und die Vorgabe ist der Stempel, nicht die Luecke');
   assert.equal(first.written, first.files, 'der erste Lauf schreibt jede Datei');
   assert.equal(first.hashed, first.files, 'und liest jede Datei');
   assert.ok(first.unchanged === 0 && first.rehashed === 0 && first.removed === 0 && first.skipped === 0);
@@ -408,9 +408,14 @@ test('Lauf: Vollauf, unveränderter Lauf, aufgefrischte und geänderte Datei', (
   const second = bundle.updateIndex(db, project, {});
   assert.deepEqual(second, {
     root: project,
-    verify: 'changed',
+    verify: 'stamp',
     files: first.files,
     unchanged: first.files,
+    // Nichts geändert: kein Byte gelesen und jede Datei über den Stempel vertraut.
+    stamped: first.files,
+    suspicious: 0,
+    falseAlarms: 0,
+    readBytes: 0,
     hashed: 0,
     rehashed: 0,
     written: 0,
@@ -638,9 +643,13 @@ test('Gate: zweimaliger Indexlauf ohne Dateiänderung erzeugt keinen vollständi
 
   assert.deepEqual(second, {
     root: project,
-    verify: 'changed',
+    verify: 'stamp',
     files: first.files,
     unchanged: first.files,
+    stamped: first.files,
+    suspicious: 0,
+    falseAlarms: 0,
+    readBytes: 0,
     hashed: 0,
     rehashed: 0,
     written: 0,
@@ -664,8 +673,10 @@ test('Gate: zweimaliger Indexlauf ohne Dateiänderung erzeugt keinen vollständi
 
 /**
  * §11 verlangt, den Umgang mit Zeitstempel-Problemen über Tests abzusichern. Die
- * Lücke wird hier als Tatsache gepinnt: derselbe Inhalt bei gleicher Grösse und
- * zurückgesetzter mtime bleibt unentdeckt — und `verify: 'all'` schliesst sie.
+ * Lücke wird hier als Tatsache gepinnt, und zwar für die Politik, zu der sie
+ * gehoert: `verify: 'changed'` liest eine Datei mit gleicher Grösse und
+ * zurueckgesetzter mtime nicht — sie bleibt unentdeckt. `verify: 'all'` schliesst
+ * sie, und `verify: 'stamp'` schliesst sie OHNE den Baum zu lesen (naechster Test).
  */
 test('Zeitstempel: die benannte Lücke und ihr Gegenmittel verify=all', () => {
   const project = fixtureProject('stempel');
@@ -681,7 +692,7 @@ test('Zeitstempel: die benannte Lücke und ihr Gegenmittel verify=all', () => {
   // Gleiche Länge, anderer Inhalt, mtime zurückgesetzt: für mtime+size unverändert.
   writeFileSync(target, 'export const markerB = 1;\n');
   utimesSync(target, stamp, stamp);
-  const blind = bundle.updateIndex(db, project, {});
+  const blind = bundle.updateIndex(db, project, { verify: 'changed' });
   assert.equal(blind.hashed, 0, 'verify=changed liest die Datei nicht — das ist die Lücke');
   assert.equal(blind.written, 0);
   assert.equal(rows(db, 'select count(*) as n from symbols where name = ?', 'markerB')[0].n, 0, 'und sieht den neuen Inhalt nicht');
@@ -698,6 +709,154 @@ test('Zeitstempel: die benannte Lücke und ihr Gegenmittel verify=all', () => {
   assert.equal(again.written, 0);
   assert.equal(again.rehashed, again.files);
   assert.equal(again.references, 0, 'ohne neue Referenzziele kein Referenzdurchgang');
+  db.close();
+});
+
+/**
+ * §11 nennt eine Luecke: gleiche Groesse, anderer Inhalt, zurueckgesetzte mtime.
+ * `verify: 'stamp'` schliesst sie OHNE den Baum zu lesen. Verglichen wird der
+ * Stempel des Inodes — Geraet, Inode, Groesse, mtime und die ctime. Eine
+ * Inhaltsaenderung bewegt die ctime auch dann, wenn mtime und Groesse danach
+ * wiederhergestellt werden; ein Ersatz der Datei bewegt den Inode.
+ *
+ * Die Kostenaussage steckt im Bericht selbst (`readBytes`), nicht nur in einem
+ * Messskript: der stillste Lauf liest null Bytes, und der Lauf, der die Luecke
+ * schliesst, liest genau die eine verdaechtige Datei.
+ */
+test('Zeitstempel: verify=stamp schliesst die Luecke, ohne den Baum zu lesen', () => {
+  const project = fixtureProject('stamp-luecke');
+  const { file } = fixtureIndex(project, 'stamp-luecke');
+  const db = bundle.openIndex(file);
+
+  const first = bundle.updateIndex(db, project, { verify: 'stamp' });
+  assert.equal(first.verify, 'stamp', 'der Bericht nennt die Politik');
+  assert.equal(first.hashed, first.files, 'der erste Lauf liest jede Datei');
+  assert.ok(first.readBytes > 0, 'und zaehlt die gelesenen Bytes');
+
+  // Nichts veraendert: der Stempel entscheidet, und es wird kein Byte gelesen.
+  const quiet = bundle.updateIndex(db, project, { verify: 'stamp' });
+  assert.equal(quiet.unchanged, quiet.files);
+  assert.equal(quiet.stamped, quiet.files, 'jede Datei wird ueber den Stempel vertraut');
+  assert.equal(quiet.suspicious, 0);
+  assert.equal(quiet.hashed, 0);
+  assert.equal(quiet.readBytes, 0, 'der stille Lauf kostet kein Byte');
+
+  const target = join(project, 'src/marker.mjs');
+  writeFileSync(target, 'export const markerA = 1;\n');
+  bundle.updateIndex(db, project, { verify: 'stamp' });
+  const stamp = statSync(target).mtime;
+
+  // Gleiche Laenge, anderer Inhalt, mtime zurueckgesetzt: die klassischen Signale
+  // sehen nichts, der Stempel muss greifen.
+  writeFileSync(target, 'export const markerB = 1;\n');
+  utimesSync(target, stamp, stamp);
+  const storedRow = rows(db, 'select bytes, mtime_ms, stamp from files where path = ?', 'src/marker.mjs')[0];
+  const nowInfo = statSync(target, { bigint: true });
+  assert.equal(storedRow.bytes, Number(nowInfo.size), 'die Groesse ist gleich geblieben');
+  assert.equal(storedRow.mtime_ms, Math.round(statSync(target).mtimeMs), 'und die mtime auf Millisekunden genau auch');
+
+  const caught = bundle.updateIndex(db, project, { verify: 'stamp' });
+  assert.equal(caught.suspicious, 1, 'gleiche Groesse und mtime, anderer Stempel');
+  assert.equal(caught.hashed, 1, 'genau diese Datei wird gelesen');
+  assert.equal(caught.written, 1);
+  assert.equal(caught.falseAlarms, 0, 'und der Inhalt war wirklich ein anderer');
+  assert.equal(caught.readBytes, Number(nowInfo.size), 'die Kosten sind genau diese eine Datei');
+
+  // WORAN es lag: die ersten vier Angaben sind gleich, die ctime ist es nicht.
+  // Die mtime im Stempel ist DIE GERUNDETE Millisekunde aus mtime_ms — dieselbe
+  // Aufloesung wie das klassische Signal, sonst meldete der Stempel "geaendert",
+  // wo Groesse+mtime "unveraendert" sagen (beim Bau gemessen: 1 ms daneben).
+  const storedParts = storedRow.stamp.split(':');
+  const nowParts = `${nowInfo.dev}:${nowInfo.ino}:${nowInfo.size}:${Math.round(statSync(target).mtimeMs)}:${nowInfo.ctimeNs}`.split(':');
+  assert.deepEqual(storedParts.slice(0, 4), nowParts.slice(0, 4), 'Geraet, Inode, Groesse und mtime sind unveraendert');
+  assert.notEqual(storedParts[4], nowParts[4], 'die ctime verraet die Aenderung');
+  assert.equal(rows(db, 'select count(*) as n from symbols where name = ?', 'markerB')[0].n, 1, 'der neue Inhalt steht im Index');
+  assert.equal(rows(db, 'select count(*) as n from symbols where name = ?', 'markerA')[0].n, 0, 'der alte ist weg');
+  db.close();
+});
+
+/**
+ * Ein Metadaten-Signal kann auch ohne Inhaltsaenderung ausschlagen: chmod bewegt
+ * die ctime, der Inhalt bleibt. Der Preis ist ein Lesevorgang, und er wird
+ * GEZAEHLT statt verschwiegen — ein Signal ohne Fehlalarmzahlen waere eine
+ * Behauptung. Entscheidend ist zweitens, dass der Fehlalarm sich nicht wiederholt:
+ * die Auffrischung schreibt den neuen Stempel mit.
+ */
+test('Zeitstempel: ein Signal ohne Inhaltsaenderung ist ein gezaehlter Fehlalarm', () => {
+  const project = fixtureProject('stamp-fehlalarm');
+  const { file } = fixtureIndex(project, 'stamp-fehlalarm');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, { verify: 'stamp' });
+
+  const target = join(project, 'src/b.mjs');
+  chmodSync(target, 0o600);
+
+  const noisy = bundle.updateIndex(db, project, { verify: 'stamp' });
+  assert.equal(noisy.suspicious, 1, 'die ctime hat sich bewegt');
+  assert.equal(noisy.hashed, 1, 'der Preis ist ein Lesevorgang');
+  assert.equal(noisy.rehashed, 1, 'inhaltlich unveraendert');
+  assert.equal(noisy.falseAlarms, 1, 'das ist der Fehlalarm — gezaehlt');
+  assert.equal(noisy.written, 0);
+
+  const again = bundle.updateIndex(db, project, { verify: 'stamp' });
+  assert.equal(again.hashed, 0, 'ein Fehlalarm wird nicht zur Dauerschleife');
+  assert.equal(again.stamped, again.files);
+  assert.equal(again.readBytes, 0);
+  db.close();
+});
+
+/**
+ * Die zweite Form derselben Luecke: die Datei wird ERSETZT (Kopie, Checkout,
+ * Restore) und traegt danach dieselbe Groesse und dieselbe mtime. mtime und
+ * Groesse sind hier nutzlos; die Identitaet des Inodes verraet es.
+ */
+test('Zeitstempel: eine ersetzte Datei wird ueber ihre Identitaet erkannt', () => {
+  const project = fixtureProject('stamp-ersatz');
+  const { file } = fixtureIndex(project, 'stamp-ersatz');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, { verify: 'stamp' });
+
+  const target = join(project, 'src/a.mjs');
+  const before = statSync(target, { bigint: true });
+  const replacement = join(project, 'src/ersatz.mjs');
+  writeFileSync(replacement, '#'.repeat(Number(before.size)));
+  // Dieselbe mtime, die auch die Indexdatei fuehrt: die gerundete Millisekunde.
+  const sameMs = new Date(Math.round(statSync(target).mtimeMs));
+  utimesSync(replacement, sameMs, sameMs);
+  renameSync(replacement, target);
+
+  const after = statSync(target, { bigint: true });
+  assert.equal(Number(before.size), Number(after.size), 'gleiche Groesse');
+  assert.equal(before.ino === after.ino, false, 'aber ein anderer Inode');
+
+  const caught = bundle.updateIndex(db, project, { verify: 'stamp' });
+  assert.equal(caught.suspicious, 1, 'gleiche Groesse und mtime, andere Identitaet');
+  assert.equal(caught.written, 1, 'die Datei wird neu indexiert');
+  assert.equal(rows(db, 'select count(*) as n from symbols where name = ?', 'alpha')[0].n, 0, 'die alten Symbole sind weg');
+  db.close();
+});
+
+/**
+ * Der Stempel ist eine Zeile, die man lesen kann: Geraet, Inode, Groesse, mtime
+ * (Millisekunden — dieselbe Groesse wie `mtime_ms`) und ctime (Nanosekunden).
+ * Und er ist eine NEUE Spalte: ein Index der alten Fassung wird verworfen und neu
+ * gebaut, statt Stempelluecken zu erben.
+ */
+test('Schema: die Stempelspalte traegt Geraet, Inode, Groesse, mtime und ctime', () => {
+  const project = fixtureProject('stamp-spalte');
+  const { file } = fixtureIndex(project, 'stamp-spalte');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, { verify: 'stamp' });
+
+  const target = join(project, 'src/a.mjs');
+  const info = statSync(target, { bigint: true });
+  assert.equal(
+    rows(db, 'select stamp from files where path = ?', 'src/a.mjs')[0].stamp,
+    `${info.dev}:${info.ino}:${info.size}:${Math.round(statSync(target).mtimeMs)}:${info.ctimeNs}`,
+    'die fuenf Angaben des Inodes: Geraet, Inode, Groesse, mtime_ms, ctime_ns',
+  );
+  assert.ok(bundle.INDEXER_VERSION >= 5, 'die Fassung der Extraktion ist gestiegen');
+  assert.equal(bundle.Config({}).verify, 'stamp', 'und der Stempel ist die Vorgabe, nicht die Luecke');
   db.close();
 });
 

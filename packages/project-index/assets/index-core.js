@@ -82,7 +82,7 @@ export const SCHEMA_VERSION = 1;
  * Erhoehen heisst: die Bedeutung des Inhalts hat sich geaendert, auch wenn die
  * Tabellen gleich geblieben sind.
  */
-export const INDEXER_VERSION = 4;
+export const INDEXER_VERSION = 5;
 
 /** Wurzel aller Indizes — ausserhalb jedes Projekts. */
 export const DEFAULT_INDEX_ROOT = join(homedir(), '.shinon', 'indexes');
@@ -345,7 +345,7 @@ export const EDGE_PATTERNS = [
  * idempotent, weil inkrementell in dieselbe Datei geschrieben wird.
  */
 export const SCHEMA = [
-  `create table if not exists files(path text primary key, language text not null, bytes integer not null, mtime_ms integer not null, digest text not null, indexed_at_ms integer not null)`,
+  `create table if not exists files(path text primary key, language text not null, bytes integer not null, mtime_ms integer not null, digest text not null, indexed_at_ms integer not null, stamp text)`,
   `create table if not exists symbols(path text not null, name text not null, kind text not null, line integer not null, primary key(path, name, kind, line))`,
   `create table if not exists edges(path text not null, kind text not null, target text not null, primary key(path, kind, target))`,
   `create table if not exists "references"(path text not null, name text not null, line integer not null, primary key(path, name, line))`,
@@ -374,6 +374,55 @@ export function toProjectPath(root, absolute) {
 /** Die Sprache einer Datei, oder null, wenn die Endung nicht indexiert wird. */
 export function languageOf(file) {
   return LANGUAGES[extname(file).toLowerCase()] ?? null;
+}
+
+/**
+ * Der Stempel eines Inodes: Geraet, Inode, Groesse, mtime (Millisekunden) und
+ * ctime (Nanosekunden) — eine Zeile, die man lesen kann.
+ *
+ * WOZU: Groesse und mtime sind eine Behauptung des Schreibers. Beide kann ein
+ * Werkzeug nach einer Aenderung WIEDERHERSTELLEN; deshalb bleibt die Luecke aus
+ * §11 (gleiche Groesse, zurueckgesetzte mtime) fuer den klassischen Vergleich
+ * unsichtbar. Die ctime kann das nicht: sie ist die Zeit der letzten Aenderung
+ * des INODES, jeder Schreibvorgang bewegt sie, und es gibt keinen Aufruf, der
+ * sie setzt. Der Inode selbst deckt die zweite Form derselben Luecke: eine
+ * ERSETZTE Datei hat eine neue Identitaet, auch bei gleicher Groesse und mtime.
+ *
+ * GEMESSEN auf diesem Rechner (ext4), nicht angenommen: writeFileSync mit
+ * gleich langem Inhalt + utimesSync auf die alte mtime laesst Groesse und mtime
+ * auf Millisekunden gleich und bewegt die ctime; ein chmod bewegt die ctime
+ * OHNE Inhaltsaenderung (das ist der Fehlalarm, der im Bericht gezaehlt wird).
+ *
+ * UND EHRLICH ZUR ROLLE DES INODES: in den Proben dieses Repos traegt die ctime
+ * die Erkennung — eine ersetzte Datei wird auch ohne die Inode-Nummer erkannt
+ * (Mutationsprobe: Inode entfernt, das Ersetzungs-Szenario bleibt gruen, rot
+ * werden nur die Format-Zusagen). Der Inode ist deshalb REDUNDANZ, kein eigener
+ * Nachweis: er deckt Dateisysteme ab, deren ctime grob ist (Sekundengranularitaet
+ * oder aus mtime abgeleitet), und genau dort ist er die zweite Chance.
+ *
+ * GRENZEN, benannt: (1) Das ist eine Eigenschaft des DATEISYSTEMS, keine Zusage.
+ * Ein Dateisystem ohne brauchbare ctime — grob oder aus mtime abgeleitet — macht
+ * dieses Signal schwaecher; `verify: 'all'` bleibt die Antwort, die nichts
+ * annimmt. Faellt der Stempel ganz aus (null), wird gelesen, nie vertraut.
+ * (2) Ein Stempel ist kein Inhaltsnachweis: er sagt "dieselbe Datei, seit dem
+ * letzten Lauf nicht angefasst", nicht "derselbe Inhalt".
+ */
+export function inodeStamp(absolute, mtimeMs = null) {
+  try {
+    const info = statSync(absolute, { bigint: true });
+    // Die mtime kommt GERUNDET von aussen herein (die Zahl, die auch in
+    // mtime_ms steht) und wird nicht hier noch einmal gelesen. GEMESSEN und
+    // deshalb so: der bigint-Wert ist ABGESCHNITTEN, der gespeicherte gerundet —
+    // bei einem Sekundenbruchteil ueber 0,5 ms unterscheiden sich beide um 1 ms,
+    // und dann meldete der Stempel "geaendert", wo das klassische Signal
+    // "unveraendert" sagt. Ein Signal, das sich selbst widerspricht, ist kein
+    // Signal. Was hier zusaetzlich dazukommt, ist die ctime (Nanosekunden: ein
+    // Zaehler fuer Aenderungen, feiner ist besser) und die Identitaet des Inodes.
+    const ms = mtimeMs ?? Math.round(Number(info.mtimeNs) / 1e6);
+    return `${info.dev}:${info.ino}:${info.size}:${ms}:${info.ctimeNs}`;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -725,8 +774,8 @@ function indexFile(db, root, absolute, file, options) {
   const safe = redactSecrets(file.text);
   forgetFile(db, path);
 
-  db.prepare('insert or replace into files(path, language, bytes, mtime_ms, digest, indexed_at_ms) values (?, ?, ?, ?, ?, ?)')
-    .run(path, language, file.bytes, file.mtimeMs, digest, Date.now());
+  db.prepare('insert or replace into files(path, language, bytes, mtime_ms, digest, indexed_at_ms, stamp) values (?, ?, ?, ?, ?, ?, ?)')
+    .run(path, language, file.bytes, file.mtimeMs, digest, Date.now(), options.stamp ?? null);
 
   // Die Fundstelle wird festgehalten, der Wert nicht.
   const insertFinding = db.prepare(`insert or ignore into ${SECRET_TABLE}(path, line, kind) values (?, ?, ?)`);
@@ -775,19 +824,34 @@ function resolveTouches(root, entry, known) {
  * Einen Indexlauf fahren — inkrementell nach Plan §11:
  *
  *   stat -> mtime+size gleich?  ja: nicht einmal lesen (unchanged)
+ *                             und mit verify=stamp zusaetzlich: Stempel gleich?
  *        -> sonst lesen und sha256 vergleichen (hashed)
  *             gleicher Hash: nur die Dateizeile auffrischen (rehashed)
  *             neuer Hash:    neu parsen und die Primaerdaten ersetzen (written)
  *
  * Damit ist 'kein vollstaendiger Rebuild' ZAEHLBAR statt behauptet: der Bericht
  * nennt, wie viele Dateien gelesen (hashed) und wie viele neu geparst (written)
- * wurden. Ein zweiter Lauf ohne Dateiaenderung hat hashed = 0 und written = 0.
+ * wurden, und wie viele BYTES dabei gelesen wurden (readBytes) — die Kosten
+ * stehen im Bericht, nicht nur in einem Messskript. Ein zweiter Lauf ohne
+ * Dateiaenderung hat hashed = 0, written = 0 und readBytes = 0.
  *
- * VERIFY (Umgang mit Zeitstempel-Problemen): `verify: 'changed'` (Standard)
- * vertraut mtime+size und liest eine als unveraendert erkannte Datei nicht.
- * Das hat eine benannte Luecke: ein Werkzeug, das den Inhalt bei GLEICHER Groesse
- * aendert und die mtime zuruecksetzt, wird nicht erkannt. `verify: 'all'` liest
- * und hasht jede Datei und schliesst diese Luecke — zum Preis eines Vollauf-Lesens.
+ * VERIFY (Umgang mit Zeitstempel-Problemen, §11) — drei Politiken, die sich in
+ * dem unterscheiden, was sie ueber eine Datei ANNEHMEN:
+ *
+ *   'stamp'   (Standard) glaubt Groesse und mtime NICHT allein. Stimmen beide,
+ *             wird zusaetzlich der Inode-Stempel verglichen (inodeStamp): ctime
+ *             und Identitaet schliessen die Luecke, ohne dass eine unveraenderte
+ *             Datei gelesen wird. Ein verdaechtiger Stempel kostet EINEN
+ *             Lesevorgang; stellt sich der Inhalt als gleich heraus, ist das ein
+ *             gezaehlter Fehlalarm (falseAlarms) und der Stempel wird mit
+ *             aufgefrischt, damit er sich nicht wiederholt.
+ *   'changed' vertraut mtime+size. Benannte Luecke: gleiche Groesse, geaenderter
+ *             Inhalt, zurueckgesetzte mtime bleibt unentdeckt.
+ *   'all'     liest und hasht jede Datei. Nimmt nichts an — und kostet ein
+ *             vollstaendiges Lesen je Lauf.
+ *
+ * Alle drei sind FAIL-CLOSED in derselben Richtung: was nicht sicher gleich ist,
+ * wird gelesen. 'stamp' ist strenger als 'changed' und billiger als 'all'.
  *
  * Der Lauf wirft nicht wegen einer einzelnen Datei; er gibt einen Bericht
  * zurueck. Der Referenzdurchgang laeuft nur, wenn sich die Menge der
@@ -797,13 +861,21 @@ function resolveTouches(root, entry, known) {
 export function updateIndex(db, root, options = {}) {
   const chunkLines = options.chunkLines ?? 40;
   const maxFileBytes = options.maxFileBytes ?? 262144;
-  const verify = options.verify ?? 'changed';
+  const verify = options.verify ?? 'stamp';
   const files = listFiles(root, options.extensions ?? SOURCE_EXTENSIONS);
   const report = {
     root: resolve(root),
     verify,
     files: files.length,
     unchanged: 0,
+    /** Ueber den vollen Stempel vertraut, ohne zu lesen (nur verify=stamp). */
+    stamped: 0,
+    /** Verdaechtig: Groesse UND mtime gleich, der Stempel nicht — die §11-Luecke. */
+    suspicious: 0,
+    /** Davon mit identischem Inhalt: der Preis des Signals, gezaehlt statt still. */
+    falseAlarms: 0,
+    /** Gelesene Bytes — die Kosten des Laufs, im Bericht nachpruefbar. */
+    readBytes: 0,
     hashed: 0,
     rehashed: 0,
     written: 0,
@@ -821,7 +893,7 @@ export function updateIndex(db, root, options = {}) {
     symbolsChanged: false,
   };
 
-  const previous = new Map(db.prepare('select path, bytes, mtime_ms, digest from files').all().map((row) => [row.path, row]));
+  const previous = new Map(db.prepare('select path, bytes, mtime_ms, digest, stamp from files').all().map((row) => [row.path, row]));
 
   db.exec('begin');
   try {
@@ -854,10 +926,36 @@ export function updateIndex(db, root, options = {}) {
       }
       const before = previous.get(path);
       const untouched = before !== undefined && before.bytes === info.size && before.mtime_ms === Math.round(info.mtimeMs);
+      // Der Stempel wird nur genommen, wenn er gebraucht wird: `verify: 'changed'`
+      // soll fuer eine unveraenderte Datei genau EINEN stat kosten — so wie vor
+      // der Stempelspalte. GEMESSEN war das die eine Stelle, an der 'changed'
+      // langsamer wurde, ohne etwas davon zu haben.
+      let stamp = null;
+      let suspicious = false;
       if (untouched && verify === 'changed') {
         report.unchanged += 1;
         continue;
       }
+      if (untouched && verify === 'stamp') {
+        // Der eigentliche Gewinn: Groesse und mtime stimmen, und der Stempel sagt
+        // "dieselbe Datei, unangetastet" — dann wird kein Byte gelesen.
+        stamp = inodeStamp(absolute, Math.round(info.mtimeMs));
+        if (stamp !== null && before.stamp === stamp) {
+          report.unchanged += 1;
+          report.stamped += 1;
+          continue;
+        }
+        // Kein brauchbarer Stempel (nicht lesbar) oder ein anderer: dieser Fall
+        // ist genau die §11-Luecke, und er wird gelesen, nicht geraten.
+        if (stamp !== null) {
+          suspicious = true;
+          report.suspicious += 1;
+        }
+      }
+      // VOR dem Lesen: aendert sich die Datei waehrend des Lesens, bleibt der
+      // gespeicherte Stempel der alte und der naechste Lauf liest erneut —
+      // fail-closed statt still veraltet.
+      if (stamp === null) stamp = inodeStamp(absolute, Math.round(info.mtimeMs));
       const file = readText(absolute, maxFileBytes);
       if (file === null) {
         // Eine uebersprungene Datei darf keine alten Zeilen stehen lassen.
@@ -866,14 +964,16 @@ export function updateIndex(db, root, options = {}) {
         continue;
       }
       report.hashed += 1;
+      report.readBytes += file.bytes;
       const digest = createHash('sha256').update(file.text).digest('hex');
       if (before !== undefined && before.digest === digest) {
-        db.prepare('update files set language = ?, bytes = ?, mtime_ms = ?, indexed_at_ms = ? where path = ?')
-          .run(languageOf(path) ?? 'text', file.bytes, file.mtimeMs, Date.now(), path);
+        db.prepare('update files set language = ?, bytes = ?, mtime_ms = ?, stamp = ?, indexed_at_ms = ? where path = ?')
+          .run(languageOf(path) ?? 'text', file.bytes, file.mtimeMs, stamp, Date.now(), path);
         report.rehashed += 1;
+        if (suspicious) report.falseAlarms += 1;
         continue;
       }
-      written.push(indexFile(db, root, absolute, file, { chunkLines }));
+      written.push(indexFile(db, root, absolute, file, { chunkLines, stamp }));
       report.written += 1;
     }
 

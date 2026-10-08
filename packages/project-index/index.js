@@ -98,14 +98,22 @@ export const Config = z.object({
   /** Fenstergroesse der Chunks in Zeilen. */
   chunkLines: z.number().default(40),
   /**
-   * Wie der Lauf Unveraendertheit feststellt:
-   *   'changed'  mtime + size; unveraenderte Dateien werden nicht gelesen.
-   *              Benannte Luecke: derselbe Inhalt bei gleicher Groesse und
-   *              zurueckgesetzter mtime bleibt unbemerkt.
-   *   'all'      jede Datei lesen und sha256 pruefen; schliesst die Luecke zum
-   *              Preis eines Vollauf-Lesens.
+   * Wie der Lauf Unveraendertheit feststellt — die Frage ist, was er ueber eine
+   * Datei ANNIMMT:
+   *
+   *   'stamp'    (Vorgabe) Groesse und mtime werden nicht allein geglaubt. Stimmen
+   *              beide, vergleicht er zusaetzlich den Inode-Stempel (Geraet,
+   *              Inode, Groesse, mtime, ctime). Damit wird ein Inhalt, der bei
+   *              GLEICHER Groesse geaendert und dessen mtime zurueckgesetzt wurde,
+   *              erkannt, ohne dass eine unveraenderte Datei gelesen wird. Der
+   *              Preis sind Lesevorgaenge fuer verdaechtige Dateien; ein Signal
+   *              ohne Inhaltsaenderung (chmod) ist ein gezaehlter Fehlalarm.
+   *   'changed'  vertraut mtime + size. Benannte Luecke: derselbe Inhalt bei
+   *              gleicher Groesse und zurueckgesetzter mtime bleibt unbemerkt.
+   *   'all'      jede Datei lesen und sha256 pruefen; nimmt nichts an und kostet
+   *              ein vollstaendiges Lesen je Lauf.
    */
-  verify: z.union([z.const('changed'), z.const('all')]).default('changed'),
+  verify: z.union([z.const('stamp'), z.const('changed'), z.const('all')]).default('stamp'),
   /** Bericht nach dem Lauf. */
   trace: z.boolean().default(true),
   /** Lauf im Worker statt im Host (Plan §12). Aus heisst: Lauf im Host. */
@@ -126,7 +134,9 @@ function reportLine(report, stats, where) {
     .join(' ');
   return (
     `[shinon-project-index] Lauf im ${where} (verify=${report.verify}): ${report.written} neu, ` +
-    `${report.rehashed} nur aufgefrischt, ${report.hashed} gelesen, ${report.unchanged} unveraendert, ` +
+    `${report.rehashed} nur aufgefrischt, ${report.hashed} gelesen (${report.readBytes} Bytes), ` +
+    `${report.unchanged} unveraendert${report.stamped > 0 ? ` (${report.stamped} ueber Stempel)` : ''}, ` +
+    `${report.falseAlarms > 0 ? `${report.falseAlarms} Fehlalarm(e), ` : ''}` +
     `${report.removed} entfernt, ${report.skipped} uebersprungen, ` +
     `Schutz: ${report.protected} nie gelesen${protectedKinds === '' ? '' : ` (${protectedKinds})`}, ` +
     `${report.findings} Fundstellen redigiert, ` +

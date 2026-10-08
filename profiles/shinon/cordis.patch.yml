@@ -53,6 +53,25 @@
     activate: true
     maxGoalRounds: 6
 
+# Project Index. `verify` steht hier, weil es eine ENTSCHEIDUNG ist und keine
+# Konstante: der wirksame Wert gehoert ins Profil, das Paket haelt nur den
+# Schema-Default.
+#
+# stamp — Shinons Umgang mit der Luecke aus §11: Groesse und mtime werden nicht
+# allein geglaubt. Stimmen beide, entscheidet zusaetzlich der Inode-Stempel
+# (Geraet, Inode, Groesse, mtime, ctime). Gemessen an diesem Repo (181 Dateien,
+# 1,19 MiB): stiller Lauf 0 Bytes gelesen wie 'changed' (58,6 gegen 58,7 ms
+# Median, verschraenkt gemessen — der eine stat mehr je Datei ist hier nicht
+# messbar), waehrend 'all' JEDEN Lauf 1,2 MB liest (100 ms). Die Luecke —
+# gleiche Groesse, zurueckgesetzte mtime — wird 6 von 6 erkannt und kostet
+# 24,9 KB (2% des Baums), 'changed' erkennt 0 von 6. Ein Werkzeug, das nur die
+# METADATEN des ganzen Baums anfasst, kostet EINEN Vollauf (99%), danach ist es
+# wieder still: der Stempel wird mit aufgefrischt.
+# 'all' bleibt die Politik, die nichts annimmt — und jeden Lauf alles liest.
+- id: shinon-project-index
+  config:
+    verify: stamp
+
 # @shinon/core owns the sidebar brand. 'sidebar.brand.mark' and
 # 'sidebar.brand.name' are single slots (exactly one occupant), so the shipped
 # official brand has to yield.
