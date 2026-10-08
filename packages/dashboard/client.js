@@ -15,6 +15,17 @@
  * und sich nicht meldet, faellt auf; ein Bundle, das sich meldet und nicht im
  * Profil steht (openapi), ist als inaktiv gekennzeichnet.
  *
+ * WORKSPACES UND SITZUNGEN (gemessen, Docs/probes/workspace-list.json): der
+ * Host haelt die Liste in `ctx.workspaceRegistry` (dsh-workspace). In den
+ * Browser kommt sie nicht ueber diesen Registry-Dienst, sondern ueber die
+ * Client-Haelfte von dsh-api-workspace-controller: die registriert den Dienst
+ * `workspaces` (WorkspaceController, `.list` ist der ClientWorkspaceModel) und
+ * `sessions` ist der Sitzungskatalog (ClientSessions, `.list` mit `byId`).
+ * Beide haben die ObservableSnapshot-Form der Client-Dienste - getSnapshot()
+ * liefert den Wert, subscribe() meldet Aenderungen - und genau so werden sie
+ * hier gelesen. Dieses Panel zeigt sie NUR: es legt keinen Workspace an,
+ * benennt nichts um und heftet/archiviert nichts.
+ *
  * 'main' ist ein keyed-Slot (options.key) und die Sidebar-Leiste
  * 'sidebar.panellist' eine list (options.id) - ohne diesen Eintrag wäre das
  * Panel nicht erreichbar.
@@ -30,6 +41,20 @@ window.__ModuleLoader__.load({
     const REGISTRY_EVENT = 'shinon:plugin';
     /** Ereignis, mit dem das Codemon seinen Zustand (XP/HP) meldet. */
     const XP_EVENT = 'shinon:exp';
+
+    /**
+     * Die zwei Client-Dienste der Workspace- und Sitzungsliste. Sie werden
+     * GELESEN, nicht importiert — Pakete bleiben referenzfrei (Konvention).
+     */
+    const WORKSPACE_SERVICE = 'workspaces';
+    const SESSION_SERVICE = 'sessions';
+
+    /**
+     * Die zwei Kanaele. `apply` setzt sie auf die echten Client-Dienste; vorher
+     * - und in einer Sitzung ohne diese Dienste - lesen sie nichts, und der
+     * Abschnitt sagt genau das statt zu verschwinden.
+     */
+    let channels = () => ({ workspaces: undefined, sessions: undefined });
 
     /**
      * Die erwarteten Bundles in Profilreihenfolge. `active: false` heisst
@@ -94,6 +119,23 @@ window.__ModuleLoader__.load({
       .shinon-exp__fill { display: block; height: 100%; background: var(--shinon-gradient, linear-gradient(115deg,#7C3AED,#6366F1)); transition: width .3s ease; }
       .shinon-exp__lvl { font-weight: 700; letter-spacing: .08em; color: var(--shinon-violet-light, #A855F7); }
       .shinon-exp__meta { font-size: 12px; color: var(--dsw-alias-label-secondary); white-space: nowrap; }
+      .shinon-ws__block { margin-bottom: 12px; padding: 10px; border-radius: 6px;
+        background: var(--dsw-alias-bg-layer-1); border: 1px solid rgba(255,255,255,.07); }
+      .shinon-ws__head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+      .shinon-ws__name { font-weight: 700; }
+      .shinon-ws__count { font-size: 11px; color: var(--dsw-alias-label-secondary); }
+      .shinon-ws__path { display: block; font-size: 11px; color: var(--dsw-alias-label-secondary);
+        margin: 2px 0 8px; word-break: break-all; }
+      .shinon-ws__empty { font-size: 11px; margin: 0; color: var(--dsw-alias-label-secondary); }
+      .shinon-ws__dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+        margin-right: 6px; vertical-align: middle; background: var(--dsw-alias-label-secondary); }
+      .shinon-ws__dot--live { background: #22c55e; }
+      .shinon-ws__origin { font-size: 11px; color: var(--dsw-alias-label-secondary); }
+      .shinon-badge { display: inline-block; font-size: 10px; letter-spacing: .04em; text-transform: uppercase;
+        padding: 1px 5px; border-radius: 3px; margin-left: 6px; }
+      .shinon-badge--pin { background: color-mix(in srgb, #6366F1 28%, transparent);
+        color: var(--shinon-violet-light, #A855F7); }
+      .shinon-badge--arch { background: rgba(255,255,255,.12); color: var(--dsw-alias-label-secondary); }
       @media (prefers-reduced-motion: reduce) { .shinon-exp__fill { transition: none; } }
     `);
 
@@ -133,6 +175,164 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'shinon-card' },
         h('div', { className: 'shinon-card__k' }, label),
         h('div', { className: 'shinon-card__v' }, value));
+    }
+
+    /**
+     * Einen ObservableSnapshot eines Client-Dienstes lesen: getSnapshot()
+     * liefert den Wert, subscribe() meldet jede Aenderung. Beide Aufrufe sind
+     * gegen ein fehlendes oder fremdes Objekt abgesichert — ein
+     * Beobachtungspanel darf an einer fehlenden Quelle nicht sterben, es muss
+     * sie benennen.
+     */
+    function useSnapshot(source) {
+      const [, bump] = React.useState(0);
+      React.useEffect(() => {
+        if (source === undefined || typeof source.subscribe !== 'function') return undefined;
+        const off = source.subscribe(() => bump((value) => value + 1));
+        return typeof off === 'function' ? off : undefined;
+      }, [source]);
+      if (source === undefined || typeof source.getSnapshot !== 'function') return undefined;
+      try {
+        return source.getSnapshot();
+      } catch {
+        return undefined;
+      }
+    }
+
+    /**
+     * Alles, was die Abschnitte brauchen. Der Zustand des Workspace-Dienstes
+     * (`state` = loading/idle/error) wird MITGELESEN statt verschwiegen:
+     * „kein Workspace\" und „noch nicht geladen\" sind zwei Aussagen.
+     */
+    function useSurfaces() {
+      const { workspaces, sessions } = channels();
+      const ws = useSnapshot(workspaces === undefined ? undefined : workspaces.list);
+      const catalogue = useSnapshot(sessions === undefined ? undefined : sessions.list);
+      return {
+        hasWorkspaces: workspaces !== undefined,
+        hasSessions: sessions !== undefined,
+        items: ws?.items ?? [],
+        archived: ws?.archivedSessionIds ?? [],
+        pinned: ws?.pinnedSessionIds ?? [],
+        wsState: ws?.state,
+        wsError: ws?.error,
+        byId: catalogue?.byId ?? {},
+      };
+    }
+
+    /** Kennung kurz: eine Sitzungs-ID ist lang und sprengt sonst die Zeile. */
+    function shortId(id) {
+      return id.length > 14 ? `${id.slice(0, 8)}..${id.slice(-4)}` : id;
+    }
+
+    /** Eine Marke am Sitzungsnamen: angeheftet/archiviert ist Host-Zustand. */
+    function badge(kind, text) {
+      return h('span', { className: `shinon-badge shinon-badge--${kind}` }, text);
+    }
+
+    /** Ein Projektionsfehler als Text: der Client-Dienst traegt code und message. */
+    function errorText(error) {
+      if (error === null || error === undefined) return '';
+      const code = error.code ?? error.name;
+      const message = error.message ?? String(error);
+      return code === undefined ? message : `${code}: ${message}`;
+    }
+
+    /** Herkunft und Arbeitsverzeichnis einer Sitzung, so weit der Katalog sie kennt. */
+    function originOf(row) {
+      if (row === undefined) return 'nicht im Katalog';
+      const origin = row.origin === 'subagent' ? 'Unteragent' : row.parentId === undefined ? 'Sitzung' : 'Abzweig';
+      return row.cwd === undefined ? origin : `${origin} · ${row.cwd}`;
+    }
+
+    /** Eine Sitzungszeile: Name mit Zustandspunkt, Kennung, Herkunft, Marken. */
+    function SessionRow({ id, row, pinned, archived }) {
+      const marks = [];
+      if (pinned.includes(id)) marks.push(badge('pin', 'angeheftet'));
+      if (archived.includes(id)) marks.push(badge('arch', 'archiviert'));
+      return h('tr', { className: 'shinon-ws__session' },
+        h('td', null,
+          h('span', { className: `shinon-ws__dot${row?.running === true ? ' shinon-ws__dot--live' : ''}` }),
+          h('span', { className: 'shinon-ws__name' }, row?.displayTitle ?? row?.title ?? '(nicht im Katalog)'),
+          ...marks),
+        h('td', null, h('code', null, shortId(id))),
+        h('td', null, h('span', { className: 'shinon-ws__origin' }, originOf(row))));
+    }
+
+    /** Die Sitzungstabelle eines Blocks: dieselbe Kopfzeile, dieselbe Zeile. */
+    function SessionTable({ ids, byId, pinned, archived }) {
+      return h('table', { className: 'shinon-plugins' },
+        h('thead', null, h('tr', null,
+          h('th', null, 'Sitzung'),
+          h('th', null, 'Kennung'),
+          h('th', null, 'Herkunft'))),
+        h('tbody', null, ids.map((id) => h(SessionRow, { key: id, id, row: byId[id], pinned, archived }))));
+    }
+
+    /** Ein Workspace mit seinen zugeordneten Sitzungen und deren Marken. */
+    function WorkspaceBlock({ item, byId, pinned, archived }) {
+      const ids = item.sessionIds ?? [];
+      const pinnedHere = ids.filter((id) => pinned.includes(id)).length;
+      const archivedHere = ids.filter((id) => archived.includes(id)).length;
+      return h('div', { className: 'shinon-ws__block' },
+        h('div', { className: 'shinon-ws__head' },
+          h('span', { className: 'shinon-ws__name' },
+            item.title === '' || item.title === undefined ? '(ohne Namen)' : item.title),
+          h('code', null, item.workspaceId),
+          h('span', { className: 'shinon-ws__count' },
+            `${ids.length} Sitzung${ids.length === 1 ? '' : 'en'}`
+            + (pinnedHere === 0 ? '' : `, ${pinnedHere} angeheftet`)
+            + (archivedHere === 0 ? '' : `, ${archivedHere} archiviert`))),
+        h('code', { className: 'shinon-ws__path' }, item.path),
+        ids.length === 0
+          ? h('p', { className: 'shinon-ws__empty' }, 'keine Sitzung zugeordnet')
+          : h(SessionTable, { ids, byId, pinned, archived }));
+    }
+
+    /**
+     * Workspaces und Sitzungen: die Liste des Hosts, im Browser sichtbar.
+     * Drei ehrliche Sonderfaelle statt einer stillen Luecke: kein Kanal, ein
+     * Workspace ohne Sitzung und eine Sitzung ohne Workspace.
+     */
+    function WorkspaceSection() {
+      const surfaces = useSurfaces();
+      if (!surfaces.hasWorkspaces && !surfaces.hasSessions) {
+        return h('section', { className: 'shinon-section' },
+          h('h3', null, 'Workspaces und Sitzungen'),
+          h('p', { className: 'shinon-dashboard__sub' },
+            'Ohne Kanal: weder `workspaces` noch `sessions` ist in dieser Sitzung verbunden. Der Host haelt '
+            + 'die Liste in ctx.workspaceRegistry (dsh-workspace); in den Browser bringt sie die '
+            + 'Client-Haelfte von dsh-api-workspace-controller.'));
+      }
+      const accounted = new Set(surfaces.items.flatMap((item) => item.sessionIds ?? []));
+      const catalogue = Object.keys(surfaces.byId);
+      const orphans = catalogue.filter((id) => !accounted.has(id));
+      const onlyMarked = [...new Set([...surfaces.pinned, ...surfaces.archived])]
+        .filter((id) => surfaces.byId[id] === undefined && !accounted.has(id));
+      return h('section', { className: 'shinon-section' },
+        h('h3', null, `Workspaces und Sitzungen — ${surfaces.items.length} Workspaces, ${catalogue.length} Sitzungen`),
+        h('p', { className: 'shinon-dashboard__sub' },
+          'Gelesen aus den Client-Diensten `workspaces` (die Projektion von ctx.workspaceRegistry) und `sessions`. '
+          + 'Nur Anzeige: dieses Panel legt keinen Workspace an, benennt nichts um und aendert keine Zuordnung.'
+          + (surfaces.hasSessions ? '' : ' `sessions` fehlt — Sitzungen zeigen nur ihre Kennung.')
+          + (surfaces.wsState === 'loading' ? ' Die Workspace-Projektion laedt noch.' : '')
+          + (surfaces.wsError === null || surfaces.wsError === undefined
+            ? '' : ` Projektionsfehler: ${errorText(surfaces.wsError)}.`)),
+        surfaces.items.length === 0
+          ? h('p', { className: 'shinon-ws__empty' }, 'Der Host meldet keinen Workspace.')
+          : surfaces.items.map((item) => h(WorkspaceBlock, {
+              key: item.workspaceId, item, byId: surfaces.byId, pinned: surfaces.pinned, archived: surfaces.archived,
+            })),
+        orphans.length === 0 ? null : h('div', { className: 'shinon-ws__block' },
+          h('div', { className: 'shinon-ws__head' },
+            h('span', { className: 'shinon-ws__name' }, 'Sitzungen ohne Workspace'),
+            h('span', { className: 'shinon-ws__count' }, `${orphans.length} ohne Zuordnung`)),
+          h(SessionTable, { ids: orphans, byId: surfaces.byId, pinned: surfaces.pinned, archived: surfaces.archived })),
+        onlyMarked.length === 0 ? null : h('div', { className: 'shinon-ws__block' },
+          h('div', { className: 'shinon-ws__head' },
+            h('span', { className: 'shinon-ws__name' }, 'Nur im Anheft-/Archiv-Satz'),
+            h('span', { className: 'shinon-ws__count' }, `${onlyMarked.length} nicht im Katalog`)),
+          h(SessionTable, { ids: onlyMarked, byId: surfaces.byId, pinned: surfaces.pinned, archived: surfaces.archived })));
     }
 
     /** Die globale EXP-Leiste: dieselbe Zusage wie im Composer-Dock, gross. */
@@ -194,14 +394,18 @@ window.__ModuleLoader__.load({
     function DashboardPanel() {
       const { map } = useRegistry();
       const { pet } = usePet();
+      const surfaces = useSurfaces();
       return h('div', { className: 'shinon-dashboard' },
         h('h2', null, 'Shinon Forge'),
         h('p', { className: 'shinon-dashboard__sub' }, 'Sichtbarkeit, Erfahrung und Zustand — was laeuft, steht hier.'),
         h('div', { className: 'shinon-dashboard__cards' },
           h(Card, { label: 'Angemeldet', value: `${map.size} / ${EXPECTED.filter((entry) => entry.active).length}` }),
           h(Card, { label: 'Codemon', value: pet === null ? '—' : `${pet.species} · L${pet.level}` }),
-          h(Card, { label: 'Siege', value: pet === null ? '—' : String(pet.wins) })),
+          h(Card, { label: 'Siege', value: pet === null ? '—' : String(pet.wins) }),
+          h(Card, { label: 'Workspaces', value: surfaces.hasWorkspaces ? String(surfaces.items.length) : '—' }),
+          h(Card, { label: 'Sitzungen', value: surfaces.hasSessions ? String(Object.keys(surfaces.byId).length) : '—' })),
         h(ExpSection),
+        h(WorkspaceSection),
         h(PluginSection));
     }
 
@@ -221,6 +425,22 @@ window.__ModuleLoader__.load({
         const registry = (window.__shinonPlugins ??= new Map());
         registry.set(PLUGIN, { label: 'Dashboard', kind: 'client', panel: PANEL_ID });
         window.dispatchEvent(new CustomEvent(REGISTRY_EVENT, { detail: { id: PLUGIN } }));
+
+        // Die zwei Kanaele fuer Workspaces und Sitzungen. `ctx.get` liefert den
+        // Dienst erst nach seiner Registrierung; fehlt er, bleibt er undefined,
+        // und der Abschnitt benennt das, statt still leer zu bleiben. Gelesen
+        // wird bei jedem Rendern, damit ein spaeter geladener Dienst noch
+        // ankommt.
+        channels = () => {
+          const read = (name) => {
+            try {
+              return typeof ctx.get === 'function' ? ctx.get(name) : ctx[name];
+            } catch {
+              return undefined;
+            }
+          };
+          return { workspaces: read(WORKSPACE_SERVICE), sessions: read(SESSION_SERVICE) };
+        };
 
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, DashboardPanel));
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
