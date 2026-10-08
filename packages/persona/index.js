@@ -132,6 +132,14 @@ export function initialState(contract) {
 const STATE_FIELDS = ['identity', 'stance', 'uncertainty', 'mood', 'capabilities', 'limitations'];
 
 /**
+ * Grenze fuer das Zaehl-Woerterbuch unbekannter Event-Typen. Ein Typ mit Pfad oder Parameter
+ * im Namen darf den Speicher nicht ueber die Sitzungsdauer wachsen lassen; alles darueber
+ * laeuft in EINEN benannten Ueberlauf-Eimer, damit die Zahl sichtbar bleibt statt zu verschwinden.
+ */
+const IGNORED_TYPE_LIMIT = 64;
+const IGNORED_OVERFLOW_KEY = '<overflow>';
+
+/**
  * Zwei Zustände feldweise vergleichen. Gleich heißt: jedes der sechs Felder ist
  * gleich, Listen elementweise und in der Reihenfolge.
  */
@@ -242,10 +250,11 @@ export function createPersonaState(contract, options = {}) {
     const result = deriveState(contract, state, eventType);
     if (!result.changed) {
       stats.ignored += 1;
-      // TODO: [DSH-Refactor] - `ignoredTypes` ist ein ungedeckeltes Wörterbuch: jeder jemals
-      // gesehene unbekannte Event-Typ bleibt für die Lebensdauer der Sitzung im Speicher.
-      // Ein Pfad/Parameter im Event-Typ genügt, um den Zähler unbegrenzt wachsen zu lassen.
-      stats.ignoredTypes[eventType] = (stats.ignoredTypes[eventType] ?? 0) + 1;
+      if (stats.ignoredTypes[eventType] !== undefined || Object.keys(stats.ignoredTypes).length < IGNORED_TYPE_LIMIT) {
+        stats.ignoredTypes[eventType] = (stats.ignoredTypes[eventType] ?? 0) + 1;
+      } else {
+        stats.ignoredTypes[IGNORED_OVERFLOW_KEY] = (stats.ignoredTypes[IGNORED_OVERFLOW_KEY] ?? 0) + 1;
+      }
       return null;
     }
     state = result.state;
@@ -420,14 +429,20 @@ export function apply(ctx, config) {
     onChange: () => renderPrompt(),
   });
 
-  // TODO: [DSH-Refactor] - `sp.getSectionOrder(...)` wird ohne Typ-Prüfung aufgerufen und die
-  // Registrierung steckt in vier verschachtelten Closures (inject → effect → renderPrompt →
-  // renderTrigger) mit handgeführtem Disposer-Stack. Fehlt eine der Methoden am injizierten
-  // Dienst, wirft es INNERHALB des inject-Callbacks; außerdem ist nicht ablesbar, welcher
-  // Disposer zu welchem Abschnitt gehört. Ziel: Methoden prüfen und die Registrierung als
-  // eine Funktion mit EINER Aufräumliste.
+  // TODO: [DSH-Refactor] - Die Registrierung steckt in vier verschachtelten Closures (inject →
+  // effect → renderPrompt → renderTrigger) mit handgefuehrtem Disposer-Stack; nicht ablesbar
+  // ist, welcher Disposer zu welchem Abschnitt gehoert. Ziel: eine Funktion mit EINER
+  // Aufraeumliste. (Der Absturzpfad selbst ist geschlossen: der Dienst wird vor dem ersten
+  // Aufruf geprueft — siehe unten.)
   ctx.inject(['systemPrompt'], (child) => {
     const sp = child.systemPrompt;
+    // Fail-loud statt Throw im inject-Callback: ein fremder Dienst ohne die beiden Methoden
+    // wuerde hier sonst werfen, und der Fehler faellt INNERHALB des Callbacks an, nicht beim
+    // Abschnitt. Kein Abschnitt ist besser als ein halb registrierter Prompt.
+    if (typeof sp?.getSectionOrder !== 'function' || typeof sp?.section !== 'function') {
+      console.error('[shinon-persona] systemPrompt-Dienst ohne getSectionOrder/section — Abschnitte NICHT registriert');
+      return;
+    }
     const atPrefix = sp.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX');
     const atSuffix = sp.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX');
 

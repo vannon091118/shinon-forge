@@ -196,18 +196,16 @@ export function apply(ctx, config) {
       const db = openIndex(file);
       stats = indexStats(db);
       db.close();
-    } catch {
-      // TODO: [DSH-Refactor] - Leeres catch: ein kaputter Index (unlesbare Datei, falsches
-      // Schema) macht den Bericht still zahlenlos. Mindestens ein benannter Hinweis gehoert
-      // ins Log — sonst ist der Befund unsichtbar.
-      /* die Zaehlung ist Beiwerk, nicht der Lauf */
+    } catch (error) {
+      // Ein kaputter Index darf nicht still zahlenlos bleiben: benannter Hinweis statt leerem catch.
+      console.error(`[shinon-project-index] Index nicht zaehlbar (${error?.message ?? 'unbekannter Fehler'}) — Bericht ohne Zahlen`);
     }
     console.log(reportLine(report, stats, where));
   };
 
-  // TODO: [DSH-Refactor] - Ein Fehlerpfad in zwei Ausfuehrungen: `start()` faengt den
-  // Host-Lauf intern ab, und der Aufrufer haengt ein zweites `.catch` an dieselbe Zusage.
-  // Eine Ursache, zwei Meldungen (dieselbe Zeile doppelt im Log). Eine Stelle muss besitzen.
+  // Ein Fehlerpfad, EIN Besitzer: `start()` faengt nichts intern ab, und genau eine
+  // Stelle meldet den Abbruch. Eine Ursache bekommt damit eine Zeile im Log — und der
+  // Worker-Ausfall bleibt ein Worker-Ausfall (Abbruch), kein stiller Zweitlauf.
   const start = async () => {
     if (config.worker) {
       const result = await runIndexInWorker(options);
@@ -217,11 +215,7 @@ export function apply(ctx, config) {
       }
       console.error(`[shinon-project-index] Worker nicht nutzbar (${result.error}) — Lauf im Host`);
     }
-    try {
-      announce(runIndex(options), 'Host');
-    } catch (error) {
-      console.error(`[shinon-project-index] Lauf abgebrochen (${error?.message ?? error}) — der vorige Stand bleibt stehen`);
-    }
+    announce(runIndex(options), 'Host');
   };
 
   const pending = setImmediate(() => {

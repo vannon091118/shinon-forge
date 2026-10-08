@@ -48,10 +48,25 @@ export function canonicalJson(value) {
   return JSON.stringify(value ?? null);
 }
 
-/** Erste `length` Hex-Zeichen von sha256(text). */
-export function digest(text, length) {
+// #region zwilling:sha256-digest — Besitzer: packages/events/index.js
+/**
+ * Erste `length` Hex-Zeichen von sha256(text).
+ *
+ * `text` ist ein String und `length` ist PFLICHT: eine vergessene Laenge ergaebe
+ * still einen 64-stelligen Wert statt eines kurzen ids. Kein Aufrufer ratet sie
+ * — beide Seiten nennen sie ausdruecklich.
+ */
+function digest(text, length) {
   return createHash('sha256').update(text).digest('hex').slice(0, length);
 }
+// #endregion zwilling:sha256-digest
+
+/**
+ * `digest` bleibt oeffentlich (der Name aendert sich nicht); der Text der Regel
+ * steht als Zwilling in `@shinon/hook` — die Byte-Gleichheit prueft
+ * `scripts/lib/repo.mjs` (SOURCE_TWINS) im Gate und im Build.
+ */
+export { digest };
 
 /** Punktpfad-Lesen: resolvePath({session:{id:'s'}}, 'session.id') → 's'. */
 export function resolvePath(source, path) {
@@ -79,7 +94,13 @@ export function firstValue(source, paths, fallback = undefined) {
  * `payload_ref` referenziert die Nutzlast; die Nutzlast selbst reist als zweites
  * Argument der Emission mit und wird nicht im Envelope dupliziert.
  */
-export function buildEnvelope(contract, { eventType, source, payload, sessionId, timestamp, traceId }) {
+/**
+ * Die Identitaet eines Events aus EINER Rechnung: Nutzlast-Referenz und
+ * `event_id`. Bauen und Nachrechnen benutzen dieselbe Quelle — sonst kostet die
+ * Pruefung eine zweite Digest-Runde ueber dieselbe Nutzlast und haengt an einem
+ * zweiten, leicht abweichenden Aufruf.
+ */
+function identityOf(contract, { eventType, sessionId, source, timestamp, payload }) {
   const payloadRef = `${contract.derivation.payload_ref.prefix}${digest(canonicalJson(payload), contract.derivation.payload_ref.length)}`;
   const identity = [
     contract.contract,
@@ -89,8 +110,13 @@ export function buildEnvelope(contract, { eventType, source, payload, sessionId,
     timestamp,
     payloadRef,
   ].join('|');
+  return { payloadRef, eventId: `${contract.derivation.event_id.prefix}${digest(identity, contract.derivation.event_id.length)}` };
+}
+
+export function buildEnvelope(contract, { eventType, source, payload, sessionId, timestamp, traceId }) {
+  const { payloadRef, eventId } = identityOf(contract, { eventType, sessionId, source, timestamp, payload });
   return {
-    event_id: `${contract.derivation.event_id.prefix}${digest(identity, contract.derivation.event_id.length)}`,
+    event_id: eventId,
     event_type: eventType,
     session_id: sessionId,
     source,
@@ -130,22 +156,17 @@ export function validateEnvelope(envelope, { contract, eventType, payload, sourc
   }
 
   if (definition) {
-    const expectedRef = `${contract.derivation.payload_ref.prefix}${digest(canonicalJson(payload), contract.derivation.payload_ref.length)}`;
-    if (envelope.payload_ref !== expectedRef) issues.push('DIGEST_MISMATCH:payload_ref');
-    // TODO: [DSH-Refactor] - Der Envelope wird hier ein ZWEITES Mal gebaut, nur um `event_id`
-    // nachzurechnen: dieselbe Digest-Arbeit doppelt, und das Schema ist an einen zweiten,
-    // leicht abweichenden Aufruf (source/traceId kommen aus dem Envelope) gekoppelt. Eine
-    // `identity(eventType, sessionId, source, timestamp, payload)`-Funktion wuerde von beiden
-    // Seiten benutzt.
-    const expectedId = buildEnvelope(contract, {
+    // EINE Rechnung fuer beide Digests — dieselbe Quelle wie `buildEnvelope`,
+    // statt den Envelope ein zweites Mal zu bauen, nur um `event_id` nachzurechnen.
+    const expected = identityOf(contract, {
       eventType,
-      source: definition.source,
-      payload,
       sessionId: envelope.session_id,
+      source: definition.source,
       timestamp: envelope.timestamp,
-      traceId: envelope.trace_id,
-    }).event_id;
-    if (envelope.event_id !== expectedId) issues.push('DIGEST_MISMATCH:event_id');
+      payload,
+    });
+    if (envelope.payload_ref !== expected.payloadRef) issues.push('DIGEST_MISMATCH:payload_ref');
+    if (envelope.event_id !== expected.eventId) issues.push('DIGEST_MISMATCH:event_id');
   }
   return issues;
 }
@@ -272,7 +293,18 @@ export function carrierPayload(...args) {
   if (objects.length === 0) return {};
   const session = objects.length > 1 ? objects[0] : {};
   const event = objects[objects.length - 1];
-  const merged = { ...session, ...event };
+  // Die Nutzlast des Session-Events steht unter `data`: DSH baut das Event als
+  // `{ type, seq, time, data: dataSnapshot }` und emittiert `(session, event)`
+  // (gemessen an dsh-session/lib/index.js:1453 und :1466). Ohne das Flachlegen
+  // kaeme z. B. `name` (tool/call) oder `message` (tool/result) nie oben an, und
+  // der Vertrag wuerde beide Ereignisse fail-closed verwerfen — live gemessen:
+  // zwei `MISSING_PAYLOAD_KEY`-Drops bei jedem Werkzeugaufruf.
+  //
+  // Die Reihenfolge ist Absicht: `data` liegt UNTER dem Event und ueberschreibt
+  // nur die Session-Felder, nicht die Huellenfelder des Events (`type`, `seq`,
+  // `time`); ein `session_id` aus der Nutzlast gewinnt gegen die Ableitung unten.
+  const data = event.data !== null && typeof event.data === 'object' ? event.data : {};
+  const merged = { ...session, ...data, ...event };
   if (merged.session_id === undefined && typeof session?.id === 'string') merged.session_id = session.id;
   return merged;
 }

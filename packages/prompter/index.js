@@ -402,30 +402,28 @@ export function loadContext(path) {
   return ContextSchema(parsed);
 }
 
+// #region zwilling:letzte-menschliche-nachricht — Besitzer: packages/prompter/index.js
 /**
- * Den zu verbessernden Prompt aus der Nutzlast holen: die letzte MENSCHLICHE
- * Nutzer-Nachricht mit Text. Gibt die Nachricht MIT zurück, weil sie später
- * ueber ihre Identitaet wiedergefunden werden muss — ueber einen Index zu
- * raten waere ein stiller Fehler.
+ * Die letzte MENSCHLICHE Nachricht mit Text — oder null.
  *
- * `source.kind === 'user'` ist der Unterschied zwischen Eingabe und Harness:
- * der Batch eines Schritts besteht oft AUSSCHLIESSLICH aus erzeugtem Kontext
- * (Zeit, Terminal, Instruktionen, Erinnerungen, Werkzeug-Feedback). Ohne den
- * Test waere die jeweils letzte Nachricht irgendein Harness-Text — und der
- * wuerde veredelt und ersetzt. Fremde Herkunft heisst deshalb: nicht anfassen.
+ * `source.kind === 'user'` ist der Unterschied zwischen Eingabe und Harness: der
+ * Batch eines Schritts besteht oft AUSSCHLIESSLICH aus erzeugtem Kontext (Zeit,
+ * Terminal, Instruktionen, Erinnerungen, Werkzeug-Feedback). Ohne diesen Test
+ * waere die jeweils letzte Nachricht irgendein Harness-Text — und der wuerde
+ * veredelt und ersetzt (Enhancer) bzw. als Auftrag gelesen (Router). Fremde
+ * Herkunft heisst deshalb: nicht anfassen.
+ *
+ * Die Nachricht kommt MIT zurueck, weil ein Aufrufer sie ueber ihre Identitaet
+ * wiederfinden muss — ueber einen Index zu raten waere ein stiller Fehler. Der
+ * Text ist UNGETRIMMT; was ein Aufrufer davon will, entscheidet er.
  */
-// TODO: [DSH-Refactor] - Zweitimplementierung derselben Regel ("letzte menschliche
-// Nachricht mit Text", `source.kind === 'user'`): @shinon/task-router fuehrt sie als
-// `readObjective`. Ein Vertrag, zwei Codepfade — Drift ist nur eine Frage der Zeit.
-// Gemeinsame Quelle (oder gepinnte Fixture) noetig.
-export function readPrompt(payload) {
-  const messages = Array.isArray(payload?.messages) ? payload.messages : [];
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
+function lastHumanMessage(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const message = list[index];
     if (message?.role !== 'user') continue;
     if (message.source?.kind !== 'user') continue;
-    const blocks = Array.isArray(message.content) ? message.content : [];
-    const text = blocks
+    const text = (Array.isArray(message.content) ? message.content : [])
       .filter((block) => block?.type === 'text' && typeof block.text === 'string')
       .map((block) => block.text)
       .join('\n');
@@ -433,6 +431,17 @@ export function readPrompt(payload) {
     return { message, text, index };
   }
   return null;
+}
+// #endregion zwilling:letzte-menschliche-nachricht
+
+/**
+ * Den zu verbessernden Prompt aus der Nutzlast holen: Nachricht, Text und Index
+ * der letzten menschlichen Nachricht. Die Regel selbst steht in der
+ * Zwillings-Region direkt darueber — bytegleich mit @shinon/task-router, geprueft
+ * von `scripts/lib/repo.mjs` (SOURCE_TWINS) im Gate und im Build.
+ */
+export function readPrompt(payload) {
+  return lastHumanMessage(payload?.messages);
 }
 
 /**

@@ -105,11 +105,16 @@ export function validateMark(mark, { model, limits = limitsOf(model) } = {}) {
   return issues;
 }
 
-// TODO: [DSH-Refactor] - „Kein zweiter Formatierer" stimmt nicht: dieselbe Vorlagen-Füllung
-// liegt als `payloadOf`/`fill` in markers/client.js noch einmal. Schon jetzt unterschiedlich —
-// der Host kürzt den Element-Text auf `limits.text`, der Client nicht, und die Kommentargrenze
-// (500) existiert nur host-seitig. Ein Format, zwei Implementierungen: eine Quelle nötig.
-/** Vorlage aus dem Vertrag: `{feld}` → Wert. Kein zweiter Formatierer. */
+// Die zwei Implementierungen koennen nicht mehr auseinanderlaufen: die Zwillings-Regel
+// "Marker-Nutzlast-Format und -Grenzen" (scripts/lib/repo.mjs, SOURCE_TWINS) verlangt, dass
+// payload.line, payload.comment, limits.text und limits.comment des Vertrags als Literal in
+// markers/client.js stehen — Gate und Build pruefen das bei jedem Lauf. Kein dritter Formatierer.
+// TODO: [DSH-Refactor] - Benannte Restgrenze: der Host liest die WIRKSAMEN Grenzen
+// (`limits.text`/`limits.comment`, im Profil ueber textLimit/commentLimit ueberschreibbar), der
+// Client spiegelt die VORGABEN des Vertrags (client.js:158/404/534) und bekommt die wirksamen
+// Grenzen nicht ueber die Naht. Das ist eine Naht-Frage, keine Formatfrage: erst wenn der Host
+// seine Grenzen mitschickt, kann der Client sie lesen.
+/** Vorlage aus dem Vertrag: `{feld}` → Wert. Der Spiegel im Client ist vertraglich gesperrt. */
 function fill(template, values) {
   return String(template).replace(/\{(\w+)\}/g, (_match, key) => (values[key] === undefined ? '' : String(values[key])));
 }

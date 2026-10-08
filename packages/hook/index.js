@@ -59,12 +59,25 @@ export const TRACE_EVENT_TYPE = 'agent.pre-step';
 /** Kanal, auf dem korrelierte Schritt-Datensätze den Host verlassen. */
 export const TRACE_CHANNEL = 'shinon/hook/pre-step';
 
-// TODO: [DSH-Refactor] - Zweite Kopie des Digest-Helfers: @shinon/events exportiert bereits
-// `digest(text, length)`. Pakete dürfen einander nicht importieren, also gehört die Funktion in
-// eine gemeinsame Quelle (scripts/lib-Vertrag) statt in zwei Pakete — sonst driften Länge und
-// Zeichenvorrat der ids unbemerkt auseinander.
-/** Erste `length` Hex-Zeichen von sha256(text). */
-const digest = (text, length = 12) => createHash('sha256').update(String(text)).digest('hex').slice(0, length);
+// #region zwilling:sha256-digest — Besitzer: packages/events/index.js
+/**
+ * Erste `length` Hex-Zeichen von sha256(text).
+ *
+ * `text` ist ein String und `length` ist PFLICHT: eine vergessene Laenge ergaebe
+ * still einen 64-stelligen Wert statt eines kurzen ids. Kein Aufrufer ratet sie
+ * — beide Seiten nennen sie ausdruecklich.
+ */
+function digest(text, length) {
+  return createHash('sha256').update(text).digest('hex').slice(0, length);
+}
+// #endregion zwilling:sha256-digest
+
+/**
+ * Laenge der vom Hook erzeugten ids. Die gemeinsame Regel verlangt die Laenge
+ * ausdruecklich: ein Vorgabewert waere eine zweite Wahrheit ueber die id-Laenge und
+ * wuerde auf der events-Seite das Verhalten eines Aufrufs OHNE Laenge aendern.
+ */
+const ID_LENGTH = 12;
 
 /**
  * Event-Schema: die erzeugten Datensätze und ihre acht Vertragsfelder.
@@ -81,25 +94,32 @@ const digest = (text, length = 12) => createHash('sha256').update(String(text)).
  * das Feld ausdrücklich als vorbelegt, und das ist eine andere Zusage als
  * "Pflichtfeld".
  */
-// TODO: [DSH-Refactor] - Die zehn Event-Typen stehen als `z.union` aus `z.const` mitten im Schema
-// (Schemastery 3.18.4 hat kein `z.enum`) und existieren sonst nirgends als prüfbare Liste. Der
-// Event-Spine führt seine Typen als Vertragsdaten (assets/event-spine.json); hier ist die Liste
-// Code. Eine exportierte Konstante, aus der die Union erzeugt wird, macht sie zählbar und
-// gate-prüfbar — heute ist sie nur durch Lesen zu erfahren.
+/**
+ * Die zehn Event-Typen, die ein Datensatz dieses Hooks tragen darf — EINE
+ * zaehlbare Liste, aus der die Union ERZEUGT wird.
+ *
+ * Schemastery 3.18.4 hat kein `z.enum`; ohne diese Konstante existierte die
+ * Liste nur als Folge von `z.const`-Zeilen mitten im Schema und war nur durch
+ * Lesen zu erfahren. Der Event-Spine fuehrt seine Typen als Vertragsdaten
+ * (assets/event-spine.json) — hier stehen sie als Code, und beides ist jetzt
+ * gegen das jeweils andere zaehlbar.
+ */
+export const EVENT_TYPES = [
+  'session.created',
+  'message.received',
+  'message.completed',
+  'claim.created',
+  'tool.requested',
+  'tool.completed',
+  'gate.failed',
+  'gate.passed',
+  'action.blocked',
+  'agent.pre-step',
+];
+
 export const EventSchema = z.object({
   event_id: z.string().min(1, 'event_id muss nicht leer sein').required(),
-  event_type: z.union([
-    z.const('session.created'),
-    z.const('message.received'),
-    z.const('message.completed'),
-    z.const('claim.created'),
-    z.const('tool.requested'),
-    z.const('tool.completed'),
-    z.const('gate.failed'),
-    z.const('gate.passed'),
-    z.const('action.blocked'),
-    z.const('agent.pre-step'),
-  ]).required(),
+  event_type: z.union(EVENT_TYPES.map((type) => z.const(type))).required(),
   session_id: z.string().min(1, 'session_id muss nicht leer sein').required(),
   source: z.const('dsh').required(),
   timestamp: z.string().min(1, 'timestamp muss nicht leer sein').required(),
@@ -193,16 +213,16 @@ export function stepIssues(step) {
  */
 export function buildStepEnvelope(step, config = {}) {
   const timestamp = typeof config.clock === 'string' && config.clock !== '' ? config.clock : new Date().toISOString();
-  const payloadRef = `pl-${digest([step.message_count, step.turn, step.step].join('|'))}`;
+  const payloadRef = `pl-${digest([step.message_count, step.turn, step.step].join('|'), ID_LENGTH)}`;
   return {
-    event_id: `evt-${digest([CONTRACT, TRACE_EVENT_TYPE, step.session_id, timestamp, payloadRef].join('|'))}`,
+    event_id: `evt-${digest([CONTRACT, TRACE_EVENT_TYPE, step.session_id, timestamp, payloadRef].join('|'), ID_LENGTH)}`,
     event_type: TRACE_EVENT_TYPE,
     session_id: step.session_id,
     source: 'dsh',
     timestamp,
     payload_ref: payloadRef,
     contract: CONTRACT,
-    trace_id: `tr-${digest([step.session_id, step.turn, step.step].join('|'))}`,
+    trace_id: `tr-${digest([step.session_id, step.turn, step.step].join('|'), ID_LENGTH)}`,
   };
 }
 
@@ -213,41 +233,60 @@ export function buildStepEnvelope(step, config = {}) {
  * oder eine wohlgeformte Absage `{ kind: 'reject' }`. Der Hook erfindet keine
  * `kind: 'enter'`-Entscheidung: die Messages gehören dem Harness, nicht uns.
  */
-// TODO: [DSH-Refactor] - Ein Handler mit drei Aufgaben in einer Leiter: Vertrags-Verstoß
-// (if/else-if mit `config.trace` im Zweig), Trace-Emission und Durchlass-Verdikt (`verdict`).
-// Der else-if-Zweig verschmilzt „kein Verstoß“ mit „trace an“, und der Abbruchpfad
-// (`return { kind: 'reject' }`) steht zweimal im Code. Auftrennen in benannte Schritte:
-// contractVerdict(step, config) → emitTrace(...) → passVerdict(...).
-async function onPreStep(ctx, config, payload, next) {
-  const step = readStep(payload);
+/**
+ * Vertrags-Verdikt: fehlende Felder, die konfigurierte Fail-Richtung und die
+ * Meldung dazu. Reine Auswertung — emittiert nichts, gibt nichts durch.
+ */
+function contractVerdict(step, config) {
   const issues = stepIssues(step);
-
+  const failClosed = issues.length > 0 && config.onContractViolation === 'reject';
   if (issues.length > 0) {
-    const failClosed = config.onContractViolation === 'reject';
     console.error(
       `[shinon-hook] Nutzlast verletzt den Vertrag (${issues.join(', ')}) — ${
         failClosed ? 'reject (fail-closed konfiguriert)' : 'Host-Schutz: Durchreichen'
       }`,
     );
-    if (failClosed) return { kind: 'reject' };
-  } else if (config.trace) {
-    try {
-      const envelope = normalizeEvent(buildStepEnvelope(step, config));
-      // Einzige Wirkung: der Datensatz. Kein State, kein Schreibzugriff.
-      if (typeof ctx?.emit === 'function') ctx.emit(TRACE_CHANNEL, envelope, step);
-    } catch (error) {
-      // fail-closed für den Datensatz: ein ungültiger Envelope verlässt uns nicht.
-      console.warn(`[shinon-hook] Trace verworfen (${error?.message})`);
-    }
   }
+  return { issues, failClosed };
+}
 
+/**
+ * Den korrelierten Datensatz emittieren — eigene Stufe, eigener Fehlerpfad.
+ *
+ * Ein vertragsbruechiger Schritt wird gar nicht erst emittiert (`issues`), und
+ * ein ungueltiger Envelope verlaesst uns nicht: fail-closed fuer den Datensatz,
+ * unabhaengig vom Durchlass-Verdikt.
+ */
+function emitTrace(ctx, config, step, issues) {
+  if (issues.length > 0 || !config.trace) return;
+  try {
+    const envelope = normalizeEvent(buildStepEnvelope(step, config));
+    // Einzige Wirkung: der Datensatz. Kein State, kein Schreibzugriff.
+    if (typeof ctx?.emit === 'function') ctx.emit(TRACE_CHANNEL, envelope, step);
+  } catch (error) {
+    console.warn(`[shinon-hook] Trace verworfen (${error?.message})`);
+  }
+}
+
+/**
+ * Der Durchlass — EIN Besitzer der Ablehnung. Sonst gilt: die Entscheidung
+ * stammt ausschließlich von `next()` (zwei `{ kind: 'reject' }` an einer Stelle
+ * mit zwei Gruenden, nicht zwei Abbruchpfade im Handler).
+ */
+async function passVerdict(config, step, verdict, next) {
+  if (verdict.failClosed) return { kind: 'reject' };
   if (config.verdict === 'block') {
     console.warn(`[shinon-hook] Schritt abgelehnt (verdict=block): turn ${step.turn}, step ${step.step}`);
     return { kind: 'reject' };
   }
-
-  // Kontrollierte Weitergabe: die Entscheidung stammt ausschließlich von next().
   return next();
+}
+
+async function onPreStep(ctx, config, payload, next) {
+  const step = readStep(payload);
+  const verdict = contractVerdict(step, config);
+  emitTrace(ctx, config, step, verdict.issues);
+  return passVerdict(config, step, verdict, next);
 }
 
 /**

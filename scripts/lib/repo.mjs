@@ -372,6 +372,156 @@ export function legacyHits(packages) {
   return hits;
 }
 
+/**
+ * Zwillings-Regeln: EINE Regel, die in zwei Paketen liegen MUSS.
+ *
+ * Warum die Dopplung ueberhaupt existiert (gemessen, nicht behauptet): Pakete
+ * dieses Repos duerfen einander zur Laufzeit nicht importieren, und jedes Bundle
+ * reist eigenstaendig (ein Host mit nur EINEM der beiden Pakete darf nicht am
+ * fehlenden anderen scheitern; kein Paket erklaert ein `@shinon/*`-Paket als
+ * Abhaengigkeit). Ein `import` ueber die Paketgrenze waere der einzige Weg zu
+ * EINER Datei — und der kostet genau diese Eigenstaendigkeit.
+ *
+ * Der Transport ist deshalb eine Zwillingsregel mit EINEM Besitzer. Die Dopplung
+ * ist damit nicht weg, aber Drift kann nicht mehr landen: Gate und Build pruefen
+ * jede Regel bei jedem Lauf.
+ *
+ *   kind 'region'    Beide Seiten tragen den Regeltext zwischen zwei Markern,
+ *                    BYTEGLEICH. Der Besitzer steht im Marker und in dieser Liste.
+ *   kind 'literals'  Der Spiegel kann keinen Text teilen (ein selbststaendiges
+ *                    Client-Bundle zieht kein `import`): ausgewaehlte WERTE des
+ *                    Besitzers muessen als Literal im Spiegel stehen.
+ *
+ * Diese Liste ist die Besitzer-Erklaerung des Repos — nicht die Datei, die
+ * zufaellig zuerst da war.
+ */
+export const SOURCE_TWINS = [
+  {
+    rule: 'sha256-Digest',
+    kind: 'region',
+    marker: 'zwilling:sha256-digest',
+    owner: 'packages/events/index.js',
+    mirror: 'packages/hook/index.js',
+  },
+  {
+    rule: 'letzte menschliche Nachricht mit Text',
+    kind: 'region',
+    marker: 'zwilling:letzte-menschliche-nachricht',
+    owner: 'packages/prompter/index.js',
+    mirror: 'packages/task-router/index.js',
+  },
+  {
+    rule: 'Naht-Namen Client -> Host',
+    kind: 'literals',
+    owner: 'packages/codingmon/assets/uebergabe.js',
+    mirror: 'packages/codingmon/client.js',
+    values: [
+      { export: 'UEBERGABE_NAMESPACE', literal: 'string' },
+      { export: 'UEBERGABE_METHOD', literal: 'string' },
+    ],
+  },
+  {
+    rule: 'Marker-Nutzlast-Format und -Grenzen',
+    kind: 'literals',
+    owner: 'packages/markers/assets/marker-model.json',
+    mirror: 'packages/markers/client.js',
+    values: [
+      { jsonPath: 'payload.line', literal: 'string' },
+      { jsonPath: 'payload.comment', literal: 'string' },
+      { jsonPath: 'limits.text', literal: 'number' },
+      { jsonPath: 'limits.comment', literal: 'number' },
+    ],
+  },
+];
+
+/** Der Text zwischen `// #region <marker>` und `// #endregion <marker>` (oder null). */
+function regionOf(text, marker) {
+  const start = text.indexOf(`// #region ${marker}`);
+  const end = text.indexOf(`// #endregion ${marker}`);
+  if (start < 0 || end < 0 || end < start) return null;
+  return text.slice(start, end + `// #endregion ${marker}`.length);
+}
+
+/** Ein String, wie er als einfaches JS-Literal im Quelltext steht. */
+const jsLiteral = (value) => `'${value
+  .replace(/\\/g, '\\\\')
+  .replace(/'/g, "\\'")
+  .replace(/\r/g, '\\r')
+  .replace(/\n/g, '\\n')
+  .replace(/\t/g, '\\t')}'`;
+
+/** Ein `export const NAME = '…'` als Wert (oder null). */
+function exportedString(text, name) {
+  const found = new RegExp(`export const ${name} = '([^']*)'`).exec(text);
+  return found === null ? null : found[1];
+}
+
+/** Ein Punktpfad in geparsten Vertragsdaten. */
+function dotPath(value, path) {
+  return path.split('.').reduce((current, key) => (isObject(current) ? current[key] : undefined), value);
+}
+
+/**
+ * Die Zwillings-Regeln pruefen. Ein fehlender Besitzer, ein fehlender Spiegel,
+ * eine fehlende oder abweichende Region und ein fehlendes Literal sind je ein
+ * Issue — Drift faellt damit im Gate (`scripts/dsh-test.mjs`) und im Build
+ * (`scripts/build.mjs`) auf, nicht erst im Betrieb.
+ * @param {string} root - Wurzel, in der die deklarierten Pfade gesucht werden.
+ * @returns {string[]} Verstoesse (leer = alle Zwillinge stimmen).
+ */
+export function twinIssues(root = ROOT) {
+  const issues = [];
+  for (const twin of SOURCE_TWINS) {
+    const ownerFile = join(root, twin.owner);
+    const mirrorFile = join(root, twin.mirror);
+    if (!existsSync(ownerFile)) {
+      issues.push(`${twin.rule}: Besitzer ${twin.owner} fehlt`);
+      continue;
+    }
+    if (!existsSync(mirrorFile)) {
+      issues.push(`${twin.rule}: Spiegel ${twin.mirror} fehlt`);
+      continue;
+    }
+    const ownerText = read(ownerFile);
+    const mirrorText = read(mirrorFile);
+
+    if (twin.kind === 'region') {
+      const ownerRegion = regionOf(ownerText, twin.marker);
+      const mirrorRegion = regionOf(mirrorText, twin.marker);
+      if (ownerRegion === null) issues.push(`${twin.rule}: Region ${twin.marker} fehlt in ${twin.owner}`);
+      if (mirrorRegion === null) issues.push(`${twin.rule}: Region ${twin.marker} fehlt in ${twin.mirror}`);
+      if (ownerRegion !== null && mirrorRegion !== null && ownerRegion !== mirrorRegion) {
+        issues.push(`${twin.rule}: Region ${twin.marker} in ${twin.mirror} ist nicht bytegleich zu ${twin.owner}`);
+      }
+      continue;
+    }
+
+    let parsed = null;
+    if (twin.owner.endsWith('.json')) {
+      try {
+        parsed = JSON.parse(ownerText);
+      } catch (error) {
+        issues.push(`${twin.rule}: Besitzer ${twin.owner} ist kein gueltiges JSON (${error.message})`);
+        continue;
+      }
+    }
+    for (const spec of twin.values ?? []) {
+      const value = spec.jsonPath === undefined ? exportedString(ownerText, spec.export) : dotPath(parsed, spec.jsonPath);
+      const label = spec.jsonPath ?? spec.export;
+      if (value === undefined || value === null || String(value) === '') {
+        issues.push(`${twin.rule}: Besitzer ${twin.owner} liefert ${label} nicht`);
+        continue;
+      }
+      const wanted = spec.literal === 'number' ? new RegExp(`\\b${String(value)}\\b`) : null;
+      const present = wanted === null ? mirrorText.includes(jsLiteral(String(value))) : wanted.test(mirrorText);
+      if (!present) {
+        issues.push(`${twin.rule}: ${twin.mirror} spiegelt ${label} (${JSON.stringify(value)}) nicht`);
+      }
+    }
+  }
+  return issues;
+}
+
 /** Profilname aus scripts.dev (die eine Quelle für das aktive Profil). */
 export function activeProfile(root = readRoot()) {
   return (root.scripts?.dev ?? '').match(/--profile\s+(\S+)/)?.[1] ?? null;
@@ -392,14 +542,44 @@ export function activeProfile(root = readRoot()) {
  * `bundles` sind alle Bundle-Namen, `entries` nur die Bundles aus diesem Repo
  * (Scope-Pakete). Fremde Bundles wie @deepseek-ai/dsh-base stehen nur in `bundles`.
  */
+/** Liegt `target` in `dir` (oder ist es `dir` selbst)? */
+function isInside(dir, target) {
+  return target === dir || target.startsWith(dir.endsWith(sep) ? dir : `${dir}${sep}`);
+}
+
+/**
+ * Ist ein Bundle fremd — lebt es bewusst ausserhalb von `packages/`?
+ *
+ * Entscheidend ist nicht der NAME, sondern das ZIEL: das Profil-Manifest fuehrt
+ * jedes Bundle als Abhaengigkeit. Ein `link:../../packages/<dir>` zeigt in dieses
+ * Repo (lokal, muss existieren); ein Ziel ausserhalb `packages/` (absoluter Pfad
+ * oder aus dem Repo heraus) ist ein fremdes Bundle — wie die `@deepseek-ai/*`-
+ * Eintraege, die schon immer erlaubt waren.
+ *
+ * Kein Eintrag, kein `link:`/`file:`-Ziel → `null`: ein unbekannter `@shinon/*`-
+ * Name ohne Ziel bleibt ein Fehler (Tippfehler-Schutz bleibt fail-closed).
+ *
+ * @param {string} name - Bundle-Name aus `dsh.profile.bundles`.
+ * @param {object|null} manifest - das Profil-Manifest.
+ * @param {string} profileDir - Verzeichnis des Profils (Bezug fuer relative Ziele).
+ * @returns {string|null} das aufgeloeste Ziel, wenn es fremd ist, sonst `null`.
+ */
+export function foreignBundleTarget(name, manifest, profileDir) {
+  const spec = manifest?.dependencies?.[name];
+  if (typeof spec !== 'string') return null;
+  const found = /^(?:link|file):(.+)$/.exec(spec);
+  if (found === null) return null;
+  const target = resolve(profileDir, found[1]);
+  return isInside(PACKAGES_DIR, target) ? null : target;
+}
+
 export function resolveProfile(profileName, packages, root = readRoot()) {
   const scope = root.name.split('/')[0];
   if (!profileName) {
     return { dir: null, manifest: null, overlay: [], bundles: [], entries: [], issues: ['kein --profile in scripts.dev'] };
   }
 
-  const dir = join(PROFILES_DIR, profileName);
-  const empty = { dir, manifest: null, overlay: [], bundles: [], entries: [] };
+  const dir = join(PROFILES_DIR, profileName);      const empty = { dir, manifest: null, overlay: [], bundles: [], entries: [], foreign: [] };
   const manifestFile = join(dir, 'package.json');
   if (!existsSync(manifestFile)) return { ...empty, issues: [`${relative(ROOT, manifestFile)} fehlt`] };
 
@@ -431,15 +611,29 @@ export function resolveProfile(profileName, packages, root = readRoot()) {
   if (duplicates.length) issues.push(`doppelte Bundles: ${duplicates.join(', ')}`);
 
   const entries = [];
+  const foreign = [];
   for (const name of bundles) {
     if (!name.startsWith(`${scope}/`)) continue;
     const pkg = packages.find((candidate) => candidate.want.name === name);
-    if (pkg) entries.push({ id: pkg.want.id, name, dir: pkg.dir });
-    else issues.push(`${name} → packages/${name.slice(scope.length + 1)} fehlt`);
+    if (pkg) {
+      entries.push({ id: pkg.want.id, name, dir: pkg.dir });
+      continue;
+    }
+    // Kein lokales Paket: entweder ein Tippfehler ODER ein Bundle, das bewusst
+    // ausserhalb dieses Repos liegt (die Profil-Abhangigkeit zeigt aus `packages/`
+    // heraus). Nur der erste Fall ist ein Fehler; der zweite ist fremd wie
+    // @deepseek-ai/dsh-base, wird sichtbar gemeldet und verlangt kein lokales
+    // Paket. Ohne Abhangigkeits-Eintrag bleibt es fail-closed ein Fehler.
+    const target = foreignBundleTarget(name, manifest, dir);
+    if (target !== null) {
+      foreign.push({ name, target });
+      continue;
+    }
+    issues.push(`${name} → packages/${name.slice(scope.length + 1)} fehlt`);
   }
   if (entries.length === 0) issues.push('kein Paket-Bundle im Profil');
 
-  return { dir, manifest, overlay: overlay.patches, bundles, entries, issues };
+  return { dir, manifest, overlay: overlay.patches, bundles, entries, foreign, issues };
 }
 
 /** Repository-weite Regeln (Paketgraph + Komposition) plus das aktive Profil. */

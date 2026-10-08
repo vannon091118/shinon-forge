@@ -66,6 +66,9 @@ check('keine "dsh-mod"-Referenzen in Runtime-Artefakten', () => {
   assert(hits.length === 0, `gefunden in: ${hits.join(', ')}`);
 });
 
+console.log('\n🔗 Quell-Zwillinge:');
+checkIssues('eine Quelle, ein Spiegel — keine Drift', () => repo.twinIssues());
+
 console.log('\n📄 Profil:');
 const { profileName, profile, issues: repoProblems } = repo.repoIssues(packages, root);
 if (!profileName) {
@@ -77,6 +80,11 @@ if (!profileName) {
     const issues = [...profile.issues, ...repoProblems];
     assert(issues.length === 0, issues.join('; '));
   });
+  // Sichtbar machen, was NICHT hier liegt: ein fremdes Bundle ist erlaubt, aber es
+  // soll niemand raten muessen, warum es keinen Eintrag unter packages/* hat.
+  if ((profile.foreign ?? []).length > 0) {
+    console.log(`  ℹ️  fremde Bundles (Ziel ausserhalb packages/): ${profile.foreign.map((entry) => entry.name).join(', ')}`);
+  }
 }
 
 console.log('\n═══════════════════════════════════════');

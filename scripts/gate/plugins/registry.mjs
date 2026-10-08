@@ -39,9 +39,14 @@ export function check(ctx) {
   const profileName = ctx.repo.activeProfile(ctx.root);
   if (profileName && !profileName.startsWith('create:')) {
     const profile = ctx.repo.resolveProfile(profileName, ctx.packages);
+    // Bundle, die bewusst AUSSERHALB dieses Repos liegen (Ziel zeigt aus packages/
+    // heraus), sind fremd wie die @deepseek-ai/*-Eintraege und muessen hier nicht
+    // registriert sein. Der Name allein entscheidet nicht.
+    const foreign = new Set((profile.foreign ?? []).map((entry) => entry.name));
     for (const name of profile.bundles ?? []) {
-      // Fremde DSH-Bundles (dsh-base, dsh-web-app, ...) gehören nicht uns.
+      // Fremde DSH-Bundles (dsh-base, dsh-web-app, ...) gehoeren nicht uns.
       if (!name.startsWith('@shinon/')) continue;
+      if (foreign.has(name)) continue;
       if (!byName.has(name)) {
         issues.push(`Profil ${profileName}: Bundle "${name}" ist nicht in packages/* registriert`);
       }

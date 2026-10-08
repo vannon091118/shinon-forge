@@ -56,6 +56,8 @@ for (const pkg of packages) {
   }
 }
 for (const hit of repo.legacyHits(packages)) problems.push(`Legacy-Referenz: ${hit}`);
+// Zwillings-Regeln (eine Quelle, ein Spiegel): Drift bricht den Build, nicht erst den Betrieb.
+for (const issue of repo.twinIssues()) problems.push(`Quell-Zwillinge: ${issue}`);
 
 const { profileName, profile, issues: repoProblems } = repo.repoIssues(packages, root);
 if (profile.issues.length) problems.push(`Profil ${profileName}: ${profile.issues.join('; ')}`);

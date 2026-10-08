@@ -14,7 +14,7 @@ export function apply(ctx, config) {
   console.log('[shinon-dashboard] Aktiviert:', config);
 
   // Register settings form for live editing
-  // TODO: [DSH-Refactor] - Dieser settings.configure-Block ist wortgleich in dashboard, token-usage, tooltip, better-errors und openapi kopiert: ein Verhalten, fuenf Kopien, keine gemeinsame Quelle.
+  // TODO: [DSH-Refactor] - Dieser settings.configure-Block ist wortgleich in dashboard, token-usage, tooltip, better-errors, openapi und core kopiert (gemessen: sechs identische Stellen, jede mit eigenem ctx.inject(['settings'])): ein Verhalten, sechs Kopien, keine gemeinsame Quelle.
   ctx.inject(['settings'], (child) => {
     child.effect(() => child.settings.configure({ auto: false }, ctx.fiber));
   });

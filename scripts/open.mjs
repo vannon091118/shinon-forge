@@ -11,6 +11,13 @@
  * trusted-host-Zusagen nicht, und wir brauchen den stabilen, tokenisierten
  * Link aus der READY-Zeile `dsh web: http://…/?token=…` — den öffnen wir selbst.
  *
+ * Port: NICHT fest. Früher stand hier die Konstante 3081; war sie belegt,
+ * brach der Boot ab, bevor die READY-Zeile kam (Fehlerbild: „Profil kaputt“).
+ * Jetzt wählt `lib/port.mjs` den ersten freien Port ab 3081 mit einem echten
+ * Bind-Versuch, `--port <n>` bleibt der ausdrückliche Wunsch (`--port 0`: das
+ * Betriebssystem bindet). Der bediente Port wird aus der READY-Zeile
+ * zurückgelesen und eine Abweichung gemeldet — die Probe ist kein Beweis.
+ *
  * Aufruf: `npm run open`  (Profil über das dev-Skript, eine Quelle)
  * Exit: Ctrl-C stoppt DSH und den Wrapper sauber (Kind-Process wird beendet).
  */
@@ -19,7 +26,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { findOnPath } from './lib/yaml.mjs';
+import { DEFAULT_PORT_BASE, parsePort, pickFreePort } from './lib/port.mjs';
 import * as os from 'node:os';
+
+/** Wert eines `--flag wert`-Arguments; `undefined`, wenn das Flag fehlt. */
+const valueOf = (flag) => {
+  const at = process.argv.indexOf(flag);
+  return at >= 0 ? process.argv[at + 1] : undefined;
+};
 
 const root = repo.ROOT;
 // activeProfile() liest das Manifest (dev-Skript, eine Quelle) — mit Default-Arg.
@@ -65,14 +79,37 @@ function lanIPv4() {
   return null;
 }
 
+/**
+ * Der Port — EINE Quelle für Server, Trusted-Host, Tunnel-Hinweis und Meldung.
+ *
+ * Drei Fälle, jeder ausdrücklich: `--port <n>` wird genommen wie angegeben,
+ * `--port 0` heißt „das Betriebssystem wählt“ (nur ohne `--network`, das eine
+ * bekannte Nummer für den Trusted-Host braucht), sonst der erste freie Port ab
+ * DEFAULT_PORT_BASE. Ohne freien Port bricht der Wrapper ab, statt zu raten.
+ */
+const requested = parsePort(valueOf('--port'));
+if (!requested.ok) {
+  console.error(`💥 open: --port "${valueOf('--port')}" ist keine Portnummer (0..65535)`);
+  process.exit(2);
+}
+const ephemeral = requested.port === 0;
+let PORT;
+try {
+  if (ephemeral && !ARGS_NETWORK) PORT = 0;
+  else if (ephemeral) PORT = await pickFreePort();
+  else PORT = requested.port ?? (await pickFreePort());
+} catch (error) {
+  console.error(`💥 open: ${error.message} — mit --port <n> einen Port vorgeben`);
+  process.exit(2);
+}
+
 console.log('═══════════════════════════════════');
 console.log('  Shinon Forge — 1-Click-Start');
 console.log(`  Profil: ${profileName}    dsh: ${dsh}`);
+console.log(`  Port: ${PORT === 0 ? '0 (vom Betriebssystem gewählt)' : PORT}${PORT === 0 || PORT === requested.port ? '' : ` (erster freier ab ${DEFAULT_PORT_BASE})`}`);
+if (ephemeral && ARGS_NETWORK) console.log(`  Hinweis: --network braucht eine bekannte Nummer, --port 0 wurde zu ${PORT} aufgelöst`);
 if (ARGS_NETWORK) console.log('  Netzwerk-Modus aktiv (--network: SSH-Tunnel für externen Zugriff)');
 console.log('═══════════════════════════════════\n');
-
-/** Der Port des Wrappers — EINE Quelle fuer Server, Trusted-Host und Meldung. */
-const PORT = 3081;
 
 const args = [
   '--profile', profileName,
@@ -107,6 +144,11 @@ child.stdout.on('data', (chunk) => {
   if (match !== null) {
     opened = true;
     const url = match[1];
+    // Rücklesen statt annehmen: die Probe kann sich geirrt haben.
+    const served = new URL(url).port;
+    if (PORT !== 0 && served !== '' && Number(served) !== PORT) {
+      console.log(`\n⚠️  dsh bedient Port ${served}, gewählt war ${PORT} — dazwischen wurde der Port anderweitig belegt.`);
+    }
     console.log(`\n🌐 1-Click: ${url}\n`);
     openBrowser(url);
   }

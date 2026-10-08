@@ -3,8 +3,6 @@ import z from '@deepseek-ai/schemastery';
 // Gelesen wird `enabled` (Verzweigung in apply) und `host`/`port` (nur in die Log-Zeile
 // interpoliert). `specPath` liest kein Code — es bleibt, weil scripts/validate-test.mjs genau
 // diesen Schluessel als Reiz der Regel „fehlende Ressource" pinnt.
-// TODO: [DSH-Refactor] - Platzhalter-Logik: der Log meldet „Starte API auf host:port", aber es
-// laeuft kein Server. Entweder einen echten Server bauen oder den Log ehrlich machen.
 export const Config = z.object({
   enabled: z.boolean().default(true),
   port: z.number().default(3000),
@@ -42,13 +40,14 @@ export function apply(ctx, config) {
     return () => {};
   }
 
-  console.log(`[openapi] Starte API auf ${config.host}:${config.port}`);
+  // Ehrlicher Log: dieses Bundle oeffnet keinen Listener. host/port werden nur benannt.
+  console.log(`[openapi] Kein Listener — Spec-Basis ${config.host}:${config.port} (kein Server in diesem Bundle)`);
 
   ctx.inject(['settings'], (child) => {
     child.effect(() => child.settings.configure({ auto: false }, ctx.fiber));
   });
 
   return () => {
-    console.log('[openapi] Shutting down');
+    console.log('[openapi] Kein Listener zu beenden');
   };
 }
