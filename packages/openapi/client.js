@@ -23,7 +23,12 @@ window.__ModuleLoader__.load({
 
     return {
       inject: [],
-      apply() {}
+      apply() {
+        // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
+        const registry = (window.__shinonPlugins ??= new Map());
+        registry.set('@shinon/openapi', { label: 'OpenAPI', kind: 'client', panel: null });
+        window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/openapi' } }));
+      }
     };
   }
 });

@@ -219,6 +219,11 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
+        // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
+        const registry = (window.__shinonPlugins ??= new Map());
+        registry.set('@shinon/core', { label: 'Core (Marke)', kind: 'client', panel: null });
+        window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/core' } }));
+
         // Single-Slots: je genau ein Besetzer. Sidebar-Marke und -Name hängen
         // zusammen (verschwinden gemeinsam, wenn die Sidebar-Deklaration fällt).
         ctx.slots.inject('sidebar.brand.mark', () => ctx.slots.inject('sidebar.brand.name', function* () {

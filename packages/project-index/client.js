@@ -17,6 +17,10 @@ window.__ModuleLoader__.load({
     return {
       inject: [],
       apply() {
+        // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
+        const registry = (window.__shinonPlugins ??= new Map());
+        registry.set('@shinon/project-index', { label: 'Project Index', kind: 'client', panel: null });
+        window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/project-index' } }));
         // Bewusst leer: der Index ist Host-seitig.
       }
     };

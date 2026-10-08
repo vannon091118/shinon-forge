@@ -1,21 +1,30 @@
 /**
- * @shinon/codingmon — Client-Hälfte (das Pet).
+ * @shinon/codingmon — Client-Hälfte (Codemons + Arena).
  *
- * Codingmon ersetzt das Helmchen in `sidebar.brand.mark` und
+ * Codemon ersetzt das Helmchen in `sidebar.brand.mark` und
  * `conversation.hero.brand.mark`. Der Austausch laeuft ueber eine
  * Fenster-Konvention, nicht ueber einen Import: dieser Client legt
  * `window.__codingmon` mit `PetMark` an, und @shinon/core rendert die Marke
  * nur dann selbst, wenn dort nichts liegt. Dasselbe Muster benutzt
  * @shinon/markers bereits mit `window.__mk` — Pakete bleiben so referenzfrei.
  *
- * XP: 1 XP pro Token. Der Token-Zaehler wird aus dem Zaehler gelesen, den die
- * DSH-Oberflaeche ohnehin rendert. Das ist bewusst eine BRUECKE und keine
- * saubere Naht — stabil genug fuer ein Pet, aber die erste Stelle, die man
- * ersetzt, sobald der Client eine Store- oder Service-Naht fuer Usage hat.
- * `xpFromTokens()` ist deshalb die einzige Stelle, die die Quelle kennt.
+ * ZEHN CODEMONS: Werte, Faehigkeiten und Gegnerauswahl stehen in `SPECIES`,
+ * `ABILITIES` und `arenaFor()` — gespiegelt aus der Host-Hälfte in index.js.
+ * Der Client haelt keinen eigenen Vertrag: dieselbe Formel, dieselbe Tabelle,
+ * dieselbe Reihenfolge. Was hier zusaetzlich lebt, ist ZUSTAND (XP, HP, Runde)
+ * und Darstellung.
  *
- * Der Client handelt nie autonom: Kaempfe passieren nur auf Klick, das Pet
- * greift nichts von selbst an.
+ * KAMPF: rundenbasiert, ausgeloest durch Klick. Der Challenger waehlt eine
+ * Faehigkeit, der Gegner antwortet sofort mit seiner eigenen — kein Timer,
+ * kein Autoplay, keine Hintergrundschleife. Wer zuerst schlaegt, entscheidet
+ * die AGI (Gleichstand an den Herausforderer). Jede Zahl im Log kommt aus
+ * einer reinen Funktion (damage), nicht aus einer Animation.
+ *
+ * XP: 1 XP pro Token aus dem Zaehler der Oberflaeche — und XP fuer jeden Sieg.
+ * Der Token-Zaehler ist bewusst eine BRUECKE und keine saubere Naht: stabil
+ * genug fuer ein Pet, aber die erste Stelle, die man ersetzt, sobald der
+ * Client eine Store- oder Service-Naht fuer Usage hat. `xpFromTokens()` ist
+ * deshalb die einzige Stelle, die die Quelle kennt.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/codingmon',
@@ -25,39 +34,69 @@ window.__ModuleLoader__.load({
     const PLUGIN = '@shinon/codingmon';
     const PANEL_ID = 'shinon-codingmon';
     const STORAGE_KEY = 'shinon.codingmon/v1';
+    const XP_PER_LEVEL = 250;
 
     // ── Vertrag (Spiegel der Host-Hälfte in index.js) ───────────────────────
     // Bewusst dupliziert: Client- und Host-Bundle teilen keinen Code, und ein
     // Import quer ueber Pakete ist in diesem Repo nicht erlaubt.
     const SPECIES = {
-      spark: { label: 'Spark', hue: 268, hp: 42, atk: 9, def: 7, agi: 8, int: 6 },
-      byte: { label: 'Byte', hue: 212, hp: 38, atk: 7, def: 9, agi: 6, int: 10 },
-      feral: { label: 'Feral', hue: 340, hp: 48, atk: 11, def: 6, agi: 9, int: 4 },
+      nullpointer: { label: 'NullPointer', family: 'spark', hue: 268, hp: 44, atk: 10, def: 6, agi: 9, int: 8 },
+      stackoverflow: { label: 'StackOverflow', family: 'byte', hue: 10, hp: 40, atk: 8, def: 7, agi: 7, int: 12 },
+      memoryleak: { label: 'MemoryLeak', family: 'feral', hue: 96, hp: 58, atk: 9, def: 5, agi: 5, int: 9 },
+      racecondition: { label: 'RaceCondition', family: 'spark', hue: 190, hp: 36, atk: 8, def: 6, agi: 14, int: 7 },
+      deadlock: { label: 'Deadlock', family: 'byte', hue: 264, hp: 62, atk: 8, def: 12, agi: 3, int: 6 },
+      segfault: { label: 'SegFault', family: 'feral', hue: 0, hp: 46, atk: 13, def: 6, agi: 8, int: 4 },
+      offbyone: { label: 'OffByOne', family: 'spark', hue: 40, hp: 38, atk: 9, def: 7, agi: 11, int: 8 },
+      bufferoverflow: { label: 'BufferOverflow', family: 'feral', hue: 320, hp: 54, atk: 12, def: 8, agi: 5, int: 5 },
+      heisenbug: { label: 'Heisenbug', family: 'byte', hue: 285, hp: 42, atk: 7, def: 6, agi: 10, int: 13 },
+      recursion: { label: 'Recursion', family: 'spark', hue: 150, hp: 50, atk: 10, def: 9, agi: 6, int: 9 },
     };
+    const SPECIES_IDS = Object.keys(SPECIES);
     const GROWTH = { hp: 8, atk: 2, def: 2, agi: 1, int: 1 };
-    /**
-     * Faehigkeiten. `species === null` = von jeder Linie lernbar; sonst eine
-     * Signatur-Faehigkeit der Linie. `stat` bestimmt, welcher Wert den Schaden
-     * traegt — dadurch spielen sich die drei Linien wirklich unterschiedlich:
-     * spark ueber Tempo, byte ueber Verstand, feral ueber rohe Kraft.
-     */
-    const ATTACKS = [
-      { id: 'tackle', label: 'Tackle', stat: 'atk', power: 12, minLevel: 1, kind: 'physisch', species: null },
-      { id: 'spark-jolt', label: 'Funkenschlag', stat: 'int', power: 14, minLevel: 2, kind: 'speziell', species: 'spark' },
-      { id: 'data-frag', label: 'Datenfrag', stat: 'int', power: 14, minLevel: 2, kind: 'speziell', species: 'byte' },
-      { id: 'claw-rush', label: 'Krallenlauf', stat: 'atk', power: 14, minLevel: 2, kind: 'physisch', species: 'feral' },
-      { id: 'glitch-bite', label: 'Glitch Bite', stat: 'atk', power: 18, minLevel: 3, kind: 'physisch', species: null },
-      { id: 'compile-beam', label: 'Compile Beam', stat: 'int', power: 20, minLevel: 5, kind: 'speziell', species: null },
-      { id: 'thunder-chain', label: 'Donnerkette', stat: 'agi', power: 24, minLevel: 6, kind: 'physisch', species: 'spark' },
-      { id: 'quarantine', label: 'Quarantaene', stat: 'int', power: 24, minLevel: 6, kind: 'speziell', species: 'byte' },
-      { id: 'blood-rush', label: 'Blutrausch', stat: 'atk', power: 26, minLevel: 6, kind: 'physisch', species: 'feral' },
-      { id: 'race-condition', label: 'Race Condition', stat: 'agi', power: 22, minLevel: 7, kind: 'physisch', species: null },
-      { id: 'stack-overflow', label: 'Stack Overflow', stat: 'int', power: 28, minLevel: 10, kind: 'speziell', species: null },
-    ];
-    const XP_PER_LEVEL = 250;
 
     /**
-     * Entwicklungsstufen. Jede Spezies hat genau drei Formen; die Stufe haengt
+     * Faehigkeiten. `species === null` = von jedem Codemon nutzbar; sonst eine
+     * der ZWEI Spezies-Faehigkeiten (Stufe 1 und Stufe 4). `stat` bestimmt, ob
+     * die Faehigkeit ueber Kraft (ATK), Tempo (AGI), Verstand (INT) oder
+     * Verteidigung (DEF) rechnet — dadurch spielen sich die zehn Linien
+     * wirklich unterschiedlich und nicht nur in der Farbe.
+     */
+    const ABILITIES = [
+      { id: 'tackle', label: 'Tackle', stat: 'atk', power: 12, minLevel: 1, kind: 'physisch', species: null },
+
+      { id: 'deref', label: 'Deref', stat: 'atk', power: 15, minLevel: 1, kind: 'physisch', species: 'nullpointer' },
+      { id: 'null-access', label: 'Nullzugriff', stat: 'int', power: 18, minLevel: 4, kind: 'speziell', species: 'nullpointer' },
+
+      { id: 'recursion-dive', label: 'Recursion Dive', stat: 'int', power: 16, minLevel: 1, kind: 'speziell', species: 'stackoverflow' },
+      { id: 'trace-back', label: 'Trace Back', stat: 'int', power: 20, minLevel: 4, kind: 'speziell', species: 'stackoverflow' },
+
+      { id: 'page-fault', label: 'Page Fault', stat: 'atk', power: 14, minLevel: 1, kind: 'physisch', species: 'memoryleak' },
+      { id: 'heap-flood', label: 'Heap Flood', stat: 'int', power: 20, minLevel: 4, kind: 'speziell', species: 'memoryleak' },
+
+      { id: 'interleave', label: 'Interleave', stat: 'agi', power: 16, minLevel: 1, kind: 'physisch', species: 'racecondition' },
+      { id: 'torn-read', label: 'Torn Read', stat: 'agi', power: 20, minLevel: 4, kind: 'physisch', species: 'racecondition' },
+
+      { id: 'barrier', label: 'Barriere', stat: 'def', power: 18, minLevel: 1, kind: 'physisch', species: 'deadlock' },
+      { id: 'starve', label: 'Starve', stat: 'int', power: 16, minLevel: 4, kind: 'speziell', species: 'deadlock' },
+
+      { id: 'dangling-pointer', label: 'Dangling Pointer', stat: 'atk', power: 17, minLevel: 1, kind: 'physisch', species: 'segfault' },
+      { id: 'core-dump', label: 'Core Dump', stat: 'atk', power: 22, minLevel: 4, kind: 'physisch', species: 'segfault' },
+
+      { id: 'nudge', label: 'Nudge', stat: 'agi', power: 14, minLevel: 1, kind: 'physisch', species: 'offbyone' },
+      { id: 'boundary-slip', label: 'Boundary Slip', stat: 'agi', power: 18, minLevel: 4, kind: 'physisch', species: 'offbyone' },
+
+      { id: 'smash', label: 'Smash', stat: 'atk', power: 18, minLevel: 1, kind: 'physisch', species: 'bufferoverflow' },
+      { id: 'stack-smash', label: 'Stack Smash', stat: 'atk', power: 23, minLevel: 4, kind: 'physisch', species: 'bufferoverflow' },
+
+      { id: 'obfuscate', label: 'Obfuscate', stat: 'int', power: 15, minLevel: 1, kind: 'speziell', species: 'heisenbug' },
+      { id: 'observation-collapse', label: 'Observation Collapse', stat: 'int', power: 21, minLevel: 4, kind: 'speziell', species: 'heisenbug' },
+
+      { id: 'base-case', label: 'Base Case', stat: 'def', power: 16, minLevel: 1, kind: 'physisch', species: 'recursion' },
+      { id: 'infinite-descent', label: 'Infinite Descent', stat: 'atk', power: 21, minLevel: 4, kind: 'physisch', species: 'recursion' },
+    ];
+
+    /**
+     * Entwicklungsstufen. Jede Familie hat genau drei Formen; die Stufe haengt
      * am Level, nicht am Zufall. Reihenfolge = Index in SPRITES.
      */
     const STAGES = [
@@ -75,6 +114,11 @@ window.__ModuleLoader__.load({
      * Pixelart, 16x16, ein Zeichen je Pixel. Keine fremden Assets: die
      * Sprites sind hier als Daten authored, damit das Bundle vierteilig
      * bleibt, der Diff lesbar ist und keine Lizenzfrage entsteht.
+     *
+     * Die zehn Spezies teilen sich DREI Familien — die Form kommt aus der
+     * Familie, die Identitaet aus Werten, Faehigkeiten und Farbton. Zehn eigene
+     * Matrizen waeren 21 weitere handgezeichnete Sprites; sie werden nicht
+     * erfunden, sondern benannt.
      *
      *   .  transparent        o  Outline
      *   a  hell               b  Koerper      c  Schatten
@@ -143,7 +187,7 @@ window.__ModuleLoader__.load({
       ],
     };
 
-    /** Palette je Spezies-Farbton — dieselben Rollen fuer alle Sprites. */
+    /** Palette je Farbton — dieselben Rollen fuer alle Sprites. */
     const paletteFor = (hue) => ({
       o: '#0B0F14',
       a: `hsl(${hue} 90% 76%)`,
@@ -156,10 +200,10 @@ window.__ModuleLoader__.load({
 
     // Selbstpruefung der Matrizen: ein verrutschtes Zeichen wuerde sonst als
     // stiller Grafikfehler durchgehen. Meldet sich nur, wenn wirklich etwas fehlt.
-    for (const [speciesId, stages] of Object.entries(SPRITES)) {
+    for (const [family, stages] of Object.entries(SPRITES)) {
       stages.forEach((rows, stage) => {
         const bad = rows.length !== 16 || rows.some((row) => row.length !== 16);
-        if (bad) console.warn(`[shinon-codingmon] Sprite ${speciesId}#${stage} ist nicht 16x16 (${rows.length} Zeilen)`);
+        if (bad) console.warn(`[shinon-codingmon] Sprite ${family}#${stage} ist nicht 16x16 (${rows.length} Zeilen)`);
       });
     }
 
@@ -167,14 +211,14 @@ window.__ModuleLoader__.load({
     /**
      * Matrix -> SVG. `shape-rendering: crispEdges` plus 1x1-Rects im 16er-
      * viewBox: die Pixel bleiben beim Skalieren scharf, es wird kein Bild
-     * interpoliert. Ergebnis wird je Spezies/Stufe/Groesse zwischengespeichert.
+     * interpoliert. Ergebnis wird je Familie/Stufe/Groesse zwischengespeichert.
      */
-    function spriteSvg(speciesId, stage, size) {
-      const key = `${speciesId}:${stage}:${size}`;
+    function spriteSvg(family, stage, size) {
+      const key = `${family}:${stage}:${size}`;
       const cached = spriteCache.get(key);
       if (cached !== undefined) return cached;
-      const rows = (SPRITES[speciesId] ?? SPRITES.spark)[stage] ?? SPRITES.spark[0];
-      const colors = paletteFor((SPECIES[speciesId] ?? SPECIES.spark).hue);
+      const rows = (SPRITES[family] ?? SPRITES.spark)[stage] ?? SPRITES.spark[0];
+      const colors = paletteFor((SPECIES[speciesOfFamily(family)] ?? SPECIES[SPECIES_IDS[0]]).hue);
       let pixels = '';
       for (let y = 0; y < rows.length; y += 1) {
         const row = rows[y];
@@ -190,6 +234,8 @@ window.__ModuleLoader__.load({
       return svg;
     }
 
+    // ── Reine Funktionen (Spiegel des Host-Vertrags) ─────────────────────────
+    const speciesOfFamily = (family) => SPECIES_IDS.find((id) => SPECIES[id].family === family) ?? SPECIES_IDS[0];
     const threshold = (level) => (XP_PER_LEVEL * (level - 1) * level) / 2;
     const levelFor = (xp) => {
       let level = 1;
@@ -197,7 +243,7 @@ window.__ModuleLoader__.load({
       return level;
     };
     const statsAt = (speciesId, level) => {
-      const base = SPECIES[speciesId] ?? SPECIES.spark;
+      const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
       const steps = Math.max(0, Math.floor(level) - 1);
       return {
         hp: base.hp + GROWTH.hp * steps,
@@ -207,16 +253,37 @@ window.__ModuleLoader__.load({
         int: base.int + GROWTH.int * steps,
       };
     };
-    const attacksFor = (level, speciesId = store.species) =>
-      ATTACKS.filter((attack) => attack.minLevel <= level
-        && (attack.species === null || attack.species === speciesId));
+    const abilitiesFor = (level, speciesId) =>
+      ABILITIES.filter((ability) => ability.minLevel <= level
+        && (ability.species === null || ability.species === speciesId));
     const formOf = (level) => STAGES[stageIndex(level)];
-    const damageOf = (attack, stats, defenderDef) =>
-      Math.max(1, Math.round((attack.power * (stats[attack.stat] ?? 0)) / 10 - defenderDef * 0.8));
+    const damageOf = (ability, stats, defenderDef) =>
+      Math.max(1, Math.round((ability.power * (stats[ability.stat] ?? 0)) / 10 - defenderDef * 0.8));
+    const rewardFor = (level) => 20 + 8 * Math.max(1, Math.floor(level));
+    const firstStrike = (challengerStats, enemyStats) => (challengerStats.agi >= enemyStats.agi ? 'challenger' : 'enemy');
+    const arenaFor = (level, round) => {
+      const lvl = Math.max(1, Math.floor(level));
+      const rnd = Math.max(0, Math.floor(round));
+      const speciesId = SPECIES_IDS[(lvl * 3 + rnd * 7) % SPECIES_IDS.length];
+      const enemyLevel = Math.max(1, lvl + ((rnd % 3) - 1));
+      return { speciesId, level: enemyLevel, stats: statsAt(speciesId, enemyLevel), reward: rewardFor(enemyLevel) };
+    };
+    /** Die staerkste Faehigkeit eines Gegners. Determinismus statt Wuerfel. */
+    const bestMove = (level, speciesId) =>
+      abilitiesFor(level, speciesId).slice().sort((a, b) => b.power - a.power)[0] ?? ABILITIES[0];
 
     // ── Store ───────────────────────────────────────────────────────────────
     const listeners = new Set();
-    const emit = () => { for (const fn of listeners) { try { fn(); } catch { /* ein Abnehmer darf den Rest nicht kippen */ } } };
+    /**
+     * Jede Aenderung erreicht zwei Empfaenger: die Abonnenten in diesem Bundle
+     * (Panel, Marke, EXP-Leiste) und — als DOM-Ereignis — fremde Panels, die
+     * den Zustand nur kennen, nicht besitzen (@shinon/dashboard). Die XP-Leiste
+     * dort muss nicht pollen, um aktuell zu sein.
+     */
+    const emit = () => {
+      for (const fn of listeners) { try { fn(); } catch { /* ein Abnehmer darf den Rest nicht kippen */ } }
+      window.dispatchEvent(new CustomEvent('shinon:exp', { detail: { xp: store.xp, level: level() } }));
+    };
     const subscribe = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
     const useStore = () => {
       const [, bump] = React.useState(0);
@@ -224,7 +291,7 @@ window.__ModuleLoader__.load({
       return store;
     };
 
-    const freshState = (speciesId = 'spark') => ({
+    const freshState = (speciesId = SPECIES_IDS[0]) => ({
       name: 'Codingmon',
       species: speciesId,
       xp: 0,
@@ -232,13 +299,35 @@ window.__ModuleLoader__.load({
       hp: statsAt(speciesId, 1).hp,
       wins: 0,
       losses: 0,
+      round: 0,
+      battle: null,
       log: [],
     });
+
+    /**
+     * Einen gelesenen Stand BRAUCHBAR machen: ein Pet aus einer aelteren
+     * Fassung (die drei Spezies spark/byte/feral) darf den Client nicht mit
+     * `undefined`-Werten in die Arena schicken. Unbekannte Spezies fallen auf
+     * die erste zurueck, ein Kampf mit unbekanntem Gegner wird verworfen —
+     * XP, Siege und Log bleiben.
+     */
+    function revive(raw) {
+      const state = { ...freshState(), ...raw };
+      if (!SPECIES[state.species]) state.species = SPECIES_IDS[0];
+      if (!Number.isFinite(state.xp) || state.xp < 0) state.xp = 0;
+      if (!Number.isFinite(state.round) || state.round < 0) state.round = 0;
+      const battle = state.battle;
+      const usable = battle !== null && typeof battle === 'object' && SPECIES[battle.speciesId]
+        && Number.isFinite(battle.hp) && Number.isFinite(battle.maxHp);
+      state.battle = usable ? battle : null;
+      if (!Number.isFinite(state.hp) || state.hp <= 0) state.hp = statsAt(state.species, levelFor(state.xp)).hp;
+      return state;
+    }
 
     let store = freshState();
     try {
       const raw = window.localStorage?.getItem(STORAGE_KEY);
-      if (raw) store = { ...freshState(), ...JSON.parse(raw) };
+      if (raw) store = revive(JSON.parse(raw));
     } catch { /* kein Storage: das Pet lebt dann nur in dieser Sitzung */ }
 
     const persist = () => {
@@ -285,8 +374,9 @@ window.__ModuleLoader__.load({
       store.xp += xp;
       const after = level();
       if (after > before) {
-        const learned = attacksFor(after).filter((attack) => attack.minLevel > (attacksFor(before).length ? before : 1) - 1);
-        store.hp = maxHp();
+        const learned = abilitiesFor(after, store.species)
+          .filter((ability) => ability.minLevel > before);
+        store.hp = statsAt(store.species, after).hp;
         note(`LEVEL ${after} — ${formOf(after).label}!${learned.length ? ` Gelernt: ${learned.map((a) => a.label).join(', ')}` : ''}`);
       } else if (reason) {
         note(reason);
@@ -300,114 +390,120 @@ window.__ModuleLoader__.load({
       if (gained > 0) award(gained, null);
     }
 
-    // ── Wilde Pets + Kaempfe ────────────────────────────────────────────────
-    let overlay = null;
-    const wilds = new Map();
-    let wildSeq = 0;
-
-    function overlayRoot() {
-      if (overlay?.isConnected) return overlay;
-      overlay = document.createElement('div');
-      overlay.className = '__cm_root';
-      overlay.setAttribute('data-plugin', PLUGIN);
-      document.body.appendChild(overlay);
-      return overlay;
+    // ── Arena: rundenbasiert, nur auf Klick ─────────────────────────────────
+    /** Einen Gegner stellen. Ohne laufenden Kampf; sonst passiert nichts. */
+    function startBattle() {
+      if (store.battle !== null) return store.battle;
+      const arena = arenaFor(level(), store.round);
+      store.round += 1;
+      store.battle = {
+        speciesId: arena.speciesId,
+        level: arena.level,
+        hp: arena.stats.hp,
+        maxHp: arena.stats.hp,
+        stats: arena.stats,
+        reward: arena.reward,
+        turn: firstStrike(stats(), arena.stats),
+        over: null,
+      };
+      note(`Runde ${store.round}: ${SPECIES[arena.speciesId].label} L${arena.level} erscheint (${arena.reward} XP)`);
+      if (store.battle.turn === 'enemy') enemyTurn();
+      persist();
+      emit();
+      return store.battle;
     }
 
-    const wildStats = (lvl) => statsAt('feral', lvl);
-
-    function spawnWild() {
-      const limit = 3;
-      if (wilds.size >= limit) return;
-      const lvl = Math.max(1, level() + Math.floor(Math.random() * 5) - 2);
-      const stats = wildStats(lvl);
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = '__cm_wild';
-      el.title = `Wildes Codingmon · Level ${lvl} · klicken zum Angreifen`;
-      el.innerHTML = `<span class="__cm_wild-body">${wildGlyph(lvl, 26 + Math.min(18, lvl))}</span>`
-        + `<span class="__cm_wild-tag">L${lvl} · ${stats.hp} HP</span>`;
-      const id = `w${++wildSeq}`;
-      const wild = { id, level: lvl, hp: stats.hp, maxHp: stats.hp, def: stats.def, atk: stats.atk, x: 0, y: 0, el };
-      wilds.set(id, wild);
-      overlayRoot().appendChild(el);
-      moveWild(wild);
-      el.addEventListener('click', (event) => { event.preventDefault(); strike(wild); });
-      return wild;
+    /** Der Gegner schlaegt zurueck — dieselbe reine Schadensformel. */
+    function enemyTurn() {
+      const battle = store.battle;
+      if (battle === null || battle.over !== null) return;
+      const move = bestMove(battle.level, battle.speciesId);
+      const dealt = damageOf(move, battle.stats, stats().def);
+      store.hp = Math.max(0, store.hp - dealt);
+      note(`${SPECIES[battle.speciesId].label} nutzt ${move.label} —${dealt} (eigenes HP ${store.hp}/${maxHp()})`);
+      if (store.hp <= 0) finish('loss', battle);
+      else battle.turn = 'challenger';
     }
 
-    function moveWild(wild) {
-      const w = overlayRoot().clientWidth || 900;
-      const hgt = overlayRoot().clientHeight || 600;
-      wild.x = Math.round(w * (0.08 + Math.random() * 0.8));
-      wild.y = Math.round(hgt * (0.12 + Math.random() * 0.68));
-      wild.el.style.transform = `translate(${wild.x}px, ${wild.y}px)`;
+    /** Eine gewaehlte Faehigkeit ausfuehren: Schaden, dann ist der Gegner dran. */
+    function useAbility(abilityId) {
+      const battle = store.battle;
+      if (battle === null || battle.over !== null || battle.turn !== 'challenger') return null;
+      const move = abilitiesFor(level(), store.species).find((ability) => ability.id === abilityId)
+        ?? abilitiesFor(level(), store.species)[0];
+      const dealt = damageOf(move, stats(), battle.stats.def);
+      battle.hp = Math.max(0, battle.hp - dealt);
+      note(`${move.label} —${dealt} gegen ${SPECIES[battle.speciesId].label} (${battle.hp}/${battle.maxHp} HP)`);
+      if (battle.hp <= 0) finish('win', battle);
+      else {
+        battle.turn = 'enemy';
+        enemyTurn();
+      }
+      persist();
+      emit();
+      return { move: move.id, dealt, battle: { ...battle } };
     }
 
-    function retireWild(wild, defeated) {
-      wild.el.classList.add(defeated ? '__cm_wild--down' : '__cm_wild--flee');
-      setTimeout(() => wild.el.remove(), 420);
-      wilds.delete(wild.id);
-    }
-
-    /** Ein Klick ist eine Attacke — die einzige Handlung, die dieses Pet kennt. */
-    function strike(wild) {
-      const mine = stats();
-      const move = attacksFor(level()).slice(-1)[0] ?? ATTACKS[0];
-      const dealt = damageOf(move, mine, wild.def);
-      wild.hp -= dealt;
-
-      if (wild.hp <= 0) {
-        const reward = 20 * wild.level;
+    /** Kampfende. Sieg zahlt XP (die einzige XP-Quelle neben den Token), K.o. heilt. */
+    function finish(outcome, battle) {
+      battle.over = outcome;
+      if (outcome === 'win') {
         store.wins += 1;
-        note(`${move.label} trifft · wildes Level ${wild.level} besiegt (+${reward} XP)`);
-        retireWild(wild, true);
+        const reward = battle.reward;
+        store.battle = null;
+        note(`Sieg gegen ${SPECIES[battle.speciesId].label} L${battle.level} — +${reward} XP`);
         award(reward, null);
-        return;
-      }
-
-      // Nur der Wildling schlaegt zurueck — das eigene Pet greift nie von selbst an.
-      const back = Math.max(1, Math.round((wild.atk * 8) / 10 - mine.def * 0.8));
-      store.hp -= back;
-      note(`${move.label} —${dealt} · Rueckstoss —${back}`);
-      if (store.hp <= 0) {
+      } else {
         store.losses += 1;
+        store.battle = null;
         store.hp = maxHp();
-        note('K.o. — das Pet rappelt sich wieder auf');
+        note(`K.o. gegen ${SPECIES[battle.speciesId].label} L${battle.level} — das Codemon rappelt sich wieder auf`);
       }
-      wild.el.classList.add('__cm_wild--hit');
-      setTimeout(() => wild.el.classList.remove('__cm_wild--hit'), 220);
+    }
+
+    /** Rast: HP auffuellen. Kein Sieg, kein XP — die einzige Heilung ausser K.o. */
+    function rest() {
+      if (store.battle !== null) return;
+      store.hp = maxHp();
+      note('Rast — HP aufgefrischt');
       persist();
       emit();
     }
 
-    /** Silhouette nach Stufe — waechst sichtbar mit dem Level. */
-    /** Wilde Codingmon: dieselbe Pixelart-Maschine, eigene Linie, Groesse nach Stufe. */
-    function wildGlyph(lvl, size) {
-      return spriteSvg('feral', stageIndex(lvl), size);
+    /** Spezies wechseln. Der Fortschritt (XP, Siege) bleibt, der Kampf endet. */
+    function pickSpecies(speciesId) {
+      if (!SPECIES[speciesId]) return;
+      store.species = speciesId;
+      store.battle = null;
+      store.hp = statsAt(speciesId, level()).hp;
+      note(`Gewechselt zu ${SPECIES[speciesId].label}`);
+      persist();
+      emit();
     }
 
-    // ── Das Pet selbst ──────────────────────────────────────────────────────
-    /**
-     * Prozedurales SVG: keine Asset-Datei, damit das Pet mit dem Level wachsen
-     * kann. Die Merkmale kommen aus dem Level, nicht aus Zufall.
-     */
-    /**
-     * Die Figur des Pets. Pixelart aus SPRITES — die Entwicklungsstufe waehlt
-     * die Matrix, es wird nichts prozedural gezeichnet.
-     */
-    function petGlyph(speciesId, lvl, size) {
-      return spriteSvg(speciesId, stageIndex(lvl), size);
+    /** Die Figur eines Codemons: Familie aus der Spezies, Farbe aus dem Farbton. */
+    function speciesGlyph(speciesId, lvl, size) {
+      const species = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
+      const key = `${species.family}:${stageIndex(lvl)}:${size}:${species.hue}`;
+      const cached = spriteCache.get(key);
+      if (cached !== undefined) return cached;
+      const svg = spriteSvg(species.family, stageIndex(lvl), size)
+        .replace('<svg ', `<svg data-species="${speciesId}" `);
+      // Der Farbton ist Teil der Spezies: die Familie liefert die Form, die
+      // Spezies die Farbe. Damit teilen sich nicht alle zehn ein Aussehen.
+      const tinted = svg.replace(/hsl\((\d+)/g, `hsl(${species.hue}`);
+      spriteCache.set(key, tinted);
+      return tinted;
     }
 
-    /** Die Marke — von @shinon/core aus den Brand-Slots gerendert. */
+    // ── Das Pet als Marke ───────────────────────────────────────────────────
     function PetMark({ size = 24 }) {
       const s = useStore();
       const lvl = levelFor(s.xp);
       return h('span', {
         className: '__cm_mark',
-        title: `${s.name} · Level ${lvl} · ${formOf(lvl).label}`,
-        dangerouslySetInnerHTML: { __html: petGlyph(s.species, lvl, size) },
+        title: `${s.name} · ${SPECIES[s.species].label} · Level ${lvl} · ${formOf(lvl).label}`,
+        dangerouslySetInnerHTML: { __html: speciesGlyph(s.species, lvl, size) },
       });
     }
 
@@ -415,73 +511,182 @@ window.__ModuleLoader__.load({
       const s = useStore();
       return h('span', {
         className: '__cm_mark',
-        dangerouslySetInnerHTML: { __html: petGlyph(s.species, levelFor(s.xp), 18) },
+        dangerouslySetInnerHTML: { __html: speciesGlyph(s.species, levelFor(s.xp), 18) },
       });
     }
 
+    /** Ein Balken. `tone` faerbt ihn (xp | hp | enemy). */
     function Bar({ value, max, tone }) {
       const pct = max <= 0 ? 0 : Math.max(0, Math.min(100, Math.round((value / max) * 100)));
       return h('div', { className: '__cm_bar', 'data-tone': tone ?? 'xp' },
         h('div', { className: '__cm_bar-fill', style: { width: `${pct}%` } }));
     }
 
-    // TODO: [DSH-Refactor] - 54 Zeilen bei Tiefe 6: Kopf, Werte, Attacken, Bilanz und Log in einer Komponente. Die Zahlen kommen bereits aus reinen Funktionen (statsAt, attacksFor, levelFor) — es fehlt nur die Trennung der Darstellung.
-    function CodingmonPanel() {
+    // ── GLOBALE EXP-LEISTE ──────────────────────────────────────────────────
+    /**
+     * Die EXP-Leiste steht im Composer-Dock und damit in JEDER Sitzung, nicht
+     * nur im Panel: Level, Fortschritt zum naechsten Level, HP. Sie liest
+     * denselben Store wie das Panel — eine Quelle, zwei Ansichten.
+     */
+    function ExpBar() {
       const s = useStore();
       const lvl = levelFor(s.xp);
-      const cur = statsAt(s.species, lvl);
-      const learned = attacksFor(lvl);
       const next = threshold(lvl + 1);
       const prev = threshold(lvl);
-      const form = formOf(lvl);
+      const pct = Math.max(0, Math.min(100, Math.round(((s.xp - prev) / Math.max(1, next - prev)) * 100)));
+      return h('div', {
+        className: '__cm_expbar',
+        title: `${s.name} · ${SPECIES[s.species].label} · Level ${lvl} · ${s.wins} Siege`,
+        'data-plugin': PLUGIN,
+      },
+        h('span', { className: '__cm_expbar-pet', dangerouslySetInnerHTML: { __html: speciesGlyph(s.species, lvl, 18) } }),
+        h('span', { className: '__cm_expbar-lvl' }, `LV ${lvl}`),
+        h('span', { className: '__cm_expbar-track' },
+          h('span', { className: '__cm_expbar-fill', style: { width: `${pct}%` } })),
+        h('span', { className: '__cm_expbar-meta' }, `${s.xp} XP · HP ${Math.max(0, s.hp)}/${maxHp()}`),
+      );
+    }
 
-      return h('div', { className: '__cm_panel' },
-        h('header', { className: '__cm_panel-head' },
-          h('span', { className: '__cm_panel-stage' },
-            h('span', { dangerouslySetInnerHTML: { __html: petGlyph(s.species, lvl, 72) } }),
-            h('button', {
-              type: 'button',
-              className: '__cm_btn',
-              title: 'Ein wildes Codingmon aufs Fenster rufen',
-              onClick: () => { spawnWild(); },
-            }, 'Wildling rufen'),
-          ),
-          h('div', { className: '__cm_panel-id' },
-            h('h2', null, s.name),
-            h('p', { className: '__cm_sub' },
-              `${SPECIES[s.species].label} · Level ${lvl} · ${form.label}`),
-            h('p', { className: '__cm_xp' },
-              `${s.xp} XP · ${next - s.xp} XP bis Level ${lvl + 1}`),
-            h(Bar, { value: s.xp - prev, max: Math.max(1, next - prev), tone: 'xp' }),
-          ),
-        ),
-
-        h('div', { className: '__cm_stats' },
-          [['HP', cur.hp], ['ATK', cur.atk], ['DEF', cur.def], ['AGI', cur.agi], ['INT', cur.int]]
-            .map(([label, value]) => h('div', { className: '__cm_stat', key: label },
-              h('span', { className: '__cm_stat-k' }, label),
-              h('span', { className: '__cm_stat-v' }, String(value)))),
-        ),
-
-        h('div', { className: '__cm_block' },
-          h('h3', null, 'Attacken'),
-          h('ul', { className: '__cm_moves' },
-            learned.map((attack) => h('li', { key: attack.id },
-              h('span', { className: '__cm_move-name' }, attack.label),
-              h('span', { className: '__cm_move-meta' }, `${attack.kind} · ${attack.stat.toUpperCase()} ${attack.power}`)))),
-        ),
-
-        h('div', { className: '__cm_block' },
-          h('h3', null, `Bilanz — ${s.wins} Siege / ${s.losses} K.o.`),
-          h('p', { className: '__cm_sub' },
-            `Eigenes HP ${Math.max(0, s.hp)}/${cur.hp} · 1 XP pro Token · ${wilds.size} Wildlinge auf dem Fenster`),
-          h('ul', { className: '__cm_log' },
-            s.log.slice(0, 8).map((line, index) => h('li', { key: `${index}-${line}` }, line))),
+    // ── Panel-Bausteine (Kopf / Werte / Arena / Liste / Bilanz) ─────────────
+    /** Kopf: Figur, Spezies-Wahl (alle ZEHN erreichbar), Level und Fortschritt. */
+    function PetHead({ s, lvl, onPick }) {
+      const cur = statsAt(s.species, lvl);
+      const next = threshold(lvl + 1);
+      const prev = threshold(lvl);
+      return h('header', { className: '__cm_panel-head' },
+        h('span', { className: '__cm_panel-stage' },
+          h('span', { dangerouslySetInnerHTML: { __html: speciesGlyph(s.species, lvl, 72) } }),
+          h('span', { className: '__cm_sub' }, formOf(lvl).label)),
+        h('div', { className: '__cm_panel-id' },
+          h('h2', null, `${s.name} — ${SPECIES[s.species].label}`),
+          h('p', { className: '__cm_sub' }, `Level ${lvl} · ${s.wins} Siege / ${s.losses} K.o. · Runde ${s.round}`),
+          h('p', { className: '__cm_xp' }, `${s.xp} XP · ${next - s.xp} XP bis Level ${lvl + 1}`),
+          h(Bar, { value: s.xp - prev, max: Math.max(1, next - prev), tone: 'xp' }),
+          h('label', { className: '__cm_pick' },
+            h('span', null, 'Codemon'),
+            h('select', {
+              value: s.species,
+              onChange: (event) => onPick(event.target.value),
+            }, SPECIES_IDS.map((id) => h('option', { key: id, value: id }, SPECIES[id].label)))),
+          h('p', { className: '__cm_sub' }, `HP ${Math.max(0, s.hp)}/${cur.hp}`),
         ),
       );
     }
 
-    // ── Skills ───────────────────────────────────────────────────────────────
+    /** Werte in einer Zeile — dieselben fuenf Zahlen wie im Vertrag. */
+    function StatsGrid({ stats }) {
+      return h('div', { className: '__cm_stats' },
+        [['HP', stats.hp], ['ATK', stats.atk], ['DEF', stats.def], ['AGI', stats.agi], ['INT', stats.int]]
+          .map(([label, value]) => h('div', { className: '__cm_stat', key: label },
+            h('span', { className: '__cm_stat-k' }, label),
+            h('span', { className: '__cm_stat-v' }, String(value)))));
+    }
+
+    /** Eine Seite der Arena: Figur, Name, Level, HP-Balken, Werte. */
+    function ArenaSide({ side, speciesId, level: lvl, hp, maxHp: top, stats: values }) {
+      return h('div', { className: `__cm_side __cm_side--${side}` },
+        h('span', { dangerouslySetInnerHTML: { __html: speciesGlyph(speciesId, lvl, 56) } }),
+        h('div', { className: '__cm_side-id' },
+          h('strong', null, SPECIES[speciesId].label),
+          h('span', { className: '__cm_sub' }, `L${lvl}`),
+          h(Bar, { value: hp, max: top, tone: side === 'enemy' ? 'enemy' : 'hp' }),
+          h('span', { className: '__cm_sub' }, `HP ${Math.max(0, hp)}/${top} · ATK ${values.atk} · DEF ${values.def}`)),
+      );
+    }
+
+    /**
+     * Die Arena: Gegner, eigenes Codemon und die Knoepfe der Faehigkeiten.
+     * Ein Klick ist eine Runde. Ist der Gegner am Zug, sind die Knoepfe
+     * gesperrt — die Anzeige sagt, warum.
+     */
+    function Arena({ s, lvl, myStats, abilities, onUse, onStart, onRest }) {
+      const battle = s.battle;
+      const myTurn = battle !== null && battle.over === null && battle.turn === 'challenger';
+      return h('section', { className: '__cm_arena' },
+        h('h3', null, 'Arena'),
+        battle === null
+          ? h('p', { className: '__cm_sub' }, 'Kein Gegner. Ein Klick stellt einen — die Runde waechst mit jedem Kampf.')
+          : h('div', { className: '__cm_board' },
+            h(ArenaSide, {
+              side: 'enemy',
+              speciesId: battle.speciesId,
+              level: battle.level,
+              hp: battle.hp,
+              maxHp: battle.maxHp,
+              stats: battle.stats,
+            }),
+            h('span', { className: '__cm_vs' }, 'VS'),
+            h(ArenaSide, {
+              side: 'own',
+              speciesId: s.species,
+              level: lvl,
+              hp: s.hp,
+              maxHp: myStats.hp,
+              stats: myStats,
+            })),
+        h('div', { className: '__cm_actions' },
+          abilities.map((ability) => h('button', {
+            key: ability.id,
+            type: 'button',
+            className: '__cm_move',
+            disabled: battle !== null && !myTurn,
+            title: battle === null ? 'Erst einen Gegner stellen' : `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}`,
+            onClick: () => onUse(ability.id),
+          },
+            h('span', { className: '__cm_move-name' }, ability.label),
+            h('span', { className: '__cm_move-meta' }, `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}`))),
+        ),
+        h('div', { className: '__cm_actions' },
+          h('button', {
+            type: 'button',
+            className: '__cm_btn',
+            disabled: battle !== null,
+            onClick: onStart,
+          }, battle === null ? 'Naechster Gegner' : `Gegner: ${SPECIES[battle.speciesId].label} L${battle.level}`),
+          h('button', {
+            type: 'button',
+            className: '__cm_btn',
+            disabled: battle !== null,
+            onClick: onRest,
+          }, 'Rast (+HP)'),
+          h('span', { className: '__cm_sub' }, battle === null
+            ? `${Math.max(0, s.hp)}/${myStats.hp} HP`
+            : (battle.turn === 'challenger' ? 'Du bist am Zug' : 'Gegner ist am Zug'))),
+      );
+    }
+
+    /** Bilanz und Log. Die Zahlen kommen aus dem Store, nicht aus der Darstellung. */
+    function Ledger({ s }) {
+      return h('div', { className: '__cm_block' },
+        h('h3', null, `Bilanz — ${s.wins} Siege / ${s.losses} K.o.`),
+        h('p', { className: '__cm_sub' }, '1 XP pro Token · Sieg XP nach Gegner-Level · Faehigkeiten ab Level 4 die zweite'),
+        h('ul', { className: '__cm_log' },
+          s.log.slice(0, 10).map((line, index) => h('li', { key: `${index}-${line}` }, line))));
+    }
+
+    function CodingmonPanel() {
+      const s = useStore();
+      const lvl = levelFor(s.xp);
+      const mine = statsAt(s.species, lvl);
+      const learned = abilitiesFor(lvl, s.species);
+
+      return h('div', { className: '__cm_panel' },
+        h(PetHead, { s, lvl, onPick: pickSpecies }),
+        h(StatsGrid, { stats: mine }),
+        h(Arena, {
+          s,
+          lvl,
+          myStats: mine,
+          abilities: learned,
+          onUse: useAbility,
+          onStart: startBattle,
+          onRest: rest,
+        }),
+        h(Ledger, { s }),
+      );
+    }
+
+    // ── Styles ──────────────────────────────────────────────────────────────
     function insertStyles(tag, css) {
       if (document.querySelector(`style[data-plugin-css="${tag}"]`) !== null) return;
       const style = document.createElement('style');
@@ -493,48 +698,62 @@ window.__ModuleLoader__.load({
 
     insertStyles(`${PLUGIN}/codingmon.css`, `
       .__cm_mark { display: inline-flex; align-items: center; }
-      .__cm_root { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
-      .__cm_wild {
-        position: absolute; top: 0; left: 0; pointer-events: auto; cursor: crosshair;
-        display: flex; flex-direction: column; align-items: center; gap: 2px;
-        background: none; border: 0; padding: 4px; color: var(--shinon-violet, #7C3AED);
-        transition: transform 2.4s ease-in-out, opacity .4s ease;
-        filter: drop-shadow(0 2px 6px rgba(0,0,0,.45));
-      }
-      .__cm_wild:hover { color: var(--shinon-violet-light, #A855F7); }
-      .__cm_wild-tag { font-size: 10px; color: var(--dsw-alias-label-secondary, #9aa); white-space: nowrap; }
-      .__cm_wild--hit { animation: __cm_shake .2s linear; }
-      .__cm_wild--down { opacity: 0; transform: scale(.4) !important; }
-      .__cm_wild--flee { opacity: 0; }
-      @keyframes __cm_shake { 0%,100% { margin-left: 0 } 25% { margin-left: -4px } 75% { margin-left: 4px } }
-
       .__cm_panel { padding: 14px; height: 100%; overflow: auto; color: var(--dsw-alias-label-primary, #E0E7FF);
         font-family: var(--shinon-font-body, ui-sans-serif, system-ui, sans-serif); }
       .__cm_panel-head { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; }
       .__cm_panel-stage { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+      .__cm_panel-id { flex: 1; }
       .__cm_panel-id h2 { margin: 0; font-family: var(--shinon-font-head, ui-sans-serif); letter-spacing: .06em; }
       .__cm_sub { margin: 2px 0; font-size: 12px; color: var(--dsw-alias-label-secondary, #9aa); }
       .__cm_xp { margin: 6px 0 4px; font-size: 12px; }
-      .__cm_bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; min-width: 120px; }
-      .__cm_bar-fill { height: 100%; background: var(--shinon-gradient, linear-gradient(115deg,#7C3AED,#6366F1)); }
-      .__cm_bar[data-tone="hp"] .__cm_bar-fill { background: linear-gradient(90deg,#ef4444,#f59e0b); }
-      .__cm_btn { font-size: 11px; padding: 3px 8px; border-radius: 5px; cursor: pointer;
+      .__cm_pick { display: flex; align-items: center; gap: 6px; margin: 6px 0; font-size: 12px; }
+      .__cm_pick select { flex: 1; background: rgba(255,255,255,.05); color: inherit; border-radius: 5px;
+        border: 1px solid rgba(124,58,237,.45); padding: 3px 6px; font: inherit; }
+      .__cm_bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; min-width: 120px; margin: 2px 0; }
+      .__cm_bar-fill { height: 100%; background: var(--shinon-gradient, linear-gradient(115deg,#7C3AED,#6366F1)); transition: width .25s ease; }
+      .__cm_bar[data-tone="hp"] .__cm_bar-fill { background: linear-gradient(90deg,#22c55e,#84cc16); }
+      .__cm_bar[data-tone="enemy"] .__cm_bar-fill { background: linear-gradient(90deg,#ef4444,#f59e0b); }
+      .__cm_btn, .__cm_move { font-size: 11px; padding: 4px 9px; border-radius: 5px; cursor: pointer;
         background: rgba(124,58,237,.18); color: inherit; border: 1px solid rgba(124,58,237,.45); }
+      .__cm_btn:disabled, .__cm_move:disabled { opacity: .45; cursor: not-allowed; }
+      .__cm_move { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 132px; }
       .__cm_stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px,1fr)); gap: 8px; margin-bottom: 14px; }
       .__cm_stat { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: 6px;
         background: var(--dsw-alias-bg-layer-1, rgba(255,255,255,.04)); }
       .__cm_stat-k { font-size: 10px; letter-spacing: .1em; color: var(--dsw-alias-label-secondary, #9aa); }
       .__cm_stat-v { font-size: 15px; font-weight: 700; }
       .__cm_block { margin-bottom: 14px; }
-      .__cm_block h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+      .__cm_block h3, .__cm_arena h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
         color: var(--dsw-alias-label-secondary, #9aa); }
-      .__cm_moves, .__cm_log { list-style: none; margin: 0; padding: 0; font-size: 12px; }
-      .__cm_moves li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0;
-        border-bottom: 1px solid rgba(255,255,255,.06); }
+      .__cm_arena { margin-bottom: 14px; }
+      .__cm_board { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center;
+        padding: 10px; border-radius: 8px; background: var(--dsw-alias-bg-layer-1, rgba(255,255,255,.04));
+        border: 1px solid rgba(124,58,237,.25); }
+      .__cm_side { display: flex; gap: 10px; align-items: center; }
+      .__cm_side--enemy { flex-direction: row-reverse; text-align: right; }
+      .__cm_side-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .__cm_side-id strong { font-size: 13px; }
+      .__cm_vs { font-size: 11px; letter-spacing: .2em; color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
       .__cm_move-name { font-weight: 600; }
-      .__cm_move-meta { color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_move-meta { font-size: 10px; color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_log { list-style: none; margin: 0; padding: 0; font-size: 12px; }
       .__cm_log li { padding: 2px 0; color: var(--dsw-alias-label-secondary, #9aa); }
-      @media (prefers-reduced-motion: reduce) { .__cm_wild { transition: none; } }
+
+      /* Globale EXP-Leiste im Composer-Dock: sichtbar in jeder Sitzung. */
+      .__cm_expbar { display: flex; align-items: center; gap: 8px; width: 100%;
+        padding: 4px 8px; margin-bottom: 6px; border-radius: 6px;
+        background: color-mix(in srgb, var(--shinon-void, #0B0F14) 45%, transparent);
+        border: 1px solid color-mix(in srgb, var(--shinon-violet, #7C3AED) 35%, transparent);
+        font-family: var(--shinon-font-body, ui-sans-serif, system-ui, sans-serif); font-size: 11px; }
+      .__cm_expbar-pet { display: inline-flex; }
+      .__cm_expbar-lvl { font-weight: 700; letter-spacing: .08em; color: var(--shinon-violet-light, #A855F7); }
+      .__cm_expbar-track { flex: 1; height: 7px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,.12); }
+      .__cm_expbar-fill { display: block; height: 100%; background: var(--shinon-gradient, linear-gradient(115deg,#7C3AED,#6366F1)); transition: width .3s ease; }
+      .__cm_expbar-meta { color: var(--dsw-alias-label-secondary, #9aa); white-space: nowrap; }
+      @media (prefers-reduced-motion: reduce) {
+        .__cm_bar-fill, .__cm_expbar-fill { transition: none; }
+      }
     `);
 
     // ── Seams ────────────────────────────────────────────────────────────────
@@ -547,14 +766,24 @@ window.__ModuleLoader__.load({
        */
       PetMark,
       apply(ctx) {
+        // Sichtbarkeit: jede Client-Haelfte meldet sich in der gemeinsamen Liste
+        // an, damit @shinon/dashboard sie zeigen kann. Kein Hintergrundprozess
+        // ohne Zeile in der UI.
+        const registry = (window.__shinonPlugins ??= new Map());
+        registry.set(PLUGIN, { label: 'Codingmon', kind: 'client', panel: PANEL_ID });
+        window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: PLUGIN } }));
+
         window.__codingmon = {
           plugin: PLUGIN,
           PetMark,
           state: () => ({ ...store, level: level(), stats: stats(), form: formOf(level()).label }),
-          attacks: () => attacksFor(level()),
-          callWild: () => spawnWild(),
-          wilds: () => [...wilds.values()].map((w) => ({ id: w.id, level: w.level, hp: w.hp, maxHp: w.maxHp })),
-          strike: (id) => { const w = wilds.get(id); return w ? strike(w) : null; },
+          species: () => SPECIES_IDS.slice(),
+          abilities: () => abilitiesFor(level(), store.species),
+          arena: (round) => arenaFor(level(), round ?? store.round),
+          start: () => startBattle(),
+          use: (id) => useAbility(id),
+          rest,
+          pick: (id) => pickSpecies(id),
           addXp: (xp) => award(xp, `+${xp} XP (manuell)`),
           reset: () => { store = freshState(store.species); persist(); emit(); },
         };
@@ -569,29 +798,23 @@ window.__ModuleLoader__.load({
           order: 25,
           label: () => 'Codingmon',
         }, CodingmonIcon));
+        // Die globale EXP-Leiste: derselbe Store, andere Ansicht.
+        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+          name: 'conversation.composer.dock',
+          id: 'shinon-exp-bar',
+          order: 20,
+        }, ExpBar));
 
         // XP aus dem Token-Zaehler. Der Takt ist bewusst traege: das Pet soll
-        // den Agenten nicht ausbremsen.
+        // den Agenten nicht ausbremsen. Kaempfe laufen NUR auf Klick.
         const tokenTimer = window.setInterval(tickTokens, 2000);
-        const wildTimer = window.setInterval(() => {
-          if (document.hidden) return;
-          if (wilds.size < 3) spawnWild();
-          for (const wild of wilds.values()) moveWild(wild);
-        }, 9000);
-        // Erster Wildling kurz nach dem Start, damit die Mechanik sichtbar ist.
-        const firstWild = window.setTimeout(() => { overlayRoot(); spawnWild(); emit(); }, 2500);
 
         ctx.effect?.(() => () => {
           window.clearInterval(tokenTimer);
-          window.clearInterval(wildTimer);
-          window.clearTimeout(firstWild);
-          for (const wild of wilds.values()) wild.el.remove();
-          wilds.clear();
-          overlay?.remove();
           delete window.__codingmon;
         });
 
-        console.log(`[shinon-codingmon] Pet aktiv — Marke uebernommen, Level ${level()}, ${attacksFor(level()).length} Attacken`);
+        console.log(`[shinon-codingmon] Arena aktiv — ${SPECIES_IDS.length} Codemons, Level ${level()}, ${abilitiesFor(level(), store.species).length} Faehigkeiten`);
       },
     };
   },

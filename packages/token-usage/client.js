@@ -46,6 +46,11 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
+        // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
+        const registry = (window.__shinonPlugins ??= new Map());
+        registry.set('@shinon/token-usage', { label: 'Token Usage', kind: 'client', panel: 'shinon-token-usage' });
+        window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/token-usage' } }));
+
         ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
           name: 'sidebar.footer.action',
           id: 'shinon-token-usage',

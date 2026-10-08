@@ -8,6 +8,11 @@ window.__ModuleLoader__.load({
     return {
       inject: ['locale'],
       apply(ctx) {
+        // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
+        const registry = (window.__shinonPlugins ??= new Map());
+        registry.set('@shinon/locale-de', { label: 'Locale DE', kind: 'client', panel: null });
+        window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/locale-de' } }));
+
         // Register German language pack
         ctx.locale.addLanguage({
           id: 'de',
