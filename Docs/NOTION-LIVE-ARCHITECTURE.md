@@ -73,6 +73,40 @@ The phrase "global tunnel" should mean a stable, authenticated HTTPS path to the
 - Redact session/message contents by default; allow workspace owners to opt into richer transcript sync.
 - Fail closed for writes when the relay or coordinator state is stale.
 
+## Mandatory agent-to-agent role negotiation
+
+**Requirement:** When two or more agents are active on one task, they must negotiate Owner/Reviewer from their real capabilities before any mutation. The user does not assign these roles manually. This is not implemented by the current scaffold; it becomes mandatory only once the coordinator and every mutating adapter enforce it.
+
+### Negotiation protocol
+
+1. **DISCOVER:** Each agent registers a stable agent/session ID and reports only verifiable capabilities: model name if known (otherwise `UNKNOWN`), available tools, repository/worktree access, write permissions, and concrete independent verification abilities. Model branding alone never determines the role.
+2. **PROPOSE:** Agents compare those capabilities against the task and propose Owner, Reviewer, bounded scope, write target, and verification plan. The Owner must be able to perform the scoped change; the Reviewer must be able to inspect the resulting diff/evidence independently.
+3. **ACK:** The other agent confirms or raises a concrete objection. The coordinator stores a versioned role contract. Both agents must acknowledge the same version before a lease can be issued. If candidates are equivalent, the first valid timestamped claim wins Owner and the other becomes Reviewer.
+4. **LEASE:** The coordinator atomically issues a time-limited writer lease bound to task ID, resource/worktree ID, scope hash, contract version, agent ID, and fencing token.
+5. **GUARD:** Every filesystem, shell, editor, Git, or repository mutation must pass through a coordinator-checked executor or isolated writer sandbox. At the actual mutation boundary, validate the current lease and fencing token. If any mutating route can bypass this check, serialize all mutations behind the single-writer executor.
+6. **REVIEW:** Reviewer is read-only for the change under review and returns `PASS`, `PASS MIT RISIKEN`, or `BLOCK` with evidence. Owner cannot self-approve or overwrite a Reviewer block.
+7. **RELEASE:** Record verified outcome and checkpoint, release the lease, and publish a read-back-confirmed handoff. A lease timeout or process crash requires atomic lease recovery and readback before retrying a potentially completed write.
+
+### Fail-closed rules
+
+- No peer connection or missing second ACK: `COORDINATION_BLOCKED`; no shared-resource mutation. Read-only analysis and truly non-overlapping work may continue.
+- Conflicting scope/owner proposals, changed contract version, missing/invalid token, stale lease, or lost coordinator heartbeat: block writes; never silently select a new scope.
+- Solo mode is permitted only when the session explicitly starts as `Solo`. An agent cannot downgrade a multi-agent session to bypass coordination.
+- Separate worktrees may be written in parallel only on isolated branches; integration/merge remains serialized and must pass the gate again.
+- Notion status fields, a prompt, or a preflight check alone are not enforcement. Notion is a dashboard/context store; the coordinator is the atomic authority.
+
+### Required acceptance tests
+
+- No contract, one ACK, conflicting ACKs, or changed scope all block mutation.
+- Simultaneous claims for one worktree yield exactly one valid writer lease.
+- Wrong/expired fencing token and stale coordinator state block mutation at the tool boundary.
+- Reviewer `BLOCK` prevents integration/completion.
+- Explicit Solo works, but an agent cannot switch into Solo itself.
+- Crash between write and readback resumes by reading actual state first and does not duplicate the mutation.
+- Peer outage, duplicate request, lease expiry, competing claims, and recovery are stress-tested.
+
+Current status: **specified, not enforced** until these tests pass against the real coordinator and all write paths.
+
 ## Multi-agent safety: same worktree bench
 
 Sharing a task board is safe; unrestricted simultaneous writes to one worktree are not. Git does not make concurrent edits to the same working directory atomic. The coordinator must enforce one of these modes:
