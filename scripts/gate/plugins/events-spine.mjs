@@ -41,15 +41,18 @@ export const ENVELOPE_FIELDS = [
 ];
 
 /**
- * Die Event-Typen des Vertrags: die neun Pfade aus Wave 2 plus fünf Typen, die
- * ausschließlich über den DSH-Carrier `session/event` erreichbar sind
- * (turn/start, turn/end, agent/inbox/spliced, request/header, developer/message).
+ * Die Event-Typen des Vertrags: die neun Pfade aus Wave 2 plus die Typen, die
+ * ausschließlich über den DSH-Carrier `session/event` erreichbar sind.
  *
  * Diese Menge wächst nur mit einem Carrier-Namen, der in der installierten
  * DSH-Fassung belegt ist — nie mit einem Alias. Vier Einträge der typeMap
  * (message.created, message.completed, tool.requested, tool.completed) standen in
  * keiner DSH-Fassung; sie sind entfernt, und der Abgleich unten fängt den
  * nächsten solchen Fall.
+ *
+ * `step.start`/`step.end` sind dabei eine Korrektur: sie hingen vorher an
+ * tool.requested/tool.completed und hätten damit bei jedem Schritt einen
+ * Tool-Aufruf behauptet, den es nicht gab.
  */
 export const EVENT_TYPES = [
   'session.created',
@@ -57,9 +60,14 @@ export const EVENT_TYPES = [
   'message.completed',
   'turn.start',
   'turn.end',
+  'step.start',
+  'step.end',
   'inbox.spliced',
   'request.header',
   'developer.message',
+  'system.message',
+  'workspace.changed',
+  'session.titled',
   'claim.created',
   'tool.requested',
   'tool.completed',
@@ -197,6 +205,18 @@ export function contractIssues(asset, file) {
         if (!carrier.verifiedTypes.includes(raw)) issues.push(`${file}: carrier.typeMap.${raw} ist in carrier.verifiedTypes nicht belegt`);
       }
     }
+    // Bekannt-unbenutzte DSH-Typen müssen benannt sein, sonst flutet jeder
+    // approval/*- oder compaction/*-Typ das Log. Benannt heißt geprüft: ein Typ
+    // ist entweder abgebildet oder ignoriert, nie beides — sonst ist unklar,
+    // welcher Zweig gilt.
+    if (!Array.isArray(carrier.ignoredTypes)) {
+      issues.push(`${file}: carrier.ignoredTypes fehlt (bekannt-unbenutzte DSH-Typen müssen benannt sein)`);
+    } else {
+      for (const raw of carrier.ignoredTypes) {
+        if (!isText(raw)) issues.push(`${file}: carrier.ignoredTypes enthält einen leeren Eintrag`);
+        else if (typeMapKeys.includes(raw)) issues.push(`${file}: carrier.ignoredTypes.${raw} steht auch in carrier.typeMap — entweder abgebildet oder ignoriert`);
+      }
+    }
   }
 
   const uncovered = EVENT_TYPES.filter((type) => !reachable.has(type));
@@ -234,6 +254,21 @@ export function fixtureIssues(fixture, asset, file) {
     const stray = Object.keys(expect).filter((field) => !ENVELOPE_FIELDS.includes(field));
     if (stray.length) issues.push(`${at}: expect trägt unbekannte Felder ${stray.join(', ')}`);
     if (expect.contract !== asset?.contract) issues.push(`${at}: expect.contract ≠ ${asset?.contract}`);
+  }
+
+  // Der stille Fall: ohne ihn ist "still" nur behauptet. Ein Eintrag muss ein
+  // Carriertyp sein, und er muss im Vertrag als ignoriert benannt sein.
+  if (!Array.isArray(fixture.ignored) || fixture.ignored.length === 0) {
+    issues.push(`${file}: ignored fehlt — eine Fixture ohne stillen Fall prüft das Ignorieren nicht`);
+  }
+  const ignored = asset?.carrier?.ignoredTypes ?? [];
+  for (const [index, step] of (fixture.ignored ?? []).entries()) {
+    const at = `${file}: ignored ${index + 1}`;
+    if (step?.signal !== asset?.carrier?.signal) issues.push(`${at}: signal muss der Carrier ${JSON.stringify(asset?.carrier?.signal)} sein`);
+    const raw = step?.payload?.[asset?.carrier?.typePath ?? 'type'];
+    if (!isText(raw)) issues.push(`${at}: payload.${asset?.carrier?.typePath ?? 'type'} fehlt`);
+    else if (!ignored.includes(raw)) issues.push(`${at}: ${raw} steht nicht in carrier.ignoredTypes`);
+    if (!isText(step?.why)) issues.push(`${at}: why fehlt (ein stiller Fall braucht eine Begründung)`);
   }
 
   if (!Array.isArray(fixture.invalid) || fixture.invalid.length === 0) {

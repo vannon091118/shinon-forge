@@ -152,7 +152,18 @@ test('persona: jeder modellierte Typ ist ein Typ des Spines, und die Lücke ist 
   // Entscheidung bleibt und nicht still wächst.
   assert.deepEqual(
     SPINE_EVENTS.filter((type) => !PERSONA_EVENT_TYPES.includes(type)).sort(),
-    ['developer.message', 'inbox.spliced', 'request.header', 'turn.end', 'turn.start'],
+    [
+      'developer.message',
+      'inbox.spliced',
+      'request.header',
+      'session.titled',
+      'step.end',
+      'step.start',
+      'system.message',
+      'turn.end',
+      'turn.start',
+      'workspace.changed',
+    ],
   );
 });
 

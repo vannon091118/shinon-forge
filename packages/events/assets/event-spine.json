@@ -54,35 +54,74 @@
     "signal": "session/event",
     "verified": true,
     "typePath": "type",
+    "note": "Fünfzehn Typen, jeder gegen die installierte DSH-Fassung belegt (SessionEventMap) UND im Live-Lauf beobachtet. Die Payload-Pflichtfelder sind die echten DSH-Feldnamen: tool/call liefert name und arguments, tool/result liefert message — ein Feld 'tool' gibt es in DSH nicht.",
     "typeMap": {
       "session.created": "session.created",
       "user/message": "message.received",
       "assistant/message": "message.completed",
-      "step/start": "tool.requested",
-      "step/end": "tool.completed",
       "turn/start": "turn.start",
       "turn/end": "turn.end",
+      "step/start": "step.start",
+      "step/end": "step.end",
       "tool/call": "tool.requested",
       "tool/result": "tool.completed",
       "agent/inbox/spliced": "inbox.spliced",
       "request/header": "request.header",
-      "developer/message": "developer.message"
+      "developer/message": "developer.message",
+      "system/message": "system.message",
+      "workspace/changes": "workspace.changed",
+      "session/title": "session.titled"
     },
     "verifiedTypes": [
       "session.created",
       "user/message",
       "assistant/message",
-      "step/start",
-      "step/end",
       "turn/start",
       "turn/end",
+      "step/start",
+      "step/end",
       "tool/call",
       "tool/result",
       "agent/inbox/spliced",
       "request/header",
-      "developer/message"
+      "developer/message",
+      "system/message",
+      "workspace/changes",
+      "session/title"
     ],
-    "note": "Die zwölf verifizierten DSH-Typen sind die vollständige aktive Palette; jeder Name ist gegen die installierte DSH-Fassung belegt. Es gibt keine Aliase: vier frühere Einträge (message.created, message.completed, tool.requested, tool.completed) kamen in keiner DSH-Fassung vor und sind entfernt. Das Gate vergleicht typeMap und verifiedTypes gegeneinander, damit kein unbelegter Eintrag nachwächst."
+    "ignoredTypes": [
+      "assistant/attempt",
+      "agent-preset/selected",
+      "approval/asked",
+      "approval/decided",
+      "approval/policy",
+      "command/run",
+      "command/done",
+      "compaction/start",
+      "compaction/summary",
+      "compaction/end",
+      "compaction/prune",
+      "feedback/record",
+      "feedback/message-put",
+      "feedback/message-delete",
+      "goal/change",
+      "image/offload",
+      "llm/retry",
+      "llm/retry-started",
+      "model/selection",
+      "permission/preset",
+      "request/context",
+      "sandbox/mode",
+      "schedule/change",
+      "session/end-seed",
+      "subagent/catalog",
+      "subagent/descriptor",
+      "todo/write",
+      "session/title-llm-request",
+      "tool/ptc-dispatch",
+      "tool/ptc-dispatch-start"
+    ],
+    "ignoredNote": "Bekannte DSH-Typen, die der Spine absichtlich NICHT abbildet. Sie werden still verworfen (kein onDrop, keine Warnung im Log) und in stats.ignored/ignoredTypes gezählt — sichtbar, aber ohne Log-Flut. Die Liste ist namentlich und vollständig für die installierte Fassung; ein NEUER DSH-Typ ist nicht hier und warnt deshalb weiter als UNKNOWN_SIGNAL. Ein Typ darf nie zugleich in typeMap und in ignoredTypes stehen."
   },
   "events": {
     "session.created": {
@@ -110,6 +149,16 @@
       "phase": "end",
       "payload": ["session_id"]
     },
+    "step.start": {
+      "source": "dsh.step",
+      "phase": "start",
+      "payload": ["session_id"]
+    },
+    "step.end": {
+      "source": "dsh.step",
+      "phase": "end",
+      "payload": ["session_id"]
+    },
     "inbox.spliced": {
       "source": "dsh.inbox",
       "phase": "context",
@@ -125,6 +174,21 @@
       "phase": "context",
       "payload": ["session_id"]
     },
+    "system.message": {
+      "source": "dsh.message",
+      "phase": "context",
+      "payload": ["session_id"]
+    },
+    "workspace.changed": {
+      "source": "dsh.workspace",
+      "phase": "observation",
+      "payload": ["session_id"]
+    },
+    "session.titled": {
+      "source": "dsh.session",
+      "phase": "metadata",
+      "payload": ["session_id"]
+    },
     "claim.created": {
       "source": "shinon.claims",
       "phase": "claim",
@@ -133,12 +197,12 @@
     "tool.requested": {
       "source": "dsh.tool",
       "phase": "action",
-      "payload": ["session_id", "tool"]
+      "payload": ["session_id", "name"]
     },
     "tool.completed": {
       "source": "dsh.tool",
       "phase": "action",
-      "payload": ["session_id", "tool"]
+      "payload": ["session_id", "message"]
     },
     "gate.passed": {
       "source": "shinon.gates",

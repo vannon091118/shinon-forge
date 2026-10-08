@@ -21,6 +21,16 @@ import { readFileSync } from 'node:fs';
  * Er darf keinen State setzen, keine Datei schreiben, kein Netz und kein Modell aufrufen.
  * Das Gate prüft genau diese Grenze statisch (scripts/gate/plugins/events-spine.mjs).
  *
+ * Drei Ausgänge, bewusst getrennt:
+ *   EMITTIERT  — der Typ steht in der typeMap (oder auf einem shinon/*-Signal).
+ *   IGNORIERT  — der Typ steht in carrier.ignoredTypes: bekannt, bewusst nicht
+ *                modelliert. Kein Ereignis, kein onDrop, keine Warnung; gezählt
+ *                in stats.ignored/ignoredTypes. DSH emittiert Dutzende Typen
+ *                (approval/*, compaction/*, ptc-dispatch/*, …), die niemand
+ *                abbilden will — als UNKNOWN_SIGNAL würden sie das Log fluten.
+ *   VERWORFEN  — alles andere: unbekannt oder vertragsbrüchig, fail-closed.
+ * Ein NEUER DSH-Typ ist nicht ignoriert und warnt deshalb weiter.
+ *
  * Der Vertrag selbst liegt als Daten in ./assets/event-spine.json — nicht im Code.
  * Ein neuer Event-Typ ist damit zuerst eine Datenänderung, kein Code-Umbau.
  */
@@ -144,7 +154,7 @@ export function createSpine(contract, options = {}) {
   const onDrop = typeof options.onDrop === 'function' ? options.onDrop : () => {};
   const clock = typeof options.clock === 'string' && options.clock !== '' ? options.clock : null;
   const defaultSessionId = typeof options.defaultSessionId === 'string' ? options.defaultSessionId : '';
-  const stats = { emitted: 0, dropped: 0, reasons: {}, lastDrop: null, lastEvent: null };
+  const stats = { emitted: 0, dropped: 0, ignored: 0, ignoredTypes: {}, reasons: {}, lastDrop: null, lastEvent: null };
 
   const drop = (reason, signal, detail) => {
     stats.dropped += 1;
@@ -160,6 +170,10 @@ export function createSpine(contract, options = {}) {
     if (mapped) return { eventType: mapped, carrier: false };
     if (contract.carrier && contract.carrier.signal === signal) {
       const raw = resolvePath(payload, contract.carrier.typePath);
+      // Bekannt und bewusst nicht modelliert: kein Ereignis — und kein Fehler.
+      if (Array.isArray(contract.carrier.ignoredTypes) && contract.carrier.ignoredTypes.includes(raw)) {
+        return { eventType: null, carrier: true, ignored: typeof raw === 'string' ? raw : String(raw) };
+      }
       const eventType = contract.carrier.typeMap?.[raw];
       return eventType ? { eventType, carrier: true } : { eventType: null, carrier: true };
     }
@@ -168,7 +182,12 @@ export function createSpine(contract, options = {}) {
 
   function observe(signal, payload) {
     const source = payload !== null && typeof payload === 'object' ? payload : {};
-    const { eventType } = resolveEventType(signal, source);
+    const { eventType, ignored } = resolveEventType(signal, source);
+    if (ignored !== undefined) {
+      stats.ignored += 1;
+      stats.ignoredTypes[ignored] = (stats.ignoredTypes[ignored] ?? 0) + 1;
+      return null;
+    }
     if (!eventType) {
       const raw = resolvePath(source, contract.carrier?.typePath ?? 'type');
       const detail = contract.carrier?.signal === signal

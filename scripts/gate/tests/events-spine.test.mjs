@@ -89,7 +89,17 @@ function connect() {
     if (handler) quiet(() => handler(payload));
     return handler !== undefined;
   };
-  return { emitted, handlers, dispose, dispatch };
+  /**
+   * Wie dispatch, aber OHNE Stummschaltung. Nötig, weil "still ignoriert"
+   * gerade bedeutet, dass nichts auf der Konsole steht — das kann man nur
+   * prüfen, wenn man die Konsole sieht.
+   */
+  const dispatchLoud = (signal, payload) => {
+    const handler = handlers.get(signal);
+    if (handler) handler(payload);
+    return handler !== undefined;
+  };
+  return { emitted, handlers, dispose, dispatch, dispatchLoud };
 }
 
 // ── 1. Contract-Gate: Vertrag ────────────────────────────────────────────────
@@ -124,10 +134,10 @@ test('events-spine: unbekannter Event-Typ und toter Signalpfad werden gemeldet',
   extra.events['mood.changed'] = { source: 'shinon.persona', phase: 'state', payload: ['session_id'] };
   assert.ok(contractIssues(extra, 'x.json').some((issue) => issue.includes('unbekannter Event-Typ mood.changed')));
 
-  // `tool.completed` ist über ZWEI Carrier-Namen erreichbar (step/end und
-  // tool/result). Erst wenn beide Wege und das Signal weg sind, ist der Typ
-  // unerreichbar. Ein Test, der nur einen Alias löscht, prüft die Abdeckung
-  // nicht — er nimmt an, dass es genau einen Weg gibt.
+  // `tool.completed` ist über Tool/call-Wege und das Signal erreichbar. Der
+  // Test löscht ALLE Wege, die auf diesen Typ zeigen, statt einen bestimmten
+  // anzunehmen: welche Carrier-Namen auf einen Typ zeigen, ist Vertragsdaten
+  // und hat sich schon einmal geändert.
   const orphan = clone(asset);
   delete orphan.signals['shinon/tool/completed'];
   for (const [raw, type] of Object.entries(orphan.carrier.typeMap)) {
@@ -151,6 +161,16 @@ test('events-spine: eine Zuordnung ohne Beleg und ein Beleg ohne Zuordnung werde
   assert.ok(contractIssues(phantom, 'x.json').some((issue) => issue.includes('carrier.verifiedTypes nennt message.created')));
 });
 
+test('events-spine: ein Typ darf nicht zugleich abgebildet und ignoriert sein', () => {
+  const both = clone(asset);
+  both.carrier.ignoredTypes.push('tool/call');
+  assert.ok(contractIssues(both, 'x.json').some((issue) => issue.includes('entweder abgebildet oder ignoriert')));
+
+  const missing = clone(asset);
+  delete missing.carrier.ignoredTypes;
+  assert.ok(contractIssues(missing, 'x.json').some((issue) => issue.includes('carrier.ignoredTypes fehlt')));
+});
+
 test('events-spine: forbidden muss die Nicht-Aktions-Grenze nennen', () => {
   const broken = clone(asset);
   broken.forbidden = ['decision'];
@@ -159,9 +179,11 @@ test('events-spine: forbidden muss die Nicht-Aktions-Grenze nennen', () => {
 
 // ── 2. Contract-Gate: Fixture ────────────────────────────────────────────────
 
-test('events-spine: die echte Fixture ist fehlerfrei und deckt alle vierzehn Pfade', () => {
+test('events-spine: die echte Fixture ist fehlerfrei und deckt alle Typen', () => {
   assert.deepEqual(fixtureIssues(fixture, asset, 'fixture.json'), []);
   assert.equal(fixture.steps.length, EVENT_TYPES.length);
+  assert.ok(fixture.ignored.length >= 3, 'zu wenige stille Fälle');
+  assert.ok(fixture.ignored.every((step) => asset.carrier.ignoredTypes.includes(step.payload.type)));
   assert.ok(fixture.invalid.length >= 3, 'zu wenige Verwerfungsfälle');
   assert.ok(fixture.invalid.every((step) => DROP_REASONS.includes(step.reason)));
   for (const reason of ['UNKNOWN_SIGNAL', 'MISSING_SESSION_ID', 'MISSING_PAYLOAD_KEY']) {
@@ -185,6 +207,16 @@ test('events-spine: Fixture ohne Verwerfungsfall wird gemeldet', () => {
   const broken = clone(fixture);
   broken.invalid = [];
   assert.ok(fixtureIssues(broken, asset, 'x.json').some((issue) => issue.includes('invalid')));
+});
+
+test('events-spine: eine Fixture, die einen nicht benannten Typ ignoriert, wird gemeldet', () => {
+  const broken = clone(fixture);
+  broken.ignored[0].payload.type = 'tool/gibt-es-nicht';
+  assert.ok(fixtureIssues(broken, asset, 'x.json').some((issue) => issue.includes('steht nicht in carrier.ignoredTypes')));
+
+  const withoutSection = clone(fixture);
+  delete withoutSection.ignored;
+  assert.ok(fixtureIssues(withoutSection, asset, 'x.json').some((issue) => issue.includes('ignored fehlt')));
 });
 
 test('events-spine: unbekannter Verwerfungsgrund wird gemeldet', () => {
@@ -259,6 +291,42 @@ test('events-spine: fehlende Session und manipulierter Digest werden verworfen',
   dispatch('shinon/session/created', { session_id: '   ' });
   assert.equal(emitted.length, 0);
   dispose();
+});
+
+test('events-spine: ein benannter Ignorier-Typ wird still verworfen — kein Ereignis, keine Warnung', () => {
+  // Das ist die Zusage, die im Live-Lauf gefehlt hat: DSH emittiert Dutzende
+  // Typen, die niemand abbilden will. Als UNKNOWN_SIGNAL fluteten sie die
+  // Konsole; ignoriert sind sie still — aber sie bleiben gezählt.
+  const { emitted, dispatchLoud, dispose } = connect();
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  try {
+    for (const step of fixture.ignored) assert.ok(dispatchLoud(step.signal, step.payload), `kein Handler für ${step.signal}`);
+  } finally {
+    console.warn = originalWarn;
+  }
+  dispose();
+  assert.equal(emitted.length, 0, 'ein ignorierter Typ darf nicht emittieren');
+  assert.deepEqual(warnings.filter((line) => line.includes('verworfen')), [], 'ein ignorierter Typ darf nicht warnen');
+});
+
+test('events-spine: ein NICHT benannter Carrier-Typ warnt weiter (fail-loud für Neues)', () => {
+  const { emitted, dispatchLoud, dispose } = connect();
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  try {
+    dispatchLoud('session/event', { type: 'brandneuer/typ', session_id: 'sess-1' });
+  } finally {
+    console.warn = originalWarn;
+  }
+  dispose();
+  assert.equal(emitted.length, 0);
+  assert.ok(
+    warnings.some((line) => line.includes('UNKNOWN_SIGNAL')),
+    `ein unbekannter Typ muss warnen, Ausgabe war: ${JSON.stringify(warnings)}`,
+  );
 });
 
 test('events-spine: unbekanntes Signal hat keinen Handler und wirft nicht', () => {
