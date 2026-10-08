@@ -4,6 +4,7 @@
     "claim": "Alle Fortschrittswerte wachsen multiplikativ (Faktor 1,35 je Stufe), der Uebergang von zwei- auf fuenfstellig ist messbar, und der Lebenslauf steht in Millionenhöhe exakt (BigInt) statt gerundet.",
     "targets": [
       "packages/codingmon/index.js",
+      "packages/codingmon/assets/mechanik.js",
       "packages/codingmon/client.js",
       "/tmp/codemon-sim.mjs"
     ],
@@ -17,6 +18,7 @@
     "claim": "Der Schaden ist eine reine Kette aus fuenf Nachschlagevorgaengen in festen Tabellen (BaseDamage x Element x Synergie x Buff - DEF x Durchgriff), und das Regelwerk ist tief genug, um es zu sezieren: Elementarkreis, zwei Faehigkeitsarten, drei Buffs und ein Vererbungsbaum ueber vier Generationen.",
     "targets": [
       "packages/codingmon/index.js",
+      "packages/codingmon/assets/mechanik.js",
       "/tmp/codemon-sim.mjs"
     ],
     "expect": "Eine unabhaengige Nachrechnung ausserhalb des Codes muss denselben Schaden ergeben; der Elementkreis muss ein echter Kreis sein; jeder Ahn und jede Erbfaehigkeit muss existieren; und die Buffs muessen aus der Tabelle kommen und den Schaden wirklich veraendern.",
@@ -41,6 +43,7 @@
     "claim": "Die Belohnungsmatrix ist ein gewichteter Wurf in Basispunkten (8500/1400/100 = 85/14/1 Prozent), ein Sieg ergibt genau einen Wurf, und die Quote wird sichtbar gemacht, ohne verbessert zu werden.",
     "targets": [
       "packages/codingmon/index.js",
+      "packages/codingmon/assets/mechanik.js",
       "packages/codingmon/client.js",
       "/tmp/codemon-sim.mjs"
     ],

@@ -9,3 +9,33 @@ storages/
 
 # Credentials — never commit. Public repo!
 .credentials.yaml
+
+# Runtime- und Werkzeug-Reste (hinzugefuegt beim Artefakt-Aufraeumen).
+logs/
+*.log
+**/.plugin-manager/logs/
+
+# Python-Reste (das Repo ist Node-only, aber Werkzeuge fallen manchmal hierher).
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# OS- und Editor-Kram.
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.orig
+*.rej
+
+# Umgebungen — nie committen. Vorlagen duerfen rein.
+.env
+.env.*
+!.env.example
+
+# Paket-/Testreste.
+*.tgz
+coverage/
+.eslintcache
+*.tsbuildinfo

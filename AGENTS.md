@@ -20,13 +20,28 @@ installed DSH. No git history yet; DSH is `upstream`.
 
 ## Build & test
 Run from repo root:
-- `npm test` → `dsh-test.mjs && validate-test.mjs && pack-test.mjs && dsh-profile-test.mjs`
+- `npm test` → `node --test packages/codingmon/test/*.test.mjs && dsh-test.mjs &&
+  validate-test.mjs && pack-test.mjs && dsh-profile-test.mjs` (die schnellen Einzeltests
+  laufen zuerst, damit eine kaputte Tabelle vor `pack-test` auffällt). Dieselben Tests
+  laufen in `.github/workflows/commit-guard.yml` auf jedem Push/PR.
 - `node scripts/dsh-test.mjs` → static gate: manifest, name contract, `index.js`,
   `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution (exit 0/1).
 - `node scripts/pack-test.mjs` → per-package distribution test: `pnpm pack` → unpack →
   isolated `npm install` → load. Optional `--keep` retains `/tmp` work dirs for debugging.
 - `node scripts/dsh-profile-test.mjs` → boots `dsh --profile shinon --dump-config` and
   asserts all 8 bundle layers resolve.
+- `npm run test:codingmon` → `node --test packages/codingmon/test/*.test.mjs`: isolated
+  tests for the Codemon core math (damage dictionaries, weighted loot RNG, ability and
+  lineage tables), the compositor rule for its keyframes and the E2E pass
+  (`durchstich.test.mjs`: the real client bundle in a vm with a fake clock). No DSH, no
+  browser, no model, and no install needed once `index.js` only re-exports the core
+  (`assets/mechanik.js`); runs in well under a second.
+  `uebergabe.test.mjs` is the ONE exception: it boots the real Typert gateway, the storage
+  family and both Cordis roots out of the pinned `node_modules`, so it needs them and skips
+  VISIBLY (reason in the test name) without them — same rule as the store test.
+- `node --test scripts/gate/tests/codingmon-store.test.mjs` → the durable pet store
+  against the real DSH storage family in a real Cordis context (needs `dsh` on PATH and
+  the bundled packages resolvable; skips visibly otherwise). Runs inside `gate:test`.
 - `npm run build` → `node scripts/build.mjs`: re-validates everything, then wipes and
   regenerates `dist/` (`manifest.json`, `profile.json`, `dist/packages/*`).
 - `npm run gate` / `gate:local` / `gate:full` → modular gate engine
@@ -49,6 +64,12 @@ Run from repo root:
   config)`), `client.js` (UI: `__ModuleLoader__.load` + slots/styles/locale),
   `cordis.patch.yml` (activation: a single `insert` entry), `package.json` (manifest).
   No runtime logic in `package.json`; no config schema in `client.js`.
+  Two extra directories are allowed next to them and nothing else: `assets/` (runtime
+  helpers, shipped into `dist/` like project-index's index core and codingmon's
+  pet-store) and `test/` (package-local tests, not shipped). Pure mechanics belong in
+  an `assets/` core WITHOUT bare imports (project-index: the worker; codingmon:
+  `assets/mechanik.js`): only then can their unit tests run in CI, which has no
+  `node_modules`. `index.js` re-exports that core, so the public names stay the same.
 - The active profile is read from the `dev` script's `--profile <name>` (single source of
   truth); do not duplicate it. Effective config values live in the profile entry, not in
   packages; packages hold only schema defaults.
@@ -61,6 +82,12 @@ Run from repo root:
 - Client-internal slot ids follow `<name>-<purpose>` (e.g. `shinon-core-brand`,
   `shinon-info-banner`). Packages don't reference each other; shared logic goes in
   `scripts/lib/`.
+- A Client -> Host seam keeps its names in ONE place: `packages/codingmon/assets/uebergabe.js`
+  (package, service key, wire namespace, method, endpoint, field list). `index.js` re-exports
+  it, `assets/pet-remote.js` imports it — but `client.js` CANNOT: a client bundle is
+  self-contained (it pulls React through `require`, not `import`). So the bundle carries the
+  names as LITERALS and `packages/codingmon/test/uebergabe.test.mjs` compares both sides
+  character by character. Never let a literal drift; extend that assertion instead.
 
 ## Pitfalls
 - `dist/` is generated — never hand-edit it; `npm run build` regenerates it wholesale.
@@ -76,6 +103,28 @@ Run from repo root:
 - Dashboard, token-usage, better-errors, and openapi are placeholders (static UI or config
   only, no server/logic) — openapi is not enabled in the profile, and the `dead-package`
   gate will flag any *other* package missing from the profile.
+- A Client -> Host endpoint needs someone to SELECT it. Host-side `./typert` discovery exists
+  (`dsh-typert-loader`), but the browser client mounts its Remote contributions from a
+  hardcoded COMPILED list in `@deepseek-ai/dsh-api-remotes` (25 entries, `$mount`), so an
+  out-of-tree bundle cannot register itself. codingmon therefore ships the contribution
+  (`petRemoteContribution()` in `assets/pet-remote.js`) plus the drift-tested sender, but a
+  client composition must still mount it; `test/uebergabe.test.mjs` mounts it itself, and
+  that is the measurable part.
+- The in-process carrier seam is `installConnection(ctx, { transport })` from
+  `@deepseek-ai/dsh-client-connection/client` (the browser client passes
+  `globalThis.__DSH_TRANSPORT__`); the transport's `rpc.call` reaches the host through the
+  `/api` interceptor the gateway registers with `ctx.connection.rpc.intercept`, and a DEFINED
+  `rpc.open` is what marks an in-process carrier (the WebSocket mux stays off). Two measured
+  traps: `ctx.provide` on a ROOT context does not fire a sibling's `ctx.inject` — provide from
+  inside a plugin fiber; and a Cordis `Context` has no `dispose` (dispose `ctx.fiber`).
+- `dsh-client-connection` ships its client half ONLY as a browser bundle
+  (`window.__ModuleLoader__.load`) with `.d.ts` beside it; `dsh-api-gateway` and
+  `dsh-typert-registry` also ship unbundled ESM under `lib/types/client/` (reachable only by
+  path, past the exports map). Load the bundle through `__ModuleLoader__` when you need it in
+  Node — see `test/uebergabe.test.mjs`.
+- Typert validates wire values with `Object.getPrototypeOf(value)` against ITS `Object.prototype`,
+  so a value built in another realm (a `vm` context) is rejected even when it is plain JSON.
+  A carrier must cross that boundary the way a real one does (serialize).
 - Several `package.json` files differ between the staged (git index) and working tree;
   `git status` will show both new and modified files. The live files are the working tree.
 

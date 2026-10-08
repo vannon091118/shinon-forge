@@ -37,3 +37,9 @@ jobs:
 
       - name: Regeln selbst testen (ohne Abhängigkeiten)
         run: node --test scripts/gate/tests/*.test.mjs
+
+      # Die Einzeltests der Codemon-Engine brauchen kein DSH, keinen Browser und
+      # kein Modell — sie laufen hier mit, weil sie sonst nur auf dem Rechner
+      # des Autors liefen. Messwert: unter einer Sekunde.
+      - name: Codemon-Engine testen (Mathematik, Beute, Keyframes)
+        run: node --test packages/codingmon/test/*.test.mjs

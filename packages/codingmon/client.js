@@ -478,9 +478,13 @@ window.__ModuleLoader__.load({
       { id: 'shiny', label: 'Shiny God-Tier', weight: 100, xp: 2500 },
     ];
     const LOOT_TOTAL = LOOT_TABLE.reduce((sum, entry) => sum + entry.weight, 0);
-    /** Der Wurf: `uniform` aus [0,1) gegen die kumulierten Gewichte. Rein. */
+    /**
+     * Der Wurf: `uniform` aus [0,1) gegen die kumulierten Gewichte. Rein.
+     * Dieselbe Sperrklinke wie in index.js: ein nicht endlicher Wert wird als 0
+     * gelesen, damit ein kaputter Eingabewert nicht die seltenste Stufe gewinnt.
+     */
     const rollLoot = (uniform) => {
-      const clamped = Math.min(1, Math.max(0, uniform));
+      const clamped = Number.isFinite(uniform) ? Math.min(1, Math.max(0, uniform)) : 0;
       const point = Math.min(LOOT_TOTAL - 1, Math.floor(clamped * LOOT_TOTAL));
       let acc = 0;
       for (const entry of LOOT_TABLE) {
@@ -604,6 +608,84 @@ window.__ModuleLoader__.load({
     const persist = () => {
       try { window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(portable())); } catch { /* siehe oben */ }
     };
+
+    /**
+     * ── Uebergabe (Client -> Host) ─────────────────────────────────────────
+     * Der Stand liegt in `localStorage` und haengt damit am BROWSER-Profil: ist
+     * das weg, ist der Grind weg. Der Host haelt daneben einen dauerhaften
+     * Spiegel (`assets/pet-store.js`), und diese Funktion ist der ABSENDER —
+     * sie schickt den Stand ueber den Typert-RPC von DSH an den Host, sofern
+     * das Client-Bundle den Beitrag dieses Pakets gemountet hat.
+     *
+     * Die Namen stehen hier als LITERAL und nicht als Import: dieses Bundle ist
+     * selbststaendig (es zieht React ueber `require`, nicht ueber `import`) und
+     * kann keine Datei aus `assets/` laden. Quelle ist `assets/uebergabe.js`;
+     * `test/uebergabe.test.mjs` vergleicht beide Seiten Zeichen fuer Zeichen,
+     * damit die Dopplung nicht STILL driftet.
+     *
+     * WAS DIESE FUNKTION NICHT TUT: sie wirft nie, sie wartet nie, und sie
+     * aendert nie den Spielstand. Ohne gemounteten Beitrag ist der Host schlicht
+     * nicht da — dann bleibt alles wie vorher (der Browser haelt den Stand
+     * allein), und der Zustand merkt sich die Absage, statt sie zu verschweigen.
+     */
+    const HOST_NAMESPACE = 'codingmon';
+    const HOST_METHOD = 'writeSnapshot';
+    let clientCtx = null;
+    let hostMirror = { sent: 0, lastAt: null, lastLevel: null, error: null, reason: 'kein Kanal' };
+
+    /** Den Namensraum des Beitrags finden — als Cordis-Dienst `remote.<namespace>`. */
+    function hostNamespace() {
+      const remote = clientCtx?.remote;
+      if (remote === null || remote === undefined) return null;
+      const viaCtx = typeof clientCtx.get === 'function' ? clientCtx.get(`remote.${HOST_NAMESPACE}`) : undefined;
+      return viaCtx ?? remote[HOST_NAMESPACE] ?? null;
+    }
+
+    function toHost() {
+      try {
+        const namespace = hostNamespace();
+        const send = namespace?.[HOST_METHOD];
+        if (typeof send !== 'function') {
+          hostMirror = { ...hostMirror, reason: 'kein Kanal' };
+          return false;
+        }
+        const snapshot = {
+          schemaVersion: STORE_VERSION,
+          species: store.species,
+          xp: Math.floor(store.xp),
+          wins: store.wins,
+          losses: store.losses,
+          round: store.round,
+          damageTotal: store.damageTotal.toString(),
+          hits: store.hits,
+          loot: { ...store.loot },
+          savedAt: new Date().toISOString(),
+        };
+        // Die Methode liefert ein RemoteResult: { ok: true, value } oder
+        // { ok: false, error }. Der Fehlerzweig ist ein ERGEBNIS, kein Wurf —
+        // ein abwesender oder ablehnender Host darf das Spiel nicht anhalten.
+        Promise.resolve(send(snapshot)).then(
+          (result) => {
+            if (result?.ok === true) {
+              hostMirror = {
+                sent: hostMirror.sent + 1,
+                lastAt: result.value?.storedAt ?? null,
+                lastLevel: result.value?.level ?? null,
+                error: null,
+                reason: 'gespiegelt',
+              };
+            } else {
+              hostMirror = { ...hostMirror, error: result?.error?.message ?? 'abgelehnt', reason: 'abgelehnt' };
+            }
+          },
+          (error) => { hostMirror = { ...hostMirror, error: error?.message ?? String(error), reason: 'kein Kanal' }; },
+        );
+        return true;
+      } catch (error) {
+        hostMirror = { ...hostMirror, error: error?.message ?? String(error), reason: 'kein Kanal' };
+        return false;
+      }
+    }
     const note = (text) => {
       store.log = [`${new Date().toLocaleTimeString('de-DE')}  ${text}`, ...store.log].slice(0, 40);
     };
@@ -751,6 +833,10 @@ window.__ModuleLoader__.load({
       store.lock = null;
       const result = action === 'start' ? openBattle(frozen, payload) : action === 'use' ? strike(frozen, payload) : null;
       persist();
+      // Jeder BEENDETE Zug geht an den Host — nicht jeder Klick: die Sperre hat
+      // den Zug schon auf einen Ausgang festgelegt, und ein Zwischenstand waere
+      // ein Stand, den der Client selbst nie hatte.
+      toHost();
       emit();
       return result;
     }
@@ -1360,6 +1446,10 @@ window.__ModuleLoader__.load({
         const registry = (window.__shinonPlugins ??= new Map());
         registry.set(PLUGIN, { label: 'Codingmon', kind: 'client', panel: PANEL_ID });
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: PLUGIN } }));
+        // Der Context des Client-Bundles: an ihm haengt (oder haengt nicht) der
+        // Remote-Beitrag. Er wird nicht kopiert und nicht gehalten ueber den
+        // Abbau hinaus — der Zustand des Spiegels ist der Zustand, nicht der Context.
+        clientCtx = ctx;
 
         window.__codingmon = {
           plugin: PLUGIN,
@@ -1380,6 +1470,10 @@ window.__ModuleLoader__.load({
           /** Der Lebenslauf als Dezimaltext (BigInt ueberlebt JSON nicht). */
           damageTotal: () => store.damageTotal.toString(),
           milestones: () => store.milestones.slice(),
+          /** Der Zustand der Uebergabe (Client -> Host): gespiegelt, abgelehnt, kein Kanal. */
+          host: () => ({ ...hostMirror }),
+          /** Die Uebergabe von Hand ausloesen — dieselbe Naht, die jeder Zug nimmt. */
+          mirror: () => toHost(),
           /** Das Regelwerk, wie das Panel es liest. */
           rulebook: () => ({
             elements: Object.keys(ELEMENTS),
@@ -1474,6 +1568,10 @@ window.__ModuleLoader__.load({
             store.lock = null;
             persist();
           }
+          // Der Context des Client-Bundles, an dem der Beitrag haengt, wird NICHT
+          // abgeraeumt (er gehoert der Composition, nicht diesem Bundle) — aber
+          // die Referenz darauf: ein abgebautes Bundle darf keinen Context halten.
+          clientCtx = null;
           delete window.__codingmon;
         });
 
