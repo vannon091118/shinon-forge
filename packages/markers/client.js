@@ -196,35 +196,66 @@ window.__ModuleLoader__.load({
         .join('\n');
 
     // ── Overlay (schwebend, wie im Original) ────────────────────────────────
-    // TODO: [DSH-Refactor] - 53 Zeilen Overlay-Aufbau in einer Funktion: DOM-Erzeugung, Ereignispfad und Zustandsanbindung liegen in einem Rumpf (Tiefe 4). Aufbau und Verdrahtung trennen.
-    function createOverlay() {
-      const host = document.body ?? document.documentElement;
-      const root = document.createElement('div');
-      root.className = '__mk_root';
-      const box = document.createElement('div');
-      box.className = '__mk_box';
-      const focus = document.createElement('div');
-      focus.className = '__mk_focus';
-      const tip = document.createElement('div');
-      tip.className = '__mk_tip';
-      const toast = document.createElement('div');
-      toast.className = '__mk_toast';
-      root.append(box, focus, tip, toast);
-      host.appendChild(root);
 
-      const place = (node, rect) => {
-        if (rect === null) {
-          node.style.display = 'none';
-          return;
-        }
-        node.style.display = 'block';
-        node.style.left = rect.x + 'px';
-        node.style.top = rect.y + 'px';
-        node.style.width = rect.w + 'px';
-        node.style.height = rect.h + 'px';
+    /** Ein leeres div mit einer Klasse — der eine Baustein des Overlays. */
+    const nodeWith = (className) => {
+      const node = document.createElement('div');
+      node.className = className;
+      return node;
+    };
+
+    /**
+     * Die Overlay-Knoten AUFBAUEN: ein Wurzelknoten mit vier Kindern, am Körper
+     * des Dokuments. Hier wird nur erzeugt — verdrahtet wird daraus in
+     * createOverlay(). Ein Zustandswechsel muss deshalb nicht durch den Aufbau.
+     */
+    function mountOverlayNodes() {
+      const root = nodeWith('__mk_root');
+      const nodes = {
+        box: nodeWith('__mk_box'),
+        focus: nodeWith('__mk_focus'),
+        tip: nodeWith('__mk_tip'),
+        toast: nodeWith('__mk_toast'),
       };
+      root.append(nodes.box, nodes.focus, nodes.tip, nodes.toast);
+      (document.body ?? document.documentElement).appendChild(root);
+      return nodes;
+    }
 
+    /** Einen Knoten auf ein Rect legen; `null` heißt verbergen (dieselbe Regel für alle vier). */
+    function place(node, rect) {
+      if (rect === null) {
+        node.style.display = 'none';
+        return;
+      }
+      node.style.display = 'block';
+      node.style.left = rect.x + 'px';
+      node.style.top = rect.y + 'px';
+      node.style.width = rect.w + 'px';
+      node.style.height = rect.h + 'px';
+    }
+
+    /** Den Hinweis ueber dem Rahmen setzen — eigener Platz, eigene Hoehe (22 px darueber). */
+    function placeTip(tip, rect, label) {
+      if (rect === null) {
+        tip.style.display = 'none';
+        return;
+      }
+      tip.textContent = label;
+      tip.style.display = 'block';
+      tip.style.left = rect.x + 'px';
+      tip.style.top = Math.max(0, rect.y - 22) + 'px';
+    }
+
+    /**
+     * Das Overlay verdrahten: Aufbau plus die drei Aktionen (Rahmen, Fokus,
+     * Meldung). Die Meldung haengt an einem Timer und ist die einzige Stelle mit
+     * Zustand — der Rest ist zustandsloses Platzieren.
+     */
+    function createOverlay() {
+      const { box, focus, tip, toast } = mountOverlayNodes();
       let toastTimer = 0;
+
       const say = (text) => {
         toast.textContent = text;
         toast.style.display = 'block';
@@ -237,14 +268,7 @@ window.__ModuleLoader__.load({
       return {
         box: (rect, label) => {
           place(box, rect);
-          if (rect === null) {
-            tip.style.display = 'none';
-            return;
-          }
-          tip.textContent = label;
-          tip.style.display = 'block';
-          tip.style.left = rect.x + 'px';
-          tip.style.top = Math.max(0, rect.y - 22) + 'px';
+          placeTip(tip, rect, label);
         },
         focus: (rect) => place(focus, rect),
         say,
@@ -270,19 +294,86 @@ window.__ModuleLoader__.load({
       return h('button', { type: 'button', className: '__mk_btn', onClick }, text);
     }
 
-    // TODO: [DSH-Refactor] - 81 Zeilen bei Verschachtelungstiefe 7 in EINER Komponente (gezaehlt, nicht geschaetzt): Panelliste, Zustandszeile und Aktionsknoepfe in einem Rumpf. In Kopf/Liste/Zeile schneiden, damit ein Zustandswechsel nicht durch sieben Ebenen muss.
-    function MarkerPanel() {
-      const { marks, comments } = useMirror();
-      const [busy, setBusy] = React.useState(false);
+    /** Kopfzeile: wie viele Marken, und wer das Panel stellt. */
+    function MarkerHead({ count }) {
+      return h('div', { className: '__mk_head' },
+        null,
+        h('span', null, 'MARKS ' + count),
+        h('span', { style: { color: 'var(--dsw-alias-label-secondary)', fontWeight: 400 } }, PLUGIN)
+      );
+    }
 
-      const payload = payloadOf(marks, comments);
-      const commented = Object.values(comments).filter((value) => String(value).trim() !== '').length;
+    /** Bedienhinweis: Taste, Ende und Kommentarzahl (Ein- und Mehrzahl). */
+    function MarkerHint({ commented }) {
+      return h('div', { className: '__mk_hint' },
+        'm drücken, Element klicken · Escape beendet · ' + commented + ' Kommentar' + (commented === 1 ? '' : 'e'));
+    }
 
-      const onClickCopy = () => {
+    /**
+     * EINE Zeile: Kennung und Ort in der Kopfzeile, darunter Selektor, Text und
+     * Kommentarfeld. Hover und Klick zeigen dasselbe Element — die Zeile kennt
+     * nur ihre drei Rueckrufe, nicht das Panel.
+     */
+    function MarkerRow({ mark, comment, onShow, onHide, onNote }) {
+      return h('div', { className: '__mk_row' },
+        h('div', {
+          className: '__mk_row_head',
+          onMouseEnter: onShow,
+          onMouseLeave: onHide,
+          onClick: onShow
+        },
+          h('span', null, h('span', { className: '__mk_id' }, mark.id), '  › ' + mark.label),
+          h('span', { style: { color: 'var(--dsw-alias-label-secondary)' } },
+            mark.rect.x + ',' + mark.rect.y + ' ' + mark.rect.w + '×' + mark.rect.h)
+        ),
+        h('div', { className: '__mk_sel' }, mark.selector),
+        mark.text ? h('div', { className: '__mk_text' }, mark.text) : null,
+        h('input', {
+          className: '__mk_comment',
+          placeholder: 'Kommentar zu ' + mark.id,
+          value: comment ?? '',
+          onChange: (event) => onNote(mark.id, event.target.value)
+        })
+      );
+    }
+
+    /** Die Liste. „keine Marke" ist ein eigener Zustand, kein Sonderfall in der Zeile. */
+    function MarkerList({ marks, comments, onShow, onHide, onNote }) {
+      if (marks.length === 0) {
+        return h('div', { className: '__mk_empty' }, 'Noch keine Marke. Taste m im Fenster, dann ein Element anklicken.');
+      }
+      return h('div', { className: '__mk_list' }, marks.map((mark) =>
+        h(MarkerRow, {
+          key: mark.id,
+          mark,
+          comment: comments[mark.id] ?? '',
+          onShow: () => onShow(mark.selector),
+          onHide,
+          onNote
+        })
+      ));
+    }
+
+    /** Die drei Aktionen des Panels. */
+    function MarkerFoot({ busy, onSend, onCopy, onClear }) {
+      return h('div', { className: '__mk_foot' },
+        h(MarkerButton, { text: busy ? 'Sende …' : 'Senden → Chat', onClick: onSend }),
+        h(MarkerButton, { text: 'Kopieren', onClick: onCopy }),
+        h(MarkerButton, { text: 'Leeren', onClick: onClear })
+      );
+    }
+
+    /**
+     * Die WIRKUNGEN des Panels, getrennt vom Aufbau: kopieren, senden, leeren,
+     * ein Element zeigen, einen Kommentar setzen. Sie sind Kinder desselben
+     * Rumpfes und teilen `overlay` — nur das Markup liegt woanders.
+     */
+    function usePanelActions({ marks, payload, setBusy }) {
+      const copy = () => {
         copyText(payload).then((copied) => overlay.say(copied ? 'Nutzlast kopiert — Strg+V im Chat' : 'Kopieren blockiert'));
       };
 
-      const onClickSend = () => {
+      const send = () => {
         if (marks.length === 0) {
           overlay.say('Nichts markiert — erst "m" drücken, dann klicken');
           return;
@@ -296,60 +387,45 @@ window.__ModuleLoader__.load({
         );
       };
 
-      const onClickClear = () => {
+      const clear = () => {
         saveMarks([]);
         saveComments({});
         overlay.say('alle Marks entfernt');
       };
 
-      const highlight = (selector) => {
+      const show = (selector) => {
         const el = resolve(selector);
         overlay.focus(el ? rectOf(el) : null);
       };
 
       const note = (id, value) => {
-        const comments2 = readComments();
-        if (value.trim() === '') delete comments2[id];
-        else comments2[id] = value.slice(0, 500);
-        saveComments(comments2);
+        const comments = readComments();
+        if (value.trim() === '') delete comments[id];
+        else comments[id] = value.slice(0, 500);
+        saveComments(comments);
       };
 
+      return { copy, send, clear, show, note };
+    }
+
+    /**
+     * Das Panel selbst: Zustand und Aufbau, keine Wirkungen. Den Aufbau tragen
+     * Kopf, Hinweis, Liste und Fuss, die Wirkungen usePanelActions — die
+     * Aenderung einer Zeile muss nicht mehr durch den Rumpf des Panels.
+     */
+    function MarkerPanel() {
+      const { marks, comments } = useMirror();
+      const [busy, setBusy] = React.useState(false);
+
+      const payload = payloadOf(marks, comments);
+      const commented = Object.values(comments).filter((value) => String(value).trim() !== '').length;
+      const { copy, send, clear, show, note } = usePanelActions({ marks, payload, setBusy });
+
       return h('div', { className: '__mk_panel' },
-        h('div', { className: '__mk_head' },
-          null,
-          h('span', null, 'MARKS ' + marks.length),
-          h('span', { style: { color: 'var(--dsw-alias-label-secondary)', fontWeight: 400 } }, PLUGIN)
-        ),
-        h('div', { className: '__mk_hint' }, 'm drücken, Element klicken · Escape beendet · ' + commented + ' Kommentar' + (commented === 1 ? '' : 'e')),
-        marks.length === 0
-          ? h('div', { className: '__mk_empty' }, 'Noch keine Marke. Taste m im Fenster, dann ein Element anklicken.')
-          : h('div', { className: '__mk_list' }, marks.map((mark) =>
-              h('div', { key: mark.id, className: '__mk_row' },
-                h('div', {
-                  className: '__mk_row_head',
-                  onMouseEnter: () => highlight(mark.selector),
-                  onMouseLeave: () => overlay.focus(null),
-                  onClick: () => highlight(mark.selector)
-                },
-                  h('span', null, h('span', { className: '__mk_id' }, mark.id), '  › ' + mark.label),
-                  h('span', { style: { color: 'var(--dsw-alias-label-secondary)' } },
-                    mark.rect.x + ',' + mark.rect.y + ' ' + mark.rect.w + '×' + mark.rect.h)
-                ),
-                h('div', { className: '__mk_sel' }, mark.selector),
-                mark.text ? h('div', { className: '__mk_text' }, mark.text) : null,
-                h('input', {
-                  className: '__mk_comment',
-                  placeholder: 'Kommentar zu ' + mark.id,
-                  value: comments[mark.id] ?? '',
-                  onChange: (event) => note(mark.id, event.target.value)
-                })
-              )
-            )),
-        h('div', { className: '__mk_foot' },
-          h(MarkerButton, { text: busy ? 'Sende …' : 'Senden → Chat', onClick: onClickSend }),
-          h(MarkerButton, { text: 'Kopieren', onClick: onClickCopy }),
-          h(MarkerButton, { text: 'Leeren', onClick: onClickClear })
-        )
+        h(MarkerHead, { count: marks.length }),
+        h(MarkerHint, { commented }),
+        h(MarkerList, { marks, comments, onShow: show, onHide: () => overlay.focus(null), onNote: note }),
+        h(MarkerFoot, { busy, onSend: send, onCopy: copy, onClear: clear })
       );
     }
 
@@ -475,6 +551,11 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
+        // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
+        const registry = (window.__shinonPlugins ??= new Map());
+        registry.set('@shinon/markers', { label: 'Marker-Spiegel', kind: 'client', panel: PANEL_ID });
+        window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/markers' } }));
+
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, MarkerPanel));
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
           name: 'sidebar.panellist',
