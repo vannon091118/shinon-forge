@@ -195,6 +195,65 @@ test('Vertrag: ein gueltiges Ergebnis wird angenommen, jede Verletzung benannt',
   }
 });
 
+test('Vertrag: references ist Pflicht nur in MAX, wo der Wert gelesen wird', () => {
+  // Live-Fund vom 2026-10-08: eine vollstaendige MIN-Antwort fiel allein an
+  // einem fehlenden `references` durch (SCHEMA_INVALID:$.references missing
+  // required value) und der Roh-Prompt galt. Gelesen wird der Wert nur in MAX
+  // (acceptance prueft ihn gegen den Kontext), also ist er nur dort Pflicht.
+  const ohne = goodResult();
+  delete ohne.references;
+
+  for (const mode of ['MIN', 'MID']) {
+    for (const [name, antwort] of [['fehlend', ohne], ['null', goodResult({ references: null })]]) {
+      const parsed = bundle.parseResult(reply(antwort), { mode });
+      assert.equal(parsed.ok, true, `${mode} / ${name}: eine einwandfreie Antwort darf nicht durchfallen`);
+      assert.deepEqual(parsed.result.references, [], `${mode} / ${name}: fehlend wird leer gefuellt, nicht erfunden`);
+      assert.equal(parsed.result.enhancedPrompt, 'Mach das schnell.', `${mode} / ${name}`);
+    }
+  }
+
+  const max = bundle.parseResult(reply(ohne), { mode: 'MAX' });
+  assert.equal(max.ok, false, 'MAX liest die Referenzen, dort bleibt das Feld Pflicht');
+  assert.match(max.reasons[0], /^SCHEMA_INVALID:.*\$\.references/, max.reasons[0]);
+  assert.equal(bundle.parseResult(reply(goodResult({ references: null })), { mode: 'MAX' }).ok, false, 'MAX / null');
+
+  // Ohne Modus gilt MAX — fail-closed statt versehentlich lax. Der Export
+  // `ResultSchema` ist genau diese strengste Fassung.
+  assert.equal(bundle.parseResult(reply(ohne)).ok, false);
+  assert.throws(() => bundle.ResultSchema(ohne), /\$\.references/);
+});
+
+test('Vertrag: ein unbrauchbares references bleibt in jedem Modus ein Fehler', () => {
+  // Der Wegfall der Pflicht ist keine Abschaltung der Pruefung: ein Feld, das
+  // kein String-Array sein kann, scheitert in ALLEN drei Modi. `null` gehoert
+  // nicht dazu — Schemastery behandelt es bei einem optionalen Array wie
+  // "fehlt" (gemessen an 3.18.4), und genau diesen Fall deckt der Test oben ab.
+  const cases = [
+    { name: 'keine Liste', value: 'packages/prompter/index.js' },
+    { name: 'Liste mit Zahl', value: [7] },
+  ];
+  for (const mode of bundle.MODES) {
+    for (const { name, value } of cases) {
+      const parsed = bundle.parseResult(reply(goodResult({ references: value })), { mode });
+      assert.equal(parsed.ok, false, `${mode} / ${name}`);
+      assert.ok(parsed.reasons[0].startsWith('SCHEMA_INVALID'), `${mode} / ${name}: ${parsed.reasons[0]}`);
+    }
+  }
+});
+
+test('Ausgang: die Tabelle ist total und nur accepted ersetzt den Prompt', () => {
+  // Der Ausgang des Enhancers hat EINEN Ort, an dem er eine Wirkung hat.
+  // Genau die drei Ausgaenge, die enhance() und enhanceGuarded() erzeugen: ein
+  // fehlender Eintrag waere ein stiller Durchfall, ein vierter waere toter Code.
+  const effects = bundle.OUTCOME_EFFECTS;
+  assert.deepEqual(Object.keys(effects).sort(), ['accepted', 'rejected', 'unavailable']);
+  assert.deepEqual(effects.accepted, { replacePrompt: true, missingMessage: ['MESSAGE_NOT_FOUND'] });
+  for (const outcome of ['rejected', 'unavailable']) {
+    assert.equal(effects[outcome].replacePrompt, false, `${outcome} darf den Prompt nicht ersetzen`);
+    assert.equal(effects[outcome].missingMessage, null, `${outcome} hat keinen Nachrichten-Grund`);
+  }
+});
+
 test('Vertrag: das Ergebnis wird nie direkt uebernommen', () => {
   const cases = [
     { name: 'sauber', result: goodResult(), accepted: true },
@@ -388,6 +447,37 @@ test('MIN/MID: auch mit geliefertem Kontext bleibt er draussen', async () => {
     assert.equal(records[0].context, 'supplied-but-unused', `${mode}: der ungenutzte Kontext ist sichtbar`);
     dispose();
   }
+});
+
+test('MIN/MID: eine Antwort ohne references wird angenommen, in MAX nicht', async () => {
+  const ohneReferenzen = goodResult();
+  delete ohneReferenzen.references;
+
+  for (const mode of ['MIN', 'MID']) {
+    const llm = fakeLlm(reply(ohneReferenzen));
+    const { ctx, records, dispose } = connect({ ...route, mode, contextPath: dummyContextPath }, { llm });
+    const claimed = [userMessage()];
+    const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+    assert.equal(llm.calls.length, 1, mode);
+    assert.equal(records[0].outcome, 'accepted', `${mode}: der Live-Fund vom 2026-10-08 darf sich nicht wiederholen`);
+    assert.deepEqual(records[0].reasons, [], mode);
+    assert.deepEqual(records[0].references, [], `${mode}: nichts genannt, nichts erfunden`);
+    assert.equal(decision.messages[0].content[0].text, 'Mach das schnell.', mode);
+    dispose();
+  }
+
+  const llm = fakeLlm(reply(ohneReferenzen));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath }, { llm });
+  const claimed = [userMessage()];
+  const downstream = { kind: 'enter', messages: claimed };
+
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
+
+  assert.equal(records[0].outcome, 'rejected', 'MAX prueft die Referenzen, also bleibt das Feld dort Pflicht');
+  assert.ok(records[0].reasons[0].startsWith('SCHEMA_INVALID'), records[0].reasons[0]);
+  assert.equal(decision, downstream, 'der Roh-Prompt gilt');
+  dispose();
 });
 
 test('Injektion: eine Anweisung im Projektkontext erweitert keine Faehigkeit', async () => {

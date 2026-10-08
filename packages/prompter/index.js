@@ -163,34 +163,50 @@ export const MODE_CAPABILITIES = Object.fromEntries(MODES.map((mode) => [
 export const INTENT_CLASSES = ['CHAT', 'LOOKUP', 'TRANSFORM', 'MULTI_STEP_TASK', 'LONG_RUNNING_GOAL'];
 
 /**
- * Der Resultatvertrag (Plan §7), wörtlich.
+ * Der Resultatvertrag (Plan §7), je Modus.
  *
  * `required()` ist hier keine Formalie, sondern trägt die Sicherheit: in
  * Schemastery sind Objekt-Schlüssel **optional**, und ein fehlendes `z.array()`
- * wird still mit `[]` gefüllt. Ohne `required()` würde ein Modell, das
- * `addedRequirements` einfach weglässt, als "nichts hinzugefügt" durchgehen —
- * die Lücke sähe genau wie Compliance aus. Mit `required()` ist ein fehlendes
- * Feld ein Schemafehler und führt zum Roh-Prompt.
+ * wird still mit `[]` gefüllt (gemessen an 3.18.4). Ohne `required()` würde ein
+ * Modell, das `addedRequirements` einfach weglässt, als "nichts hinzugefügt"
+ * durchgehen — die Lücke sähe genau wie Compliance aus. Mit `required()` ist ein
+ * fehlendes Feld ein Schemafehler und führt zum Roh-Prompt.
+ *
+ * Für `references` gilt genau das NUR in MAX. Das Feld gehört zum MAX-Auftrag
+ * (`references.code`) und wird nur dort gelesen: `acceptance()` prüft jede
+ * Referenz gegen den gelieferten Kontext. In MIN und MID bedeutet ein fehlendes
+ * Feld nichts, und ein Pflichtfeld kostet dort eine sonst einwandfreie Antwort —
+ * gemessen am 2026-10-08: `SCHEMA_INVALID:$.references missing required value`
+ * bei `mode=MIN`, der Roh-Prompt galt. Deshalb ist die Pflicht an den Modus
+ * gebunden, in dem der Wert konsumiert wird. Was bleibt: ein ANWESENDES, aber
+ * falsches Feld (etwa `null`) wird in jedem Modus abgelehnt.
  *
  * `intentClassification` ist keine Empfehlung an das Modell, sondern Daten: nur
  * diese fünf Werte passieren. Eine unbekannte Klasse wird verworfen.
  */
-export const ResultSchema = z.object({
-  enhancedPrompt: z.string().min(1, 'enhancedPrompt darf nicht leer sein').required(),
-  preservedIntent: z.boolean().required(),
-  addedRequirements: z.array(z.string()).required(),
-  removedRequirements: z.array(z.string()).required(),
-  uncertainties: z.array(z.string()).required(),
-  // TODO: [DSH-Refactor] - references ist Pflicht in JEDEM Modus, gelesen wird es nur in MAX (acceptance). Live 2026-10-08: eine schema-gueltige Modellantwort fiel damit durch (SCHEMA_INVALID:$.references missing required value, mode=MIN) und der Roh-Prompt galt. Pflicht nur dort, wo der Wert konsumiert wird.
-  references: z.array(z.string()).required(),
-  intentClassification: z.union([
-    z.const('CHAT'),
-    z.const('LOOKUP'),
-    z.const('TRANSFORM'),
-    z.const('MULTI_STEP_TASK'),
-    z.const('LONG_RUNNING_GOAL'),
-  ]).required(),
-});
+function resultSchema(mode) {
+  return z.object({
+    enhancedPrompt: z.string().min(1, 'enhancedPrompt darf nicht leer sein').required(),
+    preservedIntent: z.boolean().required(),
+    addedRequirements: z.array(z.string()).required(),
+    removedRequirements: z.array(z.string()).required(),
+    uncertainties: z.array(z.string()).required(),
+    references: mode === 'MAX' ? z.array(z.string()).required() : z.array(z.string()),
+    intentClassification: z.union([
+      z.const('CHAT'),
+      z.const('LOOKUP'),
+      z.const('TRANSFORM'),
+      z.const('MULTI_STEP_TASK'),
+      z.const('LONG_RUNNING_GOAL'),
+    ]).required(),
+  });
+}
+
+/** Die drei Verträge, je Modus einmal gebaut — der Modus ist Daten, kein Sonderfall im Rumpf. */
+const RESULT_SCHEMAS = Object.fromEntries(MODES.map((mode) => [mode, resultSchema(mode)]));
+
+/** Der MAX-Vertrag: die strengste Fassung, unter der dieser Export schon stand. */
+export const ResultSchema = RESULT_SCHEMAS.MAX;
 
 /**
  * Der MAX-Kontext (Plan §14/§15) als definierter Input.
@@ -361,9 +377,14 @@ export function readPrompt(payload) {
 /**
  * Die Modellausgabe in den Resultatvertrag ueberfuehren. Reine Funktion, kein
  * Netz. Der erste `{` bis zum letzten `}` wird genommen, damit ein Zaun oder
- * ein Satz Vorrede nicht toedlich ist — danach entscheidet das Schema.
+ * ein Satz Vorrede nicht toedlich ist — danach entscheidet das Schema des
+ * Modus, in dem der Aufruf laeuft: nur MAX verlangt `references`.
+ *
+ * Ohne `mode` gilt MAX. Ein Aufrufer, der den Modus nicht kennt, prueft damit
+ * so streng wie moeglich, statt versehentlich laxer zu werden.
  */
-export function parseResult(text) {
+export function parseResult(text, { mode = 'MAX' } = {}) {
+  const schema = RESULT_SCHEMAS[mode] ?? ResultSchema;
   const source = typeof text === 'string' ? text : '';
   const start = source.indexOf('{');
   const end = source.lastIndexOf('}');
@@ -377,7 +398,7 @@ export function parseResult(text) {
   }
 
   try {
-    return { ok: true, result: ResultSchema(parsed) };
+    return { ok: true, result: schema(parsed) };
   } catch (error) {
     return { ok: false, reasons: [`SCHEMA_INVALID:${error?.message}`] };
   }
@@ -418,7 +439,9 @@ export function resolveReferences(references, context) {
  * Die Anforderungs-Regeln gelten in JEDEM Modus — das ist die Zusage „MIN/MID
  * ändern keine Anforderungen", und sie gilt auch für MAX: Kontext erweitert den
  * Blick, nicht den Auftrag. MAX kommt genau eine Regel hinzu: Referenzen muessen
- * im gelieferten Kontext aufloesbar sein.
+ * im gelieferten Kontext aufloesbar sein — und nur MAX kennt das Feld ueberhaupt
+ * als Pflicht (siehe resultSchema). Wo es fehlt, ist die Regel gegenstandslos,
+ * nicht verletzt.
  */
 export function acceptance(result, options = {}) {
   const reasons = [];
@@ -426,8 +449,9 @@ export function acceptance(result, options = {}) {
   if (result.addedRequirements.length > 0) reasons.push('ADDED_REQUIREMENTS');
   if (result.removedRequirements.length > 0) reasons.push('REMOVED_REQUIREMENTS');
 
-  if (options.mode === 'MAX' && result.references.length > 0) {
-    const unresolvable = resolveReferences(result.references, options.context ?? null);
+  const references = Array.isArray(result?.references) ? result.references : [];
+  if (options.mode === 'MAX' && references.length > 0) {
+    const unresolvable = resolveReferences(references, options.context ?? null);
     if (unresolvable.length > 0) reasons.push(`UNRESOLVABLE_REFERENCES:${unresolvable.join(',')}`);
   }
   return { accepted: reasons.length === 0, reasons };
@@ -580,7 +604,7 @@ async function enhance(ctx, config, prompt, context, signal) {
     return { outcome: 'rejected', reasons: [`LLM_FAILED:${error?.name ?? 'Error'}`], result: null };
   }
 
-  const parsed = parseResult(text);
+  const parsed = parseResult(text, { mode: config.mode });
   if (!parsed.ok) return { outcome: 'rejected', reasons: parsed.reasons, result: null };
 
   const decision = acceptance(parsed.result, { mode: config.mode, context });
@@ -731,51 +755,88 @@ function decisionRecord(config, runtime, outcome, rawLength, sessionId, contextS
   };
 }
 
+/**
+ * Der Ausgang des Enhancers → seine Wirkung. Eine Tabelle statt verteilter
+ * Praedikate (der Marker [DSH-Refactor] in der alten Fassung: `mode` wurde
+ * zweimal geprueft, `outcome === 'accepted'` dreimal, und `MESSAGE_NOT_FOUND`
+ * musste nachtraeglich aus `messages === null` geraten werden).
+ *
+ *   replacePrompt   nur `accepted` ersetzt den Prompt-Text im Schritt
+ *   missingMessage  der Grund, wenn die Nachricht nicht auffindbar war — der
+ *                   Ausgang heisst dann `rejected`, weil der Roh-Prompt gilt
+ *
+ * Die Tabelle ist ein Vertrag: sie deckt jeden Ausgang ab, den enhance() und
+ * enhanceGuarded() erzeugen (geprueft im Abnahmetest), und sie ist die einzige
+ * Stelle, an der ein Ausgang eine Wirkung hat.
+ */
+export const OUTCOME_EFFECTS = {
+  accepted: { replacePrompt: true, missingMessage: ['MESSAGE_NOT_FOUND'] },
+  rejected: { replacePrompt: false, missingMessage: null },
+  unavailable: { replacePrompt: false, missingMessage: null },
+};
+
+/**
+ * Den Kontext dieses Schritts bereitstellen — EINE Aufloesung je Schritt.
+ *
+ * MIN und MID bekommen keinen, auch wenn einer geladen ist (der Beleg nennt ihn
+ * dann `supplied-but-unused`): ihr Auftrag erlaubt ihn nicht. Nur MAX loest
+ * wirklich auf, und ein `reason` ungleich null heisst: es gibt keinen Kontext,
+ * wo MAX einen braucht — der Ausgang steht dann ohne Modellaufruf fest. Damit
+ * fragt genau EINE Stelle nach `mode` und nicht mehr zwei.
+ *
+ * Die Reihenfolge bleibt wie vorher gewollt: eine konfigurierte DATEI geht dem
+ * Index vor, eine kaputte Datei sperrt MAX vollstaendig (maxContext).
+ */
+function supplyContext(ctx, config, runtime, prompt) {
+  if (config.mode !== 'MAX') return { context: null, source: 'none', reason: null };
+  return maxContext(ctx, config, runtime, prompt);
+}
+
 /** Der registrierte Listener. Genau ein `next()` — Durchreichen ist der Normalfall. */
 async function onPreStep(ctx, config, runtime, payload, next) {
   const prompt = readPrompt(payload);
   if (prompt === null) return next();
   const sessionId = payload?.agent?.session?.id;
 
-  // TODO: [DSH-Refactor] - Der Ausgang entsteht aus drei verstreuten Bedingungen: mode wird zweimal geprueft, outcome==='accepted' dreimal, und MESSAGE_NOT_FOUND wird nachtraeglich aus messages===null abgeleitet. Eine Entscheidung braucht einen Ort: eine Tabelle outcome -> Aktion statt verteilter Praedikate.
-
   // EINE Quelle je Schritt, einmal aufgeloest: der Beleg nennt dieselbe Quelle,
   // die den Prompt veredelt hat. Zwei Abfragen koennten zwei Antworten geben.
-  const supplied = config.mode === 'MAX'
-    ? maxContext(ctx, config, runtime, prompt)
-    : { context: null, source: 'none', reason: null };
+  const supplied = supplyContext(ctx, config, runtime, prompt);
 
-  if (config.mode === 'MAX' && supplied.context === null) {
+  if (supplied.reason !== null) {
     // MAX ohne Kontext gibt es nicht: Code-Referenzen und Touches waeren
-    // erfunden. Also wird der Modus abgelehnt, nicht weichgespuelt.
+    // erfunden. Also wird der Modus abgelehnt, nicht weichgespuelt — und zwar
+    // ohne Modellaufruf.
     report(ctx, config, decisionRecord(config, runtime, { outcome: 'unavailable', reasons: [supplied.reason], result: null }, prompt.text.length, sessionId));
     return next();
   }
 
-  const context = supplied.context;
-  const outcome = await enhanceGuarded(ctx, config, prompt.text, context, payload.signal);
-  outcome.contextUsed = config.mode === 'MAX' && context !== null;
+  const outcome = await enhanceGuarded(ctx, config, prompt.text, supplied.context, payload.signal);
+  // Ohne Kontext kann keiner benutzt worden sein — dieselbe Aufloesung, keine
+  // zweite Frage an `mode`.
+  outcome.contextUsed = supplied.context !== null;
 
   // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
   // und darf nicht in einen zweiten next() umgedeutet werden.
   const decision = await next();
 
-  const messages = outcome.outcome === 'accepted'
+  // Ein Ausgang ausserhalb der Tabelle kann nur aus unserem eigenen Code kommen;
+  // der Rueckfall ist die Durchreiche, damit ein solcher Fall nie den Schritt
+  // bricht — dieselbe Fail-Richtung wie im ganzen Paket.
+  const effect = OUTCOME_EFFECTS[outcome.outcome] ?? OUTCOME_EFFECTS.rejected;
+  const messages = effect.replacePrompt
     ? replacePrompt(decision?.messages, prompt.message, outcome.result.enhancedPrompt)
     : null;
 
-  if (outcome.outcome === 'accepted' && messages !== null) {
-    report(ctx, config, decisionRecord(config, runtime, outcome, prompt.text.length, sessionId, supplied.source));
-    return { ...decision, messages };
-  }
+  // Ersetzen kann nur, wer die Nachricht findet. Verworfen ist das nicht — aber
+  // der Beleg muss den Grund nennen, und die Tabelle kennt ihn.
+  const recorded = effect.replacePrompt && messages === null
+    ? { ...outcome, outcome: 'rejected', reasons: effect.missingMessage }
+    : outcome;
+  report(ctx, config, decisionRecord(config, runtime, recorded, prompt.text.length, sessionId, supplied.source));
 
   // Verworfen, nicht verfuegbar oder die Nachricht war nicht auffindbar: der
   // Roh-Prompt gilt unveraendert.
-  const rejected = messages === null && outcome.outcome === 'accepted'
-    ? { ...outcome, outcome: 'rejected', reasons: ['MESSAGE_NOT_FOUND'] }
-    : outcome;
-  report(ctx, config, decisionRecord(config, runtime, rejected, prompt.text.length, sessionId, supplied.source));
-  return decision;
+  return messages === null ? decision : { ...decision, messages };
 }
 
 /** Entscheidung emittieren. Einzige Wirkung des Listeners neben der Prompt-Ersetzung. */
