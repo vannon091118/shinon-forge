@@ -1,0 +1,109 @@
+#!/usr/bin/env node
+/**
+ * open.mjs — 1-Click-Start (Stufe 1 der Starter-Roadmap).
+ *
+ * Führt DSH mit dem aktiven Profil hoch (--no-open, keine Browser-Autoöffnung)
+ * und öffnet die tokenisierte Bereitschafts-URL im System-Standardbrowser.
+ * Das ist der User-Flow, den die spätere Tauri-Shell 1:1 übernimmt:
+ * dieselbe URL, dasselbe Profil — nur andere Fassade statt Browser-Tab.
+ *
+ * Warum --no-open + eigener Browser-Start: DSHs Autoöffnung kennt die
+ * trusted-host-Zusagen nicht, und wir brauchen den stabilen, tokenisierten
+ * Link aus der READY-Zeile `dsh web: http://…/?token=…` — den öffnen wir selbst.
+ *
+ * Aufruf: `npm run open`  (Profil über das dev-Skript, eine Quelle)
+ * Exit: Ctrl-C stoppt DSH und den Wrapper sauber (Kind-Process wird beendet).
+ */
+import { spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import * as repo from './lib/repo.mjs';
+import { findOnPath } from './lib/yaml.mjs';
+
+const root = repo.ROOT;
+// activeProfile() liest das Manifest (dev-Skript, eine Quelle) — mit Default-Arg.
+const profileName = repo.activeProfile();
+if (profileName === null) {
+  console.error('💥 open: kein --profile im dev-Skript (package.json) gefunden');
+  process.exit(2);
+}
+
+const dsh = findOnPath('dsh');
+if (dsh === null) {
+  console.error('💥 open: `dsh` nicht im PATH — zuerst installieren (siehe AGENTS.md)');
+  process.exit(2);
+}
+
+/** Die URL in den System-Standardbrowser geben, ohne den Wrapper zu blocken. */
+function openBrowser(url) {
+  const command = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
+    : process.platform === 'darwin' ? ['open', [url]]
+    : ['xdg-open', [url]];
+  try {
+    const child = spawn(command[0], command[1], { stdio: 'ignore', detached: true });
+    child.unref();
+  } catch (e) {
+    console.error(`\n⚠️  Browser-Start fehlgeschlagen (${e.message}) — die URL steht oben, im Tab öffnen.`);
+  }
+}
+
+console.log('═══════════════════════════════════');
+console.log('  Shinon Forge — 1-Click-Start');
+console.log(`  Profil: ${profileName}    dsh: ${dsh}`);
+console.log('═══════════════════════════════════\n');
+
+// Wie in dev:web: trusted-host für die Loopback-Adresse, --no-open weil wir
+// die tokenisierte URL selbst übernehmen (stabil, nicht DSHs Auto-Tab).
+const args = [
+  '--profile', profileName,
+  '--no-open',
+  '--trusted-host', 'localhost',
+  '--trusted-host', '127.0.0.1',
+];
+
+const child = spawn(dsh, args, {
+  cwd: root,
+  env: { ...process.env, DSH_HOME: root },
+  stdio: ['inherit', 'pipe', 'inherit'],
+});
+
+const READY = /dsh web: (http:\/\/\S+)/;
+let buffered = '';
+let opened = false;
+
+child.stdout.on('data', (chunk) => {
+  buffered += chunk;
+  process.stdout.write(chunk);
+  if (opened) return;
+  const match = READY.exec(buffered);
+  if (match !== null) {
+    opened = true;
+    const url = match[1];
+    console.log(`\n🌐 1-Click: ${url}\n`);
+    openBrowser(url);
+  }
+});
+
+/** Sauberes Beenden: Ctrl-C oder Kind-Exit beendet beides, kein Orphan. */
+const shutdown = (signal) => {
+  if (child.exitCode === null) {
+    child.kill(signal === 'SIGTERM' ? 'SIGTERM' : 'SIGINT');
+    // Endliche Abwartefrist (3s) als synchroner Busy-Loop — kein Orphan,
+    // danach hart. Kein Timer, weil der Wrapper hier sofort endet.
+    const deadline = Date.now() + 3000;
+    while (child.exitCode === null && Date.now() < deadline) {
+      const end = Date.now() + 50;
+      while (Date.now() < end && child.exitCode === null) { /* warte */ }
+    }
+    if (child.exitCode === null) child.kill('SIGKILL');
+  }
+  process.exit(signal === 'SIGTERM' ? 0 : 130);
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+child.on('exit', (code, signal) => {
+  console.log(`\n— dsh beendet${signal !== null ? ` (Signal ${signal})` : ` (Exit ${code})`}`);
+  process.exit(signal !== null || code === 0 ? 0 : code ?? 1);
+});
