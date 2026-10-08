@@ -15,6 +15,8 @@
     "dev": "DSH_HOME=$PWD dsh --profile shinon",
     "dev:web": "DSH_HOME=$PWD dsh --profile shinon --no-open --trusted-host localhost --trusted-host 127.0.0.1",
     "open": "node scripts/open.mjs",
+    "desktop:launcher": "node scripts/desktop-launcher.mjs",
+    "desktop:launcher:uninstall": "node scripts/desktop-launcher.mjs --uninstall",
     "verify:panel": "node scripts/panel-check.mjs",
     "build": "node scripts/build.mjs",
     "test": "node scripts/dsh-test.mjs && node scripts/validate-test.mjs && node scripts/pack-test.mjs && node scripts/dsh-profile-test.mjs",
