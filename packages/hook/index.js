@@ -59,6 +59,10 @@ export const TRACE_EVENT_TYPE = 'agent.pre-step';
 /** Kanal, auf dem korrelierte Schritt-Datensätze den Host verlassen. */
 export const TRACE_CHANNEL = 'shinon/hook/pre-step';
 
+// TODO: [DSH-Refactor] - Zweite Kopie des Digest-Helfers: @shinon/events exportiert bereits
+// `digest(text, length)`. Pakete dürfen einander nicht importieren, also gehört die Funktion in
+// eine gemeinsame Quelle (scripts/lib-Vertrag) statt in zwei Pakete — sonst driften Länge und
+// Zeichenvorrat der ids unbemerkt auseinander.
 /** Erste `length` Hex-Zeichen von sha256(text). */
 const digest = (text, length = 12) => createHash('sha256').update(String(text)).digest('hex').slice(0, length);
 
@@ -77,6 +81,11 @@ const digest = (text, length = 12) => createHash('sha256').update(String(text)).
  * das Feld ausdrücklich als vorbelegt, und das ist eine andere Zusage als
  * "Pflichtfeld".
  */
+// TODO: [DSH-Refactor] - Die zehn Event-Typen stehen als `z.union` aus `z.const` mitten im Schema
+// (Schemastery 3.18.4 hat kein `z.enum`) und existieren sonst nirgends als prüfbare Liste. Der
+// Event-Spine führt seine Typen als Vertragsdaten (assets/event-spine.json); hier ist die Liste
+// Code. Eine exportierte Konstante, aus der die Union erzeugt wird, macht sie zählbar und
+// gate-prüfbar — heute ist sie nur durch Lesen zu erfahren.
 export const EventSchema = z.object({
   event_id: z.string().min(1, 'event_id muss nicht leer sein').required(),
   event_type: z.union([
@@ -204,6 +213,11 @@ export function buildStepEnvelope(step, config = {}) {
  * oder eine wohlgeformte Absage `{ kind: 'reject' }`. Der Hook erfindet keine
  * `kind: 'enter'`-Entscheidung: die Messages gehören dem Harness, nicht uns.
  */
+// TODO: [DSH-Refactor] - Ein Handler mit drei Aufgaben in einer Leiter: Vertrags-Verstoß
+// (if/else-if mit `config.trace` im Zweig), Trace-Emission und Durchlass-Verdikt (`verdict`).
+// Der else-if-Zweig verschmilzt „kein Verstoß“ mit „trace an“, und der Abbruchpfad
+// (`return { kind: 'reject' }`) steht zweimal im Code. Auftrennen in benannte Schritte:
+// contractVerdict(step, config) → emitTrace(...) → passVerdict(...).
 async function onPreStep(ctx, config, payload, next) {
   const step = readStep(payload);
   const issues = stepIssues(step);

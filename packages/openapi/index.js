@@ -1,5 +1,10 @@
 import z from '@deepseek-ai/schemastery';
 
+// Gelesen wird `enabled` (Verzweigung in apply) und `host`/`port` (nur in die Log-Zeile
+// interpoliert). `specPath` liest kein Code — es bleibt, weil scripts/validate-test.mjs genau
+// diesen Schluessel als Reiz der Regel „fehlende Ressource" pinnt.
+// TODO: [DSH-Refactor] - Platzhalter-Logik: der Log meldet „Starte API auf host:port", aber es
+// laeuft kein Server. Entweder einen echten Server bauen oder den Log ehrlich machen.
 export const Config = z.object({
   enabled: z.boolean().default(true),
   port: z.number().default(3000),
@@ -38,14 +43,11 @@ export function apply(ctx, config) {
   }
 
   console.log(`[openapi] Starte API auf ${config.host}:${config.port}`);
-  
-  // Hier könnte ein Express- oder Fastify-Server gestartet werden
-  // Für jetzt nur logging
-  
+
   ctx.inject(['settings'], (child) => {
     child.effect(() => child.settings.configure({ auto: false }, ctx.fiber));
   });
-  
+
   return () => {
     console.log('[openapi] Shutting down');
   };

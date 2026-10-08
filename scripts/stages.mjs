@@ -96,24 +96,33 @@ const STAGES = {
   /** G1 - statische Struktur: Syntax, Namen, Patch-Schema, Ressourcen, Profil. */
   async G1() {
     const result = node('dsh-test.mjs');
-    const green = result.code === 0 && /37 bestanden, 0 fehlgeschlagen/.test(result.output);
-    return { green, detail: green ? '37 Checks' : lastLines(result.output, 3) };
+    // Geprueft wird der VERTRAG (Exit 0 und „0 fehlgeschlagen"), nicht eine eingefrorene Zahl:
+    // die Anzahl der Checks waechst mit dem Repo, die Konstante nicht. Der Wert im Detail kommt
+    // aus dem Lauf — validate-test.mjs loest dieselbe Falle fuer die Kontrolle.
+    const summary = /Ergebnisse: (\d+) bestanden, 0 fehlgeschlagen/.exec(result.output);
+    const green = result.code === 0 && summary !== null;
+    return { green, detail: green ? `${summary[1]} Checks` : lastLines(result.output, 3) };
   },
   /** G2 - Verträge: Regel-Fixtures (rot je Regel) und DSH-Profilauflösung. */
   async G2() {
     const fixtures = node('validate-test.mjs');
     const profileTest = node('dsh-profile-test.mjs');
-    const green = fixtures.code === 0 && /9 bestanden, 0 fehlgeschlagen/.test(fixtures.output)
-      && profileTest.code === 0 && /3 bestanden, 0 fehlgeschlagen/.test(profileTest.output);
-    return { green, detail: green ? '9 Fixtures + 3 Profil-Checks' : `${lastLines(fixtures.output, 2)} | ${lastLines(profileTest.output, 2)}` };
+    // Wie G1: der Vertrag statt eingefrorener Zaehlwerte — die Zahl der Regeln waechst mit dem Repo.
+    const fixtureSummary = /Ergebnisse: (\d+) bestanden, 0 fehlgeschlagen/.exec(fixtures.output);
+    const profileSummary = /Ergebnisse: (\d+) bestanden, 0 fehlgeschlagen/.exec(profileTest.output);
+    const green = fixtures.code === 0 && fixtureSummary !== null && profileTest.code === 0 && profileSummary !== null;
+    return { green, detail: green ? `${fixtureSummary[1]} Fixtures + ${profileSummary[1]} Profil-Checks` : `${lastLines(fixtures.output, 2)} | ${lastLines(profileTest.output, 2)}` };
   },
   /** G3 - Build: Artefakte und Distributionstest. */
   async G3() {
     const build = node('build.mjs');
     const pack = node('pack-test.mjs');
-    const green = build.code === 0 && /Artefakte: dist\/ mit 7 Paketen/.test(build.output)
-      && pack.code === 0 && /28 bestanden, 0 fehlgeschlagen/.test(pack.output);
-    return { green, detail: green ? 'dist/ + 28 Distribution-Checks' : `${lastLines(build.output, 2)} | ${lastLines(pack.output, 2)}` };
+    // Die Paketanzahl kommt aus dem Repo, die Schrittzahl aus dem Lauf — nicht aus einer
+    // Konstante, die beim naechsten Paket falsch wird (dist liefert heute 16 Pakete).
+    const artifacts = new RegExp(`Artefakte: dist/ mit ${packages.length} Paketen`).test(build.output);
+    const packSummary = /Ergebnisse: (\d+) bestanden, 0 fehlgeschlagen/.exec(pack.output);
+    const green = build.code === 0 && artifacts && pack.code === 0 && packSummary !== null;
+    return { green, detail: green ? `dist/ + ${packSummary[1]} Distribution-Checks` : `${lastLines(build.output, 2)} | ${lastLines(pack.output, 2)}` };
   },
   /** G4 - echter Boot: alle Bundles aktivieren, Server antwortet. */
   async G4() {
@@ -140,7 +149,12 @@ const STAGES = {
     try {
       if (server.url === null) return { green: false, detail: 'kein Bereitschaftssignal' };
       const page = await fetchPage(server.url);
-      const preload = page.body.match(/plugins\/\?\?([^"]+?)(?:&amp;rev=[^"]*)?")?.[1] ?? '';
+      // Alle Modul-Eintraege einsammeln und dekodieren — dasselbe Muster wie scripts/panel-check.mjs.
+      // Vorher stand hier ein Regex-Literal ohne schliessendes `/`: die Datei parste gar nicht
+      // ("Invalid regular expression: missing /"), also liefen G1..G8 nie.
+      const preload = [...page.body.matchAll(/plugins\/\?\?([^"]+)/g)]
+        .map((match) => decodeURIComponent(match[1]))
+        .join('\n');
       const missing = BUNDLES.filter((bundle) => !preload.includes(`${bundle.name}/client.js`)).map((bundle) => bundle.name);
       if (missing.length > 0) return { green: false, detail: `nicht im Client-Bundle: ${missing.join(', ')}` };
       if (preload.includes('@shinon/openapi')) return { green: false, detail: '@shinon/openapi ist aktiv, soll es nicht sein' };

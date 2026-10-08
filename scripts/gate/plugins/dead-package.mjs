@@ -5,8 +5,16 @@
  */
 export const id = 'dead-package';
 
-/** Bewusst nicht im Profil aktivierte Pakete (Vorbereitung, nicht vergessen). */
-const KNOWN_INACTIVE = new Set(['openapi']);
+/**
+ * Bewusst nicht im Profil aktivierte Pakete (Vorbereitung, nicht vergessen).
+ *
+ * `openapi`: vom Plan vorgesehen, aber nicht Teil des Profils.
+ * `popup`: die Client-Hälfte ist ein ehrlicher Platzhalter ohne Overlay — die
+ * Aktivierung ist eine Entscheidung über Slot, Felder und Anzahl der Einträge,
+ * kein Versehen. Der Host-Teil ist gebaut und geprueft (Trigger-Tabelle,
+ * Nutzlast aus dem letzten Objektargument).
+ */
+const KNOWN_INACTIVE = new Set(['openapi', 'popup']);
 
 export function check(ctx) {
   const profileName = ctx.repo.activeProfile(ctx.root);

@@ -128,6 +128,9 @@ export const Config = z.object({
  * nicht. Wer den Lauf liest, soll sehen, dass Dateien nicht gelesen wurden und
  * Werte ersetzt wurden — ohne dass ein Wert im Protokoll steht.
  */
+// TODO: [DSH-Refactor] - Eine einzige lange String-Konkatenation mit bedingten Teilstuecken
+// inline. Als Feldliste (label, wert, nur-wenn) bauen und einmal rendern — dann ist ein
+// neues Feld eine Datenzeile statt einer Klammeroperation in einem Ausdruck.
 function reportLine(report, stats, where) {
   const protectedKinds = Object.entries(report.protectedKinds ?? {})
     .map(([kind, count]) => `${kind}=${count}`)
@@ -194,11 +197,17 @@ export function apply(ctx, config) {
       stats = indexStats(db);
       db.close();
     } catch {
+      // TODO: [DSH-Refactor] - Leeres catch: ein kaputter Index (unlesbare Datei, falsches
+      // Schema) macht den Bericht still zahlenlos. Mindestens ein benannter Hinweis gehoert
+      // ins Log — sonst ist der Befund unsichtbar.
       /* die Zaehlung ist Beiwerk, nicht der Lauf */
     }
     console.log(reportLine(report, stats, where));
   };
 
+  // TODO: [DSH-Refactor] - Ein Fehlerpfad in zwei Ausfuehrungen: `start()` faengt den
+  // Host-Lauf intern ab, und der Aufrufer haengt ein zweites `.catch` an dieselbe Zusage.
+  // Eine Ursache, zwei Meldungen (dieselbe Zeile doppelt im Log). Eine Stelle muss besitzen.
   const start = async () => {
     if (config.worker) {
       const result = await runIndexInWorker(options);

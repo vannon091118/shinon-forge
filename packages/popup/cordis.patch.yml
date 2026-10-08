@@ -1,0 +1,13 @@
+- insert:
+    - id: shinon-popup
+      name: '@shinon/popup'
+      config:
+        enabled: true
+        slotName: 'conversation.composer.dock'
+        trigger: 'user/message'
+        showOriginal: true
+        showOutput: true
+        showProcess: true
+        category: 'process-step'
+        color: '#ff8800'
+        trajectoryChannel: 'shinon/trajectory'

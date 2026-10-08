@@ -128,9 +128,34 @@ export function initialState(contract) {
   };
 }
 
+/** Die Felder, die einen Persona-Zustand ausmachen — die Grundlage des Vergleichs. */
+const STATE_FIELDS = ['identity', 'stance', 'uncertainty', 'mood', 'capabilities', 'limitations'];
+
+/**
+ * Zwei Zustände feldweise vergleichen. Gleich heißt: jedes der sechs Felder ist
+ * gleich, Listen elementweise und in der Reihenfolge.
+ */
+function sameState(left, right) {
+  for (const field of STATE_FIELDS) {
+    if (Array.isArray(left[field]) || Array.isArray(right[field])) {
+      const a = Array.isArray(left[field]) ? left[field] : [];
+      const b = Array.isArray(right[field]) ? right[field] : [];
+      if (a.length !== b.length || a.some((value, index) => value !== b[index])) return false;
+    } else if (left[field] !== right[field]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Ein Event, ein Übergang. Deterministisch und rein — kein Modell, keine Zeit, kein Zufall.
  * Unbekannte Events ändern nichts (fail-closed: kein Raten).
+ *
+ * `changed` ist ein Messergebnis, keine Behauptung: der berechnete Zustand wird
+ * feldweise gegen den vorigen geprüft. Ein Übergang, der nichts verschiebt (etwa
+ * eine Limitation, die schon gesetzt war), meldet damit `false` — kein
+ * History-Eintrag, kein neuer Prompt-Abschnitt für eine Nicht-Änderung.
  */
 export function deriveState(contract, state, eventType) {
   const transition = contract.transitions?.[eventType];
@@ -142,18 +167,16 @@ export function deriveState(contract, state, eventType) {
   for (const item of transition.addLimitations ?? []) limitations.add(item);
   const maxLimitations = contract.limits?.maxLimitations ?? 8;
 
-  return {
-    state: {
-      identity: contract.identity ?? state.identity,
-      stance: transition.stance ?? base.stance,
-      uncertainty: transition.uncertainty ?? base.uncertainty,
-      mood: transition.mood ?? base.mood,
-      capabilities: [...(contract.baseline?.capabilities ?? state.capabilities)],
-      limitations: [...limitations].slice(-maxLimitations),
-    },
-    changed: true,
-    reason: eventType,
+  const next = {
+    identity: contract.identity ?? state.identity,
+    stance: transition.stance ?? base.stance,
+    uncertainty: transition.uncertainty ?? base.uncertainty,
+    mood: transition.mood ?? base.mood,
+    capabilities: [...(contract.baseline?.capabilities ?? state.capabilities)],
+    limitations: [...limitations].slice(-maxLimitations),
   };
+
+  return { state: next, changed: !sameState(state, next), reason: eventType };
 }
 
 /** Der Zustand als System-Kontext: genau die sechs Felder, plus die Stimme des Moods. */
@@ -179,6 +202,10 @@ export function renderStateContext(contract, state) {
 }
 
 /** Den Zustandsblock aus einem gerenderten Kontext zurücklesen (Verbraucher + Tests). */
+// TODO: [DSH-Refactor] - Text-Round-Trip als API: der Zustand wird gerendert, um ihn per
+// Regex aus dem Markdown wieder einzulesen. Die Regex bindet die Funktion an die exakte
+// Ausgabe von renderStateContext (Sprachwechsel, Formatierung, zusätzlicher Code-Block
+// brechen sie still) — Nutzer sollen den Zustands-Getter benutzen, nicht den Text parsen.
 export function stateFromContext(text) {
   const match = String(text).match(/```json\n([\s\S]*?)\n```/);
   return match ? JSON.parse(match[1]) : null;
@@ -215,6 +242,9 @@ export function createPersonaState(contract, options = {}) {
     const result = deriveState(contract, state, eventType);
     if (!result.changed) {
       stats.ignored += 1;
+      // TODO: [DSH-Refactor] - `ignoredTypes` ist ein ungedeckeltes Wörterbuch: jeder jemals
+      // gesehene unbekannte Event-Typ bleibt für die Lebensdauer der Sitzung im Speicher.
+      // Ein Pfad/Parameter im Event-Typ genügt, um den Zähler unbegrenzt wachsen zu lassen.
       stats.ignoredTypes[eventType] = (stats.ignoredTypes[eventType] ?? 0) + 1;
       return null;
     }
@@ -390,11 +420,21 @@ export function apply(ctx, config) {
     onChange: () => renderPrompt(),
   });
 
+  // TODO: [DSH-Refactor] - `sp.getSectionOrder(...)` wird ohne Typ-Prüfung aufgerufen und die
+  // Registrierung steckt in vier verschachtelten Closures (inject → effect → renderPrompt →
+  // renderTrigger) mit handgeführtem Disposer-Stack. Fehlt eine der Methoden am injizierten
+  // Dienst, wirft es INNERHALB des inject-Callbacks; außerdem ist nicht ablesbar, welcher
+  // Disposer zu welchem Abschnitt gehört. Ziel: Methoden prüfen und die Registrierung als
+  // eine Funktion mit EINER Aufräumliste.
   ctx.inject(['systemPrompt'], (child) => {
     const sp = child.systemPrompt;
     const atPrefix = sp.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX');
     const atSuffix = sp.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX');
 
+    // TODO: [DSH-Refactor] - Die Reihenfolge ist als Zahlenrauschen gemischt: feste Literale
+    // (1000/1100/1200/1300) neben relativen Ankern (atPrefix + n, atSuffix - n), dazu zwei
+    // bedingte sections.push(...)-Zweige. Ein verschobener Anker ist damit unsichtbar und
+    // nicht testbar. Ordnung und Bedingungen gehören in eine Datenliste mit benannten Ankern.
     const sections = [
       ['shinon:identity', atPrefix, config.identity],
       ['shinon:epistemic', atPrefix + 1, config.epistemic],

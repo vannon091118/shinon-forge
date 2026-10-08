@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "dev": "DSH_HOME=$PWD dsh --profile shinon",
-    "dev:web": "DSH_HOME=$PWD dsh --profile shinon --no-open --trusted-host localhost --trusted-host 127.0.0.1",
+    "dev:web": "DSH_HOME=$PWD dsh --profile shinon --no-open --trusted-host localhost --trusted-host 127.0.0.1 --port 3085",
     "open": "node scripts/open.mjs",
     "desktop:launcher": "node scripts/desktop-launcher.mjs",
     "desktop:launcher:uninstall": "node scripts/desktop-launcher.mjs --uninstall",
@@ -51,7 +51,8 @@
     "@shinon/prompter": "workspace:*",
     "@shinon/project-index": "workspace:*",
     "@shinon/task-router": "workspace:*",
-    "@shinon/codingmon": "workspace:*"
+    "@shinon/codingmon": "workspace:*",
+    "@shinon/popup": "workspace:*"
   },
   "repository": {
     "type": "git",

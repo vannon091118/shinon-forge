@@ -1,10 +1,9 @@
 import z from '@deepseek-ai/schemastery';
 
-export const Config = z.object({
-  enabled: z.boolean().default(true),
-  showStackTraces: z.boolean().default(false),
-  locale: z.string().default('de'),
-});
+// Keine Einstellungen: apply() loggt nur, kein Code liest einen Wert dieser Ebene.
+// `enabled`, `showStackTraces` und `locale` sind entfallen. packages/better-errors/cordis.patch.yml
+// schreibt sie noch (ausserhalb dieses Slices).
+export const Config = z.object({});
 
 export function apply(ctx, config) {
   console.log('[shinon-better-errors] Aktiviert:', config);

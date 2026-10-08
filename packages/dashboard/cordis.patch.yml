@@ -1,7 +1,3 @@
 - insert:
     - id: shinon-dashboard
       name: '@shinon/dashboard'
-      config:
-        enabled: true
-        defaultView: 'overview'
-        sidebarPosition: 'left'

@@ -105,6 +105,10 @@ export function validateMark(mark, { model, limits = limitsOf(model) } = {}) {
   return issues;
 }
 
+// TODO: [DSH-Refactor] - „Kein zweiter Formatierer" stimmt nicht: dieselbe Vorlagen-Füllung
+// liegt als `payloadOf`/`fill` in markers/client.js noch einmal. Schon jetzt unterschiedlich —
+// der Host kürzt den Element-Text auf `limits.text`, der Client nicht, und die Kommentargrenze
+// (500) existiert nur host-seitig. Ein Format, zwei Implementierungen: eine Quelle nötig.
 /** Vorlage aus dem Vertrag: `{feld}` → Wert. Kein zweiter Formatierer. */
 function fill(template, values) {
   return String(template).replace(/\{(\w+)\}/g, (_match, key) => (values[key] === undefined ? '' : String(values[key])));
@@ -143,8 +147,16 @@ export function renderPayload(marks, comments = {}, model) {
  * Eine abgelehnte Marke landet in `stats.dropped` — nie in der Liste.
  */
 export function createMirror(model, options = {}) {
-  const limits = limitsOf(model);
-  const limit = Number.isFinite(options.markLimit) ? options.markLimit : limits.marks;
+  // Der Vertrag liefert die Vorgaben, eine ausdrueckliche Option gewinnt.
+  // Vorher war `limitsOf(model)` die EINZIGE Quelle — damit war `config.textLimit`
+  // eine tote Option: die Textgrenze kam immer aus dem JSON, egal was das Profil sagte.
+  const contractLimits = limitsOf(model);
+  const limits = {
+    text: Number.isFinite(options.textLimit) ? options.textLimit : contractLimits.text,
+    marks: Number.isFinite(options.markLimit) ? options.markLimit : contractLimits.marks,
+    comment: Number.isFinite(options.commentLimit) ? options.commentLimit : contractLimits.comment,
+  };
+  const limit = limits.marks;
   const marks = [];
   const comments = {};
   const stats = { accepted: 0, dropped: 0, reasons: {}, lastDrop: null };
@@ -156,6 +168,11 @@ export function createMirror(model, options = {}) {
     return null;
   };
 
+  // TODO: [DSH-Refactor] - `add` mischt drei Verantwortungen und mutiert dabei sein eigenes
+  // Zwischenergebnis: Normalisierung, dann In-Place-Id-Vergabe (`mark.id = nextMarkId(marks)`
+  // schreibt in das Objekt, das gleich als Marke abgelegt wird), dann In-Place-Id-Vergabe-Vergleich
+  // und drei aufeinanderfolgende drop-Prüfungen. Reihenfolge und früher Ausstieg sind nur durch
+  // Zeilenposition bestimmt. Zerlegen: idFor(...), verify(...) → Verdict, admit(...).
   function add(raw) {
     const mark = normalizeMark(raw, { model, limits });
     if (mark.id === null) mark.id = nextMarkId(marks);
@@ -228,7 +245,7 @@ export function apply(ctx, config) {
     return () => {};
   }
 
-  const mirror = createMirror(model, { markLimit: config.markLimit });
+  const mirror = createMirror(model, { markLimit: config.markLimit, textLimit: config.textLimit });
   if (!/^https?:\/\//.test(config.inboxUrl)) {
     console.warn(`[shinon-markers] Inbox-URL ist keine http(s)-Adresse: ${config.inboxUrl}`);
   }

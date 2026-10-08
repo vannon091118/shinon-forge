@@ -1,0 +1,8 @@
+{
+  "contract": "shinon.project-index/query-v1",
+  "source": "shinon.project-index",
+  "mode": "MAX",
+  "budgetTokens": 6000,
+  "indexVerify": "stamp",
+  "note": "Kontext kommt vom Project Index (sqlite/fts5, inkrementell, verify: stamp). Diese Datei ist ein Schema-Platzhalter; der echte Kontext wird zur Laufzeit über ctx.get('shinon_index_query') vom Index-Dienst geliefert. Falls der Dienst nicht antwortet, greift der Fallback auf den Roh-Prompt (fail-open)."
+}

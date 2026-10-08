@@ -132,6 +132,11 @@ export function validateEnvelope(envelope, { contract, eventType, payload, sourc
   if (definition) {
     const expectedRef = `${contract.derivation.payload_ref.prefix}${digest(canonicalJson(payload), contract.derivation.payload_ref.length)}`;
     if (envelope.payload_ref !== expectedRef) issues.push('DIGEST_MISMATCH:payload_ref');
+    // TODO: [DSH-Refactor] - Der Envelope wird hier ein ZWEITES Mal gebaut, nur um `event_id`
+    // nachzurechnen: dieselbe Digest-Arbeit doppelt, und das Schema ist an einen zweiten,
+    // leicht abweichenden Aufruf (source/traceId kommen aus dem Envelope) gekoppelt. Eine
+    // `identity(eventType, sessionId, source, timestamp, payload)`-Funktion wuerde von beiden
+    // Seiten benutzt.
     const expectedId = buildEnvelope(contract, {
       eventType,
       source: definition.source,
@@ -258,6 +263,10 @@ function subscribe(ctx, signal, handler, label) {
  * als (session, event): der Typ steht im Event, die Session-Id in der Session.
  * Beides wird zusammengeführt, damit der Vertrag wie vorgesehen lesen kann.
  */
+// TODO: [DSH-Refactor] - Positionsheuristik statt Signatur: erstes Objekt = Session, letztes =
+// Event. Bei EINEM Argument ist `session` still `{}` und das Event traegt die Session-Felder
+// selbst — ein Fehler, der wie gueltige Daten aussieht. Der Aufrufer (config.carrier.signal)
+// kennt die Signatur; sie sollte hier als benannte Parameter ankommen.
 export function carrierPayload(...args) {
   const objects = args.filter((arg) => arg !== null && typeof arg === 'object');
   if (objects.length === 0) return {};
@@ -284,9 +293,21 @@ export function apply(ctx, config) {
       // Einzige Wirkung des Spines: der emittierte Envelope. Kein State, kein Schreibzugriff.
       if (typeof ctx?.emit === 'function') ctx.emit(config.emitChannel, envelope, payload);
     },
-    onDrop: (reason, { signal, detail }) => {
-      console.warn(`[shinon-events] verworfen ${reason} (${signal}): ${detail}`);
-    },
+    // Ein Drop wird GEZAEHLT und EINMAL genannt. In einem echten Lauf wiederholt sich
+    // dieselbe Ursache pro Ereignis — gemessen: hunderte Zeilen `MISSING_PAYLOAD_KEY:name`
+    // in einem einzigen Schritt. Auf schwacher Hardware ist ein Log, das pro Event
+    // schreibt, selbst ein Kostenfaktor. Gezaehlt wird weiter vollstaendig (`spine.stats`),
+    // genannt wird jede Ursache einmal, und das Log ist gedeckelt.
+    onDrop: (() => {
+      const reported = new Set();
+      const LIMIT = 64;
+      return (reason, { signal, detail }) => {
+        const key = `${reason}|${signal}|${detail}`;
+        if (reported.has(key) || reported.size >= LIMIT) return;
+        reported.add(key);
+        console.warn(`[shinon-events] verworfen ${reason} (${signal}): ${detail}`);
+      };
+    })(),
   });
 
   const signals = Object.keys(contract.signals ?? {});

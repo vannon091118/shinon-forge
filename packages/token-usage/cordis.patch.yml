@@ -1,7 +1,3 @@
 - insert:
     - id: shinon-token-usage
       name: '@shinon/token-usage'
-      config:
-        enabled: true
-        showInSidebar: true
-        showDetailed: false

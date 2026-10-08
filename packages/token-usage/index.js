@@ -1,10 +1,9 @@
 import z from '@deepseek-ai/schemastery';
 
-export const Config = z.object({
-  enabled: z.boolean().default(true),
-  showInSidebar: z.boolean().default(true),
-  showDetailed: z.boolean().default(false),
-});
+// Keine Einstellungen: der Client rendert unabhaengig von Werten dieser Ebene.
+// `enabled`, `showInSidebar` und `showDetailed` sind entfallen. packages/token-usage/cordis.patch.yml
+// schreibt sie noch (ausserhalb dieses Slices).
+export const Config = z.object({});
 
 export function apply(ctx, config) {
   console.log('[shinon-token-usage] Aktiviert:', config);

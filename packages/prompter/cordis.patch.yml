@@ -16,8 +16,10 @@
         model: agnes-2.5-flash
         # MAX: Kontext kommt vom Project Index (shinon.project-index/query-v1)
         # über ctx.get('shinon_index_query'). Index muss aktiv sein (profile verify: stamp).
-        contextPath: ''
-        maxTokens: 1200
-        temperature: 0
+        # MAX: Kontext aus dem Project Index. Index-Datei (Schema-Platzhalter),
+        # echter Kontext zur Laufzeit über ctx.get('shinon_index_query').
+        contextPath: './assets/max-context.json'
+        maxTokens: 6000  # Ideal für MAX; maximal 15000 möglich, dann länger dauern (unlimitierte Thinking-Token).
+        temperature: 0.3
         timeoutMs: 15000
         trace: true

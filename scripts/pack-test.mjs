@@ -64,6 +64,9 @@ if (packages.length === 0) {
   process.exit(1);
 }
 
+// TODO: [DSH-Refactor] - Teuerster Lauf des Repos: je Paket ein eigener `pnpm pack` + ein isoliertes
+// `npm install` (16x, sequenziell, netzgebunden). Auf schwacher Hardware ist das der Flaschenhals des
+// gesamten Tests. Installation einmal bauen und je Paket nur das Tarball tauschen (oder parallelisieren).
 for (const pkg of packages) {
   const packDir = join(WORK, 'work', pkg.dir);
   const tarballDir = join(WORK, 'tarballs', pkg.dir);

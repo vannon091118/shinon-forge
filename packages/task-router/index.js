@@ -102,6 +102,11 @@ export const DISPOSED_EVENT = 'agent/disposed';
 /** Der Dienstname der Goal-Domaene in `ctx.goals`. */
 export const GOAL_SERVICE = 'goals';
 
+// Die Gleichheit ist GEPINNT, nicht nur behauptet: scripts/gate/tests/task-router.test.mjs
+// laedt beide Pakete und vergleicht INTENT_CLASSES, SOURCE_CONTRACT und SOURCE_CHANNEL
+// gegen die echten Werte des Enhancers — eine Abweichung wird dort rot, nicht still.
+// Eine dritte Quelle gibt es bewusst nicht: Pakete dieses Repos importieren einander nicht,
+// und eine Datei ausserhalb der Pakete reist nicht im Artefakt mit (`pnpm pack`).
 /**
  * Das geschlossene Vokabular aus §16, wortgleich mit dem Enhancer. Eine Klasse
  * ausserhalb dieser Liste ist keine Klassifikation, sondern Text.
@@ -164,6 +169,10 @@ export const ACTIVATION_REASONS = [
   'LINEAR_TURN',
   'ACTIVATION_DISABLED',
   'NO_LIVE_AGENT',
+  // Eigener Grund, seit er es ist: bei mehreren vorgemerkten Sitzungen und einem
+  // Datensatz ohne Sitzung waere die Zuordnung geraten. Das ist NICHT "kein
+  // lebender Agent" (es sind zwei), sondern "keine eindeutige Zuordnung".
+  'STEP_AMBIGUOUS',
   'NO_GOAL_SERVICE',
   'GOAL_EXISTS',
   'GOAL_ERROR',
@@ -236,44 +245,64 @@ export const DecisionSchema = z.object({
  *
  * Die Reihenfolge der Pruefungen ist die Fail-Richtung: erst die HERKUNFT
  * (fremder Datensatz -> nichts), dann das VOKABULAR, dann die SCHWELLE, dann die
- * SUBSTANZ. Jede Stufe nennt ihren Grund, weil eine Entscheidung, die ihren
- * Grund verschweigt, nicht nachpruefbar ist.
+ * SUBSTANZ. Sie steht in DECISION_RULES, untereinander statt hintereinander.
+ * Jede Stufe nennt ihren Grund, weil eine Entscheidung, die ihren Grund
+ * verschweigt, nicht nachpruefbar ist.
  */
-export function decide(record, config = {}) {
+/**
+ * Die Regeln als TABELLE: die erste Zeile, deren `when` zutrifft, entscheidet.
+ * Jede Zeile bringt ihren Grund UND die Felder mit, die in den Datensatz
+ * gehoeren — ein neuer Grund ist damit eine Datenzeile, und die Fail-Reihenfolge
+ * ist eine Liste statt einer sechsstufigen if-Leiter mit lokaler Closure.
+ *
+ * Die letzte Zeile trifft immer: sie ist der Kandidat.
+ */
+const DECISION_RULES = [
+  { goal: false, when: (f) => f.record === null || typeof f.record !== 'object', reason: () => 'NO_RECORD', fields: () => ({}) },
+  { goal: false, when: (f) => f.record.contract !== SOURCE_CONTRACT, reason: () => 'FOREIGN_RECORD', fields: (f) => ({ intent: f.intent }) },
+  { goal: false, when: (f) => f.intent === '', reason: () => 'NO_CLASSIFICATION', fields: (f) => ({ intent: f.intent }) },
+  { goal: false, when: (f) => !INTENT_CLASSES.includes(f.intent), reason: (f) => `UNKNOWN_CLASS:${f.intent}`, fields: (f) => ({ intent: f.intent }) },
+  { goal: false, when: (f) => f.weight < f.threshold, reason: (f) => `BELOW_THRESHOLD:${f.weight}<${f.threshold}`, fields: (f) => ({ intent: f.intent, weight: f.weight }) },
+  { goal: false, when: (f) => !(f.weight > 0), reason: () => 'NO_GOAL_WEIGHT', fields: (f) => ({ intent: f.intent, weight: f.weight }) },
+  { goal: false, when: (f) => f.rawLength < f.minRawLength, reason: (f) => `BELOW_MIN_RAW_LENGTH:${f.rawLength}<${f.minRawLength}`, fields: (f) => ({ intent: f.intent, weight: f.weight, rawLength: f.rawLength }) },
+  { goal: true, when: () => true, reason: (f) => `GOAL_CANDIDATE:${f.intent}`, fields: (f) => ({ intent: f.intent, weight: f.weight, rawLength: f.rawLength }) },
+];
+
+/**
+ * Die Tatsachen EINMAL messen: Schwelle, Substanzgrenze und die aus dem Datensatz
+ * gelesenen Werte. Eine Laenge ist keine Zahl, die negativ sein kann: was nicht
+ * als positive Zahl gemessen wurde, gilt als "nicht gemessen" (0) und damit als
+ * zu kurz. Die Richtung ist bewusst streng — die Alternative waere, einer
+ * unbrauchbaren Angabe Zieltauglichkeit zuzusprechen.
+ */
+function decisionFacts(record, config) {
   const threshold = Number.isFinite(config.threshold) ? config.threshold : DEFAULT_THRESHOLD;
   const minRawLength = Number.isFinite(config.minRawLength) ? config.minRawLength : DEFAULT_MIN_RAW_LENGTH;
-  const verdict = (goal, reason, parts = {}) => ({
-    goal,
-    reason,
-    intent: parts.intent ?? '',
-    weight: parts.weight ?? 0,
+  const intent = typeof record?.intentClassification === 'string' ? record.intentClassification : '';
+  const measured = record?.rawLength;
+  return {
+    record,
     threshold,
-    rawLength: parts.rawLength ?? 0,
     minRawLength,
-  });
+    intent,
+    weight: INTENT_WEIGHTS[intent] ?? 0,
+    rawLength: Number.isFinite(measured) && measured > 0 ? measured : 0,
+  };
+}
 
-  if (record === null || typeof record !== 'object') return verdict(false, 'NO_RECORD');
-  if (record.contract !== SOURCE_CONTRACT) return verdict(false, 'FOREIGN_RECORD', { intent: typeof record.intentClassification === 'string' ? record.intentClassification : '' });
-
-  const intent = record.intentClassification;
-  if (typeof intent !== 'string' || intent === '') return verdict(false, 'NO_CLASSIFICATION');
-  if (!INTENT_CLASSES.includes(intent)) return verdict(false, `UNKNOWN_CLASS:${intent}`);
-
-  // Ab hier gibt es eine GUELTIGE Klasse. Ob sie einen Kandidaten traegt,
-  // entscheidet die Policy — nicht das Etikett.
-  const weight = INTENT_WEIGHTS[intent] ?? 0;
-  if (weight < threshold) return verdict(false, `BELOW_THRESHOLD:${weight}<${threshold}`, { intent, weight });
-  if (!(weight > 0)) return verdict(false, 'NO_GOAL_WEIGHT', { intent, weight });
-
-  // Eine Laenge ist keine Zahl, die negativ sein kann: was nicht als positive
-  // Zahl gemessen wurde, gilt als "nicht gemessen" (0) und damit als zu kurz.
-  // Die Richtung ist bewusst streng — die Alternative waere, einer unbrauchbaren
-  // Angabe Zieltauglichkeit zuzusprechen.
-  const measured = record.rawLength;
-  const rawLength = Number.isFinite(measured) && measured > 0 ? measured : 0;
-  if (rawLength < minRawLength) return verdict(false, `BELOW_MIN_RAW_LENGTH:${rawLength}<${minRawLength}`, { intent, weight, rawLength });
-
-  return verdict(true, `GOAL_CANDIDATE:${intent}`, { intent, weight, rawLength });
+export function decide(record, config = {}) {
+  const facts = decisionFacts(record, config);
+  const rule = DECISION_RULES.find((candidate) => candidate.when(facts));
+  const fields = rule.fields(facts);
+  return {
+    goal: rule.goal,
+    reason: rule.reason(facts),
+    intent: fields.intent ?? '',
+    weight: fields.weight ?? 0,
+    threshold: facts.threshold,
+    rawLength: fields.rawLength ?? 0,
+    minRawLength: facts.minRawLength,
+  };
 }
 
 /**
@@ -307,8 +336,11 @@ export function readObjective(messages) {
  * Sitzung, aber nicht den Agenten — und `ctx.goals` akzeptiert nur die exakte
  * Instanz der Registry, keine nachgebaute Identitaet.
  */
+/** Ein Wert nur dann als Objekt behandeln — `null`, `undefined` und Skalare zaehlen als nichts. */
+const objectOrNull = (value) => (value !== null && typeof value === 'object' ? value : null);
+
 function readStep(payload) {
-  const agent = payload?.agent !== null && typeof payload?.agent === 'object' ? payload.agent : null;
+  const agent = objectOrNull(payload?.agent);
   const sessionId = typeof agent?.session?.id === 'string' ? agent.session.id : '';
   return {
     agent,
@@ -319,29 +351,61 @@ function readStep(payload) {
   };
 }
 
-/** Die vorgemerkte Sitzung zu diesem Datensatz — exakt, sonst gar nicht. */
+/**
+ * Die vorgemerkte Sitzung zu diesem Datensatz nehmen — und wenn es keine gibt,
+ * den GRUND nennen, nicht nur `null`.
+ *
+ * Zwei Aufloesungspolitiken, zwei benannte Ergebnisse: EXAKT ueber die Sitzung
+ * des Datensatzes, oder — wenn der Datensatz keine nennt — die EINE eindeutige
+ * Vormerkung. Eine Zuweisung nach Reihenfolge waere geraten, und ein geratenes
+ * Goal ist schlimmer als keines; genau deshalb ist "mehrere vorgemerkt" ein
+ * eigener Grund (STEP_AMBIGUOUS) und nicht dasselbe wie "kein lebender Agent".
+ */
 function takeStep(runtime, record) {
   const sessionId = typeof record?.session_id === 'string' ? record.session_id : '';
   if (sessionId !== '') {
-    const step = runtime.pending.get(sessionId);
+    if (!runtime.pending.has(sessionId)) return { step: null, reason: 'NO_LIVE_AGENT' };
+    const step = runtime.pending.get(sessionId) ?? null;
     runtime.pending.delete(sessionId);
-    return step ?? null;
+    return { step, reason: step === null ? 'NO_LIVE_AGENT' : null };
   }
-  // Ohne Sitzung im Datensatz bleibt nur die EINE eindeutige Vormerkung. Bei
-  // mehreren waere die Zuordnung geraten, und ein geratener Goal ist schlimmer
-  // als keiner.
-  if (runtime.pending.size !== 1) return null;
+  if (runtime.pending.size !== 1) {
+    return { step: null, reason: runtime.pending.size === 0 ? 'NO_LIVE_AGENT' : 'STEP_AMBIGUOUS' };
+  }
   const [only] = runtime.pending.values();
   runtime.pending.clear();
-  return only ?? null;
+  return { step: only ?? null, reason: only === null ? 'NO_LIVE_AGENT' : null };
 }
 
-const activationVerdict = (activated, reason, goalId = '', maxGoalRounds = 0) => ({
+/**
+ * Das Ergebnis einer Aktivierung — benannte Felder statt vier Positionsargumente,
+ * die an der Aufrufstelle wie ein Zweitupel aussahen (`activationVerdict(false,
+ * 'LINEAR_TURN')`: gemeint sind `activated` und `reason`).
+ */
+const activationVerdict = ({ activated = false, reason, goalId = '', maxGoalRounds = 0 }) => ({
   activated,
   reason,
   goalId,
   maxGoalRounds,
 });
+
+/**
+ * Einen Fehler der Goal-Domaene einordnen.
+ *
+ * Die Domaene wirft `GoalError` mit einem stabilen `code`; aus der installierten
+ * Fassung gelesen sind das GOAL_AGENT_NOT_LIVE, GOAL_ALREADY_EXISTS,
+ * GOAL_STALE_REVISION, GOAL_NOT_FOUND, GOAL_CHANGE_VERSION und GOAL_INVALID_*
+ * (@deepseek-ai/dsh-goal). Ein Fehler MIT Code wird als Code gemeldet; ein
+ * Fehler OHNE Code kommt nicht aus dieser Taxonomie und wird als `NAME:<Klasse>`
+ * gemeldet. Vorher entschied `error?.code ?? error?.name ?? 'Error'`, und ein
+ * fremder Fehler sah damit aus wie ein Code der Domaene.
+ */
+function classifyGoalError(error) {
+  const code = error?.code;
+  if (typeof code === 'string' && code !== '') return code;
+  const name = error?.name;
+  return typeof name === 'string' && name !== '' ? `NAME:${name}` : 'NAME:Unknown';
+}
 
 /**
  * Die Aktivierungsentscheidung aus §17: einen Goal-Kandidaten an DSHs
@@ -353,10 +417,11 @@ const activationVerdict = (activated, reason, goalId = '', maxGoalRounds = 0) =>
  * keine Zufallsvariable, und ein automatischer Lauf darf sie nicht ueberschreiben.
  */
 export function activateGoal(ctx, config, runtime, record) {
-  if (config.activate !== true) return activationVerdict(false, 'ACTIVATION_DISABLED');
-  const step = takeStep(runtime, record);
-  if (step === null || step.agent === null) return activationVerdict(false, 'NO_LIVE_AGENT');
-  if (step.objective === null) return activationVerdict(false, 'NO_LIVE_AGENT');
+  if (config.activate !== true) return activationVerdict({ reason: 'ACTIVATION_DISABLED' });
+  const found = takeStep(runtime, record);
+  if (found.step === null) return activationVerdict({ reason: found.reason });
+  const step = found.step;
+  if (step.agent === null || step.objective === null) return activationVerdict({ reason: 'NO_LIVE_AGENT' });
 
   // `ctx.get` ist der dokumentierte Weg, einen Dienst OHNE Injektionszwang zu
   // lesen. Absicht: die Entscheidung aus §16 darf nicht davon abhaengen, ob eine
@@ -370,32 +435,36 @@ export function activateGoal(ctx, config, runtime, record) {
       runtime.warnedNoService = true;
       console.warn(`[shinon-task-router] Dienst "${GOAL_SERVICE}" nicht verfuegbar — Kandidaten bleiben Entscheidungen ohne Goal`);
     }
-    return activationVerdict(false, 'NO_GOAL_SERVICE');
+    return activationVerdict({ reason: 'NO_GOAL_SERVICE' });
   }
 
+  // Zwei Aufrufe, zwei Erholungen: ein werfender `get` heisst "der Agent ist
+  // nicht der lebende dieser Registry" (also: nicht erzeugen), ein werfender
+  // `create` heisst "DSH hat den Versuch abgelehnt" (also: der Versuch bleibt
+  // sichtbar). Deshalb zwei Bloecke mit je eigenem Grund, aber EINER Einordnung.
+  let current;
   try {
-    const current = typeof goals.get === 'function' ? goals.get(step.agent) : undefined;
-    if (current !== undefined && current !== null) return activationVerdict(false, `GOAL_EXISTS:${current?.phase ?? 'unknown'}`);
+    current = typeof goals.get === 'function' ? goals.get(step.agent) : undefined;
   } catch (error) {
-    // Ein werfender `get` heisst: der Agent ist nicht der lebende dieser Registry.
-    return activationVerdict(false, `GOAL_ERROR:${error?.code ?? error?.name ?? 'Error'}`);
+    return activationVerdict({ reason: `GOAL_ERROR:${classifyGoalError(error)}` });
   }
+  if (current !== undefined && current !== null) return activationVerdict({ reason: `GOAL_EXISTS:${current?.phase ?? 'unknown'}` });
 
   try {
     const view = goals.create(step.agent, { objective: step.objective, maxGoalRounds: config.maxGoalRounds });
     const goalId = typeof view?.id === 'string' ? view.id : '';
     const rounds = Number.isFinite(view?.maxGoalRounds) ? view.maxGoalRounds : config.maxGoalRounds;
     if (config.trace) console.log(`[shinon-task-router] Goal aktiviert (${goalId}, max ${rounds} Runden) — Runden faehrt DSH`);
-    return activationVerdict(true, 'ACTIVATED', goalId, rounds);
+    return activationVerdict({ activated: true, reason: 'ACTIVATED', goalId, maxGoalRounds: rounds });
   } catch (error) {
-    const code = error?.code ?? error?.name ?? 'Error';
+    const code = classifyGoalError(error);
     if (config.trace) console.warn(`[shinon-task-router] Goal NICHT aktiviert (${code}) — linearer Turn bleibt`);
-    return activationVerdict(false, `GOAL_ERROR:${code}`);
+    return activationVerdict({ reason: `GOAL_ERROR:${code}` });
   }
 }
 
 /** Aus der Entscheidung und der Aktivierung den Datensatz bauen. */
-export function buildDecision(decision, activation = activationVerdict(false, 'LINEAR_TURN')) {
+export function buildDecision(decision, activation = activationVerdict({ reason: 'LINEAR_TURN' })) {
   return {
     contract: CONTRACT,
     outcome: decision.goal ? 'goal' : 'linear',
@@ -498,10 +567,28 @@ export const MicroStateSchema = z.object({
   NEXT_ACTION: z.string().required(),
 });
 
+/**
+ * Die Empfehlung, wenn die Tabelle den Schluessel nicht kennt: NONE — wer die
+ * Phase nicht kennt, empfiehlt nichts (fail-closed) —, aber BENANNT und einmal
+ * je Schluessel gemeldet. Vorher degradierte `?? 'NONE'` still: eine unbekannte
+ * Phase oder ein unbekannter Armierungsstand sah aus wie "nichts zu tun".
+ *
+ * Der Merker ist kein Zustand des Laufs, sondern eine Log-Bremse (je Schluessel
+ * eine Zeile, begrenzt durch die Zahl der verschiedenen Schluessel).
+ */
+const UNKNOWN_ADVICE = 'NONE';
+const reportedUnknownAdvice = new Set();
+
 /** Die Beratung aus der Tabelle — unbekannt kostet eine Empfehlung, nie die Wahrheit. */
 export function nextActionFor(state, activation = '') {
   const key = state === 'active' ? `active:${activation}` : state;
-  return NEXT_ACTIONS[key] ?? 'NONE';
+  const advice = NEXT_ACTIONS[key];
+  if (advice !== undefined) return advice;
+  if (!reportedUnknownAdvice.has(key)) {
+    reportedUnknownAdvice.add(key);
+    console.warn(`[shinon-task-router] Zustand "${key}" ist nicht in NEXT_ACTIONS — Empfehlung bleibt ${UNKNOWN_ADVICE}`);
+  }
+  return UNKNOWN_ADVICE;
 }
 
 /**
@@ -531,34 +618,61 @@ export function nextActionFor(state, activation = '') {
  * FAIL-CLOSED in beide Richtungen: kein View → NO_GOAL, unlesbarer View →
  * UNAVAILABLE, unbekannte Phase → gespiegelt und ohne Empfehlung.
  */
-export function projectMicroState(view, options = {}) {
+/**
+ * Wie erreichbar der autoritative Zustand war — die Achse, die NO_GOAL von
+ * UNAVAILABLE trennt, und die Bruecke zu den Feldern.
+ *
+ * `readable` schliesst `present` ein: KEIN Feldzugriff findet ohne diesen
+ * Vorbehalt statt (gemessen: `view.phase` ohne diese Bruecke warf bei `null` mit
+ * TypeError).
+ */
+function availability(view, options) {
   const present = view !== null && view !== undefined;
-  const unavailable = options.unavailable === true || (present && typeof view.phase !== 'string');
-  const state = unavailable ? MICRO_UNAVAILABLE : present ? view.phase : MICRO_NO_GOAL;
-  // `readable` ist die einzige Bruecke zu den Feldern des View — sie schliesst
-  // `present` ein, damit KEIN Feldzugriff ohne Vorbehalt stattfindet (gemessen:
-  // `view.phase` ohne diese Bruecke warf bei null mit TypeError).
-  const readable = present && !unavailable;
+  const usable = present && typeof view.phase === 'string' && options.unavailable !== true;
+  return {
+    present,
+    readable: usable,
+    state: options.unavailable === true || (present && !usable) ? MICRO_UNAVAILABLE : present ? view.phase : MICRO_NO_GOAL,
+  };
+}
 
-  const objective = readable && typeof view.objective === 'string' ? view.objective : '';
+/**
+ * Den Blocker rendern — nur bei Phase `blocked` (die Types sagen: „present exactly
+ * while blocked") und nur aus einem vorhandenen Grund. Kein Grund heisst leer,
+ * nicht geraten.
+ */
+function blockerOf(view) {
+  if (view.phase !== 'blocked') return '';
+  const reason = objectOrNull(view.blockedReason);
+  if (reason === null) return '';
+  return [reason.code, reason.message]
+    .filter((part) => typeof part === 'string' && part !== '')
+    .join(': ');
+}
+
+/** Die Felder, die WORTGLEICH aus dem autoritativen View stammen. Nie abgeleitet. */
+function authoritativeFields(view) {
+  return {
+    OBJECTIVE: typeof view.objective === 'string' ? view.objective : '',
+    CURRENT_BLOCKER: blockerOf(view),
+  };
+}
+
+export function projectMicroState(view, options = {}) {
+  const reach = availability(view, options);
+  // LAST_VERIFIED_FACT kommt AUSSCHLIESSLICH aus der benannten Quelle — leer,
+  // wenn keine da ist, und unabhaengig davon, ob ein View lesbar war.
   const fact = typeof options.fact === 'string' ? options.fact : '';
-
-  let blocker = '';
-  if (readable && view.phase === 'blocked' && view.blockedReason !== null && typeof view.blockedReason === 'object') {
-    blocker = [view.blockedReason.code, view.blockedReason.message]
-      .filter((part) => typeof part === 'string' && part !== '')
-      .join(': ');
-  }
-
-  const activation = readable && typeof view.activation === 'string' ? view.activation : '';
+  const fields = reach.readable ? authoritativeFields(view) : { OBJECTIVE: '', CURRENT_BLOCKER: '' };
+  const activation = reach.readable && typeof view.activation === 'string' ? view.activation : '';
 
   return MicroStateSchema({
     contract: MICRO_STATE_CONTRACT,
-    OBJECTIVE: objective,
-    CURRENT_STATE: state,
+    OBJECTIVE: fields.OBJECTIVE,
+    CURRENT_STATE: reach.state,
     LAST_VERIFIED_FACT: fact,
-    CURRENT_BLOCKER: blocker,
-    NEXT_ACTION: nextActionFor(state, activation),
+    CURRENT_BLOCKER: fields.CURRENT_BLOCKER,
+    NEXT_ACTION: nextActionFor(reach.state, activation),
   });
 }
 
@@ -605,7 +719,7 @@ export function createMicroStateService(ctx) {
  */
 function onDecision(ctx, config, runtime, record) {
   const decision = decide(record, config);
-  const activation = decision.goal ? activateGoal(ctx, config, runtime, record) : activationVerdict(false, 'LINEAR_TURN');
+  const activation = decision.goal ? activateGoal(ctx, config, runtime, record) : activationVerdict({ reason: 'LINEAR_TURN' });
   if (config.trace && !decision.goal) console.log(`[shinon-task-router] linearer Turn (${decision.reason})`);
   try {
     const emitted = DecisionSchema(buildDecision(decision, activation));

@@ -1,0 +1,30 @@
+{
+  "name": "@shinon/popup",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "meta": {
+    "title": "Shinon Popup — Trajectory-Overlay",
+    "description": "Konfigurierbares Popup über dem Chat-Input mit Original/Ausgabe/Vorgang als Trajectory-Eintrag"
+  }
+}

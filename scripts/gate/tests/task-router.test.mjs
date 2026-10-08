@@ -660,7 +660,9 @@ test('§17: ohne Sitzung im Datensatz wird nicht geraten', async () => {
   await many.ctx.waterfall(prompter.PRE_STEP_EVENT, second, loopDefault(second.messages));
   many.ctx.emit(prompter.DECISION_CHANNEL, { contract: prompter.CONTRACT, intentClassification: 'MULTI_STEP_TASK', rawLength: 128 });
   assert.equal(many.decisions[2].outcome, 'goal', 'die Entscheidung faellt trotzdem');
-  assert.equal(many.decisions[2].activation, 'NO_LIVE_AGENT', 'aber ohne geratene Zuordnung');
+  // Und der Grund ist ein ANDERER als „kein lebender Agent": es sind zwei. Eine
+  // Zuordnung waere geraten, und das darf man dem Datensatz ansehen.
+  assert.equal(many.decisions[2].activation, 'STEP_AMBIGUOUS', 'aber ohne geratene Zuordnung');
   assert.deepEqual(goals.calls.create, [], 'kein Goal aus einer Vermutung');
   many.prompterDispose();
   many.routerDispose();

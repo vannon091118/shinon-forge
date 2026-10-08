@@ -48,6 +48,15 @@ export const Config = z.object({
  * bei @shinon/project-index: ein Vertragsname und ZWEI Operationen (`read`,
  * `write`) — kein Dateihandle, kein Schema, kein Speicher.
  */
+/**
+ * Die Dienste, die dieser Host braucht. Ohne deklarierte Injektion verweigert
+ * Cordis den Zugriff auf `ctx.storageDomain` (live gemessen im echten Boot:
+ * „cannot get property \"storageDomain\" without inject"). Genau so deklarieren
+ * es die mitgelieferten Hostplugins (dsh-agent-instructions exportiert `inject`
+ * neben `Config` und `apply`).
+ */
+export const inject = ['storageDomain'];
+
 export const STORE_SERVICE = 'shinon_codingmon_store';
 
 /** Vertragsname des Spiegels — was der Dienst zusichert, nicht wie er es tut. */

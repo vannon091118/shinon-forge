@@ -35,11 +35,15 @@ if (dsh === null) {
   process.exit(2);
 }
 
+/** Öffner je Plattform — Tabelle statt verschachtelter Ternaere. */
+const PLATFORM_OPENERS = {
+  win32: (url) => ['cmd', ['/c', 'start', '', url]],
+  darwin: (url) => ['open', [url]],
+};
+
 /** Die URL in den System-Standardbrowser geben, ohne den Wrapper zu blocken. */
 function openBrowser(url) {
-  const command = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
-    : process.platform === 'darwin' ? ['open', [url]]
-    : ['xdg-open', [url]];
+  const command = (PLATFORM_OPENERS[process.platform] ?? ((target) => ['xdg-open', [target]]))(url);
   try {
     const child = spawn(command[0], command[1], { stdio: 'ignore', detached: true });
     child.unref();
@@ -67,16 +71,22 @@ console.log(`  Profil: ${profileName}    dsh: ${dsh}`);
 if (ARGS_NETWORK) console.log('  Netzwerk-Modus aktiv (--network: SSH-Tunnel für externen Zugriff)');
 console.log('═══════════════════════════════════\n');
 
+/** Der Port des Wrappers — EINE Quelle fuer Server, Trusted-Host und Meldung. */
+const PORT = 3081;
+
 const args = [
   '--profile', profileName,
   '--no-open',
   '--trusted-host', 'localhost',
   '--trusted-host', '127.0.0.1',
+  '--port', String(PORT),
 ];
 if (ARGS_NETWORK) {
   const lan = lanIPv4();
-  if (lan) args.push('--trusted-host', `${lan}:3080`);
-  console.log(`\n🔗 Netzwerk: ${lan ?? 'keine nicht-loopback-IP'} — Use SSH-Tunnel (z.B. ssh -R 18765:localhost:3080 tunnel@host) für externen Zugriff. DSH blockiert --host 0.0.0.0 aus Sicherheitsgründen.\n`);
+  // Vorher stand hier `${lan}:3080` — ein Trusted-Host fuer einen Port, auf dem
+  // der Server nicht laeuft. Der Tunnel-Beispielbefehl nennt denselben Wert.
+  if (lan) args.push('--trusted-host', `${lan}:${PORT}`);
+  console.log(`\n🔗 Netzwerk: ${lan ?? 'keine nicht-loopback-IP'} — Use SSH-Tunnel (z.B. ssh -R 18765:localhost:${PORT} tunnel@host) für externen Zugriff. DSH blockiert --host 0.0.0.0 aus Sicherheitsgründen.\n`);
 }
 
 const child = spawn(dsh, args, {
@@ -116,13 +126,15 @@ child.stdout.on('data', (chunk) => {
 /** Exit-Code, wenn ein Signal den Wrapper beendet (null = kein Signal). */
 let closing = null;
 
+/**
+ * Ein Signal beendet Kind und Wrapper. Der Wrapper wartet auf den Timer statt in
+ * einer Schleife; die Abwartefrist (3 s) ist die harte Grenze, danach SIGKILL.
+ */
 const shutdown = (signal) => {
   const code = signal === 'SIGTERM' ? 0 : 130;
   if (child.exitCode !== null) process.exit(code);
   closing = code;
   child.kill(signal === 'SIGTERM' ? 'SIGTERM' : 'SIGINT');
-  // Endet das Kind vorher, beendet der 'exit'-Handler unten den Wrapper mit
-  // demselben Code; sonst greift hier die harte Frist.
   setTimeout(() => {
     if (child.exitCode === null) child.kill('SIGKILL');
     process.exit(code);

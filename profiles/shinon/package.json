@@ -35,7 +35,8 @@
         "@shinon/prompter",
         "@shinon/project-index",
         "@shinon/task-router",
-        "@shinon/codingmon"
+        "@shinon/codingmon",
+        "@deepseek-ai/dsh-experimental-auto-review"
       ]
     }
   }

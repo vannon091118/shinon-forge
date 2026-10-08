@@ -2,6 +2,4 @@
     - id: shinon-tooltip
       name: '@shinon/tooltip'
       config:
-        showTooltips: true
         tooltipDelay: 300
-        tooltipPosition: 'top'
