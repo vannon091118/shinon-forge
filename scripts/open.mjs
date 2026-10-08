@@ -19,6 +19,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { findOnPath } from './lib/yaml.mjs';
+import * as os from 'node:os';
 
 const root = repo.ROOT;
 // activeProfile() liest das Manifest (dev-Skript, eine Quelle) — mit Default-Arg.
@@ -47,19 +48,36 @@ function openBrowser(url) {
   }
 }
 
+const ARGS_NETWORK = process.argv.includes('--network');
+
+// LAN-IP ermitteln (für Netzwerk-Trusted-Host)
+function lanIPv4() {
+  const ifaces = os.networkInterfaces();
+  for (const addrs of Object.values(ifaces)) {
+    for (const a of addrs) {
+      if (a.family === 'IPv4' && !a.internal) return a.address;
+    }
+  }
+  return null;
+}
+
 console.log('═══════════════════════════════════');
 console.log('  Shinon Forge — 1-Click-Start');
 console.log(`  Profil: ${profileName}    dsh: ${dsh}`);
+if (ARGS_NETWORK) console.log('  Netzwerk-Modus aktiv (--network: SSH-Tunnel für externen Zugriff)');
 console.log('═══════════════════════════════════\n');
 
-// Wie in dev:web: trusted-host für die Loopback-Adresse, --no-open weil wir
-// die tokenisierte URL selbst übernehmen (stabil, nicht DSHs Auto-Tab).
 const args = [
   '--profile', profileName,
   '--no-open',
   '--trusted-host', 'localhost',
   '--trusted-host', '127.0.0.1',
 ];
+if (ARGS_NETWORK) {
+  const lan = lanIPv4();
+  if (lan) args.push('--trusted-host', `${lan}:3080`);
+  console.log(`\n🔗 Netzwerk: ${lan ?? 'keine nicht-loopback-IP'} — Use SSH-Tunnel (z.B. ssh -R 18765:localhost:3080 tunnel@host) für externen Zugriff. DSH blockiert --host 0.0.0.0 aus Sicherheitsgründen.\n`);
+}
 
 const child = spawn(dsh, args, {
   cwd: root,

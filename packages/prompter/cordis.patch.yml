@@ -4,7 +4,7 @@
       config:
         observeEvents: ['agent/pre-step']
         # MIN = nur Rechtschreibung, Grammatik, Zeichensetzung, minimale Struktur.
-        mode: MIN
+        mode: MAX
         # Route des One-Shot-Childs. Leer heisst: KEIN Aufruf — der Enhancer
         # haengt am Schritt, meldet 'NO_ROUTE' und der Roh-Prompt gilt.
         # Zum Aktivieren hier eine Route des Profils eintragen, z. B.
@@ -12,12 +12,10 @@
         #   model: agnes-2.5-flash
         # Das ist eine bewusste Entscheidung, weil damit pro Nutzer-Schritt ein
         # zusaetzlicher Modellaufruf entsteht.
-        provider: ''
-        model: ''
-        # Kontext-Quelle fuer MAX: eine JSON-Datei in der Form von ContextSchema,
-        # relativ zum Paket aufgeloest. Leer heisst: kein Kontext — dann wird MAX
-        # mit 'MODE_NEEDS_CONTEXT' abgelehnt, statt Referenzen zu erfinden.
-        # Der Project Index (Phase 4) fuellt spaeter genau diese Form.
+        provider: agnes
+        model: agnes-2.5-flash
+        # MAX: Kontext kommt vom Project Index (shinon.project-index/query-v1)
+        # über ctx.get('shinon_index_query'). Index muss aktiv sein (profile verify: stamp).
         contextPath: ''
         maxTokens: 1200
         temperature: 0

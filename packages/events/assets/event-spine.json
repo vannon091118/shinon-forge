@@ -56,13 +56,37 @@
     "typePath": "type",
     "typeMap": {
       "session.created": "session.created",
+      "user/message": "message.received",
+      "assistant/message": "message.completed",
+      "step/start": "tool.requested",
+      "step/end": "tool.completed",
+      "turn/start": "turn.start",
+      "turn/end": "turn.end",
+      "tool/call": "tool.requested",
+      "tool/result": "tool.completed",
+      "agent/inbox/spliced": "inbox.spliced",
+      "request/header": "request.header",
+      "developer/message": "developer.message",
       "message.created": "message.received",
       "message.completed": "message.completed",
       "tool.requested": "tool.requested",
       "tool.completed": "tool.completed"
     },
-    "verifiedTypes": ["session.created"],
-    "note": "session/event ist der einzige im Repo belegte DSH-Event-Name. Die typeMap-Einträge außer session.created sind Kandidaten und gelten als NOT_VERIFIED, bis ein DSH-Boot sie bestätigt."
+    "verifiedTypes": [
+      "session.created",
+      "user/message",
+      "assistant/message",
+      "step/start",
+      "step/end",
+      "turn/start",
+      "turn/end",
+      "tool/call",
+      "tool/result",
+      "agent/inbox/spliced",
+      "request/header",
+      "developer/message"
+    ],
+    "note": "Die zwölf verifizierten DSH-Typen bilden die aktive Palette ab. Vier frühere typeMap-Aliase bleiben für Replay-/Integrationskompatibilität erhalten."
   },
   "events": {
     "session.created": {
@@ -78,6 +102,31 @@
     "message.completed": {
       "source": "dsh.message",
       "phase": "output",
+      "payload": ["session_id"]
+    },
+    "turn.start": {
+      "source": "dsh.turn",
+      "phase": "start",
+      "payload": ["session_id"]
+    },
+    "turn.end": {
+      "source": "dsh.turn",
+      "phase": "end",
+      "payload": ["session_id"]
+    },
+    "inbox.spliced": {
+      "source": "dsh.inbox",
+      "phase": "context",
+      "payload": ["session_id"]
+    },
+    "request.header": {
+      "source": "dsh.request",
+      "phase": "metadata",
+      "payload": ["session_id"]
+    },
+    "developer.message": {
+      "source": "dsh.message",
+      "phase": "context",
       "payload": ["session_id"]
     },
     "claim.created": {
