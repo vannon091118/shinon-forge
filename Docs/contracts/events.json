@@ -1,16 +1,16 @@
 {
   "name": "@shinon/events — Hook/Event-Spine (Wave 2)",
   "status": "NOT_VERIFIED",
-  "note": "Gebaut und getestet: die neun Event-Pfade werden in einem Replay gegen die eingefrorene Fixture envelopegleich reproduziert, ungültige Events werden fail-closed verworfen, die Nicht-Aktions-Grenze ist statisch geprüft (npm run gate:test, 21/21). Der Mount ist belegt: dsh 0.2.0-rc.2 löst das Profil auf und listet alle Bundle-Layer inklusive shinon-events (dsh-profile-test, Exit 0). NICHT geprüft: das Verhalten gegen ein echtes, laufendes DSH-Signal, und die Carrier-Typnamen außer session.created sind Kandidaten. Genau deshalb NOT_VERIFIED statt IMPLEMENTED.",
+  "note": "Gebaut und getestet: die vierzehn Event-Pfade (neun Shinon-Signale plus fünf Typen über den DSH-Carrier session/event) werden in einem Replay gegen die eingefrorene Fixture envelopegleich reproduziert, ungültige Events werden fail-closed verworfen, die Nicht-Aktions-Grenze ist statisch geprüft (npm run gate:test, 22 Events-Tests, Exit 0). Der Mount ist belegt: dsh löst das Profil auf und listet alle Bundle-Layer inklusive shinon-events (dsh-profile-test, Exit 0). Der Carrier-Vertrag ist gemessen, nicht geraten: alle zwölf typeMap-Namen kommen in der installierten DSH-Fassung vor; die vier früheren Aliase (message.created, message.completed, tool.requested, tool.completed) kamen in keiner vor und sind entfernt. Das Gate vergleicht typeMap und verifiedTypes gegeneinander, damit kein unbelegter Eintrag nachwächst. NICHT geprüft: das Verhalten gegen ein echtes, laufendes DSH-Signal — dafür fehlt ein Live-Lauf im Profil. Genau deshalb NOT_VERIFIED statt IMPLEMENTED.",
   "rules": [
     {
-      "positive": "Der Spine ist datengetrieben: Envelope (8 Felder), neun Event-Typen, Signal-/Carrier-Zuordnung und Ableitungsregeln stehen in packages/events/assets/event-spine.json. Ein neuer Event-Typ ist zuerst eine Datenänderung.",
+      "positive": "Der Spine ist datengetrieben: Envelope (8 Felder), vierzehn Event-Typen, Signal-/Carrier-Zuordnung und Ableitungsregeln stehen in packages/events/assets/event-spine.json. Ein neuer Event-Typ ist zuerst eine Datenänderung.",
       "forbidden": "Ein Event-Typ, der nur im Code existiert; ein Envelope-Feld, das im Vertrag fehlt; eine erfundene Quelle.",
       "fallback": "Ist der Vertrag nicht lesbar, verbindet sich der Spine nicht und sagt das — er rät keine Typen.",
       "error": "EVENT_CONTRACT_UNREADABLE (Warnung, kein Mount) — der Host läuft weiter.",
       "trace": "Jedes emittierte Event trägt contract=shinon.event-spine/v1 und payload_ref auf die Nutzlast.",
       "replay": "Das Gate prüft den Vertrag deterministisch: scripts/gate/plugins/events-spine.mjs (contractIssues).",
-      "invariant": "Envelope = {event_id, event_type, session_id, source, timestamp, payload_ref, contract, trace_id}; events.keys = die neun Typen; jeder Typ ist über Signal oder Carrier erreichbar."
+      "invariant": "Envelope = {event_id, event_type, session_id, source, timestamp, payload_ref, contract, trace_id}; events.keys = die vierzehn Typen; jeder Typ ist über Signal oder Carrier erreichbar; jeder Carrier-Eintrag ist in verifiedTypes belegt und umgekehrt."
     },
     {
       "positive": "Ein Event, das den Contract verletzt, wird verworfen und nie emittiert. Abgewiesen werden: unbekanntes Signal, unbekannter Carrier-Typ, fehlende Session, fehlender Pflicht-Nutzlastschlüssel, Vertrags-/Quellen-/Digest-Abweichung.",

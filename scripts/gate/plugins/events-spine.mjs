@@ -40,11 +40,26 @@ export const ENVELOPE_FIELDS = [
   'trace_id',
 ];
 
-/** Die neun initialen Event-Typen aus Wave 2. */
+/**
+ * Die Event-Typen des Vertrags: die neun Pfade aus Wave 2 plus fünf Typen, die
+ * ausschließlich über den DSH-Carrier `session/event` erreichbar sind
+ * (turn/start, turn/end, agent/inbox/spliced, request/header, developer/message).
+ *
+ * Diese Menge wächst nur mit einem Carrier-Namen, der in der installierten
+ * DSH-Fassung belegt ist — nie mit einem Alias. Vier Einträge der typeMap
+ * (message.created, message.completed, tool.requested, tool.completed) standen in
+ * keiner DSH-Fassung; sie sind entfernt, und der Abgleich unten fängt den
+ * nächsten solchen Fall.
+ */
 export const EVENT_TYPES = [
   'session.created',
   'message.received',
   'message.completed',
+  'turn.start',
+  'turn.end',
+  'inbox.spliced',
+  'request.header',
+  'developer.message',
   'claim.created',
   'tool.requested',
   'tool.completed',
@@ -163,11 +178,25 @@ export function contractIssues(asset, file) {
     if (!isText(carrier.signal)) issues.push(`${file}: carrier.signal fehlt`);
     if (!isText(carrier.typePath)) issues.push(`${file}: carrier.typePath fehlt`);
     if (typeof carrier.verified !== 'boolean') issues.push(`${file}: carrier.verified muss ein Boolean sein`);
+    const typeMapKeys = Object.keys(carrier.typeMap ?? {});
     for (const [raw, type] of Object.entries(carrier.typeMap ?? {})) {
       if (!known(EVENT_TYPES)(type)) issues.push(`${file}: carrier.typeMap.${raw} → unbekannter Event-Typ ${type}`);
       reachable.add(type);
     }
-    if (!Array.isArray(carrier.verifiedTypes)) issues.push(`${file}: carrier.verifiedTypes fehlt (unbelegte Zuordnungen müssen markiert sein)`);
+    // Der Spiegel zwischen Tabelle und Belegliste. Ohne ihn reist ein erfundener
+    // Alias unbemerkt mit: er steht in der typeMap, in verifiedTypes fehlt er, und
+    // nichts vergleicht die beiden Listen. Genau so blieben vier Aliase im
+    // Artefakt, die es in DSH nirgends gibt.
+    if (!Array.isArray(carrier.verifiedTypes)) {
+      issues.push(`${file}: carrier.verifiedTypes fehlt (unbelegte Zuordnungen müssen markiert sein)`);
+    } else {
+      for (const raw of carrier.verifiedTypes) {
+        if (!typeMapKeys.includes(raw)) issues.push(`${file}: carrier.verifiedTypes nennt ${raw}, der Eintrag fehlt in carrier.typeMap`);
+      }
+      for (const raw of typeMapKeys) {
+        if (!carrier.verifiedTypes.includes(raw)) issues.push(`${file}: carrier.typeMap.${raw} ist in carrier.verifiedTypes nicht belegt`);
+      }
+    }
   }
 
   const uncovered = EVENT_TYPES.filter((type) => !reachable.has(type));

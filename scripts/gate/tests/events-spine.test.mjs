@@ -124,10 +124,31 @@ test('events-spine: unbekannter Event-Typ und toter Signalpfad werden gemeldet',
   extra.events['mood.changed'] = { source: 'shinon.persona', phase: 'state', payload: ['session_id'] };
   assert.ok(contractIssues(extra, 'x.json').some((issue) => issue.includes('unbekannter Event-Typ mood.changed')));
 
+  // `tool.completed` ist über ZWEI Carrier-Namen erreichbar (step/end und
+  // tool/result). Erst wenn beide Wege und das Signal weg sind, ist der Typ
+  // unerreichbar. Ein Test, der nur einen Alias löscht, prüft die Abdeckung
+  // nicht — er nimmt an, dass es genau einen Weg gibt.
   const orphan = clone(asset);
   delete orphan.signals['shinon/tool/completed'];
-  delete orphan.carrier.typeMap['tool.completed'];
-  assert.ok(contractIssues(orphan, 'x.json').some((issue) => issue.includes('ohne Signal/Carrier-Pfad: tool.completed')));
+  for (const [raw, type] of Object.entries(orphan.carrier.typeMap)) {
+    if (type === 'tool.completed') delete orphan.carrier.typeMap[raw];
+  }
+  const issues = contractIssues(orphan, 'x.json');
+  assert.ok(issues.some((issue) => issue.includes('ohne Signal/Carrier-Pfad: tool.completed')));
+  const uncovered = issues.filter((issue) => issue.includes('ohne Signal/Carrier-Pfad'));
+  assert.equal(uncovered.length, 1, 'nur tool.completed darf unerreichbar sein');
+});
+
+test('events-spine: eine Zuordnung ohne Beleg und ein Beleg ohne Zuordnung werden gemeldet', () => {
+  // Der Spiegel, der die vier erfundenen Aliase hätte fangen müssen: sie standen
+  // in der typeMap und in verifiedTypes fehlten sie — verglichen wurde nie.
+  const unverified = clone(asset);
+  unverified.carrier.verifiedTypes = unverified.carrier.verifiedTypes.filter((raw) => raw !== 'tool/call');
+  assert.ok(contractIssues(unverified, 'x.json').some((issue) => issue.includes('carrier.typeMap.tool/call ist in carrier.verifiedTypes nicht belegt')));
+
+  const phantom = clone(asset);
+  phantom.carrier.verifiedTypes.push('message.created');
+  assert.ok(contractIssues(phantom, 'x.json').some((issue) => issue.includes('carrier.verifiedTypes nennt message.created')));
 });
 
 test('events-spine: forbidden muss die Nicht-Aktions-Grenze nennen', () => {
@@ -138,7 +159,7 @@ test('events-spine: forbidden muss die Nicht-Aktions-Grenze nennen', () => {
 
 // ── 2. Contract-Gate: Fixture ────────────────────────────────────────────────
 
-test('events-spine: die echte Fixture ist fehlerfrei und deckt alle neun Pfade', () => {
+test('events-spine: die echte Fixture ist fehlerfrei und deckt alle vierzehn Pfade', () => {
   assert.deepEqual(fixtureIssues(fixture, asset, 'fixture.json'), []);
   assert.equal(fixture.steps.length, EVENT_TYPES.length);
   assert.ok(fixture.invalid.length >= 3, 'zu wenige Verwerfungsfälle');

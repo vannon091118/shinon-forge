@@ -102,20 +102,31 @@ child.stdout.on('data', (chunk) => {
   }
 });
 
-/** Sauberes Beenden: Ctrl-C oder Kind-Exit beendet beides, kein Orphan. */
+/**
+ * Sauberes Beenden: Ctrl-C oder Kind-Exit beendet beides, kein Orphan.
+ *
+ * Die Abwartefrist liegt auf dem Timer, nicht in einer Warteschleife. Eine
+ * synchrone Warteschleife blockiert den Event-Loop — und damit genau den
+ * 'exit'-Handler, der `child.exitCode` setzt: sie kann den Exit NIE beobachten
+ * und läuft immer die volle Frist ab. Gemessen (Kind endet nach 300ms):
+ * Warteschleife 3020ms Wanduhr und volle CPU-Last; mit der Frist auf dem Timer
+ * endet der Wrapper nach 315ms, sobald das Kind wirklich weg ist. SIGKILL
+ * greift nur, wenn es nicht wegkommt — das ist die harte Frist, wie vorher.
+ */
+/** Exit-Code, wenn ein Signal den Wrapper beendet (null = kein Signal). */
+let closing = null;
+
 const shutdown = (signal) => {
-  if (child.exitCode === null) {
-    child.kill(signal === 'SIGTERM' ? 'SIGTERM' : 'SIGINT');
-    // Endliche Abwartefrist (3s) als synchroner Busy-Loop — kein Orphan,
-    // danach hart. Kein Timer, weil der Wrapper hier sofort endet.
-    const deadline = Date.now() + 3000;
-    while (child.exitCode === null && Date.now() < deadline) {
-      const end = Date.now() + 50;
-      while (Date.now() < end && child.exitCode === null) { /* warte */ }
-    }
+  const code = signal === 'SIGTERM' ? 0 : 130;
+  if (child.exitCode !== null) process.exit(code);
+  closing = code;
+  child.kill(signal === 'SIGTERM' ? 'SIGTERM' : 'SIGINT');
+  // Endet das Kind vorher, beendet der 'exit'-Handler unten den Wrapper mit
+  // demselben Code; sonst greift hier die harte Frist.
+  setTimeout(() => {
     if (child.exitCode === null) child.kill('SIGKILL');
-  }
-  process.exit(signal === 'SIGTERM' ? 0 : 130);
+    process.exit(code);
+  }, 3000);
 };
 
 process.on('SIGINT', () => shutdown('SIGINT'));
@@ -123,5 +134,5 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 child.on('exit', (code, signal) => {
   console.log(`\n— dsh beendet${signal !== null ? ` (Signal ${signal})` : ` (Exit ${code})`}`);
-  process.exit(signal !== null || code === 0 ? 0 : code ?? 1);
+  process.exit(closing ?? (signal !== null || code === 0 ? 0 : code ?? 1));
 });

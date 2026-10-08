@@ -24,7 +24,7 @@ import {
   EVENT_TYPES as SPINE_EVENTS,
 } from '../plugins/events-spine.mjs';
 import {
-  EVENT_TYPES,
+  PERSONA_EVENT_TYPES,
   STATE_FIELDS,
   stateContractIssues,
   staticIssues,
@@ -136,9 +136,24 @@ test('persona: der echte Zustandsvertrag ist fehlerfrei', () => {
   assert.deepEqual(stateContractIssues(contract, 'persona-state.json'), []);
 });
 
-test('persona: die Übergänge sind genau die neun Event-Typen des Spines', () => {
-  assert.deepEqual([...EVENT_TYPES].sort(), [...SPINE_EVENTS].sort());
-  assert.deepEqual(Object.keys(contract.transitions).sort(), [...SPINE_EVENTS].sort());
+test('persona: die Übergänge sind genau die Event-Typen, die die Persona modelliert', () => {
+  assert.deepEqual(Object.keys(contract.transitions).sort(), [...PERSONA_EVENT_TYPES].sort());
+});
+
+test('persona: jeder modellierte Typ ist ein Typ des Spines, und die Lücke ist benannt', () => {
+  // Teilmenge, nicht Gleichheit: der Spine spricht vierzehn Typen, die Persona
+  // neun. Ein Typ, den die Persona einführt und der Spine nicht kennt, wäre eine
+  // zweite Sprache — und muss rot sein.
+  for (const type of PERSONA_EVENT_TYPES) {
+    assert.ok(SPINE_EVENTS.includes(type), `${type} ist kein Event-Typ des Spines`);
+  }
+  assert.ok(SPINE_EVENTS.length > PERSONA_EVENT_TYPES.length, 'der Spine muss mehr Typen kennen als die Persona modelliert');
+  // Die nicht modellierten Typen sind namentlich benannt, damit die Lücke eine
+  // Entscheidung bleibt und nicht still wächst.
+  assert.deepEqual(
+    SPINE_EVENTS.filter((type) => !PERSONA_EVENT_TYPES.includes(type)).sort(),
+    ['developer.message', 'inbox.spliced', 'request.header', 'turn.end', 'turn.start'],
+  );
 });
 
 test('persona: fehlender Übergang wird gemeldet', () => {

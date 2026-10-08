@@ -26,10 +26,18 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dshRoot } from '../../lib/yaml.mjs';
+import { dshHarnessDir, dshRoot } from '../../lib/yaml.mjs';
 
-/** Die Fassung, an der alle folgenden Aussagen gemessen wurden. */
-const VERIFIED_DSH_VERSION = '0.2.0-rc.2';
+/**
+ * Die Fassung, an der alle folgenden Aussagen gemessen wurden.
+ *
+ * Neu gemessen am 2026-10-08 gegen 0.2.1-alpha.1 (vorher 0.2.0-rc.2): der Seam
+ * ist unverändert — `send(message, target, wakeup)` mit genau einem
+ * `inbox.splice`, genau ein `inbox.claim(` (in preStep) und genau ein
+ * `waterfall("agent/pre-step")` im ganzen Harness. Nur die Version ändert sich,
+ * die Zusagen nicht.
+ */
+const VERIFIED_DSH_VERSION = '0.2.1-alpha.1';
 
 const REPO = fileURLToPath(new URL('../../..', import.meta.url));
 const root = dshRoot();
@@ -92,7 +100,12 @@ test('Eingang: es gibt genau einen Konsumenten und genau einen Seam', () => {
   assert.equal(count(preStep, 'waterfall("agent/pre-step"'), 1, 'preStep dispatcht genau einen Seam');
 
   // Der Seam hat im ganzen installierten Harness genau EINEN Produzenten.
-  const packages = join(root, 'node_modules/@deepseek-ai');
+  // Gesucht wird der VOLLSTÄNDIGE @deepseek-ai-Baum (dshHarnessDir), nicht
+  // dshRoot(): das ist das dsh-Paket, und dessen eigener Teilbaum enthält den
+  // Agent-Loop gar nicht — der Scan zählte dort 18 statt 250+ Pakete und die
+  // Aussage "genau ein Produzent" wäre über den falschen Baum gefallen.
+  const packages = dshHarnessDir();
+  assert.ok(packages !== null, 'der @deepseek-ai-Baum des Installats ist nicht auffindbar (dshHarnessDir() ist null)');
   let files = 0;
   let waterfalls = 0;
   let listeners = 0;
@@ -109,7 +122,7 @@ test('Eingang: es gibt genau einen Konsumenten und genau einen Seam', () => {
       listeners += count(text, 'on("agent/pre-step"');
     }
   }
-  assert.ok(files > 300, `zu wenige Dateien gescannt: ${files}`);
+  assert.ok(files > 300, `zu wenige Dateien gescannt: ${files} in ${packages}`);
   assert.equal(waterfalls, 1, 'genau ein waterfall("agent/pre-step") im Harness');
   assert.equal(mentions, waterfalls + listeners, 'jedes weitere Vorkommen ist ein Listener, keine zweite Quelle');
   assert.ok(listeners >= 10, `erwartet viele Listener, gefunden: ${listeners}`);

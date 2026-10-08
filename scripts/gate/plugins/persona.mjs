@@ -22,8 +22,17 @@ export const STATE_CONTRACT_ID = 'shinon.persona-state/v1';
 /** Die sechs Felder, die der Zustand nach außen hat — mehr nicht. */
 export const STATE_FIELDS = ['identity', 'stance', 'uncertainty', 'mood', 'capabilities', 'limitations'];
 
-/** Dieselben neun Event-Typen wie der Spine: eine Sprache, nicht zwei. */
-export const EVENT_TYPES = [
+/**
+ * Die Event-Typen, die die Persona MODELLIERT — nicht die des Spines.
+ *
+ * Der Spine spricht inzwischen vierzehn Typen (neun Pfade + fünf Carrier-Typen
+ * aus DSH); die Persona bildet neun davon auf Zustände ab. Die beiden Mengen
+ * sind bewusst NICHT gleich: `deriveState` ignoriert unbekannte Typen
+ * (fail-closed), und ein Übergang für `request.header` wäre ein Zustand ohne
+ * Bedeutung. Jeder Typ hier MUSS ein Typ des Spines sein — das prüft
+ * scripts/gate/tests/persona-state.test.mjs gegen die Spine-Liste.
+ */
+export const PERSONA_EVENT_TYPES = [
   'session.created',
   'message.received',
   'message.completed',
@@ -81,11 +90,11 @@ export function stateContractIssues(contract, file) {
   if (!Array.isArray(baseline.limitations)) issues.push(`${file}: baseline.limitations fehlt`);
 
   const transitions = contract.transitions ?? {};
-  for (const type of EVENT_TYPES) {
+  for (const type of PERSONA_EVENT_TYPES) {
     if (!transitions[type]) issues.push(`${file}: Übergang für ${type} fehlt`);
   }
   for (const type of Object.keys(transitions)) {
-    if (!EVENT_TYPES.includes(type)) issues.push(`${file}: unbekannter Übergang ${type}`);
+    if (!PERSONA_EVENT_TYPES.includes(type)) issues.push(`${file}: unbekannter Übergang ${type}`);
   }
 
   const voice = contract.voice ?? {};

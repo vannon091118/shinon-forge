@@ -20,14 +20,14 @@
     },
     {
       "signal": "session/event",
-      "payload": { "type": "message.created", "session_id": "sess-1", "text": "hallo shinon" },
+      "payload": { "type": "user/message", "session_id": "sess-1", "text": "hallo shinon" },
       "expect": {
-        "event_id": "evt_32bd8d7678589c37",
+        "event_id": "evt_96a0d465259b6ff5",
         "event_type": "message.received",
         "session_id": "sess-1",
         "source": "dsh.message",
         "timestamp": "2026-10-07T12:00:00.000Z",
-        "payload_ref": "sha256:0630b9cb08867d5a",
+        "payload_ref": "sha256:aa3727b9b5d0ac61",
         "contract": "shinon.event-spine/v1",
         "trace_id": "trc_98a7ce332bf5"
       }
@@ -128,6 +128,76 @@
         "payload_ref": "sha256:9564a1e9194ed8bc",
         "contract": "shinon.event-spine/v1",
         "trace_id": "trc_7f29246f9d9f"
+      }
+    },
+    {
+      "signal": "session/event",
+      "payload": { "type": "turn/start", "session_id": "sess-1", "turn": 4 },
+      "expect": {
+        "event_id": "evt_b73b9e93637155a9",
+        "event_type": "turn.start",
+        "session_id": "sess-1",
+        "source": "dsh.turn",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:ff7b84d5197298e4",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_b529481c2a46"
+      }
+    },
+    {
+      "signal": "session/event",
+      "payload": { "type": "turn/end", "session_id": "sess-1", "turn": 4 },
+      "expect": {
+        "event_id": "evt_60a29626950a3038",
+        "event_type": "turn.end",
+        "session_id": "sess-1",
+        "source": "dsh.turn",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:c2094f54a9cae516",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_609ca44c318f"
+      }
+    },
+    {
+      "signal": "session/event",
+      "payload": { "type": "agent/inbox/spliced", "session_id": "sess-1", "count": 2 },
+      "expect": {
+        "event_id": "evt_adb9d5f2badf4afb",
+        "event_type": "inbox.spliced",
+        "session_id": "sess-1",
+        "source": "dsh.inbox",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:cbc634ff0a70e87b",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_a6203fad7e0a"
+      }
+    },
+    {
+      "signal": "session/event",
+      "payload": { "type": "request/header", "session_id": "sess-1", "model": "deepseek-v4" },
+      "expect": {
+        "event_id": "evt_2f56cbd69ffdbe45",
+        "event_type": "request.header",
+        "session_id": "sess-1",
+        "source": "dsh.request",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:466f73e240ece2fa",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_3ad458977e39"
+      }
+    },
+    {
+      "signal": "session/event",
+      "payload": { "type": "developer/message", "session_id": "sess-1", "text": "AGENTS.md gilt" },
+      "expect": {
+        "event_id": "evt_6004a6d6730afb10",
+        "event_type": "developer.message",
+        "session_id": "sess-1",
+        "source": "dsh.message",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:4281579da0a5869d",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_8eac9d243c50"
       }
     }
   ],

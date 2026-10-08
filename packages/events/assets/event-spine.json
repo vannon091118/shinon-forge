@@ -66,11 +66,7 @@
       "tool/result": "tool.completed",
       "agent/inbox/spliced": "inbox.spliced",
       "request/header": "request.header",
-      "developer/message": "developer.message",
-      "message.created": "message.received",
-      "message.completed": "message.completed",
-      "tool.requested": "tool.requested",
-      "tool.completed": "tool.completed"
+      "developer/message": "developer.message"
     },
     "verifiedTypes": [
       "session.created",
@@ -86,7 +82,7 @@
       "request/header",
       "developer/message"
     ],
-    "note": "Die zwölf verifizierten DSH-Typen bilden die aktive Palette ab. Vier frühere typeMap-Aliase bleiben für Replay-/Integrationskompatibilität erhalten."
+    "note": "Die zwölf verifizierten DSH-Typen sind die vollständige aktive Palette; jeder Name ist gegen die installierte DSH-Fassung belegt. Es gibt keine Aliase: vier frühere Einträge (message.created, message.completed, tool.requested, tool.completed) kamen in keiner DSH-Fassung vor und sind entfernt. Das Gate vergleicht typeMap und verifiedTypes gegeneinander, damit kein unbelegter Eintrag nachwächst."
   },
   "events": {
     "session.created": {
