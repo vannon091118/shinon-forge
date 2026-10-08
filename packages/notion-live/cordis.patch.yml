@@ -1,0 +1,6 @@
+- insert:
+    - id: shinon-notion-live
+      name: '@shinon/notion-live'
+      config:
+        enabled: false
+        relayUrl: ''

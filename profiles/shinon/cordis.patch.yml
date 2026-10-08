@@ -155,3 +155,10 @@
   name: "@deepseek-ai/dsh-client-ui-chat"
   config:
     transcriptView: verbose
+
+# Notion Live is mounted for its status panel, but stays disabled until
+# the public OAuth gateway and local bench coordinator are implemented.
+- id: shinon-notion-live
+  config:
+    enabled: false
+    relayUrl: ''

@@ -15,7 +15,8 @@
     "@shinon/prompter": "link:../../packages/prompter",
     "@shinon/project-index": "link:../../packages/project-index",
     "@shinon/task-router": "link:../../packages/task-router",
-    "@shinon/codingmon": "link:../../packages/codingmon"
+    "@shinon/codingmon": "link:../../packages/codingmon",
+    "@shinon/notion-live": "link:../../packages/notion-live"
   },
   "dsh": {
     "profile": {
@@ -36,6 +37,7 @@
         "@shinon/project-index",
         "@shinon/task-router",
         "@shinon/codingmon",
+        "@shinon/notion-live",
         "@deepseek-ai/dsh-experimental-auto-review"
       ]
     }

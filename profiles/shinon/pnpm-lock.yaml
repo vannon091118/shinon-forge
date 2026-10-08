@@ -32,6 +32,9 @@ importers:
       '@shinon/markers':
         specifier: link:../../packages/markers
         version: link:../../packages/markers
+      '@shinon/notion-live':
+        specifier: link:../../packages/notion-live
+        version: link:../../packages/notion-live
       '@shinon/persona':
         specifier: link:../../packages/persona
         version: link:../../packages/persona
