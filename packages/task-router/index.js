@@ -50,7 +50,21 @@ import z from '@deepseek-ai/schemastery';
  *                                   Absicht, wird sie NICHT angetastet
  *                                   (GOAL_EXISTS) — eine Entscheidung eines
  *                                   Menschen ist keine Zufallsvariable
- *   * Progress-Auswertung ......... NICHT hier (§18 loop-guard)
+ *   * Progress-Auswertung ......... NICHT hier (§19 loop-guard)
+ *
+ * §18 (GOAL MICRO-STATE) — die ZUSAETZLICHE Projektion dieses Pakets:
+ * OBJECTIVE, CURRENT_STATE, LAST_VERIFIED_FACT, CURRENT_BLOCKER, NEXT_ACTION.
+ * Die Zusage, die dabei mehr wiegt als die fuenf Felder: „Dieser Zustand ist
+ * keine zweite autoritative Session-Historie.“ GEBAUT als ein Dienst
+ * (`shinon_goal_micro_state`), der bei JEDEM Aufruf frisch aus `ctx.goals`
+ * liest und nichts speichert — kein eigener State, kein Listener, keine
+ * Meldung, kein Zeitstempel. Autoritativ bleiben DSHs Goal-View und die
+ * Session-Daten; die Projektion gibt OBJECTIVE, CURRENT_STATE und
+ * CURRENT_BLOCKER wortgleich zurueck, leitet nichts davon ab und erfindet
+ * nichts (leer statt geraten). LAST_VERIFIED_FACT hat einen benannten
+ * Quellschlitz und sonst keine Quelle. NEXT_ACTION ist eine Beratung als
+ * DATEN — ausgefuehrt wird sie nirgends; die EINZIGE Schreibstelle an
+ * Goal-State bleibt `create` in activateGoal (§17).
  *
  * FAIL-CLOSED, jede Richtung benannt: ohne lebenden Agenten, ohne Dienst, ohne
  * Aktivierungsschalter oder ohne Substanz gibt es KEINEN Goal — und der Grund
@@ -398,6 +412,190 @@ export function buildDecision(decision, activation = activationVerdict(false, 'L
   };
 }
 
+// ── §18: Goal Micro-State — die zusätzliche Projektion ────────────────────
+
+/** Vertragsname der Micro-State-Projektion (Plan §18). */
+export const MICRO_STATE_CONTRACT = 'shinon.task-router/micro-state-v1';
+
+/**
+ * Der Dienstname der Projektion — die Naht für alle, die den Zustand LESEN
+ * wollen, ohne dieses Paket zu importieren (Pakete referenzieren einander
+ * nicht; §19 wird dieselbe Regel brauchen wie die Naht des Enhancers).
+ */
+export const MICRO_STATE_SERVICE = 'shinon_goal_micro_state';
+
+/**
+ * Die fünf Felder aus §18 — wortgleich und in der Reihenfolge des Plans.
+ * Genau diese fünf: der Datensatz ist EINE Momentaufnahme. Was nicht hier
+ * steht (Zeitstempel, Rundenliste, Nachrichten, Verlauf), darf die
+ * Projektion auch nicht mit sich führen — sonst wäre sie die zweite
+ * Session-Historie, die §18 ausdruecklich verbietet.
+ */
+export const MICRO_STATE_FIELDS = [
+  'OBJECTIVE',
+  'CURRENT_STATE',
+  'LAST_VERIFIED_FACT',
+  'CURRENT_BLOCKER',
+  'NEXT_ACTION',
+];
+
+/**
+ * Zustaende, die NICHT aus einer DSH-Phase stammen — die zwei Aussagen, die
+ * man nicht verwechseln darf: `NO_GOAL` heisst „autoritativ kein Ziel da“
+ * (der Dienst antwortete mit nichts), `UNAVAILABLE` heisst „kein autoritativer
+ * Zustand lesbar“ (Dienst fehlt, Lesen wirft, Zustand kaputt). Eine
+ * Lesefehler zu `NO_GOAL` zu machen, waere eine Existenzaussage aus einem
+ * Werkzeugfehler — genau die Verwechselung, die §18 mit seinem
+ * Autoritativitaets-Satz verhindert.
+ */
+export const MICRO_NO_GOAL = 'NO_GOAL';
+export const MICRO_UNAVAILABLE = 'UNAVAILABLE';
+
+/**
+ * NEXT_ACTION als DATEN — Beratung, nie eine Aktion.
+ *
+ * Jeder Wert benennt, was als NAECHSTES zu erwarten bzw. zu tun waere; die
+ * Projektion fuehrt keinen davon aus, und es gibt im Paket keinen Code, der
+ * diesen Wert liest, um zu handeln. Die einzige Schreibstelle an Goal-State
+ * bleibt `create` in activateGoal (§17). Die Tabelle ist eine Entscheidung,
+ * keine Wahrheit — sie steht deshalb hier als Daten und nicht als Verzweigung.
+ *
+ *   NO_GOAL / UNAVAILABLE . NONE — nichts zu erinnern bzw. nichts zu raten
+ *   active:armed ......... ROUND — die naechste Runde reserviert DSHs
+ *                            Round-Driver, nicht wir (§17)
+ *   active:disarmed ...... NONE — der Prozess darf nicht automatisch
+ *                            weiterfahren; eine Weiterfahrt waere DSHs
+ *                            Angelegenheit, keine unsere
+ *   paused ............... RESUME — Fortsetzen ist ein Befehl an DSH
+ *   blocked .............. HUMAN — die Blockade heben WIR NICHT selbst
+ *                            (§17 Block-Policy: nicht ueberschreiben)
+ *   complete ............. NONE — die Absicht ist erfuellt
+ *   unbekannte Phase ..... NONE — fail-closed: wer die Phase nicht kennt,
+ *                            empfiehlt nichts (die Phase selbst wird
+ *                            trotzdem gespiegelt, sie ist autoritativ)
+ */
+export const NEXT_ACTIONS = {
+  [MICRO_NO_GOAL]: 'NONE',
+  [MICRO_UNAVAILABLE]: 'NONE',
+  'active:armed': 'ROUND',
+  'active:disarmed': 'NONE',
+  paused: 'RESUME',
+  blocked: 'HUMAN',
+  complete: 'NONE',
+};
+
+/**
+ * Der Datensatz der Projektion: Umschlag plus die fuenf Felder aus §18.
+ * `required()` ueberall — ein fehlendes Feld saehe wie ein gueltiger Zustand
+ * aus, und ein Micro-State ohne NEXT_ACTION ist keine Momentaufnahme.
+ */
+export const MicroStateSchema = z.object({
+  contract: z.const(MICRO_STATE_CONTRACT).required(),
+  OBJECTIVE: z.string().required(),
+  CURRENT_STATE: z.string().required(),
+  LAST_VERIFIED_FACT: z.string().required(),
+  CURRENT_BLOCKER: z.string().required(),
+  NEXT_ACTION: z.string().required(),
+});
+
+/** Die Beratung aus der Tabelle — unbekannt kostet eine Empfehlung, nie die Wahrheit. */
+export function nextActionFor(state, activation = '') {
+  const key = state === 'active' ? `active:${activation}` : state;
+  return NEXT_ACTIONS[key] ?? 'NONE';
+}
+
+/**
+ * Die Projektion als REINE Funktion: Eingabe ein GoalView (oder null),
+ * Ausgabe die fuenf Felder. Kein Zustand, keine Uhr, kein Dienst — und damit
+ * auch nichts, was zweite Autoritaet werden koennte.
+ *
+ * QUELLENREGEL je Feld (§18: „Autoritative Zustände bleiben die dafür
+ * vorgesehenen DSH-Services und Session-Daten“):
+ *
+ *   OBJECTIVE ......... view.objective — die vom Menschen gewollte Absicht,
+ *                       die DSH dauerhaft fuehrt. Wortgleich, nie veraedelt.
+ *   CURRENT_STATE ...... view.phase wortgleich (autoritativ); NO_GOAL und
+ *                       UNAVAILABLE sind AUSSAGEN DIESES Lesers, nicht DSH-
+ *                       Phasen, und deshalb benannt statt gemischt.
+ *   LAST_VERIFIED_FACT AUSSCHLIESSLICH aus der benannten Quelle
+ *                       (options.fact). Die Projektion leitet ihn nicht ab,
+ *                       merkt ihn sich nicht und entnimmt ihn schon gar nicht
+ *                       dem Modelltext — leer statt erfunden. Es gibt heute
+ *                       noch keine Evidenzquelle, die ihn fuellt (§19); das
+ *                       Feld und sein Schlitz sind gebaut, die Quelle fehlt.
+ *   CURRENT_BLOCKER .... view.blockedReason, und nur bei Phase `blocked`
+ *                       (die Types sagen: „present exactly while blocked“).
+ *                       Kein Grund vorhanden → leer, nicht raten.
+ *   NEXT_ACTION ........ NEXT_ACTIONS — Beratung, die nie ausgefuehrt wird.
+ *
+ * FAIL-CLOSED in beide Richtungen: kein View → NO_GOAL, unlesbarer View →
+ * UNAVAILABLE, unbekannte Phase → gespiegelt und ohne Empfehlung.
+ */
+export function projectMicroState(view, options = {}) {
+  const present = view !== null && view !== undefined;
+  const unavailable = options.unavailable === true || (present && typeof view.phase !== 'string');
+  const state = unavailable ? MICRO_UNAVAILABLE : present ? view.phase : MICRO_NO_GOAL;
+  // `readable` ist die einzige Bruecke zu den Feldern des View — sie schliesst
+  // `present` ein, damit KEIN Feldzugriff ohne Vorbehalt stattfindet (gemessen:
+  // `view.phase` ohne diese Bruecke warf bei null mit TypeError).
+  const readable = present && !unavailable;
+
+  const objective = readable && typeof view.objective === 'string' ? view.objective : '';
+  const fact = typeof options.fact === 'string' ? options.fact : '';
+
+  let blocker = '';
+  if (readable && view.phase === 'blocked' && view.blockedReason !== null && typeof view.blockedReason === 'object') {
+    blocker = [view.blockedReason.code, view.blockedReason.message]
+      .filter((part) => typeof part === 'string' && part !== '')
+      .join(': ');
+  }
+
+  const activation = readable && typeof view.activation === 'string' ? view.activation : '';
+
+  return MicroStateSchema({
+    contract: MICRO_STATE_CONTRACT,
+    OBJECTIVE: objective,
+    CURRENT_STATE: state,
+    LAST_VERIFIED_FACT: fact,
+    CURRENT_BLOCKER: blocker,
+    NEXT_ACTION: nextActionFor(state, activation),
+  });
+}
+
+/**
+ * Die Projektion als DIENST (§18): angeboten, nicht gespeichert.
+ *
+ * Jeder Aufruf liest den Zielzustand FRISCH aus `ctx.goals` — es gibt keinen
+ * gehaltenen Zwischenzustand, keinen Verlauf, keine zweite Historie; was
+ * zwischen zwei Aufrufen geschah, liegt bei DSH und in den Session-Daten.
+ * Genau EINE Leseoperation: `get` des Ziel-Dienstes. Jede SCHREIBmethode
+ * dieses Dienstes (create, edit, pause, block, ...) wird von dieser Schicht
+ * nie aufgerufen — die einzige Schreibstelle bleibt activateGoal (§17), und
+ * dass sie die einzige bleibt, prueft ein Abnahmetest mit einer Attrappe, auf
+ * der jede Schreibmethode wirft.
+ *
+ * Fehler werden NICHT zu NO_GOAL: „ich kann nicht lesen“ ist eine andere
+ * Aussage als „es gibt keins“. Beide fail-closed, beide benannt (UNAVAILABLE).
+ */
+export function createMicroStateService(ctx) {
+  return {
+    contract: MICRO_STATE_CONTRACT,
+    state(agent, options = {}) {
+      try {
+        const goals = typeof ctx?.get === 'function' ? ctx.get(GOAL_SERVICE) : undefined;
+        if (typeof goals?.get !== 'function') return projectMicroState(null, { ...options, unavailable: true });
+        const view = goals.get(agent);
+        return projectMicroState(view ?? null, options);
+      } catch {
+        // Alles, was beim Lesen wirft (kein `ctx.get`, kein Ziel-Dienst, ein
+        // werfendes `get` wie GOAL_AGENT_NOT_LIVE) ist ein Lesefehler — und
+        // ein Lesefehler ist KEIN Zielzustand: also UNAVAILABLE, nicht NO_GOAL.
+        return projectMicroState(null, { ...options, unavailable: true });
+      }
+    },
+  };
+}
+
 /**
  * Den eingehenden Datensatz entscheiden und melden.
  *
@@ -453,6 +651,16 @@ export function apply(ctx, config) {
     if (sessionId !== '') runtime.pending.delete(sessionId);
   }));
 
+  // §18: die Projektion wird ANGEBOTEN, nicht gespeichert — genau EIN provide,
+  // ohne eigenen Zustand und ohne zusätzlichen Listener. Ein Host ohne
+  // `provide` ist kein Fehler des Laufs (dieselbe Haltung wie beim Query-Dienst
+  // des Project Index); er bekommt die Aussage in derselben Aktivierungszeile.
+  const canProvide = typeof ctx?.provide === 'function';
+  const releaseMicroState = canProvide ? ctx.provide(MICRO_STATE_SERVICE, createMicroStateService(ctx)) : null;
+  const microStateInfo = canProvide
+    ? `Projektion ${MICRO_STATE_SERVICE} bereitgestellt (${MICRO_STATE_CONTRACT})`
+    : `Projektion ${MICRO_STATE_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
+
   // Der Dienst wird NICHT hier gesucht, sondern je Entscheidung. Grund, im
   // echten Boot gemessen: DSH stellt die Goal-Domaene erst NACH unseren
   // Bundle-Layern bereit — ein Sichtbarkeitscheck beim Mounten waere eine
@@ -463,11 +671,12 @@ export function apply(ctx, config) {
   // zur Entscheidung wirklich kein Dienst da ist.
   const goalInfo = config.activate ? `goal=an (max ${config.maxGoalRounds} Runden)` : 'goal=aus (nur Entscheidung)';
   console.log(
-    `[shinon-task-router] Aktiviert — beobachtet ${config.sourceChannel} (threshold=${config.threshold}, minRawLength=${config.minRawLength}, ${goalInfo}, trace=${config.trace ? 'an' : 'aus'})`,
+    `[shinon-task-router] Aktiviert — beobachtet ${config.sourceChannel} (threshold=${config.threshold}, minRawLength=${config.minRawLength}, ${goalInfo}, trace=${config.trace ? 'an' : 'aus'}, ${microStateInfo})`,
   );
 
   return () => {
     for (const dispose of disposers) if (typeof dispose === 'function') dispose();
+    if (typeof releaseMicroState === 'function') releaseMicroState();
     runtime.pending.clear();
     console.log('[shinon-task-router] Deaktiviert — Listener abgemeldet');
   };

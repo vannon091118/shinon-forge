@@ -34,7 +34,7 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 
@@ -420,10 +420,14 @@ test('Kette: die Schwelle aus der Konfiguration wirkt bis in den Datensatz', asy
   routerDispose();
 });
 
-test('Der Router mutiert nichts: kein Dienst, kein State, nur ein Datensatz', async () => {
-  // Ein Host, der jede schreibende Absicht sichtbar macht. Waere hier ein
-  // `set`/`provide` dabei, waere die Zusage aus §16 („Das LLM darf nicht alleine
-  // Goal-State mutieren") nicht mehr geprueft, sondern nur behauptet.
+test('Der Router mutiert nichts: genau ein Lesedienst, kein Schreibweg, nur ein Datensatz', async () => {
+  // Ein Host, der jede schreibende Absicht sichtbar macht. BIS §18 haengte die
+  // Zusage („Das LLM darf nicht alleine Goal-State mutieren“) daran, dass es
+  // GAR KEINEN provide gibt — das war ein Stellvertreter: Abwesenheit ist kein
+  // Beweis. §18 bringt genau EINEN Dienst mit (die Projektion), und der direkte
+  // Beweis, dass er nur LIEST, steht im §18-Lesetest: eine Attrappe, auf der
+  // jede Schreibmethode wirft und mitzaehlt. Hier bleibt die Zusage, was sie
+  // immer war: kein Schreiben von Zustand und genau eine Meldung.
   const seen = { on: [], emit: [], set: [], provide: [], handlers: new Map() };
   const host = {
     on: (name, handler) => {
@@ -444,7 +448,8 @@ test('Der Router mutiert nichts: kein Dienst, kein State, nur ein Datensatz', as
   // Absicht vor, der Eingang entscheidet, das Lifecycle-Ereignis raeumt weg.
   assert.deepEqual(seen.on, [router.PRE_STEP_EVENT, router.SOURCE_CHANNEL, router.DISPOSED_EVENT], 'genau diese drei Kanaele');
   assert.deepEqual(seen.set, [], 'kein Schreiben von Zustand');
-  assert.deepEqual(seen.provide, [], 'kein Registrieren eines Dienstes');
+  assert.deepEqual(seen.provide.map((entry) => entry.name), [router.MICRO_STATE_SERVICE], 'genau EIN Dienst, und er ist die Projektion selbst (§18)');
+  assert.equal(seen.provide[0].value.contract, router.MICRO_STATE_CONTRACT, 'und er traegt seinen Vertrag');
   assert.equal(seen.emit.length, 1, 'genau eine Meldung');
   assert.equal(seen.emit[0].name, router.DECISION_CHANNEL);
   assert.equal(seen.emit[0].payload.outcome, 'goal');
@@ -702,4 +707,200 @@ test('§17: die Absicht ist die MENSCHLICHE Nachricht, und eine tote Sitzung ist
   assert.equal(goals.calls.create.length, 1, 'kein zweites Goal');
   prompterDispose();
   routerDispose();
+});
+
+// ── e. §18: Goal Micro-State — die zusätzliche Projektion ──────────────────
+
+/** Ein GoalView in der Form der installierten DSH-Fassung (Felder unten gepinnt). */
+const goalView = (over = {}) => ({
+  id: 'goal-1',
+  revision: 3,
+  objective: 'bitte baue die zwoelf neuen module und teste sie danach gruendlich',
+  phase: 'active',
+  maxGoalRounds: 6,
+  roundsStarted: 2,
+  createdAt: 1728000000000,
+  updatedAt: 1728000600000,
+  activation: 'armed',
+  ...over,
+});
+
+/** Umschlag plus die fünf Felder aus §18 — Reihenfolge der Sortierung. */
+const stateKeys = ['CURRENT_BLOCKER', 'CURRENT_STATE', 'LAST_VERIFIED_FACT', 'NEXT_ACTION', 'OBJECTIVE', 'contract'];
+
+test('§18: die fünf Felder wortgleich — und der Datensatz trägt sonst nichts', () => {
+  assert.deepEqual(
+    router.MICRO_STATE_FIELDS,
+    ['OBJECTIVE', 'CURRENT_STATE', 'LAST_VERIFIED_FACT', 'CURRENT_BLOCKER', 'NEXT_ACTION'],
+    'wortgleich und in der Reihenfolge des Plans',
+  );
+  assert.equal(router.MICRO_STATE_CONTRACT, 'shinon.task-router/micro-state-v1');
+  assert.equal(router.MICRO_STATE_SERVICE, 'shinon_goal_micro_state');
+
+  const state = router.projectMicroState(goalView());
+  assert.deepEqual(Object.keys(state).sort(), stateKeys);
+  // Genau die Zusage aus §18 — die kleinste Form der „keine zweiten
+  // autoritativen Session-Historie“ ist die Feldmenge selbst: kein
+  // Zeitstempel, keine Rundenliste, keine Nachrichten, kein Verlauf.
+  assert.equal(router.MicroStateSchema(state).contract, router.MICRO_STATE_CONTRACT);
+  assert.equal(state.OBJECTIVE, 'bitte baue die zwoelf neuen module und teste sie danach gruendlich');
+});
+
+test('§18: die Projektion spiegelt den autoritativen Zielzustand — Phase für Phase', () => {
+  // FeldFORMEN aus der INSTALLIERTEN Fassung gelesen (types.d.ts von
+  // dsh-goal), nicht aus dem Gedächtnis — §17 verlangt das für die API, und
+  // dieselbe Nahtstelle gilt hier: ein umbenanntes Feld bei DSH fiel sonst
+  // still auf eine leere Projektion.
+  const typesPath = join(dirname(dshRequire.resolve('@deepseek-ai/dsh-goal')), 'types', 'types.d.ts');
+  const types = readFileSync(typesPath, 'utf8');
+  for (const pin of [
+    'readonly objective: string',
+    'readonly phase: GoalPhase',
+    'readonly blockedReason?: GoalBlockReason',
+    'readonly activation: GoalActivation',
+    "type GoalPhase = 'active' | 'paused' | 'blocked' | 'complete'",
+  ]) {
+    assert.ok(types.includes(pin), `Feld/Form der installierten Fassung: ${pin}`);
+  }
+
+  const objective = 'die Entwuerfe pruefen und dann die Freigabe anfragen';
+  const active = router.projectMicroState(goalView({ objective }));
+  assert.equal(active.OBJECTIVE, objective, 'wortgleich, nie veraedelt');
+  assert.equal(active.CURRENT_STATE, 'active');
+  assert.equal(active.CURRENT_BLOCKER, '');
+  assert.equal(active.NEXT_ACTION, 'ROUND', 'die naechste Runde faehrt DSHs Round-Driver, nicht wir');
+
+  assert.equal(router.projectMicroState(goalView({ activation: 'disarmed' })).NEXT_ACTION, 'NONE', 'ohne automatische Weiterfahrt keine Runden-Empfehlung');
+  assert.equal(router.projectMicroState(goalView({ phase: 'paused' })).NEXT_ACTION, 'RESUME');
+  assert.equal(router.projectMicroState(goalView({ phase: 'complete' })).NEXT_ACTION, 'NONE');
+
+  // Blockiert: der Grund kommt wortgleich aus DSH, und die Empfehlung ist der
+  // MENSCH — §17 verbietet, die Blockade selbst zu heben.
+  const blocked = router.projectMicroState(goalView({ phase: 'blocked', blockedReason: { code: 'needs-human', message: 'Wartet auf Freigabe' } }));
+  assert.equal(blocked.CURRENT_STATE, 'blocked');
+  assert.equal(blocked.CURRENT_BLOCKER, 'needs-human: Wartet auf Freigabe');
+  assert.equal(blocked.NEXT_ACTION, 'HUMAN');
+
+  // Blockiert OHNE Grund: DSH liefert keinen — die Zeile bleibt leer, statt
+  // einen Grund zu raten; die Empfehlung bleibt der Mensch.
+  const reasonless = router.projectMicroState(goalView({ phase: 'blocked' }));
+  assert.equal(reasonless.CURRENT_BLOCKER, '');
+  assert.equal(reasonless.NEXT_ACTION, 'HUMAN');
+
+  // Kein Ziel: benannt, nicht gemischt.
+  const none = router.projectMicroState(null);
+  assert.equal(none.CURRENT_STATE, 'NO_GOAL');
+  assert.equal(none.OBJECTIVE, '');
+  assert.equal(none.NEXT_ACTION, 'NONE');
+
+  // Ein unlesbarer View ist KEIN Zielzustand: „vorhanden“ und „lesbar“ sind
+  // zwei Aussagen, und nur die zweite darf hier fallen. Benannt statt gemischt.
+  for (const corrupt of [{ objective: 'da' }, 'phase-als-text', 42, []]) {
+    const state = router.projectMicroState(corrupt);
+    assert.equal(state.CURRENT_STATE, 'UNAVAILABLE', JSON.stringify(corrupt));
+    assert.equal(state.OBJECTIVE, '', JSON.stringify(corrupt));
+    assert.equal(state.NEXT_ACTION, 'NONE', JSON.stringify(corrupt));
+  }
+
+  // Eine unbekannte künftige Phase wird gespiegelt (autoritativ!) und kostet
+  // jede Empfehlung — fail-closed in die Richtung „nichts raten“.
+  const future = router.projectMicroState(goalView({ phase: 'archived' }));
+  assert.equal(future.CURRENT_STATE, 'archived');
+  assert.equal(future.NEXT_ACTION, 'NONE');
+});
+
+test('§18: LAST_VERIFIED_FACT kommt aus der benannten Quelle — leer statt erfunden', () => {
+  const view = goalView();
+  // Ohne Quelle: leer. Die Projektion leitet keinen Fakt aus dem Zielzustand
+  // ab — und schon gar nicht aus dem Modelltext.
+  assert.equal(router.projectMicroState(view).LAST_VERIFIED_FACT, '');
+  assert.equal(router.projectMicroState(null).LAST_VERIFIED_FACT, '');
+
+  // Benannte Quelle: wortgleich und unveraendert.
+  const fact = 'Build gruen (Lauf 42, 17 von 17)';
+  assert.equal(router.projectMicroState(view, { fact }).LAST_VERIFIED_FACT, fact);
+
+  // Kein Merker: jede Projektion ist eine Momentaufnahme — der dritte Aufruf
+  // sieht nicht den ersten. Genau das verlangt §18 („keine zweite
+  // autoritative Session-Historie“).
+  assert.equal(router.projectMicroState(view, { fact: 'zweiter Fakt' }).LAST_VERIFIED_FACT, 'zweiter Fakt');
+  assert.equal(router.projectMicroState(view).LAST_VERIFIED_FACT, '');
+
+  // Nicht-Strings sind keine Quelle — auch nicht mit toString().
+  for (const bogus of [null, undefined, 42, ['Fakt'], { toString: () => 'Fakt' }]) {
+    assert.equal(router.projectMicroState(view, { fact: bogus }).LAST_VERIFIED_FACT, '', String(bogus));
+  }
+});
+
+test('§18: die Projektion liest nur — jede Schreibmethode des Ziel-Dienstes bleibt unberührt', () => {
+  // Der DIREKTE Beweis statt des frueheren Stellvertreters („kein provide“):
+  // eine Attrappe, auf der JEDE Schreibmethode wirft und sich mitzaehlt.
+  const calls = { get: 0, mutated: [] };
+  const view = goalView();
+  const hostile = {
+    get() {
+      calls.get += 1;
+      return view;
+    },
+  };
+  for (const verb of ['create', 'edit', 'pause', 'resume', 'complete', 'block', 'clear', 'disarm']) {
+    hostile[verb] = () => {
+      calls.mutated.push(verb);
+      throw new Error(`geschrieben: ${verb}`);
+    };
+  }
+  const service = router.createMicroStateService({ get: (name) => (name === router.GOAL_SERVICE ? hostile : undefined) });
+
+  const state = service.state({ session: { id: 'sess-1' } });
+  assert.equal(state.CURRENT_STATE, 'active', 'gelesen, nicht geschrieben');
+  assert.equal(calls.get, 1, 'genau EINE Leseoperation je Aufruf');
+  assert.deepEqual(calls.mutated, [], 'keine Schreibmethode wurde auch nur berührt');
+
+  // Fehler beim Lesen sind KEIN Zielzustand — „ich kann nicht lesen“ ≠ „es
+  // gibt keins“. Beide fail-closed, aber sie sagen verschiedene Dinge.
+  const throwing = router.createMicroStateService({
+    get: () => {
+      throw new GoalError('agent nicht live', 'GOAL_AGENT_NOT_LIVE');
+    },
+  }).state({ session: { id: 'sess-1' } });
+  assert.equal(throwing.CURRENT_STATE, 'UNAVAILABLE', 'Lesefehler ≠ kein Ziel');
+  assert.equal(throwing.OBJECTIVE, '');
+
+  // Ohne Ziel-Dienst und ohne ctx.get gleichfalls benannt, ohne Wurf.
+  assert.equal(router.createMicroStateService({ get: () => undefined }).state(null).CURRENT_STATE, 'UNAVAILABLE');
+  assert.equal(router.createMicroStateService({}).state({ session: { id: 'sess-1' } }).CURRENT_STATE, 'UNAVAILABLE');
+});
+
+test('§18: am echten Context angeboten, frisch gelesen, beim Dispose wieder frei', async () => {
+  const llm = fakeLlm(result());
+  const view = goalView();
+  const goals = fakeGoals({ current: view });
+  const { ctx, prompterDispose, routerDispose } = chain({ llm, goals });
+
+  const service = ctx.get(router.MICRO_STATE_SERVICE);
+  assert.ok(service, 'der Router hat beim Mounten angeboten — am ECHTEN Cordis-Context');
+  assert.equal(service.contract, router.MICRO_STATE_CONTRACT);
+  assert.equal(typeof service.state, 'function');
+
+  const first = service.state({ session: { id: 'sess-1' } });
+  assert.deepEqual(Object.keys(first).sort(), stateKeys);
+  assert.equal(first.CURRENT_STATE, 'active');
+  assert.equal(first.OBJECTIVE, view.objective);
+
+  // FRISCH gelesen statt cacht: derselbe Dienst, zwischen den beiden Aufrufen
+  // geaenderter autoritativer Zustand — die zweite Antwort ist die zweite
+  // Wahrheit, und die erste bleibt, was sie war: eine Momentaufnahme.
+  view.phase = 'blocked';
+  view.blockedReason = { code: 'needs-human', message: 'Wartet auf Freigabe' };
+  const second = service.state({ session: { id: 'sess-1' } });
+  assert.equal(second.CURRENT_STATE, 'blocked');
+  assert.equal(second.CURRENT_BLOCKER, 'needs-human: Wartet auf Freigabe');
+  assert.equal(second.NEXT_ACTION, 'HUMAN');
+  assert.equal(first.CURRENT_STATE, 'active', 'die erste Antwort ist keine Zeile in einem Verlauf geworden');
+
+  // Nach dispose ist das Angebot wieder frei (die Release-Funktion, die der
+  // Context an provide zurueckgibt).
+  routerDispose();
+  assert.equal(ctx.get(router.MICRO_STATE_SERVICE), undefined, 'dispose gibt den Dienst wieder frei');
+  prompterDispose();
 });
