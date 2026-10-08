@@ -196,6 +196,7 @@ window.__ModuleLoader__.load({
         .join('\n');
 
     // ── Overlay (schwebend, wie im Original) ────────────────────────────────
+    // TODO: [DSH-Refactor] - 53 Zeilen Overlay-Aufbau in einer Funktion: DOM-Erzeugung, Ereignispfad und Zustandsanbindung liegen in einem Rumpf (Tiefe 4). Aufbau und Verdrahtung trennen.
     function createOverlay() {
       const host = document.body ?? document.documentElement;
       const root = document.createElement('div');
@@ -269,6 +270,7 @@ window.__ModuleLoader__.load({
       return h('button', { type: 'button', className: '__mk_btn', onClick }, text);
     }
 
+    // TODO: [DSH-Refactor] - 81 Zeilen bei Verschachtelungstiefe 7 in EINER Komponente (gezaehlt, nicht geschaetzt): Panelliste, Zustandszeile und Aktionsknoepfe in einem Rumpf. In Kopf/Liste/Zeile schneiden, damit ein Zustandswechsel nicht durch sieben Ebenen muss.
     function MarkerPanel() {
       const { marks, comments } = useMirror();
       const [busy, setBusy] = React.useState(false);

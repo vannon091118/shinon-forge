@@ -626,6 +626,7 @@ function onDecision(ctx, config, runtime, record) {
  * die Aktivierung faengt jeden Fehler, und `next()` wird unveraendert
  * durchgereicht (Fehler des Downstream sind NICHT unsere).
  */
+// TODO: [DSH-Refactor] - 55 Zeilen Mount mit drei Registrierungen, Dienst-Angebot und Log in einem Rumpf; die Abmeldung spiegelt sie von Hand (dieselbe Anzahl Klammern, kein gemeinsamer Nenner). Je eine benannte Paar-Funktion fuer Registrierung und Abmeldung, damit ein neuer Listener nicht vergessen werden kann.
 export function apply(ctx, config) {
   if (typeof ctx?.on !== 'function') {
     console.error(`[shinon-task-router] ctx.on fehlt — ${config.sourceChannel} wurde NICHT beobachtet (BLOCKED)`);

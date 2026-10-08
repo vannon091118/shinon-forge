@@ -181,6 +181,7 @@ export const ResultSchema = z.object({
   addedRequirements: z.array(z.string()).required(),
   removedRequirements: z.array(z.string()).required(),
   uncertainties: z.array(z.string()).required(),
+  // TODO: [DSH-Refactor] - references ist Pflicht in JEDEM Modus, gelesen wird es nur in MAX (acceptance). Live 2026-10-08: eine schema-gueltige Modellantwort fiel damit durch (SCHEMA_INVALID:$.references missing required value, mode=MIN) und der Roh-Prompt galt. Pflicht nur dort, wo der Wert konsumiert wird.
   references: z.array(z.string()).required(),
   intentClassification: z.union([
     z.const('CHAT'),
@@ -735,6 +736,8 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   const prompt = readPrompt(payload);
   if (prompt === null) return next();
   const sessionId = payload?.agent?.session?.id;
+
+  // TODO: [DSH-Refactor] - Der Ausgang entsteht aus drei verstreuten Bedingungen: mode wird zweimal geprueft, outcome==='accepted' dreimal, und MESSAGE_NOT_FOUND wird nachtraeglich aus messages===null abgeleitet. Eine Entscheidung braucht einen Ort: eine Tabelle outcome -> Aktion statt verteilter Praedikate.
 
   // EINE Quelle je Schritt, einmal aufgeloest: der Beleg nennt dieselbe Quelle,
   // die den Prompt veredelt hat. Zwei Abfragen koennten zwei Antworten geben.

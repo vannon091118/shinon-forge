@@ -425,6 +425,7 @@ window.__ModuleLoader__.load({
         h('div', { className: '__cm_bar-fill', style: { width: `${pct}%` } }));
     }
 
+    // TODO: [DSH-Refactor] - 54 Zeilen bei Tiefe 6: Kopf, Werte, Attacken, Bilanz und Log in einer Komponente. Die Zahlen kommen bereits aus reinen Funktionen (statsAt, attacksFor, levelFor) — es fehlt nur die Trennung der Darstellung.
     function CodingmonPanel() {
       const s = useStore();
       const lvl = levelFor(s.xp);
