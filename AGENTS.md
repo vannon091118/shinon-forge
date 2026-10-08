@@ -9,11 +9,14 @@ installed DSH. No git history yet; DSH is `upstream`.
 ## Dev environment
 - Node `^22.19.0 || >=24` and pnpm `11.7.0` on PATH (packageManager is pinned).
 - `pnpm pack`/`npm` are invoked by the tests — both must be installed.
-- DSH `0.2.0-rc.2` is installed (`dsh --version`); `npm run dev` and the profile
-  test need it on PATH. Run with `DSH_HOME=$PWD` (the `dev` script does this).
-- No lockfile and no `pnpm-workspace.yaml` (the root `package.json` uses the
-  unsupported `workspaces` field; pnpm warns about it). Fresh-checkout installs are
-  not reproducible.
+- DSH `0.2.1-alpha.1` is installed (`dsh --version`) and pinned in the root
+  `package.json`; `npm run dev` and the profile test need it on PATH. Run with
+  `DSH_HOME=$PWD` (the `dev` script does this).
+- `package-lock.json` is versioned, and there is no `pnpm-workspace.yaml` (the root
+  `package.json` uses the unsupported `workspaces` field; pnpm warns about it).
+  Fresh-checkout installs stay non-reproducible anyway: installs run through pnpm
+  and there is no `pnpm-lock.yaml`, so the npm lockfile pins npm's resolution, not
+  the pnpm run.
 
 ## Build & test
 Run from repo root:
