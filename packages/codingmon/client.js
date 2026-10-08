@@ -33,8 +33,12 @@ window.__ModuleLoader__.load({
     const h = React.createElement;
     const PLUGIN = '@shinon/codingmon';
     const PANEL_ID = 'shinon-codingmon';
+    /** Speicher-Schluessel. Bleibt derselbe, damit alte Staende nicht verloren gehen. */
     const STORAGE_KEY = 'shinon.codingmon/v1';
-    const XP_PER_LEVEL = 250;
+    /** Stand der Ablage. v2 = Eskalation, Regelwerk, Loot, Sperre. */
+    const STORE_VERSION = 2;
+    /** XP-Basis der ersten Stufe (kumulativ, exponentiell). */
+    const XP_BASE = 250;
 
     // ── Vertrag (Spiegel der Host-Hälfte in index.js) ───────────────────────
     // Bewusst dupliziert: Client- und Host-Bundle teilen keinen Code, und ein
@@ -52,7 +56,7 @@ window.__ModuleLoader__.load({
       recursion: { label: 'Recursion', family: 'spark', hue: 150, hp: 50, atk: 10, def: 9, agi: 6, int: 9 },
     };
     const SPECIES_IDS = Object.keys(SPECIES);
-    const GROWTH = { hp: 8, atk: 2, def: 2, agi: 1, int: 1 };
+
 
     /**
      * Faehigkeiten. `species === null` = von jedem Codemon nutzbar; sonst eine
@@ -234,9 +238,40 @@ window.__ModuleLoader__.load({
       return svg;
     }
 
-    // ── Reine Funktionen (Spiegel des Host-Vertrags) ─────────────────────────
-    const speciesOfFamily = (family) => SPECIES_IDS.find((id) => SPECIES[id].family === family) ?? SPECIES_IDS[0];
-    const threshold = (level) => (XP_PER_LEVEL * (level - 1) * level) / 2;
+    // ── 1. ESKALATION (Spiegel des Host-Vertrags) ─────────────────
+    // Bewusst dupliziert: Client- und Host-Bundle teilen keinen Code, und ein
+    // Import quer ueber Pakete ist in diesem Repo nicht erlaubt. Die Probe
+    // /tmp/codemon-sim.mjs vergleicht beide Seiten Zahl fuer Zahl, damit die
+    // Dopplung nicht auseinanderlaeuft.
+    const ESCALATION = { factor: 1.35, perLevel: 'x1,35', label: 'multiplikativ je Stufe' };
+    const POWER_UNIT = 10;
+
+    /** Die Leiter als Zahl: `base * factor^(level-1)`. */
+    const powerAt = (base, level) => {
+      const steps = Math.max(0, Math.floor(level) - 1);
+      return Math.round(base * Math.pow(ESCALATION.factor, steps));
+    };
+
+    /** Dieselbe Leiter EXAKT in BigInt (Basis 135/100). Fuer den Lebenslauf. */
+    const powerAtExact = (base, level) => {
+      const steps = BigInt(Math.max(0, Math.floor(level) - 1));
+      return BigInt(Math.round(base)) * (135n ** steps) / (100n ** steps);
+    };
+
+    /** Tausenderpunkte. Nimmt Number und BigInt (ueber den Dezimaltext). */
+    const formatNumber = (value) => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    /** Ein Wert samt Inszenierung: exakter Betrag, Text, Stellenzahl. */
+    const describeValue = (base, level) => {
+      const exact = powerAtExact(base, level);
+      return { exact, text: formatNumber(exact), digits: String(exact).length, safe: exact <= BigInt(Number.MAX_SAFE_INTEGER) };
+    };
+
+    /** Kumulative XP-Schwelle (multiplikativ, nicht quadratisch). */
+    const threshold = (level) => {
+      const steps = Math.max(0, Math.floor(level) - 1);
+      return Math.round((XP_BASE * (Math.pow(ESCALATION.factor, steps) - 1)) / (ESCALATION.factor - 1));
+    };
     const levelFor = (xp) => {
       let level = 1;
       while (threshold(level + 1) <= xp) level += 1;
@@ -244,33 +279,157 @@ window.__ModuleLoader__.load({
     };
     const statsAt = (speciesId, level) => {
       const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
-      const steps = Math.max(0, Math.floor(level) - 1);
+      const scale = Math.pow(ESCALATION.factor, Math.max(0, Math.floor(level) - 1));
       return {
-        hp: base.hp + GROWTH.hp * steps,
-        atk: base.atk + GROWTH.atk * steps,
-        def: base.def + GROWTH.def * steps,
-        agi: base.agi + GROWTH.agi * steps,
-        int: base.int + GROWTH.int * steps,
+        hp: Math.round(base.hp * scale),
+        atk: Math.round(base.atk * scale),
+        def: Math.round(base.def * scale),
+        agi: Math.round(base.agi * scale),
+        int: Math.round(base.int * scale),
       };
     };
-    const abilitiesFor = (level, speciesId) =>
-      ABILITIES.filter((ability) => ability.minLevel <= level
-        && (ability.species === null || ability.species === speciesId));
+
+    /** Meilensteine der Inszenierung: zweistellig bis Millionen. */
+    const MILESTONES = [10, 100, 1000, 10000, 1000000];
+    const milestoneFor = (before, after) => {
+      let hit = null;
+      for (const mark of MILESTONES) if (Number(before) < mark && Number(after) >= mark) hit = mark;
+      return hit;
+    };
+
+    // ── 2. REGELWERK (feste Tabellen, je Faktor ein Nachschlagen) ─────────
+    const ELEMENTS = {
+      spark: { label: 'Spark', beats: 'byte', losesTo: 'feral' },
+      byte: { label: 'Byte', beats: 'feral', losesTo: 'spark' },
+      feral: { label: 'Feral', beats: 'spark', losesTo: 'byte' },
+    };
+    const ELEMENT_WIN = 1.5;
+    const ELEMENT_LOSS = 0.75;
+    const ELEMENT_CHART = Object.fromEntries(Object.entries(ELEMENTS).map(([attacker, entry]) => [
+      attacker,
+      Object.fromEntries(Object.keys(ELEMENTS).map((defender) => [
+        defender,
+        defender === entry.beats ? ELEMENT_WIN : defender === entry.losesTo ? ELEMENT_LOSS : 1,
+      ])),
+    ]));
+    const CATEGORY = {
+      physisch: { label: 'physisch', defFactor: 0.8 },
+      speziell: { label: 'speziell', defFactor: 0.35 },
+    };
+    const SYNERGY = {
+      'spark:physisch': 1,
+      'spark:speziell': 1.25,
+      'byte:physisch': 1,
+      'byte:speziell': 1.25,
+      'feral:physisch': 1,
+      'feral:speziell': 1.25,
+    };
+    /** Vererbungsbaum: Ahn, Generation und die geerbte Faehigkeit je Linie. */
+    const LINEAGE = {
+      nullpointer: { ancestor: null, generation: 1, inherits: [] },
+      stackoverflow: { ancestor: null, generation: 1, inherits: [] },
+      memoryleak: { ancestor: null, generation: 1, inherits: [] },
+      racecondition: { ancestor: 'nullpointer', generation: 2, inherits: ['null-access'] },
+      deadlock: { ancestor: 'stackoverflow', generation: 2, inherits: ['trace-back'] },
+      segfault: { ancestor: 'memoryleak', generation: 2, inherits: ['heap-flood'] },
+      offbyone: { ancestor: 'racecondition', generation: 3, inherits: ['torn-read'] },
+      heisenbug: { ancestor: 'deadlock', generation: 3, inherits: ['starve'] },
+      bufferoverflow: { ancestor: 'segfault', generation: 3, inherits: ['core-dump'] },
+      recursion: { ancestor: 'offbyone', generation: 4, inherits: ['boundary-slip'] },
+    };
+    const NEUTRAL_BUFF = { id: 'neutral', label: 'kein Buff', factor: 1 };
+    const BUFFS = [
+      { id: 'linie', label: 'Reine Linie', factor: 1.1, test: 'inherited' },
+      { id: 'nichts-zu-verlieren', label: 'Nichts zu verlieren', factor: 1.5, test: 'low-hp' },
+      { id: 'uebertaktet', label: 'Uebertaktet', factor: 1.15, test: 'full-hp' },
+    ];
+    const BUFF_TESTS = {
+      inherited: (ability, attacker) => attacker.inherited.includes(ability.id),
+      'low-hp': (ability, attacker) => attacker.hp / Math.max(1, attacker.maxHp) < 0.25,
+      'full-hp': (ability, attacker) => attacker.hp / Math.max(1, attacker.maxHp) >= 0.9,
+    };
+    const buffFor = (ability, attacker) => {
+      for (const buff of BUFFS) {
+        const test = BUFF_TESTS[buff.test];
+        if (typeof test === 'function' && test(ability, attacker)) return buff;
+      }
+      return NEUTRAL_BUFF;
+    };
+    const inheritedAbilities = (speciesId) => (LINEAGE[speciesId] ?? LINEAGE[SPECIES_IDS[0]]).inherits ?? [];
+
+    // ── Reine Funktionen (Spiegel des Host-Vertrags) ─────────────────────────
+    const speciesOfFamily = (family) => SPECIES_IDS.find((id) => SPECIES[id].family === family) ?? SPECIES_IDS[0];
+    const abilitiesFor = (level, speciesId) => {
+      const inherited = inheritedAbilities(speciesId);
+      return ABILITIES.filter((ability) => ability.minLevel <= level
+        && (ability.species === null || ability.species === speciesId || inherited.includes(ability.id)));
+    };
     const formOf = (level) => STAGES[stageIndex(level)];
-    const damageOf = (ability, stats, defenderDef) =>
-      Math.max(1, Math.round((ability.power * (stats[ability.stat] ?? 0)) / 10 - defenderDef * 0.8));
-    const rewardFor = (level) => 20 + 8 * Math.max(1, Math.floor(level));
+
+    /**
+     * Der Schaden: BaseDamage * Element * Synergie * Buff - DEF * Durchgriff.
+     * Fuenf Nachschlagevorgaenge, ein Minimum von 1, keine Zufallszahl.
+     */
+    const resolveAttack = (ability, attacker, defender) => {
+      const category = CATEGORY[ability.kind] ?? CATEGORY.physisch;
+      const element = (ELEMENT_CHART[attacker.element] ?? ELEMENT_CHART.spark)[defender.element] ?? 1;
+      const synergy = SYNERGY[`${attacker.element}:${ability.kind}`] ?? 1;
+      const buff = buffFor(ability, attacker);
+      const base = (ability.power * (attacker.stats[ability.stat] ?? 0)) / POWER_UNIT;
+      const dealt = Math.max(1, Math.round(base * element * synergy * buff.factor - defender.stats.def * category.defFactor));
+      return { base, element, synergy, category: ability.kind, defFactor: category.defFactor, buff, dealt };
+    };
+    /** Kurzform: nur der Betrag. */
+    const damageOf = (ability, attacker, defender) => resolveAttack(ability, attacker, defender).dealt;
+    /** XP fuer einen Sieg. Waechst mit dem Level des Gegners — multiplikativ. */
+    const rewardFor = (level) => powerAt(20, Math.max(1, Math.floor(level)) + 1);
     const firstStrike = (challengerStats, enemyStats) => (challengerStats.agi >= enemyStats.agi ? 'challenger' : 'enemy');
     const arenaFor = (level, round) => {
       const lvl = Math.max(1, Math.floor(level));
       const rnd = Math.max(0, Math.floor(round));
       const speciesId = SPECIES_IDS[(lvl * 3 + rnd * 7) % SPECIES_IDS.length];
       const enemyLevel = Math.max(1, lvl + ((rnd % 3) - 1));
-      return { speciesId, level: enemyLevel, stats: statsAt(speciesId, enemyLevel), reward: rewardFor(enemyLevel) };
+      return {
+        speciesId,
+        element: SPECIES[speciesId].family,
+        level: enemyLevel,
+        stats: statsAt(speciesId, enemyLevel),
+        reward: rewardFor(enemyLevel),
+      };
     };
     /** Die staerkste Faehigkeit eines Gegners. Determinismus statt Wuerfel. */
     const bestMove = (level, speciesId) =>
       abilitiesFor(level, speciesId).slice().sort((a, b) => b.power - a.power)[0] ?? ABILITIES[0];
+
+    // ── 3. PACING (kuenstliche Rundendauer) ─────────────────────────────────
+    const PACING = { delayMs: 3000, lockedText: 'Codermon ist im Kampf, warte auf das Ergebnis' };
+    /**
+     * Die Dauer, mit der dieser Client rechnet. Sie ist ein SPIEGEL des
+     * Vertragswerts: der Host liest die effektive Zahl aus der Profil-Ebene,
+     * und die kann der Browser nicht lesen. Eine Abweichung waere still —
+     * deshalb steht der Spiegel hier sichtbar an genau einer Stelle.
+     */
+    const roundDelayMs = PACING.delayMs;
+
+    // ── 4. LOOT (gewichteter Wurf in Basispunkten) ──────────────────────────
+    const LOOT_TABLE = [
+      { id: 'schrott', label: 'Schrott', weight: 8500, xp: 0 },
+      { id: 'brauchbar', label: 'Brauchbares Teil', weight: 1400, xp: 25 },
+      { id: 'shiny', label: 'Shiny God-Tier', weight: 100, xp: 2500 },
+    ];
+    const LOOT_TOTAL = LOOT_TABLE.reduce((sum, entry) => sum + entry.weight, 0);
+    /** Der Wurf: `uniform` aus [0,1) gegen die kumulierten Gewichte. Rein. */
+    const rollLoot = (uniform) => {
+      const clamped = Math.min(1, Math.max(0, uniform));
+      const point = Math.min(LOOT_TOTAL - 1, Math.floor(clamped * LOOT_TOTAL));
+      let acc = 0;
+      for (const entry of LOOT_TABLE) {
+        acc += entry.weight;
+        if (point < acc) return entry;
+      }
+      return LOOT_TABLE[LOOT_TABLE.length - 1];
+    };
+    const lootOdds = (entry) => Number(((entry.weight / LOOT_TOTAL) * 100).toFixed(2));
 
     // ── Store ───────────────────────────────────────────────────────────────
     const listeners = new Set();
@@ -292,6 +451,7 @@ window.__ModuleLoader__.load({
     };
 
     const freshState = (speciesId = SPECIES_IDS[0]) => ({
+      version: STORE_VERSION,
       name: 'Codingmon',
       species: speciesId,
       xp: 0,
@@ -302,27 +462,70 @@ window.__ModuleLoader__.load({
       round: 0,
       battle: null,
       log: [],
+      /**
+       * Der Lebenslauf. `damageTotal` ist die Summe allen Schadens und wird als
+       * BigInt gefuehrt: bei Level 50 stehen hier Betraege in Millionenhöhe, und
+       * eine Zahl, die man nachrechnen will, darf nicht ab 2^53 runden. JSON
+       * kennt kein BigInt — persist() schreibt den Dezimaltext, revive() liest
+       * ihn zurueck.
+       */
+      damageTotal: 0n,
+      hits: 0,
+      peakHit: 0,
+      digits: 1,
+      milestones: [],
+      /** Beutezaehler und die letzten Funde. Reine Zahlen, keine Deutung. */
+      loot: { schrott: 0, brauchbar: 0, shiny: 0 },
+      drops: [],
+      sinceShiny: 0,
+      /** Die Sperre. Nicht null = ein Zug laeuft und nimmt keinen Input an. */
+      lock: null,
+      rejections: 0,
     });
 
     /**
-     * Einen gelesenen Stand BRAUCHBAR machen: ein Pet aus einer aelteren
-     * Fassung (die drei Spezies spark/byte/feral) darf den Client nicht mit
-     * `undefined`-Werten in die Arena schicken. Unbekannte Spezies fallen auf
-     * die erste zurueck, ein Kampf mit unbekanntem Gegner wird verworfen —
-     * XP, Siege und Log bleiben.
+     * Einen gelesenen Stand BRAUCHBAR machen: ein Pet aus einer aelteren Fassung
+     * (die drei Spezies spark/byte/feral, kein Regelwerk, kein BigInt) darf den
+     * Client nicht mit `undefined`-Werten in die Arena schicken. Unbekannte
+     * Spezies fallen auf die erste zurueck, ein Kampf mit unbekanntem Gegner
+     * wird verworfen — XP, Siege, Beute und Log bleiben.
      */
     function revive(raw) {
-      const state = { ...freshState(), ...raw };
+      const state = { ...freshState(), ...(raw ?? {}) };
       if (!SPECIES[state.species]) state.species = SPECIES_IDS[0];
       if (!Number.isFinite(state.xp) || state.xp < 0) state.xp = 0;
       if (!Number.isFinite(state.round) || state.round < 0) state.round = 0;
+      try {
+        state.damageTotal = BigInt(raw?.damageTotal ?? 0);
+      } catch {
+        state.damageTotal = 0n;
+      }
+      if (state.damageTotal < 0n) state.damageTotal = 0n;
+      for (const key of ['hits', 'peakHit', 'digits', 'sinceShiny', 'rejections']) {
+        if (!Number.isFinite(state[key]) || state[key] < 0) state[key] = 0;
+      }
+      if (state.digits < 1) state.digits = 1;
+      state.loot = { ...freshState().loot, ...(state.loot ?? {}) };
+      state.milestones = Array.isArray(state.milestones) ? state.milestones : [];
+      state.drops = Array.isArray(state.drops) ? state.drops : [];
       const battle = state.battle;
       const usable = battle !== null && typeof battle === 'object' && SPECIES[battle.speciesId]
         && Number.isFinite(battle.hp) && Number.isFinite(battle.maxHp);
       state.battle = usable ? battle : null;
+      // Eine Sperre haengt an einem Timer, und der ueberlebt das Neuladen nicht.
+      // Ein Stand mit gesetzter Sperre waere eine Wartezeit ohne Uhr: der Spieler
+      // wartete fuer immer. Also faellt der Zug, und das Log sagt es.
+      if (state.lock !== null && state.lock !== undefined) {
+        const pending = state.lock.action;
+        state.lock = null;
+        state.log = [`${new Date().toLocaleTimeString('de-DE')}  Neuladen mitten im Zug (${pending}) — der Zug ist verfallen`, ...(state.log ?? [])].slice(0, 40);
+      }
       if (!Number.isFinite(state.hp) || state.hp <= 0) state.hp = statsAt(state.species, levelFor(state.xp)).hp;
       return state;
     }
+
+    /** Der Stand, wie er auf die Platte geht: BigInt als Dezimaltext. */
+    const portable = () => ({ ...store, damageTotal: store.damageTotal.toString() });
 
     let store = freshState();
     try {
@@ -331,7 +534,7 @@ window.__ModuleLoader__.load({
     } catch { /* kein Storage: das Pet lebt dann nur in dieser Sitzung */ }
 
     const persist = () => {
-      try { window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(store)); } catch { /* siehe oben */ }
+      try { window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(portable())); } catch { /* siehe oben */ }
     };
     const note = (text) => {
       store.log = [`${new Date().toLocaleTimeString('de-DE')}  ${text}`, ...store.log].slice(0, 40);
@@ -369,9 +572,25 @@ window.__ModuleLoader__.load({
       return gained;
     }
 
+    /**
+     * Einen Meilenstein feiern — aber nur, wenn wirklich eine Stelle dazukommt.
+     * `kind` trennt, WELCHER Wert gewachsen ist (Lebenslauf, Einzeltreffer, XP,
+     * Beute), damit die Anzeige nicht alles in einen Topf wirft.
+     */
+    function celebrate(kind, before, after, label) {
+      const mark = milestoneFor(before, after);
+      if (mark === null) return null;
+      const digits = String(after).length;
+      store.milestones = [{ at: Date.now(), kind, mark, value: String(after), digits, label }, ...store.milestones].slice(0, 20);
+      note(`MEILENSTEIN ${formatNumber(mark)}+ (${kind}) — ${label}: ${formatNumber(after)} (${digits} Stellen)`);
+      return mark;
+    }
+
     function award(xp, reason) {
       const before = level();
-      store.xp += xp;
+      const xpBefore = store.xp;
+      store.xp += Math.max(0, Math.round(xp));
+      store.digits = Math.max(store.digits, String(store.xp).length);
       const after = level();
       if (after > before) {
         const learned = abilitiesFor(after, store.species)
@@ -381,6 +600,7 @@ window.__ModuleLoader__.load({
       } else if (reason) {
         note(reason);
       }
+      celebrate('xp', xpBefore, store.xp, `Level ${after}`);
       persist();
       emit();
     }
@@ -390,95 +610,251 @@ window.__ModuleLoader__.load({
       if (gained > 0) award(gained, null);
     }
 
-    // ── Arena: rundenbasiert, nur auf Klick ─────────────────────────────────
-    /** Einen Gegner stellen. Ohne laufenden Kampf; sonst passiert nichts. */
+    // ── 3. PACING: der Zug sperrt den Zustand ───────────────────────────────
+    /** Rundendauer aus dem Vertrag; eine kaputte Zahl wird zu 0, nicht zu NaN. */
+    const roundDelay = () => Math.max(0, Number(roundDelayMs) || 0);
+    /** Timer je Zug. Ausserhalb des Zustands, weil ein Handle nicht auf die Platte gehoert. */
+    const timers = new Map();
+
+    /**
+     * Ein Input WAEHREND der Sperre wird kalt abgewiesen, nicht eingereiht und
+     * nicht verrechnet. Das ist die eine Stelle, die die Luecke schliesst: wer
+     * zehnmal klickt, bekommt neun Absagen und genau ein Ergebnis.
+     */
+    function guard(action) {
+      if (store.lock === null) return true;
+      store.rejections += 1;
+      note(`${PACING.lockedText} (abgewiesen: ${action})`);
+      persist();
+      emit();
+      return false;
+    }
+
+    /**
+     * Einen Zug beginnen: SYNCHRON, in derselben Millisekunde wie der Klick,
+     * wird der Schnappschuss eingefroren, den das Ergebnis benutzen darf — und
+     * erst danach wird gewartet. Diese Reihenfolge ist der ganze Punkt: waere
+     * die Sperre erst nach dem `await` gesetzt, koennte ein zweiter Klick im
+     * selben Tick ein zweites Ergebnis buchen (Race Condition). Der eingefrorene
+     * Stand ist die EINZIGE Quelle des Ergebnisses; was der Nutzer waehrend der
+     * Wartezeit sieht, ist die Wartezeit selbst.
+     */
+    function beginTurn(action, payload) {
+      if (!guard(action)) return null;
+      const now = Date.now();
+      const lock = {
+        id: `${now}-${store.round}-${store.hits}-${action}`,
+        action,
+        payload,
+        at: now,
+        until: now + roundDelay(),
+        frozen: {
+          level: level(),
+          species: store.species,
+          hp: store.hp,
+          stats: stats(),
+          inherited: inheritedAbilities(store.species),
+          battle: store.battle === null ? null : { ...store.battle, stats: { ...store.battle.stats } },
+        },
+      };
+      store.lock = lock;
+      persist();
+      emit();
+      timers.set(lock.id, window.setTimeout(() => settle(lock.id), roundDelay()));
+      return lock;
+    }
+
+    /**
+     * Das Ergebnis ausspielen. Der Timer prueft ZUERST seine Kennung: ein Zug,
+     * der schon ersetzt wurde, darf nicht mehr schreiben (sonst wuerde ein
+     * spaeter Zuendender den aktuellen Kampf ueberschreiben). Alles Folgende
+     * laeuft in einem Block — waehrend der Sperre konnte nichts anderes den
+     * Zustand bewegen.
+     */
+    function settle(lockId) {
+      const timer = timers.get(lockId);
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        timers.delete(lockId);
+      }
+      const lock = store.lock;
+      if (lock === null || lock.id !== lockId) return null;
+      const { frozen, action, payload } = lock;
+      store.lock = null;
+      const result = action === 'start' ? openBattle(frozen, payload) : action === 'use' ? strike(frozen, payload) : null;
+      persist();
+      emit();
+      return result;
+    }
+
+    /** Der Zug, wie ihn der Client nach aussen meldet (fuer Proben und Anzeige). */
+    const lockStatus = () => (store.lock === null ? null : { ...store.lock.frozen, id: store.lock.id, action: store.lock.action, until: store.lock.until });
+
+    // ── 1./2. Arena: ein Klick = ein Zug, Ergebnis verzoegert ───────────────
+    /**
+     * Den Treffer buchen: der Lebenslauf waechst als BigInt, Einzeltreffer und
+     * Stellenzahl werden nachgezogen, und ein Stellensprung wird gefeiert.
+     * Alle Ausgaben sind formatiert — der Sprung von zwei- auf fuenfstellig ist
+     * die Aussage, nicht die Animation.
+     */
+    function bookHit(dealt, label) {
+      const before = store.damageTotal;
+      const peakBefore = store.peakHit;
+      store.damageTotal += BigInt(Math.max(0, Math.round(dealt)));
+      store.hits += 1;
+      if (dealt > store.peakHit) store.peakHit = dealt;
+      store.digits = Math.max(store.digits, String(store.damageTotal).length);
+      celebrate('lebenslauf', before, store.damageTotal, label);
+      celebrate('treffer', peakBefore, store.peakHit, label);
+    }
+
+    /** Einen Gegner stellen — als Zug, nicht sofort. */
     function startBattle() {
       if (store.battle !== null) return store.battle;
       const arena = arenaFor(level(), store.round);
+      const lock = beginTurn('start', { arena });
+      if (lock === null) return null;
       store.round += 1;
+      persist();
+      return { locked: true, until: lock.until, arena };
+    }
+
+    /** Den eingefrorenen Gegner aufstellen; schlaegt er zuerst, tut er es sofort. */
+    function openBattle(frozen, payload) {
+      const arena = payload.arena;
       store.battle = {
         speciesId: arena.speciesId,
+        element: arena.element,
         level: arena.level,
         hp: arena.stats.hp,
         maxHp: arena.stats.hp,
         stats: arena.stats,
         reward: arena.reward,
-        turn: firstStrike(stats(), arena.stats),
+        turn: firstStrike(frozen.stats, arena.stats),
         over: null,
       };
-      note(`Runde ${store.round}: ${SPECIES[arena.speciesId].label} L${arena.level} erscheint (${arena.reward} XP)`);
-      if (store.battle.turn === 'enemy') enemyTurn();
-      persist();
-      emit();
-      return store.battle;
+      note(`Runde ${store.round}: ${SPECIES[arena.speciesId].label} L${arena.level} erscheint (${formatNumber(arena.reward)} XP)`);
+      if (store.battle.turn === 'enemy') enemyAnswer();
+      return { locked: false, battle: { ...store.battle } };
     }
 
-    /** Der Gegner schlaegt zurueck — dieselbe reine Schadensformel. */
-    function enemyTurn() {
+    /**
+     * Die gewaehlte Faehigkeit aus dem EINGEFRORENEN Stand ausfuehren. Der
+     * Gegner antwortet im selben Block: ein Klick ergibt genau eine Runde, nie
+     * zwei halbe.
+     */
+    function strike(frozen, payload) {
       const battle = store.battle;
-      if (battle === null || battle.over !== null) return;
-      const move = bestMove(battle.level, battle.speciesId);
-      const dealt = damageOf(move, battle.stats, stats().def);
-      store.hp = Math.max(0, store.hp - dealt);
-      note(`${SPECIES[battle.speciesId].label} nutzt ${move.label} —${dealt} (eigenes HP ${store.hp}/${maxHp()})`);
-      if (store.hp <= 0) finish('loss', battle);
-      else battle.turn = 'challenger';
-    }
-
-    /** Eine gewaehlte Faehigkeit ausfuehren: Schaden, dann ist der Gegner dran. */
-    function useAbility(abilityId) {
-      const battle = store.battle;
-      if (battle === null || battle.over !== null || battle.turn !== 'challenger') return null;
-      const move = abilitiesFor(level(), store.species).find((ability) => ability.id === abilityId)
-        ?? abilitiesFor(level(), store.species)[0];
-      const dealt = damageOf(move, stats(), battle.stats.def);
-      battle.hp = Math.max(0, battle.hp - dealt);
-      note(`${move.label} —${dealt} gegen ${SPECIES[battle.speciesId].label} (${battle.hp}/${battle.maxHp} HP)`);
-      if (battle.hp <= 0) finish('win', battle);
+      if (battle === null || battle.over !== null) return null;
+      const known = abilitiesFor(frozen.level, frozen.species);
+      const move = known.find((ability) => ability.id === payload.abilityId) ?? known[0];
+      const attacker = {
+        element: SPECIES[frozen.species].family,
+        stats: frozen.stats,
+        hp: frozen.hp,
+        maxHp: frozen.stats.hp,
+        inherited: frozen.inherited,
+      };
+      const result = resolveAttack(move, attacker, battle);
+      battle.hp = Math.max(0, battle.hp - result.dealt);
+      bookHit(result.dealt, `${move.label} gegen ${SPECIES[battle.speciesId].label}`);
+      note(`${move.label} —${formatNumber(result.dealt)} (Element ${result.element}x${result.category === 'speziell' ? `, Durchgriff ${result.defFactor}` : ''}`
+        + `${result.buff.id === 'neutral' ? '' : `, ${result.buff.label} ${result.buff.factor}x`}) — Gegner ${formatNumber(battle.hp)}/${formatNumber(battle.maxHp)} HP`);
+      let outcome = null;
+      if (battle.hp <= 0) outcome = finish('win', battle);
       else {
         battle.turn = 'enemy';
-        enemyTurn();
+        outcome = enemyAnswer();
       }
-      persist();
-      emit();
-      return { move: move.id, dealt, battle: { ...battle } };
+      return { move: move.id, dealt: result.dealt, factors: result, battle: { ...battle }, outcome };
     }
 
-    /** Kampfende. Sieg zahlt XP (die einzige XP-Quelle neben den Token), K.o. heilt. */
+    /** Der Gegner schlaegt zurueck — dieselbe reine Kette, sein Stand. */
+    function enemyAnswer() {
+      const battle = store.battle;
+      if (battle === null || battle.over !== null) return null;
+      const move = bestMove(battle.level, battle.speciesId);
+      const attacker = {
+        element: battle.element ?? SPECIES[battle.speciesId].family,
+        stats: battle.stats,
+        hp: battle.hp,
+        maxHp: battle.maxHp,
+        inherited: [],
+      };
+      const result = resolveAttack(move, attacker, { element: SPECIES[store.species].family, stats: stats() });
+      store.hp = Math.max(0, store.hp - result.dealt);
+      note(`${SPECIES[battle.speciesId].label} nutzt ${move.label} —${formatNumber(result.dealt)} (Element ${result.element}x) — eigenes HP ${formatNumber(store.hp)}/${formatNumber(maxHp())}`);
+      if (store.hp <= 0) return finish('loss', battle);
+      battle.turn = 'challenger';
+      return null;
+    }
+
+    /**
+     * Eine Faehigkeit waehlen: sie wird nicht gerechnet, sie wird als Zug
+     * begonnen. Die Sperre wird ZUERST geprueft — auch ein Klick auf einen
+     * ausgegrauten Knopf ist ein Klick und bekommt die Absage, nicht ein
+     * stilles Nichts.
+     */
+    function useAbility(abilityId) {
+      if (!guard('use')) return null;
+      const battle = store.battle;
+      if (battle === null || battle.over !== null || battle.turn !== 'challenger') return null;
+      const lock = beginTurn('use', { abilityId });
+      return lock === null ? null : { locked: true, until: lock.until, abilityId };
+    }
+
+    /**
+     * Kampfende. Der Sieg zahlt XP (die einzige XP-Quelle neben den Token) UND
+     * rollt die Beute: ein Wurf, ein Ergebnis. Der Zaehler `sinceShiny` macht
+     * die Quote sichtbar, ohne sie zu verbessern — es gibt keine Gnade, nur
+     * eine Zahl, die zeigt, wie lange man schon leer ausgeht.
+     */
     function finish(outcome, battle) {
       battle.over = outcome;
       if (outcome === 'win') {
         store.wins += 1;
         const reward = battle.reward;
+        const shinyBefore = store.loot.shiny;
         store.battle = null;
-        note(`Sieg gegen ${SPECIES[battle.speciesId].label} L${battle.level} — +${reward} XP`);
-        award(reward, null);
+        const drop = rollLoot(Math.random());
+        store.loot[drop.id] += 1;
+        store.sinceShiny = drop.id === 'shiny' ? 0 : store.sinceShiny + 1;
+        store.drops = [{ at: Date.now(), id: drop.id, label: drop.label, level: battle.level }, ...store.drops].slice(0, 20);
+        note(`Sieg gegen ${SPECIES[battle.speciesId].label} L${battle.level} — +${formatNumber(reward)} XP · Beute: ${drop.label} (${lootOdds(drop)} %)`
+          + `${drop.id === 'shiny' ? ' — SHINY!' : ` · ${store.sinceShiny} Siege seit dem letzten Shiny`}`);
+        if (drop.id === 'shiny') celebrate('beute', shinyBefore, store.loot.shiny, drop.label);
+        award(reward + drop.xp, null);
       } else {
         store.losses += 1;
         store.battle = null;
         store.hp = maxHp();
         note(`K.o. gegen ${SPECIES[battle.speciesId].label} L${battle.level} — das Codemon rappelt sich wieder auf`);
       }
+      return outcome;
     }
 
-    /** Rast: HP auffuellen. Kein Sieg, kein XP — die einzige Heilung ausser K.o. */
+    /** Rast: HP auffuellen. Kein Sieg, kein XP — und waehrend eines Zuges nichts. */
     function rest() {
-      if (store.battle !== null) return;
+      if (!guard('rest')) return null;
+      if (store.battle !== null) return null;
       store.hp = maxHp();
       note('Rast — HP aufgefrischt');
       persist();
       emit();
+      return { hp: store.hp };
     }
 
-    /** Spezies wechseln. Der Fortschritt (XP, Siege) bleibt, der Kampf endet. */
+    /** Spezies wechseln. Der Fortschritt (XP, Siege, Beute) bleibt, der Kampf endet. */
     function pickSpecies(speciesId) {
-      if (!SPECIES[speciesId]) return;
+      if (!SPECIES[speciesId]) return null;
+      if (!guard('pick')) return null;
       store.species = speciesId;
       store.battle = null;
       store.hp = statsAt(speciesId, level()).hp;
-      note(`Gewechselt zu ${SPECIES[speciesId].label}`);
+      note(`Gewechselt zu ${SPECIES[speciesId].label} (Generation ${(LINEAGE[speciesId] ?? {}).generation ?? 1})`);
       persist();
       emit();
+      return { species: speciesId };
     }
 
     /** Die Figur eines Codemons: Familie aus der Spezies, Farbe aus dem Farbton. */
@@ -543,7 +919,8 @@ window.__ModuleLoader__.load({
         h('span', { className: '__cm_expbar-lvl' }, `LV ${lvl}`),
         h('span', { className: '__cm_expbar-track' },
           h('span', { className: '__cm_expbar-fill', style: { width: `${pct}%` } })),
-        h('span', { className: '__cm_expbar-meta' }, `${s.xp} XP · HP ${Math.max(0, s.hp)}/${maxHp()}`),
+        h('span', { className: '__cm_expbar-meta' },
+          `${formatNumber(s.xp)} XP · HP ${formatNumber(Math.max(0, s.hp))}/${formatNumber(maxHp())} · ${s.wins} Siege · Beute ${s.loot.shiny} shiny`),
       );
     }
 
@@ -553,14 +930,17 @@ window.__ModuleLoader__.load({
       const cur = statsAt(s.species, lvl);
       const next = threshold(lvl + 1);
       const prev = threshold(lvl);
+      const lineage = LINEAGE[s.species] ?? {};
       return h('header', { className: '__cm_panel-head' },
         h('span', { className: '__cm_panel-stage' },
           h('span', { dangerouslySetInnerHTML: { __html: speciesGlyph(s.species, lvl, 72) } }),
           h('span', { className: '__cm_sub' }, formOf(lvl).label)),
         h('div', { className: '__cm_panel-id' },
           h('h2', null, `${s.name} — ${SPECIES[s.species].label}`),
-          h('p', { className: '__cm_sub' }, `Level ${lvl} · ${s.wins} Siege / ${s.losses} K.o. · Runde ${s.round}`),
-          h('p', { className: '__cm_xp' }, `${s.xp} XP · ${next - s.xp} XP bis Level ${lvl + 1}`),
+          h('p', { className: '__cm_sub' },
+            `Level ${lvl} · ${s.wins} Siege / ${s.losses} K.o. · Runde ${s.round} · ${ELEMENTS[SPECIES[s.species].family].label} · Generation ${lineage.generation ?? 1}`),
+          h('p', { className: '__cm_xp' },
+            `${formatNumber(s.xp)} XP (${String(s.xp).length} Stellen) · ${formatNumber(Math.max(0, next - s.xp))} XP bis Level ${lvl + 1}`),
           h(Bar, { value: s.xp - prev, max: Math.max(1, next - prev), tone: 'xp' }),
           h('label', { className: '__cm_pick' },
             h('span', null, 'Codemon'),
@@ -601,9 +981,19 @@ window.__ModuleLoader__.load({
      */
     function Arena({ s, lvl, myStats, abilities, onUse, onStart, onRest }) {
       const battle = s.battle;
+      const locked = s.lock !== null;
       const myTurn = battle !== null && battle.over === null && battle.turn === 'challenger';
       return h('section', { className: '__cm_arena' },
         h('h3', null, 'Arena'),
+        // Die Sperre ist sichtbar: ein Balken, der genau die Vertragsdauer
+        // laeuft, der Absagesatz aus dem Vertrag und der Zaehler der kalten
+        // Abweisungen. Kein Klick wird eingereiht.
+        locked ? h('div', { className: '__cm_lock' },
+          h('span', { className: '__cm_lock-text' }, PACING.lockedText),
+          h('span', { className: '__cm_lock-track' },
+            h('span', { className: '__cm_lock-fill', style: { animationDuration: `${roundDelayMs}ms` } })),
+          h('span', { className: '__cm_sub' },
+            `Zug ${s.lock.action} — ${s.rejections} abgewiesene Eingabe${s.rejections === 1 ? '' : 'n'}`)) : null,
         battle === null
           ? h('p', { className: '__cm_sub' }, 'Kein Gegner. Ein Klick stellt einen — die Runde waechst mit jedem Kampf.')
           : h('div', { className: '__cm_board' },
@@ -629,39 +1019,131 @@ window.__ModuleLoader__.load({
             key: ability.id,
             type: 'button',
             className: '__cm_move',
-            disabled: battle !== null && !myTurn,
-            title: battle === null ? 'Erst einen Gegner stellen' : `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}`,
+            disabled: locked || (battle !== null && !myTurn),
+            title: battle === null
+              ? 'Erst einen Gegner stellen'
+              : `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}${inheritedAbilities(s.species).includes(ability.id) ? ' · geerbt (Reine Linie)' : ''}`,
             onClick: () => onUse(ability.id),
           },
             h('span', { className: '__cm_move-name' }, ability.label),
-            h('span', { className: '__cm_move-meta' }, `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}`))),
+            h('span', { className: '__cm_move-meta' },
+              `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}${inheritedAbilities(s.species).includes(ability.id) ? ' · Erbe' : ''}`))),
         ),
         h('div', { className: '__cm_actions' },
           h('button', {
             type: 'button',
             className: '__cm_btn',
-            disabled: battle !== null,
+            disabled: locked || battle !== null,
             onClick: onStart,
           }, battle === null ? 'Naechster Gegner' : `Gegner: ${SPECIES[battle.speciesId].label} L${battle.level}`),
           h('button', {
             type: 'button',
             className: '__cm_btn',
-            disabled: battle !== null,
+            disabled: locked || battle !== null,
             onClick: onRest,
           }, 'Rast (+HP)'),
-          h('span', { className: '__cm_sub' }, battle === null
-            ? `${Math.max(0, s.hp)}/${myStats.hp} HP`
-            : (battle.turn === 'challenger' ? 'Du bist am Zug' : 'Gegner ist am Zug'))),
+          h('span', { className: '__cm_sub' }, locked
+            ? 'gesperrt — das Ergebnis kommt verzoegert'
+            : battle === null
+              ? `${formatNumber(Math.max(0, s.hp))}/${formatNumber(myStats.hp)} HP`
+              : (battle.turn === 'challenger' ? 'Du bist am Zug' : 'Gegner ist am Zug'))),
       );
+    }
+
+    /**
+     * ESKALATION: was eine Stufe ausmacht. Die Zahlen stehen formatiert da,
+     * weil die Aussage die Zahl ist: Schwelle, Werte und Lohn wachsen
+     * multiplikativ (x1,35 je Stufe), und der Lebenslauf steht daneben als
+     * BigInt — in Millionenhöhe exakt und nicht gerundet. Der Stellensprung
+     * (zwei- auf fuenfstellig) ist damit der Beweis der investierten Zeit und
+     * keine Behauptung: er steht als Meilenstein mit Wert und Datum im Log.
+     */
+    function EscalationBlock({ s, lvl, myStats }) {
+      const next = threshold(lvl + 1);
+      const base = statsAt(s.species, 1);
+      const peak = Math.max(0, Math.round(s.peakHit));
+      const upcoming = MILESTONES.find((mark) => BigInt(mark) > s.damageTotal) ?? null;
+      return h('div', { className: '__cm_block' },
+        h('h3', null, `Eskalation — Faktor ${ESCALATION.factor} je Stufe`),
+        h('ul', { className: '__cm_facts' },
+          h('li', { key: 'threshold' },
+            `Schwelle L${lvl + 1}: ${formatNumber(next)} XP (L1 ${formatNumber(threshold(1))}, L20 ${formatNumber(threshold(20))}, L50 ${formatNumber(threshold(50))})`),
+          h('li', { key: 'stats' },
+            `Werte L${lvl}: HP ${formatNumber(myStats.hp)} · ATK ${formatNumber(myStats.atk)} — auf L1: HP ${formatNumber(base.hp)} · ATK ${formatNumber(base.atk)}`),
+          h('li', { key: 'hit' }, `Groesster Treffer: ${formatNumber(peak)} (${String(peak).length} Stellen)`),
+          h('li', { key: 'total' }, `Lebenslauf: ${formatNumber(s.damageTotal)} Schaden in ${formatNumber(s.hits)} Treffern (BigInt, exakt)`),
+          h('li', { key: 'digits' }, `Stellen: ${String(s.damageTotal).length}`
+            + (upcoming === null ? ' — alle Meilensteine erreicht' : ` — naechster Meilenstein ${formatNumber(upcoming)}`))),
+        s.milestones.length === 0 ? null : h('ol', { className: '__cm_milestones' },
+          s.milestones.slice(0, 5).map((entry, index) => h('li', { key: `${index}-${entry.at}` },
+            `MEILENSTEIN ${formatNumber(entry.mark)}+ · ${entry.kind} · ${entry.label} → ${formatNumber(entry.value)} (${entry.digits} Stellen)`))));
+    }
+
+    /**
+     * DAS REGELWERK, offen lesbar: Elementkreis, Synergie, Durchgriff, Buffs und
+     * der Vererbungsbaum. Das System rechnet nicht klug, es schlaegt nach — wer
+     * gewinnen will, muss die Tabelle lesen. Deshalb steht sie im Panel und
+     * nicht in einer Hilfe.
+     */
+    function Rulebook({ s }) {
+      const element = SPECIES[s.species].family;
+      const lineage = LINEAGE[s.species] ?? {};
+      const chain = [];
+      let cursor = s.species;
+      while (cursor !== undefined && cursor !== null && LINEAGE[cursor] !== undefined) {
+        chain.push(cursor);
+        cursor = LINEAGE[cursor].ancestor;
+      }
+      const abilityLabel = (id) => (ABILITIES.find((ability) => ability.id === id) ?? { label: id }).label;
+      return h('div', { className: '__cm_block' },
+        h('h3', null, 'Regelwerk (statisch)'),
+        h('table', { className: '__cm_table' },
+          h('thead', null, h('tr', null,
+            h('th', null, 'Angreifer / Ziel'),
+            ...Object.keys(ELEMENTS).map((id) => h('th', { key: id }, ELEMENTS[id].label)))),
+          h('tbody', null, Object.keys(ELEMENTS).map((attacker) => h('tr', { key: attacker },
+            h('td', null, ELEMENTS[attacker].label),
+            Object.keys(ELEMENTS).map((defender) => h('td', { key: defender }, `${ELEMENT_CHART[attacker][defender]}x`)))))),
+        h('ul', { className: '__cm_facts' },
+          h('li', { key: 'own' },
+            `Eigenes Element: ${ELEMENTS[element].label} — schlaegt ${ELEMENTS[ELEMENTS[element].beats].label}, verliert gegen ${ELEMENTS[ELEMENTS[element].losesTo].label}`),
+          h('li', { key: 'synergy' },
+            `Synergie: speziell ${SYNERGY[`${element}:speziell`]}x · physisch ${SYNERGY[`${element}:physisch`]}x`),
+          h('li', { key: 'category' },
+            `Durchgriff: physisch ${CATEGORY.physisch.defFactor} · speziell ${CATEGORY.speziell.defFactor}`),
+          h('li', { key: 'buff' }, `Buffs: ${BUFFS.map((buff) => `${buff.label} ${buff.factor}x`).join(' · ')}`),
+          h('li', { key: 'line' },
+            `Linie: ${chain.map((id) => SPECIES[id].label).join(' → ')} (Generation ${lineage.generation ?? 1})`),
+          h('li', { key: 'inherits' },
+            `Erbfaehigkeiten: ${(lineage.inherits ?? []).map(abilityLabel).join(', ') || 'keine'}`)),
+        h('p', { className: '__cm_sub' },
+          'Der Schaden ist BaseDamage x Element x Synergie x Buff - DEF x Durchgriff — fuenf Nachschlagevorgaenge, kein Zweig.'));
+    }
+
+    /**
+     * DIE SKINNER-BOX, offen: Quoten und Zaehler stehen da. Es gibt keine Gnade
+     * und keinen Pity-Timer — nur die Zahl der Siege seit dem letzten Shiny,
+     * damit die irrationale Erwartung eine Anzeige hat.
+     */
+    function DropLedger({ s }) {
+      return h('div', { className: '__cm_block' },
+        h('h3', null, `Beute — ${formatNumber(s.loot.shiny)} shiny`),
+        h('ul', { className: '__cm_facts' },
+          LOOT_TABLE.map((entry) => h('li', { key: entry.id },
+            `${entry.label}: ${lootOdds(entry)} % — ${formatNumber(s.loot[entry.id] ?? 0)} gefunden`)),
+          h('li', { key: 'streak' }, `${formatNumber(s.sinceShiny)} Siege seit dem letzten Shiny`)),
+        s.drops.length === 0 ? null : h('ul', { className: '__cm_log' },
+          s.drops.slice(0, 5).map((drop, index) => h('li', { key: `${index}-${drop.at}` }, `${drop.label} (Gegner L${drop.level})`))));
     }
 
     /** Bilanz und Log. Die Zahlen kommen aus dem Store, nicht aus der Darstellung. */
     function Ledger({ s }) {
       return h('div', { className: '__cm_block' },
         h('h3', null, `Bilanz — ${s.wins} Siege / ${s.losses} K.o.`),
-        h('p', { className: '__cm_sub' }, '1 XP pro Token · Sieg XP nach Gegner-Level · Faehigkeiten ab Level 4 die zweite'),
+        h('p', { className: '__cm_sub' },
+          '1 XP pro Token · Sieg XP nach Gegner-Level (multiplikativ) · jede Runde verzoegert, kein Input waehrend eines Zuges'),
         h('ul', { className: '__cm_log' },
-          s.log.slice(0, 10).map((line, index) => h('li', { key: `${index}-${line}` }, line))));
+          s.log.slice(0, 12).map((line, index) => h('li', { key: `${index}-${line}` }, line))));
     }
 
     function CodingmonPanel() {
@@ -682,6 +1164,9 @@ window.__ModuleLoader__.load({
           onStart: startBattle,
           onRest: rest,
         }),
+        h(EscalationBlock, { s, lvl, myStats: mine }),
+        h(Rulebook, { s }),
+        h(DropLedger, { s }),
         h(Ledger, { s }),
       );
     }
@@ -751,8 +1236,27 @@ window.__ModuleLoader__.load({
       .__cm_expbar-track { flex: 1; height: 7px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,.12); }
       .__cm_expbar-fill { display: block; height: 100%; background: var(--shinon-gradient, linear-gradient(115deg,#7C3AED,#6366F1)); transition: width .3s ease; }
       .__cm_expbar-meta { color: var(--dsw-alias-label-secondary, #9aa); white-space: nowrap; }
+      /* Die Sperre: Balken, Absagesatz, Zaehler der kalten Abweisungen. */
+      .__cm_lock { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin-bottom: 10px;
+        border-radius: 6px; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35); }
+      .__cm_lock-text { font-size: 12px; font-weight: 600; color: #fca5a5; }
+      .__cm_lock-track { height: 6px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,.14); }
+      .__cm_lock-fill { display: block; height: 100%; width: 100%; transform: scaleX(0); transform-origin: left center;
+        background: linear-gradient(90deg,#ef4444,#f59e0b); animation-name: __cm_lock-grow;
+        animation-timing-function: linear; animation-fill-mode: forwards; }
+      @keyframes __cm_lock-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+      .__cm_facts { list-style: none; margin: 0 0 8px; padding: 0; font-size: 12px; }
+      .__cm_facts li { padding: 2px 0; color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
+      .__cm_table th, .__cm_table td { padding: 3px 6px; text-align: left;
+        border-bottom: 1px solid rgba(255,255,255,.08); }
+      .__cm_table th { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+        color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_milestones { margin: 6px 0 0; padding-left: 18px; font-size: 12px;
+        color: var(--shinon-violet-light, #A855F7); }
       @media (prefers-reduced-motion: reduce) {
         .__cm_bar-fill, .__cm_expbar-fill { transition: none; }
+        .__cm_lock-fill { animation: none; transform: scaleX(1); }
       }
     `);
 
@@ -785,7 +1289,67 @@ window.__ModuleLoader__.load({
           rest,
           pick: (id) => pickSpecies(id),
           addXp: (xp) => award(xp, `+${xp} XP (manuell)`),
-          reset: () => { store = freshState(store.species); persist(); emit(); },
+          /** Die laufende Sperre (null = kein Zug). */
+          lock: () => lockStatus(),
+          /** Wie viele Eingaben die Sperre kalt abgewiesen hat. */
+          rejections: () => store.rejections,
+          /** Der Lebenslauf als Dezimaltext (BigInt ueberlebt JSON nicht). */
+          damageTotal: () => store.damageTotal.toString(),
+          milestones: () => store.milestones.slice(),
+          /** Das Regelwerk, wie das Panel es liest. */
+          rulebook: () => ({
+            elements: Object.keys(ELEMENTS),
+            chart: ELEMENT_CHART,
+            category: CATEGORY,
+            synergy: SYNERGY,
+            buffs: BUFFS,
+            lineage: LINEAGE,
+            pacing: { ...PACING, delayMs: roundDelayMs },
+          }),
+          /** Die Loot-Tabelle samt Quote und der reine Wurf. */
+          loot: () => ({ table: LOOT_TABLE.map((entry) => ({ ...entry, odds: lootOdds(entry) })), total: LOOT_TOTAL, roll: rollLoot }),
+          /**
+           * Der Vertrag, wie ihn nur der Client nachrechnen kann — dieselben
+           * Funktionen, die der Host exportiert. Eine Probe vergleicht beide
+           * Seiten Zahl fuer Zahl, damit die Dopplung nicht auseinanderlaeuft.
+           */
+          contract: () => ({
+            threshold: (level) => threshold(level),
+            levelFor: (xp) => levelFor(xp),
+            statsAt: (speciesId, level) => statsAt(speciesId, level),
+            rewardFor: (level) => rewardFor(level),
+            arenaFor: (level, round) => arenaFor(level, round),
+            abilitiesFor: (level, speciesId) => abilitiesFor(level, speciesId).map((ability) => ability.id),
+            inherited: (speciesId) => inheritedAbilities(speciesId).slice(),
+            chart: () => ELEMENT_CHART,
+            ladder: (base, level) => powerAtExact(base, level).toString(),
+            describeValue: (base, level) => {
+              const value = describeValue(base, level);
+              return { text: value.text, digits: value.digits, safe: value.safe };
+            },
+            rollLoot: (uniform) => rollLoot(uniform).id,
+            resolveAttack: (abilityId, speciesId, defenderSpeciesId, level) => {
+              const ability = ABILITIES.find((entry) => entry.id === abilityId) ?? ABILITIES[0];
+              const own = statsAt(speciesId, level);
+              const attacker = {
+                element: SPECIES[speciesId].family,
+                stats: own,
+                hp: own.hp,
+                maxHp: own.hp,
+                inherited: inheritedAbilities(speciesId),
+              };
+              const defender = { element: SPECIES[defenderSpeciesId].family, stats: statsAt(defenderSpeciesId, level) };
+              const result = resolveAttack(ability, attacker, defender);
+              return { ...result, buff: result.buff.id };
+            },
+          }),
+          reset: () => {
+            for (const timer of timers.values()) window.clearTimeout(timer);
+            timers.clear();
+            store = freshState(store.species);
+            persist();
+            emit();
+          },
         };
 
         ctx.slots.inject('sidebar.brand.mark', () => ctx.slots.register({ name: 'sidebar.brand.mark' }, PetMark));

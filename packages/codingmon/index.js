@@ -4,28 +4,47 @@ import z from '@deepseek-ai/schemastery';
  * @shinon/codingmon — die Codemon-Engine (Host-Hälfte).
  *
  * Der Host hält den VERTRAG, der Client hält den ZUSTAND. Diese Trennung ist
- * Absicht: Level-Kurve, Werteverteilung, Faehigkeiten und die Auswahl des
- * Gegners sind reine Funktionen ohne Zeit, Zufall oder Modell. Damit ist
- * „wie stark ist Level 7 gegen Runde 4" eine nachrechenbare Aussage und keine
- * Behauptung aus einer Animation — und sie ist ohne Browser pruefbar.
+ * Absicht: die Leiter der Eskalation, das Regelwerk, die Loot-Gewichte und die
+ * Rundendauer sind reine Tabellen und reine Funktionen ohne Zeit und ohne
+ * Zufallsquelle. Damit ist „was kostet Level 12, was trifft es und was faellt
+ * dabei\" eine nachrechenbare Aussage und keine Behauptung aus einer Animation
+ * — und sie ist ohne Browser pruefbar.
+ *
+ * VIER MECHANIKEN, EINE QUELLE JE MECHANIK.
+ *   1. ESKALATION: jede Stufe multipliziert, nichts addiert. `ESCALATION.factor`
+ *      ist die eine Zahl, aus der XP-Schwelle, Gegner-Lohn, Werte und Schaden
+ *      folgen (Math.pow). Fuer den LEBENSLAUF (Summe allen Schadens) fuehrt der
+ *      Client ein BigInt — dort sind Millionen exakt und nicht gerundet.
+ *      `formatNumber` setzt Tausenderpunkte, `describeValue` nennt die
+ *      Stellenzahl, damit der Sprung von zwei- auf fuenfstellig inszenierbar
+ *      ist, ohne dass die Anzeige luegt.
+ *   2. REGELWERK: `ELEMENTS`/`ELEMENT_CHART` (Elementarkreis),
+ *      `CATEGORY` (Verteidigungsdurchgriff), `SYNERGY` (Element mal Art),
+ *      `BUFFS` (Zustandslagen) und `LINEAGE` (Vererbungsbaum der zehn Linien).
+ *      Der Schaden ist BaseDamage * Element * Synergie * Buff - DEF * Durchgriff,
+ *      also fuenf Nachschlagevorgaenge in festen Tabellen und KEINE Fallunter-
+ *      scheidung ueber Zahlen. Das System rechnet nicht klug, es schlaegt nach;
+ *      die Analyse muss der Spieler machen.
+ *   3. PACING: `PACING.delayMs` ist die kuenstliche Rundendauer. Der Host nennt
+ *      nur die Zahl und die Absage (LOCKED_TEXT); die Sperre selbst haelt der
+ *      Client, weil dort der Zustand liegt.
+ *   4. LOOT: `LOOT_TABLE` in Basispunkten (8500/1400/100 = 85/14/1 Prozent).
+ *      `rollLoot(uniform)` ist eine reine Funktion eines Wertes aus [0,1) —
+ *      derselbe Wurf ergibt immer dieselbe Beute, damit die Tabelle pruefbar
+ *      ist und erst der Client echtes Math.random() einsetzt.
  *
  * Der Host entscheidet nichts und handelt nicht: er validiert die Parameter,
  * stellt die Vertragsfunktionen bereit und protokolliert die Aktivierung.
- * Alles Sichtbare — Pet, Arena, XP — lebt im Client.
+ * Alles Sichtbare — Pet, Arena, EXP — lebt im Client.
  *
- * ZEHN SPEZIES, ZWEI FAEHIGKEITEN JE SPEZIES. `family` waehlt die Pixelart-Form
- * im Client (drei handgezeichnete Familien), `hue` die Farbe; die Spezies
- * unterscheidet sich in Werten und Faehigkeiten. Zehn eigene 16x16-Matrizen
- * waeren 21 weitere handgezeichnete Sprites — die gibt es nicht, und sie werden
- * hier nicht erfunden: die Form kommt aus der Familie, die Identitaet aus den
- * Zahlen.
- *
- * XP-Quelle (Client): 1 XP pro Token. Der Client liest den Token-Zaehler, den
- * die DSH-Oberflaeche ohnehin anzeigt. Das ist eine Bruecke, keine saubere
- * Naht — siehe den Hinweis in client.js.
+ * ZEHN SPEZIES, ZWEI FAEIGKEITEN JE SPEZIES. `family` waehlt die Pixelart-Form
+ * im Client (drei handgezeichnete Familien) und ist zugleich das ELEMENT der
+ * Linie; die Spezies unterscheidet sich in Werten, Faehigkeiten und Vererbung.
+ * Zehn eigene 16x16-Matrizen waeren 21 weitere handgezeichnete Sprites — die
+ * gibt es nicht, und sie werden hier nicht erfunden.
  */
 
-/** Basis-Werte je Spezies. `family` = Pixelart-Form, `hue` = Farbe. */
+/** Basis-Werte je Spezies. `family` = Pixelart-Form UND Element, `hue` = Farbe. */
 export const SPECIES = {
   nullpointer: { label: 'NullPointer', family: 'spark', hue: 268, hp: 44, atk: 10, def: 6, agi: 9, int: 8 },
   stackoverflow: { label: 'StackOverflow', family: 'byte', hue: 10, hp: 40, atk: 8, def: 7, agi: 7, int: 12 },
@@ -42,17 +61,186 @@ export const SPECIES = {
 /** Die zehn Spezies-Schluessel in Vertragsreihenfolge. */
 export const SPECIES_IDS = Object.keys(SPECIES);
 
-/** Wachstum je Levelstufe. Deterministisch, additiv, keine Zufallsanteile. */
-export const GROWTH = { hp: 8, atk: 2, def: 2, agi: 1, int: 1 };
+// ── 1. ESKALATION ─────────────────────────────────────────────────────────
+/**
+ * Die eine Zahl, aus der alles waechst: jede Stufe multipliziert mit 1,35.
+ * Nichts wird addiert — deshalb ist der Abstand zwischen Level 3 und Level 20
+ * kein Gefuehl, sondern 1,35 hoch 17.
+ */
+export const ESCALATION = { factor: 1.35, perLevel: 'x1,35', label: 'multiplikativ je Stufe' };
+/** XP-Basis der ersten Stufe (kumulativ, exponentiell). */
+export const XP_BASE = 250;
+/** Schadens-Einheit: Kraft x Faehigkeitsstaerke / 10. */
+export const POWER_UNIT = 10;
+
+/** Die Leiter als Zahl: `base * factor^(level-1)`. */
+export function powerAt(base, level) {
+  const steps = Math.max(0, Math.floor(level) - 1);
+  return Math.round(base * Math.pow(ESCALATION.factor, steps));
+}
+
+/**
+ * Dieselbe Leiter EXAKT in BigInt (Basis 135/100, ganzzahlig geteilt). Fuer
+ * den Lebenslauf: dort steht der Schaden in Millionen und soll trotzdem eine
+ * Zahl bleiben, die man nachrechnen kann. Die Rundungsstelle ist dieselbe wie
+ * bei `powerAt`, weil BigInt ganzzahlig abschneidet.
+ */
+export function powerAtExact(base, level) {
+  const steps = BigInt(Math.max(0, Math.floor(level) - 1));
+  const scaled = BigInt(Math.round(base)) * (135n ** steps);
+  return scaled / (100n ** steps);
+}
+
+/** Tausenderpunkte. Nimmt Number und BigInt (ueber den Dezimaltext). */
+export function formatNumber(value) {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/**
+ * Ein Wert samt Inszenierung: exakter Betrag, Anzeigetext mit Trennzeichen,
+ * Stellenzahl und ob er noch verlustfrei in eine Number passt. Die Stellenzahl
+ * ist der Anker fuer die Meilensteine (zweistellig -> fuenfstellig).
+ */
+export function describeValue(base, level) {
+  const exact = powerAtExact(base, level);
+  const digits = String(exact).length;
+  return { exact, text: formatNumber(exact), digits, safe: exact <= BigInt(Number.MAX_SAFE_INTEGER) };
+}
+
+/** Kumulative XP-Schwelle: XP, die man fuer `level` insgesamt braucht. */
+export function threshold(level, xpPerLevel = XP_BASE) {
+  const l = Math.max(1, Math.floor(level));
+  const steps = l - 1;
+  return Math.round((xpPerLevel * (Math.pow(ESCALATION.factor, steps) - 1)) / (ESCALATION.factor - 1));
+}
+
+/** Level zu einer XP-Summe. Umkehrung von threshold. */
+export function levelFor(xp, xpPerLevel = XP_BASE) {
+  let level = 1;
+  while (threshold(level + 1, xpPerLevel) <= xp) level += 1;
+  return level;
+}
+
+/** Werte eines Codemons auf einer Stufe. Reine Funktion, multiplikativ. */
+export function statsAt(speciesId, level) {
+  const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
+  const steps = Math.max(0, Math.floor(level) - 1);
+  const scale = Math.pow(ESCALATION.factor, steps);
+  return {
+    hp: Math.round(base.hp * scale),
+    atk: Math.round(base.atk * scale),
+    def: Math.round(base.def * scale),
+    agi: Math.round(base.agi * scale),
+    int: Math.round(base.int * scale),
+  };
+}
+
+/**
+ * Meilensteine: zweistellig, dreistellig, vierstellig, fuenfstellig, dann die
+ * Millionen. `milestoneFor(before, after)` nennt den hoechsten Sprung, damit
+ * die Anzeige genau einmal feiert und nicht bei jedem Treffer.
+ */
+export const MILESTONES = [10, 100, 1000, 10000, 1000000];
+
+export function milestoneFor(before, after) {
+  let hit = null;
+  for (const mark of MILESTONES) if (Number(before) < mark && Number(after) >= mark) hit = mark;
+  return hit;
+}
+
+// ── 2. REGELWERK (feste Tabellen, ein Nachschlagen je Faktor) ─────────────
+/**
+ * Elementarkreis der drei Familien: Spark schlaegt Byte, Byte schlaegt Feral,
+ * Feral schlaegt Spark. `beats`/`losesTo` sind die Quelle, `ELEMENT_CHART` ist
+ * daraus GEBAUT — eine Quelle, kein zweites Zahlengedaechtnis.
+ */
+export const ELEMENTS = {
+  spark: { label: 'Spark', beats: 'byte', losesTo: 'feral' },
+  byte: { label: 'Byte', beats: 'feral', losesTo: 'spark' },
+  feral: { label: 'Feral', beats: 'spark', losesTo: 'byte' },
+};
+
+/** Multiplikatoren: 1,5 gegen das geschlagene, 0,75 gegen das siegende Element. */
+export const ELEMENT_WIN = 1.5;
+export const ELEMENT_LOSS = 0.75;
+
+export const ELEMENT_CHART = Object.fromEntries(Object.entries(ELEMENTS).map(([attacker, entry]) => [
+  attacker,
+  Object.fromEntries(Object.keys(ELEMENTS).map((defender) => [
+    defender,
+    defender === entry.beats ? ELEMENT_WIN : defender === entry.losesTo ? ELEMENT_LOSS : 1,
+  ])),
+]));
+
+/** Faehigkeitsarten: wie stark die Verteidigung des Ziels durchschlagen wird. */
+export const CATEGORY = {
+  physisch: { label: 'physisch', defFactor: 0.8 },
+  speziell: { label: 'speziell', defFactor: 0.35 },
+};
+
+/** Synergie: Element mal Art der Faehigkeit. Ein Nachschlagen, kein Zweig. */
+export const SYNERGY = {
+  'spark:physisch': 1,
+  'spark:speziell': 1.25,
+  'byte:physisch': 1,
+  'byte:speziell': 1.25,
+  'feral:physisch': 1,
+  'feral:speziell': 1.25,
+};
+
+/**
+ * Vererbungsbaum der zehn Linien: je Spezies der Ahn, die Generation und die
+ * Faehigkeit, die sie von ihrer Linie erbt. Die Generation ist ein Nachschlagen
+ * (`LINEAGE[id].generation`), und wer eine geerbte Faehigkeit benutzt, kaempft
+ * mit der reinen Linie (Buff `linie`).
+ */
+export const LINEAGE = {
+  nullpointer: { ancestor: null, generation: 1, inherits: [] },
+  stackoverflow: { ancestor: null, generation: 1, inherits: [] },
+  memoryleak: { ancestor: null, generation: 1, inherits: [] },
+  racecondition: { ancestor: 'nullpointer', generation: 2, inherits: ['null-access'] },
+  deadlock: { ancestor: 'stackoverflow', generation: 2, inherits: ['trace-back'] },
+  segfault: { ancestor: 'memoryleak', generation: 2, inherits: ['heap-flood'] },
+  offbyone: { ancestor: 'racecondition', generation: 3, inherits: ['torn-read'] },
+  heisenbug: { ancestor: 'deadlock', generation: 3, inherits: ['starve'] },
+  bufferoverflow: { ancestor: 'segfault', generation: 3, inherits: ['core-dump'] },
+  recursion: { ancestor: 'offbyone', generation: 4, inherits: ['boundary-slip'] },
+};
+
+/** Der Buff, wenn nichts zutrifft. */
+export const NEUTRAL_BUFF = { id: 'neutral', label: 'kein Buff', factor: 1 };
+
+/**
+ * Buffs als Tabelle: Name, Faktor und die Lage, in der sie gilt. `test` ist ein
+ * Schluessel in BUFF_TESTS — die Lage wird nicht im Schadenspfad ausgewertet,
+ * sondern nachgeschlagen.
+ */
+export const BUFFS = [
+  { id: 'linie', label: 'Reine Linie', factor: 1.1, test: 'inherited' },
+  { id: 'nichts-zu-verlieren', label: 'Nichts zu verlieren', factor: 1.5, test: 'low-hp' },
+  { id: 'uebertaktet', label: 'Uebertaktet', factor: 1.15, test: 'full-hp' },
+];
+
+/** Die Bedingungen. Reine Praedikate ueber (Faehigkeit, Angreifer). */
+export const BUFF_TESTS = {
+  inherited: (ability, attacker) => attacker.inherited.includes(ability.id),
+  'low-hp': (ability, attacker) => attacker.hp / Math.max(1, attacker.maxHp) < 0.25,
+  'full-hp': (ability, attacker) => attacker.hp / Math.max(1, attacker.maxHp) >= 0.9,
+};
+
+/** Den ersten zutreffenden Buff nachschlagen. */
+export function buffFor(ability, attacker) {
+  for (const buff of BUFFS) {
+    const test = BUFF_TESTS[buff.test];
+    if (typeof test === 'function' && test(ability, attacker)) return buff;
+  }
+  return NEUTRAL_BUFF;
+}
 
 /**
  * Faehigkeiten: eine neutrale Grundfaehigkeit fuer alle, plus genau ZWEI
  * Spezies-Faehigkeiten je Linie (Stufe 1 und Stufe 4 — der Aufstieg ist die
  * zweite Faehigkeit, nicht eine neue Spezies).
- *
- * `stat` traegt den Schaden, `kind` benennt die Art, `power` skaliert mit dem
- * Wert. Keine Zufallszahl, kein Krit, keine Ausnahme: derselbe Klick auf
- * dieselbe Lage ergibt immer denselben Schaden.
  */
 export const ABILITIES = [
   { id: 'tackle', label: 'Tackle', stat: 'atk', power: 12, minLevel: 1, kind: 'physisch', species: null },
@@ -88,46 +276,38 @@ export const ABILITIES = [
   { id: 'infinite-descent', label: 'Infinite Descent', stat: 'atk', power: 21, minLevel: 4, kind: 'physisch', species: 'recursion' },
 ];
 
-/**
- * Kumulative XP-Schwelle: XP, die man fuer `level` insgesamt braucht.
- * Level 1 = 0, Level 2 = base, Level 3 = base*3, Level 4 = base*6 …
- * Quadratisch, damit spaete Level wirklich Arbeit kosten.
- */
-export function threshold(level, xpPerLevel) {
-  const l = Math.max(1, Math.floor(level));
-  return (xpPerLevel * (l - 1) * l) / 2;
-}
-
-/** Level zu einer XP-Summe. Umkehrung von threshold. */
-export function levelFor(xp, xpPerLevel) {
-  let level = 1;
-  while (threshold(level + 1, xpPerLevel) <= xp) level += 1;
-  return level;
-}
-
-/** Werte eines Codemons auf einer Stufe. Reine Funktion. */
-export function statsAt(speciesId, level) {
-  const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
-  const steps = Math.max(0, Math.floor(level) - 1);
-  return {
-    hp: base.hp + GROWTH.hp * steps,
-    atk: base.atk + GROWTH.atk * steps,
-    def: base.def + GROWTH.def * steps,
-    agi: base.agi + GROWTH.agi * steps,
-    int: base.int + GROWTH.int * steps,
-  };
-}
-
-/** Faehigkeiten, die eine Spezies auf einer Stufe kennt (Grundfaehigkeit inklusive). */
+/** Faehigkeiten, die eine Spezies auf einer Stufe kennt (Grund- und Erbfaehigkeiten). */
 export function abilitiesFor(level, speciesId) {
+  const lineage = LINEAGE[speciesId] ?? LINEAGE[SPECIES_IDS[0]];
+  const inherited = lineage.inherits ?? [];
   return ABILITIES.filter((ability) => ability.minLevel <= level
-    && (ability.species === null || ability.species === speciesId));
+    && (ability.species === null || ability.species === speciesId || inherited.includes(ability.id)));
 }
 
-/** Schaden einer Faehigkeit gegen eine Verteidigung. Mindestens 1, nie negativ. */
-export function damage(ability, attackerStats, defenderDef) {
-  const raw = (ability.power * (attackerStats[ability.stat] ?? 0)) / 10;
-  return Math.max(1, Math.round(raw - defenderDef * 0.8));
+/** Die Erbfaehigkeiten einer Spezies (fuer den Buff und die Anzeige). */
+export function inheritedAbilities(speciesId) {
+  return (LINEAGE[speciesId] ?? LINEAGE[SPECIES_IDS[0]]).inherits ?? [];
+}
+
+/**
+ * Der Schaden: BaseDamage * Element * Synergie * Buff - DEF * Durchgriff.
+ * Fuenf Nachschlagevorgaenge in festen Tabellen, ein Minimum von 1. Keine
+ * Zufallszahl, kein Krit, keine Ausnahme — derselbe Zug auf dieselbe Lage
+ * ergibt immer denselben Schaden.
+ */
+export function resolveAttack(ability, attacker, defender) {
+  const category = CATEGORY[ability.kind] ?? CATEGORY.physisch;
+  const element = (ELEMENT_CHART[attacker.element] ?? ELEMENT_CHART.spark)[defender.element] ?? 1;
+  const synergy = SYNERGY[`${attacker.element}:${ability.kind}`] ?? 1;
+  const buff = buffFor(ability, attacker);
+  const base = (ability.power * (attacker.stats[ability.stat] ?? 0)) / POWER_UNIT;
+  const dealt = Math.max(1, Math.round(base * element * synergy * buff.factor - defender.stats.def * category.defFactor));
+  return { base, element, synergy, category: ability.kind, defFactor: category.defFactor, buff, dealt };
+}
+
+/** Kurzform des Schadens (Zahl) fuer Stellen, die nur den Betrag brauchen. */
+export function damage(ability, attacker, defender) {
+  return resolveAttack(ability, attacker, defender).dealt;
 }
 
 /** Wer zuerst schlaegt: hoehere AGI, Gleichstand geht an den Herausforderer. */
@@ -135,9 +315,9 @@ export function firstStrike(challengerStats, enemyStats) {
   return challengerStats.agi >= enemyStats.agi ? 'challenger' : 'enemy';
 }
 
-/** XP fuer einen Sieg. Waechst mit dem Level des Gegners, nicht mit seiner Art. */
+/** XP fuer einen Sieg. Waechst mit dem Level des Gegners — multiplikativ. */
 export function rewardFor(level) {
-  return 20 + 8 * Math.max(1, Math.floor(level));
+  return powerAt(20, Math.max(1, Math.floor(level)) + 1);
 }
 
 /**
@@ -151,7 +331,61 @@ export function arenaFor(level, round) {
   const rnd = Math.max(0, Math.floor(round));
   const speciesId = SPECIES_IDS[(lvl * 3 + rnd * 7) % SPECIES_IDS.length];
   const enemyLevel = Math.max(1, lvl + ((rnd % 3) - 1));
-  return { speciesId, level: enemyLevel, stats: statsAt(speciesId, enemyLevel), reward: rewardFor(enemyLevel) };
+  return {
+    speciesId,
+    element: SPECIES[speciesId].family,
+    level: enemyLevel,
+    stats: statsAt(speciesId, enemyLevel),
+    reward: rewardFor(enemyLevel),
+  };
+}
+
+// ── 3. PACING (kuenstliche Rundendauer) ───────────────────────────────────
+/**
+ * Kein Echtzeitdruck: ein Zug sperrt den Zustand, das Ergebnis kommt verzoegert.
+ * Die Absage an jeden weiteren Input steht hier, damit Host und Client
+ * denselben Satz benutzen und eine Probe ihn pruefen kann.
+ */
+export const PACING = {
+  delayMs: 3000,
+  lockedText: 'Codermon ist im Kampf, warte auf das Ergebnis',
+};
+
+// ── 4. LOOT (gewichteter Wurf in Basispunkten) ────────────────────────────
+/**
+ * Die Skinner-Box: 85 Prozent Schrott, 14 Prozent Brauchbares, 1 Prozent
+ * Shiny. Gewichte in Basispunkten, Summe 10000 — die Quote ist damit exakt
+ * ablesbar und nicht gerundet.
+ */
+export const LOOT_TABLE = [
+  { id: 'schrott', label: 'Schrott', weight: 8500, xp: 0 },
+  { id: 'brauchbar', label: 'Brauchbares Teil', weight: 1400, xp: 25 },
+  { id: 'shiny', label: 'Shiny God-Tier', weight: 100, xp: 2500 },
+];
+
+/** Gesamtgewicht: der Nenner der Quote. */
+export const LOOT_TOTAL = LOOT_TABLE.reduce((sum, entry) => sum + entry.weight, 0);
+
+/**
+ * Der Wurf: `uniform` aus [0,1) wird auf die kumulierten Gewichte abgebildet.
+ * Reine Funktion — der Client reicht Math.random() hinein, eine Probe eine
+ * feste Folge. Der hoehere Treffer gewinnt den Gleichstand nicht: die Grenzen
+ * sind halboffen, deshalb ist jede Quote exakt ihr Gewicht.
+ */
+export function rollLoot(uniform) {
+  const clamped = Math.min(1, Math.max(0, uniform));
+  const point = Math.min(LOOT_TOTAL - 1, Math.floor(clamped * LOOT_TOTAL));
+  let acc = 0;
+  for (const entry of LOOT_TABLE) {
+    acc += entry.weight;
+    if (point < acc) return entry;
+  }
+  return LOOT_TABLE[LOOT_TABLE.length - 1];
+}
+
+/** Die Quote eines Loots in Prozent, wie die Anzeige sie nennt. */
+export function lootOdds(entry) {
+  return Number(((entry.weight / LOOT_TOTAL) * 100).toFixed(2));
 }
 
 /**
@@ -161,8 +395,18 @@ export function arenaFor(level, round) {
 export const Config = z.object({
   /** XP pro Token. Der Auftrag sagt 1. */
   xpPerToken: z.number().min(0).default(1),
-  /** XP-Basis je Levelstufe (kumulativ quadratisch). */
-  xpPerLevel: z.number().min(1).default(250),
+  /** XP-Basis der ersten Stufe (kumulativ und multiplikativ). */
+  xpPerLevel: z.number().min(1).default(XP_BASE),
+  /**
+   * Kuenstliche Rundendauer in Millisekunden. Kein Zeitdruck, nur Verzoegerung.
+   * ACHTUNG (ehrliche Grenze): die Sperre haelt der CLIENT, und der Browser
+   * kann diese Host-Konfiguration nicht lesen — er spiegelt PACING.delayMs
+   * (siehe client.js, `roundDelayMs`). Ein anderer Wert hier wirkt deshalb nur
+   * auf die Host-Seite und nicht auf die Wartezeit im Browser. Wer die Dauer
+   * wirklich umstellen will, braucht einen client-sichtbaren Kanal; bis dahin
+   * ist der Vertragswert die eine Quelle.
+   */
+  roundDelayMs: z.number().min(0).default(PACING.delayMs),
   /** Start-Spezies (Schluessel aus SPECIES). Schemastery 3.18.4 kennt kein z.enum. */
   species: z.union(SPECIES_IDS.map((id) => z.const(id))).default(SPECIES_IDS[0]),
   /** Name des Pets; leer = der Client waehlt einen. */
@@ -174,23 +418,29 @@ export const Config = z.object({
 export function apply(ctx, config) {
   // Der Vertrag ist reine Datenweitergabe: keine Zeit, kein Zufall, kein Modell.
   const contract = {
-    version: 'shinon.codingmon/v1',
+    version: 'shinon.codingmon/v2',
     xpPerToken: config.xpPerToken,
     xpPerLevel: config.xpPerLevel,
+    roundDelayMs: config.roundDelayMs,
+    escalation: { factor: ESCALATION.factor, xpBase: XP_BASE, milestones: MILESTONES.slice() },
     species: config.species,
     speciesCount: SPECIES_IDS.length,
     abilities: ABILITIES.map((ability) => ({ ...ability })),
-    growth: { ...GROWTH },
+    elements: Object.keys(ELEMENTS),
+    loot: LOOT_TABLE.map((entry) => ({ ...entry, odds: lootOdds(entry) })),
+    pacing: { ...PACING },
   };
 
   console.log(
-    `[shinon-codingmon] Aktiviert — ${ABILITIES.length} Faehigkeiten, ${SPECIES_IDS.length} Spezies `
-    + `(${contract.version}, authority NONE)`,
+    `[shinon-codingmon] Aktiviert — ${ABILITIES.length} Faehigkeiten, ${SPECIES_IDS.length} Spezies, `
+    + `${contract.elements.length} Elemente, ${contract.loot.length} Loot-Stufen `
+    + `(${contract.version}, Faktor ${ESCALATION.factor}, Runde ${config.roundDelayMs} ms, authority NONE)`,
   );
 
   // Kein Service am Kontext: `ctx.set` verlangt ein vorheriges `provide`, und
-  // ein eigener Service waere hier unnoetig. Wer die Kurve braucht, importiert
-  // die Named Exports dieses Moduls — dieselbe Quelle, kein Nachbau.
+  // ein eigener Service waere hier unnoetig. Wer die Leiter oder das Regelwerk
+  // braucht, importiert die Named Exports dieses Moduls — dieselbe Quelle,
+  // kein Nachbau.
   return () => {
     console.log('[shinon-codingmon] Deaktiviert');
   };
