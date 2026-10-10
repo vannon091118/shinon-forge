@@ -15,7 +15,7 @@
  * und sich nicht meldet, faellt auf; ein Bundle, das sich meldet und nicht im
  * Profil steht (openapi), ist als inaktiv gekennzeichnet.
  *
- * WORKSPACES UND SITZUNGEN (gemessen, Docs/probes/workspace-list.json): der
+ * WORKSPACES UND SITZUNGEN (gemessen, docs/probes/workspace-list.json): der
  * Host haelt die Liste in `ctx.workspaceRegistry` (dsh-workspace). In den
  * Browser kommt sie nicht ueber diesen Registry-Dienst, sondern ueber die
  * Client-Haelfte von dsh-api-workspace-controller: die registriert den Dienst
@@ -433,8 +433,14 @@ window.__ModuleLoader__.load({
         // ankommt.
         channels = () => {
           const read = (name) => {
+            // `ctx.get` ist die dokumentierte optionale Abfrage (undefined, wenn der
+            // Dienst fehlt). KEIN Klammerzugriff `ctx[name]`: der ist am
+            // Cordis-Proxy ein direkter Dienstzugriff und wirft ohne `inject`
+            // ('cannot get property "workspaces" without inject') — anderen Hälften
+            // kostete genau das die Aktivierung (Plan 2.6 / F-m). Ohne `get` gibt es
+            // hier keinen Dienst, und der Abschnitt benennt das statt zu werfen.
             try {
-              return typeof ctx.get === 'function' ? ctx.get(name) : ctx[name];
+              return typeof ctx.get === 'function' ? ctx.get(name) : undefined;
             } catch {
               return undefined;
             }
@@ -442,6 +448,7 @@ window.__ModuleLoader__.load({
           return { workspaces: read(WORKSPACE_SERVICE), sessions: read(SESSION_SERVICE) };
         };
 
+        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
         // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
         // Locale-Dienst gilt die deutsche Tabelle.
         const MENU_DE = { 'menu.dashboard': 'Shinon Dashboard' };
@@ -457,6 +464,7 @@ window.__ModuleLoader__.load({
           const hit = typeof locale?.bind === 'function' ? locale.bind('shinon')(key) : undefined;
           return hit === undefined || hit === key ? (MENU_DE[key] ?? key) : hit;
         };
+        // <<< shinon:dsh-idiom locale-fallback/menu
 
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, DashboardPanel));
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

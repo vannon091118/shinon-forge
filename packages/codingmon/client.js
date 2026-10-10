@@ -2,12 +2,12 @@
  * @shinon/codingmon — Client-Hälfte (Codemons + Arena).
  *
  * Die Marken-Slots der Sidebar und des Hero haelt @shinon/core: es zeigt dort
- * Shinons gezeichnetes Zeichen (eine Marke, eine Formensprache). `PetMark` gibt
- * dieser Client trotzdem heraus — ueber eine Fenster-Konvention statt ueber
- * einen Import: `window.__codingmon` mit `PetMark` (dasselbe Muster wie
- * `window.__mk` bei @shinon/markers, damit Pakete referenzfrei bleiben). Wer
- * die Figur an einer eigenen Stelle zeigen will, holt sie sich dort ab; in der
- * Markenleiste und im Hero steht sie nicht mehr.
+ * Shinons gezeichnetes Zeichen (eine Marke, eine Formensprache). Dieser Client
+ * besetzt keinen Marken-Slot und gibt auch keine Marke heraus — die Figur
+ * bleibt in ihren eigenen Flaechen (Panel, XP-Leiste, Arena). Nach aussen
+ * lesbar ist allein der ZUSTAND, ueber eine Fenster-Konvention statt ueber
+ * einen Import: `window.__codingmon` mit `state()` (dasselbe Muster wie
+ * `window.__mk` bei @shinon/markers, damit Pakete referenzfrei bleiben).
  *
  * ZEHN CODEMONS: Werte, Faehigkeiten und Gegnerauswahl stehen in `SPECIES`,
  * `ABILITIES` und `arenaFor()` — gespiegelt aus der Host-Hälfte in index.js.
@@ -1435,11 +1435,11 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       /**
-       * Fenster-API — zugleich die Naht, ueber die @shinon/core die Marke
-       * abgibt, und die Stelle, an der eine Probe den Zustand pruefen kann
-       * (dasselbe Muster wie window.__mk bei @shinon/markers).
+       * Fenster-API — die Stelle, an der eine andere Client-Haelfte oder eine
+       * Probe den Zustand liest (dasselbe Muster wie window.__mk bei
+       * @shinon/markers): der Client gibt unter `window.__codingmon` seinen
+       * Zustand heraus, keine Marke.
        */
-      PetMark,
       apply(ctx) {
         // Sichtbarkeit: jede Client-Haelfte meldet sich in der gemeinsamen Liste
         // an, damit @shinon/dashboard sie zeigen kann. Kein Hintergrundprozess
@@ -1454,7 +1454,6 @@ window.__ModuleLoader__.load({
 
         window.__codingmon = {
           plugin: PLUGIN,
-          PetMark,
           state: () => ({ ...store, level: level(), stats: stats(), form: formOf(level()).label }),
           species: () => SPECIES_IDS.slice(),
           abilities: () => abilitiesFor(level(), store.species),
@@ -1541,9 +1540,10 @@ window.__ModuleLoader__.load({
         // `conversation.hero.brand.mark` sind Single-Slots und gehoeren @shinon/core,
         // das dort Shinons gezeichnetes Zeichen haelt. Zwei Besetzer auf einem
         // Single-Slot entscheidet die Ladeordnung — also besetzt hier genau einer.
-        // Das Pet bleibt in seinen eigenen Flaechen (Panel, XP-Leiste, Arena) und
-        // liegt weiter als `window.__codingmon.PetMark` fuer Fremd-Nutzer bereit.
+        // Das Pet bleibt in seinen eigenen Flaechen (Panel, XP-Leiste, Arena);
+        // eine Marke gibt dieser Client nach aussen nicht heraus.
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, CodingmonPanel));
+        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
         // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
         // Locale-Dienst gilt die deutsche Tabelle.
         const MENU_DE = { 'menu.codingmon': 'Codingmon' };
@@ -1559,6 +1559,7 @@ window.__ModuleLoader__.load({
           const hit = typeof locale?.bind === 'function' ? locale.bind('shinon')(key) : undefined;
           return hit === undefined || hit === key ? (MENU_DE[key] ?? key) : hit;
         };
+        // <<< shinon:dsh-idiom locale-fallback/menu
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
           name: 'sidebar.panellist',
           id: PANEL_ID,

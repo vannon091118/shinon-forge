@@ -43,9 +43,12 @@ export function apply(ctx, config) {
   // Ehrlicher Log: dieses Bundle oeffnet keinen Listener. host/port werden nur benannt.
   console.log(`[openapi] Kein Listener — Spec-Basis ${config.host}:${config.port} (kein Server in diesem Bundle)`);
 
+  // >>> shinon:dsh-idiom settings-registration — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
+  // Registriert die Einstellungs-Form dieses Pakets beim Settings-Dienst.
   ctx.inject(['settings'], (child) => {
     child.effect(() => child.settings.configure({ auto: false }, ctx.fiber));
   });
+  // <<< shinon:dsh-idiom settings-registration
 
   return () => {
     console.log('[openapi] Kein Listener zu beenden');

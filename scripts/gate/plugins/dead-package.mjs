@@ -17,7 +17,7 @@ export const id = 'dead-package';
  * `key-router`, `narrative`, `shinon-forge`: gebaut und ausgeliefert (sie
  * laden im Distributionstest), aber NICHT in `dsh.profile.bundles` — ob sie
  * aktiviert werden, ist eine offene Entscheidung und keine Auslassung. Gemessen
- * und geführt in `Docs/ZAHLEN.md` §1 (Pakete nicht im Profil) und §3.1
+ * und geführt in `docs/ZAHLEN.md` §1 (Pakete nicht im Profil) und §3.1
  * (Versions-Drift); die Paketnamen stehen im Root-Manifest in `devDependencies`.
  */
 const KNOWN_INACTIVE = new Set(['openapi', 'popup', 'key-router', 'narrative', 'shinon-forge']);

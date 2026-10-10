@@ -67,7 +67,7 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
   prüfen mit `npm run commit:guard -- --ci | --last n | --range a..b | --all`.
 - CI (`.github/workflows/commit-guard.yml`) läuft auf jedem Push/PR ohne Filter;
   unauflösbare Ranges fallen auf die **volle** Historie zurück.
-- Regeln/Quelle der Trailer-Texte: `Docs/COMMIT-REGELN.md`,
+- Regeln/Quelle der Trailer-Texte: `docs/COMMIT-REGELN.md`,
   `scripts/lib/commit-text.mjs`.
 
 ## Status & Ehrlichkeit
@@ -78,15 +78,15 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
   Patch-Configs nur strukturell geprüft, `!!js` blinder Fleck des Gates.
 - Nicht doppelt bauen, was DSH schon hat: Subagent/Skills, Session-Log (Audit),
   Reload-Mechaniken. `dsh --version` und der installierte Stand sind Ground Truth —
-  Doku (auch `Docs/research/`) kann neuer sein.
+  Doku (auch `docs/research/`) kann neuer sein.
 
 ## Wo was steht
 
 | Frage | Ort |
 |---|---|
-| Architektur-Regeln, Validierung | `Docs/ARCHITECTURE.md`, `scripts/lib/repo.mjs` |
-| Commit-Regeln | `Docs/COMMIT-REGELN.md`, `scripts/lib/commit-text.mjs` |
+| Architektur-Regeln, Validierung | `docs/ARCHITECTURE.md`, `scripts/lib/repo.mjs` |
+| Commit-Regeln | `docs/COMMIT-REGELN.md`, `scripts/lib/commit-text.mjs` |
 | Pitfalls (Stack-Fallen) | `AGENTS.md` „Pitfalls" + `dsh-bug-muster` |
-| Cordis-Mechaniken | `cordis-architektur` + `Docs/research/2026-10-09-cordis-dsh-recherche.md` |
-| Verträge/Probes | `Docs/contracts/`, `Docs/probes/` |
+| Cordis-Mechaniken | `cordis-architektur` + `docs/research/2026-10-09-cordis-dsh-recherche.md` — **Ziel fehlt in diesem Baum** (offener Posten, STAND §6.4) |
+| Verträge/Probes | `docs/contracts/`, `docs/probes/` |
 | Prompt/Persona-Flächen | `prompts/README.md` (System-Prompt-Registry, keine Datei-Templates) |

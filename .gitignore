@@ -20,6 +20,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
+# Freebuff workspace metadata.
+.freebuff/
+
 # OS- und Editor-Kram.
 .DS_Store
 Thumbs.db

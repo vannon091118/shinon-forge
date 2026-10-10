@@ -35,7 +35,41 @@ window.__ModuleLoader__.load({
     const CKEY = '__mk.comments';
     const INBOX = 'http://127.0.0.1:9333/inbox';
     const TEXT_LIMIT = 200;
+    const COMMENT_LIMIT = 500;
+    const MARK_LIMIT = 200;
     const SELECTOR_MAX_PARTS = 6;
+
+    // ── Wirksame Grenzen (Vertragsgabe oder Profil) ──────────────────────────
+    // Der Host legt seine WIRKSAMEN Grenzen beim Ausliefern in die Seite (Naht
+    // `webserver/index-inject`, siehe packages/markers/index.js); hier werden sie
+    // gelesen statt geraten. Der Name steht als LITERAL, weil dieses Bundle
+    // selbstaendig ist und `index.js` nicht importieren kann — scripts/gate/tests/
+    // markers.test.mjs vergleicht beide Seiten Zeichen fuer Zeichen.
+    const LIMITS_GLOBAL = '__DSH_MARKERS_CONFIG__';
+    /** Der Vertragsname, den ein Datensatz tragen muss (fremde Daten gelten nicht). */
+    const MODEL_CONTRACT = 'shinon.marker-mirror/v1';
+    const hostLimits = (() => {
+      const raw = typeof window === 'object' ? window[LIMITS_GLOBAL] : null;
+      const record = raw !== null && typeof raw === 'object' ? raw : null;
+      // Ein Datensatz aus einem FREMDEN Vertrag wird ganz verworfen: Zahlen ohne
+      // passenden Vertragsnamen sind keine Grenzen dieses Spiegels.
+      const named = record !== null && record.contract === MODEL_CONTRACT
+        && record.limits !== null && typeof record.limits === 'object';
+      const pick = (value, fallback) => (Number.isFinite(value) && value > 0 ? value : fallback);
+      const host = named ? record.limits : {};
+      const limits = {
+        text: pick(host.text, TEXT_LIMIT),
+        marks: pick(host.marks, MARK_LIMIT),
+        comment: pick(host.comment, COMMENT_LIMIT),
+        from: named ? 'host' : 'vertrag',
+      };
+      console.log(
+        `[shinon-markers] Grenzen aus ${limits.from === 'host' ? LIMITS_GLOBAL : 'dem Vertrag (Rueckfall)'}` +
+          ` — text=${limits.text}/marks=${limits.marks}/comment=${limits.comment}` +
+          (raw === null || raw === undefined ? ' (die Seite traegt keinen Datensatz)' : ''),
+      );
+      return limits;
+    })();
 
     // ── Spiegel-Bild ────────────────────────────────────────────────────────
     function insertStyles(tag, css) {
@@ -155,7 +189,7 @@ window.__ModuleLoader__.load({
       return { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height) };
     };
 
-    const textOf = (el) => (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, TEXT_LIMIT);
+    const textOf = (el) => (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, hostLimits.text);
 
     const resolve = (selector) => {
       try {
@@ -401,7 +435,7 @@ window.__ModuleLoader__.load({
       const note = (id, value) => {
         const comments = readComments();
         if (value.trim() === '') delete comments[id];
-        else comments[id] = value.slice(0, 500);
+        else comments[id] = value.slice(0, hostLimits.comment);
         saveComments(comments);
       };
 
@@ -466,6 +500,12 @@ window.__ModuleLoader__.load({
 
     const addMark = (el) => {
       const marks = readMarks();
+      // Die Markenmenge kommt aus den WIRKSAMEN Grenzen, nicht aus einer zweiten
+      // Konstante; statt still zu verwerfen sagt die Leiste, woran es liegt.
+      if (marks.length >= hostLimits.marks) {
+        overlay.say(`Marken-Grenze erreicht: ${hostLimits.marks} (${hostLimits.from})`);
+        return null;
+      }
       const mark = {
         id: nextId(marks),
         label: labelOf(el),
@@ -531,7 +571,7 @@ window.__ModuleLoader__.load({
       comment: (id, value) => {
         const comments = readComments();
         if (String(value ?? '').trim() === '') delete comments[id];
-        else comments[id] = String(value).slice(0, 500);
+        else comments[id] = String(value).slice(0, hostLimits.comment);
         saveComments(comments);
         return comments[id] ?? '';
       },
@@ -542,6 +582,8 @@ window.__ModuleLoader__.load({
         return el ? rectOf(el) : null;
       },
       hover: () => ({ rect: hoverRect, label: hoverLabel }),
+      /** Die wirksamen Grenzen und ihre Herkunft (Vertrag oder Profil). */
+      limits: () => ({ ...hostLimits }),
       clear: () => {
         saveMarks([]);
         saveComments({});
@@ -556,6 +598,7 @@ window.__ModuleLoader__.load({
         registry.set('@shinon/markers', { label: 'Marker-Spiegel', kind: 'client', panel: PANEL_ID });
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/markers' } }));
 
+        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
         // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
         // Locale-Dienst gilt die deutsche Tabelle.
         const MENU_DE = { 'menu.markers': 'Shinon Marker' };
@@ -571,6 +614,7 @@ window.__ModuleLoader__.load({
           const hit = typeof locale?.bind === 'function' ? locale.bind('shinon')(key) : undefined;
           return hit === undefined || hit === key ? (MENU_DE[key] ?? key) : hit;
         };
+        // <<< shinon:dsh-idiom locale-fallback/menu
 
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, MarkerPanel));
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

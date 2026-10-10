@@ -1,7 +1,7 @@
 # REPOSITORY_INVENTORY — Phase A (read-only)
 
 > **Status:** current — Phase-A-Audit, lesend erhoben am 2026-10-10. **Stand:** 2026-10-10
-> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 ## 1. Root, Branch, Commit
 - Root (gemessen `git rev-parse --show-toplevel`): `/home/vannon/Dokumente/Projekte/Shinon-forge` — BESTÄTIGT.
@@ -10,9 +10,9 @@
 - Submodules: keine. Stash: leer. `git status` zeigt **31 modifizierte Dateien + 2 untracked**, alle NICHT von diesem Audit (Audit hat keine Datei geändert außer `docs/audit/` neu) — BESTÄTIGT.
 
 ## 2. Uncommitted Changes (fremd, geschützt — nicht anfassen)
-- Modifiziert (Auswahl, voll in `git diff --name-only`): `Docs/ZAHLEN.md`, `Docs/probes/brand-render.json`, 6× `packages/*/package.json` (`better-errors`, `core`, `events`, `project-index`, `prompter`, `task-router`, `token-usage`, `tooltip`), 12× `packages/*/client.js`, `packages/{codingmon,core,markers,tooltip}/index.js`, `profiles/web/cordis.patch.yml`, `.freebuff/project-id` (gelöscht im Worktree).
+- Modifiziert (Auswahl, voll in `git diff --name-only`): `docs/ZAHLEN.md`, `docs/probes/brand-render.json`, 6× `packages/*/package.json` (`better-errors`, `core`, `events`, `project-index`, `prompter`, `task-router`, `token-usage`, `tooltip`), 12× `packages/*/client.js`, `packages/{codingmon,core,markers,tooltip}/index.js`, `docs/archive/legacy-profiles/web/cordis.patch.yml` (damals unter `profiles/web/`; am 2026-10-11 archiviert), `.freebuff/project-id` (gelöscht im Worktree).
 - Stichprobe Diff: `packages/*/package.json` `meta.title/description` String → `{en,de}`-Objekt (z. B. `core`, `tooltip`) — nur beobachtet, nicht bewertet.
-- Untracked: `scripts/branding-check.mjs` (Chromium-Messharness für Branding), `scripts/gate/tests/client-activation.test.mjs` (Aktivierungs-Wache, wird in `Docs/ZAHLEN.md` §2.1 zitiert, aber weder in `package.json`-Scripts noch in `policy.json` verdrahtet) — BESTÄTIGT.
+- Untracked: `scripts/branding-check.mjs` (Chromium-Messharness für Branding), `scripts/gate/tests/client-activation.test.mjs` (Aktivierungs-Wache, wird in `docs/ZAHLEN.md` §2.1 zitiert, aber weder in `package.json`-Scripts noch in `policy.json` verdrahtet) — BESTÄTIGT.
 - `.gitignore`: `node_modules/`, `dist/`, `sessions/`, `storages/`, `.credentials.yaml`, `logs/` u. a. — `node_modules/` (190+ `@deepseek-ai/*`-Pakete) und `dist/` existieren lokal als Artefakte, sind aber kein Source — BESTÄTIGT.
 
 ## 3. Baum ( surveying, keine `node_modules`-Volltexte)

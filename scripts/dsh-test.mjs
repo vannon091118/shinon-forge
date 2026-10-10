@@ -69,6 +69,12 @@ check('keine "dsh-mod"-Referenzen in Runtime-Artefakten', () => {
 console.log('\n🔗 Quell-Zwillinge:');
 checkIssues('eine Quelle, ein Spiegel — keine Drift', () => repo.twinIssues());
 
+console.log('\n🧩 Generierte Idiome:');
+checkIssues('eine Quelle, generierte Blöcke — kein Drift', () => [
+  ...repo.idiomIssues(repo.ROOT, 'index.js'),
+  ...repo.idiomIssues(repo.ROOT, 'client.js'),
+]);
+
 console.log('\n📄 Profil:');
 const { profileName, profile, issues: repoProblems } = repo.repoIssues(packages, root);
 if (!profileName) {

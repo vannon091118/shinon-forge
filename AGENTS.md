@@ -1,11 +1,11 @@
 # Shinon Forge
 
 > **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-09
-> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 An independent fork of the DeepSeek Harness (DSH). It ships the `@shinon/*` Cordis
 plugin bundles under `packages/`, enabled by the canonical profile `profiles/shinon`
-(which packages are active: `Docs/ZAHLEN.md`; owner of that list is
+(which packages are active: `docs/ZAHLEN.md`; owner of that list is
 `profiles/shinon/package.json`). Correctness is checked statically by the gate and
 distribution tests below — the profile boot test also runs `dsh --profile shinon
 --dump-config` against an installed DSH. The repository has git history; its remotes
@@ -14,11 +14,11 @@ remote, so `npm run sync` cannot work as written.
 
 ## Dev environment
 - Node and pnpm (the `packageManager` field is pinned) must be on PATH; the declared
-  values and their proof commands: `Docs/ZAHLEN.md` §1.
+  values and their proof commands: `docs/ZAHLEN.md` §1.
 - `pnpm pack`/`npm` are invoked by the tests — both must be installed.
 - DSH is pinned in the root `package.json` (`dependencies`); the installed
   `dsh --version` currently differs from that pin, and the drift is known — one gate test
-  refuses to assert against the unverified fassung. Both numbers: `Docs/ZAHLEN.md` §1.
+  refuses to assert against the unverified fassung. Both numbers: `docs/ZAHLEN.md` §1.
   `npm run dev` and the profile test need `dsh` on PATH. Run with `DSH_HOME=$PWD`
   (the `dev` script does this).
 - `package-lock.json` is versioned; the root `package.json` also carries the
@@ -31,7 +31,7 @@ remote, so `npm run sync` cannot work as written.
 Run from repo root:
 
 **Ist-Zustand:** Welche dieser Läufe Exit 0 liefern, mit welchen Zählungen, und warum
-welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wiederholen.
+welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wiederholen.
 - `npm test` → `node --test packages/codingmon/test/*.test.mjs && dsh-test.mjs &&
   validate-test.mjs && pack-test.mjs && dsh-profile-test.mjs` (die schnellen Einzeltests
   laufen zuerst, damit eine kaputte Tabelle vor `pack-test` auffällt). Dieselben Tests
@@ -41,7 +41,7 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `node scripts/pack-test.mjs` → per-package distribution test: `pnpm pack` → unpack →
   isolated `npm install` → load. Optional `--keep` retains `/tmp` work dirs for debugging.
 - `node scripts/dsh-profile-test.mjs` → boots `dsh --profile shinon --dump-config` and
-  asserts every bundle layer of the profile resolves (count: `Docs/ZAHLEN.md` §2).
+  asserts every bundle layer of the profile resolves (count: `docs/ZAHLEN.md` §2).
 - `npm run test:codingmon` → `node --test packages/codingmon/test/*.test.mjs`: isolated
   tests for the Codemon core math (damage dictionaries, weighted loot RNG, ability and
   lineage tables), the compositor rule for its keyframes and the E2E pass
@@ -56,6 +56,11 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   the bundled packages resolvable; skips visibly otherwise). Runs inside `gate:test`.
 - `npm run build` → `node scripts/build.mjs`: re-validates everything, then wipes and
   regenerates `dist/` (`manifest.json`, `profile.json`, `dist/packages/*`).
+- `npm run branding` → the effect measurement for the branding layer in a real Chromium
+  (`scripts/branding-check.mjs`, needs a built `dist/` and a browser binary; `--browser
+  <path>` or `SHINON_CHROME`). It is NOT one of the gate plugins — the gate engine runs it
+  as an extra stage only with `--branding` and otherwise prints a visible skip
+  (`node scripts/gate/engine.mjs --full --branding`).
 - `npm run gate` / `gate:local` / `gate:full` → modular gate engine
   (`scripts/gate/engine.mjs`): slice-selected checks, one plugin per capability. Sits
   alongside `npm test`, does not replace it.
@@ -73,7 +78,7 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   - `packages/<dir>/client.js` `__ModuleLoader__.load({ id })` → `@shinon/<dir>`
   - `profiles/<name>/cordis.patch.yml` `id`/`name` → same as the package patch.
 - The shape of a package — which files and folders it may contain — is owned by
-  `Docs/ARCHITECTURE.md` §2. **One** statement, matching the measured tree: the four role
+  `docs/ARCHITECTURE.md` §2. **One** statement, matching the measured tree: the four role
   files are mandatory (`index.js` host half with Schemastery `Config` + `apply(ctx,
   config)`, `client.js` UI half with `__ModuleLoader__.load` + slots/styles/locale,
   `cordis.patch.yml` with a single `insert` entry, `package.json` manifest); allowed extras
@@ -91,7 +96,14 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - Host-shared deps (`SHARED_DEPS` in `scripts/lib/repo.mjs`, currently
   `@deepseek-ai/schemastery`) must be declared in BOTH `peerDependencies` and
   `devDependencies` of every package.
-- The declared Schemastery version (`Docs/ZAHLEN.md` §1) has no `z.enum` — model enums as
+- Recurring plugin blocks stand ONCE in `scripts/lib/plugin-idioms.mjs`
+  (settings registration, locale fallback). The blocks in `packages/*/index.js` and
+  `packages/*/client.js` are generated between `shinon:dsh-idiom` markers: write with
+  `npm run idioms`, check with `npm run idioms:check` — `host-half`/`client-half`,
+  `dsh-test` and `build` check too. Never edit between the markers by hand; sharing by
+  import is impossible here (one tarball per package, self-contained client bundle),
+  which is exactly why the derivation is generated and drift-checked.
+- The declared Schemastery version (`docs/ZAHLEN.md` §1) has no `z.enum` — model enums as
   `z.union([z.const('a'), z.const('b')])`.
 - If a contract changes, edit it in `scripts/lib/repo.mjs` (the shared source) — never in
   `dsh-test.mjs` or `build.mjs` directly.
@@ -119,11 +131,11 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `token-usage` and `better-errors` are config-only (their `apply()` only logs); `openapi`
   has a contract but no server and is **not** enabled in the profile. `dashboard` is **not**
   a placeholder: it reads the real `workspaces`/`sessions` services (evidence:
-  `Docs/probes/workspace-list.json`). The `dead-package` gate flags any package missing from
+  `docs/probes/workspace-list.json`). The `dead-package` gate flags any package missing from
   the profile.
 - Documentation: every Markdown file carries a status block, and hard numbers (packages,
-  layers, test counts, versions) have exactly **one** owner. Read `Docs/INDEX.md` §2 and
-  `Docs/ZAHLEN.md` before writing a number into any document — nothing in the gate
+  layers, test counts, versions) have exactly **one** owner. Read `docs/INDEX.md` §2 and
+  `docs/ZAHLEN.md` before writing a number into any document — nothing in the gate
   checks documentation drift.
 - A Client -> Host endpoint needs someone to SELECT it. Host-side `./typert` discovery exists
   (`dsh-typert-loader`), but the browser client mounts its Remote contributions from a
@@ -132,6 +144,13 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   (`petRemoteContribution()` in `packages/codingmon/assets/pet-remote.js`) plus the drift-tested sender, but a
   client composition must still mount it; `test/uebergabe.test.mjs` mounts it itself, and
   that is the measurable part.
+- `@shinon/markers` ships its EFFECTIVE limits (profile wins, contract is the fallback) to
+  the browser through `webserver/index-inject` as `window.__DSH_MARKERS_CONFIG__`
+  (`LIMITS_GLOBAL` in `packages/markers/index.js`); the client half reads it, discards a
+  record whose `contract` is not its own and uses the values for text clip, comment clip
+  and mark count. The name is a LITERAL on both sides (a client bundle cannot import a host
+  file) and is drift-checked by the twin rule in `scripts/lib/repo.mjs` plus
+  `scripts/gate/tests/markers.test.mjs` — extend those two, never just one side.
 - The in-process carrier seam is `installConnection(ctx, { transport })` from
   `@deepseek-ai/dsh-client-connection/client` (the browser client passes
   `globalThis.__DSH_TRANSPORT__`); the transport's `rpc.call` reaches the host through the
@@ -158,7 +177,7 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   Check with `npm run commit:guard -- --ci | --last n | --range a..b | --all`.
 - CI (`.github/workflows/commit-guard.yml`) runs on every push/PR with no filter; an
   unresolvable range falls back to the **full** history, never to a narrower one.
-  Rules, enforcement and commands: `Docs/COMMIT-REGELN.md`. Single source of the
+  Rules, enforcement and commands: `docs/COMMIT-REGELN.md`. Single source of the
   patterns and the trailer: `scripts/lib/commit-text.mjs`.
 
 ## Session memory (all agents)

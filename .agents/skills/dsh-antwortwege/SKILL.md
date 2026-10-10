@@ -34,7 +34,7 @@ Seitenliste in der Sidebar.)
 ## Introspektion des INSTALLIERTEN DSH (Ground Truth)
 
 Die Doku folgt `master`; das Repo pinnt eine Version. **Was zählt, steht in der
-installierten Fassung** — Probe-Muster `Docs/probes/goal-integration.json`:
+installierten Fassung** — Probe-Muster `docs/probes/goal-integration.json`:
 „gelesen in DSH 0.2.0-rc.2, nicht geraten".
 
 - `dsh --version` — welche Fassung überhaupt.
@@ -53,17 +53,17 @@ installierten Fassung** — Probe-Muster `Docs/probes/goal-integration.json`:
 
 | Frage | Ort |
 |---|---|
-| Konvention/Vertrag des Repos | `AGENTS.md`, `Docs/ARCHITECTURE.md` |
+| Konvention/Vertrag des Repos | `AGENTS.md`, `docs/ARCHITECTURE.md` |
 | Ist diese Bug-Klasse bekannt? | `.agents/skills/dsh-bug-muster` (Katalog B1–B14) |
 | Wie nutze ich Cordis hier maximal? | `.agents/skills/cordis-architektur` |
 | Welcher Check wann? | `.agents/skills/dsh-dev-workflow`, `.agents/skills/dsh-test-tempo` |
-| Was wurde schon RECHERCHIERT? | `Docs/research/2026-10-09-cordis-dsh-recherche.md` (Quellen + Belege) |
-| Was wurde schon BEWIESEN? | `Docs/probes/*.json` (Claim/Evidence je Behauptung) |
-| Welche Zahlen/Verträge gelten? | `scripts/lib/repo.mjs` (eine Quelle), `Docs/contracts/` |
+| Was wurde schon RECHERCHIERT? | `docs/research/2026-10-09-cordis-dsh-recherche.md` (Quellen + Belege) — **Ziel fehlt in diesem Baum** (offener Posten, STAND §6.4) |
+| Was wurde schon BEWIESEN? | `docs/probes/*.json` (Claim/Evidence je Behauptung) |
+| Welche Zahlen/Verträge gelten? | `scripts/lib/repo.mjs` (eine Quelle), `docs/contracts/` |
 
 ## Recherche-Disziplin (Tempo-Regeln)
 
-1. **Erst lokal, dann online**: Proben und `Docs/research/` enthalten oft schon
+1. **Erst lokal, dann online**: Proben und `docs/research/` enthalten oft schon
    die Antwort mit Beleg — doppelte Recherche ist verschenkte Zeit.
 2. **Version-Wahrheit**: Doku ≠ installiert. Für API-Namen/Signaturen gilt die
    installierte Fassung; die Doku ist die Landkarte, `.d.ts`/`--dump-config` der

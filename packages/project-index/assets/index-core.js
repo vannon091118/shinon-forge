@@ -43,7 +43,7 @@
  *             Chunks und FTS sehen nur den redigierten Text. Die Fundstelle
  *             (Pfad, Zeile, Art) wird festgehalten, der WERT NICHT.
  *
- * Gemessen vor dem Bau (Docs/probes/secret-protection.json): die Musterliste aus
+ * Gemessen vor dem Bau (docs/probes/secret-protection.json): die Musterliste aus
  * Plan §13 trifft die entscheidende Datei dieses Repos nicht — `credentials*`
  * scheitert an `.credentials.yaml`, weil dem Namen ein Punkt vorangeht. Beide
  * Schichten bauen deshalb auf ganzen Namen bzw. auf dem Inhalt, nicht auf Praefixen.
@@ -583,7 +583,7 @@ const textOnly = { parser: 'keiner (nur Text)', symbols: () => [], edges: () => 
  * Die Parser-Registry: Sprache -> verfuegbarer Parser -> Symbole / Kanten.
  *
  * `parser` benennt, WELCHER Parser traegt. Die Zuordnung ist gemessen
- * (Docs/probes/project-index-parserstrategie.json), nicht behauptet:
+ * (docs/probes/project-index-parserstrategie.json), nicht behauptet:
  *
  *   javascript/jsx/typescript/tsx  KEIN Parser. acorn, espree, meriyah,
  *       typescript, @babel/parser und esprima sind weder im Repo noch in der

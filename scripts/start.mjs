@@ -57,7 +57,7 @@ function main() {
   if (dsh === null) {
     console.error(
       '💥 start: kein lauffähiges `dsh` gefunden (Repo-Installat, Vendor, PATH, bekannte Prefixe geprüft) — ' +
-        'DSH installieren: npm install -g @deepseek-ai/dsh (Fassung + Pin: Docs/ZAHLEN.md §1)',
+        'DSH installieren: npm install -g @deepseek-ai/dsh (Fassung + Pin: docs/ZAHLEN.md §1)',
     );
     process.exit(2);
   }

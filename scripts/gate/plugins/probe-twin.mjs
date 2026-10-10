@@ -8,7 +8,7 @@
  *   - Das Gate entscheidet aus tatsächlichen Ergebnissen, nie aus Prosa.
  *
  * Dieses Gate ist der Validator: es prüft die Probe-Definitionen in
- * Docs/probes/*.json strukturell. Es führt nichts aus (kein Netz, kein
+ * docs/probes/*.json strukturell. Es führt nichts aus (kein Netz, kein
  * Modell) — Ausführung ist der Twin, und der gehört nicht in ein Gate.
  *
  * Vokabular (Falsify_Me): BESTAETIGT | WIDERSPRUCH | UNKLAR
@@ -25,9 +25,39 @@ export const id = 'probe-twin';
 export const PROBE_RESULTS = ['BESTAETIGT', 'WIDERSPRUCH', 'UNKLAR'];
 export const VERDICTS = ['PLAN', 'RESEARCH', 'ASK', 'WRITE'];
 
+/**
+ * `nachtrag` — die standardisierte Nachmessung.
+ *
+ * Warum es das Feld gibt und warum es eine FORM hat: eine Probe wird nicht
+ * nachträglich aktuell gemacht (`docs/INDEX.md` §2), aber eine Aussage kann durch
+ * eine spätere Messung teilweise überholt sein. Statt den Belegtext still zu
+ * überschreiben, trägt die Probe einen Nachtrag mit DATUM und GELTUNGSBEREICH —
+ * maschinenlesbar, damit er nicht zur Prosa wird, die niemand prüft.
+ *
+ * @param {unknown} nachtrag
+ * @param {string} file
+ */
+export function nachtragIssues(nachtrag, file) {
+  const issues = [];
+  if (typeof nachtrag !== 'object' || nachtrag === null || Array.isArray(nachtrag)) {
+    return [`${file}: nachtrag muss ein Objekt {date, scope, note} sein`];
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(nachtrag.date ?? '')) {
+    issues.push(`${file}: nachtrag.date fehlt oder ist kein YYYY-MM-DD`);
+  }
+  if (typeof nachtrag.scope !== 'string' || nachtrag.scope.trim() === '') {
+    issues.push(`${file}: nachtrag.scope fehlt (welche Aussage gilt nicht mehr?)`);
+  }
+  if (typeof nachtrag.note !== 'string' || nachtrag.note.trim() === '') {
+    issues.push(`${file}: nachtrag.note fehlt`);
+  }
+  return issues;
+}
+
 export function probeIssues(probe, file) {
   const issues = [];
   if (typeof probe !== 'object' || probe === null) return [`${file}: kein Objekt`];
+  if (probe.nachtrag !== undefined) issues.push(...nachtragIssues(probe.nachtrag, file));
   if (typeof probe.id !== 'string' || probe.id === '') issues.push(`${file}: id fehlt`);
   if (typeof probe.claim !== 'string' || probe.claim.trim() === '') {
     issues.push(`${file}: claim fehlt (ohne Behauptung keine Falsifikation)`);
@@ -48,7 +78,7 @@ export function probeIssues(probe, file) {
 }
 
 export function check(ctx) {
-  const dir = join(ctx.repo.ROOT, 'Docs', 'probes');
+  const dir = join(ctx.repo.ROOT, 'docs', 'probes');
   if (!existsSync(dir)) return [];
 
   const issues = [];

@@ -32,7 +32,7 @@ falschen. Regeln aus DSHs Testing-Policy (`docs/testing.md`) und diesem Repo.
 
 1. **„A guard only guards if the regression fails it."** Ein neuer Check ist erst
    ein Guard, wenn er die Regression sieht: Mutation einbauen → Test muss **rot**
-   werden → revertieren → grün. Genau so dokumentieren (`Docs/probes/`,
+   werden → revertieren → grün. Genau so dokumentieren (`docs/probes/`,
    siehe Skill `dsh-beweis-tempo`). Ein Guard ohne diesen Beweis ist Dekoration.
 2. **„Test the real entry path."** Handmontierte `ctx.plugin({…})`-Suiten beweisen
    nicht, dass das Plugin **so wie ausgeliefert** lädt — `unwrapExports`,

@@ -2,7 +2,7 @@
  * contracts — 7-Punkt-Vertragsform (propsa-Prinzip, nativ).
  *
  * Eine Fähigkeit ist erst implementiert, wenn sie falsifizierbar ist. Jeder
- * Vertrag in Docs/contracts/*.json muss die sieben Punkte tragen; ein Vertrag
+ * Vertrag in docs/contracts/*.json muss die sieben Punkte tragen; ein Vertrag
  * mit Lücken ist eine Behauptung, kein Vertrag.
  *
  * Zustände (propsa): IMPLEMENTED | STUB | NOT_IMPLEMENTED | NOT_VERIFIED
@@ -10,7 +10,7 @@
  *   NOT_VERIFIED  = gebaut, aber niemand hat es geprüft.
  * Beides ist ehrlich, aber es führt zu verschiedenen Entscheidungen.
  *
- * Fehlt Docs/contracts/ komplett, meldet das Gate das — nicht als Fehler,
+ * Fehlt docs/contracts/ komplett, meldet das Gate das — nicht als Fehler,
  * sondern als offenen Posten (es gibt dann nichts zu prüfen).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -42,7 +42,7 @@ export function contractIssues(contract, file) {
 }
 
 export function check(ctx) {
-  const dir = join(ctx.repo.ROOT, 'Docs', 'contracts');
+  const dir = join(ctx.repo.ROOT, 'docs', 'contracts');
   if (!existsSync(dir)) return [];
 
   const issues = [];

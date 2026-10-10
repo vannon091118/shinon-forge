@@ -1,7 +1,7 @@
 # @shinon/narrative — Narrative Engine
 
 > **Status:** current — Paket-Doku Narrative Engine. **Stand:** 2026-10-10
-> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 **Stand der Umsetzung:** WIP (Wave 3). Das Paket ist gebaut und lädt im
 Distributionstest, ist aber **nicht** in `dsh.profile.bundles` aktiviert.
