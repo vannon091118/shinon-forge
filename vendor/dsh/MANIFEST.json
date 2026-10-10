@@ -1,0 +1,130 @@
+{
+  "vendor": "dsh",
+  "package": "@deepseek-ai/dsh",
+  "version": "0.2.1-alpha.2",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "apps/cli"
+  },
+  "source": {
+    "tarball": "https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.2.1-alpha.2.tgz",
+    "integrity": "sha512-CkRE0uAOg2ldL2VpfF4cNRsl178CH5nM+8YklPrlMZl5ln0KhVfd42dJuRlgOXZmkpizCRvrVS8LAL+GKfgk0w==",
+    "shasum": "7acc898e09c4cd0678ab8bf5ee1029ee9c25a026",
+    "tarballSha256": "e4cad394413d6af93cc1fab8d198ef995e1ba7cbd7bc43386df5ed7ef4b692d0",
+    "fileCount": 20,
+    "unpackedSize": 74391
+  },
+  "gitHead": null,
+  "gitHeadNote": "Die Registry veroeffentlicht fuer 0.2.1-alpha.2 kein gitHead (npm view @deepseek-ai/dsh@0.2.1-alpha.2 gitHead --json -> leer). Ein Commit-Hash ist damit NICHT belegbar; belegbar sind Paketfassung, Tarball-Integritaet und der sha256 jeder vendorten Datei. Ein erfundener Hash waere schlimmer als ein ehrliches null.",
+  "vendoredAt": "2026-10-11",
+  "vendoredBy": "PLAN.md Schritt 3.2 (D2) — Vendoring des DSH-Subsets aus alpha.2",
+  "changes": "keine — jede Datei byte-identisch zum Tarball (sha256 je Datei unten, 20/20 verglichen, 0 Abweichungen)",
+  "scope": {
+    "enclosed": "das veroeffentlichte CLI-Paket @deepseek-ai/dsh (20 Dateien): lib/*.js, lib/types/*.d.ts, LICENSE, package.json, README*",
+    "excluded": "der Oekosystem-Baum (@deepseek-ai/*-Bundles, 260 Pakete, ~273 MiB) bleibt npm-Abhaengigkeit aus dem Root-Lockfile — nicht vendort"
+  },
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be",
+      "bytes": 1065
+    },
+    {
+      "path": "README.i18n.yaml",
+      "sha256": "a509fec3a2d0fa7d915abe33bf3542cda91bd1ae6d8144cda890970a0fe9acc6",
+      "bytes": 767
+    },
+    {
+      "path": "README.md",
+      "sha256": "4888e4e05d413915aaf013d6dea00278b251adbf16045d0048ac2242851a03c7",
+      "bytes": 7224
+    },
+    {
+      "path": "README.zh.md",
+      "sha256": "db305fc18a04d1542724a6a72947ef795be9d43c2fbd621b59bbbf7ab741f867",
+      "bytes": 7157
+    },
+    {
+      "path": "lib/bin.js",
+      "sha256": "f9f0f13209aaeb586712b52c0f4b84072db9b21ccce77984a5e8fb52dd553362",
+      "bytes": 11761
+    },
+    {
+      "path": "lib/dump-config-BEDI-dNY.js",
+      "sha256": "fa34d3397b9ac9423f3b98a9f4798b9205f684e1eaf368352e0a93c09831d28f",
+      "bytes": 2708
+    },
+    {
+      "path": "lib/dump-config-crgOY3tW.js",
+      "sha256": "4183d3918048badf0a5194fb3c86fbb37b7bf8ccbf638c14bd2ff2b1c545721a",
+      "bytes": 90
+    },
+    {
+      "path": "lib/dump-config-schema-DhhNOaro.js",
+      "sha256": "85c7eef6eee4532570133d3b90487996e912216b96825e33c1bb659036a269f1",
+      "bytes": 2037
+    },
+    {
+      "path": "lib/plugin-BGnVfe_D.js",
+      "sha256": "300438e9e181847cff2e01b8bc404806da532c0801a505a2dc94a94c14c72836",
+      "bytes": 5928
+    },
+    {
+      "path": "lib/profile-boot-BZ2ZjNWi.js",
+      "sha256": "c394b2aa2ce08a3b1fcc8c544257c7d689dd4d0b1cfaf8602687e65eeaba5aa1",
+      "bytes": 12593
+    },
+    {
+      "path": "lib/profile-boot.js",
+      "sha256": "c53d4e2caf21428e263b525e657dafaf63fd183f7ef016aabda56af7998b6c4f",
+      "bytes": 310
+    },
+    {
+      "path": "lib/types/args.d.ts",
+      "sha256": "dc1054bdca71a3a3d840eab441c03a6ca6c31aaec649652faa1788317790a9a9",
+      "bytes": 2989
+    },
+    {
+      "path": "lib/types/bin.d.ts",
+      "sha256": "7e403cae4c0bae0845e07d3698ce3e7459d74132c7accb5119bb47d39c201609",
+      "bytes": 770
+    },
+    {
+      "path": "lib/types/dump-config-schema.d.ts",
+      "sha256": "75484f0f442dde459de9da50d28eec911a4c660f1e31afe378f1c167fa3c3faf",
+      "bytes": 979
+    },
+    {
+      "path": "lib/types/dump-config.d.ts",
+      "sha256": "48e9c71f3d20376c928bdfc683e03dd8d821d57d494611e2428811b931d28ce7",
+      "bytes": 1587
+    },
+    {
+      "path": "lib/types/plugin.d.ts",
+      "sha256": "13f7bdcf1892b22b13064a996348c0526de89750d706fa04164b634c3920dc71",
+      "bytes": 667
+    },
+    {
+      "path": "lib/types/process-shutdown.d.ts",
+      "sha256": "ac138facee40b2a01436b3778a47bc086ccc8ece145b9ee04e9317dafa628bc4",
+      "bytes": 1345
+    },
+    {
+      "path": "lib/types/profile-boot.d.ts",
+      "sha256": "1e9672c740c855aec2fab3224b8ca7bb80931401c6145c59f4dcd1e0b560d96c",
+      "bytes": 4992
+    },
+    {
+      "path": "lib/types/startup-diagnostics.d.ts",
+      "sha256": "3d18c7fb6c3c38e198acf2c00e24956947cd96500194934ea334cfed58c84051",
+      "bytes": 1090
+    },
+    {
+      "path": "package.json",
+      "sha256": "f33d958d5b858747dd6c281ffecbf3b4b5cdee5b3ee02817e9339879a6d71b61",
+      "bytes": 8332
+    }
+  ]
+}

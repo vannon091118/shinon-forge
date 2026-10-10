@@ -163,6 +163,38 @@ node -p "require('./node_modules/@deepseek-ai/dsh-experimental-voice-input-bundl
 node scripts/dsh-profile-test.mjs                                                      # 3/0, Exit 0
 ```
 
+## 7. Nachtrag: ein zweiter Schreiber hat die Zeile danach wieder auf 19 gehoben
+
+Beim Beginn der Folgeschritte war die Profilzeile **nicht mehr** die aus §5: gemessen
+am 2026-10-11 um 01:26 hat `profiles/shinon/package.json` **19** Bundles
+(14 eigene, 5 fremde). Die Differenz zur Entscheidung aus §5 ist genau eine Zeile:
+
+| Zeile | Was damit geschah | Beleg |
+|---|---|---|
+| `@deepseek-ai/dsh-experimental-voice-input-bundle` | entfernt (§5) | `grep -c voice` im Dump → 0 |
+| `@deepseek-ai/dsh-experimental-inspector-profile` | **hinzugefügt**, nicht in diesem Durchgang — die Profildatei trägt den Stand vom 2026-10-11 01:18, und zu diesem Zeitpunkt lief bereits ein `dsh --profile shinon` (`scripts/start.mjs`, PID 126619) | `stat -c %y profiles/shinon/package.json` → 01:18; `ps` → laufender Boot |
+
+**Gegenstand:** `@deepseek-ai/dsh-experimental-inspector-profile`, Manifest-Aussage
+„Optional Web bundle for raw Session logs and Chat node inspection". Verdikt hier
+**nicht** gefällt: derselbe Suchlauf wie in §4 nennt `inspector` **genau einmal** im
+Baum — in der Profilzeile selbst, die es lädt. Kein `@shinon`-Paket, kein Gate, keine
+Probe liest es. Das ist das Merkmal eines **Kandidaten** aus §2, und die Entscheidung
+darüber gehört dem Auftraggeber; bis dahin bleibt die Zeile stehen, weil sie jemand
+anderes bewusst gesetzt hat.
+
+**Gemessen nach dieser Änderung** (Repo-`dsh@0.2.1-alpha.1` zuerst im PATH, 01:26):
+
+| Größe | Wert | Befehl |
+|---|---|---|
+| Bundles | **19** (14 eigene, 5 fremde) | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.length"` |
+| Layer-Köpfe | **55** (`dsh-base` 31, `dsh-web-app` 7, `@shinon/*` 14, experimentell 3) | `DSH_HOME=$PWD dsh --profile shinon --dump-config \| grep -c '^# == '` |
+| Einträge | **205** (94 / 91 / 14 / 6) | derselbe Dump, `grep -c '^- id: '` |
+| Profiltest | **3/0**, 19 Layer, 14 Repo-Bundles | `node scripts/dsh-profile-test.mjs` |
+
+Die Zerlegung (Köpfe/Einträge) entsteht wie in §1, indem die Zeilen zwischen zwei
+Köpfen dem vorangehenden Kopf zugeschlagen werden. Wer diese Zahlen zitiert, nennt den
+Zeitpunkt: sie hängen an einer Datei, die ein zweiter Schreiber ändern kann.
+
 **Nicht geprüft in diesem Schritt:** ob die drei Kandidaten in einem *laufenden* Boot
 stören (kein Browser-Boot in diesem Durchgang) und was sie im Boot an Zeit oder Speicher
 kosten — das ist Sache von 4.1 (F1). Die Liste ist eine Verdrahtungs-, keine

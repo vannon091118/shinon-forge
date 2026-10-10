@@ -71,6 +71,10 @@ gilt nicht als Nachmessung.
 | [`packages/narrative/README.md`](../packages/narrative/README.md) | current | 2026-10-10 | Paket-Doku Narrative Engine |
 | [`packages/shinon-forge/README.md`](../packages/shinon-forge/README.md) | current | 2026-10-10 | Paket-Doku Shinon Forge |
 | [`PLAN.md`](../PLAN.md) | plan | 2026-10-11 | Umsetzungsplan des Umbaus (jeder Schritt trägt seinen eigenen Status) |
+| [`LICENSE`](../LICENSE) | current | 2026-10-11 | eigene Lizenz (MIT, `Copyright (c) 2026 Vannon`) — kein Markdown, deshalb ohne Statusblock |
+| [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) | current | 2026-10-11 | Fremdhinweise, getrennt vom eigenen Copyright (A12) |
+| [`vendor/MODIFICATIONS.md`](../vendor/MODIFICATIONS.md) | current | 2026-10-11 | Änderungslog des vendorten DSH-Anteils (Schritt 3.2) |
+| [`vendor/dsh/`](../vendor/dsh/) (20 Dateien + `MANIFEST.json`) | imported | 2026-10-11 | unverändert übernommenes Fremdpaket `@deepseek-ai/dsh@0.2.1-alpha.2` — kein Teil des kanonischen Satzes, Herkunft im Manifest |
 | [`docs/audit/`](audit/) — 13 Nachweis-Dokumente: [`CHANGELOG.md`](audit/CHANGELOG.md), [`STAND_2026-10-10.md`](audit/STAND_2026-10-10.md), [`UPSTREAM_DIFF.md`](audit/UPSTREAM_DIFF.md), [`ARCHITECTURE_MAP.md`](audit/ARCHITECTURE_MAP.md), [`DEPENDENCY_FINDINGS.md`](audit/DEPENDENCY_FINDINGS.md), [`REPOSITORY_INVENTORY.md`](audit/REPOSITORY_INVENTORY.md), [`SHINON_MIGRATION_MAP.md`](audit/SHINON_MIGRATION_MAP.md), [`VERIFICATION_MATRIX.md`](audit/VERIFICATION_MATRIX.md), [`REPAIR_PLAN.md`](audit/REPAIR_PLAN.md), [`WORKTREE_REVIEW.md`](audit/WORKTREE_REVIEW.md), [`PLUGIN_IDIOME_2-1.md`](audit/PLUGIN_IDIOME_2-1.md), [`UMBAU_2026-10-11.md`](audit/UMBAU_2026-10-11.md), [`DSH_SUBSET_3-1.md`](audit/DSH_SUBSET_3-1.md) | current | je Dokument (Statusblock) | Audit, Reparatur- und Umsetzungs-Nachweise; jeder nennt Messbefehl und Messzeitpunkt |
 
 Nicht in dieser Tabelle: [`docs/archive/legacy-profiles/`](archive/legacy-profiles/) (archivierte
@@ -84,7 +88,8 @@ werden nicht nachträglich „aktuell“ gemacht, sondern neu gemessen.
 ## 4. Pfad-Konvention (damit Verweise auflösbar bleiben)
 
 - Ein Pfad in Backticks oder als Markdown-Link ist **repo-relativ** und muss existieren.
-  Er beginnt mit `packages/`, `profiles/`, `scripts/`, `docs/`, `assets/`, `prompts/` oder `starter/`.
+  Er beginnt mit `packages/`, `profiles/`, `scripts/`, `docs/`, `assets/`, `prompts/`,
+  `vendor/` oder `starter/`.
 - Aussagen über **fremde** Repos tragen den Repo-Namen als Präfix und sind damit
   erkennbar kein Pfad in diesem Baum: `` `Feed-the-Floor-Bleed/scripts/shinon/` ``.
 - Geplante, noch nicht existierende Dateien werden **nicht** als Pfad geschrieben,
@@ -95,10 +100,10 @@ Prüfbefehl (erwartet `defekt 0`):
 ```bash
 node --input-type=module -e '
 import fs from "node:fs"; import path from "node:path";
-const files = ["README.md","AGENTS.md","IDEA.md","shinon-forge-implementierungsplan.md","prompts/README.md"];
+const files = ["README.md","AGENTS.md","IDEA.md","shinon-forge-implementierungsplan.md","THIRD_PARTY_NOTICES.md","prompts/README.md"];
 const walk = d => fs.readdirSync(d,{withFileTypes:true}).flatMap(e => { const p = d+"/"+e.name; return e.isDirectory() ? walk(p) : (e.name.endsWith(".md") ? [p] : []); });
-files.push(...walk("docs"), ...walk("packages"));
-const pat = /`((?:packages|profiles|scripts|docs|assets|prompts|starter)\/[A-Za-z0-9._\/-]+)`|\[[^\]]*\]\(((?:packages|profiles|scripts|docs|assets|prompts|starter)\/[^)\s]+)\)/g;
+files.push(...walk("docs"), ...walk("packages"), ...walk("vendor"));
+const pat = /`((?:packages|profiles|scripts|docs|assets|prompts|vendor|starter)\/[A-Za-z0-9._\/-]+)`|\[[^\]]*\]\(((?:packages|profiles|scripts|docs|assets|prompts|vendor|starter)\/[^)\s]+)\)/g;
 let checked = 0, broken = 0;
 for (const f of files) for (const m of fs.readFileSync(f,"utf8").matchAll(pat)) {
   const ref = (m[1] || m[2]).split("#")[0]; checked++;
