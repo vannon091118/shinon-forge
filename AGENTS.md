@@ -146,8 +146,6 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - Typert validates wire values with `Object.getPrototypeOf(value)` against ITS `Object.prototype`,
   so a value built in another realm (a `vm` context) is rejected even when it is plain JSON.
   A carrier must cross that boundary the way a real one does (serialize).
-- Several `package.json` files differ between the staged (git index) and working tree;
-  `git status` will show both new and modified files. The live files are the working tree.
 
 ## Commit rules (fail-closed)
 - Every commit message ends with the Vannon trailer:

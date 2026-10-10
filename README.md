@@ -237,7 +237,8 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 | `npm run stages` | Startstufen/Ready-Zeile aus `scripts/open.mjs` nachvollziehen |
 | `npm run commit:guard -- …` | Commit-Regeln prüfen (`--ci`, `--last n`, `--range`, `--all`) |
 | `npm run hooks:install` | Git-Hooks aktivieren (einmal pro Klon) |
-| `npm run update` / `sync` | Upstream-DSH aktualisieren / `upstream` mergen (Ausgabe ist beratend) |
+| `npm run update` | Upstream-Prüfung (Ausgabe ist beratend, kein echter Versionsvergleich) |
+| `npm run sync` | derzeit ohne Funktion: braucht ein `upstream`-Remote, das nicht eingerichtet ist (`git fetch upstream` → Exit 128) |
 | `npm run desktop:launcher` | Desktop-Starter (Konzept, siehe [`Docs/STARTER-PLAN.md`](Docs/STARTER-PLAN.md)) |
 
 ---
