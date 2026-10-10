@@ -39,18 +39,21 @@
 # einen Mehrschritt-Auftrag haelt, wird zurueckgestuft. Die einzige
 # deterministische Tatsache der Entscheidung, die nicht vom Modell kommt.
 #
-# activate=true ist die Aktivierungsentscheidung aus §17 (Shinon) und die
-# bewussteste Zeile in dieser Datei: ein Kandidat erzeugt dann ein echtes
-# DSH-Goal (ctx.goals), das DSHs Round-Driver bis zur Obergrenze fortsetzt —
-# pro Runde ein vollstaendiger Agentenschritt mit Modellaufrufen. maxGoalRounds
-# ist deshalb SHINONS Stop-Policy: DSH selbst erlaubt 256 Runden
-# (defaultMaxGoalRounds). Zum Abschalten genuegt `activate: false`.
-# Ein bereits bestehendes Goal wird NIE automatisch ueberschrieben.
+# activate=false ist die Entscheidung C7 ("sicherer Start bis H5"): der Router
+# BEURTEILT weiterhin jede Eingabe (threshold und minRawLength gelten unveraendert)
+# und meldet seine Entscheidung — er erzeugt aber KEIN echtes DSH-Goal
+# (ctx.goals), und damit keine vom Round-Driver fortgesetzten Runden mit
+# vollstaendigen Agentenschritten und Modellaufrufen. Wie viel das wert ist,
+# entscheidet H5 (4.6) an Messdaten, nicht an Meinung.
+# Zum Anschalten genuegt `activate: true`; die Faehigkeit ist gebaut und getestet
+# (docs/probes/task-router.json, docs/probes/goal-micro-state.json).
+# maxGoalRounds ist dann SHINONS Stop-Policy: DSH selbst erlaubt 256 Runden
+# (defaultMaxGoalRounds). Ein bereits bestehendes Goal wird NIE ueberschrieben.
 - id: shinon-task-router
   config:
     threshold: 2
     minRawLength: 24
-    activate: true
+    activate: false
     maxGoalRounds: 6
 
 # Project Index. `verify` steht hier, weil es eine ENTSCHEIDUNG ist und keine
@@ -87,26 +90,22 @@
 # Ohne gesetzte Variable bleibt die Route konfiguriert-aber-schlüssellos.
 #
 # WICHTIG: `agent-default-model` MUSS auf eine Route mit Key zeigen. Die
-# deepseek-official-Route (dsh-llm-deepseek) ist im Web-Profil gemountet, hat
-# aber ohne DEEPSEEK_API_KEY keinen Schlüssel → MISSING_CREDENTIAL. Deshalb
-# zeigt der Default auf openrouter; die Modellwahl in der UI darf ihn
-# überschreiben, aber der Startzustand muss funktionieren.
+# deepseek-official-Route (dsh-llm-deepseek) ist gemountet, hat aber ohne
+# DEEPSEEK_API_KEY keinen Schlüssel → MISSING_CREDENTIAL. Deshalb zeigt der
+# Default auf die Route, die die Entscheidung A8 festgelegt hat:
+# agnes/agnes-2.5-flash (apiKeyEnv AGNES_API_KEY, api openai-completions, baseURL
+# unten in der llm-pi-ai-Route). Die Modellwahl in der UI darf ihn überschreiben,
+# aber der Startzustand muss funktionieren.
+#
+# Diese Zeile und der Kommentar oben nennen DIESELBE Route (C8); wer sie ändert,
+# ändert beide — sonst widersprechen sich Kommentar und Config.
 - id: llm-pi-ai
   name: '@deepseek-ai/dsh-llm-pi-ai'
   config:
     providers:
-      # KATALOG-ROUTEN: kein `models:` setzen!
-      # Laut Adapter-README ERSETZT ein `models:`-Block den Katalog der Route
-      # vollstaendig ("Replaces the route's catalog wholesale"). Genau daran hing
-      # der Befund, dass die Modellwahl nur ein einziges Modell anbot: hier stand
-      # zuvor ein models-Eintrag fuer openrouter und damit der ganze Katalog weg.
-      # Ohne models-Liste liefert der installierte pi-ai-Katalog alle Modelle der
-      # Route; die Models-Seite kann zusaetzlich live ueber GET {baseURL}/models
-      # nachfragen.
       openrouter:
         apiKeyEnv: SHINON_API_KEY
         displayName: Shinon Forge
-      # --- Free-Tier-Anbieter, alle als Katalog-Route vorhanden ---
       nvidia:
         apiKeyEnv: NVIDIA_API_KEY
         displayName: Shinon Forge
@@ -128,24 +127,39 @@
       huggingface:
         apiKeyEnv: HUGGINGFACE_API_KEY
         displayName: Shinon Forge
-      # Agnes AI (Sapiens AI) — NICHT im pi-ai-Katalog, deshalb als eigene Route
-      # deklariert: api + baseURL + nicht-leere models-Liste sind hier Pflicht,
-      # sonst wird das Profil beim Schreiben abgelehnt.
-      # `contextWindow` bewusst weggelassen: unbekannt, es gilt der dokumentierte
-      # Default des Adapters.
       agnes:
-        displayName: Shinon Forge
+        displayName: Shinon Forge Agnes
         apiKeyEnv: AGNES_API_KEY
         api: openai-completions
         baseURL: https://apihub.agnes-ai.com/v1
         models:
           - id: agnes-2.5-flash
             name: Agnes 2.5 Flash
+          - id: agnes-2.5-pro-alpha
+            name: agnes-2.5-pro-alpha
+          - id: agnes-video-2.5-flash
+            name: agnes-video-2.5-flash
+          - id: agnes-3.0-flash
+            name: agnes-3.0-flash
+          - id: agnes-image-2.1-flash
+            name: agnes-image-2.1-flash
+          - id: agnes-video-2.5
+            name: agnes-video-2.5
+          - id: agnes-image-2.0-flash
+            name: agnes-image-2.0-flash
+          - id: agnes-3.0-flash-max
+            name: agnes-3.0-flash-max
+          - id: agnes-2.5-pro
+            name: agnes-2.5-pro
+          - id: agnes-2.5-pro-beta
+            name: agnes-2.5-pro-beta
+          - id: agnes-image-2.5-flash
+            name: agnes-image-2.5-flash
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
     provider: agnes
-    model: agnes-2.5-flash
+    model: agnes-3.0-flash
 - id: agent-preset-registry
   name: "@deepseek-ai/dsh-agent-preset-registry"
   config:
@@ -155,6 +169,10 @@
   name: "@deepseek-ai/dsh-client-ui-chat"
   config:
     transcriptView: verbose
+# Permission-Default (C7): `workspace-write` mit `approval: ask` — kein stiller
+# Vollzugriff im Startzustand. `danger-full-access` (approval: never) bleibt als
+# benannter Preset waehlbar, wird aber nicht mehr vorausgewaehlt: ein Nutzer, der
+# ihn will, waehlt ihn bewusst.
 - id: permission
   name: "@deepseek-ai/dsh-permission-presets"
   config:
@@ -168,4 +186,4 @@
       danger-full-access:
         sandbox: danger-full-access
         approval: never
-    defaultPreset: danger-full-access
+    defaultPreset: workspace-write
