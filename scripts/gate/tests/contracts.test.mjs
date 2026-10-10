@@ -76,6 +76,18 @@ test('probe-twin: Vokabular wird erzwungen', () => {
   assert.ok(probeIssues({ ...goodProbe, verdict: 'NOPE' }, 'p.json')[0].includes('verdict'));
 });
 
+test('probe-twin: der Nachtrag braucht Datum, Geltungsbereich und Nachmessung', () => {
+  // Das Feld ersetzt das stille Umschreiben eines Belegtextes (docs/INDEX.md §2).
+  const good = { ...goodProbe, nachtrag: { date: '2026-10-10', scope: 'Geometrie', note: 'neu gezeichnet' } };
+  assert.deepEqual(probeIssues(good, 'p.json'), []);
+  assert.ok(probeIssues({ ...goodProbe, nachtrag: '2026-10-10, irgendwas' }, 'p.json')[0].includes('Objekt'), 'ein bloßer Text ist keine standardisierte Nachmessung');
+  assert.ok(probeIssues({ ...good, nachtrag: { scope: 'x', note: 'y' } }, 'p.json')[0].includes('date'));
+  assert.ok(probeIssues({ ...good, nachtrag: { date: '10.10.2026', scope: 'x', note: 'y' } }, 'p.json')[0].includes('date'), 'das Datumsformat ist YYYY-MM-DD');
+  assert.ok(probeIssues({ ...good, nachtrag: { date: '2026-10-10', note: 'y' } }, 'p.json')[0].includes('scope'));
+  assert.ok(probeIssues({ ...good, nachtrag: { date: '2026-10-10', scope: 'x', note: ' ' } }, 'p.json')[0].includes('note'));
+  assert.deepEqual(probeIssues(goodProbe, 'p.json'), [], 'ohne Nachtrag bleibt die Probe gültig');
+});
+
 test('probe-twin: alle drei Ergebnisse und vier Verdicts sind erlaubt', () => {
   for (const result of PROBE_RESULTS) {
     assert.deepEqual(probeIssues({ ...goodProbe, result }, 'p.json'), [], result);

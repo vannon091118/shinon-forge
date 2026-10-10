@@ -46,8 +46,8 @@ const REQUIRED_FILES = [
   '.githooks/commit-msg',
   '.githooks/prepare-commit-msg',
   '.github/workflows/commit-guard.yml',
-  'Docs/COMMIT-REGELN.md',
-  'Docs/contracts/commit-trailer.json',
+  'docs/COMMIT-REGELN.md',
+  'docs/contracts/commit-trailer.json',
 ];
 
 /** Laufzeit-/Verhaltensprüfung der Regeln. Reine Funktion, testbar. */

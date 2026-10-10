@@ -529,7 +529,7 @@ test('Suche: FTS5 findet Begriffe und bricht an einem unbrauchbaren Ausdruck nic
 
 /**
  * Die Registry benennt, WELCHER Parser traegt — die Zuordnung ist gemessen
- * (Docs/probes/project-index-parserstrategie.json), nicht behauptet: fuer
+ * (docs/probes/project-index-parserstrategie.json), nicht behauptet: fuer
  * JavaScript existiert in dieser Runtime keiner, fuer JSON gibt es den
  * eingebauten, fuer YAML keinen, der aus diesem Paket erreichbar waere.
  */
@@ -1316,7 +1316,7 @@ function canaryHits(indexRoot, ...needles) {
 /**
  * Die Pfadregeln treffen ganze NAMEN, nicht Präfixe.
  *
- * Der Grund steht in Docs/probes/secret-protection.json: `.credentials.yaml`
+ * Der Grund steht in docs/probes/secret-protection.json: `.credentials.yaml`
  * liegt in der Wurzel dieses Repos und trägt drei echte Schlüssel — `credentials*`
  * trifft sie nicht, weil dem Namen ein Punkt vorangeht. Die Tabelle prüft beide
  * Richtungen, damit die Regeln weder blind noch übermäßig breit sind.
@@ -1338,7 +1338,7 @@ test('Schutz: die Pfadregeln treffen Namen mit führendem Punkt und verschonen Q
     // und die Alternative — Praefixe nach Gefuehl zu unterscheiden — waere eine
     // Liste, die niemand nachpruefen kann. Die WIRKSAME Grenze bleibt die
     // fehlende Faehigkeit des Enhancers, nicht der Index.
-    ['Docs/probes/secret-protection.json', 'secret-datei'],
+    ['docs/probes/secret-protection.json', 'secret-datei'],
     ['secrets-notes.md', 'secret-datei'],
     // §13 nennt `credentials*` als Praefix. Ein Praefixname ist genau dann ein
     // Zugangsdatentraeger, wenn er KEIN Programm ist: `credentials-prod.yaml`
@@ -1448,7 +1448,7 @@ test('Schutz: Test-Secrets erscheinen nicht als ungeschützter Inhalt im Index',
 /**
  * Das Muster, das vor dem Bau blind war.
  *
- * Gemessen (Docs/probes/secret-protection.json): eine Fassung mit Lookbehind auf
+ * Gemessen (docs/probes/secret-protection.json): eine Fassung mit Lookbehind auf
  * Bezeichnerzeichen lieferte 0 Treffer, weil in `SHINON_API_KEY` vor `API_KEY`
  * ein Unterstrich steht — blind genau für die häufigste Schreibweise. Die Tabelle
  * hält die Formen fest, die tragen, und die Gegenfälle, die nicht tragen dürfen.

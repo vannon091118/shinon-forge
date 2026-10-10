@@ -11,6 +11,10 @@
  *   --local     LOCAL    — die kurze Menge aus policy.engine.local (Hooks)
  *   --full      FULL     — alle Gates gegen den Stand vs. HEAD (CI)
  *   --release   RELEASE  — wie --full, für den Release-Lauf
+ *   --branding  Zusatzstufe: die Wirkungs-Messung im echten Chromium
+ *               (scripts/branding-check.mjs) läuft mit. Ohne das Flag steht sie als
+ *               sichtbarer Skip mit Grund in der Ausgabe — sie braucht `dist/` und
+ *               ein Browser-Binary und ist deshalb kein Gate der schnellen Läufe.
  *
  * Läuft ohne node_modules — nur node:-Module und scripts/lib/repo.mjs.
  */
@@ -123,10 +127,29 @@ async function main() {
     }
   }
 
+  // Die optionale Wirkungs-Messung: sie ist KEIN Gate (kein statischer Slice, sie
+  // braucht ein gebautes `dist/` und ein Browser-Binary), aber sie ist auch kein
+  // toter Code — deshalb hängt sie mit sichtbarem Grund an dieser Engine.
+  const branding = args.includes('--branding');
+  let brandingFailed = 0;
+  if (branding) {
+    console.log('🌐 branding — Wirkungs-Messung im echten Chromium (dist/packages/core/client.js)');
+    try {
+      execFileSync(process.execPath, [join(HERE, '..', 'branding-check.mjs')], { stdio: 'inherit', cwd: repo.ROOT });
+    } catch (error) {
+      brandingFailed = 1;
+      console.error(`💥 branding — ${error.message}`);
+    }
+  } else {
+    console.log('⏭️  branding — nicht gelaufen (nur mit --branding; braucht `npm run build` und Chromium)');
+  }
+
   console.log(
-    `\n${failed === 0 ? '✅' : '💥'} Verdict: ${failed === 0 ? 'PASS' : 'FAIL'} — ${ran} gelaufen, ${skipped} geskippt, ${failed} fehlgeschlagen`,
+    `\n${failed + brandingFailed === 0 ? '✅' : '💥'} Verdict: ${failed + brandingFailed === 0 ? 'PASS' : 'FAIL'} — ` +
+      `${ran} gelaufen, ${skipped} geskippt, ${failed} fehlgeschlagen` +
+      (branding ? `, Branding-Messung ${brandingFailed === 0 ? 'grün' : 'rot'}` : ', Branding-Messung nicht gelaufen'),
   );
-  process.exit(failed > 0 ? 1 : 0);
+  process.exit(failed + brandingFailed > 0 ? 1 : 0);
 }
 
 // Nur als CLI ausführen, nicht beim Import (Tests importieren die Helfer).

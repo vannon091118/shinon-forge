@@ -20,7 +20,7 @@ export const id = 'doctor';
  *
  * Standard ist `1.0.0`. `key-router`, `narrative` und `shinon-forge` führen
  * `0.1.0`: Vorbereitungs-Pakete, bewusst nicht im Profil (siehe
- * `dead-package` und `Docs/ZAHLEN.md` §1). Diese Aufteilung ist eine
+ * `dead-package` und `docs/ZAHLEN.md` §1). Diese Aufteilung ist eine
  * Entscheidung, kein Versehen — deshalb schlägt der Doctor nur bei
  * UNDEKLARIERTER Abweichung an. Wer eine Version ändert, ändert sie hier
  * UND im Manifest; alles andere ist Drift und bleibt rot.
