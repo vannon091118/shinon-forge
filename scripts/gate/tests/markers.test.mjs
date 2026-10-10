@@ -20,6 +20,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadClientBundle, requireStub } from './helpers/client-sandbox.mjs';
 import {
   MARK_FIELDS,
   MODEL_CONTRACT,
@@ -290,4 +291,97 @@ test('markers: fehlender Vertrag ist fail-open für den Host, nicht fail-loud', 
   const dispose = quiet(() => bundle.apply({}, { modelPath: './assets/gibt-es-nicht.json', inboxUrl: 'http://127.0.0.1:9333/inbox', textLimit: 200, markLimit: 200, panelLabel: 'x', panelOrder: 30 }));
   assert.equal(typeof dispose, 'function');
   assert.equal(dispose(), undefined);
+});
+
+// ── 6. Die Naht zum Browser: wirksame Grenzen ────────────────────────────────
+// Der Client kann die WIRKSAMEN Grenzen nicht erraten (selbständiges Bundle) und
+// importiert deshalb nichts: der Host schickt sie beim Ausliefern der Seite mit.
+// Ohne diese Prüfung wäre die Vertragszusage „die wirksamen Grenzen gelten im
+// Browser" eine Behauptung über Code, den es nicht gibt.
+
+const applyWith = (ctx, overrides = {}) => quiet(() => bundle.apply(ctx, {
+  modelPath: './assets/marker-model.json',
+  inboxUrl: 'http://127.0.0.1:9333/inbox',
+  textLimit: 200,
+  markLimit: 200,
+  panelLabel: 'Shinon Marker',
+  panelOrder: 30,
+  ...overrides,
+}));
+
+test('markers: der Host reicht seine WIRKSAMEN Grenzen an die Seite durch', () => {
+  const rows = [];
+  let channel = null;
+  const dispose = applyWith({ on: (name, handler) => { channel = name; handler(rows); } }, { textLimit: 120, markLimit: 7 });
+  assert.equal(channel, bundle.INDEX_INJECT, 'die Zeile hängt an der Naht des Webservers');
+  assert.equal(rows.length, 1, 'genau eine Zeile');
+  assert.deepEqual(rows[0], {
+    kind: 'global',
+    name: bundle.LIMITS_GLOBAL,
+    value: { contract: model.contract, limits: { text: 120, marks: 7, comment: 500 } },
+  }, 'die Profilwerte gelten, der Vertrag nur als Vorgabe');
+  assert.equal(dispose(), undefined);
+});
+
+test('markers: ohne ctx.on bleibt der Host stumm statt zu werfen', () => {
+  const dispose = applyWith({}, { textLimit: 120 });
+  assert.equal(typeof dispose, 'function', 'ein Disposer muss auch ohne Naht zurückkommen');
+  assert.equal(dispose(), undefined);
+});
+
+test('markers: beide Hälften tragen denselben Namen der Grenzen-Naht', () => {
+  assert.equal(bundle.LIMITS_GLOBAL, '__DSH_MARKERS_CONFIG__');
+  assert.equal(bundle.INDEX_INJECT, 'webserver/index-inject');
+  assert.ok(hostSource.includes(`'${bundle.LIMITS_GLOBAL}'`), 'der Host nennt das Global als Literal');
+  assert.ok(clientSource.includes(`'${bundle.LIMITS_GLOBAL}'`), 'der Client liest dasselbe Literal');
+});
+
+test('markers: der Client benutzt die wirksamen Grenzen, nicht die Vorgaben', () => {
+  const wanted = ['hostLimits.text', 'hostLimits.marks', 'hostLimits.comment', 'limits: () => ({ ...hostLimits })'];
+  for (const token of wanted) assert.ok(clientSource.includes(token), `der Client muss ${token} benutzen`);
+  assert.ok(
+    clientSource.includes('const LIMITS_GLOBAL = ') && clientSource.includes('hostLimits.from'),
+    'die Herkunft (`host` oder `vertrag`) muss am Client ablesbar sein',
+  );
+});
+
+test('markers: mirror.limits() nennt die wirksamen Grenzen des Spiegels', () => {
+  assert.deepEqual(bundle.createMirror(model).limits(), { text: 200, marks: 200, comment: 500 }, 'Vertragsvorgabe');
+  assert.deepEqual(bundle.createMirror(model, { textLimit: 120, markLimit: 7 }).limits(), { text: 120, marks: 7, comment: 500 }, 'Profil gewinnt');
+});
+
+// Das ECHTE Client-Bundle in einem vm-Kontext: was die Hälfte aus der Seite liest,
+// ist nur so wahr, wie es sich ausführen lässt — der statische Scan oben kann
+// `hostLimits` nicht auswerten.
+// Die Grenzen kommen aus dem vm-Kontext und tragen damit dessen Object.prototype:
+// fuer einen Vergleich im Host-Realm muessen sie kopiert werden (dieselbe
+// Realm-Grenze, die Typert auf der Wire-Seite zieht).
+const mountWith = (globals) => {
+  const { registration, sandbox } = loadClientBundle('markers', globals);
+  registration.factory(requireStub());
+  const api = sandbox.sandbox.__mk;
+  return { limits: () => ({ ...api.limits() }) };
+};
+
+test('markers: das echte Client-Bundle übernimmt die Grenzen der Seite', () => {
+  const api = mountWith({ __DSH_MARKERS_CONFIG__: { contract: MODEL_CONTRACT, limits: { text: 12, marks: 2, comment: 7 } } });
+  assert.deepEqual(api.limits(), { text: 12, marks: 2, comment: 7, from: 'host' }, 'das Profil gewinnt im Browser');
+});
+
+test('markers: ohne Datensatz gilt der Vertrag, ein fremder Vertrag wird verworfen', () => {
+  assert.deepEqual(
+    mountWith({}).limits(),
+    { text: 200, marks: 200, comment: 500, from: 'vertrag' },
+    'ohne Naht bleiben die Vertragsvorgaben',
+  );
+  assert.deepEqual(
+    mountWith({ __DSH_MARKERS_CONFIG__: { contract: 'fremd/v1', limits: { text: 1, marks: 1, comment: 1 } } }).limits(),
+    { text: 200, marks: 200, comment: 500, from: 'vertrag' },
+    'Zahlen ohne passenden Vertragsnamen sind keine Grenzen dieses Spiegels',
+  );
+  assert.deepEqual(
+    mountWith({ __DSH_MARKERS_CONFIG__: { contract: MODEL_CONTRACT, limits: { text: 0, marks: null, comment: 'viel' } } }).limits(),
+    { text: 200, marks: 200, comment: 500, from: 'host' },
+    'unbrauchbare Einzelwerte fallen auf die Vertragsgabe zurück, der Datensatz bleibt gültig',
+  );
 });

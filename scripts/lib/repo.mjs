@@ -23,12 +23,20 @@
  *               Datei, liegt im Paket und parst in ihrem Format
  *   Komposition Profil-Manifest, doppelte insert-ids über alle Layer, azyklischer
  *               Paketgraph
+ *   Idiome      generierte Plugin-Bausteine deckungsgleich mit ihrer einen Quelle
+ *               (scripts/lib/plugin-idioms.mjs) — und keine Kopie daneben
  */
 import { execFileSync } from 'child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { dirname, join, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { loadYaml } from './yaml.mjs';
+import { idiomIssues } from './plugin-idioms.mjs';
+
+// Generierte Plugin-Bausteine (settings-Registrierung, Locale-Fallback): sie stehen
+// EINMAL in scripts/lib/plugin-idioms.mjs und liegen als markierte Ableitung in den
+// Paketen. Wer die Quelle ändert, schreibt mit `npm run idioms` nach; geprüft wird hier.
+export { idiomIssues };
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const PACKAGES_DIR = join(ROOT, 'packages');
@@ -430,6 +438,14 @@ export const SOURCE_TWINS = [
       { jsonPath: 'payload.comment', literal: 'string' },
       { jsonPath: 'limits.text', literal: 'number' },
       { jsonPath: 'limits.comment', literal: 'number' },
+      // Die Markenmenge ist seit Schritt 2.3 nicht mehr nur eine Vertragszahl: sie
+      // kommt aus den wirksamen Grenzen der Seite. Die Vertragsgabe steht als
+      // Rueckfall im Client und muss dort bleiben.
+      { jsonPath: 'limits.marks', literal: 'number' },
+      // Und der Vertragsname: der Client verwirft einen Datensatz aus einem fremden
+      // Vertrag — dafuer muss er den eigenen Namen als Literal tragen (er kann
+      // index.js nicht importieren).
+      { jsonPath: 'contract', literal: 'string' },
     ],
   },
 ];

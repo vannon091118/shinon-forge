@@ -16,6 +16,13 @@ import { readFileSync } from 'node:fs';
  *   Client (client.js)   — der Spiegel im nativen DSH-Side-Panel: markieren,
  *                          kommentieren, Nutzlast bauen, kopieren.
  *
+ * DIE EINE NAHT ZUM BROWSER (INDEX_INJECT/LIMITS_GLOBAL): die WIRKSAMEN Grenzen
+ * — Profilwerte, nicht Vertragsvorgaben — legt der Host beim Ausliefern der Seite
+ * als `window.__DSH_MARKERS_CONFIG__` in den Index (dieselbe Naht, über die DSH
+ * Theme, Dokument-Vorschau und Modell-Einstellungen ausliefert). Der Client liest
+ * sie beim Mounten; er kann die Grenzen nicht erraten, weil er ein selbständiges
+ * Bundle ist. Beide Seiten führen den Namen als Literal, der Test vergleicht sie.
+ *
  * Fail-closed für die Marke: eine Marke ohne Selektor oder ohne ganzzahliges Rect
  * existiert nicht. Fail-open für den Host: die Beobachtung darf die Sitzung nie
  * mit einem Throw stören — Verstöße werden gezählt, nicht geworfen.
@@ -105,15 +112,38 @@ export function validateMark(mark, { model, limits = limitsOf(model) } = {}) {
   return issues;
 }
 
+/** Das Global, in das der Host seine WIRKSAMEN Grenzen legt (der Client liest es). */
+export const LIMITS_GLOBAL = '__DSH_MARKERS_CONFIG__';
+
+/**
+ * Die Naht, ueber die dsh-host-webserver die Zeilen aller Haelften einsammelt.
+ * `ctx.on(INDEX_INJECT, table => table.push(row))` — dieselbe Naht, die DSH fuer
+ * Theme, Dokument-Vorschau und Modell-Einstellungen benutzt.
+ */
+export const INDEX_INJECT = 'webserver/index-inject';
+
+/**
+ * Der Datensatz, den der Browser liest: Vertragsname + WIRKSAME Grenzen.
+ * @param {object} model
+ * @param {{text: number, marks: number, comment: number}} limits
+ * @returns {{contract: string, limits: {text: number, marks: number, comment: number}}}
+ */
+export function limitsRecord(model, limits) {
+  return {
+    contract: model?.contract ?? EMPTY_MODEL.contract,
+    limits: { text: limits.text, marks: limits.marks, comment: limits.comment },
+  };
+}
+
 // Die zwei Implementierungen koennen nicht mehr auseinanderlaufen: die Zwillings-Regel
 // "Marker-Nutzlast-Format und -Grenzen" (scripts/lib/repo.mjs, SOURCE_TWINS) verlangt, dass
 // payload.line, payload.comment, limits.text und limits.comment des Vertrags als Literal in
 // markers/client.js stehen — Gate und Build pruefen das bei jedem Lauf. Kein dritter Formatierer.
-// TODO: [DSH-Refactor] - Benannte Restgrenze: der Host liest die WIRKSAMEN Grenzen
-// (`limits.text`/`limits.comment`, im Profil ueber textLimit/commentLimit ueberschreibbar), der
-// Client spiegelt die VORGABEN des Vertrags (client.js:158/404/534) und bekommt die wirksamen
-// Grenzen nicht ueber die Naht. Das ist eine Naht-Frage, keine Formatfrage: erst wenn der Host
-// seine Grenzen mitschickt, kann der Client sie lesen.
+// GESCHLOSSEN (2026-10-11): der Host liest die WIRKSAMEN Grenzen (`limits.text`/`limits.marks`,
+// im Profil ueber textLimit/markLimit ueberschreibbar) und schickt sie ueber INDEX_INJECT als
+// `window.__DSH_MARKERS_CONFIG__` mit; der Client liest sie beim Mounten (client.js). Die Zahlen
+// des Vertrags bleiben die VORGABE (Rueckfall), das Profil gewinnt. Vorher stand hier eine
+// benannte Restgrenze: der Client spiegelte nur die Vorgaben.
 /** Vorlage aus dem Vertrag: `{feld}` → Wert. Der Spiegel im Client ist vertraglich gesperrt. */
 function fill(template, values) {
   return String(template).replace(/\{(\w+)\}/g, (_match, key) => (values[key] === undefined ? '' : String(values[key])));
@@ -222,6 +252,8 @@ export function createMirror(model, options = {}) {
     nextId: () => nextMarkId(marks),
     render: () => renderPayload(marks, comments, model),
     snapshot: () => ({ contract: model?.contract ?? EMPTY_MODEL.contract, marks: marks.length, comments: Object.keys(comments).length }),
+    /** Die WIRKSAMEN Grenzen dieses Spiegels (Vertrag + Optionen aus dem Profil). */
+    limits: () => ({ ...limits }),
     stats,
     model,
   };
@@ -255,9 +287,23 @@ export function apply(ctx, config) {
     console.warn(`[shinon-markers] Inbox-URL ist keine http(s)-Adresse: ${config.inboxUrl}`);
   }
 
+  // Die Naht zum Browser: der Host schickt die WIRKSAMEN Grenzen mit, statt den
+  // Client raten zu lassen. Ohne `ctx.on` (Tests, fremde Hosts) bleibt es bei der
+  // Aussage in der Aktivierungszeile — fail-open, wie der ganze Host.
+  const canInject = typeof ctx?.on === 'function';
+  if (canInject) {
+    ctx.on(INDEX_INJECT, (table) => {
+      if (Array.isArray(table)) {
+        table.push({ kind: 'global', name: LIMITS_GLOBAL, value: limitsRecord(model, mirror.limits()) });
+      }
+    });
+  }
+
   console.log(
     `[shinon-markers] Spiegel geladen (${model.contract}) — Quelle ${model.source?.repo ?? 'unbekannt'}, ` +
-      `${model.fields?.length ?? 0} Felder, authority ${model.authority}`,
+      `${model.fields?.length ?? 0} Felder, authority ${model.authority}` +
+      `, Grenzen text=${mirror.limits().text}/marks=${mirror.limits().marks}/comment=${mirror.limits().comment}` +
+      (canInject ? ` — als ${LIMITS_GLOBAL} an die Seite durchgereicht (${INDEX_INJECT})` : ` — NICHT durchgereicht (kein ctx.on)`),
   );
 
   return () => {
