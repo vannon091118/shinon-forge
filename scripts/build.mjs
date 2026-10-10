@@ -58,6 +58,11 @@ for (const pkg of packages) {
 for (const hit of repo.legacyHits(packages)) problems.push(`Legacy-Referenz: ${hit}`);
 // Zwillings-Regeln (eine Quelle, ein Spiegel): Drift bricht den Build, nicht erst den Betrieb.
 for (const issue of repo.twinIssues()) problems.push(`Quell-Zwillinge: ${issue}`);
+// Generierte Idiome: dieselbe Regel für die Plugin-Bausteine — die Ableitung in den
+// Paketen muss zeichengenau zu scripts/lib/plugin-idioms.mjs passen.
+for (const half of ['index.js', 'client.js']) {
+  for (const issue of repo.idiomIssues(repo.ROOT, half)) problems.push(`Idiom-Drift: ${issue}`);
+}
 
 const { profileName, profile, issues: repoProblems } = repo.repoIssues(packages, root);
 if (profile.issues.length) problems.push(`Profil ${profileName}: ${profile.issues.join('; ')}`);
