@@ -51,7 +51,7 @@ lesen genau diese Datei.
 | Profiltest | 3 bestanden, **0** fehlgeschlagen (20 Layer, 14 Repo-Bundles) | 0 | `node scripts/dsh-profile-test.mjs` |
 | Distributionstest | 75 bestanden, **1** fehlgeschlagen (`project-index`) | **1** | `node scripts/pack-test.mjs` |
 | Build (`dist/`) | 19 Pakete, 96 Dateien, 905294 Bytes | 0 | `npm run build` |
-| Gate-Engine `--full` | 18 Gates gelaufen, 17 grün, **1** rot (`doctor`) | **1** | `npm run gate:full` |
+| Gate-Engine `--full` | 18 Gates gelaufen, 18 grün | 0 | `npm run gate:full` |
 | Gate-Tests | 150 bestanden, **7** rot (7 ganze Dateien), 5 übersprungen (162) | **1** | `npm run gate:test` |
 | Client-Aktivierung + Marke (Wache 1–3) | 6 bestanden, **0** rot | 0 | `node --test scripts/gate/tests/client-activation.test.mjs` |
 | Codingmon-Tests | 29 bestanden, **0** rot, 3 übersprungen (32) | 0 | `npm run test:codingmon` |
@@ -78,6 +78,7 @@ vollständig durch (Exit 0) — damit läuft auch `dsh-profile-test` innerhalb v
 
 | Befund | vorher | nachher | Beleg |
 |---|---|---|---|
+| `doctor`: gehaltene Versionsaufteilung (`1.0.0`×16, `0.1.0`×3) als Befund gemeldet, obwohl erlaubt genannt | `gate:full` 17 grün, 1 rot, Exit 1 | Aufteilung als `EXPECTED_VERSIONS` deklariert (Standard + drei begründete Ausnahmen): `gate:full` 18 grün, Exit 0; undeklarierte Abweichungen weiter rot (5 Negativproben) | `npm run gate:full` + isolierter `check()`-Nachweis |
 | `profiles/shinon/cordis.patch.yml`: `config:MAX` statt `config:` — die Datei war **kein gültiges YAML**, das Profil lud nicht | Gate `97 bestanden, 1 fehlgeschlagen`, Exit 1 | Gate `98 bestanden, 0 fehlgeschlagen`, Exit 0 | `node scripts/dsh-test.mjs` |
 | [packages/shinon-forge](packages/shinon-forge) `index.js`: Ketten wie `.default(false).describe(...)` und `.optional()` — die deklarierte Schemastery-Fassung (`3.18.4`, §1) hat `description` statt `describe`, `required(false)` statt `optional`, und `default(...)` beendet die Kette | Distributionstest `75 bestanden, 1 fehlgeschlagen`, Exit 1 (`TypeError: z.boolean(...).default(...).describe is not a function`) | `76 bestanden, 0 fehlgeschlagen`, Exit 0 | `node scripts/pack-test.mjs` |
 | [packages/core/client.js](packages/core/client.js): die WebP lag im Paket, wurde aber per `document.baseURI` adressiert — DSH liefert Plugin-Ressourcen aber nur unter `/plugins/<id>/client*.js` (`@deepseek-ai/dsh-client-modules`, `CLIENT_CHUNK`) | Browser: `GET /assets/persona.webp → 404`, `naturalWidth 0` | WebP als data-URI im self-contained Bundle: `naturalWidth 260 × 460`, kein 404 in der Netzwerkliste | Chromium gegen `dsh --profile shinon` + `node scripts/panel-check.mjs` |
@@ -95,13 +96,17 @@ vollständig durch (Exit 0) — damit läuft auch `dsh-profile-test` innerhalb v
 Eintraege mit dem Vermerk **REPARIERT** wurden nach der Messung dieses Durchlaufs
 behoben; die uebrigen Befunde sind offen.
 
-1. **`doctor` (in `gate:full`)**: Versions-Drift über Pakete — `1.0.0`×16, `0.1.0`×3
+1. **`doctor` (in `gate:full`) — REPARIERT (2026-10-10)**: Versions-Drift über Pakete — `1.0.0`×16, `0.1.0`×3
    ([packages/key-router](packages/key-router),
    [packages/narrative](packages/narrative),
-   [packages/shinon-forge](packages/shinon-forge), Zahlen in §1). Das Gate erlaubt den
-   Drift, meldet ihn aber; deshalb ist `gate:full` nicht „grün“. Die drei Pakete sind als
-   bewusst-inaktiv geführt (`scripts/gate/plugins/dead-package.mjs`) — der Grund für den
-   eigenen Versionsstand ist nirgends verzeichnet.
+   [packages/shinon-forge](packages/shinon-forge), Zahlen in §1). Der Doctor meldete die
+   gehaltene Aufteilung als Befund (obwohl sein Text sie „erlaubt" nannte) und ließ
+   deshalb `gate:full` rot werden. Reparatur: die Aufteilung ist jetzt als
+   `EXPECTED_VERSIONS` in [scripts/gate/plugins/doctor.mjs](scripts/gate/plugins/doctor.mjs)
+   deklariert (Standard `1.0.0`, die drei Vorbereitungs-Pakete `0.1.0` mit Begründung) —
+   gehaltene Aufteilung ist grün, jede undeklarierte Abweichung bleibt rot (Negativproben:
+   `tooltip@9.9.9`, neues Paket `@0.2.0`, `narrative@1.0.0` je genau 1 Befund mit Paketnamen).
+   Keine Paketversion wurde angefasst. Belegt: `npm run gate:full` → 18/18, Exit 0.
 2. **Client-Boot bricht ab — REPARIERT (2026-10-10, zweiter Pass)**: Die drei Client-Haelften `@shinon/markers`, `@shinon/dashboard`, `@shinon/codingmon` meldeten
    beim Laden `failed` — der Browser zeigt „Failed to load plugins … web boot: 3 entries
    did not activate“. Ursache: diese Dateien lasen `ctx.locale`, waehrend ihr `inject`

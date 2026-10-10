@@ -206,7 +206,7 @@ Statusklassen — und was sie hier bedeuten:
 | Codemon-Kernmathematik, Kompositor-Regel, Client-Durchstich im vm | **Verified** | `npm run test:codingmon` → Exit 0 (überspringt sichtbar, was DSH-Bausteine braucht) |
 | Distributionstest (`pnpm pack` → Isolat → Load) | **Verified** (76 von 76) | `node scripts/pack-test.mjs` → Exit 0 |
 | Web-UI-Boot in Chromium + Panel-Beleg | **Verified** (7 von 7) | `dsh --profile shinon` + `node scripts/panel-check.mjs --url … --token …` → Exit 0 |
-| Gate-Engine `--full` | **Rot** (`doctor`: nur noch Versions-Drift) | `npm run gate:full` → Exit 1 |
+| Gate-Engine `--full` | **Verified** (18 von 18; gehaltene Versionsaufteilung ist deklariert, Undeklariertes bleibt rot) | `npm run gate:full` → Exit 0 |
 | Gate-Tests (reine Gate-Logik) | **Rot** (2 von 300) | `npm run gate:test` → Exit 1 |
 | Volle Kette | **Verified** (29 → 98 → 9 → 76 → 3 grün) | `npm test` → Exit 0 |
 | Echter Modellaufruf | **Nicht geprüft** | `Docs/ZAHLEN.md` §4 |

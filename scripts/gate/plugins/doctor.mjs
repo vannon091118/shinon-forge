@@ -15,6 +15,23 @@ import { join } from 'node:path';
 
 export const id = 'doctor';
 
+/**
+ * Deklarierte Paketversionen — bewusst gehalten, NICHT vereinheitlicht.
+ *
+ * Standard ist `1.0.0`. `key-router`, `narrative` und `shinon-forge` führen
+ * `0.1.0`: Vorbereitungs-Pakete, bewusst nicht im Profil (siehe
+ * `dead-package` und `Docs/ZAHLEN.md` §1). Diese Aufteilung ist eine
+ * Entscheidung, kein Versehen — deshalb schlägt der Doctor nur bei
+ * UNDEKLARIERTER Abweichung an. Wer eine Version ändert, ändert sie hier
+ * UND im Manifest; alles andere ist Drift und bleibt rot.
+ */
+export const EXPECTED_VERSIONS = {
+  default: '1.0.0',
+  'key-router': '0.1.0',
+  narrative: '0.1.0',
+  'shinon-forge': '0.1.0',
+};
+
 export function check(ctx) {
   const issues = [];
   const root = ctx.root;
@@ -44,15 +61,18 @@ export function check(ctx) {
     }
   }
 
-  // 3. Version-Drift: alle Pakete eines Repos führen eine Version.
-  const versions = new Map();
+  // 3. Version-Drift: jede Paketversion muss der Deklaration oben entsprechen.
+  //    Gehaltene Aufteilung (Standard + drei 0.1.0) ist grün; alles Undeklarierte
+  //    — auch ein einzelner Ausreißer — ist ein Befund mit Paketnamen.
   for (const pkg of ctx.packages) {
+    const want = EXPECTED_VERSIONS[pkg.dir] ?? EXPECTED_VERSIONS.default;
     const v = pkg.manifest?.version;
-    if (typeof v === 'string') versions.set(v, (versions.get(v) ?? 0) + 1);
-  }
-  if (versions.size > 1) {
-    const detail = [...versions.entries()].map(([v, n]) => `${v}×${n}`).join(', ');
-    issues.push(`Versions-Drift über Pakete: ${detail} (erlaubt, aber bewusst halten)`);
+    if (v !== want) {
+      issues.push(
+        `${pkg.dir}: Version "${v ?? 'fehlt'}" ≠ deklariert "${want}" ` +
+          `(scripts/gate/plugins/doctor.mjs EXPECTED_VERSIONS) — Version dort und im Manifest gemeinsam ändern`,
+      );
+    }
   }
 
   return issues;
