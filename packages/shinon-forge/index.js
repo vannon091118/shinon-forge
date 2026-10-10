@@ -31,11 +31,11 @@ try {
 } catch {
   // Fallback: minimale Schema-API für Test-/Offline-Betrieb.
   // Sie spiegelt die GEMESSENE API der deklarierten Schemastery-Fassung
-  // (`Docs/ZAHLEN.md` §1, 3.18.4): Metadaten heißen `description` (nicht
+  // (`docs/ZAHLEN.md` §1, 3.18.4): Metadaten heißen `description` (nicht
   // `describe`), Optionalität heißt `required(false)` (kein `optional`), und
   // `default(...)` ist der ABSCHLUSS der Kette — danach trägt das Ergebnis
   // keine Metadaten-Methoden mehr. Genau daran scheiterte das Laden des Pakets
-  // im Distributionstest (`Docs/ZAHLEN.md` §2.1).
+  // im Distributionstest (`docs/ZAHLEN.md` §2.1).
   // Ein Schema ist — wie in der echten Fassung — aufrufbar: die Kette liefert
   // ein Schema, der Aufruf den geparsten Wert (für Objekte mit Defaults).
   const chainable = (spec) => {

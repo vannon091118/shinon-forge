@@ -187,7 +187,7 @@ gestoppt und gemeldet, nicht repariert.
 - **Nachweis:** Liste plus `node -p`-Ausgabe der Bundle-Liste.
 - **Risiko:** mittel / mittel.
 - **Abhängig von:** A2
-- **Status:** **erledigt im Arbeitsbaum** (2026-10-11) — die Liste steht in [docs/audit/DSH_SUBSET_3-1.md](docs/audit/DSH_SUBSET_3-1.md): je Bundle ein Verdikt mit Begründung, gemessen wurden **19** Bundles (14 eigene, 5 fremde), 55 Layer-Köpfe und 207 Einträge im Dump. `dsh-base` (28 Köpfe) und `dsh-web-app` (4 Köpfe) sind nötig, die 14 eigenen getragen; die **drei** `dsh-experimental-*` (auto-review, agent-team-profile, voice-input-bundle) liest in diesem Baum **niemand** (3 Treffer, alle im Profil) → Kandidaten mit Empfehlung. **Entschieden und umgesetzt (A4/C7):** `voice-input-bundle` ist entfernt (einziger First-Use-Download, Manifest: „downloads its runtime on first use“), auto-review und agent-team-profile bleiben bewusst. Ein viertes experimental-Bundle (`schedule-bundle`) war nicht installiert und ist seit 2.4 entfernt. Endstand nach beiden Verkürzungen, gegen das Repo-`dsh@0.2.1-alpha.1` gemessen: **18** Bundles (14 eigene, 4 fremde), **54** Layer-Köpfe, **203** Einträge, Profiltest 3/0 mit 18 Layern. Die Zählung der Einträge hängt an der dsh-Fassung: das globale `0.2.0-rc.2` liefert bei denselben 54 Köpfen **201** Einträge
+- **Status:** **erledigt im Arbeitsbaum** (2026-10-11) — die Liste steht in [docs/audit/DSH_SUBSET_3-1.md](docs/audit/DSH_SUBSET_3-1.md): je Bundle ein Verdikt mit Begründung, gemessen wurden **19** Bundles (14 eigene, 5 fremde), 55 Layer-Köpfe und 207 Einträge im Dump. **Endstand dieser Zeile ist nicht mehr 18:** ein zweiter Schreiber hat am selben Tag `@deepseek-ai/dsh-experimental-inspector-profile` hinzugefügt (gemessen 01:26: 19 Bundles (14 eigene, 5 fremde), 55 Layer-Köpfe, 205 Einträge, Profiltest 3/0 mit 19 Layern; Verdikt offen, §7 des Nachweises). `dsh-base` (28 Köpfe) und `dsh-web-app` (4 Köpfe) sind nötig, die 14 eigenen getragen; die **drei** `dsh-experimental-*` (auto-review, agent-team-profile, voice-input-bundle) liest in diesem Baum **niemand** (3 Treffer, alle im Profil) → Kandidaten mit Empfehlung. **Entschieden und umgesetzt (A4/C7):** `voice-input-bundle` ist entfernt (einziger First-Use-Download, Manifest: „downloads its runtime on first use“), auto-review und agent-team-profile bleiben bewusst. Ein viertes experimental-Bundle (`schedule-bundle`) war nicht installiert und ist seit 2.4 entfernt. Endstand nach beiden Verkürzungen, gegen das Repo-`dsh@0.2.1-alpha.1` gemessen: **18** Bundles (14 eigene, 4 fremde), **54** Layer-Köpfe, **203** Einträge, Profiltest 3/0 mit 18 Layern. Die Zählung der Einträge hängt an der dsh-Fassung: das globale `0.2.0-rc.2` liefert bei denselben 54 Köpfen **201** Einträge
 
 ### 3.2 (D2) Vendoring nach `vendor/dsh/`
 - **Ziel:** DSH im Repo, nachvollziehbar gepflegt.
@@ -196,7 +196,7 @@ gestoppt und gemeldet, nicht repariert.
 - **Nachweis:** Manifest, Änderungslog, Diff-Liste.
 - **Risiko:** hoch / hoch (Umfang, Lizenzpflichten, Umfang der Kopie).
 - **Abhängig von:** A2; **stoppt** bei abweichenden Copyleft-/Attributionspflichten
-- **Status:** offen
+- **Status:** **erledigt im Arbeitsbaum** (2026-10-11) — `vendor/dsh/` trägt das veröffentlichte CLI-Paket **`@deepseek-ai/dsh@0.2.1-alpha.2`**, 20 Dateien, jede **byte-identisch** zum Registry-Tarball (`sha256` je Datei in [vendor/dsh/MANIFEST.json](vendor/dsh/MANIFEST.json); Dateivergleich 20/20, **0** Abweichungen → leere Diff-Liste). Der Ökosystem-Baum (260 Pakete, ~273 MiB) ist **nicht** vendort und bleibt npm-Abhängigkeit. Zwei Abweichungen vom Wortlaut, beide belegt statt geraten: (1) **kein Commit-Hash** — die Registry veröffentlicht für diese Fassung kein `gitHead` (`npm view … gitHead` → leer), das Manifest sagt deshalb `null` mit Begründung statt eines erfundenen Hashs; (2) **kein `THIRD_PARTY_NOTICES.md` im Paket** (20 Dateien, keine mit dem Namen) — übernommen ist die `LICENSE` unverändert, der Befund steht in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Die Stoppbedingung ist **nicht** ausgelöst: MIT, kein Copyleft, Copyright- und Lizenzhinweis bleiben unverändert. Nachweis: Änderungslog [vendor/MODIFICATIONS.md](vendor/MODIFICATIONS.md), Copyright-Hinweis im Repo-Root ([LICENSE](LICENSE), `Copyright (c) 2026 Vannon`), Fassungsmischung belegt (alpha.1 installiert vs. alpha.2 vendort unterscheiden sich in genau zwei Dateien: `lib/bin.js`, `package.json`); `dsh-test` 99/0, `gate:test` 327/0 unverändert grün
 
 ### 3.3 (D3) Spike: Boot ohne benanntes Profil
 - **Ziel:** Produktprofil ohne `$DSH_HOME/profiles/<name>` als Produktkonzept.
@@ -205,7 +205,28 @@ gestoppt und gemeldet, nicht repariert.
 - **Nachweis:** Logausgabe des Spikes.
 - **Risiko:** hoch / hoch (Bootpfad hängt an Upstream-API; in diesem Thread **nicht** lokal verifiziert).
 - **Abhängig von:** 3.2
-- **Status:** offen
+- **Status:** **nicht ausgeführt — angehalten** (2026-10-11). Die API ist aus dem vendorten Paket gelesen und steht fest: `RunProfileOptions.resolvedProfile?: { profile: Profile; installAnchor: string }`, `Profile = { name, dir, layers, patchPath, patches, skippedBundles }` (Quelle: [vendor/dsh/lib/types/profile-boot.d.ts](vendor/dsh/lib/types/profile-boot.d.ts), `…/dsh-app-boot/lib/types/profile.d.ts`). Der **Vollzug** wurde nicht gefahren, weil genau zu diesem Zeitpunkt ein fremder Boot auf demselben Arbeitsbaum lief (`scripts/start.mjs` → `dsh --profile shinon`, PID 126619, gestartet 01:17) und dieselben Dateien schrieb: `profiles/shinon/cordis.yml` (der Boot schreibt den Profil-Root bei jedem Start neu) und `.credentials.yaml` im Arbeitsbaum (Stoppbedingung 1 des Plans: die Datei gehört **außerhalb** der Arbeitskopie; ich lese und lösche sie nicht). Ein zweiter Boot hätte denselben Profilordner mitbenutzt.
+
+### 3.4–3.7 — angehalten (Stand 2026-10-11, 01:26)
+
+**Gemeinsamer Grund:** die drei Schritte schreiben in Dateien, die in diesem Moment von
+einem **laufenden fremden Boot** (PID 126619) und einem **zweiten Schreiber** benutzt
+werden — `profiles/shinon/package.json` (01:18 geändert), `profiles/shinon/cordis.yml`
+(vom Boot bei jedem Start neu geschrieben), Root-`package.json` + `package-lock.json`
+(3.5) und der Profilordner selbst (3.6). Dazu die Stoppbedingung 1 des Plans: es liegt
+eine `.credentials.yaml` **im** Arbeitsbaum, die dort nicht hingehört (nicht gelesen,
+nicht gelöscht, nur gemeldet).
+
+**Ein zweiter, harter Befund gilt nur für 3.5:** der Schritt verlangt
+„`workspace:*` → semver-Range (19 Stellen)" **und** das Entfernen des
+`workspaces`-Felds. Gemessen ist das so nicht ausführbar: keines der 19 Pakete ist
+veröffentlicht (`npm view @shinon/core` → **E404**, ebenso `events`, `locale-de`,
+`codingmon`, `key-router`). Ohne `workspaces` oder `file:`-Verknüpfung würde
+`npm install` diese 19 Abhängigkeiten aus der Registry holen wollen und scheitern. Die
+Entscheidung, **welcher** npm-Mechanismus die lokalen Pakete bindet (`workspaces`
+behalten + `*`/`file:` statt `workspace:*`, oder `workspaces` weg + `file:`-Ranges),
+gehört dem Auftraggeber — sie ändert den Charakter des Manifests, nicht nur seine
+Schreibweise.
 
 ### 3.4 (D4) `bin`-Feld und echter Einstieg
 - **Ziel:** ein Einstieg, keine Voraussetzung im PATH.
@@ -214,7 +235,7 @@ gestoppt und gemeldet, nicht repariert.
 - **Nachweis:** Protokoll des Laufs mit Exit-Code.
 - **Risiko:** mittel / mittel.
 - **Abhängig von:** 3.3, 3.5
-- **Status:** offen
+- **Status:** **angehalten** — braucht den Bootpfad aus 3.3 und ein pnpm-freies Manifest aus 3.5 (siehe Block oben).
 
 ### 3.5 (D5) pnpm-Reste entfernen
 - **Ziel:** npm ist die einzige Quelle.
@@ -223,7 +244,7 @@ gestoppt und gemeldet, nicht repariert.
 - **Nachweis:** `git grep -n '\bpnpm\b'` in Skripten/Manifesten; `git ls-files | grep -c pnpm` → 0.
 - **Risiko:** hoch / hoch (Lockfile-Churn; `npm install` nötig, hier bisher nicht ausgeführt).
 - **Abhängig von:** A1
-- **Status:** offen
+- **Status:** **angehalten** — die Abnahme („kein pnpm-Aufruf, keine pnpm-Datei") ist messbar, aber der Weg dorthin ist im Plan widersprüchlich (siehe Block oben: `@shinon/*` ist nicht veröffentlicht, `workspace:*` → semver-Range scheitert). Erste Vermessung des Ist-Stands: **6** getrackte pnpm-Dateien (`git ls-files | grep -i pnpm`) — `pnpm-workspace.yaml`, `profiles/{shinon,headless}/{pnpm-lock,pnpm-workspace}.yaml`, `docs/archive/legacy-profiles/web/pnpm-workspace.yaml`; **2** echte Aufrufe (`scripts/dsh-profile-test.mjs`, `scripts/pack-test.mjs`); `packageManager: pnpm@11.7.0` und `workspaces` im Root-Manifest; **19** `workspace:*`-Stellen.
 
 ### 3.6 (D6) `profiles/` durch Code-Konfiguration ersetzen
 - **Ziel:** Profilkonfiguration ist Produktquelle, nicht Ordnerkonvention.
@@ -232,7 +253,7 @@ gestoppt und gemeldet, nicht repariert.
 - **Nachweis:** Konfigurationsvergleich vor/nach.
 - **Risiko:** hoch / hoch (Ladeordnung).
 - **Abhängig von:** 3.3
-- **Status:** offen
+- **Status:** **angehalten** — hängt an 3.3 und würde `profiles/` genau dann umbauen, wenn ein fremder Boot daraus liest und schreibt.
 
 ### 3.7 (D7) Build- und Gate-Ballast
 - **Ziel:** genau ein Testeinstieg, ohne pnpm.
@@ -241,7 +262,7 @@ gestoppt und gemeldet, nicht repariert.
 - **Nachweis:** Befehl plus Exit-Code.
 - **Risiko:** mittel / mittel.
 - **Abhängig von:** A5, 3.5
-- **Status:** offen
+- **Status:** **angehalten** — hängt an 3.5.
 
 ### 3.8 (Overlay) MVP-UI
 - **Ziel:** Shinon-Oberfläche ohne Fork der Web-UI.

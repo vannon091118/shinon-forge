@@ -1,7 +1,7 @@
 # @shinon/shinon-forge
 
 > **Status:** current — Paket-Doku Shinon Forge. **Stand:** 2026-10-10
-> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Memory Sync, Global Runner und Engine Adapters für alle Agents.
 

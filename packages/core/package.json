@@ -30,7 +30,7 @@
   },
   "meta": {
     "title": { "en": "Shinon Forge - Core", "de": "Shinon Forge - Kern" },
-    "description": { "en": "Custom design and branding for DeepSeek Harness", "de": "Eigenes Design und Branding für DeepSeek Harness" }
+    "description": { "en": "Custom design and branding for Shinon Forge", "de": "Eigenes Design und Branding für Shinon Forge" }
   },
   "icon": "./assets/icon.svg"
 }
