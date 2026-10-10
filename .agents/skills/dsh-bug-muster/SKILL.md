@@ -118,8 +118,9 @@ nur für echte Verzeichnisse.
   laufen lassen; Lockfile nicht „nebenbei" upgraden.
 - **`dist/` ist generiert** — nie handeditieren, `npm run build` regeneriert alles.
 - **Reload-Helfer sind entfallen** (2026-10-10 gelöscht: drei Dateien, null Aufrufer, veraltetes `web`-Ziel) — HMR läuft über den DSH-Prozess selbst.
-- **`scripts/dsh-update.mjs`** prüft keine Registry (`latest` = `current`) und nutzt `--profile web`
-  — Output ist beratend; Ground Truth ist der installierte Stand.
+- **`scripts/dsh-update.mjs`** prüft die Registry echt (Maximum nach Semver) und installiert
+  ins kanonische Profil — offline meldet er UNGEPRÜFT statt „keine Updates“; der
+  Install-Pfad selbst lief live noch nie (ausdrücklich als ungeprüft markiert).
 - **`git status` ist seit 2026-10-10 sauber vercommittet** — davor galt: die Arbeitsdateien sind wahr.
 
 ## Erste Diagnoseschritte bei unklarem Fehler
