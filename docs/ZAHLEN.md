@@ -39,7 +39,7 @@ der sie gemessen wurden.
 | Verträge unter `docs/contracts/` | **6** | `ls docs/contracts \| wc -l` | 0 |
 | Proben unter `docs/probes/` | **27** | `ls docs/probes \| wc -l` | 0 |
 | Generierte Plugin-Bausteine (Idiome) | **12** Blöcke in **11** Dateien, **0** handgepflegte Kopien (eine Quelle: `scripts/lib/plugin-idioms.mjs`) | `npm run idioms:check` | 0 |
-| Verweise in Markdown, die nicht auflösen | **0** (585 Verweise geprüft — seit dem Doku-Zug sieht der Lauf `docs/`, `packages/` und `vendor/`) | Prüfbefehl in `docs/INDEX.md` §4 | 0 |
+| Verweise in Markdown, die nicht auflösen | **0** (590 Verweise geprüft — seit dem Doku-Zug sieht der Lauf `docs/`, `packages/` und `vendor/`) | Prüfbefehl in `docs/INDEX.md` §4 | 0 |
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
 sondern in `profiles/shinon/package.json` (`dsh.profile.bundles`); die Befehle oben
