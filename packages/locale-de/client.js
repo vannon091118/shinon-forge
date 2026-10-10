@@ -24,22 +24,21 @@ window.__ModuleLoader__.load({
         // Wörterbuch des 'shinon'-Namespace. Jeder Schlüssel hat genau einen
         // Leser (Menü-Label je Bundle, Fallback-Text der Token-Anzeige);
         // leserlose Schlüssel werden hier nicht gesammelt.
-        ctx.locale.register('shinon', {
-          en: {
-            'token.fallback': 'Token: --',
-            'menu.dashboard': 'Shinon Dashboard',
-            'menu.markers': 'Shinon Marker',
-            'menu.codingmon': 'Codingmon',
-            'menu.popup': 'Shinon Popup',
-          },
-          de: {
-            'token.fallback': 'Token: --',
-            'menu.dashboard': 'Shinon Dashboard',
-            'menu.markers': 'Shinon Marker',
-            'menu.codingmon': 'Codingmon',
-            'menu.popup': 'Shinon Popup',
-          },
-        });
+        //
+        // EINE Tabelle für BEIDE Sprachslots (Entscheidung E6, 2026-10-11): die
+        // Schlüssel dieses Namensraums sind Eigennamen der Oberfläche (Panel-Titel,
+        // ein Platzhalter), es gibt keine zweite, englische Formulierung. Vorher
+        // standen zwei wortgleiche Hälften hier — die behaupteten eine Übersetzung,
+        // die es nicht gab, und ein Sprachenwechsel zeigte keine Wirkung. Wer einen
+        // Text wirklich übersetzen will, gibt ihn als eigenen Eintrag je Sprache an.
+        const TEXTS = {
+          'token.fallback': 'Token: --',
+          'menu.dashboard': 'Shinon Dashboard',
+          'menu.markers': 'Shinon Marker',
+          'menu.codingmon': 'Codingmon',
+          'menu.popup': 'Shinon Popup',
+        };
+        ctx.locale.register('shinon', { en: TEXTS, de: TEXTS });
         
         console.log('[shinon-locale-de] Deutsch registriert');
       }

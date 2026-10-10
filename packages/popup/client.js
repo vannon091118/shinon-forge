@@ -62,6 +62,7 @@ window.__ModuleLoader__.load({
           + 'dieser Client rendert sie nicht — sichtbar ist nur diese Zeile.'
         );
 
+        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
         // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
         // Locale-Dienst gilt die deutsche Tabelle. LABEL bleibt die interne
         // Kennung für announce().
@@ -78,6 +79,7 @@ window.__ModuleLoader__.load({
           const hit = typeof locale?.bind === 'function' ? locale.bind('shinon')(key) : undefined;
           return hit === undefined || hit === key ? (MENU_DE[key] ?? key) : hit;
         };
+        // <<< shinon:dsh-idiom locale-fallback/menu
 
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
           name: 'sidebar.panellist',
