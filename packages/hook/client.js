@@ -63,6 +63,7 @@ window.__ModuleLoader__.load({
         // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
         const registry = (window.__shinonPlugins ??= new Map());
         registry.set('@shinon/hook', { label: 'Hook', kind: 'client', panel: null });
+        // Label "Hook" bewusst englisch: Bezeichnung des Event-Beobachters (technische Komponente; kein Endnutzer-Titel).
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/hook' } }));
         for (const { eventType } of boundObservers) {
           console.log(`[shinon-hook-client] Beobachter registriert für: ${eventType}`);

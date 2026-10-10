@@ -29,8 +29,8 @@
     }
   },
   "meta": {
-    "title": "Shinon Forge - Core",
-    "description": "Custom design and branding for DeepSeek Harness"
+    "title": { "en": "Shinon Forge - Core", "de": "Shinon Forge - Kern" },
+    "description": { "en": "Custom design and branding for DeepSeek Harness", "de": "Eigenes Design und Branding für DeepSeek Harness" }
   },
   "icon": "./assets/icon.svg"
 }

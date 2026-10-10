@@ -33,7 +33,7 @@ window.__ModuleLoader__.load({
       apply() {
         // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
         const registry = (window.__shinonPlugins ??= new Map());
-        registry.set('@shinon/better-errors', { label: 'Better Errors', kind: 'client', panel: null });
+        registry.set('@shinon/better-errors', { label: 'Fehler besser', kind: 'client', panel: null });
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/better-errors' } }));
       }
     };

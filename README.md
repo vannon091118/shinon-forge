@@ -232,6 +232,7 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 | `npm run test:codingmon` / `test:hook` | paketlokale Tests |
 | `npm run build` | regeneriert `dist/` (Manifest, Profil, Paketkopien) |
 | `npm run dev` / `dev:web` / `open` | DSH mit dem Profil starten (Web-UI) |
+| `npm start [-- …]` | alleinstehende Startdatei (`scripts/start.mjs`): heilt Node ≥ 22 selbst, findet `dsh` auch außerhalb des PATH, startet das Profil; `--check` prüft nur die Startfähigkeit |
 | `npm run verify:panel` | Panel-Beleg über `scripts/panel-check.mjs` (braucht jsdom) |
 | `npm run stages` | Startstufen/Ready-Zeile aus `scripts/open.mjs` nachvollziehen |
 | `npm run commit:guard -- …` | Commit-Regeln prüfen (`--ci`, `--last n`, `--range`, `--all`) |

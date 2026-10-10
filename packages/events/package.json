@@ -24,7 +24,7 @@
     }
   },
   "meta": {
-    "title": "Shinon Forge - Event Spine",
-    "description": "Hook/Event-Spine: DSH-Signale beobachten, normalisieren, validieren, emittieren"
+    "title": { "en": "Shinon Forge - Event Spine", "de": "Shinon Forge - Event-Spine" },
+    "description": { "en": "Hook/event spine: observe, normalize, validate and emit DSH signals", "de": "Hook/Event-Spine: DSH-Signale beobachten, normalisieren, validieren, emittieren" }
   }
 }

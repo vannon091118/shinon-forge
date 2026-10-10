@@ -229,16 +229,16 @@ export function createMirror(model, options = {}) {
 
 export const Config = z.object({
   /** Spiegel-Vertrag (Felder, Format, Grenzen) aus dem Paket. */
-  modelPath: z.string().default('./assets/marker-model.json'),
+  modelPath: z.string().description('Spiegel-Vertrag (Dateipfad im Paket)').default('./assets/marker-model.json'),
   /** Brutalords Inbox — nur Zugabe; der Hauptweg ist die Zwischenablage. */
-  inboxUrl: z.string().default('http://127.0.0.1:9333/inbox'),
+  inboxUrl: z.string().description('Inbox-URL (Zugabe; Hauptweg ist die Zwischenablage)').default('http://127.0.0.1:9333/inbox'),
   /** Grenze für den Element-Text einer Marke. */
-  textLimit: z.number().default(200),
+  textLimit: z.number().description('Grenze für den Element-Text einer Marke').default(200),
   /** Grenze für die Markenmenge einer Sitzung. */
-  markLimit: z.number().default(200),
+  markLimit: z.number().description('Grenze für die Markenmenge einer Sitzung').default(200),
   /** Beschriftung und Position im nativen Side Panel. */
-  panelLabel: z.string().default('Shinon Marker'),
-  panelOrder: z.number().default(30),
+  panelLabel: z.string().description('Beschriftung im Side Panel').default('Shinon Marker'),
+  panelOrder: z.number().description('Position im Side Panel').default(30),
 });
 
 export function apply(ctx, config) {

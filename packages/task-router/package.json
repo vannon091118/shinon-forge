@@ -24,7 +24,7 @@
     }
   },
   "meta": {
-    "title": "Shinon Forge - Task Router",
-    "description": "Deterministische Goal-Policy: das Etikett ist notwendig, nicht ausreichend"
+    "title": { "en": "Shinon Forge - Task Router", "de": "Shinon Forge - Aufgabenverteiler" },
+    "description": { "en": "Deterministic goal policy: the label is necessary, not sufficient", "de": "Deterministische Goal-Policy: das Etikett ist notwendig, nicht ausreichend" }
   }
 }

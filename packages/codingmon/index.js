@@ -22,9 +22,9 @@ export * from './assets/uebergabe.js';
 
 export const Config = z.object({
   /** XP pro Token. Der Auftrag sagt 1. */
-  xpPerToken: z.number().min(0).default(1),
+  xpPerToken: z.number().description('XP pro Token').min(0).default(1),
   /** XP-Basis der ersten Stufe (kumulativ und multiplikativ). */
-  xpPerLevel: z.number().min(1).default(XP_BASE),
+  xpPerLevel: z.number().description('XP-Basis der ersten Stufe').min(1).default(XP_BASE),
   /**
    * Kuenstliche Rundendauer in Millisekunden. Kein Zeitdruck, nur Verzoegerung.
    * ACHTUNG (ehrliche Grenze): die Sperre haelt der CLIENT, und der Browser
@@ -34,13 +34,13 @@ export const Config = z.object({
    * wirklich umstellen will, braucht einen client-sichtbaren Kanal; bis dahin
    * ist der Vertragswert die eine Quelle.
    */
-  roundDelayMs: z.number().min(0).default(PACING.delayMs),
+  roundDelayMs: z.number().description('Künstliche Rundendauer in Millisekunden').min(0).default(PACING.delayMs),
   /** Start-Spezies (Schluessel aus SPECIES). Schemastery 3.18.4 kennt kein z.enum. */
-  species: z.union(SPECIES_IDS.map((id) => z.const(id))).default(SPECIES_IDS[0]),
+  species: z.union(SPECIES_IDS.map((id) => z.const(id))).description('Start-Spezies').default(SPECIES_IDS[0]),
   /** Name des Pets; leer = der Client waehlt einen. */
-  petName: z.string().default(''),
+  petName: z.string().description('Name des Pets (leer = der Client wählt)').default(''),
   /** Kanaele, auf denen der Spine Ereignisse liefert (nur Beobachtung). */
-  eventsChannel: z.string().default('shinon/event'),
+  eventsChannel: z.string().description('Kanal für Spine-Ereignisse (nur Beobachtung)').default('shinon/event'),
 });
 
 /**

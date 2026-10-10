@@ -19,6 +19,7 @@ window.__ModuleLoader__.load({
         // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
         const registry = (window.__shinonPlugins ??= new Map());
         registry.set('@shinon/prompter', { label: 'Prompter', kind: 'client', panel: null });
+        // Label "Prompter" bewusst englisch: technische Komponente (Prompt-Veredler), kein Endnutzer-Titel.
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/prompter' } }));
         // Bewusst leer: der Enhancer ist Host-seitig.
       }

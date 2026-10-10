@@ -1,12 +1,13 @@
 /**
  * @shinon/codingmon — Client-Hälfte (Codemons + Arena).
  *
- * Codemon ersetzt das Helmchen in `sidebar.brand.mark` und
- * `conversation.hero.brand.mark`. Der Austausch laeuft ueber eine
- * Fenster-Konvention, nicht ueber einen Import: dieser Client legt
- * `window.__codingmon` mit `PetMark` an, und @shinon/core rendert die Marke
- * nur dann selbst, wenn dort nichts liegt. Dasselbe Muster benutzt
- * @shinon/markers bereits mit `window.__mk` — Pakete bleiben so referenzfrei.
+ * Die Marken-Slots der Sidebar und des Hero haelt @shinon/core: es zeigt dort
+ * Shinons gezeichnetes Zeichen (eine Marke, eine Formensprache). `PetMark` gibt
+ * dieser Client trotzdem heraus — ueber eine Fenster-Konvention statt ueber
+ * einen Import: `window.__codingmon` mit `PetMark` (dasselbe Muster wie
+ * `window.__mk` bei @shinon/markers, damit Pakete referenzfrei bleiben). Wer
+ * die Figur an einer eigenen Stelle zeigen will, holt sie sich dort ab; in der
+ * Markenleiste und im Hero steht sie nicht mehr.
  *
  * ZEHN CODEMONS: Werte, Faehigkeiten und Gegnerauswahl stehen in `SPECIES`,
  * `ABILITIES` und `arenaFor()` — gespiegelt aus der Host-Hälfte in index.js.
@@ -1536,15 +1537,33 @@ window.__ModuleLoader__.load({
           },
         };
 
-        ctx.slots.inject('sidebar.brand.mark', () => ctx.slots.register({ name: 'sidebar.brand.mark' }, PetMark));
-        ctx.slots.inject('conversation.hero.brand.mark', () =>
-          ctx.slots.register({ name: 'conversation.hero.brand.mark' }, PetMark));
+        // KEINE Marken-Slots mehr: `sidebar.brand.mark` und
+        // `conversation.hero.brand.mark` sind Single-Slots und gehoeren @shinon/core,
+        // das dort Shinons gezeichnetes Zeichen haelt. Zwei Besetzer auf einem
+        // Single-Slot entscheidet die Ladeordnung — also besetzt hier genau einer.
+        // Das Pet bleibt in seinen eigenen Flaechen (Panel, XP-Leiste, Arena) und
+        // liegt weiter als `window.__codingmon.PetMark` fuer Fremd-Nutzer bereit.
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, CodingmonPanel));
+        // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
+        // Locale-Dienst gilt die deutsche Tabelle.
+        const MENU_DE = { 'menu.codingmon': 'Codingmon' };
+        // Gelesen wird `ctx.get?.('locale')`, NICHT `ctx.locale`: ein direkter
+        // Dienst-Zugriff ist am Cordis-Proxy durch `inject` gesperrt und wirft
+        // ('cannot get property "locale" without inject') — das kostete dieser
+        // Hälfte die Aktivierung. `ctx.get` ist die dokumentierte optionale
+        // Abfrage (undefined, wenn der Dienst fehlt), und die `?.` tragen einen
+        // Context ganz ohne `get` (die Attrappen in durchstich/uebergabe); dann
+        // gilt MENU_DE.
+        const t = (key) => {
+          const locale = ctx.get?.('locale');
+          const hit = typeof locale?.bind === 'function' ? locale.bind('shinon')(key) : undefined;
+          return hit === undefined || hit === key ? (MENU_DE[key] ?? key) : hit;
+        };
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
           name: 'sidebar.panellist',
           id: PANEL_ID,
           order: 25,
-          label: () => 'Codingmon',
+          label: () => t('menu.codingmon'),
         }, CodingmonIcon));
         // Die globale EXP-Leiste: derselbe Store, andere Ansicht.
         ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({

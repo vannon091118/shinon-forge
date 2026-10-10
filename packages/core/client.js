@@ -23,20 +23,38 @@ window.__ModuleLoader__.load({
     const PLUGIN = '@shinon/core';
 
     // ── Marken-Geometrie (self-contained; viewBox 32×32) ──────────────────
+    // Shinons Zeichen, NEU gezeichnet: Ring + Funke, alles Kurven — kein
+    // einziges <rect> (ein Guard zaehlt sie: scripts/gate/tests/
+    // client-activation.test.mjs). Es ersetzt das Pixel-Sprite, das zuvor an
+    // der Marke hing — die Marke steht in der Sidebar INNEN im Toggle-Button
+    // (ui-sidebar rendert `sidebar.brand.mark` in ihren Knopf), also traegt
+    // jetzt eine gezeichnete Form die Schaltflaeche.
     const MARK = {
-      // Helm-/Gesichtssilhouette
-      silhouette: 'M16 3.2c-5.1 0-8.6 3.4-8.6 8.2 0 3.1 1.1 5.6 3 7.3v3.1c0 .9.7 1.6 1.6 1.6h8c.9 0 1.6-.7 1.6-1.6v-3.1c1.9-1.7 3-4.2 3-7.3 0-4.8-3.5-8.2-8.6-8.2z',
-      // Visor-Band
-      visor: 'M9.4 12.1h13.2c.5 0 .9.4.9.9v2.3c0 .5-.4.9-.9.9H9.4c-.5 0-.9-.4-.9-.9v-2.3c0-.5.4-.9.9-.9z',
-      // Seitliche Haarpinsel — ergeben die weibliche Silhouette
-      hairLeft: 'M7.3 10.6C5.9 12 5.2 13.9 5.2 16.1c0 2.9 1 5.3 2.7 7-.6-2.3-.8-4.6-.6-6.9z',
-      hairRight: 'M24.7 10.6c1.4 1.4 2.1 3.3 2.1 5.5 0 2.9-1 5.3-2.7 7 .6-2.3.8-4.6.6-6.9z',
-      // Signal-Kern
-      core: 'M16 15.9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z',
-      // Antennen-Detail
-      antenna: 'M16 1.4c-.4 0-.7.3-.7.7v1.4c0 .4.3.7.7.7s.7-.3.7-.7V2.1c0-.4-.3-.7-.7-.7z'
+      // Sechseck-Ring: die Esse.
+      ring: 'M16 3.4 25.2 8.9v11.2L16 25.6 6.8 20.1V8.9z',
+      // Vierstrahliger Funke im Zentrum: der Schlag auf den Amboss.
+      spark: 'M16 8.4c1.1 2.9 2.7 4.6 5.6 5.7-2.9 1.1-4.5 2.8-5.6 5.7-1.1-2.9-2.7-4.6-5.6-5.7 2.9-1.1 4.5-2.8 5.6-5.7z',
+      // Zwei geschwungene Fluegel — dieselbe Bewegung wie die Haarpinsel des
+      // Hintergrund-Assets, damit Marke und Persona eine Linie bleiben.
+      wingLeft: 'M4.6 11.2c-.9 1.4-1.4 3.2-1.4 5 0 1.7.4 3.2 1.2 4.5',
+      wingRight: 'M27.4 11.2c.9 1.4 1.4 3.2 1.4 5 0 1.7-.4 3.2-1.2 4.5'
     };
     const DEFAULT_SIZE = 24;
+
+    // Dasselbe Zeichen als Alpha-Maske: die Laufanzeige ("Arbeitet") traegt es
+    // anstelle der gelieferten Wal-Maske (siehe CSS unten). Aus MARK abgeleitet,
+    // damit Maske und Marke nicht auseinanderlaufen.
+    // WEISS, nicht Schwarz: eine CSS-Maske liest bei einem <image> den Alpha-Kanal,
+    // bei einer SVG-`<mask>` die Luminanz. Weiss ist unter beiden Lesarten deckend —
+    // ein schwarzes Zeichen waere bei Luminanz-Deutung unsichtbar.
+    const MARK_MASK = 'url("data:image/svg+xml,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+      + '<path d="' + MARK.ring + '" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/>'
+      + '<path d="' + MARK.wingLeft + '" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>'
+      + '<path d="' + MARK.wingRight + '" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>'
+      + '<path d="' + MARK.spark + '" fill="#fff"/>'
+      + '</svg>'
+    ) + '")';
 
     // Persona-Asset. GEMESSEN (2026-10-10): DSH liefert Plugin-Ressourcen nur
     // unter /plugins/<id>/client*.js (@deepseek-ai/dsh-client-modules, CLIENT_CHUNK);
@@ -71,15 +89,62 @@ window.__ModuleLoader__.load({
       }
 
       .shinon-mark { display: block; flex-shrink: 0; color: var(--dsw-alias-brand-primary, var(--shinon-violet)); }
-      .shinon-mark .shinon-mark__body { fill: url(#shinon-mark-gradient); }
-      .shinon-mark .shinon-mark__hair { fill: currentColor; opacity: .85; }
-      .shinon-mark .shinon-mark__visor { fill: var(--shinon-void); opacity: .92; }
-      .shinon-mark .shinon-mark__core { fill: var(--shinon-mist); }
+      .shinon-mark .shinon-mark__ring { stroke: currentColor; opacity: .92; }
+      .shinon-mark .shinon-mark__wing { stroke: currentColor; opacity: .5; }
+      .shinon-mark .shinon-mark__spark { fill: url(#shinon-mark-gradient); }
 
-      /* Signal-Kern pulsiert — reine Presentation, kein Gameplay-Effekt. */
-      @keyframes shinon-core-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-      .shinon-mark .shinon-mark__core { animation: shinon-core-pulse 2.4s ease-in-out infinite; }
-      @media (prefers-reduced-motion: reduce) { .shinon-mark .shinon-mark__core { animation: none; } }
+      /* Der Funke pulsiert — reine Presentation, kein Gameplay-Effekt. */
+      @keyframes shinon-core-pulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+      .shinon-mark .shinon-mark__spark { animation: shinon-core-pulse 2.4s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) { .shinon-mark .shinon-mark__spark { animation: none; } }
+
+      /* ── Alt-Architektur: der gelieferte Fisch als FALLBACK ─────────────
+         Die Marken-Slots sind Single-Slots MIT Fallback (Sidebar-Rail,
+         Logo-Zeile, Hero-Hitbox): gibt DSH dort seinen eigenen Fisch aus —
+         weil kein Besetzer da ist oder ein Besetzer abgedankt hat —, haengt
+         sichtbar das Zeichen der alten Marke in der UI. Diese Regeln greifen
+         nur, solange DIESES Bundle geladen ist, und lassen an den Marken-
+         Stellen allein Shinons Zeichen stehen. */
+      [class*="railMark"] > svg:not(.shinon-mark),
+      [class*="brandMark"] > svg:not(.shinon-mark),
+      [class*="fishHitbox"] > svg:not(.shinon-mark) { display: none; }
+
+      /* ── Laufanzeige ("Arbeitet") ─────────────────────────────────────
+         DSH malt dort einen Wal: [data-chat-running] haelt eine leere
+         Spanne mit 'background: currentColor' und der Wal-APNG als 'mask',
+         daneben einen statischen Wal als SVG. Beides wird hier ersetzt:
+         dieselbe Geometrie wie die Marke, die Palette des Hintergrunds, und
+         die Bewegung kommt aus dieser Datei statt aus dem Fremd-Asset.
+         Spezifitaet (Attribut + Klasse) schlaegt die gelieferte Regel, auch
+         wenn dessen Style-Tag spaeter eingehaengt wird. */
+      [data-chat-running] [class*="runningWhaleAnimated"] {
+        background: var(--shinon-gradient);
+        -webkit-mask: ${MARK_MASK} center/contain no-repeat;
+        mask: ${MARK_MASK} center/contain no-repeat;
+        animation: shinon-running-drift 1.8s ease-in-out infinite;
+      }
+      [data-chat-running] [class*="runningWhaleStill"] { display: none; }
+      @keyframes shinon-running-drift {
+        0%, 100% { transform: translateY(-6%) rotate(-5deg) scale(.96); }
+        50%      { transform: translateY(6%) rotate(5deg) scale(1.04); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [data-chat-running] [class*="runningWhaleAnimated"] { animation: none; }
+      }
+
+      /* Der gelieferte Fisch schwamm beim Hover (SMIL in seinem SVG). Das
+         Zeichen antwortet ebenfalls — dieselbe Geste mit ruhigeren Mitteln:
+         es wiegt sich, der Funke atmet weiter. */
+      [class*="fishHitbox"]:hover .shinon-mark,
+      button:hover > [class*="railMark"] .shinon-mark { animation: shinon-mark-sway 1.6s ease-in-out infinite; }
+      @keyframes shinon-mark-sway {
+        0%, 100% { transform: rotate(-5deg); }
+        50%      { transform: rotate(5deg); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [class*="fishHitbox"]:hover .shinon-mark,
+        button:hover > [class*="railMark"] .shinon-mark { animation: none; }
+      }
 
       .shinon-wordmark {
         font-family: var(--shinon-font-head);
@@ -110,6 +175,14 @@ window.__ModuleLoader__.load({
         position: absolute; inset: 0; overflow: hidden;
         pointer-events: none; z-index: 0;
       }
+      /* GEMESSEN im Browser (Chromium): der gelieferte Overlay-Layer ist
+         click-through, gibt seine Klicks aber an seine DIREKTEN Kinder zurueck —
+         '.pI_x6G_overlayLayer>*{pointer-events:auto}' (ui-layout). Diese Regel hat
+         dieselbe Spezifitaet wie '.shinon-bg', also entscheidet die Quellreihenfolge:
+         steht das Layout-CSS nach unserem Style-Tag, schluckt der Hintergrund JEDEN
+         Klick im ganzen Fenster. Deshalb hier eine Stufe hoeher — der Layer traegt
+         data-shell-overlay, damit gewinnt diese Regel in beiden Reihenfolgen. */
+      [data-shell-overlay] > .shinon-bg { pointer-events: none; }
       .shinon-bg__persona {
         position: absolute; top: 50%; right: 4%;
         height: min(78%, 620px); width: auto;
@@ -147,8 +220,11 @@ window.__ModuleLoader__.load({
       }
     `);
 
-    /** Gemeinsame Marken-Geometrie für Sidebar und Hero. */
-    function MarkGlyph({ size = DEFAULT_SIZE, className }) {
+    /**
+     * Shinons Zeichen fuer Sidebar (Rail im Toggle-Button) und Hero.
+     * Dekorativ wie die gelieferte Marke daneben: `aria-hidden`.
+     */
+    function ForgeSigil({ size = DEFAULT_SIZE, className }) {
       return h('svg', {
         className: ['shinon-mark', className].filter(Boolean).join(' '),
         viewBox: '0 0 32 32',
@@ -164,24 +240,20 @@ window.__ModuleLoader__.load({
             h('stop', { offset: '100%', stopColor: 'var(--shinon-indigo)' })
           )
         ),
-        h('path', { className: 'shinon-mark__body', d: MARK.silhouette }),
-        h('path', { className: 'shinon-mark__hair', d: MARK.hairLeft }),
-        h('path', { className: 'shinon-mark__hair', d: MARK.hairRight }),
-        h('path', { className: 'shinon-mark__visor', d: MARK.visor }),
-        h('path', { className: 'shinon-mark__core', d: MARK.core }),
-        h('path', { className: 'shinon-mark__hair', d: MARK.antenna })
+        h('path', { className: 'shinon-mark__ring', d: MARK.ring, fill: 'none', strokeWidth: 2.4, strokeLinejoin: 'round' }),
+        h('path', { className: 'shinon-mark__wing', d: MARK.wingLeft, fill: 'none', strokeWidth: 2.4, strokeLinecap: 'round' }),
+        h('path', { className: 'shinon-mark__wing', d: MARK.wingRight, fill: 'none', strokeWidth: 2.4, strokeLinecap: 'round' }),
+        h('path', { className: 'shinon-mark__spark', d: MARK.spark })
       );
     }
 
     /** Sidebar-Marke: Slot gibt nur die Kantenlänge vor. */
     function SidebarBrandMark({ size }) {
-      // @shinon/codingmon uebernimmt die Marke, sobald es geladen ist. Die
-      // Uebergabe laeuft ueber eine Fenster-Konvention statt ueber einen
-      // Paket-Import, damit Pakete referenzfrei bleiben — dasselbe Muster wie
-      // window.__mk bei @shinon/markers. Ohne Pet bleibt das Helmchen.
-      const Pet = window.__codingmon?.PetMark;
-      if (Pet) return h(Pet, { size: size ?? DEFAULT_SIZE });
-      return h(MarkGlyph, { size: size ?? DEFAULT_SIZE });
+      // GEMESSEN (2026-10-10): ui-sidebar rendert diesen Slot INNEN in seinen
+      // Toggle-<button> (railMark, ui-sidebar/lib/client.js:279) — hier steht
+      // also das Zeichen auf einer Schaltflaeche, und darum gehoert hier
+      // Shinons gezeichnete Marke hin und kein Pixel-Sprite.
+      return h(ForgeSigil, { size: size ?? DEFAULT_SIZE });
     }
 
     /** Sidebar-Name: Besetzer besitzt eigenen Inhalt und Breite. */
@@ -191,14 +263,12 @@ window.__ModuleLoader__.load({
 
     /** Hero-Marke vor der Headline der leeren Session. */
     function HeroBrandMark({ size, className }) {
-      const Pet = window.__codingmon?.PetMark;
-      const mark = Pet ? h(Pet, { size: size ?? 48 }) : h(MarkGlyph, { size: size ?? 48, className });
-      // Das Background-Branding haengt an DIESEM Slot (gemessen 2026-10-10):
-      // `conversation.hero.brand.mark` ist bereits unser Single-Slot, also
-      // kostet es niemanden seinen Platz. Ein eigener Slot dafuer war ein
-      // Fehlgriff: `conversation.hero.workspace` ist single-occupant und
-      // gehoert dem WorkspacePicker (Beleg in Docs/ZAHLEN.md §2.1).
-      return h(React.Fragment, null, BackgroundBranding(), mark);
+      // KEIN Background hier: ui-conversation rendert diesen Slot INNEN in die
+      // 34px-Hitbox der Hero-Zeile (HeroShell, `fishHitbox`). Ein absolut
+      // positioniertes Bild deckte darin nur die Hitbox und nicht das Fenster —
+      // das war der Grund, warum der Hintergrund unsichtbar war. Er liegt
+      // jetzt in `shell.overlay` (siehe apply()).
+      return h(ForgeSigil, { size: size ?? 48, className });
     }
 
     /** Hinweisbanner über dem Composer — Status aus der Brand-Spec. */
@@ -245,12 +315,21 @@ window.__ModuleLoader__.load({
           id: 'shinon-info-banner',
           order: 10
         }, InfoBanner));
-        // Kein eigener Slot fuers Background-Branding: es wird von
-        // `HeroBrandMark` mitgerendert (siehe dort). Der Versuch, dafuer
-        // `conversation.hero.workspace` zu belegen, hatte den
-        // WorkspacePicker verdrängt — der Klick auf "Choose workspace"
-        // blieb dann ohne Menue (gemessen 2026-10-10, Beleg in
-        // Docs/ZAHLEN.md §2.1).
+        // ── Background-Branding: eigener Eintrag im frame-weiten Overlay ──
+        // `shell.overlay` ist der dokumentierte Platz dafuer (client-ui-layout:
+        // "Frame-wide floating layer, above every column and outside their
+        // scroll containers ... The layer itself is click-through"); er wird
+        // als `.overlayLayer` mit `position:absolute; inset:0; z-index:20;
+        // pointer-events:none` gerendert. Frueher hing das Bild am Hero-Slot —
+        // dort deckte es nur die 34px-Hitbox und verschwand ausserhalb der
+        // leeren Session (Beleg in Docs/ZAHLEN.md §2.1).
+        // `conversation.hero.workspace` bleibt tabu: single-occupant und im
+        // Besitz des WorkspacePickers.
+        ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+          name: 'shell.overlay',
+          id: 'shinon-background',
+          order: 0
+        }, BackgroundBranding));
       }
     };
   }

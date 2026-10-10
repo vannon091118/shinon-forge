@@ -6,10 +6,10 @@ import z from '@deepseek-ai/schemastery';
  */
 
 export const Config = z.object({
-  brandName: z.string().default('Shinon Forge'),
-  primaryColor: z.string().default('var(--dsw-alias-brand-primary)'),
-  sidebarCompact: z.boolean().default(false),
-  showInfoBanner: z.boolean().default(true).volatile(),
+  brandName: z.string().description('Markenname').default('Shinon Forge'),
+  primaryColor: z.string().description('Primärfarbe').default('var(--dsw-alias-brand-primary)'),
+  sidebarCompact: z.boolean().description('Kompakte Sidebar').default(false),
+  showInfoBanner: z.boolean().description('Infobanner anzeigen').default(true).volatile(),
 });
 
 export function apply(ctx, config) {

@@ -14,6 +14,7 @@ window.__ModuleLoader__.load({
         // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
         const registry = (window.__shinonPlugins ??= new Map());
         registry.set('@shinon/persona', { label: 'Persona', kind: 'client', panel: null });
+        // Label "Persona" bewusst englisch: technische Komponente (System-Prompt-Rolle), kein Endnutzer-Titel.
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/persona' } }));
         // Bewusst leer: Persona ist Host-seitig.
       }

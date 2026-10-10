@@ -24,7 +24,7 @@
     }
   },
   "meta": {
-    "title": "Shinon Forge - Project Index",
-    "description": "SQLite/FTS5-Index des Projekts, ausserhalb des Projekts geschrieben"
+    "title": { "en": "Shinon Forge - Project Index", "de": "Shinon Forge - Projektindex" },
+    "description": { "en": "SQLite/FTS5 index of the project, written outside the project", "de": "SQLite/FTS5-Index des Projekts, ausserhalb des Projekts geschrieben" }
   }
 }

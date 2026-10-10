@@ -24,7 +24,7 @@
     }
   },
   "meta": {
-    "title": "Shinon Forge - Token Usage",
-    "description": "Token-Nutzungsstatistiken anzeigen"
+    "title": { "en": "Shinon Forge - Token Usage", "de": "Shinon Forge - Token-Nutzung" },
+    "description": { "en": "Show token usage statistics", "de": "Token-Nutzungsstatistiken anzeigen" }
   }
 }

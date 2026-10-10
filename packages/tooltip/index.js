@@ -13,7 +13,7 @@ import z from '@deepseek-ai/schemastery';
 // `tooltipDelay: soon` und erwartet „ValidationError: invalid config"). Das Feld darf erst fallen,
 // wenn dieser Pfad einen anderen Reiz hat.
 export const Config = z.object({
-  tooltipDelay: z.number().default(300),
+  tooltipDelay: z.number().description('Verzögerung in Millisekunden').default(300),
 });
 
 export function apply(ctx, config) {

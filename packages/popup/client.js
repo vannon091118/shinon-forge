@@ -62,11 +62,28 @@ window.__ModuleLoader__.load({
           + 'dieser Client rendert sie nicht — sichtbar ist nur diese Zeile.'
         );
 
+        // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
+        // Locale-Dienst gilt die deutsche Tabelle. LABEL bleibt die interne
+        // Kennung für announce().
+        const MENU_DE = { 'menu.popup': 'Shinon Popup' };
+        // Gelesen wird `ctx.get?.('locale')`, NICHT `ctx.locale`: ein direkter
+        // Dienst-Zugriff ist am Cordis-Proxy durch `inject` gesperrt und wirft
+        // ('cannot get property "locale" without inject') — das kostete dieser
+        // Hälfte die Aktivierung. `ctx.get` ist die dokumentierte optionale
+        // Abfrage (undefined, wenn der Dienst fehlt), und die `?.` tragen einen
+        // Context ganz ohne `get` (die Attrappen in durchstich/uebergabe); dann
+        // gilt MENU_DE.
+        const t = (key) => {
+          const locale = ctx.get?.('locale');
+          const hit = typeof locale?.bind === 'function' ? locale.bind('shinon')(key) : undefined;
+          return hit === undefined || hit === key ? (MENU_DE[key] ?? key) : hit;
+        };
+
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
           name: 'sidebar.panellist',
           id: PANEL_ID,
           order: 70,
-          label: () => LABEL
+          label: () => t('menu.popup')
         }, PopupIcon));
       },
     };

@@ -24,8 +24,8 @@
     }
   },
   "meta": {
-    "title": "Shinon Forge - Tooltips",
-    "description": "Erweiterte Tooltips für alle Tools und Funktionen"
+    "title": { "en": "Shinon Forge - Tooltips", "de": "Shinon Forge - Kurzhilfen" },
+    "description": { "en": "Extended tooltips for all tools and functions", "de": "Erweiterte Tooltips für alle Tools und Funktionen" }
   },
   "icon": "./assets/icon.svg"
 }

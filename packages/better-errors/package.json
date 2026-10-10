@@ -24,7 +24,7 @@
     }
   },
   "meta": {
-    "title": "Shinon Forge - Better Errors",
-    "description": "Verbesserte Fehleranzeige mit deutschen Meldungen"
+    "title": { "en": "Shinon Forge - Better Errors", "de": "Shinon Forge - Bessere Fehler" },
+    "description": { "en": "Improved error display with German messages", "de": "Verbesserte Fehleranzeige mit deutschen Meldungen" }
   }
 }

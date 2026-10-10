@@ -30,6 +30,7 @@ window.__ModuleLoader__.load({
         // Sichtbarkeit: diese Client-Haelfte meldet sich in der gemeinsamen Liste von @shinon/dashboard an (Konvention, kein Import) — kein Hintergrundprozess ohne Zeile in der UI.
         const registry = (window.__shinonPlugins ??= new Map());
         registry.set('@shinon/task-router', { label: 'Task Router', kind: 'client', panel: null });
+        // Label "Task Router" bewusst englisch: technische Komponente (Aufgabenverteiler), kein Endnutzer-Titel.
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/task-router' } }));
         const mirror = { plugin: PLUGIN, decisions: [], channel: DECISION_CHANNEL, last: null };
         if (typeof ctx?.on === 'function') {

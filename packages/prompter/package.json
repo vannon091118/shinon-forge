@@ -25,7 +25,7 @@
     }
   },
   "meta": {
-    "title": "Shinon Forge - Prompt Enhancer",
-    "description": "One-Shot Prompt-Veredler mit Host-Validierung und Roh-Prompt-Fallback"
+    "title": { "en": "Shinon Forge - Prompt Enhancer", "de": "Shinon Forge - Prompt-Veredler" },
+    "description": { "en": "One-shot prompt enhancer with host validation and raw-prompt fallback", "de": "One-Shot Prompt-Veredler mit Host-Validierung und Roh-Prompt-Fallback" }
   }
 }
