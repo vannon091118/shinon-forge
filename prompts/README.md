@@ -1,9 +1,9 @@
 # Prompts — DSH-native Persona-Schicht
 
 > **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
-> **Einstieg:** `Docs/INDEX.md` · **Zahlen (aktuell):** `Docs/ZAHLEN.md`
+> **Einstieg:** `docs/INDEX.md` · **Zahlen (aktuell):** `docs/ZAHLEN.md`
 
-> **Die alten goose-Prompts liegen in `Docs/legacy-goose-prompts/`.** Sie zielten
+> **Die alten goose-Prompts liegen in `docs/legacy-goose-prompts/`.** Sie zielten
 > auf `~/.config/goose/prompts/` und die Goose-Binary — Shinon Forge läuft auf DSH.
 > Sie sind historisch, nicht aktiv.
 

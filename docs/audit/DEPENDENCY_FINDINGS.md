@@ -1,7 +1,7 @@
 # DEPENDENCY_FINDINGS — Phase A (Beweismittel, keine Wertung)
 
 > **Status:** current — Phase-A-Audit, lesend erhoben am 2026-10-10. **Stand:** 2026-10-10
-> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 | ID | Schwere | Befund | Beleg | Status |
 |---|---|---|---|---|
@@ -13,7 +13,7 @@
 | A-WT-01 | hoch | 31 fremde modifizierte Dateien + 2 untracked im Arbeitsbaum (u. a. `meta.{title,description}` String→`{en,de}` in 8 Manifesten, 12 Client-Hälften, `profiles/web`-Patch) — geschützt, nicht von diesem Audit; jede Reparatur muss dagegen rebasen | `git status --short`, `git diff --stat`, Stichprobe `git diff packages/core/package.json` | BESTÄTIGT |
 | A-DUP-01 | mittel | 6× identischer `settings.configure`-Block (per TODO im Code selbst benannt) | `packages/dashboard/index.js:17` + TODO-Scan (9 TODOs, alle `[DSH-Refactor]`) | TEILWEISE BESTÄTIGT |
 | A-LEG-01 | niedrig | Legacy-String `dsh-mod`: 0 Treffer in Runtime-Artefakten | `grep -rn dsh-mod packages/*/… profiles/shinon/` → leer; `dsh-test` Legacy-Guard grün | BESTÄTIGT |
-| A-PROF-01 | mittel | `profiles/web` ist Altbestand (nur fremde Bundles, kein `@shinon/*`); Arbeitsbaum ändert ihn uncommitted — Absicht unbekannt | `cat profiles/web/cordis.patch.yml` + `git diff --name-only` | BESTÄTIGT existent, Absicht OFFEN |
-| A-INACT-01 | mittel | 4 inaktive Pakete ohne verzeichneten Grund (`key-router`, `narrative`, `popup`, `shinon-forge`); `openapi` begründet inaktiv | `profiles/shinon/package.json` vs `ls packages`; `Docs/ARCHITECTURE.md` §8 | BESTÄTIGT |
+| A-PROF-01 | mittel | `profiles/web` ist Altbestand (nur fremde Bundles, kein `@shinon/*`); Arbeitsbaum ändert ihn uncommitted — Absicht unbekannt. **Erledigt 2026-10-11:** Wert übernommen, Altprofil nach `docs/archive/legacy-profiles/web/` archiviert | `cat profiles/web/…` (damaliger Pfad) + `git diff --name-only`; heute: `ls docs/archive/legacy-profiles/web/` | BESTÄTIGT existent, Absicht OFFEN — **entschieden (E1)** |
+| A-INACT-01 | mittel | 4 inaktive Pakete ohne verzeichneten Grund (`key-router`, `narrative`, `popup`, `shinon-forge`); `openapi` begründet inaktiv | `profiles/shinon/package.json` vs `ls packages`; `docs/ARCHITECTURE.md` §8 | BESTÄTIGT |
 
 Interpretation vs. Beobachtung: Die Tabelle oben ist Beobachtung. Hypothese (nicht belegt): Die `{en,de}`-Manifest-Änderungen im Arbeitsbaum könnten die Gate-Regel `manifestIssues` (keine Aussage über `meta`-Form) passieren, aber externe Verbraucher (Plugin-Manager-Titelanzeige) sind UNGEPRÜFT.

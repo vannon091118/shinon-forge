@@ -1,11 +1,11 @@
 # REPAIR_PLAN — priorisiert, nach Ursachen (Phase B/C-Vorschlag, nichts umgesetzt)
 
 > **Status:** current — Phase-A-Audit, Vorschlag mit Stand 2026-10-10. **Stand:** 2026-10-10
-> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Reihenfolge = Fundament zuerst. Jede Einheit: Ausgangszustand → Referenzen prüfen → minimal ändern → Verifikation tatsächlich ausführen → Diff kontrollieren.
 
-1. **P0 — Umgebung herstellen (BLOCKIERT alles andere):** Node ≥22 (vorhanden: `~/.nvm/versions/node/v24.21.0` — per nvm/mise aktivieren, NICHT per System-Umbau), `pnpm` lauffähig machen, `dsh` auf PATH (Pin `0.2.1-alpha.1` vs. installiert-Drift aus `Docs/ZAHLEN.md` beachten), `schemastery` auflösbar machen. Verifikation: `node --version`, `pnpm --version`, `dsh --version`, `npm run test:codingmon` ohne Skips, `node scripts/dsh-profile-test.mjs` Exit 0.
+1. **P0 — Umgebung herstellen (BLOCKIERT alles andere):** Node ≥22 (vorhanden: `~/.nvm/versions/node/v24.21.0` — per nvm/mise aktivieren, NICHT per System-Umbau), `pnpm` lauffähig machen, `dsh` auf PATH (Pin `0.2.1-alpha.1` vs. installiert-Drift aus `docs/ZAHLEN.md` beachten), `schemastery` auflösbar machen. Verifikation: `node --version`, `pnpm --version`, `dsh --version`, `npm run test:codingmon` ohne Skips, `node scripts/dsh-profile-test.mjs` Exit 0.
 2. **P0 — Arbeitsbaum sichern:** 31 fremde Änderungen + 2 untracked sind geschützt. Nichts resetten/cleanen. Mit Eigentümer klären: `{en,de}`-Meta-Diffs behalten oder reverten? `profiles/web`-Diff Absicht? Untracked (`branding-check.mjs`, `client-activation.test.mjs`) in Suiten verdrahten oder verwerfen? Erst danach Phase C.
 3. **P1 — `gate:test`-Rot auflösen:** nach P0 erneut messen; falls die 7 Dateien grün werden, war es reines Umgebungs-Rot (Erwartung). Falls Reste bleiben, je Datei Root-Cause (kein Sammel-Fix).
 4. **P1 — Einstiegspunkte entwirren:** `bin/shinon.mjs` entweder zum echten CLI ausbauen (eigene Produktentscheidung + `bin`-Feld + Tests) oder löschen; Reload-Helfer-Kanon bestimmen (1 behalten, 2 stilllegen); `*.tgz` aus `packages/` entfernen (Artefakt gehört nicht in Source).

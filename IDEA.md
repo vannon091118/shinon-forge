@@ -1,5 +1,5 @@
 > **Status:** plan — Absicht für noch nicht Gebautes; jeder Abschnitt trägt seinen eigenen Stand. **Stand:** 2026-10-07
-> **Einstieg:** `Docs/INDEX.md` · **Zahlen (aktuell):** `Docs/ZAHLEN.md`
+> **Einstieg:** `docs/INDEX.md` · **Zahlen (aktuell):** `docs/ZAHLEN.md`
 
 heute 02:28
 dsh(3).zip

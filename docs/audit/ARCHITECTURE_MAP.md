@@ -1,13 +1,13 @@
 # ARCHITECTURE_MAP — Phase A (rekonstruiert, nicht behauptet)
 
 > **Status:** current — Phase-A-Audit, lesend erhoben am 2026-10-10. **Stand:** 2026-10-10
-> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 ## 0. Vorab: Was dieses Repo NICHT ist (Befund A-ARCH-00, kritisch)
 Der Auftrag spricht von SH-Overhaul-Modifikation, Zielspiel, Mod-Loader, Tauri-Desktop-Oberfläche mit Rust-Backend.
 **Widerlegt für diesen Baum:**
-- `grep -ri tauri|cargo|Silent Hill|mod loader|\.esp` → nur DSH-Treffer + `Docs/STARTER-PLAN.md`-Konzepttext; `glob **/{Cargo.toml,tauri.conf*,src-tauri/**,*.rs}` → 0 Dateien; `ls starter src-tauri *.rs` → nicht vorhanden — BESTÄTIGT.
-- Was existiert: **DeepSeek-Harness-(DSH)-Overlay**: 19 Cordis-Bundles `@shinon/*` unter `packages/`, kanonisches DSH-Profil `profiles/shinon`, Gate-Engine, Build-Pipeline. Tauri ist **Stufe 2 = Konzept** (`Docs/STARTER-PLAN.md`: „noch nicht gebaut"), scharf ist nur Stufe 1 (`scripts/open.mjs` öffnet Systembrowser) + `.desktop`-Starter (`scripts/desktop-launcher.mjs`, schreibt nach `~/.local/share/applications/`).
+- `grep -ri tauri|cargo|Silent Hill|mod loader|\.esp` → nur DSH-Treffer + `docs/STARTER-PLAN.md`-Konzepttext; `glob **/{Cargo.toml,tauri.conf*,src-tauri/**,*.rs}` → 0 Dateien; `ls starter src-tauri *.rs` → nicht vorhanden — BESTÄTIGT.
+- Was existiert: **DeepSeek-Harness-(DSH)-Overlay**: 19 Cordis-Bundles `@shinon/*` unter `packages/`, kanonisches DSH-Profil `profiles/shinon`, Gate-Engine, Build-Pipeline. Tauri ist **Stufe 2 = Konzept** (`docs/STARTER-PLAN.md`: „noch nicht gebaut"), scharf ist nur Stufe 1 (`scripts/open.mjs` öffnet Systembrowser) + `.desktop`-Starter (`scripts/desktop-launcher.mjs`, schreibt nach `~/.local/share/applications/`).
 - „Standalone" ist hier unbelegt: Profile brauchen installiertes DSH + Modellschlüssel (`SHINON_API_KEY`); kein Mod-Paket-, kein Spiel-, kein Offline-Produkt-Beleg. Produktentscheidung OFFEN.
 
 ## 1. Einstiegspunkte (alle BESTÄTIGT statisch)
@@ -28,7 +28,7 @@ Der Auftrag spricht von SH-Overhaul-Modifikation, Zielspiel, Mod-Loader, Tauri-D
 ## 3. Abhängigkeitsgraph (statisch, BESTÄTIGT)
 - `@shinon/*` untereinander: **keine** Kanten in `dependencies/peerDependencies` (alle 19 `name`-Treffer sind Eigen-Namen, keine Querverweise) — azyklisch per Konstruktion, `dependencyIssues` grün.
 - Host-shared: `SHARED_DEPS = ['@deepseek-ai/schemastery']`, muss in peer+dev jedes Pakets stehen (Gate-Regel).
-- Profil: 20 Layer = 14× `@shinon/*` + 6× fremd (`dsh-base`, `dsh-web-app`, 4× `dsh-experimental-*`); 5 Pakete inaktiv (`key-router`, `narrative`, `openapi`, `popup`, `shinon-forge`) — für `openapi` dokumentiert begründet, für 4 ohne Grund (bekannt, `Docs/ZAHLEN.md`).
+- Profil: 20 Layer = 14× `@shinon/*` + 6× fremd (`dsh-base`, `dsh-web-app`, 4× `dsh-experimental-*`); 5 Pakete inaktiv (`key-router`, `narrative`, `openapi`, `popup`, `shinon-forge`) — für `openapi` dokumentiert begründet, für 4 ohne Grund (bekannt, `docs/ZAHLEN.md`).
 - Verdrahtungs-Traps (aus AGENTS.md + Tests, hier nur referenziert, nicht erneut bewiesen): `ctx.provide` auf ROOT erreicht kein Sibling-`inject` (provide aus Plugin-Fiber); `Context` hat kein `dispose` (fiber disposen); Typert verwirft realm-fremde Objekte (`vm`-Kontext → serialisieren); Client-Remote-Beiträge brauchen Mount aus kompilierter Liste (`petRemoteContribution()` + Sender vorhanden, Mount nur im Test).
 
 ## 4. Doppelt / verwaist / tot (Verdacht, mit Status)

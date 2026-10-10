@@ -1,6 +1,6 @@
 ---
 name: cordis-architektur
-description: Cordis-Architektur in Shinon Forge ausreizen - Services, inject/provide, Events, Effects, Patch-Layer, Scope-Werkzeuge. Nutzen vor Arbeiten an index.js, cordis.patch.yml, Service-Nahtstellen oder neuen Host-Plugins. Quellen: Docs/research/2026-10-09-cordis-dsh-recherche.md.
+description: Cordis-Architektur in Shinon Forge ausreizen - Services, inject/provide, Events, Effects, Patch-Layer, Scope-Werkzeuge. Nutzen vor Arbeiten an index.js, cordis.patch.yml, Service-Nahtstellen oder neuen Host-Plugins. Quellen: docs/research/2026-10-09-cordis-dsh-recherche.md (dieses Ziel gibt es in diesem Baum nicht - offener Posten, STAND §6.4).
 ---
 
 # Cordis-Architektur ausreizen
@@ -99,7 +99,7 @@ Mechanismen nutzt. Regeln gelten für jedes `packages/<dir>/index.js`.
 - **Schemastery 3.18.4 hat kein `z.enum`** — Enums als
   `z.union([z.const('a'), z.const('b')])`.
 - Patch-Werte werden **strukturell** geprüft, nicht gegen das Paket-Schema
-  (`Docs/ARCHITECTURE.md` §8) — Schema-Drift findet das Gate nicht. Wer Config-Schema
+  (`docs/ARCHITECTURE.md` §8) — Schema-Drift findet das Gate nicht. Wer Config-Schema
   ändert, prüft die Patch-Werte selbst gegen das neue Schema.
 - Profil-Ebene dupliziert keine Bundle-Werte; sie überschreibt nur, was abweicht.
 

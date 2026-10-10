@@ -1,0 +1,14 @@
+{
+  "id": "brand-renders-in-client",
+  "claim": "Die Shinon-Marke ersetzt die DeepSeek-Marke im laufenden Web-Client.",
+  "targets": ["packages/core/client.js", "sidebar.brand.mark", "conversation.hero.brand.mark"],
+  "expect": "Im Web-Client (dsh web) zeigt die Sidebar das Shinon-Zeichen und den Namen SHINON statt der DeepSeek-Marke.",
+  "result": "BESTAETIGT",
+  "verdict": "WRITE",
+  "evidence": "Live geprüft 2026-10-07: .shinon-mark ×2 im DOM (Sidebar 24px / Hero 34px), Wortmarke 'SHINON' mit linear-gradient(115deg) aktiv, CSS-Vars --shinon-cyber-1/2/3 aufgelöst. Screenshot bestätigt.",
+  "nachtrag": {
+    "date": "2026-10-10",
+    "scope": "Geometrie der Marke (Anzahl Rechtecke/Pfade). Die Aussage und die Zahl der Marken im DOM (Sidebar 24px / Hero 34px) gelten unveraendert.",
+    "note": "statisch: das ZEICHEN selbst ist neu gezeichnet (Ring + Funke + zwei Fluegel, nur Kurven, kein <rect>). Die Klasse der Wurzel bleibt .shinon-mark, damit dieser Beleg weiter messbar bleibt. Der Marken-Slot der Sidebar rendert INNEN in den Toggle-Button (ui-sidebar). Beleg jetzt: node --test scripts/gate/tests/client-activation.test.mjs (Wache 3a/3b) — ein LEBENDER Boot war nicht moeglich (kein dsh im PATH), deshalb ist dieser Nachtrag ausdruecklich statisch und nicht am Screenshot geprueft."
+  }
+}

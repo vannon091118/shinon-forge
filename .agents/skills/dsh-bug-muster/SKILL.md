@@ -1,6 +1,6 @@
 ---
 name: dsh-bug-muster
-description: Haeufige Bug-Klassen im Shinon-Forge/DSH/Cordis-Stack mit Symptom, Mechanismus und Workaround - Namensvertrags-Drift, Loader-Fallen, Fiber-Walk, Realm-Grenzen, Test-Masken, Teardown. Nutzen beim Debugging oder wenn Tests gruen sind, aber die Laufzeit nicht. Quellen: Docs/research/2026-10-09-cordis-dsh-recherche.md.
+description: Haeufige Bug-Klassen im Shinon-Forge/DSH/Cordis-Stack mit Symptom, Mechanismus und Workaround - Namensvertrags-Drift, Loader-Fallen, Fiber-Walk, Realm-Grenzen, Test-Masken, Teardown. Nutzen beim Debugging oder wenn Tests gruen sind, aber die Laufzeit nicht. Quellen: docs/research/2026-10-09-cordis-dsh-recherche.md (dieses Ziel gibt es in diesem Baum nicht - offener Posten, STAND §6.4).
 ---
 
 # Bug-Katalog DSH/Cordis — Symptom → Mechanismus → Workaround

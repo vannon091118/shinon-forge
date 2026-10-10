@@ -5,12 +5,12 @@
 
 <br/>
 
-<!-- STATUS BOARD — Zahlen sind hier bewusst NICHT wiederholt; Eigentümer ist Docs/ZAHLEN.md -->
+<!-- STATUS BOARD — Zahlen sind hier bewusst NICHT wiederholt; Eigentümer ist docs/ZAHLEN.md -->
 <a href="https://github.com/vannon091118/shinon-forge/releases"><img src="https://img.shields.io/badge/version-v0.2.0-7B2FF7?style=for-the-badge&logo=git&logoColor=white" alt="Version (Spiegel von package.json)"/></a>&nbsp;
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6B7280?style=for-the-badge" alt="MIT"/></a>&nbsp;
-<a href="package.json"><img src="https://img.shields.io/badge/node-%5E22.19.0%20%7C%7C%20%3E%3D24-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node (Spiegel von package.json, Zahl: Docs/ZAHLEN.md §1)"/></a>&nbsp;
-<a href="Docs/INDEX.md"><img src="https://img.shields.io/badge/DOKU-INDEX-1D4ED8?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Doku-Index"/></a>&nbsp;
-<a href="Docs/ZAHLEN.md"><img src="https://img.shields.io/badge/ZAHLEN-belegt-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Zahlen"/></a>
+<a href="package.json"><img src="https://img.shields.io/badge/node-%5E22.19.0%20%7C%7C%20%3E%3D24-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node (Spiegel von package.json, Zahl: docs/ZAHLEN.md §1)"/></a>&nbsp;
+<a href="docs/INDEX.md"><img src="https://img.shields.io/badge/DOKU-INDEX-1D4ED8?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Doku-Index"/></a>&nbsp;
+<a href="docs/ZAHLEN.md"><img src="https://img.shields.io/badge/ZAHLEN-belegt-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Zahlen"/></a>
 
 <br/><br/>
 
@@ -24,7 +24,7 @@
 ---
 
 > **Status:** current — Einstieg in das Repository. **Stand:** 2026-10-10
-> **Dokumentation:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+> **Dokumentation:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 ---
 
@@ -34,9 +34,9 @@
 > tables, tree and status block are shared.
 >
 > **Harte Zahlen stehen nicht in dieser Datei.** Sie haben genau einen Eigentümer:
-> [`Docs/ZAHLEN.md`](Docs/ZAHLEN.md) — jede mit dem Befehl, der sie erzeugt.
+> [`docs/ZAHLEN.md`](docs/ZAHLEN.md) — jede mit dem Befehl, der sie erzeugt.
 > **Hard numbers do not live in this file.** They have a single owner:
-> [`Docs/ZAHLEN.md`](Docs/ZAHLEN.md), each with the command that produces it.
+> [`docs/ZAHLEN.md`](docs/ZAHLEN.md), each with the command that produces it.
 
 ---
 
@@ -56,7 +56,7 @@ nicht daneben — wir bauen es darauf.
 Ein Paket ist genau ein Ordner unter `packages/`, ein Bundle ist ein Paket mit
 `dsh.bundle.patch`, und das kanonische Profil ist `profiles/shinon`. **Wie viele**
 Pakete es gibt, welche davon aktiv sind und wie viele Layer das Profil hat, steht
-gemessen in [`Docs/ZAHLEN.md`](Docs/ZAHLEN.md) — nicht in Fließtext.
+gemessen in [`docs/ZAHLEN.md`](docs/ZAHLEN.md) — nicht in Fließtext.
 
 ## 🇬🇧 What is Shinon Forge?
 
@@ -74,7 +74,7 @@ build beside it — we build on top of it.
 One package is exactly one folder under `packages/`, a bundle is a package with
 `dsh.bundle.patch`, and the canonical profile is `profiles/shinon`. **How many**
 packages exist, which are active and how many profile layers there are is measured in
-[`Docs/ZAHLEN.md`](Docs/ZAHLEN.md) — not in prose.
+[`docs/ZAHLEN.md`](docs/ZAHLEN.md) — not in prose.
 
 ---
 
@@ -82,7 +82,7 @@ packages exist, which are active and how many profile layers there are is measur
 
 ```bash
 # 1. DSH installieren (falls noch nicht da)
-npm install -g @deepseek-ai/dsh          # geprüfte Fassung + Pin: Docs/ZAHLEN.md §1
+npm install -g @deepseek-ai/dsh          # geprüfte Fassung + Pin: docs/ZAHLEN.md §1
 
 # 2. Dieses Repo klonen
 git clone https://github.com/vannon091118/shinon-forge.git
@@ -92,17 +92,17 @@ cd shinon-forge
 (cd profiles/shinon && pnpm install)
 
 # 4. Prüfen, ob das Profil auflöst   → in diesem Durchlauf ausgeführt: Exit 0
-                                         (Layer und Bundles: Docs/ZAHLEN.md §2)
+                                         (Layer und Bundles: docs/ZAHLEN.md §2)
 DSH_HOME=$PWD dsh --profile shinon --dump-config
 
 # 5. Booten (Web-UI)   → in diesem Durchlauf NICHT gestartet, also hier auch nicht behauptet
 DSH_HOME=$PWD dsh --profile shinon
 ```
 
-Schritt 4 ist belegt (`node scripts/dsh-profile-test.mjs`, Exit 0, Zahl: `Docs/ZAHLEN.md` §2).
+Schritt 4 ist belegt (`node scripts/dsh-profile-test.mjs`, Exit 0, Zahl: `docs/ZAHLEN.md` §2).
 Schritt 3 und 5 sind in diesem Durchlauf **nicht** ausgeführt worden: für Schritte, die
 einen Modellschlüssel oder einen Browser brauchen, gibt es hier keinen Beleg — sie stehen
-in `Docs/ZAHLEN.md` §4 unter „nicht geprüft“.
+in `docs/ZAHLEN.md` §4 unter „nicht geprüft“.
 
 ---
 
@@ -129,7 +129,7 @@ deshalb **nicht** Teil der belegten Zusagen dieses Repos.
 Ein Paket ist ein Ordner unter `packages/`. Vier Rollendateien sind Pflicht
 (`index.js`, `client.js`, `cordis.patch.yml`, `package.json`); zusätzlich erlaubt sind
 `assets/`, `test/` und benannte Ausnahmen — die **eine** verbindliche Aussage dazu
-steht in [`Docs/ARCHITECTURE.md`](Docs/ARCHITECTURE.md) §2.
+steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 
 | Paket | Rolle | Profil |
 |---|---|---|
@@ -153,10 +153,10 @@ steht in [`Docs/ARCHITECTURE.md`](Docs/ARCHITECTURE.md) §2.
 | **[@shinon/openapi](packages/openapi)** | Vertrag (`openapi.yaml`) vorhanden, **kein** Server — bewusst nicht aktiviert | — |
 | **[@shinon/popup](packages/popup)** | zeigt Original/Ergebnis/Prozess im `conversation.composer.dock` | — |
 
-Die Spalte „Profil“ ist gemessen aus `profiles/shinon/package.json` (Zahl: `Docs/ZAHLEN.md` §1).
+Die Spalte „Profil“ ist gemessen aus `profiles/shinon/package.json` (Zahl: `docs/ZAHLEN.md` §1).
 Fünf Pakete stehen nicht darin (`key-router`, `narrative`, `openapi`, `popup`,
 `shinon-forge`) — bei `openapi` ist das eine dokumentierte Entscheidung
-(`Docs/ARCHITECTURE.md` §4); für die übrigen vier ist in diesem Baum **kein** Grund
+(`docs/ARCHITECTURE.md` §4); für die übrigen vier ist in diesem Baum **kein** Grund
 verzeichnet. Alle 19 Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
 allein `dsh.profile.bundles` im Profil.
 
@@ -183,7 +183,7 @@ allein `dsh.profile.bundles` im Profil.
 ```
 
 **Regel:** DSH ist die Laufzeit, wir bauen Schichten darauf — kein zweiter Kernel
-daneben. Verbindlich: [`Docs/ARCHITECTURE.md`](Docs/ARCHITECTURE.md).
+daneben. Verbindlich: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
@@ -193,7 +193,7 @@ Statusklassen — und was sie hier bedeuten:
 
 - **Verified** — in **diesem** Durchlauf (2026-10-10) ausgeführt und **Exit 0 gesehen**.
 - **Rot** — in diesem Durchlauf ausgeführt und **nicht** Exit 0; der Befund steht in
-  [`Docs/ZAHLEN.md`](Docs/ZAHLEN.md) §3.
+  [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §3.
 - **Nicht geprüft** — kein Exit-0-Beleg aus diesem Durchlauf (auch wenn es früher lief).
 
 | Bereich | Status 2026-10-10 | Beleg |
@@ -207,12 +207,12 @@ Statusklassen — und was sie hier bedeuten:
 | Distributionstest (`pnpm pack` → Isolat → Load) | **Verified** (76 von 76) | `node scripts/pack-test.mjs` → Exit 0 |
 | Web-UI-Boot in Chromium + Panel-Beleg | **Verified** (7 von 7) | `dsh --profile shinon` + `node scripts/panel-check.mjs --url … --token …` → Exit 0 |
 | Gate-Engine `--full` | **Verified** (18 von 18; gehaltene Versionsaufteilung ist deklariert, Undeklariertes bleibt rot) | `npm run gate:full` → Exit 0 |
-| Gate-Tests (reine Gate-Logik) | **Verified** (306 von 306; braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `Docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
+| Gate-Tests (reine Gate-Logik) | **Verified** (306 von 306; braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
 | Volle Kette | **Verified** (29 → 98 → 9 → 76 → 3 grün) | `npm test` → Exit 0 |
-| Echter Modellaufruf | **Nicht geprüft** | `Docs/ZAHLEN.md` §4 |
+| Echter Modellaufruf | **Nicht geprüft** | `docs/ZAHLEN.md` §4 |
 
 Zählungen, Exit-Codes und die Ursachen jedes roten Befunds stehen **nur** in
-[`Docs/ZAHLEN.md`](Docs/ZAHLEN.md) §2/§3.
+[`docs/ZAHLEN.md`](docs/ZAHLEN.md) §2/§3.
 
 ---
 
@@ -239,13 +239,13 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 | `npm run hooks:install` | Git-Hooks aktivieren (einmal pro Klon) |
 | `npm run update` | echte Registry-Prüfung (Maximum nach Semver) ins kanonische Profil; offline UNGEPRÜFT statt „keine Updates"; Install-Pfad live ungeprüft |
 | `npm run sync` | derzeit ohne Funktion: braucht ein `upstream`-Remote, das nicht eingerichtet ist (`git fetch upstream` → Exit 128) |
-| `npm run desktop:launcher` | Desktop-Starter (Konzept, siehe [`Docs/STARTER-PLAN.md`](Docs/STARTER-PLAN.md)) |
+| `npm run desktop:launcher` | Desktop-Starter (Konzept, siehe [`docs/STARTER-PLAN.md`](docs/STARTER-PLAN.md)) |
 
 ---
 
 ## 🗺 Offene Arbeit (gemessen, nicht gewünscht)
 
-- **Rote Prüfläufe beheben** — Reihenfolge und Ursachen: [`Docs/ZAHLEN.md`](Docs/ZAHLEN.md) §3.
+- **Rote Prüfläufe beheben** — Reihenfolge und Ursachen: [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §3.
   Einer ist Umgebungsarbeit (`schemastery` fehlt im Root, deshalb wird
   `codingmon-store` rot statt zu überspringen), einer ist ein bewusstes Verhalten
   (`message-ingress` verweigert die Zusage gegen eine ungeprüfte DSH-Fassung).
@@ -253,8 +253,8 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 - **Fünf nicht aktivierte Pakete** (`key-router`, `narrative`, `openapi`, `popup`,
   `shinon-forge`): entscheiden, ob sie ins Profil kommen. Alle fünf sind gebaut und
   laden im Distributionstest; keines ist vergessen, aber keines ist aktiv.
-- **Native App** (Stufe 1 scharf, 2–4 Konzept): [`Docs/STARTER-PLAN.md`](Docs/STARTER-PLAN.md).
-- **Belege nachziehen**, wo nur ältere Messungen existieren: `Docs/probes/` nennt je
+- **Native App** (Stufe 1 scharf, 2–4 Konzept): [`docs/STARTER-PLAN.md`](docs/STARTER-PLAN.md).
+- **Belege nachziehen**, wo nur ältere Messungen existieren: `docs/probes/` nennt je
   Probe sein Datum.
 
 ---
@@ -263,7 +263,7 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 
 ```text
 Shinon-forge/
-├── packages/                  # jedes Paket = ein Ordner: @shinon/<ordner>  (Anzahl: Docs/ZAHLEN.md §1)
+├── packages/                  # jedes Paket = ein Ordner: @shinon/<ordner>  (Anzahl: docs/ZAHLEN.md §1)
 │   ├── core/ persona/ locale-de/ tooltip/ events/ hook/ markers/ dashboard/
 │   ├── prompter/ task-router/ project-index/ codingmon/ key-router/ narrative/
 │   ├── shinon-forge/ better-errors/ token-usage/
@@ -272,7 +272,7 @@ Shinon-forge/
 │   ├── shinon/                # kanonisches Profil (dsh.profile.bundles, cordis.patch.yml)
 │   ├── headless/              # One-shot-Profil (Modell-Route)
 │   └── web/                   # Altbestand: nur fremde Bundles, kein @shinon/*
-├── Docs/
+├── docs/
 │   ├── INDEX.md               # Einstieg + Statusregel für jedes Dokument
 │   ├── ZAHLEN.md              # einziger Eigentümer aller harten Zahlen
 │   ├── ARCHITECTURE.md        # Namespace, Paketgrenzen, Profil-Vertrag
@@ -288,8 +288,8 @@ Shinon-forge/
 └── profiles/shinon/pnpm-workspace.yaml   # out-of-tree-Profil, offline installierbar
 ```
 
-Jede Datei in `Docs/` trägt einen Statusblock; die vollständige Liste steht in
-[`Docs/INDEX.md`](Docs/INDEX.md) §3.
+Jede Datei in `docs/` trägt einen Statusblock; die vollständige Liste steht in
+[`docs/INDEX.md`](docs/INDEX.md) §3.
 
 ---
 
@@ -306,6 +306,6 @@ Jede Datei in `Docs/` trägt einen Statusblock; die vollständige Liste steht in
 
 **Powered by DSH. Developed by a solo dev on an FX-6300.**
 
-`@shinon/*` · MIT · Node-Fassung und alle weiteren Zahlen: `Docs/ZAHLEN.md` §1
+`@shinon/*` · MIT · Node-Fassung und alle weiteren Zahlen: `docs/ZAHLEN.md` §1
 
 </div>

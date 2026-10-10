@@ -1,0 +1,9 @@
+{
+  "id": "profile-boot-resolves",
+  "claim": "Das Profil shinon ist auflösbar und bootet, ohne dass ein Paket fehlt.",
+  "targets": ["profiles/shinon/package.json", "profiles/shinon/cordis.patch.yml", "packages/*"],
+  "expect": "dsh --profile shinon --dump-config endet mit exit 0 und listet alle 6 @shinon-Bundle-Layer.",
+  "result": "BESTAETIGT",
+  "verdict": "WRITE",
+  "evidence": "dsh --profile shinon --dump-config → EXIT=0, 1308 Zeilen, 6 @shinon-Layer (2026-10-07)."
+}

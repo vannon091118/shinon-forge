@@ -1,15 +1,15 @@
 ---
 name: dsh-beweis-tempo
-description: Beweise einmal fuehren statt doppelt verifizieren - Proben-Praxis (Docs/probes JSON: Claim/Targets/Expect/Result/Verdict/Evidence), Mutationsprobe, Abnahmetest, Statusklassen, Commit-Schnellregeln. Nutzen wenn eine Behauptung gerade geprueft wurde oder eine Aenderung Nachweise braucht.
+description: Beweise einmal fuehren statt doppelt verifizieren - Proben-Praxis (docs/probes JSON: Claim/Targets/Expect/Result/Verdict/Evidence), Mutationsprobe, Abnahmetest, Statusklassen, Commit-Schnellregeln. Nutzen wenn eine Behauptung gerade geprueft wurde oder eine Aenderung Nachweise braucht.
 ---
 
 # Beweis-Tempo: was heute geprüft wird, muss morgen niemand wieder prüfen
 
-Dieses Repo hält Behauptungen als **Proben** fest (`Docs/probes/*.json`) — mit
+Dieses Repo hält Behauptungen als **Proben** fest (`docs/probes/*.json`) — mit
 Beleg statt Prosa. Wer eine Prüfung einmal macht, schreibt sie auf: der nächste
 Lauf (anderer Agent, anderer Tag) liest statt zu forschen.
 
-## Proben-Format (`Docs/probes/<thema>.json`)
+## Proben-Format (`docs/probes/<thema>.json`)
 
 Datei ist eine Liste von Proben (oder ein einzelnes Objekt wie
 `brand-render.json`). Felder je Probe:
@@ -35,7 +35,7 @@ Datei ist eine Liste von Proben (oder ein einzelnes Objekt wie
 
 ## Mutationsprobe + Abnahmetest (das schnellste Doppel)
 
-Muster aus `Docs/probes/prompter-modi.json`:
+Muster aus `docs/probes/prompter-modi.json`:
 
 1. **Abnahmetest** festschreiben: der feste Befehl, der die Behauptung prüft
    (z. B. `node --test scripts/gate/tests/prompter-contract.test.mjs` → 28/28).
