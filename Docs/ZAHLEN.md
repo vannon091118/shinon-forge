@@ -52,7 +52,7 @@ lesen genau diese Datei.
 | Distributionstest | 75 bestanden, **1** fehlgeschlagen (`project-index`) | **1** | `node scripts/pack-test.mjs` |
 | Build (`dist/`) | 19 Pakete, 96 Dateien, 905294 Bytes | 0 | `npm run build` |
 | Gate-Engine `--full` | 18 Gates gelaufen, 18 grün | 0 | `npm run gate:full` |
-| Gate-Tests | 150 bestanden, **7** rot (7 ganze Dateien), 5 übersprungen (162) | **1** | `npm run gate:test` |
+| Gate-Tests | **306** bestanden, 0 rot, 0 übersprungen | 0 | `node --test scripts/gate/tests/*.test.mjs` mit Node v22.23.3 und Repo-`dsh` (0.2.1-alpha.1) zuerst im PATH |
 | Client-Aktivierung + Marke (Wache 1–3) | 6 bestanden, **0** rot | 0 | `node --test scripts/gate/tests/client-activation.test.mjs` |
 | Codingmon-Tests | 29 bestanden, **0** rot, 3 übersprungen (32) | 0 | `npm run test:codingmon` |
 | Marker-Tests | 20 bestanden, 0 rot | 0 | `node --test scripts/gate/tests/markers.test.mjs` |
@@ -60,14 +60,17 @@ lesen genau diese Datei.
 | Panel-Beleg gegen die laufende UI | 7 bestanden, **0** fehlgeschlagen | 0 | `node scripts/panel-check.mjs --url http://127.0.0.1:3085 --token <token>` |
 | Volle Kette | **nicht durchgelaufen** (bricht bei `pack-test` ab) | **1** | `npm test` |
 
-**Warum die Zählungen kleiner sind als im ersten Durchlauf dieses Tages:** die sieben
-roten `gate:test`-Dateien und der eine rote `pack-test`-Fall scheitern alle am selben
-Umgebungsgrund — dieses Checkout hat **keine** `node_modules`-Aufloesung fuer
-`@deepseek-ai/schemastery` und **kein** `dsh` im PATH:
-`Cannot find package '@deepseek-ai/schemastery' imported from …/packages/project-index/index.js`
-und `dsh muss im PATH liegen (dshRoot() ist null)`. Die betroffenen Dateien sind
-**byte-identisch mit HEAD** (`git diff` leer) — es ist kein Befund dieses Durchlaufs,
-sondern der fehlende Install. Mit vollem Install standen hier 300 (297/2/1) bzw. 76/0.
+**Warum `gate:test` früher rot war und jetzt grün ist:** der Baum war unvollständig installiert —
+`node_modules/@deepseek-ai/dsh` und `node_modules/@deepseek-ai/schemastery` fehlten auf oberster
+Ebene (nur verschachtelte Kopien lagen vor), dazu 18 verschachtelte Pakete unter
+`node_modules/@deepseek-ai/dsh/node_modules/` (alle im Lock verzeichnet). Vervollständigt am
+2026-10-10 exakt nach Lock (`.ignored`-Kopie für `schemastery@3.18.4`, Registry-Tarballs für
+`dsh@0.2.1-alpha.1` + 18 verschachtelte, alle versionsgeprüft) — kein Test, kein Lock, kein
+Manifest angefasst. Voraussetzung für Grün (alle drei nötig, alle gemessen): Node ≥ 22
+(`node:sqlite`, `parseEnv` — unter v18 stirbt schon der Import), `dsh@0.2.1-alpha.1` aus dem
+Repo zuerst im PATH (vor einem fremden globalen `dsh`, sonst misst `message-ingress` die
+falsche Fassung), vollständiger Lock-Baum. Unter der Standard-Shell (Node v18, ohne PATH)
+bleibt der Lauf rot — das ist dann Umgebungs-Rot, kein Code-Rot.
 
 **Volle Kette:** `npm test` führt Codingmon-Tests → Gate → Fixtures → Distribution →
 Profil in dieser Reihenfolge aus (`package.json`) und lief in diesem Durchlauf
@@ -78,6 +81,7 @@ vollständig durch (Exit 0) — damit läuft auch `dsh-profile-test` innerhalb v
 
 | Befund | vorher | nachher | Beleg |
 |---|---|---|---|
+| `gate:test`: unvollständiger Lock-Baum (Top-Level `dsh` + `schemastery` fehlten, 18× `dsh/node_modules` fehlten), falsche Toolchain (Node v18, fremdes `dsh@0.2.0-rc.2` zuerst im PATH) | 150 bestanden, 7 Dateien rot, 5 übersprungen (162), Exit 1 | Baum lock-exakt vervollständigt, Lauf mit Node v22 + Repo-`dsh@0.2.1-alpha.1` zuerst im PATH: **306/306, Exit 0** (kein Test geändert) | `node --test scripts/gate/tests/*.test.mjs` |
 | `doctor`: gehaltene Versionsaufteilung (`1.0.0`×16, `0.1.0`×3) als Befund gemeldet, obwohl erlaubt genannt | `gate:full` 17 grün, 1 rot, Exit 1 | Aufteilung als `EXPECTED_VERSIONS` deklariert (Standard + drei begründete Ausnahmen): `gate:full` 18 grün, Exit 0; undeklarierte Abweichungen weiter rot (5 Negativproben) | `npm run gate:full` + isolierter `check()`-Nachweis |
 | `profiles/shinon/cordis.patch.yml`: `config:MAX` statt `config:` — die Datei war **kein gültiges YAML**, das Profil lud nicht | Gate `97 bestanden, 1 fehlgeschlagen`, Exit 1 | Gate `98 bestanden, 0 fehlgeschlagen`, Exit 0 | `node scripts/dsh-test.mjs` |
 | [packages/shinon-forge](packages/shinon-forge) `index.js`: Ketten wie `.default(false).describe(...)` und `.optional()` — die deklarierte Schemastery-Fassung (`3.18.4`, §1) hat `description` statt `describe`, `required(false)` statt `optional`, und `default(...)` beendet die Kette | Distributionstest `75 bestanden, 1 fehlgeschlagen`, Exit 1 (`TypeError: z.boolean(...).default(...).describe is not a function`) | `76 bestanden, 0 fehlgeschlagen`, Exit 0 | `node scripts/pack-test.mjs` |
@@ -123,15 +127,16 @@ behoben; die uebrigen Befunde sind offen.
    dieselbe Wache steht als statischer Scan (inject-Abdeckung) in derselben Datei und
    laeuft ohne Abhaengigkeiten in CI. Ein **vollstaendiger** `dsh --profile shinon`-Boot
    ist hier weiterhin nicht messbar (CLI nicht installiert, §4).
-3. **Gate-Tests (2 rot in `npm run gate:test`)**:
-   - Test 3, `codingmon-store` („die Host-Hälfte öffnet den Spiegel selbst und gibt ihn
-     als Dienst heraus“): `@deepseek-ai/schemastery` ist im Repo-Root **nicht installiert**
-     (`ERR_MODULE_NOT_FOUND` aus [packages/codingmon/index.js](packages/codingmon/index.js)) —
-     der Test wird rot, statt sichtbar zu überspringen.
-   - Test 143, `message-ingress` („der Vertrag gilt für die geprüfte Fassung, nicht für
-     jede“): installiertes DSH `0.2.0-rc.2` ≠ geprüfte Fassung `0.2.1-alpha.1` (Pin im
-     Root-Manifest). Der Test **verweigert** die Zusage, statt sie stillschweigend gegen
-     eine ungeprüfte Fassung weiterzuführen — das ist sein Zweck.
+3. **Gate-Tests — REPARIERT (2026-10-10)**: 7 Dateien rot (`context-resolver`, `context-wiring`,
+   `hook-pre-step`, `message-ingress`, `project-index`, `prompter-contract`, `task-router`) —
+   Ursachen `dshRoot() ist null` (kein `dsh` im PATH), fehlendes Top-Level-`schemastery` und
+   18 fehlende verschachtelte Pakete unter `dsh/node_modules` (darunter
+   `dsh-api-session-controller`, das `message-ingress` braucht). Dazu die Fassungsfalle:
+   ein fremdes globales `dsh@0.2.0-rc.2` zuerst im PATH lässt `message-ingress` gegen die
+   ungeprüfte Fassung messen — der Test **verweigert** die Zusage dann zu Recht, statt sie
+   still weiterzuführen. Reparatur: Baum exakt nach Lock vervollständigt (2 Top-Level +
+   18 verschachtelt, alle versionsgeprüft), Lauf mit Node v22 und Repo-`dsh@0.2.1-alpha.1`
+   zuerst im PATH. Kein Test geändert, kein Skip erfunden. Belegt: 306/306, Exit 0.
 
 ## 4. In diesem Durchlauf **nicht** geprüft (kein Exit-0-Beleg vorhanden)
 
