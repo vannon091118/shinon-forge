@@ -42,3 +42,10 @@ Thumbs.db
 coverage/
 .eslintcache
 *.tsbuildinfo
+
+# pnpm-Reste: dieses Repo trackt keine und ruft pnpm nirgends auf (PLAN.md Schritt
+# 3.5/A1). Ein Profil kann sie trotzdem zur Laufzeit bekommen — `dsh plugin add`
+# schreibt ueber UPSTREAMs `initProfile` selbst eine pnpm-workspace.yaml ins
+# Profilverzeichnis. Damit landet so eine Datei nie versehentlich im Commit.
+pnpm-workspace.yaml
+pnpm-lock.yaml

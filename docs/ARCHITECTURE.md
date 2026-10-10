@@ -70,7 +70,7 @@ Das Format stammt aus `@deepseek-ai/dsh-app-boot` (`loadProfile` /
 |----------------------------------------|----------------------------------------------------------------|
 | `package.json`                          | `dsh.profile.bundles` — die Patch-Layer in Anwendungsreihenfolge |
 | `cordis.patch.yml`                      | User-Ebene: top-level YAML-Array von Patch-Einträgen (Patches des Includes, `insert`-Listen) |
-| `pnpm-workspace.yaml`                   | pnpm-Einstellungen (`packages: [.]`, `nodeLinker: hoisted`) für out-of-tree Bundles |
+| (`pnpm-workspace.yaml`)                | **nicht mehr im Repo** (Schritt 3.5/A1). Upstreams `initProfile` legt bei Bedarf selbst eine an, wenn ein Profil `dsh plugin add` benutzt — eine solche Datei bleibt untracked und wird nie committet |
 | `node_modules/` (gitignored)            | die per `link:` verknüpften `@shinon/*`-Pakete                  |
 
 - Ein Profil liegt unter `<DSH_HOME>/profiles/<name>`. **Das Repo-Root ist das
@@ -161,7 +161,7 @@ profiles/shinon/package.json         (Aktivierung: dsh.profile.bundles)
 | `npm test`                             | Gate → Regel-Fixtures → Distributionstest → Profiltest; stoppt beim ersten Fehler                |
 | `node scripts/dsh-test.mjs`            | Gate: Manifest, Ressourcen, Patch-Schema, Namensvertrag, Syntax, Legacy-Guard, Komposition      |
 | `node scripts/validate-test.mjs`       | Regel-Fixtures: je Regel muss Gate **und** Build rot werden (Kontrolle bleibt grün)             |
-| `node scripts/pack-test.mjs`           | Distributionstest je Paket: `pnpm pack` → entpacken → isoliert installieren → laden             |
+| `node scripts/pack-test.mjs`           | Distributionstest je Paket: `npm pack` → entpacken → isoliert installieren → laden              |
 | `node scripts/dsh-profile-test.mjs`    | Profiltest: `DSH_HOME=<Repo>` `dsh --profile shinon --dump-config` → alle Bundle-Layer          |
 | `npm run gate` / `gate:local` / `gate:full` | modulare Gate-Engine (`scripts/gate/engine.mjs`), Slice-fähig                              |
 | `npm run build` (`scripts/build.mjs`)  | dieselben Regeln + Artefakte nach `dist/` (`manifest.json`, `profile.json`, Paketkopien)        |
@@ -194,9 +194,11 @@ Neue Features starten als *plan* und werden erst mit ausführbarem Nachweis *cur
   deshalb verweigert ein Gate-Test seine Zusage gegen die ungeprüfte Fassung.
 - `!!js`-Ausdrücke (DSH-YAML-Dialekt) kennt der Validator nicht; die Dateien dieses
   Repos nutzen sie nicht — bewusster blinder Fleck.
-- Das Root-`package.json` hat kein Lockfile und keine `pnpm-workspace.yaml`
-  (das Feld `workspaces` unterstützt pnpm nicht) → das Root-Install ist nicht
-  reproduzierbar. Das Profil bringt sein eigenes `pnpm-workspace.yaml` mit.
+- Das Root-Install hat **eine** Quelle: `package-lock.json` (versioniert, seit Schritt 3.5
+  regeneriert und mit dem Manifest synchron) und **npm** als einzigen Paketmanager. Es gibt
+  keine `pnpm-workspace.yaml` und kein `packageManager`-Feld mehr. Das Profil bringt
+  ebenfalls keine mit; Upstreams `initProfile` kann bei `dsh plugin add` selbst eine
+  anlegen — sie bleibt untracked.
 - Fünf Pakete (`key-router`, `narrative`, `openapi`, `popup`, `shinon-forge`) stehen
   **nicht** im Profil und sind damit inaktiv; für `openapi` ist das eine dokumentierte
   Entscheidung, für die übrigen ist kein Grund verzeichnet (`docs/ZAHLEN.md` §1/§3).

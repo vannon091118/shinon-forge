@@ -18,7 +18,7 @@ Stelle. Reihenfolge spart Zeit: schnelle Checks zuerst, teure zuletzt.
 | `node scripts/validate-test.mjs` | je Regel: Gate **und** Build werden rot (Fixtures) | `dsh` |
 | `node --test scripts/gate/tests/codingmon-store.test.mjs` | Pet-Store gegen echte DSH-Storage-Familie | `dsh`, `node_modules` |
 | `node --test packages/codingmon/test/uebergabe.test.mjs` | Naht Client->Host, Literal-Drift, beide Cordis-Roots | `node_modules` |
-| `node scripts/pack-test.mjs` | Distribution je Paket: `pnpm pack` → isoliert installieren → laden | pnpm + npm |
+| `node scripts/pack-test.mjs` | Distribution je Paket: `npm pack` → isoliert installieren → laden | npm (netzgebunden, teuerster Lauf) |
 | `node scripts/dsh-profile-test.mjs` | `dsh --profile shinon --dump-config`, alle 8 Bundle-Layer | installiertes DSH |
 | `npm test` | alles oben in der Reihenfolge schnell → teuer | Gesamtstack |
 | `npm run gate` / `gate:local` / `gate:full` | modularer Gate-Engine, slice-selektiv | siehe `scripts/gate/engine.mjs` |

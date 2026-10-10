@@ -88,8 +88,12 @@ npm install -g @deepseek-ai/dsh          # geprüfte Fassung + Pin: docs/ZAHLEN.
 git clone https://github.com/vannon091118/shinon-forge.git
 cd shinon-forge
 
-# 3. Profil-Dependencies auflösen (out-of-tree-Profil)
-(cd profiles/shinon && pnpm install)
+# 3. Wurzel-Abhängigkeiten (npm ist die einzige Paketquelle, Schritt 3.5/A1)
+npm install
+# 3b. Profil-Dependencies: `profiles/shinon` bindet seine Bundles mit `link:` —
+#     das lehnt npm ab (gemessen: EUNSUPPORTEDPROTOCOL). Bis die Bindungsfrage aus
+#     PLAN.md 3.5/3.6 entschieden ist, sind diese Links von Hand bereitzustellen;
+#     der Profiltest sagt es sichtbar, wenn sie fehlen.
 
 # 4. Prüfen, ob das Profil auflöst   → in diesem Durchlauf ausgeführt: Exit 0
                                          (Layer und Bundles: docs/ZAHLEN.md §2)
@@ -109,7 +113,8 @@ in `docs/ZAHLEN.md` §4 unter „nicht geprüft“.
 ## 🔌 Boot und Schlüssel
 
 Das Repo-Root ist das `DSH_HOME`: dort liegt `profiles/shinon` als echtes DSH-Profil
-(`package.json` mit `dsh.profile.bundles`, `cordis.patch.yml`, `pnpm-workspace.yaml`).
+(`package.json` mit `dsh.profile.bundles` und `cordis.patch.yml` — ein
+`pnpm-workspace.yaml` führt dieses Repo nicht mehr, Schritt 3.5/A1).
 Der Schlüssel gehört **nie** ins Repo — im Profil steht nur der Referenzname
 (`apiKeyEnv`), das Secret kommt aus der Umgebung:
 
@@ -204,11 +209,11 @@ Statusklassen — und was sie hier bedeuten:
 | Marker-Regeln in Vertrag + Host + Client | **Verified** | `node --test scripts/gate/tests/markers.test.mjs` → Exit 0 |
 | Event-Spine gegen die eingefrorene Fixture | **Verified** | `node --test scripts/gate/tests/events-spine.test.mjs` → Exit 0 |
 | Codemon-Kernmathematik, Kompositor-Regel, Client-Durchstich im vm | **Verified** | `npm run test:codingmon` → Exit 0 (überspringt sichtbar, was DSH-Bausteine braucht) |
-| Distributionstest (`pnpm pack` → Isolat → Load) | **Verified** (76 von 76) | `node scripts/pack-test.mjs` → Exit 0 |
+| Distributionstest (`npm pack` → Isolat → Load) | **Verified** (76 von 76) | `node scripts/pack-test.mjs` → Exit 0 |
 | Web-UI-Boot in Chromium + Panel-Beleg | **Verified** (7 von 7) | `dsh --profile shinon` + `node scripts/panel-check.mjs --url … --token …` → Exit 0 |
 | Gate-Engine `--full` | **Verified** (18 von 18; gehaltene Versionsaufteilung ist deklariert, Undeklariertes bleibt rot) | `npm run gate:full` → Exit 0 |
-| Gate-Tests (reine Gate-Logik) | **Verified** (306 von 306; braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
-| Volle Kette | **Verified** (29 → 98 → 9 → 76 → 3 grün) | `npm test` → Exit 0 |
+| Gate-Tests (reine Gate-Logik) | **Verified** (327 von 327; braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
+| Volle Kette | **Verified** (32 → 99 → 9 → 76 → 3 grün, ohne `pnpm` und ohne globales `dsh` im PATH) | `npm test` → Exit 0 |
 | Echter Modellaufruf | **Nicht geprüft** | `docs/ZAHLEN.md` §4 |
 
 Zählungen, Exit-Codes und die Ursachen jedes roten Befunds stehen **nur** in
@@ -225,14 +230,14 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 | `npm test` | Volle Kette: Codingmon-Tests → Gate → Fixtures → Distribution → Profil (stoppt beim ersten Fehler) |
 | `node scripts/dsh-test.mjs` | statisches Gate: Manifest, Namensvertrag, `index.js`, `client.js`, `cordis.patch.yml`, Legacy-Guard, Quell-Zwillings-Drift, Profil |
 | `node scripts/validate-test.mjs` | Regel-Fixtures: jede Regel muss Gate **und** Build rot werden |
-| `node scripts/pack-test.mjs` | Distribution je Paket: `pnpm pack` → entpacken → isoliert installieren → laden |
+| `node scripts/pack-test.mjs` | Distribution je Paket: `npm pack` → entpacken → isoliert installieren → laden |
 | `node scripts/dsh-profile-test.mjs` | Profiltest: `dsh --profile shinon --dump-config`, alle Layer |
 | `npm run gate` / `gate:local` / `gate:full` | modulare Gate-Engine (Slices / lokal / alle Gates) |
 | `npm run gate:test` | reine Gate-Logik (kein DSH nötig) |
 | `npm run test:codingmon` / `test:hook` | paketlokale Tests |
 | `npm run build` | regeneriert `dist/` (Manifest, Profil, Paketkopien) |
 | `npm run dev` / `dev:web` / `open` | DSH mit dem Profil starten (Web-UI) |
-| `npm start [-- …]` | alleinstehende Startdatei (`scripts/start.mjs`): heilt Node ≥ 22 selbst, findet `dsh` auch außerhalb des PATH, startet das Profil; `--check` prüft nur die Startfähigkeit |
+| `npm start [-- …]` · `shinon [-- …]` | der Einstieg ([`bin/shinon.mjs`](bin/shinon.mjs), auch als `bin`-Feld im Manifest): heilt Node ≥ 22 selbst, findet `dsh` auch außerhalb des PATH und **nennt dessen Herkunft**, startet das Profil; `--check` prüft nur die Startfähigkeit. `scripts/start.mjs` bleibt als kompatibler Aufruf und importiert dieselbe Umsetzung |
 | `npm run verify:panel` | Panel-Beleg über `scripts/panel-check.mjs` (braucht jsdom) |
 | `npm run stages` | Startstufen/Ready-Zeile aus `scripts/open.mjs` nachvollziehen |
 | `npm run commit:guard -- …` | Commit-Regeln prüfen (`--ci`, `--last n`, `--range`, `--all`) |
@@ -285,7 +290,7 @@ Shinon-forge/
 ├── IDEA.md · shinon-forge-implementierungsplan.md   # plan bzw. historical (Statusblock im Kopf)
 ├── scripts/                   # Gate-Engine, Build, Tests, Helfer (gate/, lib/, *.mjs)
 ├── prompts/ · assets/banner.svg
-└── profiles/shinon/pnpm-workspace.yaml   # out-of-tree-Profil, offline installierbar
+└── profiles/shinon/          # out-of-tree-Profil (package.json, cordis.patch.yml, cordis.yml)
 ```
 
 Jede Datei in `docs/` trägt einen Statusblock; die vollständige Liste steht in

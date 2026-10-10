@@ -2,10 +2,15 @@
 /**
  * pack-test.mjs - Distributionstest (Exit Gate für Block 1)
  *
- * Je Paket: pnpm pack -> Tarball entpacken -> isoliert installieren -> laden.
+ * Je Paket: `npm pack` -> Tarball entpacken -> isoliert installieren -> laden.
  * Rot, solange ein Paket seine host-shared Abhängigkeit nicht deklariert
- * (siehe SHARED_DEPS in scripts/lib/repo.mjs), grün, sobald alle 7 Tarballs
+ * (siehe SHARED_DEPS in scripts/lib/repo.mjs), grün, sobald alle Tarballs
  * im Isolat laden. Eingebunden in `npm test`.
+ *
+ * Eine Quelle: **npm**. Seit PLAN.md Schritt 3.5 ruft dieser Test kein pnpm
+ * mehr auf (A1); der Tarball entsteht über `npm pack`, das Isolat über
+ * `npm install`. Beide Wege sind gemessen gleichwertig: das Tarball heißt
+ * `shinon-<dir>-<version>.tgz` und entpackt nach `package/`.
  *
  * Option: --keep  Zwischenstände unter /tmp behalten (Debugging).
  */
@@ -64,8 +69,8 @@ if (packages.length === 0) {
   process.exit(1);
 }
 
-// TODO: [DSH-Refactor] - Teuerster Lauf des Repos: je Paket ein eigener `pnpm pack` + ein isoliertes
-// `npm install` (16x, sequenziell, netzgebunden). Auf schwacher Hardware ist das der Flaschenhals des
+// TODO: [DSH-Refactor] - Teuerster Lauf des Repos: je Paket ein eigener `npm pack` + ein isoliertes
+// `npm install` (19x, sequenziell, netzgebunden). Auf schwacher Hardware ist das der Flaschenhals des
 // gesamten Tests. Installation einmal bauen und je Paket nur das Tarball tauschen (oder parallelisieren).
 for (const pkg of packages) {
   const packDir = join(WORK, 'work', pkg.dir);
@@ -75,10 +80,10 @@ for (const pkg of packages) {
   let tarball = null;
   console.log(`\n${pkg.dir}`);
 
-  step('pnpm pack', () => {
+  step('npm pack', () => {
     cpSync(pkg.base, packDir, { recursive: true });
     mkdirSync(tarballDir, { recursive: true });
-    const packed = run('pnpm', ['pack', '--pack-destination', tarballDir], packDir);
+    const packed = run('npm', ['pack', '--pack-destination', tarballDir, ...NPM_FLAGS], packDir);
     if (!packed.ok) throw new Error(packed.detail);
     const name = readdirSync(tarballDir).find((file) => file.endsWith('.tgz'));
     if (!name) throw new Error(`kein Tarball in ${tarballDir}`);

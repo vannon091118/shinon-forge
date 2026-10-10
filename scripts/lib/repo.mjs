@@ -551,7 +551,8 @@ export function activeProfile(root = readRoot()) {
  * mit
  *   package.json         dsh.profile.bundles - die Bundle-Patch-Layer in Reihenfolge
  *   cordis.patch.yml     die User-Ebene (top-level YAML-Array von Patch-Einträgen)
- *   pnpm-workspace.yaml  pnpm-Einstellungen für out-of-tree Bundles
+ * (eine `pnpm-workspace.yaml` legt UPSTREAMs initProfile bei Bedarf selbst an, wenn ein
+ * Profil `dsh plugin add` nutzt; dieses Repo trackt keine — Schritt 3.5/A1)
  * Bundles sind Pakete mit dsh.bundle.patch; das Repo-Root ist ein gültiges
  * DSH_HOME, weil es profiles/ enthält.
  *
