@@ -71,6 +71,7 @@ vollständig durch (Exit 0) — damit läuft auch `dsh-profile-test` innerhalb v
 | [packages/shinon-forge](packages/shinon-forge) `index.js`: Ketten wie `.default(false).describe(...)` und `.optional()` — die deklarierte Schemastery-Fassung (`3.18.4`, §1) hat `description` statt `describe`, `required(false)` statt `optional`, und `default(...)` beendet die Kette | Distributionstest `75 bestanden, 1 fehlgeschlagen`, Exit 1 (`TypeError: z.boolean(...).default(...).describe is not a function`) | `76 bestanden, 0 fehlgeschlagen`, Exit 0 | `node scripts/pack-test.mjs` |
 | [packages/core/client.js](packages/core/client.js): die WebP lag im Paket, wurde aber per `document.baseURI` adressiert — DSH liefert Plugin-Ressourcen aber nur unter `/plugins/<id>/client*.js` (`@deepseek-ai/dsh-client-modules`, `CLIENT_CHUNK`) | Browser: `GET /assets/persona.webp → 404`, `naturalWidth 0` | WebP als data-URI im self-contained Bundle: `naturalWidth 260 × 460`, kein 404 in der Netzwerkliste | Chromium gegen `dsh --profile shinon` + `node scripts/panel-check.mjs` |
 | `key-router`, `narrative`, `shinon-forge` waren `git status`-untracked, standen aber im Root-`devDependencies`-Anspruch nicht — und fehlten dort wirklich | `doctor`: 4 Befunde (3× fehlende `devDependencies`, Drift) | eingecheckt; `doctor`: **1** Befund (nur Drift, §3.1) | `git status --porcelain`, `npm run gate:full` |
+| [packages/core/client.js](packages/core/client.js): `@shinon/core` belegte `conversation.hero.workspace` — ein **Single-Slot**. Gemessen im Browser: der Slot enthielt danach nur noch `.shinon-bg`, der Vendor-Besetzer `WorkspacePicker` war verdrängt; der Klick auf „Choose workspace“ wechselte nur noch `aria-expanded` und öffnete **kein** Menü. Der Slot ist jetzt frei, das Branding hängt an `conversation.hero.brand.mark` (unserem eigenen Slot) | Slot-Inhalt: `div.shinon-bg` (kein Picker), Klick ohne Menü | Slot-Inhalt: Vendor-Picker; Klick öffnet `Default workspace`, `brutalord-the-feral-cycle`, `Shinon-forge`, `Add workspace…`, und `Add workspace…` öffnet den Host-Ordnerdialog (zenity auf `DISPLAY=:0`) | Chromium gegen `dsh --profile shinon` + Prozess-Beobachtung |
 | Doku-Pfade auf das alte Verzeichnis packages/shion-forge (fünf Stellen) und auf die geplante, nicht existierende Datei starter/README.md (zwei Stellen) | Prüfbefehl aus `Docs/INDEX.md` §4: 2 defekt | 0 defekt | Prüfbefehl in `Docs/INDEX.md` §4 |
 
 ## 3. Rote Befunde (in diesem Durchlauf gemessen, **nicht** repariert)
@@ -82,7 +83,14 @@ vollständig durch (Exit 0) — damit läuft auch `dsh-profile-test` innerhalb v
    Drift, meldet ihn aber; deshalb ist `gate:full` nicht „grün“. Die drei Pakete sind als
    bewusst-inaktiv geführt (`scripts/gate/plugins/dead-package.mjs`) — der Grund für den
    eigenen Versionsstand ist nirgends verzeichnet.
-2. **Gate-Tests (2 rot in `npm run gate:test`)**:
+2. **Client-Boot bricht ab (fremde, noch laufende Arbeit im Arbeitsbaum)**: Die drei
+   Client-Haelften `@shinon/markers`, `@shinon/dashboard`, `@shinon/codingmon` melden
+   beim Laden `failed` — der Browser zeigt „Failed to load plugins … web boot: 3 entries
+   did not activate“. Ursache im Baum: diese drei Dateien tragen frisch eingesetzten
+   Code, der `ctx.locale` liest, waehrend ihr `inject` nur `['slots']` nennt (Cordis
+   liefert einen nicht injizierten Dienst nicht) — die `apply()` wirft und der Eintrag
+   gilt als nicht aktiviert. Die Dateien sind **nicht** Teil des Reparatur-Commits.
+3. **Gate-Tests (2 rot in `npm run gate:test`)**:
    - Test 3, `codingmon-store` („die Host-Hälfte öffnet den Spiegel selbst und gibt ihn
      als Dienst heraus“): `@deepseek-ai/schemastery` ist im Repo-Root **nicht installiert**
      (`ERR_MODULE_NOT_FOUND` aus [packages/codingmon/index.js](packages/codingmon/index.js)) —

@@ -192,8 +192,13 @@ window.__ModuleLoader__.load({
     /** Hero-Marke vor der Headline der leeren Session. */
     function HeroBrandMark({ size, className }) {
       const Pet = window.__codingmon?.PetMark;
-      if (Pet) return h(Pet, { size: size ?? 48 });
-      return h(MarkGlyph, { size: size ?? 48, className });
+      const mark = Pet ? h(Pet, { size: size ?? 48 }) : h(MarkGlyph, { size: size ?? 48, className });
+      // Das Background-Branding haengt an DIESEM Slot (gemessen 2026-10-10):
+      // `conversation.hero.brand.mark` ist bereits unser Single-Slot, also
+      // kostet es niemanden seinen Platz. Ein eigener Slot dafuer war ein
+      // Fehlgriff: `conversation.hero.workspace` ist single-occupant und
+      // gehoert dem WorkspacePicker (Beleg in Docs/ZAHLEN.md §2.1).
+      return h(React.Fragment, null, BackgroundBranding(), mark);
     }
 
     /** Hinweisbanner über dem Composer — Status aus der Brand-Spec. */
@@ -240,12 +245,12 @@ window.__ModuleLoader__.load({
           id: 'shinon-info-banner',
           order: 10
         }, InfoBanner));
-        // Background-Branding hinter dem Hero (leere Session).
-        ctx.slots.inject('conversation.hero.workspace', () => ctx.slots.register({
-          name: 'conversation.hero.workspace',
-          id: 'shinon-bg',
-          order: -100
-        }, BackgroundBranding));
+        // Kein eigener Slot fuers Background-Branding: es wird von
+        // `HeroBrandMark` mitgerendert (siehe dort). Der Versuch, dafuer
+        // `conversation.hero.workspace` zu belegen, hatte den
+        // WorkspacePicker verdrängt — der Klick auf "Choose workspace"
+        // blieb dann ohne Menue (gemessen 2026-10-10, Beleg in
+        // Docs/ZAHLEN.md §2.1).
       }
     };
   }
