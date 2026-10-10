@@ -111,8 +111,8 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   (`index.js`/`client.js`/`cordis.patch.yml`, profiles) — the gate's legacy-guard fails on it.
 - `scripts/gate/policy.json` must stay in sync with `scripts/gate/plugins/*.mjs`:
   `policy.mjs` exits 1 if a plugin has no trigger or a trigger has no plugin file.
-- `node scripts/dsh-update.mjs` hardcodes a DSH install path
-  (`/home/vannon/.local/opt/node-v22.23.3-.../@deepseek-ai/dsh`) and uses `--profile web`
+- `node scripts/dsh-update.mjs` resolves its version through `scripts/lib/dsh.mjs` but
+  performs no registry check (`latest` equals `current`) and uses `--profile web`
   for install — it's not wired to the `shinon` profile; treat its output as advisory.
 - Reload helpers were removed (2026-10-10: three files, no callers, stale `web`-profile target). HMR runs through the DSH process itself.
 - `token-usage` and `better-errors` are config-only (their `apply()` only logs); `openapi`

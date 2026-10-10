@@ -5,22 +5,21 @@
  * Checkt neue DSH-Versionen und aktualisiert die Mods
  */
 
-import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, '..');
-const DSH_PATH = '/home/vannon/.local/opt/node-v22.23.3-linux-x64/lib/node_modules/@deepseek-ai/dsh';
+import { execSync, execFileSync } from 'child_process';
+import { dshBinary } from './lib/dsh.mjs';
 
 /**
- * Prüfe aktuelle DSH Version
+ * Aktuelle DSH-Version: das entdeckte Binary (`dshBinary()` aus lib/dsh.mjs,
+ * eine Auflösung für alle Skripte) nach `--version` fragen statt einen
+ * hartcodierten Installationspfad zu lesen. `unknown`, wenn nichts auflöst.
  */
 function getDshVersion() {
   try {
-    const pkg = JSON.parse(readFileSync(resolve(DSH_PATH, 'package.json'), 'utf8'));
-    return pkg.version;
+    const binary = dshBinary();
+    if (binary === null) return 'unknown';
+    return execFileSync(binary[0], [...binary.slice(1), '--version'], { encoding: 'utf8' })
+      .trim()
+      .split('\n')[0];
   } catch {
     return 'unknown';
   }
