@@ -1,5 +1,8 @@
 # Repo-Analyse — alle 31 Repos unter `vannon091118`
 
+> **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen (aktuell):** `Docs/ZAHLEN.md`
+
 > Verifiziert 2026-10-07 gegen die echten Git-Bäume (nicht gegen Beschreibungen).
 > Zweck: Entscheidungsgrundlage für den Fundament-Plan. Kein Code, kein Urteil aus zweiter Hand.
 
@@ -8,7 +11,7 @@
 | Repo | Sicht | Dateien | Tech | Rolle im Fundament | Verdict |
 |---|---|---|---|---|---|
 | **Shinon_Agent** | pub | 8466 | node+py | **Convergence-Schicht (Contracts + Control Plane)** | ⭐ **Kern-Fund** |
-| Feed-the-Floor-Bleed | pub | 537 | node | **Gate-Engine** (`scripts/shinon/`) | ⭐ **sofort ziehen** |
+| Feed-the-Floor-Bleed | pub | 537 | node | **Gate-Engine** (`Feed-the-Floor-Bleed/scripts/shinon/`) | ⭐ **sofort ziehen** |
 | Shinon_Agent/interface-specs | – | 11 | json | 6 Contracts + WIRING + Schemas | ⭐ **kanonisch** |
 | karma | pub | 136 | py | FalsificationGate, Evidence, Reward | ⭐ echt (Python) |
 | limen | priv | 84 | py | Provider-Plane, Key-Pool, 429 | ⭐ echt (Python) |

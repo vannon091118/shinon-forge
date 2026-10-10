@@ -1,9 +1,12 @@
 # Starter-Plan — DSH als native App (Roadmap + Stand)
 
-> Status: **PLAN + TEILS UMGESETZT** (Stufe 1 scharf, Stufen 2–4 Konzepte).
-> Diese Datei ist der **einzige Anker** für jeden Agenten, der am Starter arbeitet —
-> damit niemand Stale vermutet: jeder Abschnitt trägt einen **Stand** + **Datum**.
-> Liest ein anderer Agent nur diese Datei: nichts wird geraten, alles ist markiert.
+> **Status:** plan — Stufe 1 scharf, Stufen 2–4 Konzepte. **Stand:** 2026-10-08
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen (aktuell):** `Docs/ZAHLEN.md`
+>
+> Diese Datei ist für den Starter die maßgebliche Fließtext-Quelle: jeder Abschnitt trägt
+> einen **Stand** + **Datum**, nichts wird geraten. Sie ist **nicht** der Einstieg in die
+> Dokumentation (das ist `Docs/INDEX.md`) und keine Quelle für harte Zahlen (das ist
+> `Docs/ZAHLEN.md`) — frühere Fassungen nannten sie „einziger Anker“, das ist zurückgenommen.
 
 ## Der eine Satz
 DSH ist extern installiert (`@deepseek-ai/dsh` via npm, installiert `0.2.0-rc.2`,

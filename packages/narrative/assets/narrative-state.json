@@ -1,0 +1,46 @@
+{
+  "contract": "shinon.narrative/v1",
+  "authority": "NONE",
+  "role": "Narrative Engine — bestimmt Composite, Mood, Arc, Relationship aus Event-Historie",
+  "fields": [
+    { "name": "chronicle", "type": "array", "note": "Letzte N Events (Hot Memory)" },
+    { "name": "arcs", "type": "array", "note": "Offene und archivierte Arcs (Mid Memory)" },
+    { "name": "relationships", "type": "object", "note": "State zwischen Akteuren" },
+    { "name": "composite", "type": "object", "note": "Deterministischer Gesamtzustand" },
+    { "name": "seq", "type": "number", "note": "Monotone Sequenznummer" }
+  ],
+  "derivation": {
+    "composite": {
+      "input": ["prevComposite", "event"],
+      "method": "deterministic_hash",
+      "output": ["seq", "mood", "narrator", "arc_id", "relationship_state"]
+    },
+    "mood": {
+      "anti_repeat": true,
+      "pool": ["idle", "curious", "focused", "working", "concerned", "blocked"]
+    },
+    "arc": {
+      "create": "first_event",
+      "freeze": "after N events or explicit",
+      "status": ["active", "archived"]
+    },
+    "relationship": {
+      "compute": "co-occurrence + history",
+      "states": ["fresh_pair", "established_duo", "trusted_team"],
+      "fields": ["trust", "respect", "patterns", "conflicts", "open_threads"]
+    }
+  },
+  "forbidden": [
+    "autonomous_action",
+    "model_call",
+    "tool_call",
+    "project_write",
+    "state_mutation_of_other_systems"
+  ],
+  "invariants": [
+    "Ein Composite wird nur aus Vorgänger + Event abgeleitet, nie aus Modell oder Zeit.",
+    "Die Sequenz wächst monoton: jede(seq) > jede(seq-1).",
+    "Arc-Freeze ist deterministisch: gleiche Historie = gleicher Snapshot.",
+    "Relationship-State ist abgeleitet, nicht behauptet."
+  ]
+}

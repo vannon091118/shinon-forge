@@ -52,6 +52,9 @@
     "@shinon/project-index": "workspace:*",
     "@shinon/task-router": "workspace:*",
     "@shinon/codingmon": "workspace:*",
+    "@shinon/key-router": "workspace:*",
+    "@shinon/narrative": "workspace:*",
+    "@shinon/shinon-forge": "workspace:*",
     "@shinon/popup": "workspace:*"
   },
   "repository": {

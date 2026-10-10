@@ -1,5 +1,8 @@
 # Commit-Regeln — Shinon Forge
 
+> **Status:** current — Regeln und ihre Durchsetzung. **Stand:** 2026-10-08
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+
 Zwei Regeln. Beide fail-closed. Keine Ausnahmen, kein Schalter.
 
 ## 1. Kein KI-Footer. Nie.

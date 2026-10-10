@@ -1,0 +1,22 @@
+# @shinon/narrative — Narrative Engine
+#
+# Beobachtet Events, baut Chronicle, trackt Arcs und Relationships,
+# leitet Composite-Zustand deterministisch ab.
+#
+# Architektur (aus SYSTEM-ANALYSIS.md):
+#   REAL EVENT → OBSERVATION → EVIDENCE → NARRATIVE → PERSONA STATE → VOICE
+#
+# Niemals umgekehrt. Narrative ist Interpretation, nie technische Autorität.
+
+- insert:
+    - id: shinon-narrative
+      name: '@shinon/narrative'
+      config:
+        # Event-Kanal, auf dem der Spine emittiert
+        eventsChannel: 'shinon/event'
+        # Maximale Chronik-Länge (Hot-Memory)
+        chronicleLimit: 50
+        # Freeze-Schwelle: nach N Events wird ein Arc eingefroren
+        freezeThreshold: 20
+        # Beziehungsfenster: wie viele zurückliegende Events für relationship berechnen
+        relationshipWindow: 20

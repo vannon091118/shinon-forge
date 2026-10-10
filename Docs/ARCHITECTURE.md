@@ -1,6 +1,8 @@
 # Architektur — Shinon Forge
 
-Verbindliche Konventionen für `packages/`, `profiles/` und `scripts/`.
+> **Status:** current — verbindliche Konventionen für `packages/`, `profiles/`, `scripts/`. **Stand:** 2026-10-09
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md` (einziger Eigentümer harter Zahlen)
+
 Durchgesetzt von `scripts/lib/repo.mjs`, geprüft von `scripts/dsh-test.mjs` (Gate),
 `scripts/build.mjs` (Pipeline) und `scripts/validate-test.mjs` (Regel-Fixtures) —
 alle vier nutzen dieselbe Validierungsquelle.
@@ -23,9 +25,9 @@ Alle führenden Namen werden daraus abgeleitet (Scope aus dem Root-Paket, heute 
 - Namen ändern heißt: Ordner umbenennen und die vier Spiegel nachziehen; Gate und
   Build prüfen danach automatisch.
 
-## 2. Paketgrenzen
+## 2. Paketgrenzen — **die eine** Aussage
 
-Jedes Paket ist ein Cordis-Bundle aus vier Dateien mit klarer Rolle:
+Ein Paket ist ein Cordis-Bundle. **Pflicht sind vier Rollendateien:**
 
 | Datei                | Rolle            | Gehört hierher                                                    | Gehört nicht hierher              |
 |----------------------|------------------|-------------------------------------------------------------------|-----------------------------------|
@@ -34,36 +36,59 @@ Jedes Paket ist ein Cordis-Bundle aus vier Dateien mit klarer Rolle:
 | `cordis.patch.yml`   | Aktivierung      | genau **ein** `insert`-Eintrag mit `id`, `name`, Config           | mehrere Einträge, Fremdpakete     |
 | `package.json`       | Manifest         | `name`, `exports` (`.`, `./client`, `./cordis.patch.yml`), `dsh.bundle.patch`, `dsh.client.platform`, optional `icon` (Datei muss existieren); host-shared Deps als `peerDependencies` **und** `devDependencies` | Laufzeitlogik |
 
-- Pakete kennen sich nicht gegenseitig; gemeinsame Logik lebt ausschließlich im
-  Tooling (`scripts/lib/`), nicht in Paketen.
-- Client-interne IDs folgen `<name>-<zweck>` (z. B. `shinon-core-brand`, `shinon-info-banner`).
-- Host-shared Abhängigkeiten stehen in `SHARED_DEPS` (`scripts/lib/repo.mjs`) und werden als peer+dev erzwungen. Immer die API der deklarierten Version nutzen: Schemastery 3.18.4 kennt kein `z.enum` — Enums sind `z.union([z.const('a'), z.const('b')])`.
-- Weitere Dateien liefert ein Paket nur, wenn Manifest oder Patch sie **referenzieren**
-  (heute: `packages/openapi/openapi.yaml`) — siehe § 4.
+**Darüber hinaus erlaubt — und nur das (heute gemessener Bestand):**
+
+| Zusatz | Regel | heute |
+|---|---|---|
+| `assets/` | Laufzeit-Hilfsdateien, werden nach `dist/` mitkopiert | in den meisten Paketen |
+| `test/` | paketlokale Tests, **nicht** ausgeliefert | `codingmon`, `hook` |
+| `fixtures/` | eingefrorene Eingaben für Tests, nur wenn der Test sie liest | `hook/fixtures/` |
+| `README.md` | Paket-Doku (Statusblock wie jedes Dokument, s. `Docs/INDEX.md`) | `narrative`, `shinon-forge` |
+| eine von Manifest oder Patch **referenzierte** Ressource | muss existieren, eine Datei sein, innerhalb des Pakets liegen und in ihrem Format parsen | `openapi/openapi.yaml` |
+
+Alles andere ist ein Fehler: das Gate lehnt Ressourcen ab, die nicht existieren oder
+das Paket verlassen, und das Build kopiert nur `assets/` plus `artifactFiles`
+(Pfade, die Manifest oder Patch wirklich nennen).
+
+Für Enums gilt die deklarierte Schemastery-Fassung (`Docs/ZAHLEN.md` §1): sie kennt
+**kein** `z.enum` — Enums werden als `z.union([z.const('a'), z.const('b')])` modelliert.
+
+- Pakete kennen sich nicht gegenseitig; gemeinsame Tooling-Logik lebt in
+  `scripts/lib/`, **niemals** in Paketen.
+- Client-interne Slot-IDs folgen `<name>-<zweck>` (z. B. `shinon-core-brand`,
+  `shinon-info-banner`).
+- Host-shared Abhängigkeiten stehen in `SHARED_DEPS` (`scripts/lib/repo.mjs`) und
+  werden als peer **und** dev erzwungen.
 
 ## 3. DSH-Profil
 
 `profiles/<profil>/` ist ein **echtes DSH-Profil**, keine Cordis-Konfiguration.
-Das Format stammt nicht aus diesem Repo, sondern aus `@deepseek-ai/dsh-app-boot`
-(`loadProfile` / `loadProfileDirectory`); nachzulesen am installierten DSH.
+Das Format stammt aus `@deepseek-ai/dsh-app-boot` (`loadProfile` /
+`loadProfileDirectory`); nachzulesen am installierten DSH.
 
 | Datei                                  | Rolle                                                          |
 |----------------------------------------|----------------------------------------------------------------|
 | `package.json`                          | `dsh.profile.bundles` — die Patch-Layer in Anwendungsreihenfolge |
-| `cordis.patch.yml`                      | User-Ebene: top-level YAML-Array von Patch-Einträgen (Patches des Includes, `insert`-Listen, `!!js`) |
+| `cordis.patch.yml`                      | User-Ebene: top-level YAML-Array von Patch-Einträgen (Patches des Includes, `insert`-Listen) |
 | `pnpm-workspace.yaml`                   | pnpm-Einstellungen (`packages: [.]`, `nodeLinker: hoisted`) für out-of-tree Bundles |
 | `node_modules/` (gitignored)            | die per `link:` verknüpften `@shinon/*`-Pakete                  |
 
 - Ein Profil liegt unter `<DSH_HOME>/profiles/<name>`. **Das Repo-Root ist das
-  `DSH_HOME`**, weil es `profiles/` enthält — damit ist der Lauf reproduzierbar,
+  `DSH_HOME`**, weil es `profiles/` enthält — der Lauf ist damit reproduzierbar,
   ohne etwas nach `~/.dsh` zu installieren.
-- `dsh.profile.bundles` nennt Repo-Bundles mit `@shinon/<dir>` und fremde Bundles
-  mit ihrem Paketnamen (`@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app` liefern
-  die Harness). `@shinon/openapi` ist bewusst **nicht** dabei.
+- Kanonisch ist **`profiles/shinon`**; die aktive Profilwahl steht einmal in
+  `scripts.dev` (`--profile shinon`) und wird nirgends dupliziert.
+- `profiles/headless` ist das One-shot-Profil (Modell-Route, ein Bundle aus diesem Repo).
+- `profiles/web` ist **Altbestand**: es nennt nur fremde Bundles und **kein**
+  `@shinon/*`-Paket. Es ist kein zweites kanonisches Profil.
+- `dsh.profile.bundles` nennt eigene Bundles als `@shinon/<dir>` und fremde mit ihrem
+  Paketnamen. **Welche** eigenen Pakete aktiv sind und **wie viele** Layer das Profil
+  hat, steht gemessen in `Docs/ZAHLEN.md` §1; Quelle ist allein
+  `profiles/shinon/package.json`.
 - Ein Bundle ist ein Paket mit `dsh.bundle.patch`; DSH löst es zuerst aus der
-  Installation, dann aus dem Profil auf.
-- Die User-Ebene dupliziert keine Bundle-Werte: jeder Paket-Patch bringt seine
-  Config mit, das Profil überschreibt nur, was abweichen soll.
+  Installation, dann aus dem Profil auf. Ein Paket ohne Profil-Eintrag ist gebaut,
+  aber nicht aktiv — heute sind das fünf, namentlich und gezählt in
+  `Docs/ZAHLEN.md` §1 (`Pakete **nicht** im Profil`).
 
 ## 4. Validierungsregeln
 
@@ -98,13 +123,11 @@ doppelte `insert`-id über Bundles und User-Ebene; der Paketgraph aus
 `dependencies`/`peerDependencies` von `@shinon/*`-Paketen muss azyklisch sein und darf
 nur existierende Pakete nennen.
 
-**OpenAPI-Entscheidung.** `packages/openapi/cordis.patch.yml` referenziert
-`specPath: './openapi.yaml'`; der Vertrag existiert bereits als JSDoc in
-`packages/openapi/index.js`. Deshalb wurde die Datei **angelegt** (minimales, gültiges
-OpenAPI-3.0-Dokument mit `/api/v1/status`) statt die Referenz zu entfernen: die
-Ressourcen-Regel wird so an einer echten Referenz geprüft, und der spätere Server hat
-seinen Vertrag schon. Das Profil bleibt unverändert inaktiv — `@shinon/openapi` ist
-weder Bundle noch Dependency.
+**Beispiel „referenzierte Ressource“.** `packages/openapi/cordis.patch.yml`
+referenziert `specPath: './openapi.yaml'`; die Datei existiert als minimales,
+gültiges OpenAPI-3.0-Dokument. Sie ist damit der eine Fall, in dem ein Paket eine
+Datei außerhalb von `assets/`/`test/` trägt (siehe § 2). Das Profil ist davon
+unberührt: `@shinon/openapi` bleibt inaktiv.
 
 ## 5. State und Datenfluss
 
@@ -113,6 +136,7 @@ weder Bundle noch Dependency.
 | Schema-Defaults   | Paket selbst                      | `index.js`                         |
 | Patch-Werte       | Paket (ausgeliefert) bzw. Profil (überschrieben) | `packages/<dir>/cordis.patch.yml`, `profiles/shinon/cordis.patch.yml` |
 | UI-Zustand        | DSH-Services (`slots`, `styles`, `locale`) | Client-Hälfte              |
+| Zahlen (Bestand, Prüfläufe) | `Docs/ZAHLEN.md` | sonst nirgends |
 
 Fluss:
 
@@ -125,39 +149,57 @@ profiles/shinon/package.json         (Aktivierung: dsh.profile.bundles)
 ```
 
 - Ein Config-Wert steht im Paket: als Schema-Default (`index.js`) und als
-  Patch-Wert (`cordis.patch.yml`).
+  Patch-Wert (`cordis.patch.yml`). Wirksame Werte stehen im Profil, nicht im Paket.
 - Pakete halten keinen globalen Zustand; sie registrieren sich bei den DSH-Services.
-- Das aktive Profil wird aus `scripts.dev` gelesen (`--profile <name>`), nicht dupliziert.
 
 ## 6. Werkzeuge
 
 | Einstieg                               | Aufgabe                                                                                        |
 |----------------------------------------|------------------------------------------------------------------------------------------------|
-| `npm test`                             | Gate → Regel-Fixtures → Distributionstest → Profiltest; Exit 1 bei jeder Abweichung            |
+| `npm test`                             | Gate → Regel-Fixtures → Distributionstest → Profiltest; stoppt beim ersten Fehler                |
 | `node scripts/dsh-test.mjs`            | Gate: Manifest, Ressourcen, Patch-Schema, Namensvertrag, Syntax, Legacy-Guard, Komposition      |
 | `node scripts/validate-test.mjs`       | Regel-Fixtures: je Regel muss Gate **und** Build rot werden (Kontrolle bleibt grün)             |
 | `node scripts/pack-test.mjs`           | Distributionstest je Paket: `pnpm pack` → entpacken → isoliert installieren → laden             |
-| `node scripts/dsh-profile-test.mjs`    | Profiltest: `DSH_HOME=<Repo>` `dsh --profile shinon --dump-config` → Exit 0, alle Bundle-Layer   |
+| `node scripts/dsh-profile-test.mjs`    | Profiltest: `DSH_HOME=<Repo>` `dsh --profile shinon --dump-config` → alle Bundle-Layer          |
+| `npm run gate` / `gate:local` / `gate:full` | modulare Gate-Engine (`scripts/gate/engine.mjs`), Slice-fähig                              |
 | `npm run build` (`scripts/build.mjs`)  | dieselben Regeln + Artefakte nach `dist/` (`manifest.json`, `profile.json`, Paketkopien)        |
+| `npm run stages` (`scripts/stages.mjs`)| Startstufen und READY-Zeile des Starters nachvollziehen                                         |
+| `npm run verify:panel` (`scripts/panel-check.mjs`) | Panel-Beleg über das gebaute Client-Bundle (braucht jsdom)                          |
+
+**Ist-Zustand:** Welche dieser Läufe heute Exit 0 liefern und welche rot sind, steht
+in `Docs/ZAHLEN.md` §2/§3. Diese Datei behauptet keine Testergebnisse.
 
 Wer Verträge ändert, ändert sie in `scripts/lib/repo.mjs` — nie in den Aufrufern.
 
 ## 7. Statusklassen
 
-`Verified` / `Experimental` / `Planned` werden in der README geführt. Neue Features
-starten als *Planned* und werden erst mit ausführbarem Nachweis *Verified*.
+`Verified` / `Rot` / `Nicht geprüft` werden in der README geführt (Beleg = ein in
+**diesem** Durchlauf gesehener Exit-Code). Für Dokumente gilt die Statusregel in
+`Docs/INDEX.md` §2 (`current`, `historical`, `plan`, `evidence`, `imported`).
+Neue Features starten als *plan* und werden erst mit ausführbarem Nachweis *current*.
 
 ## 8. Bewusste Grenzen
 
-- Kein Voll-Boot (`dsh --profile shinon` startet die Web-UI) — verifiziert ist nur
-  die Config-Auflösung (`scripts/dsh-profile-test.mjs`); README: *Planned*.
+- Kein Voll-Boot in der Doku belegt: verifiziert ist die Config-Auflösung
+  (`scripts/dsh-profile-test.mjs`); Web-UI und Modellaufruf brauchen Browser bzw.
+  Schlüssel und sind in `Docs/ZAHLEN.md` §4 als „nicht geprüft“ geführt.
 - Patch-Configs werden **strukturell** validiert, nicht gegen das Schemastery-Schema
   des Pakets (`index.js`) — dafür müssten die Pakete samt `schemastery` geladen werden.
-- `!!js`-Ausdrücke (DSH-YAML-Dialekt) kennt der Validator nicht und die Dateien
-  dieses Repos nutzen sie nicht; sie sind ein bewusster blinder Fleck.
-- Das Root-`package.json` hat weiterhin kein Lockfile / keine `pnpm-workspace.yaml`
-  → das Root-Install ist nicht reproduzierbar. Das Profil bringt sein eigenes
-  `pnpm-workspace.yaml` und `pnpm-lock.yaml` mit (nur `link:`-Deps, offline installierbar).
-- Reload-Helfer existieren dreifach (`scripts/dsh_reload.js`, `dsh_reload.mjs`, `reload.mjs`).
-- Dashboard, Token Usage und Better Errors sind Platzhalter; OpenAPI hat einen
-  Vertrag, aber keinen Server.
+- `@deepseek-ai/schemastery` ist im Repo-Root **nicht installiert**; Tests, die es
+  brauchen, überspringen sichtbar (Grund im Testnamen) — einer davon wird heute rot
+  statt zu überspringen (`Docs/ZAHLEN.md` §3.3).
+- Das installierte DSH (`dsh --version`) weicht vom Pin im Root-Manifest ab; genau
+  deshalb verweigert ein Gate-Test seine Zusage gegen die ungeprüfte Fassung.
+- `!!js`-Ausdrücke (DSH-YAML-Dialekt) kennt der Validator nicht; die Dateien dieses
+  Repos nutzen sie nicht — bewusster blinder Fleck.
+- Das Root-`package.json` hat kein Lockfile und keine `pnpm-workspace.yaml`
+  (das Feld `workspaces` unterstützt pnpm nicht) → das Root-Install ist nicht
+  reproduzierbar. Das Profil bringt sein eigenes `pnpm-workspace.yaml` mit.
+- Fünf Pakete (`key-router`, `narrative`, `openapi`, `popup`, `shinon-forge`) stehen
+  **nicht** im Profil und sind damit inaktiv; für `openapi` ist das eine dokumentierte
+  Entscheidung, für die übrigen ist kein Grund verzeichnet (`Docs/ZAHLEN.md` §1/§3).
+  `profiles/web` ist Altbestand ohne eigene Bundles.
+- Reload-Helfer existieren dreifach (`scripts/dsh_reload.js`, `dsh_reload.mjs`,
+  `reload.mjs`); keiner ist als kanonisch dokumentiert.
+- `better-errors` und `token-usage` sind Config-Ebenen ohne Logik (ihr `apply()`
+  loggt nur); `openapi` hat einen Vertrag, aber keinen Server und ist nicht aktiviert.

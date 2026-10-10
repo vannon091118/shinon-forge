@@ -5,6 +5,10 @@
 #}
 # Gesprächs-Zusammenfassung
 
+> **Status:** imported — unverändert übernommener Fremdtext (Goose-Prompts), nicht Teil des kanonischen Satzes.
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+
+
 {% if user_intent %}
 ## Ziel des Nutzers
 {% for item in user_intent %}

@@ -1,5 +1,8 @@
 # Fundament-Plan — Shinon Forge auf der DSH-Architektur
 
+> **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen (aktuell):** `Docs/ZAHLEN.md`
+
 > Status: PLAN (Entwurf, zum Freigeben). Nicht: implementiert.
 > Regel: DSH/Cordis ist das Fundament. Wir bauen Schichten DARAUF.
 > Aus fremden Repos übernehmen wir nur Invarianten/Prinzipien — keinen Fremdcode.
@@ -9,7 +12,7 @@ Jede Report-Behauptung gegen die echten Bäume geprüft — nicht übernommen, b
 
 | Report-Block | Quelle | Verdict | Beleg |
 |---|---|---|---|
-| **S1 Shinon Gate Engine** | Feed-the-Floor-Bleed `scripts/shinon/` | ✅ **ECHT & stark** | `engine.mjs` (157 Z), `policy.json` (12 Gates, slices/local/always), 12 Plugins, `lib/commit-text.mjs`, eigene Tests + `docs/`. JS, node-only, CI-Job `shinon.yml`. **Reifste, direkteste Vorlage.** |
+| **S1 Shinon Gate Engine** | `Feed-the-Floor-Bleed/scripts/shinon/` | ✅ **ECHT & stark** | `engine.mjs` (157 Z), `policy.json` (12 Gates, slices/local/always), 12 Plugins, `lib/commit-text.mjs`, eigene Tests + `docs/`. JS, node-only, CI-Job `shinon.yml`. **Reifste, direkteste Vorlage.** |
 | S4 Contract Schema 7-Punkt | propsa `bausteine/` | ✅ echt (nur Prinzip) | 7 Verträge, 4 Zustände. Ist Form/Disziplin, kein Runtime-Code. |
 | A1 Probe/Twin | Falsify_Me | ✅ echt (Prinzip) | Probe-Vertrag, Thinker/Validator/Twin, Verdicts. |
 | A5 Provenance | DOKI | ✅ echt (Prinzip) | CONTRACT v2, 7-Punkt, „derived ≠ authority". |
@@ -65,8 +68,8 @@ Contracts und Disziplin** — als Regeln, die unsere Bundles/`scripts` testen.
 `packages/events/` — `@shinon/events`, der Beobachtungs-/Emissions-Spine, der den
 Zyklus aus der Analyse als erste Runtime-Schicht trägt: Signale beobachten →
 normalisieren → validieren → emittieren. Neun Event-Typen, Envelope mit acht
-Pflichtfeldern, Vertrag als Daten (`assets/event-spine.json`), Replay-Fixture
-(`assets/replay/session-created.json`).
+Pflichtfeldern, Vertrag als Daten (`packages/events/assets/event-spine.json`), Replay-Fixture
+(`packages/events/assets/replay/session-created.json`).
 - **Fail-closed für Events, fail-open für den Host:** ein Event, das den Vertrag
   verletzt, wird nie emittiert (Grund + Zähler statt stillem Durchlauf); ein
   Handler wirft nie zurück in den beobachteten Prozess.
@@ -166,9 +169,9 @@ LAYER 3  @shinon/dashboard   fail-OPEN   (Präsentation)
 - **Parallel-Persistenz** (eigene SQLite-Welten) — DSH-Session-Log ist der Audit.
 
 ## Konfiguration & Aktivierung
-- `profiles/shinon/cordis.patch.yml` führt aktuell 6 Pakete (openapi bewusst
-  draußen). L0–L3 nur aktiv, wenn je ein `insert`-Eintrag ergänzt wird — dann
-  prüft das Profil-Gate den 4-Wege-Namen.
+- `profiles/shinon/cordis.patch.yml` nannte damals 6 Pakete (openapi bewusst
+  draußen); die heutige Zahl steht in `Docs/ZAHLEN.md` §1. L0–L3 nur aktiv, wenn je
+  ein `insert`-Eintrag ergänzt wird — dann prüft das Profil-Gate den 4-Wege-Namen.
 - Schemastery 3.18.4 kennt kein `z.enum` → `z.union([z.const('a'), …])`.
 
 ## Reihenfolge & „fertig"

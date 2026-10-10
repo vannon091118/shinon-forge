@@ -1,5 +1,9 @@
 # Goose Prompt Overrides — Shinon (deutsch)
 
+> **Status:** imported — unverändert übernommener Fremdtext (Goose-Prompts), nicht Teil des kanonischen Satzes.
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+
+
 Overrides der eingebauten Goose-Prompt-Templates. Goose lädt sie aus `~/.config/goose/prompts/<name>.md`
 und benutzt sie statt der im Binary eingebetteten Defaults. Der Deploy ist erfolgt; die Dateien hier sind
 die versionierbare Quelle (identische Checksummen, per `check-prompts.py` geprüft).

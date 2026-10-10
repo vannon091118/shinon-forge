@@ -36,7 +36,10 @@
         "@shinon/project-index",
         "@shinon/task-router",
         "@shinon/codingmon",
-        "@deepseek-ai/dsh-experimental-auto-review"
+        "@deepseek-ai/dsh-experimental-auto-review",
+        "@deepseek-ai/dsh-experimental-agent-team-profile",
+        "@deepseek-ai/dsh-experimental-schedule-bundle",
+        "@deepseek-ai/dsh-experimental-voice-input-bundle"
       ]
     }
   }

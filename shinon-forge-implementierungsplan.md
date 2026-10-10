@@ -1,5 +1,8 @@
 # Shinon Forge – verifizierbarer Implementierungsplan
 
+> **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen (aktuell):** `Docs/ZAHLEN.md`
+
 ## Zweck
 
 Dieser Plan dient als ausführbare Arbeitsgrundlage für ein LLM oder einen Entwickler.

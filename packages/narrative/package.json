@@ -1,0 +1,32 @@
+{
+  "name": "@shinon/narrative",
+  "version": "0.1.0",
+  "description": "Narrative Engine — Chronicle, Arcs, Relationships, Composite State",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./assets/narrative-state.json": "./assets/narrative-state.json"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "meta": {
+    "title": "Shinon Forge - Narrative Engine",
+    "description": "Deterministische Ableitung von Composite, Mood, Arc, Relationship aus Event-Historie"
+  }
+}

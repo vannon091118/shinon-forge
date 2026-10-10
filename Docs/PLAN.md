@@ -1,5 +1,8 @@
 # DSH-Mod Plan - DeepSeek Harness Customisierung
 
+> **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen (aktuell):** `Docs/ZAHLEN.md`
+
 > Hinweis: Historischer Planungsstand. Die Pakete heißen heute `@shinon/*` und liegen als `packages/<name>/`; das kanonische Profil ist `profiles/shinon`.
 
 ## Zielsetzung
@@ -7,7 +10,7 @@ Ein modifiziertes DSH mit deutscher native Sprache, vorinstallierten QoL-Plugins
 
 ## Architektur-Entscheidung
 - **Plugin-basiert**: Alle Mods sind eigene Cordis-Bundles im Workspace
-- **Patch-Datei**: `~/.dsh/profiles/web/cordis.patch.yml` wird durch das Bundle erweitert
+- **Patch-Datei**: `profiles/shinon/cordis.patch.yml (heute)` wird durch das Bundle erweitert
 - **Workspace**: Alle Plugins unter `packages/` mit eigenem `package.json`
 - **Updater**: `node tools/update.mjs` pullt Änderungen und führt `plugin_manager install_bundle` aus
 

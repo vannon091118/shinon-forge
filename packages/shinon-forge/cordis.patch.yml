@@ -1,0 +1,26 @@
+# @shinon/shinon-forge — Memory Sync, Global Runner, Engine Adapters
+#
+# Architektur:
+#   Notion (MCP) ──▶ memory_sync Tool ──▶ ~/.agents/AGENTS.md + memory.json
+#                                              │
+#                                              ▼
+#                                   Agent Config-Files (.claude, .codex, etc.)
+#
+#   Agent Sessions ──▶ Polling Runner ──▶ Engine Dispatch ──▶ Status Back
+#
+# Engines: claude, codex, agy, muse, hermes, pi, cline, grok, freebuff
+
+- insert:
+    - id: shinon-shinon-forge
+      name: '@shinon/shinon-forge'
+      config:
+        # Polling-Intervall in Sekunden
+        pollInterval: 5
+        # Notion MCP Server Name
+        notionMcpServer: 'notion'
+        # Kanonische Notion Page ID
+        memoryPageId: ''
+        # Max Engine-Fails bevor Stop
+        maxEngineFails: 3
+        # Heartbeat Timeout (Sekunden)
+        heartbeatTimeout: 60

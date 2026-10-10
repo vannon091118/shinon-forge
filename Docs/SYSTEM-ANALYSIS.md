@@ -1,5 +1,8 @@
 # Shinon Forge — Systemanalyse und Übergabe
 
+> **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen (aktuell):** `Docs/ZAHLEN.md`
+
 Diese Datei ist die belastbare Übergabe an den nächsten Agenten. Sie ist aus den tatsächlichen Repositories vannon091118/Falsify_Me, vannon091118/propsa, vannon091118/Feed-the-Floor-Bleed, vannon091118/DOKI, vannon091118/Shinon_Agent (inkl. Promtguard-main und .archive/commit-layer-master) sowie dem aktuellen Stand von vannon091118/shinon-forge (Commit d275db09477b409868081130fb1b8614b61fe953, Arbeitsbaum danach um `@shinon/persona` weiter) gebildet. Annahmen oder frühere Zusammenfassungen wurden nicht weitergeführt.
 
 ## Quellenübersicht — woher jedes System wirklich kommt
@@ -10,7 +13,7 @@ Die Herkunft wurde per GitHub-Abfrage (`gh repo list vannon091118`, `gh repo vie
 |---|---|---|
 | Falsify_Me | `vannon091118/Falsify_Me` (public), Branch main | geklont und gelesen |
 | PROPAKT / propsa | `vannon091118/propsa` (public), Branch main | geklont und gelesen |
-| Shinon Gate Engine | `vannon091118/Feed-the-Floor-Bleed` (public) — Gate-Code unter `scripts/shinon/`, daneben die Dorf-/Spielserver-Architektur | geklont und gelesen |
+| Shinon Gate Engine | `vannon091118/Feed-the-Floor-Bleed` (public) — Gate-Code unter `Feed-the-Floor-Bleed/scripts/shinon/`, daneben die Dorf-/Spielserver-Architektur | geklont und gelesen |
 | DOKI | `vannon091118/DOKI` (public) | geklont und gelesen |
 | Promtguard | **kein eigenes Repository** — `Promtguard-main/` liegt in `vannon091118/Shinon_Agent`; Interface-Spec unter `Shinon_Agent/interface-specs/promtguard.contract.json` | im Shinon_Agent-Klon gelesen |
 | SyxCraft Commit Layer | **kein eigenes Repository** — der Layer liegt als `.archive/commit-layer-master/` in `vannon091118/Shinon_Agent` (Default Branch dort: master/material) | im Shinon_Agent-Klon gelesen |
@@ -109,7 +112,7 @@ Agenten können dieselben Dateien lesen, aus denen ihr eigenes Plan entstanden i
 
 ### Quelle
 - Repository: vannon091118/propsa, main.
-- Wichtigste Dateien: README.md, docs/wiki/Bausteine.md, packages/core/src/vertrag.ts, bausteine/vertrage/*.contract.json, bausteine/geraest/*.ts, bausteine/AGENTS.md, tests/vertrag.test.ts, scripts/pruefen/vertragsGates.mjs, package.json.
+- Wichtigste Dateien (im Repo `propsa`): README.md, docs/wiki/Bausteine.md, `propsa/packages/core/src/vertrag.ts`, bausteine/vertrage/*.contract.json, bausteine/geraest/*.ts, bausteine/AGENTS.md, tests/vertrag.test.ts, scripts/pruefen/vertragsGates.mjs, package.json.
 
 ### Primäre Rolle
 Gemeinsame Vertragssprache und Statusdisziplin: ein Baustein wird durch sieben Punkte und vier Zustände beschrieben, nicht durch Code, den man raten muss.
@@ -146,7 +149,7 @@ Verträge sind Prüfobjekte: `regelVollstaendig` prüft die Sieben-Punkte-Füllu
 - Baustein-Positionen 0..3, einseitige Abgabe nach unten (keine zyklischen Aufwärtsaufrufe).
 
 ### Persistenz
-- Verträge sind Dokumente, keine Runtime: `bausteine/vertrage/*.contract.json`, `packages/core/src/vertrag.ts`, gespiegelt in `tauri-app/src-tauri/src/vertrag.rs`.
+- Verträge sind Dokumente, keine Runtime: `bausteine/vertrage/*.contract.json`, `propsa/packages/core/src/vertrag.ts`, gespiegelt in `propsa/tauri-app/src-tauri/src/vertrag.rs`.
 - Status ist dokumentiert, kein laufender Service-Zustand.
 
 ### Determinismus
@@ -195,7 +198,7 @@ Verträge sind Prüfobjekte: `regelVollstaendig` prüft die Sieben-Punkte-Füllu
 
 ### Quelle
 - Repository: vannon091118/Feed-the-Floor-Bleed, main.
-- Wichtigste Dateien: scripts/shinon/engine.mjs, scripts/shinon/policy.json, scripts/shinon/policy.mjs, scripts/shinon/lib/engine-policy.mjs, scripts/shinon/plugins/*.mjs (insbes. commit-integrity.mjs), scripts/shinon/prepare-commit-msg.mjs, scripts/shinon/commit-msg.mjs, scripts/shinon/policy-schema.mjs, .github/workflows/shinon.yml, docs/ARCHITEKTUR.md.
+- Wichtigste Dateien (im Repo `Feed-the-Floor-Bleed`): `Feed-the-Floor-Bleed/scripts/shinon/engine.mjs`, `Feed-the-Floor-Bleed/scripts/shinon/policy.json`, `Feed-the-Floor-Bleed/scripts/shinon/policy.mjs`, `Feed-the-Floor-Bleed/scripts/shinon/lib/engine-policy.mjs`, `Feed-the-Floor-Bleed/scripts/shinon/plugins/*.mjs` (insbes. commit-integrity.mjs), `Feed-the-Floor-Bleed/scripts/shinon/prepare-commit-msg.mjs`, `Feed-the-Floor-Bleed/scripts/shinon/commit-msg.mjs`, `Feed-the-Floor-Bleed/scripts/shinon/policy-schema.mjs`, .github/workflows/shinon.yml, docs/ARCHITEKTUR.md.
 
 ### Primäre Rolle
 Technische Gate-Ausführung und Governance-Enforcement auf Git-Änderungen: Scope → relevante Plugins → PASS/FAIL.
@@ -208,7 +211,7 @@ Lokale Hooks sind umgehbar (--no-verify, klone Ignorierung, core.hooksPath). Ein
    - `SLICE` (Standard) nutzt `git diff --cached --name-only` für gestagte Änderungen.
    - `--full` / `--push` nutzt Union aus `git diff --name-only HEAD` und `git diff --cached --name-only`.
    - `--local` nutzt keinen Diff; seine Menge steht fest in der Policy.
-2. Relevante Gate-Plugins → Plugins werden aus `scripts/shinon/plugins/*.mjs` geladen; `policy.mjs` validiert, dass die im Policy konfigurierten Plugins auch als Dateien existieren und umgekehrt.
+2. Relevante Gate-Plugins → Plugins werden aus `Feed-the-Floor-Bleed/scripts/shinon/plugins/*.mjs` geladen; `policy.mjs` validiert, dass die im Policy konfigurierten Plugins auch als Dateien existieren und umgekehrt.
 3. Policy entscheidet, welche Plugins laufen → `shouldRun(pluginName, changedFiles, forceFull, policy)`:
    - `forceFull` → alles.
    - Plugin in `policy.engine.always` → immer.
@@ -778,7 +781,7 @@ Schritt 0 (`@shinon/core`) ist gebaut. Die Schritte 1–6 sind die Kern-Bundles,
 
 ### 3. @shinon/context — Beobachtung und Gedächtnis (aus DOKI)
 - **Ziel:** DSH-Events werden beobachtet, persistiert und zu rekonstruierbarem Kontext, ohne eine zweite Runtime zu bauen. Das ist die Memory-/Second-Brain-Stufe und Voraussetzung für Narrative.
-- **Dateien/Module:** `packages/context/{index.js,client.js,cordis.patch.yml,package.json}`, `scripts/gate/plugins/context.mjs`, `Docs/contracts/context.json`, Slices-Eintrag in `scripts/gate/policy.json`.
+- **Dateien/Module (geplant, noch nicht im Baum):** vier Rollendateien als Paket `context`, ein Gate-Plugin `context` und ein Vertrag `context` im Verzeichnis `Docs/contracts/`, Slices-Eintrag in `scripts/gate/policy.json`.
 - **Abhängigkeiten:** DSH `session/event` + Session-Append (DSH-Session-Log ist der Audit), `@shinon/persona` (Anzeige).
 - **Contract:** Observation-ID-Regel, Cursor-Trennung (live vs. replay), Confidence-Domänen (`capture`/`inference`/`policy_relevance`), `rule_version`-Digests, Inklusions-Gate.
 - **Test:** `node:test` für ID-Bildung, Dedupe, Cursor-Vorschub bei Crash; `pack-test` für die Distribution.
@@ -787,7 +790,7 @@ Schritt 0 (`@shinon/core`) ist gebaut. Die Schritte 1–6 sind die Kern-Bundles,
 
 ### 4. @shinon/claims — Claims und Kontextkontinuität (aus Promtguard + FalsifyMe)
 - **Ziel:** aus Kontext wird arbeitsfähiger, prüfbarer Zustand: Claims als Atome, Handoff als Übergabe, Scope als Grenze.
-- **Dateien/Module:** `packages/claims/{index.js,client.js,cordis.patch.yml,package.json}`, `Docs/contracts/claims.json`, Gate-Plugin + `policy.json`-Slice; `Docs/decisions/` als Decision Journal.
+- **Dateien/Module (geplant):** vier Rollendateien als Paket `claims`, ein Vertrag im Verzeichnis `Docs/contracts/`, Gate-Plugin + `policy.json`-Slice; ein eigenes Decision-Journal-Verzeichnis gibt es nicht — Entscheidungen führt heute `Docs/INDEX.md`.
 - **Abhängigkeiten:** `@shinon/context` (Observation als Belegquelle), DSH-Append/Session.
 - **Contract:** Lebenszyklus `unverified → supported → confirmed | refuted | conflicted`, append-only, latest-wins; Handoff-Felder (`from`, `to`, `timestamp`, `note`, `handoff_version`); Scope-Bounding je Aufgabe.
 - **Test:** `node:test` für erlaubte/verbotene Übergänge; Negativtest für „Beleg fehlt“.
@@ -796,7 +799,7 @@ Schritt 0 (`@shinon/core`) ist gebaut. Die Schritte 1–6 sind die Kern-Bundles,
 
 ### 5. @shinon/verify — Falsifikation und Verdict (aus Falsify_Me)
 - **Ziel:** Shinon darf glauben, aber nicht behaupten: jeder WRITE-Kandidat braucht Probe + unabhängige Gegenprüfung.
-- **Dateien/Module:** `packages/verify/{index.js,client.js,cordis.patch.yml,package.json}`, `Docs/contracts/verify.json`, `Docs/probes/*` (heute `brand-render.json`, `profile-boot.json`, `webui-chat.json`), `scripts/gate/plugins/probe-twin.mjs`, `scripts/gate/plugins/registry.mjs`.
+- **Dateien/Module (geplant):** vier Rollendateien als Paket `verify`, ein Vertrag im Verzeichnis `Docs/contracts/`; Proben liegen unter `Docs/probes/` (dieses Dokument nennt drei ältere), geprüft wird heute von `scripts/gate/plugins/probe-twin.mjs` und `scripts/gate/plugins/registry.mjs`.
 - **Abhängigkeiten:** `@shinon/claims`, `@shinon/context`, Gate-Engine.
 - **Contract:** Probe-Struktur (`id`, `requirement_ref` auf originale H-IDs, `class`, `target`, `claim`, `check`), Anti-Vakuum-Minima, Verdict-Vokabular, „keine Prosa als Evidenz“.
 - **Test:** negative Fixtures — leeres Probe-Set → PLAN, jede UNKLAR-Probe → PLAN, API-Fehler → alle Proben UNKLAR.
@@ -805,7 +808,7 @@ Schritt 0 (`@shinon/core`) ist gebaut. Die Schritte 1–6 sind die Kern-Bundles,
 
 ### 6. @shinon/narrative — Chronicle, Arcs, Relationships, Consequences
 - **Ziel:** das, was Shinon bisher fehlt: gelebte historische Kontinuität. Nicht „Commit 294“, sondern „Shinon ist im Arc *Übergang vom Framework zur Persona*, offene Threads: …“.
-- **Dateien/Module:** `packages/narrative/{index.js,client.js,cordis.patch.yml,package.json}`, `packages/narrative/assets/` (Arc-/Event-/Thread-/Mood-Schemata und Templates), `Docs/contracts/narrative.json`, Gate-Plugin + `policy.json`-Slice. Adapter: DOKI (Observation/Provenance), Commit-Layer (Git-Event → NarrativeEvent), FalsifyMe (Verdict-Wechsel), DSH-Session (Turns). Chronik-State persistiert über `@shinon/context`, nicht in einer neuen DB.
+- **Dateien/Module:** `packages/narrative/{index.js,client.js,cordis.patch.yml,package.json}`, `packages/narrative/assets/` (Arc-/Event-/Thread-/Mood-Schemata und Templates), Gate-Plugin + `policy.json`-Slice; ein Eintrag unter `Docs/contracts/` fehlt bis heute. Adapter: DOKI (Observation/Provenance), Commit-Layer (Git-Event → NarrativeEvent), FalsifyMe (Verdict-Wechsel), DSH-Session (Turns). Chronik-State persistiert über `@shinon/context`, nicht in einer neuen DB.
 - **Abhängigkeiten:** `@shinon/context` (Observations), `@shinon/claims` (Evidence), `@shinon/persona` (Anzeige des State).
 - **Contract:** `NarrativeEvent/Arc/Thread/RelationshipState/Consequence/NarrativeState/NarrativeSnapshot/NarrativeRenderer`; HOT/MID/COLD; Ableitung deterministisch, Prosa austauschbar; `authority: NONE`.
 - **Test:** Determinismus-Test — gleiche Chronik + gleiches Event-Set → gleiche Composite-/Mood-/Arc-Auswahl; Snapshot-Test für verlustfreien Freeze; Negativtest „Narrative mutiert technischen State“ → FAIL.
@@ -814,7 +817,7 @@ Schritt 0 (`@shinon/core`) ist gebaut. Die Schritte 1–6 sind die Kern-Bundles,
 
 ### 7. @shinon/brand-state — Persona-State → Animation (zuletzt)
 - **Ziel:** das bestehende Branding (SVG-Mark, Wortmarke, Pulse in `@shinon/core`) zeigt echten inneren Zustand statt Deko.
-- **Dateien/Module:** `packages/core/client.js` (Pulse), `packages/brand-state/{client.js,index.js,cordis.patch.yml,package.json}` oder Erweiterung des Persona-Clients; `Docs/contracts/brand-state.json`; `Docs/probes/brand-render.json` als Probe.
+- **Dateien/Module (geplant):** `packages/core/client.js` (Pulse) oder ein neues Paket `brand-state` bzw. eine Erweiterung des Persona-Clients; ein Vertrag im Verzeichnis `Docs/contracts/`; `Docs/probes/brand-render.json` als Probe.
 - **Abhängigkeiten:** `@shinon/persona` (State), DSH `slots`/`styles`.
 - **Contract:** State→Visual-Mapping (`IDLE/THINKING/VERIFYING/SPEAKING/CURIOUS/SKEPTICAL/BLOCKED/ERROR`), nur Darstellung, nie State-Quelle.
 - **Test:** `client-half`-Gate + `brand-render`-Probe; Mapping-Tabelle als reine Funktion getestet.

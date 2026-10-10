@@ -1,3 +1,6 @@
+> **Status:** imported — unverändert übernommener Fremdtext (Goose-Prompts), nicht Teil des kanonischen Satzes.
+> **Einstieg:** `Docs/INDEX.md` · **Zahlen:** `Docs/ZAHLEN.md`
+
 ## Aufgaben-Kontext
 - Ein LLM-Kontextlimit wurde erreicht, während ein Nutzer in einer Arbeitssession mit einem Agenten (dir, Shinon) war
 - Destilliere das Gespräch unten zu einer strukturierten Zusammenfassung, aus der nur die geschwätzigsten Teile entfernt sind

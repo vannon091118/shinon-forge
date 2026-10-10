@@ -1,0 +1,31 @@
+{
+  "name": "@shinon/key-router",
+  "version": "0.1.0",
+  "description": "Key Router — Multi-API-Key Pool mit 429-Rotation und Eskalationszeiten",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "meta": {
+    "title": "Shinon Key Router",
+    "description": "Rotiert API-Keys bei 429 aus dem Nutzer-Pool, mit eskalierenden Wartezeiten"
+  }
+}

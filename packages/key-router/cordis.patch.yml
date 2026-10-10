@@ -1,0 +1,24 @@
+# @shinon/key-router — Multi-API-Key Pool Rotation
+#
+# Architektur:
+#   API-Key-Pool ──▶ Router Service ──▶ LLM Provider (override deepseek-official)
+#                       │
+#                       ▼
+#                 Bei 429 → nächster Key + Backoff
+#                       │
+#                       ▼
+#                 Eskalationszeiten pro Key (initial → maxDelayMs)
+#
+# Keys werden über Config oder DEEPSEEK_API_KEY Umgebungsvariable geladen.
+
+- insert:
+    - id: shinon-key-router
+      name: '@shinon/key-router'
+      config:
+        providers:
+          - id: deepseek-official
+            pool: []
+            initialDelayMs: 2000
+            maxDelayMs: 60000
+            maxRetries: 5
+        defaultKey: ''
