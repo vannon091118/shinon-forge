@@ -114,8 +114,7 @@ welche rot sind, steht **nur** in `Docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `node scripts/dsh-update.mjs` hardcodes a DSH install path
   (`/home/vannon/.local/opt/node-v22.23.3-.../@deepseek-ai/dsh`) and uses `--profile web`
   for install — it's not wired to the `shinon` profile; treat its output as advisory.
-- Three reload helpers exist (`scripts/dsh_reload.js`, `dsh_reload.mjs`, `reload.mjs`);
-  none is documented as canonical. Don't assume which to use.
+- Reload helpers were removed (2026-10-10: three files, no callers, stale `web`-profile target). HMR runs through the DSH process itself.
 - `token-usage` and `better-errors` are config-only (their `apply()` only logs); `openapi`
   has a contract but no server and is **not** enabled in the profile. `dashboard` is **not**
   a placeholder: it reads the real `workspaces`/`sessions` services (evidence:

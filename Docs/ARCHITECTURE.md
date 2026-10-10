@@ -199,7 +199,6 @@ Neue Features starten als *plan* und werden erst mit ausführbarem Nachweis *cur
   **nicht** im Profil und sind damit inaktiv; für `openapi` ist das eine dokumentierte
   Entscheidung, für die übrigen ist kein Grund verzeichnet (`Docs/ZAHLEN.md` §1/§3).
   `profiles/web` ist Altbestand ohne eigene Bundles.
-- Reload-Helfer existieren dreifach (`scripts/dsh_reload.js`, `dsh_reload.mjs`,
-  `reload.mjs`); keiner ist als kanonisch dokumentiert.
+- Reload-Helfer sind entfallen (bis 2026-10-10 dreifach vorhanden, ohne Aufrufer und mit veraltetem `web`-Profil als Ziel): HMR läuft über den DSH-Prozess selbst, Locale steht in `packages/locale-de/`.
 - `better-errors` und `token-usage` sind Config-Ebenen ohne Logik (ihr `apply()`
   loggt nur); `openapi` hat einen Vertrag, aber keinen Server und ist nicht aktiviert.

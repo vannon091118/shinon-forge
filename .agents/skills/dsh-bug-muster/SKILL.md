@@ -117,11 +117,10 @@ nur für echte Verzeichnisse.
   `pnpm-workspace.yaml`) — Ergebnisse von `pack-test`/`npm test` im Zweifel zweimal
   laufen lassen; Lockfile nicht „nebenbei" upgraden.
 - **`dist/` ist generiert** — nie handeditieren, `npm run build` regeneriert alles.
-- **drei Reload-Helfer** (`dsh_reload.js`, `dsh_reload.mjs`, `reload.mjs`), keiner
-  kanonisch — nicht still voraussetzen welcher.
+- **Reload-Helfer sind entfallen** (2026-10-10 gelöscht: drei Dateien, null Aufrufer, veraltetes `web`-Ziel) — HMR läuft über den DSH-Prozess selbst.
 - **`scripts/dsh-update.mjs`** harcoded einen fremden Pfad und nutzt `--profile web`
   — Output ist beratend; Ground Truth ist der installierte Stand.
-- **`git status` zeigt staged vs. working tree** — die Arbeitsdateien sind wahr.
+- **`git status` ist seit 2026-10-10 sauber vercommittet** — davor galt: die Arbeitsdateien sind wahr.
 
 ## Erste Diagnoseschritte bei unklarem Fehler
 1. Fehlermeldung gegen B1–B4 (Cordis-Inject/Fiber) prüfen — das sind die häufigsten.

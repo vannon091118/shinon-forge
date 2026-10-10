@@ -6,7 +6,7 @@ import z from '@deepseek-ai/schemastery';
  */
 
 // `showTooltips` und `tooltipPosition` sind entfallen: kein Code liest sie — der einzige Treffer
-// fuer showTooltips ausserhalb dieses Pakets ist Hilfetext in scripts/dsh_reload.mjs und Docs/PLAN.md.
+// fuer showTooltips ausserhalb dieses Pakets ist Hilfetext in Docs/PLAN.md.
 // packages/tooltip/cordis.patch.yml schreibt beide noch (ausserhalb dieses Slices).
 // TODO: [DSH-Refactor] - `tooltipDelay` bleibt als einziges Feld stehen, obwohl es im Code keinen
 // Konsumenten hat: es ist der Reiz des Fehlerpfads G7 (scripts/stages.mjs schreibt
