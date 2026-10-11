@@ -50,20 +50,8 @@ if (!profileName) {
   process.exit(1);
 }
 
-// DSH loest die Repo-Bundles aus profiles/<name>/node_modules; out-of-tree
-// Profile installieren ihre Dependencies dort selbst (wie `dsh plugin`).
-const modulesDir = join(profile.dir, 'node_modules');
 console.log(`  Profil: ${profileName}    DSH_HOME: ${repo.ROOT}`);
 console.log(`  Bundles: ${profile.bundles.length} (${profile.entries.length} aus diesem Repo)\n`);
-
-if (existsSync(join(profile.dir, 'package.json')) && !existsSync(modulesDir)) {
-  console.log(`  … ${profile.dir}/node_modules fehlt - pnpm install`);
-  try {
-    execFileSync('pnpm', ['install'], { cwd: profile.dir, stdio: 'inherit' });
-  } catch {
-    /* der Dump-Check unten meldet das eigentliche Problem */
-  }
-}
 
 let dump = null;
 check(`dsh --profile ${profileName} --dump-config`, () => {

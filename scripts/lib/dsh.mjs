@@ -27,7 +27,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findOnPath } from './yaml.mjs';
 
@@ -123,6 +123,24 @@ export function dshRoot() {
     if (dir !== null && existsSync(join(dir, 'package.json'))) return dir;
   }
   return prefixRoot();
+}
+
+/**
+ * HERKUNFT der dsh-Auflösung — nicht die Reihenfolge (die steht in `dshRoot()`),
+ * sondern nur die Auswertung ihres Ergebnisses am Pfad. Damit kann ein Einstieg
+ * melden, WO sein dsh herkommt („ohne globales dsh" ist eine Aussage, die man
+ * zeigen muss), ohne die Reihenfolge ein zweites Mal zu beschreiben — die bliebe
+ * sonst nicht synchron.
+ * @returns {{ kind: 'Repo-Installat' | 'Vendor' | 'PATH oder Installations-Prefix', root: string } | null}
+ */
+export function dshSource() {
+  const root = dshRoot();
+  if (root === null) return null;
+  if (root.startsWith(join(ROOT, 'node_modules') + sep)) return { kind: 'Repo-Installat', root };
+  if (root.startsWith(join(ROOT, 'vendor') + sep) || root.startsWith(join(ROOT, 'starter') + sep)) {
+    return { kind: 'Vendor', root };
+  }
+  return { kind: 'PATH oder Installations-Prefix', root };
 }
 
 /**

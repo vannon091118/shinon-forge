@@ -1,7 +1,7 @@
 # Zahlen — Shinon Forge
 
 > **Status:** current — **einziger Eigentümer** aller harten Zahlen dieses Repos. **Stand:** 2026-10-11
-> **Einstieg:** `docs/INDEX.md` · gemessen mit Node v22.23.3, dsh `0.2.1-alpha.1` (Repo, zuerst im PATH), pnpm 11.7.0
+> **Einstieg:** `docs/INDEX.md` · gemessen mit Node v22.23.3 und npm 10.9.9 (einzige Paketquelle seit Schritt 3.5), dsh `0.2.1-alpha.1` (Repo, zuerst im PATH)
 
 Regel: **Kein anderes Dokument nennt eine dieser Zahlen.** README, `AGENTS.md` und
 `docs/ARCHITECTURE.md` verweisen hierher. Wer eine Zahl ändert, ändert sie hier und
@@ -34,12 +34,14 @@ der sie gemessen wurden.
 | DSH installiert | **0.2.0-rc.2** | `dsh --version` | 0 |
 | DSH-Pin im Root-Manifest | **0.2.1-alpha.1** | `node -p "require('./package.json').dependencies['@deepseek-ai/dsh']"` | 0 |
 | Schemastery (deklariert) | `~3.18.4` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
-| Node / pnpm | `^22.19.0 \|\| >=24.0.0` / `11.7.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
-| Markdown-Dokumente im Baum | **50** (davon 6 unter `.agents/skills/`, 3 unter `vendor/` — die zwei fremden READMEs des vendorten Pakets und unser Änderungslog —; enthält die 13 Nachweis-Dokumente unter `docs/audit/`) | `find . -name '*.md' -not -path './node_modules/*' -not -path './attachments/*' -not -path './dist/*' \| wc -l` | 0 |
+| Node | `^22.19.0 \|\| >=24.0.0` (Paketmanager: **npm**, kein `packageManager`-Feld mehr) | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
+| pnpm-Dateien im Baum | **0** (am 2026-10-11 gelöscht: `pnpm-workspace.yaml`, `profiles/{shinon,headless}/{pnpm-workspace,pnpm-lock}.yaml`, das `pnpm-workspace.yaml` des archivierten `web`-Profils). Geprüft wird seit dem 2026-10-11 vom Gate gegen die zwei Artefaktnamen, nicht per `grep pnpm`: ein `pnpm-workspace.yaml`, das UPSTREAMs `initProfile` bei `dsh plugin add` selbst anlegt, macht `npm test` rot | `node scripts/dsh-test.mjs` (Prüfung „pnpm-Reste") | 0 |
+| pnpm-**Aufrufe** im Code | **0** (A1; die zwei echten Aufrufe — `pnpm install` in `dsh-profile-test.mjs`, `pnpm pack` in `pack-test.mjs` — sind durch npm ersetzt). Nennungen: **21** in `scripts/` — Kommentare, Meldungstexte und die Mustertabelle der Prüfung selbst; ein *Wort* ist kein Befund, ein Prozess-/Script-Aufruf schon | Aufrufe: Gate-Prüfung „pnpm-Reste" (`node scripts/dsh-test.mjs`); Nennungen: `git grep -c -i pnpm -- scripts` | 0 |
+| Markdown-Dokumente im Baum | **53** (davon 6 unter `.agents/skills/`, 3 unter `vendor/` — die zwei fremden READMEs des vendorten Pakets und unser Änderungslog —; enthält die 16 Nachweis-Dokumente unter `docs/audit/`) | `find . -name '*.md' -not -path './node_modules/*' -not -path './attachments/*' -not -path './dist/*' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | **6** | `ls docs/contracts \| wc -l` | 0 |
 | Proben unter `docs/probes/` | **27** | `ls docs/probes \| wc -l` | 0 |
 | Generierte Plugin-Bausteine (Idiome) | **12** Blöcke in **11** Dateien, **0** handgepflegte Kopien (eine Quelle: `scripts/lib/plugin-idioms.mjs`) | `npm run idioms:check` | 0 |
-| Verweise in Markdown, die nicht auflösen | **0** (590 Verweise geprüft — seit dem Doku-Zug sieht der Lauf `docs/`, `packages/` und `vendor/`) | Prüfbefehl in `docs/INDEX.md` §4 | 0 |
+| Verweise in Markdown, die nicht auflösen | **0** (620 Verweise geprüft — seit dem Doku-Zug sieht der Lauf `docs/`, `packages/` und `vendor/`) | Prüfbefehl in `docs/INDEX.md` §4 | 0 |
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
 sondern in `profiles/shinon/package.json` (`dsh.profile.bundles`); die Befehle oben
@@ -49,12 +51,15 @@ lesen genau diese Datei.
 
 | Lauf | Ergebnis | Exit | Befehl |
 |---|---|---|---|
-| Gate (statisch) | 99 bestanden, **0** fehlgeschlagen | 0 | `node scripts/dsh-test.mjs` |
+| Gate (statisch) | 100 bestanden, **0** fehlgeschlagen | 0 | `node scripts/dsh-test.mjs` |
 | Regel-Fixtures | 9 bestanden, **0** fehlgeschlagen | 0 | `node scripts/validate-test.mjs` |
 | Profiltest | 3 bestanden, **0** fehlgeschlagen (19 Layer, 14 Repo-Bundles) | 0 | `node scripts/dsh-profile-test.mjs` |
 | Profil-Konfiguration im echten Dump | 55 Layer-Köpfe / 205 Einträge (Repo-`dsh@0.2.1-alpha.1` zuerst im PATH; das globale `0.2.0-rc.2` liefert dieselben Köpfe, aber 201 Einträge — Fassungsfalle, [docs/audit/DSH_SUBSET_3-1.md](audit/DSH_SUBSET_3-1.md) §6), `shinon-task-router.activate: false`, `permission.defaultPreset: workspace-write` (Preset `workspace-write: {sandbox: workspace-write, approval: ask}`), `agent-default-model: agnes/agnes-2.5-flash`, `ui-settings-general.welcomeNoticeVersion: 2026-09-28.1` (als String gelesen) | 0 | `DSH_HOME=$PWD dsh --profile shinon --dump-config` |
+| Spike Produktprofil `resolvedProfile` (Schritt 3.3) | **11** Zusagen, **11** grün (3 Bündel gelöst und gemountet, `fiber.state === 2`, `profileContext.dir` = Spike-Verzeichnis, kein Schlüsselwert in der Ausgabe) | 0 | `node scripts/spike-resolved-profile.mjs` (Repo-`dsh` zuerst im PATH) |
+| Frischer Klon: `npm install` + `npm start` (Schritt 3.4) | **731** Pakete installiert, Start **ohne** `dsh` im PATH (`command -v dsh` → NEIN), Herkunft `Repo-Installat`, dsh `0.2.1-alpha.1` | 0 | in einer Arbeitsbaum-Kopie ohne `node_modules`/`dist`/`logs`: `npm install`, dann `env -i … npm start -- --check` |
+| Frischer Klon ohne pnpm-Spuren (Schritt 3.5) | **0** pnpm-Dateien im Klon, kein `packageManager`-Feld, **731** Pakete, Lockfile nach dem Install **byteidentisch** zum getrackten, `npm start -- --check` grün (`pnpm` und `dsh` nicht im PATH) | 0 | in einer Arbeitsbaum-Kopie ohne `profiles/`: `npm install`, dann `env -i … npm start -- --check` |
 | Vendoring `vendor/dsh` (Schritt 3.2) | **20** Dateien verglichen, **0** Abweichungen gegen das Registry-Tarball (Dateiliste und `sha256` je Datei identisch; Manifest: [vendor/dsh/MANIFEST.json](vendor/dsh/MANIFEST.json)) | 0 | `npm pack @deepseek-ai/dsh@0.2.1-alpha.2` → entpacken → Datei-für-Datei-Vergleich |
-| Distributionstest | 75 bestanden, **1** fehlgeschlagen (`project-index`) | **1** | `node scripts/pack-test.mjs` |
+| Distributionstest (jetzt `npm pack`, Schritt 3.5) | **76** bestanden, **0** fehlgeschlagen (19 Pakete × 4 Stufen; mit `npm pack` statt `pnpm pack` — vorher 75/1 rot an `project-index`) | 0 | `node scripts/pack-test.mjs` |
 | Build (`dist/`) | 19 Pakete, 96 Dateien, 915156 Bytes | 0 | `npm run build` |
 | Gate-Engine `--full` | 18 Gates gelaufen, 18 grün; die Branding-Stufe meldet ohne Flag einen sichtbaren Skip, mit `--branding` läuft sie (siehe nächste Zeile) | 0 | `npm run gate:full` |
 | Branding-Wirkung im echten Chromium | **28** bestanden, **0** fehlgeschlagen (ausgeliefertes `dist/packages/core/client.js`, `/usr/bin/google-chrome`) | 0 | `npm run branding` · `node scripts/gate/engine.mjs --full --branding` |
@@ -65,7 +70,7 @@ lesen genau diese Datei.
 | Marker-Tests | **27** bestanden, 0 rot (davon 6 für die Naht der wirksamen Grenzen, Schritt 2.3) | 0 | `node --test scripts/gate/tests/markers.test.mjs` |
 | Events-Spine-Tests | 26 bestanden, 0 rot | 0 | `node --test scripts/gate/tests/events-spine.test.mjs` |
 | Panel-Beleg gegen die laufende UI | 7 bestanden, **0** fehlgeschlagen | 0 | `node scripts/panel-check.mjs --url http://127.0.0.1:3085 --token <token>` |
-| Volle Kette | **nicht durchgelaufen** (bricht bei `pack-test` ab) | **1** | `npm test` |
+| Volle Kette (Schritt 3.5/3.7) | **durchgelaufen** — Codingmon-Tests 32/32 → Gate 100/0 → Fixtures 9/0 → Distribution 76/0 → Profiltest 3/0, unter einem PATH **ohne `pnpm` und ohne globales `dsh`** (`command -v pnpm` → NEIN, `command -v dsh` → NEIN; Node v22.23.3, npm 10.9.9, das Repo-`dsh` kommt aus `node_modules/.bin`). Unter Node v18 reißt dieselbe Kette an der Codingmon-Naht (`getRandomValues`) — Umgebungs-Rot, kein Code-Rot | 0 | `env -i … npm test` |
 
 **Warum `gate:test` früher rot war und jetzt grün ist:** der Baum war unvollständig installiert —
 `node_modules/@deepseek-ai/dsh` und `node_modules/@deepseek-ai/schemastery` fehlten auf oberster

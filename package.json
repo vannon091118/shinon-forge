@@ -4,18 +4,20 @@
   "description": "Shinon Forge - Built on DSH. Forged differently.",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
   "workspaces": [
     "packages/*"
   ],
+  "bin": {
+    "shinon": "bin/shinon.mjs"
+  },
   "scripts": {
     "dev": "DSH_HOME=$PWD dsh --profile shinon",
     "dev:web": "DSH_HOME=$PWD dsh --profile shinon --no-open --trusted-host localhost --trusted-host 127.0.0.1 --port 3085",
     "open": "node scripts/open.mjs",
-    "start": "node scripts/start.mjs",
+    "start": "node bin/shinon.mjs",
     "desktop:launcher": "node scripts/desktop-launcher.mjs",
     "desktop:launcher:uninstall": "node scripts/desktop-launcher.mjs --uninstall",
     "verify:panel": "node scripts/panel-check.mjs",

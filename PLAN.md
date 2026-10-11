@@ -205,28 +205,45 @@ gestoppt und gemeldet, nicht repariert.
 - **Nachweis:** Logausgabe des Spikes.
 - **Risiko:** hoch / hoch (Bootpfad hängt an Upstream-API; in diesem Thread **nicht** lokal verifiziert).
 - **Abhängig von:** 3.2
-- **Status:** **nicht ausgeführt — angehalten** (2026-10-11). Die API ist aus dem vendorten Paket gelesen und steht fest: `RunProfileOptions.resolvedProfile?: { profile: Profile; installAnchor: string }`, `Profile = { name, dir, layers, patchPath, patches, skippedBundles }` (Quelle: [vendor/dsh/lib/types/profile-boot.d.ts](vendor/dsh/lib/types/profile-boot.d.ts), `…/dsh-app-boot/lib/types/profile.d.ts`). Der **Vollzug** wurde nicht gefahren, weil genau zu diesem Zeitpunkt ein fremder Boot auf demselben Arbeitsbaum lief (`scripts/start.mjs` → `dsh --profile shinon`, PID 126619, gestartet 01:17) und dieselben Dateien schrieb: `profiles/shinon/cordis.yml` (der Boot schreibt den Profil-Root bei jedem Start neu) und `.credentials.yaml` im Arbeitsbaum (Stoppbedingung 1 des Plans: die Datei gehört **außerhalb** der Arbeitskopie; ich lese und lösche sie nicht). Ein zweiter Boot hätte denselben Profilordner mitbenutzt.
+- **Status:** **erledigt im Arbeitsbaum** (2026-10-11) — die Frage ist **beantwortet: ja.** Der Spike [`scripts/spike-resolved-profile.mjs`](scripts/spike-resolved-profile.mjs) lädt das Profil über **`loadProfileDirectory(dir, installAnchor)`** und übergibt es als **`resolvedProfile: { profile, installAnchor }`** an `runProfile`; `$DSH_HOME/profiles/<name>` kommt nicht vor. Gemessen: **Exit 0**, **11/11** Zusagen — 3 Bündel gelöst, keines übersprungen, Baum aktiv (`fiber.state === 2`, Loader vorhanden), `profileContext.dir` = Spike-Verzeichnis, `installAnchor` = `<Repo>/node_modules/@deepseek-ai/dsh/package.json`, und jedes der drei Bündel hat sich im `apply()` gemeldet — `[shinon-events] 9 Signale + Carrier gebunden (shinon.event-spine/v1, authority NONE)`, also die ganze Kette Profil → Patch → Plugin → eigenes `assets/`. Der Lauf bleibt schlüsselfrei (leerer Umgebungs-Snapshot, zusätzlich geprüft gegen alle `*KEY*`/`*TOKEN*`/`*SECRET*`-Werte des Prozesses). Nachweis mit wörtlichem Log, Zusagentabelle und **vier Befunden für 3.6**: [docs/audit/SPIKE_3-3.md](docs/audit/SPIKE_3-3.md). Berührt wurden nur `<Repo>/dist/.spike-3-3` (gitignoriert) und der Spike-Prozess — der fremde Boot auf denselben `profiles/` blieb unangetastet.
 
-### 3.4–3.7 — angehalten (Stand 2026-10-11, 01:26)
+### 3.5–3.7 — Stand (2026-10-11)
 
-**Gemeinsamer Grund:** die drei Schritte schreiben in Dateien, die in diesem Moment von
-einem **laufenden fremden Boot** (PID 126619) und einem **zweiten Schreiber** benutzt
-werden — `profiles/shinon/package.json` (01:18 geändert), `profiles/shinon/cordis.yml`
-(vom Boot bei jedem Start neu geschrieben), Root-`package.json` + `package-lock.json`
-(3.5) und der Profilordner selbst (3.6). Dazu die Stoppbedingung 1 des Plans: es liegt
-eine `.credentials.yaml` **im** Arbeitsbaum, die dort nicht hingehört (nicht gelesen,
-nicht gelöscht, nur gemeldet).
+**Der harte Befund gilt für 3.5:** der Schritt verlangt „`workspace:*` → semver-Range
+(19 Stellen)" **und** das Entfernen des `workspaces`-Felds. Gemessen (npm 10.9.9) ist
+diese Kombination nicht ausführbar:
 
-**Ein zweiter, harter Befund gilt nur für 3.5:** der Schritt verlangt
-„`workspace:*` → semver-Range (19 Stellen)" **und** das Entfernen des
-`workspaces`-Felds. Gemessen ist das so nicht ausführbar: keines der 19 Pakete ist
-veröffentlicht (`npm view @shinon/core` → **E404**, ebenso `events`, `locale-de`,
-`codingmon`, `key-router`). Ohne `workspaces` oder `file:`-Verknüpfung würde
-`npm install` diese 19 Abhängigkeiten aus der Registry holen wollen und scheitern. Die
-Entscheidung, **welcher** npm-Mechanismus die lokalen Pakete bindet (`workspaces`
-behalten + `*`/`file:` statt `workspace:*`, oder `workspaces` weg + `file:`-Ranges),
-gehört dem Auftraggeber — sie ändert den Charakter des Manifests, nicht nur seine
-Schreibweise.
+| Manifest-Lage | `npm install --dry-run` | Beleg |
+|---|---|---|
+| `workspaces` vorhanden, `"@shinon/core": "workspace:*"` | **Exit 0**, „add @shinon/core 1.0.0“ (lokales Paket) | Scratch-Reproduktion außerhalb des Repos |
+| kein `workspaces`, `"@shinon/core": "workspace:*"` | **Exit 1**, `EUNSUPPORTEDPROTOCOL — Unsupported URL Type "workspace:"` | dieselbe |
+| kein Registry-Paket als Rückfall | `npm view @shinon/core` → **E404** (ebenso `events`, `locale-de`, `codingmon`, `key-router`) | Registry-Abfrage |
+| **echter frischer Klon dieses Repos** (Manifest unverändert) | **Exit 0**, 731 Pakete in 24 s | `/tmp/fresh-clone`, `npm install` |
+
+Das Protokoll lebt also **vom** `workspaces`-Feld: nimmt man beides wie im Plan
+verlangt weg, gibt es für die 19 lokalen Pakete weder Workspace-Verknüpfung noch
+Registry-Rückfall. **Der Ist-Stand installiert heute schon mit npm** — was 3.5 wirklich
+zu tun bleibt, ist damit kleiner, als der Plan annimmt: die sechs pnpm-Dateien, das
+`packageManager`-Feld und die zwei pnpm-Aufrufe. Ob das `workspace:*`-Protokoll bleiben
+darf (es läuft gemessen mit npm 10) oder auf `*`/`file:` weichen soll, gehört dem
+Auftraggeber — der Plan verlangt die Entfernung, die Messung verlangt sie **nicht**.
+
+**Erledigt ist davon der protokollfreie Teil (2026-10-11):** die sechs getrackten
+pnpm-Dateien, das `packageManager`-Feld und die zwei echten pnpm-Aufrufe sind weg, der
+npm-Lockfile ist nachgezogen und als Quelle belegt (Nachweis:
+[docs/audit/PAKETQUELLE_NPM_3-5.md](docs/audit/PAKETQUELLE_NPM_3-5.md)). Abnahme in einer
+Arbeitsbaum-Kopie außerhalb des Repos unter einem PATH **ohne `dsh` und ohne `pnpm`**:
+`npm install` **Exit 0** (731 Pakete), `npm start -- --check` **Exit 0** (Herkunft
+`Repo-Installat`, Version `0.2.1-alpha.1`). Offen bleibt allein die Bindungsfrage —
+`workspaces` und die 19 `workspace:*`-Stellen sind unangetastet, weil jede Antwort
+darauf eine andere Änderung verlangt.
+
+**Für 3.6 gilt der Fortsetzungshemmer:** 3.6 schreibt `profiles/` um, während
+dort ein **laufender fremder Boot** (PID 126619) liest und schreibt
+(`profiles/shinon/cordis.yml` wird bei jedem Start neu geschrieben). Dazu die
+Stoppbedingung 1: eine `.credentials.yaml` liegt **im** Arbeitsbaum (nicht gelesen,
+nicht gelöscht, nur gemeldet). Der Teil von 3.7, der **ohne** die Bindungsentscheidung
+auskommt, ist dagegen gemessen (siehe 3.7 unten).
 
 ### 3.4 (D4) `bin`-Feld und echter Einstieg
 - **Ziel:** ein Einstieg, keine Voraussetzung im PATH.
@@ -235,7 +252,7 @@ Schreibweise.
 - **Nachweis:** Protokoll des Laufs mit Exit-Code.
 - **Risiko:** mittel / mittel.
 - **Abhängig von:** 3.3, 3.5
-- **Status:** **angehalten** — braucht den Bootpfad aus 3.3 und ein pnpm-freies Manifest aus 3.5 (siehe Block oben).
+- **Status:** **erledigt im Arbeitsbaum** (2026-10-11) — `bin/shinon.mjs` ist ein **echter** Einstieg (Audit-Befund A-INV-03 war: „verwaist: nur Logs, kein `bin`-Feld, kein Script verweist darauf“): Node-Heilung auf ≥ 22, **eine** dsh-Auflösung über `dshBinary()`, `--check` mit Angabe der **Herkunft** (`dshSource()` in [scripts/lib/dsh.mjs](scripts/lib/dsh.mjs)), Start mit `--profile <aktiv>` und `DSH_HOME=<Repo>`. `scripts/start.mjs` ist nur noch ein Kompatibilitäts-Einstieg, der dieselbe Umsetzung importiert (eine Quelle, kein zweiter Startpfad). Root-Manifest trägt jetzt `"bin": { "shinon": "bin/shinon.mjs" }`, `npm start` zeigt dorthin. Gemessen: `env -i … bin/shinon.mjs --check` **Exit 0** ohne `dsh` im PATH (Herkunft: `Repo-Installat`), `npm start -- --check` **Exit 0**, der Kompatibilitätspfad **Exit 0**, und unter System-Node v18 heilt sich der Einstieg selbst auf v22.23.3 (**Exit 0**). **Die frische-Klon-Hälfte der Abnahme ist gemessen**, in einer Arbeitsbaum-Kopie außerhalb des Repos (`/tmp/fresh-clone`, ohne `node_modules`/`dist`/`logs`/`sessions`/`storages`): `npm install` **Exit 0** (731 Pakete, 24 s. npm 10.9.9, Node v22.23.3) und `npm start` **Exit 0** — mit einem PATH, auf dem `command -v dsh` **NEIN** sagt (nur `node`/`npm`/`npx`), Herkunft im Protokoll: `Repo-Installat — /tmp/fresh-clone/node_modules/@deepseek-ai/dsh`, Version `0.2.1-alpha.1` (nicht das globale `0.2.0-rc.2`). Auch `npm start -- --version` (echter Startpfad, endet sofort) und der Direktaufruf `node bin/shinon.mjs --check` sind **Exit 0**. Protokoll: [docs/audit/EINSTIEG_3-4.md](docs/audit/EINSTIEG_3-4.md).
 
 ### 3.5 (D5) pnpm-Reste entfernen
 - **Ziel:** npm ist die einzige Quelle.
@@ -244,7 +261,7 @@ Schreibweise.
 - **Nachweis:** `git grep -n '\bpnpm\b'` in Skripten/Manifesten; `git ls-files | grep -c pnpm` → 0.
 - **Risiko:** hoch / hoch (Lockfile-Churn; `npm install` nötig, hier bisher nicht ausgeführt).
 - **Abhängig von:** A1
-- **Status:** **angehalten** — die Abnahme („kein pnpm-Aufruf, keine pnpm-Datei") ist messbar, aber der Weg dorthin ist im Plan widersprüchlich (siehe Block oben: `@shinon/*` ist nicht veröffentlicht, `workspace:*` → semver-Range scheitert). Erste Vermessung des Ist-Stands: **6** getrackte pnpm-Dateien (`git ls-files | grep -i pnpm`) — `pnpm-workspace.yaml`, `profiles/{shinon,headless}/{pnpm-lock,pnpm-workspace}.yaml`, `docs/archive/legacy-profiles/web/pnpm-workspace.yaml`; **2** echte Aufrufe (`scripts/dsh-profile-test.mjs`, `scripts/pack-test.mjs`); `packageManager: pnpm@11.7.0` und `workspaces` im Root-Manifest; **19** `workspace:*`-Stellen.
+- **Status:** **protokollfreier Teil erledigt im Arbeitsbaum** (2026-10-11) — die sechs getrackten pnpm-Dateien sind gelöscht (das Root-`pnpm-workspace.yaml`, die vier unter `profiles/{shinon,headless}/` und das `pnpm-workspace.yaml` des archivierten `web`-Profils), das `packageManager: pnpm@11.7.0` ist aus dem Root-Manifest raus, die zwei echten Aufrufe sind auf npm umgestellt (`npm pack`/`npm install` in [scripts/pack-test.mjs](scripts/pack-test.mjs); der Auto-Install per `pnpm install` in [scripts/dsh-profile-test.mjs](scripts/dsh-profile-test.mjs) ist **weg** — er ersetzt ihn durch eine sichtbare Warnung, weil die Profil-Dependencies `link:` nutzen und npm dieses Protokoll ablehnt, gemessen: `EUNSUPPORTEDPROTOCOL`), und der npm-Lockfile ist nachgezogen (Root-devDeps 16 → 19, 815 Einträge, 19 Workspace-Links, Pin `0.2.1-alpha.1` unverändert). **Abnahme gemessen** (`git ls-files | grep -ci pnpm` → **0**; echte pnpm-Aufrufe in `scripts/` → **0**) in einem frischen Klon außerhalb des Repos ohne `dsh` und ohne `pnpm` im PATH: `npm install` **Exit 0** (731 Pakete, 19 s), `npm start -- --check` **Exit 0**, Lockfile nach dem Install byteidentisch. **Durchsetzend geprüft:** die Invariante hat seit dem 2026-10-11 einen Eigentümer — `pnpmIssues()` in [scripts/lib/repo.mjs](scripts/lib/repo.mjs), geprüft vom Gate (Prüfung „pnpm-Reste", 99 → **100** Prüfungen) und vom Build, mit präzisen Mustern statt `grep pnpm` (Artefaktnamen, Prozess-/Script-Aufruf, Manifest-Script) und drei Negativproben ([§8.2](docs/audit/PAKETQUELLE_NPM_3-5.md)). Nachweis: [docs/audit/PAKETQUELLE_NPM_3-5.md](docs/audit/PAKETQUELLE_NPM_3-5.md). **Offen bleibt die Bindungsfrage** (`workspaces` + 19× `workspace:*`, siehe Block oben) — sie ist der einzige Teil des Schritts, der eine Entscheidung des Auftraggebers braucht.
 
 ### 3.6 (D6) `profiles/` durch Code-Konfiguration ersetzen
 - **Ziel:** Profilkonfiguration ist Produktquelle, nicht Ordnerkonvention.
@@ -262,7 +279,7 @@ Schreibweise.
 - **Nachweis:** Befehl plus Exit-Code.
 - **Risiko:** mittel / mittel.
 - **Abhängig von:** A5, 3.5
-- **Status:** **angehalten** — hängt an 3.5.
+- **Status:** **der messbare Teil ist erledigt** (2026-10-11) — der eine dokumentierte Testeinstieg existiert und läuft **ohne pnpm**: `npm test` unter `env -i` mit einem PATH **ohne `pnpm` und ohne globales `dsh`** (Node v22.23.3, npm 10.9.9) → Codingmon **32/32** → Gate **100/0** → Fixtures **9/0** → Distribution **76/0** → Profiltest **3/0**, **Exit 0** (dasselbe unter Node v18 bleibt Umgebungs-Rot an der Codingmon-Naht, siehe `docs/ZAHLEN.md` §2). Bestandsaufnahme für A5 mitgemessen: fünf Läufe in der Kette, daneben `gate`/`gate:full` (18 Gates), `gate:test` (327), `build`, `branding`, `commit:guard`. **Die Bewertung** (welche Gates bleiben) hängt an A5 und ist hier nicht entschieden. Nachweis: [docs/audit/PAKETQUELLE_NPM_3-5.md](docs/audit/PAKETQUELLE_NPM_3-5.md) §6.
 
 ### 3.8 (Overlay) MVP-UI
 - **Ziel:** Shinon-Oberfläche ohne Fork der Web-UI.

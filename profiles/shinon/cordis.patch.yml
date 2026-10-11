@@ -159,7 +159,7 @@
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
     provider: agnes
-    model: agnes-3.0-flash
+    model: agnes-2.5-flash
 - id: agent-preset-registry
   name: "@deepseek-ai/dsh-agent-preset-registry"
   config:

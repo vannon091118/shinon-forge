@@ -13,19 +13,23 @@ are `origin` and `main`, both pointing at this repository — there is **no** `u
 remote, so `npm run sync` cannot work as written.
 
 ## Dev environment
-- Node and pnpm (the `packageManager` field is pinned) must be on PATH; the declared
-  values and their proof commands: `docs/ZAHLEN.md` §1.
-- `pnpm pack`/`npm` are invoked by the tests — both must be installed.
+- Node and npm must be on PATH — **npm ist die einzige Paketquelle** (PLAN.md Schritt
+  3.5/A1: `packageManager`, `pnpm-workspace.yaml` und die pnpm-Aufrufe sind raus). Die
+  deklarierten Werte und ihre Prüfbefehle: `docs/ZAHLEN.md` §1.
+- pnpm wird vom Repo **nicht** mehr aufgerufen. Zwei Ausnahmen, die bleiben und die man
+  kennen muss, weil sie fremder Code sind: `dsh plugin add` (der Upstream-Plugin-Manager)
+  spricht weiter pnpm und legt bei Bedarf selbst ein `pnpm-workspace.yaml` im Profil an
+  (`initProfile` in `dsh-app-boot`); wir committen ein solches nie.
 - DSH is pinned in the root `package.json` (`dependencies`); the installed
   `dsh --version` currently differs from that pin, and the drift is known — one gate test
   refuses to assert against the unverified fassung. Both numbers: `docs/ZAHLEN.md` §1.
   `npm run dev` and the profile test need `dsh` on PATH. Run with `DSH_HOME=$PWD`
   (the `dev` script does this).
-- `package-lock.json` is versioned; the root `package.json` also carries the
-  `workspaces` field, which pnpm does not support — and a root `pnpm-workspace.yaml`
-  (`packages/*`) exists next to it. Fresh-checkout installs stay non-reproducible
-  anyway: installs run through pnpm and there is no `pnpm-lock.yaml`, so the npm
-  lockfile pins npm's resolution, not the pnpm run.
+- `package-lock.json` is versioned and **is** the source of resolution; the root
+  `package.json` carries `workspaces: ["packages/*"]` and the local packages are bound
+  with the `workspace:*` protocol. Measured: `npm install` on a fresh checkout is
+  **Exit 0** (npm 10 accepts `workspace:` **with** the `workspaces` field and rejects it
+  without — the protocol part of step 3.5 is still an open decision).
 
 ## Build & test
 Run from repo root:
@@ -38,7 +42,7 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   laufen in `.github/workflows/commit-guard.yml` auf jedem Push/PR.
 - `node scripts/dsh-test.mjs` → static gate: manifest, name contract, `index.js`,
   `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution (exit 0/1).
-- `node scripts/pack-test.mjs` → per-package distribution test: `pnpm pack` → unpack →
+- `node scripts/pack-test.mjs` → per-package distribution test: `npm pack` → unpack →
   isolated `npm install` → load. Optional `--keep` retains `/tmp` work dirs for debugging.
 - `node scripts/dsh-profile-test.mjs` → boots `dsh --profile shinon --dump-config` and
   asserts every bundle layer of the profile resolves (count: `docs/ZAHLEN.md` §2).
