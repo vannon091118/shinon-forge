@@ -598,7 +598,7 @@ window.__ModuleLoader__.load({
         registry.set('@shinon/markers', { label: 'Marker-Spiegel', kind: 'client', panel: PANEL_ID });
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/markers' } }));
 
-        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
+        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test) params={"table":"MENU_DE","key":"menu.markers","label":"Shinon Marker"}
         // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
         // Locale-Dienst gilt die deutsche Tabelle.
         const MENU_DE = { 'menu.markers': 'Shinon Marker' };

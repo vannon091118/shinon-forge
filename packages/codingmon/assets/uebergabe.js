@@ -35,6 +35,17 @@ export const UEBERGABE_METHOD = 'writeSnapshot';
 /** Der kanonische Endpunkt `<namespace>/<method>`, wie das Gateway ihn bildet. */
 export const UEBERGABE_ENDPOINT = `${UEBERGABE_NAMESPACE}/${UEBERGABE_METHOD}`;
 
+/**
+ * Die LESE-Methode derselben Naht: der Client fragt den Aktivitaetsstand des
+ * Hosts (abgeschlossene Agent-Schritte), statt auf einen Push zu warten — ein
+ * Push (`ctx.emit`) erreicht den Browser nicht. Derselbe Beitrag, zweite
+ * Methode; `test/uebergabe.test.mjs` vergleicht auch sie Zeichen fuer Zeichen.
+ */
+export const UEBERGABE_ACTIVITY_METHOD = 'readActivity';
+
+/** Der kanonische Endpunkt der Lese-Methode. */
+export const UEBERGABE_ACTIVITY_ENDPOINT = `${UEBERGABE_NAMESPACE}/${UEBERGABE_ACTIVITY_METHOD}`;
+
 /** Der Name des einzigen Parameters. Die SRC-Aufloesung liest ihn aus der Signatur. */
 export const UEBERGABE_PARAMETER = 'snapshot';
 
@@ -46,4 +57,5 @@ export const UEBERGABE_PARAMETER = 'snapshot';
  */
 export const SNAPSHOT_FIELDS = [
   'schemaVersion', 'species', 'xp', 'wins', 'losses', 'round', 'damageTotal', 'hits', 'loot', 'savedAt',
+  'completions', 'wild',
 ];

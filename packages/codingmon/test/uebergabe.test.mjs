@@ -456,7 +456,71 @@ test('Zusage: Client und Host nennen dieselben Namen (die Dopplung driftet nicht
   const source = readFileSync(CLIENT_FILE, 'utf8');
   assert.equal(source.includes(`const HOST_NAMESPACE = '${uebergabe.UEBERGABE_NAMESPACE}'`), true, 'der Namespace stimmt');
   assert.equal(source.includes(`const HOST_METHOD = '${uebergabe.UEBERGABE_METHOD}'`), true, 'die Methode stimmt');
+  assert.equal(source.includes(`const HOST_ACTIVITY_METHOD = '${uebergabe.UEBERGABE_ACTIVITY_METHOD}'`), true, 'die Lese-Methode stimmt');
+  assert.equal(uebergabe.UEBERGABE_ACTIVITY_ENDPOINT, `${uebergabe.UEBERGABE_NAMESPACE}/${uebergabe.UEBERGABE_ACTIVITY_METHOD}`, 'der Lese-Endpunkt folgt der Regel');
   const host = await import(pathToFileURL(HOST_FILE).href);
   assert.equal(host.UEBERGABE_ENDPOINT, uebergabe.UEBERGABE_ENDPOINT, 'der Host exportiert denselben Endpunkt');
+  assert.equal(host.UEBERGABE_ACTIVITY_ENDPOINT, uebergabe.UEBERGABE_ACTIVITY_ENDPOINT, 'und denselben Lese-Endpunkt');
   assert.equal(host.SNAPSHOT_FIELDS, uebergabe.SNAPSHOT_FIELDS, 'und dieselbe Feldliste');
+});
+
+test('Zusage: agent/status zaehlt abgeschlossene Schritte, readActivity nennt sie', { skip }, async () => {
+  const medium = mkdtempSync(join(tmpdir(), 'codingmon-aktivitaet-'));
+  const { ctx: host, carrier } = await bootHost(medium);
+  const storeFile = join(medium, 'codingmon_pet.json');
+
+  const disposeHost = quiet(() => bundle.apply(host, bundle.Config({})));
+  await until(() => host.get(bundle.STORE_SERVICE));
+  const client = await bootClient(carrier);
+  const unmount = await client.remote.$mount(remote.petRemoteContribution());
+  const namespace = await until(() => client.get(`remote.${uebergabe.UEBERGABE_NAMESPACE}`));
+  const read = () => namespace[uebergabe.UEBERGABE_ACTIVITY_METHOD]();
+
+  // Anfang: nichts getan, nichts laeuft. Reine Primitiven ueber die Naht.
+  const idle = await read();
+  assert.equal(idle.ok, true, 'die Lese-Methode ist aufrufbar');
+  assert.equal(idle.value.completions, 0);
+  assert.equal(idle.value.running, false);
+  assert.equal(typeof idle.value.at, 'string');
+
+  // `running` allein zaehlt nichts — erst `idle` danach schliesst den Schritt.
+  host.emit('agent/status', { status: 'running' });
+  assert.equal((await read()).value.running, true, 'der Host sieht die laufende Arbeit');
+  assert.equal((await read()).value.completions, 0, 'angefangen ist nicht abgeschlossen');
+  host.emit('agent/status', { status: 'idle' });
+  assert.equal((await read()).value.running, false);
+  assert.equal((await read()).value.completions, 1, 'running -> idle = ein Schritt (J3)');
+
+  // `idle` ohne `running` und fremde Staende zaehlen nicht.
+  host.emit('agent/status', { status: 'idle' });
+  host.emit('agent/status', { status: 'kaffee' });
+  assert.equal((await read()).value.completions, 1, 'nur abgeschlossene Arbeit zaehlt');
+  assert.equal((await read()).value.running, false);
+
+  // Zwei weitere Schritte: der Zaehler waechst, die Rate folgt den Schritten.
+  for (let i = 0; i < 2; i += 1) {
+    host.emit('agent/status', { status: 'running' });
+    host.emit('agent/status', { status: 'idle' });
+  }
+  assert.equal((await read()).value.completions, 3);
+
+  // J2: der Zaehler ueberlebt im Spiegel. Erst braucht es einen Stand — ohne
+  // Stand erfindet der Host keinen Datensatz, sondern zaehlt nur fluichtig.
+  const snapshot = {
+    schemaVersion: 3, species: 'nullpointer', xp: 0, wins: 0, losses: 0, round: 0,
+    damageTotal: '0', hits: 0, loot: { schrott: 0, brauchbar: 0, shiny: 0 }, completions: 0, wild: null,
+  };
+  const written = await namespace[uebergabe.UEBERGABE_METHOD](snapshot);
+  assert.equal(written.ok, true, 'der Stand liegt auf dem Medium');
+  host.emit('agent/status', { status: 'running' });
+  host.emit('agent/status', { status: 'idle' });
+  // Das Ablegen ist async (Medium-Bestaetigung): pollen statt raten.
+  const readCompletions = () => JSON.parse(readFileSync(storeFile, 'utf8')).tables.snapshots[store.PET_KEY].completions;
+  await until(() => readCompletions() === 4);
+  assert.equal(readCompletions(), 4, 'der Spiegel hebt den Zaehler auf');
+  assert.equal((await read()).value.completions, 4);
+
+  await unmount();
+  await client.fiber.dispose();
+  await disposeHost();
 });

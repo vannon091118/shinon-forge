@@ -16,21 +16,21 @@ import { join } from 'node:path';
 export const id = 'doctor';
 
 /**
- * Deklarierte Paketversionen — bewusst gehalten, NICHT vereinheitlicht.
+ * Versionen — eine REGEL, keine Liste.
  *
- * Standard ist `1.0.0`. `key-router`, `narrative` und `shinon-forge` führen
- * `0.1.0`: Vorbereitungs-Pakete, bewusst nicht im Profil (siehe
- * `dead-package` und `docs/ZAHLEN.md` §1). Diese Aufteilung ist eine
- * Entscheidung, kein Versehen — deshalb schlägt der Doctor nur bei
- * UNDEKLARIERTER Abweichung an. Wer eine Version ändert, ändert sie hier
- * UND im Manifest; alles andere ist Drift und bleibt rot.
+ * Zwei Zeilen gibt es in diesem Repo: `1.0.0` für ausgelieferte Pakete und
+ * `0.1.0` für Vorbereitungs-Pakete (siehe `docs/ZAHLEN.md` §1). Welche Zeile ein
+ * Paket führt, entscheidet das PAKET: ein aktives Paket führt `1.0.0`, ein im
+ * eigenen Manifest als `dsh.inactive` deklariertes darf `0.1.0` führen.
+ *
+ * Warum nicht als Tabelle im Gate (bis 2026-10-11 `EXPECTED_VERSIONS`): die
+ * Tabelle war eine zweite Quelle für dieselbe Zahl — jedes Vorbereitungs-Paket
+ * musste sich hier eintragen, und ein neues Paket war bis dahin rot, obwohl sein
+ * eigenes Manifest vollständig war. Dieselbe Begründung wie in `dead-package`:
+ * die Erklärung gehört dem Paket, das Gate liest sie nur.
  */
-export const EXPECTED_VERSIONS = {
-  default: '1.0.0',
-  'key-router': '0.1.0',
-  narrative: '0.1.0',
-  'shinon-forge': '0.1.0',
-};
+export const SHIPPED_VERSION = '1.0.0';
+export const PREPARATION_VERSION = '0.1.0';
 
 export function check(ctx) {
   const issues = [];
@@ -47,32 +47,40 @@ export function check(ctx) {
     }
   }
 
-  // 2. Dependency-Drift: devDependencies im Root vs. echte Pakete.
+  // 2. Dependency-Drift: das Inventar im Root-Manifest vs. echte Pakete.
+  //    Beide Richtungen zählen — bis auf eine: ein Paket, das sich im eigenen
+  //    Manifest als `dsh.inactive` zurückstellt, muss das Inventar noch nicht
+  //    belasten. Sonst wäre jedes neue Paket (auch ein bewusst zurückgestelltes)
+  //    wieder ein Eintrag in einer ZENTRALEN Datei, und genau das soll die
+  //    Erklärung im Paket vermeiden (siehe `dead-package`).
   const workspaceDeps = Object.keys(root.devDependencies ?? {}).filter((n) => n.startsWith('@shinon/'));
-  const actual = new Set(ctx.packages.map((p) => p.want.name));
+  const actual = new Map(ctx.packages.map((p) => [p.want.name, p]));
   for (const dep of workspaceDeps) {
     if (!actual.has(dep)) {
       issues.push(`package.json: devDependency "${dep}" hat kein Paket in packages/*`);
     }
   }
-  for (const name of actual) {
-    if (!workspaceDeps.includes(name)) {
-      issues.push(`package.json: Paket "${name}" fehlt in devDependencies`);
-    }
+  for (const [name, pkg] of actual) {
+    if (workspaceDeps.includes(name)) continue;
+    if (pkg.manifest?.dsh?.inactive === true) continue;
+    issues.push(
+      `package.json: Paket "${name}" fehlt in devDependencies ` +
+        '(ein noch nicht ausgeliefertes Paket erklärt sich mit `"dsh": { "inactive": true }` im eigenen Manifest)',
+    );
   }
 
-  // 3. Version-Drift: jede Paketversion muss der Deklaration oben entsprechen.
-  //    Gehaltene Aufteilung (Standard + drei 0.1.0) ist grün; alles Undeklarierte
-  //    — auch ein einzelner Ausreißer — ist ein Befund mit Paketnamen.
+  // 3. Version-Drift: die Zeile des Pakets steht in seinem eigenen Manifest.
+  //    Nur ein als inaktiv deklariertes Vorbereitungspaket darf die
+  //    Vorbereitungs-Zeile neben der Auslieferungs-Zeile führen; alles andere —
+  //    auch ein einzelner Ausreißer — ist ein Befund mit Paketnamen.
   for (const pkg of ctx.packages) {
-    const want = EXPECTED_VERSIONS[pkg.dir] ?? EXPECTED_VERSIONS.default;
     const v = pkg.manifest?.version;
-    if (v !== want) {
-      issues.push(
-        `${pkg.dir}: Version "${v ?? 'fehlt'}" ≠ deklariert "${want}" ` +
-          `(scripts/gate/plugins/doctor.mjs EXPECTED_VERSIONS) — Version dort und im Manifest gemeinsam ändern`,
-      );
-    }
+    const inactive = pkg.manifest?.dsh?.inactive === true;
+    if (inactive ? v === SHIPPED_VERSION || v === PREPARATION_VERSION : v === SHIPPED_VERSION) continue;
+    issues.push(
+      `${pkg.dir}: Version "${v ?? 'fehlt'}" — ${inactive ? 'ein Vorbereitungspaket (dsh.inactive)' : 'ein ausgeliefertes Paket (ohne dsh.inactive)'} ` +
+        `führt ${inactive ? `${PREPARATION_VERSION} oder ${SHIPPED_VERSION}` : SHIPPED_VERSION}`,
+    );
   }
 
   return issues;

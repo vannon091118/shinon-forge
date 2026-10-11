@@ -60,6 +60,12 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   the bundled packages resolvable; skips visibly otherwise). Runs inside `gate:test`.
 - `npm run build` → `node scripts/build.mjs`: re-validates everything, then wipes and
   regenerates `dist/` (`manifest.json`, `profile.json`, `dist/packages/*`).
+- `npm run scale:check` → `node scripts/scale-check.mjs`: the scaling proof — copies the
+  tree to `/tmp`, adds N clone plugins (`--plugins N`, default 20, `--keep`, `--json`)
+  and runs idioms → static gate → `gate --full` → gate tests → distribution test → build
+  over the copy. The repo tree is never touched; needs Node ≥ 22. Not part of `npm test`
+  (it copies the tree and takes about a minute and a half); numbers in `docs/ZAHLEN.md`
+  §2, method in `docs/audit/SKALIERUNG_2026-10-11.md`.
 - `npm run branding` → the effect measurement for the branding layer in a real Chromium
   (`scripts/branding-check.mjs`, needs a built `dist/` and a browser binary; `--browser
   <path>` or `SHINON_CHROME`). It is NOT one of the gate plugins — the gate engine runs it
@@ -107,6 +113,18 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   `dsh-test` and `build` check too. Never edit between the markers by hand; sharing by
   import is impossible here (one tarball per package, self-contained client bundle),
   which is exactly why the derivation is generated and drift-checked.
+  **Each file declares its own values in the opening marker** (` params={…}`, JSON);
+  there is no central region table to keep in sync, and the tools refuse to guess —
+  an unknown block id, missing or unparseable params leave the file untouched and are
+  reported (fail-closed). A new plugin writes its marker with its own table/key/label
+  and runs `npm run idioms`.
+- The gate carries **no per-package list**. A package that is deliberately not in the
+  profile yet says so itself: `"dsh": { "inactive": true }` in its own manifest
+  (`dead-package`); that is also what lets it skip the root inventory (`doctor`) and
+  carry the preparation version — the version rule is derived from that same field, so
+  nothing outside its own folder has to be edited (one exception, named because it is
+  real: a menu label needs one line in `packages/locale-de/client.js`, the owner of the
+  texts). Recipe and the measured cost per new plugin: `docs/ARCHITECTURE.md` §2.1.
 - The declared Schemastery version (`docs/ZAHLEN.md` §1) has no `z.enum` — model enums as
   `z.union([z.const('a'), z.const('b')])`.
 - If a contract changes, edit it in `scripts/lib/repo.mjs` (the shared source) — never in

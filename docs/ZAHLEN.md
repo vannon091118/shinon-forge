@@ -28,9 +28,9 @@ der sie gemessen wurden.
 | davon eigene (`@shinon/*`) | **14** | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.filter(b=>b.startsWith('@shinon/')).length"` | 0 |
 | davon fremde | **5** (`@deepseek-ai/dsh-base`, `dsh-web-app`, `dsh-experimental-auto-review`, `dsh-experimental-agent-team-profile`, `dsh-experimental-inspector-profile`) | dieselbe Liste | 0 |
 | Vendorte Dateien unter `vendor/` | **22** (20 Paketdateien aus `@deepseek-ai/dsh@0.2.1-alpha.2` + `MANIFEST.json` + `MODIFICATIONS.md`; Herkunft und `sha256` je Datei: [vendor/dsh/MANIFEST.json](vendor/dsh/MANIFEST.json)) | `find vendor -type f \| wc -l` | 0 |
-| Pakete **nicht** im Profil | **5** (`key-router`, `narrative`, `openapi`, `popup`, `shinon-forge`) | `ls packages` gegen die Liste oben | 0 |
+| Pakete **nicht** im Profil | **5** (`key-router`, `narrative`, `openapi`, `popup`, `shinon-forge`) — alle fünf erklären ihre Zurückstellung selbst (`"dsh": { "inactive": true }` im eigenen Manifest, gelesen von `dead-package`) | `ls packages` gegen die Liste oben | 0 |
 | Version des Repos | **0.2.0** | `node -p "require('./package.json').version"` | 0 |
-| Paketversionen | **16× `1.0.0`, 3× `0.1.0`** (`0.1.0`: `key-router`, `narrative`, `shinon-forge`) | `node -e "for (const d of require('fs').readdirSync('packages')) console.log(require('./packages/'+d+'/package.json').version)"` | 0 |
+| Paketversionen | **16× `1.0.0`, 3× `0.1.0`** (`0.1.0`: `key-router`, `narrative`, `shinon-forge`) — verteilt **ohne** zentrale Liste: die Zeile folgt aus dem eigenen Manifest (`dsh.inactive` darf `0.1.0` führen, sonst `1.0.0`; Regel im `doctor`) | `node -e "for (const d of require('fs').readdirSync('packages')) console.log(require('./packages/'+d+'/package.json').version)"` | 0 |
 | DSH installiert | **0.2.0-rc.2** | `dsh --version` | 0 |
 | DSH-Pin im Root-Manifest | **0.2.1-alpha.1** | `node -p "require('./package.json').dependencies['@deepseek-ai/dsh']"` | 0 |
 | Schemastery (deklariert) | `~3.18.4` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
@@ -40,7 +40,7 @@ der sie gemessen wurden.
 | Markdown-Dokumente im Baum | **53** (davon 6 unter `.agents/skills/`, 3 unter `vendor/` — die zwei fremden READMEs des vendorten Pakets und unser Änderungslog —; enthält die 16 Nachweis-Dokumente unter `docs/audit/`) | `find . -name '*.md' -not -path './node_modules/*' -not -path './attachments/*' -not -path './dist/*' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | **6** | `ls docs/contracts \| wc -l` | 0 |
 | Proben unter `docs/probes/` | **27** | `ls docs/probes \| wc -l` | 0 |
-| Generierte Plugin-Bausteine (Idiome) | **12** Blöcke in **11** Dateien, **0** handgepflegte Kopien (eine Quelle: `scripts/lib/plugin-idioms.mjs`) | `npm run idioms:check` | 0 |
+| Generierte Plugin-Bausteine (Idiome) | **12** Blöcke in **11** Dateien, **0** handgepflegte Kopien (eine Quelle: `scripts/lib/plugin-idioms.mjs`; die Werte je Block stehen in der Startmarke der Datei, nicht in einer Tabelle im Gate) | `npm run idioms:check` | 0 |
 | Verweise in Markdown, die nicht auflösen | **0** (620 Verweise geprüft — seit dem Doku-Zug sieht der Lauf `docs/`, `packages/` und `vendor/`) | Prüfbefehl in `docs/INDEX.md` §4 | 0 |
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -59,11 +59,12 @@ lesen genau diese Datei.
 | Frischer Klon: `npm install` + `npm start` (Schritt 3.4) | **731** Pakete installiert, Start **ohne** `dsh` im PATH (`command -v dsh` → NEIN), Herkunft `Repo-Installat`, dsh `0.2.1-alpha.1` | 0 | in einer Arbeitsbaum-Kopie ohne `node_modules`/`dist`/`logs`: `npm install`, dann `env -i … npm start -- --check` |
 | Frischer Klon ohne pnpm-Spuren (Schritt 3.5) | **0** pnpm-Dateien im Klon, kein `packageManager`-Feld, **731** Pakete, Lockfile nach dem Install **byteidentisch** zum getrackten, `npm start -- --check` grün (`pnpm` und `dsh` nicht im PATH) | 0 | in einer Arbeitsbaum-Kopie ohne `profiles/`: `npm install`, dann `env -i … npm start -- --check` |
 | Vendoring `vendor/dsh` (Schritt 3.2) | **20** Dateien verglichen, **0** Abweichungen gegen das Registry-Tarball (Dateiliste und `sha256` je Datei identisch; Manifest: [vendor/dsh/MANIFEST.json](vendor/dsh/MANIFEST.json)) | 0 | `npm pack @deepseek-ai/dsh@0.2.1-alpha.2` → entpacken → Datei-für-Datei-Vergleich |
-| Distributionstest (jetzt `npm pack`, Schritt 3.5) | **76** bestanden, **0** fehlgeschlagen (19 Pakete × 4 Stufen; mit `npm pack` statt `pnpm pack` — vorher 75/1 rot an `project-index`) | 0 | `node scripts/pack-test.mjs` |
-| Build (`dist/`) | 19 Pakete, 96 Dateien, 915156 Bytes | 0 | `npm run build` |
+| Distributionstest (jetzt `npm pack`, Schritt 3.5) | **76** bestanden, **0** fehlgeschlagen (19 Pakete × 4 Stufen) in **6,5 s** (Pool 6; vor dem Umbau sequenziell ≈ 22 s) | 0 | `node scripts/pack-test.mjs` |
+| Build (`dist/`) | 19 Pakete, 96 Dateien, 915735 Bytes | 0 | `npm run build` |
+| **Skalierungslauf** (Kopie des Baums + **20** neue Pakete = 39, alle selbst als `dsh.inactive` erklärt): Idiom-Schreiber → statisches Gate → Gate-Engine `--full` → Gate-Tests → Distributionstest → Build | **6 von 6** Stufen grün — Gate **200** bestanden/0, `gate:full` 18 grün/0, Gate-Tests **328**/0, Distribution **156**/0, Build 39 Pakete/196 Dateien; Dauer ≈ 98 s | 0 | `npm run scale:check` (Nachweis: [docs/audit/SKALIERUNG_2026-10-11.md](audit/SKALIERUNG_2026-10-11.md)) |
 | Gate-Engine `--full` | 18 Gates gelaufen, 18 grün; die Branding-Stufe meldet ohne Flag einen sichtbaren Skip, mit `--branding` läuft sie (siehe nächste Zeile) | 0 | `npm run gate:full` |
 | Branding-Wirkung im echten Chromium | **28** bestanden, **0** fehlgeschlagen (ausgeliefertes `dist/packages/core/client.js`, `/usr/bin/google-chrome`) | 0 | `npm run branding` · `node scripts/gate/engine.mjs --full --branding` |
-| Gate-Tests | **327** bestanden, 0 rot, 0 übersprungen | 0 | `node --test scripts/gate/tests/*.test.mjs` mit Node v22.23.3 und Repo-`dsh` (0.2.1-alpha.1) zuerst im PATH |
+| Gate-Tests | **328** bestanden, 0 rot, 0 übersprungen | 0 | `node --test scripts/gate/tests/*.test.mjs` mit Node v22.23.3 und Repo-`dsh` (0.2.1-alpha.1) zuerst im PATH |
 | Client-Aktivierung + Marke (Wache 1–3) | 6 bestanden, **0** rot | 0 | `node --test scripts/gate/tests/client-activation.test.mjs` |
 | Client-Locale + `ctx`-Zugriff (Schritt 2.6) | 6 bestanden, **0** rot (3 Zusagen dieser Datei + 3 der Nachbarwachen im selben Lauf) | 0 | `node --test scripts/gate/tests/client-locale.test.mjs` |
 | Codingmon-Tests | **32** bestanden, **0** rot, 0 übersprungen (32) | 0 | `npm run test:codingmon` |
@@ -94,7 +95,8 @@ vollständig durch (Exit 0) — damit läuft auch `dsh-profile-test` innerhalb v
 | Befund | vorher | nachher | Beleg |
 |---|---|---|---|
 | `gate:test`: unvollständiger Lock-Baum (Top-Level `dsh` + `schemastery` fehlten, 18× `dsh/node_modules` fehlten), falsche Toolchain (Node v18, fremdes `dsh@0.2.0-rc.2` zuerst im PATH) | 150 bestanden, 7 Dateien rot, 5 übersprungen (162), Exit 1 | Baum lock-exakt vervollständigt, Lauf mit Node v22 + Repo-`dsh@0.2.1-alpha.1` zuerst im PATH: **306/306, Exit 0** (kein Test geändert) | `node --test scripts/gate/tests/*.test.mjs` |
-| `doctor`: gehaltene Versionsaufteilung (`1.0.0`×16, `0.1.0`×3) als Befund gemeldet, obwohl erlaubt genannt | `gate:full` 17 grün, 1 rot, Exit 1 | Aufteilung als `EXPECTED_VERSIONS` deklariert (Standard + drei begründete Ausnahmen): `gate:full` 18 grün, Exit 0; undeklarierte Abweichungen weiter rot (5 Negativproben) | `npm run gate:full` + isolierter `check()`-Nachweis |
+| `doctor`: gehaltene Versionsaufteilung (`1.0.0`×16, `0.1.0`×3) als Befund gemeldet, obwohl erlaubt genannt | `gate:full` 17 grün, 1 rot, Exit 1 | zuerst als `EXPECTED_VERSIONS` deklariert (Standard + drei begründete Ausnahmen): `gate:full` 18 grün, Exit 0; undeklarierte Abweichungen weiter rot (5 Negativproben) — seit dem Skalierungslauf (Zeile darunter) **ohne** diese Liste, abgeleitet aus dem eigenen Manifest | `npm run gate:full` + isolierter `check()`-Nachweis |
+| **Skalierung: drei zentrale Handlisten im Gate** — Idiom-Regionen (`host-half`/`client-half`), `KNOWN_INACTIVE` (`dead-package`), `EXPECTED_VERSIONS` (`doctor`); dazu Bestandszahlen in `plugin-idioms.test.mjs` und der lineare Distributionstest | mit 39 Paketen (20 neue, jedes vollständig konform): 60 + 5 + 1 Befunde, 3 Gate-Tests rot; Distributionstest 19 Pakete ≈ 22 s sequenziell | mit 39 Paketen: `node scripts/dsh-test.mjs` 200/0, `gate:full` 18/0, Gate-Tests 328/0, Distribution 156/0, `build` 39 Pakete — **je neuem Paket kein Eingriff außerhalb seines Ordners** (Ausnahme, genannt und nötig: eine Zeile im Wörterbuch von `@shinon/locale-de`, wenn das Paket einen Menü-Text zeigt); Distributionstest 39 Pakete in 13,5 s | `npm run scale:check` ([docs/audit/SKALIERUNG_2026-10-11.md](audit/SKALIERUNG_2026-10-11.md)) |
 | `profiles/shinon/cordis.patch.yml`: `config:MAX` statt `config:` — die Datei war **kein gültiges YAML**, das Profil lud nicht | Gate `97 bestanden, 1 fehlgeschlagen`, Exit 1 | Gate `98 bestanden, 0 fehlgeschlagen`, Exit 0 | `node scripts/dsh-test.mjs` |
 | [packages/shinon-forge](packages/shinon-forge) `index.js`: Ketten wie `.default(false).describe(...)` und `.optional()` — die deklarierte Schemastery-Fassung (`3.18.4`, §1) hat `description` statt `describe`, `required(false)` statt `optional`, und `default(...)` beendet die Kette | Distributionstest `75 bestanden, 1 fehlgeschlagen`, Exit 1 (`TypeError: z.boolean(...).default(...).describe is not a function`) | `76 bestanden, 0 fehlgeschlagen`, Exit 0 | `node scripts/pack-test.mjs` |
 | [packages/core/client.js](packages/core/client.js): die WebP lag im Paket, wurde aber per `document.baseURI` adressiert — DSH liefert Plugin-Ressourcen aber nur unter `/plugins/<id>/client*.js` (`@deepseek-ai/dsh-client-modules`, `CLIENT_CHUNK`) | Browser: `GET /assets/persona.webp → 404`, `naturalWidth 0` | WebP als data-URI im self-contained Bundle: `naturalWidth 260 × 460`, kein 404 in der Netzwerkliste | Chromium gegen `dsh --profile shinon` + `node scripts/panel-check.mjs` |
@@ -112,17 +114,21 @@ vollständig durch (Exit 0) — damit läuft auch `dsh-profile-test` innerhalb v
 Eintraege mit dem Vermerk **REPARIERT** wurden nach der Messung dieses Durchlaufs
 behoben; die uebrigen Befunde sind offen.
 
-1. **`doctor` (in `gate:full`) — REPARIERT (2026-10-10)**: Versions-Drift über Pakete — `1.0.0`×16, `0.1.0`×3
+1. **`doctor` (in `gate:full`) — REPARIERT (2026-10-10, Regel am 2026-10-11 ersetzt)**:
+   Versions-Drift über Pakete — `1.0.0`×16, `0.1.0`×3
    ([packages/key-router](packages/key-router),
    [packages/narrative](packages/narrative),
    [packages/shinon-forge](packages/shinon-forge), Zahlen in §1). Der Doctor meldete die
    gehaltene Aufteilung als Befund (obwohl sein Text sie „erlaubt" nannte) und ließ
-   deshalb `gate:full` rot werden. Reparatur: die Aufteilung ist jetzt als
-   `EXPECTED_VERSIONS` in [scripts/gate/plugins/doctor.mjs](scripts/gate/plugins/doctor.mjs)
-   deklariert (Standard `1.0.0`, die drei Vorbereitungs-Pakete `0.1.0` mit Begründung) —
-   gehaltene Aufteilung ist grün, jede undeklarierte Abweichung bleibt rot (Negativproben:
-   `tooltip@9.9.9`, neues Paket `@0.2.0`, `narrative@1.0.0` je genau 1 Befund mit Paketnamen).
-   Keine Paketversion wurde angefasst. Belegt: `npm run gate:full` → 18/18, Exit 0.
+   deshalb `gate:full` rot werden. Zuerst als `EXPECTED_VERSIONS`
+   in [scripts/gate/plugins/doctor.mjs](scripts/gate/plugins/doctor.mjs) deklariert —
+   **seit dem Skalierungslauf vom 2026-10-11 ohne diese Liste**: die Zeile eines Pakets
+   folgt aus seinem eigenen Manifest (ein `dsh.inactive`-Paket darf die
+   Vorbereitungs-Zeile führen, ein ausgeliefertes führt die Auslieferungs-Zeile), jede
+   andere Abweichung bleibt rot (Negativproben: `tooltip@9.9.9`, neues Paket `@0.2.0`,
+   `narrative@1.0.0` je genau 1 Befund mit Paketnamen). Keine Paketversion wurde
+   angefasst. Belegt: `npm run gate:full` → 18/18, Exit 0; `npm run scale:check` →
+   20 zusätzliche Pakete ohne einen Befund.
 2. **Client-Boot bricht ab — REPARIERT (2026-10-10, zweiter Pass)**: Die drei Client-Haelften `@shinon/markers`, `@shinon/dashboard`, `@shinon/codingmon` meldeten
    beim Laden `failed` — der Browser zeigt „Failed to load plugins … web boot: 3 entries
    did not activate“. Ursache: diese Dateien lasen `ctx.locale`, waehrend ihr `inject`

@@ -16,10 +16,10 @@
  * Beides behauptet nichts über eine Oberfläche, die es nicht gibt — der Eintrag
  * sagt ausdrücklich, dass dieser Client nichts rendert.
  *
- * Das Paket ist deshalb im Gate als bewusst inaktiv geführt
- * (`scripts/gate/plugins/dead-package.mjs`, KNOWN_INACTIVE): ein echtes Overlay
- * braucht eine Entscheidung — Slot, Felder, Anzahl der Einträge — und ist keine
- * Refactor-Arbeit.
+ * Das Paket erklärt sich deshalb im eigenen Manifest als bewusst inaktiv
+ * (`"dsh": { "inactive": true }`, gelesen vom `dead-package`-Gate): ein echtes
+ * Overlay braucht eine Entscheidung — Slot, Felder, Anzahl der Einträge — und ist
+ * keine Refactor-Arbeit.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/popup',
@@ -62,7 +62,7 @@ window.__ModuleLoader__.load({
           + 'dieser Client rendert sie nicht — sichtbar ist nur diese Zeile.'
         );
 
-        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
+        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test) params={"table":"MENU_DE","key":"menu.popup","label":"Shinon Popup","noteSuffix":" LABEL bleibt die interne","noteLines":["Kennung für announce()."]}
         // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
         // Locale-Dienst gilt die deutsche Tabelle. LABEL bleibt die interne
         // Kennung für announce().

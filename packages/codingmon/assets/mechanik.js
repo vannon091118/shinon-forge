@@ -453,6 +453,51 @@ export function lootOdds(entry) {
   return Number(((entry.weight / LOOT_TOTAL) * 100).toFixed(2));
 }
 
+// ── 5. SPAWN (Wild-Spawn aus erfolgreicher Agent-Arbeit) ───────────────────
+/**
+ * Die Spawn-Rate haengt an ABGESCHLOSSENEN Schritten, nicht an Tokens (J3):
+ * Der Host zaehlt `running` -> `idle`-Wechsel von `agent/status` (Quelle ist
+ * DSHs Agent-Loop, kein Shinon-Paket), der Client fragt den Zaehler ueber den
+ * Remote-Endpunkt und rechnet HIER, ob etwas erscheint. Reine Funktion aus
+ * (Zaehler, Stufe): derselbe Zaehler ergibt immer dasselbe Wild — kein Zufall,
+ * kein Timer, keine zweite Wahrheit neben `arenaFor`.
+ */
+/** Jeder wievielte abgeschlossene Schritt ein Wild-Spawn ausloest. */
+export const SPAWN_EVERY = 3;
+
+/**
+ * Das Wild-Spawn zu einem Zaehlerstand — oder `null`, wenn keines ansteht.
+ * Die Art streut deterministisch ueber den Zaehler, die Stufe schwankt wie in
+ * `arenaFor` um hoechstens eine Stufe (nie unter 1).
+ * @param {number} completions - abgeschlossene Agent-Schritte (>= 0).
+ * @param {number} level - Stufe des eigenen Codemons.
+ * @returns {object|null} `{ speciesId, element, level }` oder `null`.
+ */
+export function spawnFor(completions, level) {
+  const done = Math.max(0, Math.floor(completions ?? 0));
+  if (done <= 0 || done % SPAWN_EVERY !== 0) return null;
+  const lvl = Math.max(1, Math.floor(level ?? 1));
+  const speciesId = SPECIES_IDS[(done * 7 + 3) % SPECIES_IDS.length];
+  return {
+    speciesId,
+    element: SPECIES[speciesId].family,
+    level: Math.max(1, lvl + ((done % 3) - 1)),
+  };
+}
+
+/**
+ * Die Typwirkung als Zeichen statt Tabelle: Faktor plus Symbol fuer die
+ * Kampfansicht (`×1,5` mit Pfeil, kein Matrix-`<table>`). Die Zahl ist
+ * dieselbe wie in `resolveAttack` — ein Nachschlagen, kein Zweig.
+ * @param {string} attackerElement - Element des Angreifers.
+ * @param {string} defenderElement - Element des Ziels.
+ * @returns {{factor: number, symbol: string}} `▲` wirksam, `●` neutral, `▼` schwach.
+ */
+export function effectiveness(attackerElement, defenderElement) {
+  const factor = (ELEMENT_CHART[attackerElement] ?? ELEMENT_CHART.spark)[defenderElement] ?? 1;
+  return { factor, symbol: factor > 1 ? '▲' : factor < 1 ? '▼' : '●' };
+}
+
 /**
  * Codingmon-Konfiguration (Schemastery).
  * `xpPerToken` ist der Vertrag aus dem Auftrag: jeder Token ist genau 1 XP.

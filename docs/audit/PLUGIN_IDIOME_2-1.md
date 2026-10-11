@@ -2,6 +2,12 @@
 
 > **Status:** current — Nachweis zum Plan-Schritt 2.1 (C2), alles hier in diesem Durchlauf gemessen. **Stand:** 2026-10-10
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md` (einziger Eigentümer harter Zahlen)
+>
+> **Fortschreibung 2026-10-11:** Die Baustein-Parameter stehen seither **nicht** mehr in
+> der zentralen `REGIONS`-Tabelle (§2 unten), sondern in der Startmarke jeder Datei
+> (` params={…}`); die Prüfung findet die Blöcke im Baum. Mechanismus und Nachweis:
+> [SKALIERUNG_2026-10-11.md](SKALIERUNG_2026-10-11.md), Quelle: `scripts/lib/plugin-idioms.mjs`.
+> Die Mutationsproben und die Verhaltensgleichheit unten bleiben gültig.
 
 **Auftrag (PLAN.md 2.1):** die sechs `settings.configure`-Kopien auf eine Quelle
 bringen — kein neues Feature, keine Verhaltensänderung, keine Test-Anpassung, keine

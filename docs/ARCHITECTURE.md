@@ -60,6 +60,35 @@ Für Enums gilt die deklarierte Schemastery-Fassung (`docs/ZAHLEN.md` §1): sie 
 - Host-shared Abhängigkeiten stehen in `SHARED_DEPS` (`scripts/lib/repo.mjs`) und
   werden als peer **und** dev erzwungen.
 
+### 2.1 Ein neues Paket hinzufügen
+
+Es gibt **keine** zentrale Liste, in die sich ein Paket eintragen müsste; das Gate
+liest alles aus dem Baum. Gemessen mit 20 zusätzlichen Paketen (`npm run scale:check`,
+Nachweis: `docs/audit/SKALIERUNG_2026-10-11.md`): ein neues Paket kostet genau das hier.
+
+1. Ordner `packages/<dir>/` mit den vier Rollendateien (§2) und den vier
+   Vertragsnamen aus §1 (Manifest, Patch `id`/`name`, ModuleLoader-id).
+2. Trägt die Hälfte einen **generierten Block** (Settings-Registrierung, Locale-
+   Fallback), schreibt man **nicht** die Zeilen, sondern die **Startmarke mit den
+   eigenen Werten** (` params={"table":…,"key":…,"label":…}`, Bauart in
+   `scripts/lib/plugin-idioms.mjs`) und lässt `npm run idioms` den Block rendern.
+   `npm run idioms:check` und das Gate verlangen Zeichengleichheit mit der Quelle.
+3. Solange das Paket bewusst nicht im Profil steht:
+   `"dsh": { "inactive": true }` ins eigene Manifest (`dsh.inactive`). Damit ist es
+   für `dead-package` erklärt, muss noch nicht im Root-Inventar
+   (`devDependencies`) stehen und darf die Vorbereitungs-Version führen
+   (`doctor`; Regeln ohne Namensliste). Ohne diese Erklärung ist das Paket tot und
+   `gate:full` rot.
+4. Zeigt das Paket einen **Menü-Text**, bekommt dieser Schlüssel **eine** Zeile im
+   Wörterbuch von `packages/locale-de/client.js` — die Besitzerin der Texte. Der
+   Fallback im Paket ist nur die Sicherheitsleine; der Wächter in
+   `scripts/gate/tests/client-locale.test.mjs` verlangt beides.
+5. Soll das Paket **aktiv** werden: Eintrag in `profiles/shinon/cordis.patch.yml`,
+   `@shinon/<dir>` in `profiles/shinon/package.json` (`dependencies` **und**
+   `dsh.profile.bundles`), Zeile im Root-`devDependencies`, `dsh.inactive` entfernen,
+   dann `npm install` im Profil. Das ist Handarbeit und bleibt es — ein Profil ist eine
+   Entscheidung, kein Nebeneffekt.
+
 ## 3. DSH-Profil
 
 `profiles/<profil>/` ist ein **echtes DSH-Profil**, keine Cordis-Konfiguration.
@@ -166,6 +195,7 @@ profiles/shinon/package.json         (Aktivierung: dsh.profile.bundles)
 | `npm run gate` / `gate:local` / `gate:full` | modulare Gate-Engine (`scripts/gate/engine.mjs`), Slice-fähig                              |
 | `npm run build` (`scripts/build.mjs`)  | dieselben Regeln + Artefakte nach `dist/` (`manifest.json`, `profile.json`, Paketkopien)        |
 | `npm run stages` (`scripts/stages.mjs`)| Startstufen und READY-Zeile des Starters nachvollziehen                                         |
+| `npm run scale:check` (`scripts/scale-check.mjs`) | Skalierungsnachweis: Kopie des Baums + N neue Pakete (`--plugins N`) durch die ganze Kette; nicht Teil von `npm test` |
 | `npm run verify:panel` (`scripts/panel-check.mjs`) | Panel-Beleg über das gebaute Client-Bundle (braucht jsdom)                          |
 
 **Ist-Zustand:** Welche dieser Läufe heute Exit 0 liefern und welche rot sind, steht
