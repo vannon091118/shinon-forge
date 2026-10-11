@@ -38,9 +38,9 @@ hängen:
 | Echte pnpm-**Aufrufe** vorher | **2** — `run('pnpm', ['pack', …])` in [scripts/pack-test.mjs](../scripts/pack-test.mjs) und `execFileSync('pnpm', ['install'], …)` in [scripts/dsh-profile-test.mjs](../scripts/dsh-profile-test.mjs) |
 
 **Warum die Vorprüfung wichtig ist:** die Upstream-Seite legt zur Laufzeit wieder eine
-`pnpm-workspace.yaml` an. Dagegen hilft kein Löschen, sondern nur, dass sie **nie
-getrackt** wird — deshalb zwei `.gitignore`-Zeilen (`pnpm-workspace.yaml`,
-`pnpm-lock.yaml`), ergänzt in diesem Durchgang.
+`pnpm-workspace.yaml` an. Dagegen hilft kein Löschen, sondern nur eine **durchsetzende
+Prüfung** — die kam in diesem Durchgang nach, siehe §8.1 (die zwei zwischenzeitlich
+eingefügten `.gitignore`-Zeilen sind mit §8.2 wieder zurückgenommen).
 
 ## 3. Was entfernt wurde und was bleibt
 
@@ -87,6 +87,16 @@ Arbeitsbaum-Kopie **ohne** `node_modules`, `dist`, `logs`, `sessions`, `storages
 | `packageManager` im Klon-Manifest | Feld fehlt (wie beabsichtigt) | — |
 | Lockfile nach dem Install | byteidentisch zum getrackten (`diff` → 0 Zeilen) | — |
 
+**Wiederholt auf dem Endstand dieser Änderungen** (`/tmp/fresh-clone3`, dieselbe Bauart,
+dieselben drei Kommandos): `npm install` **Exit 0** (731 Pakete), `npm start -- --check`
+**Exit 0** (dsh `0.2.1-alpha.1`, Herkunft `Repo-Installat`), Lockfile nach dem Install
+**byteidentisch** — die Zahlen oben sind damit nicht an einen Zwischenstand gebunden.
+
+**Und ein drittes Mal mit `profiles/` im Klon** (`/tmp/fresh-final`, nur ohne lokale
+Installate): dieselben Ergebnisse, plus `find` nach den zwei pnpm-Artefaktnamen → **0**.
+Die früheren Kopien hatten `profiles/` weggelassen; dieser Lauf zeigt, dass auch ein
+vollständiger Baum ohne pnpm-Reste installiert und startet.
+
 Damit ist die Abnahme des Schritts für den protokollfreien Teil erfüllt: **kein
 pnpm-Aufruf** (`git grep -n -I -E "…('pnpm'…)" -- scripts` → 0 Treffer) und **keine
 pnpm-Datei in Root oder Profil** (`git ls-files | grep -ci pnpm` → 0).
@@ -99,7 +109,7 @@ Werkzeuge (A5) bleibt offen und gehört dem Auftraggeber:
 
 | Lauf | Kommando | Ergebnis | Exit |
 |---|---|---|---|
-| Volle Kette | `npm test` unter `env -i`, PATH **ohne `pnpm`** und **ohne globales `dsh`** (Node v22.23.3, npm 10.9.9) | Gate **99/0** → Fixtures **9/0** → Distribution **76/0** → Profiltest **3/0** | **0** |
+| Volle Kette | `npm test` unter `env -i`, PATH **ohne `pnpm`** und **ohne globales `dsh`** (Node v22.23.3, npm 10.9.9) | Codingmon **32/32** → Gate **100/0** → Fixtures **9/0** → Distribution **76/0** → Profiltest **3/0** | **0** |
 | dasselbe unter Node v18 | derselbe Befehl, PATH ohne Node 22 | rot an der Codingmon-Naht (`getRandomValues` fehlt unter Node 18) — **Umgebungs-Rot, kein Code-Rot**; dieselbe Aussage steht in `docs/ZAHLEN.md` §2 | 1 |
 
 **Warum die Kette ohne globales `dsh` läuft:** `npm run` legt `node_modules/.bin` vorne
@@ -119,9 +129,76 @@ bleiben daneben `npm run gate`/`gate:full` (modulare Engine, 18 Gates), `npm run
   protokollfreie Teil ist davon abgeschlossen; der Rest bleibt Teil von 3.5.
 - **Der Upstream-Plugin-Manager spricht weiter pnpm** (`dsh plugin add`, Neuanlage einer
   `pnpm-workspace.yaml` im Profil über `initProfile`). Das ist fremder Code; hier
-  gemessen, nicht geändert. Die zwei `.gitignore`-Zeilen sorgen dafür, dass so eine
-  Laufzeitdatei nicht getrackt werden kann.
+  gemessen, nicht geändert. Sichtbar wird so eine Laufzeitdatei jetzt durch die
+  Gate-Prüfung aus §8.1 — sie macht das Gate rot, statt still im Baum zu liegen.
 - **3.6 bleibt angehalten**: `profiles/` umzubauen, während dort ein fremder Boot liest
   und schreibt, ist weiterhin der falsche Zeitpunkt.
 - **Nicht gefahren**: `dsh plugin add` (würde das Profil verändern — hier bewusst nicht),
   Modellaufruf, lebender Browser-Lauf.
+
+## 8. Nachbesserung nach dem Audit (2026-10-11)
+
+Drei Befunde des Audits sind geschlossen, jeder mit Vorher/Nachher.
+
+### 8.1 Warnblock im Profiltest entfernt (ungefragt und sachlich falsch)
+
+[scripts/dsh-profile-test.mjs](../scripts/dsh-profile-test.mjs) warnte, wenn
+`profiles/<name>/node_modules` fehlt, und riet, die Profil-Dependencies von Hand
+bereitzustellen. Gemessen war das falsch: das Profil löst ohne jeden Installat auf.
+
+| Lauf in einem Klon **ohne** `profiles/shinon/node_modules` (Repo-`dsh 0.2.1-alpha.1` im PATH) | vorher | nachher |
+|---|---|---|
+| Ergebnis | `⚠️  …/profiles/shinon/node_modules fehlt — dieser Test installiert nicht.` + 3/0, Exit 0 | **keine Warnung**, 3/0, Exit 0 — und am Endstand erneut gemessen (Klon ohne Profil-Installat: Exit 0, drei Zusagen, **null** Warnzeilen im Log) |
+
+Entfernt: der Warnblock, sein Kommentar und die dadurch unbenutzte `modulesDir`-Variable.
+Ein Nutzer bekommt damit keinen Auftrag mehr, der nichts bewirkt.
+
+### 8.2 Die pnpm-Invariante hat jetzt einen Eigentümer (Gate **und** Build)
+
+`pnpmIssues()` in [scripts/lib/repo.mjs](../scripts/lib/repo.mjs) ist die eine Quelle;
+geprüft wird sie vom Gate ([scripts/dsh-test.mjs](../scripts/dsh-test.mjs), Prüfung
+„pnpm-Reste" — damit **99 → 100** Prüfungen) und vom Build
+([scripts/build.mjs](../scripts/build.mjs)). Die Muster sind präzise, kein `grep pnpm`
+über Dateinamen:
+
+- **Artefakte**: Dateiname exakt `pnpm-workspace.yaml` / `pnpm-lock.yaml`, über den
+ganzen Baum außer `node_modules`, `.git`, `dist`, `attachments`;
+- **Aufrufe**: `(exec|spawn|fork|run)[A-Za-z]*('pnpm'` in `scripts/`, `bin/`, `packages/`;
+- **Manifest**: `pnpm` an einer Kommandogrenze in einem `scripts.<name>`-Wert.
+
+Ein *Wort*vorkommen in Kommentar oder Dokument ist **kein** Befund — genau daran war das
+frühere `grep pnpm` gescheitert (es traf diesen Nachweis selbst, weil sein eigener Name das
+Muster enthielt).
+
+**Negativ vorgeführt** (Verletzung erzeugt, Exit-Code gemessen, Verletzung entfernt):
+
+| Probe | mit Verletzung | nach dem Entfernen |
+|---|---|---|
+| `pnpm-workspace.yaml` im Wurzelverzeichnis | Gate **Exit 1**: „pnpm-Datei im Baum: pnpm-workspace.yaml" | **Exit 0**, 100/0 |
+| Wegwerfdatei `__pnpm-probe.mjs` in `scripts/` mit `execFileSync('pnpm', ['install'])` | Gate **Exit 1**: „pnpm-Aufruf: scripts/__pnpm-probe.mjs"; Build **Exit 1**: „pnpm-Reste: …" | **Exit 0**, 100/0 |
+| `package.json` mit `"probe": "pnpm install"` | Gate **Exit 1**: „package.json scripts.probe ruft pnpm" | **Exit 0**, `git diff package.json` leer |
+
+**Eigener Fehler in der ersten Musterfassung, von der Probe gefunden:**
+`execFile|exec|spawn|…` erkannte `execFileSync(` **nicht** (auf `execFile` folgt `Sync`,
+nicht `(`) — die Probe blieb grün. Das Muster wurde auf `[A-Za-z]*` erweitert und die
+Probe wiederholt (rot → grün). Ohne die Negativprobe wäre die Prüfung blind für genau die
+Sync-Variante gewesen, die im Repo vorher stand.
+
+### 8.3 Zwei ungefragte Zutaten zurückgenommen
+
+- **Die zwei `.gitignore`-Zeilen sind weg.** Der Planwortlaut (3.5 Abnahme: „kein
+  pnpm-Aufruf und keine pnpm-Datei mehr in Root oder Profil") trägt keine Ignore-Regel,
+  und mit 8.2 gibt es die durchsetzende Prüfung. Was jetzt gilt: die Laufzeitreste unter
+  `profiles/*/node_modules` bleiben über `node_modules/` gedeckt; eine von UPSTREAMs
+  `initProfile` angelegte `pnpm-workspace.yaml` liegt **sichtbar** im Baum und macht das
+  Gate rot (statt still ignoriert zu sein) — das ist A1 gemäß.
+- **Die zwei mitkorrigierten README-Zahlen sind zurückgenommen** (306 → 327 und
+  29/98 → 32/99 wieder auf ihren vorherigen Wortlaut). Zahlen haben genau **einen**
+  Eigentümer (`docs/ZAHLEN.md` §2), und weder 3.5 noch 3.7 tragen eine
+  Zählkorrektur. **Gemeldet, nicht behoben:** die README-Zeilen nennen damit weiter 306
+  bzw. 29 → 98, während §2 der Zahlentabelle 327 bzw. 32 → 99 misst — ein Befund für den
+  Eigentümer der Zahlen, nicht für diesen Schritt.
+- **Was bleibt:** die pnpm-bezogenen README-Korrekturen (Quickstart `npm install` statt
+  `pnpm install`, `npm pack` in der Distributionstest-Zeile, Profilbeschreibung und
+  Baum-Zeile ohne `pnpm-workspace.yaml`) — die trägt 3.5/A1 („pnpm entfernen statt
+  lauffähig machen").

@@ -50,24 +50,8 @@ if (!profileName) {
   process.exit(1);
 }
 
-// DSH loest die Repo-Bundles aus profiles/<name>/node_modules; out-of-tree
-// Profile installieren ihre Dependencies dort selbst (wie `dsh plugin`).
-const modulesDir = join(profile.dir, 'node_modules');
 console.log(`  Profil: ${profileName}    DSH_HOME: ${repo.ROOT}`);
 console.log(`  Bundles: ${profile.bundles.length} (${profile.entries.length} aus diesem Repo)\n`);
-
-// Kein Auto-Install mehr (PLAN.md Schritt 3.5/A1): dieser Test ruft **kein** pnpm auf.
-// Ein npm-Install ist hier auch nicht möglich — die Profil-Dependencies nutzen das
-// Protokoll `link:` (gemessen: npm 10 → EUNSUPPORTEDPROTOCOL), und genau das hängt an
-// der offenen Bindungsfrage (3.5) bzw. verschwindet mit der Code-Konfiguration (3.6).
-// Deshalb: sichtbarer Hinweis statt stillem Scheitern ODER stillem Fremdaufruf — und der
-// Dump-Check unten meldet den echten Fehler, wenn die Bündel nicht auflösen.
-if (existsSync(join(profile.dir, 'package.json')) && !existsSync(modulesDir)) {
-  console.log(`  ⚠️  ${profile.dir}/node_modules fehlt — dieser Test installiert nicht.`);
-  console.log('      Dieses Profil kann npm nicht installieren: seine Dependencies nutzen `link:`');
-  console.log('      (gemessen: npm 10 → EUNSUPPORTEDPROTOCOL). Zugehörige Entscheidung: PLAN.md 3.5/3.6.');
-  console.log('      Bis dahin die Profil-Dependencies von Hand bereitstellen.\n');
-}
 
 let dump = null;
 check(`dsh --profile ${profileName} --dump-config`, () => {

@@ -56,8 +56,13 @@ export const RUNTIME_FILES = ['package.json', 'index.js', 'client.js', 'cordis.p
  */
 const PATCH_KEYS = ['id', 'name', 'config', 'group', 'disabled', 'inject', 'intercept', 'isolate', 'insert'];
 const ENTRY_KEYS = ['id', 'name', 'config', 'group', 'disabled', 'inject', 'intercept', 'isolate'];
-/** Manifest-Felder unter `dsh`, die DSH liest. */
-const MANIFEST_DSH_KEYS = ['bundle', 'client'];
+/**
+ * Manifest-Felder unter `dsh`, die dieses Repo liest: `bundle`/`client` liest DSH
+ * selbst, `inactive` nur das Gate (`dead-package`) — ein Paket erklärt damit im
+ * eigenen Manifest, dass es bewusst noch nicht im Profil steht, statt dass eine
+ * zentrale Liste im Gate jedes neue Paket nachgetragen braucht.
+ */
+const MANIFEST_DSH_KEYS = ['bundle', 'client', 'inactive'];
 
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 /** Erste Abweichung zwischen zwei Namen (leer, wenn gleich). */
@@ -378,6 +383,69 @@ export function legacyHits(packages) {
     }
   }
   return hits;
+}
+
+/**
+ * pnpm-Reste: dieses Repo ruft pnpm nirgends auf und traegt keine pnpm-Datei
+ * (PLAN.md Schritt 3.5/A1). Der Befund ist nicht theoretisch — UPSTREAMs
+ * `initProfile` (`@deepseek-ai/dsh-app-boot`) legt bei `dsh plugin add` selbst eine
+ * `pnpm-workspace.yaml` im Profilverzeichnis an, und ein `pnpm pack`/`pnpm install`
+ * gerät leicht wieder in ein Skript.
+ *
+ * Deshalb hat die Invariante hier EINEN Eigentuemer mit praezisen Mustern statt eines
+ * `grep pnpm` ueber Dateinamen: geprueft werden die zwei echten pnpm-Artefakte, ein
+ * echter Prozess-/Script-Aufruf und die Script-Eintraege des Root-Manifests. Ein
+ * Wortvorkommen in Kommentar oder Dokument ist kein Befund.
+ */
+export const PNPM_ARTIFACTS = ['pnpm-workspace.yaml', 'pnpm-lock.yaml'];
+/**
+ * Ein echter Aufruf: Prozess- oder Script-Start mit `pnpm` als Kommando — auch die
+ * Sync-Varianten (`execFileSync`, `spawnSync`), die ein festes Kommandoliteral nehmen.
+ */
+const PNPM_CALL = /(?:exec|spawn|fork|run)[A-Za-z]*\(\s*['"`]pnpm['"`]/;
+/** `pnpm` an einer Kommandogrenze im Script-Wert eines Manifests. */
+const PNPM_SCRIPT = /(?:^|[\s&|;(])pnpm(?:\s|$)/;
+const CODE_EXTENSIONS = ['.js', '.mjs', '.cjs'];
+/** Verzeichnisse des eigenen Codes, in denen ein pnpm-Aufruf verboten ist. */
+const CODE_DIRS = ['scripts', 'bin', 'packages'];
+/** Nie durchsucht: Fremdbaum, Git-Interna und generierte Artefakte. */
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'attachments']);
+
+/** Alle Dateien ab `dir`, ohne Fremdbaum, Git-Interna und generierte Artefakte. */
+function walkRepo(dir, found = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) walkRepo(path, found);
+    else found.push(path);
+  }
+  return found;
+}
+
+/**
+ * Verstoesse gegen die pnpm-Invariante (leer = invariant haelt).
+ * @param {string} root - Wurzel, in der gesucht wird.
+ * @returns {string[]}
+ */
+export function pnpmIssues(root = ROOT) {
+  const issues = [];
+  for (const path of walkRepo(root)) {
+    const base = path.split(sep).pop();
+    if (PNPM_ARTIFACTS.includes(base)) issues.push(`pnpm-Datei im Baum: ${relative(root, path)}`);
+  }
+  for (const dir of CODE_DIRS) {
+    const base = join(root, dir);
+    if (!existsSync(base)) continue;
+    for (const path of walkRepo(base)) {
+      if (CODE_EXTENSIONS.some((extension) => path.endsWith(extension)) && PNPM_CALL.test(read(path))) {
+        issues.push(`pnpm-Aufruf: ${relative(root, path)}`);
+      }
+    }
+  }
+  for (const [name, command] of Object.entries(readJSON(join(root, 'package.json')).scripts ?? {})) {
+    if (PNPM_SCRIPT.test(command)) issues.push(`package.json scripts.${name} ruft pnpm`);
+  }
+  return issues;
 }
 
 /**

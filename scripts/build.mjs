@@ -56,6 +56,8 @@ for (const pkg of packages) {
   }
 }
 for (const hit of repo.legacyHits(packages)) problems.push(`Legacy-Referenz: ${hit}`);
+// pnpm-Invariante (Schritt 3.5/A1): keine pnpm-Datei im Baum, kein pnpm-Aufruf im Code.
+for (const issue of repo.pnpmIssues()) problems.push(`pnpm-Reste: ${issue}`);
 // Zwillings-Regeln (eine Quelle, ein Spiegel): Drift bricht den Build, nicht erst den Betrieb.
 for (const issue of repo.twinIssues()) problems.push(`Quell-Zwillinge: ${issue}`);
 // Generierte Idiome: dieselbe Regel für die Plugin-Bausteine — die Ableitung in den

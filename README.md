@@ -212,8 +212,8 @@ Statusklassen — und was sie hier bedeuten:
 | Distributionstest (`npm pack` → Isolat → Load) | **Verified** (76 von 76) | `node scripts/pack-test.mjs` → Exit 0 |
 | Web-UI-Boot in Chromium + Panel-Beleg | **Verified** (7 von 7) | `dsh --profile shinon` + `node scripts/panel-check.mjs --url … --token …` → Exit 0 |
 | Gate-Engine `--full` | **Verified** (18 von 18; gehaltene Versionsaufteilung ist deklariert, Undeklariertes bleibt rot) | `npm run gate:full` → Exit 0 |
-| Gate-Tests (reine Gate-Logik) | **Verified** (327 von 327; braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
-| Volle Kette | **Verified** (32 → 99 → 9 → 76 → 3 grün, ohne `pnpm` und ohne globales `dsh` im PATH) | `npm test` → Exit 0 |
+| Gate-Tests (reine Gate-Logik) | **Verified** (306 von 306; braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
+| Volle Kette | **Verified** (29 → 98 → 9 → 76 → 3 grün) | `npm test` → Exit 0 |
 | Echter Modellaufruf | **Nicht geprüft** | `docs/ZAHLEN.md` §4 |
 
 Zählungen, Exit-Codes und die Ursachen jedes roten Befunds stehen **nur** in

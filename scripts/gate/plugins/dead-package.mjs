@@ -1,26 +1,15 @@
 /**
  * dead-package (Slice) — ein Paket, das kein aktives Profil referenziert, ist
- * tot: es lädt nie, kostet aber Pflege. Erlaubt sind Pakete, die bewusst noch
- * nicht aktiviert sind (Liste unten) — alles andere ist ein Befund.
+ * tot: es lädt nie, kostet aber Pflege. Erlaubt ist ein Paket, das seine
+ * Zurückstellung SELBST erklärt: `"dsh": { "inactive": true }` im eigenen
+ * Manifest.
+ *
+ * Warum nicht als zentrale Liste im Gate (bis 2026-10-11 `KNOWN_INACTIVE`):
+ * mit vielen Paketen hieße das, für jedes neue Paket dieses Gate-File
+ * anzufassen — gemessen an 39 Paketen fünf Befunde, bis die Liste wuchs. Die
+ * Erklärung gehört dem Paket (ein Besitzer), das Gate liest sie nur.
  */
 export const id = 'dead-package';
-
-/**
- * Bewusst nicht im Profil aktivierte Pakete (Vorbereitung, nicht vergessen).
- *
- * `openapi`: vom Plan vorgesehen, aber nicht Teil des Profils.
- * `popup`: die Client-Hälfte ist ein ehrlicher Platzhalter ohne Overlay — die
- * Aktivierung ist eine Entscheidung über Slot, Felder und Anzahl der Einträge,
- * kein Versehen. Der Host-Teil ist gebaut und geprueft (Trigger-Tabelle,
- * Nutzlast aus dem letzten Objektargument).
- *
- * `key-router`, `narrative`, `shinon-forge`: gebaut und ausgeliefert (sie
- * laden im Distributionstest), aber NICHT in `dsh.profile.bundles` — ob sie
- * aktiviert werden, ist eine offene Entscheidung und keine Auslassung. Gemessen
- * und geführt in `docs/ZAHLEN.md` §1 (Pakete nicht im Profil) und §3.1
- * (Versions-Drift); die Paketnamen stehen im Root-Manifest in `devDependencies`.
- */
-const KNOWN_INACTIVE = new Set(['openapi', 'popup', 'key-router', 'narrative', 'shinon-forge']);
 
 export function check(ctx) {
   const profileName = ctx.repo.activeProfile(ctx.root);
@@ -30,8 +19,14 @@ export function check(ctx) {
 
   const issues = [];
   for (const pkg of ctx.packages) {
+    const declared = pkg.manifest?.dsh?.inactive;
+    // Das Feld ist eine Zusage: ein Nicht-Boolean ist ein Befund, kein „gilt als aktiv".
+    if (declared !== undefined && typeof declared !== 'boolean') {
+      issues.push(`${pkg.dir}: dsh.inactive muss ein Boolean sein (ist ${JSON.stringify(declared)})`);
+      continue;
+    }
     if (referenced.has(pkg.dir)) continue;
-    if (KNOWN_INACTIVE.has(pkg.dir)) continue;
+    if (declared === true) continue;
     issues.push(`${pkg.dir}: von Profil "${profileName}" nicht referenziert (tot) und nicht als inaktiv dokumentiert`);
   }
   return issues;

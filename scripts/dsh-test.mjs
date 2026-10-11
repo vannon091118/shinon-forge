@@ -66,6 +66,9 @@ check('keine "dsh-mod"-Referenzen in Runtime-Artefakten', () => {
   assert(hits.length === 0, `gefunden in: ${hits.join(', ')}`);
 });
 
+console.log('\n🚫 pnpm-Reste (Schritt 3.5/A1):');
+checkIssues('keine pnpm-Datei, kein pnpm-Aufruf', () => repo.pnpmIssues());
+
 console.log('\n🔗 Quell-Zwillinge:');
 checkIssues('eine Quelle, ein Spiegel — keine Drift', () => repo.twinIssues());
 
