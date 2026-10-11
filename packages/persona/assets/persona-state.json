@@ -7,7 +7,13 @@
     "uncertainty": "explicit",
     "mood": "idle",
     "capabilities": ["analysis", "verification"],
-    "limitations": []
+    "limitations": [],
+    "relation": "known"
+  },
+  "relation": {
+    "levels": ["stranger", "known", "trusted", "anchor"],
+    "initial": "known",
+    "note": "Die Persona liest die Stufe aus relation.updated (Nutzlastfeld relation) — sie setzt sie nie selbst. Unbenannte Stufen ändern nichts (fail-closed)."
   },
   "transitions": {
     "session.created": {
@@ -42,6 +48,9 @@
       "mood": "blocked",
       "stance": "critical",
       "addLimitations": ["action_blocked"]
+    },
+    "relation.updated": {
+      "note": "Kein statischer Übergang: die Stufe kommt aus dem Event (relation-Feld der Nutzlast). Nur lesend — die Persona schreibt keine Relation."
     }
   },
   "voice": {

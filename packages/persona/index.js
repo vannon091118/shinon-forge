@@ -125,11 +125,12 @@ export function initialState(contract) {
     mood: baseline.mood ?? 'idle',
     capabilities: [...(baseline.capabilities ?? [])],
     limitations: [...(baseline.limitations ?? [])],
+    relation: baseline.relation ?? contract.relation?.initial ?? 'known',
   };
 }
 
 /** Die Felder, die einen Persona-Zustand ausmachen — die Grundlage des Vergleichs. */
-const STATE_FIELDS = ['identity', 'stance', 'uncertainty', 'mood', 'capabilities', 'limitations'];
+const STATE_FIELDS = ['identity', 'stance', 'uncertainty', 'mood', 'capabilities', 'limitations', 'relation'];
 
 /**
  * Grenze fuer das Zaehl-Woerterbuch unbekannter Event-Typen. Ein Typ mit Pfad oder Parameter
@@ -165,11 +166,25 @@ function sameState(left, right) {
  * eine Limitation, die schon gesetzt war), meldet damit `false` — kein
  * History-Eintrag, kein neuer Prompt-Abschnitt für eine Nicht-Änderung.
  */
-export function deriveState(contract, state, eventType) {
+export function deriveState(contract, state, eventType, event) {
   const transition = contract.transitions?.[eventType];
   if (!transition) return { state, changed: false, reason: 'UNKNOWN_EVENT' };
 
+  // relation.updated trägt die Stufe im Event (Nutzlastfeld relation) — kein
+  // statischer Übergang. Unbenannt heißt: nichts ändern (fail-closed, kein Raten).
+  // Nur lesend: die Persona setzt die Stufe aus dem Event, schreibt aber nie eine.
+  let relation = state.relation ?? contract.baseline?.relation ?? contract.relation?.initial ?? 'known';
+  if (eventType === 'relation.updated') {
+    const level = event !== null && typeof event === 'object' ? event.relation : undefined;
+    const levels = contract.relation?.levels ?? [];
+    if (typeof level !== 'string' || !levels.includes(level)) {
+      return { state, changed: false, reason: 'UNKNOWN_RELATION' };
+    }
+    relation = level;
+  }
+
   const base = transition.reset ? initialState(contract) : state;
+  if (transition.reset) relation = base.relation;
   const limitations = new Set(base.limitations ?? []);
   for (const item of transition.removeLimitations ?? []) limitations.delete(item);
   for (const item of transition.addLimitations ?? []) limitations.add(item);
@@ -182,6 +197,7 @@ export function deriveState(contract, state, eventType) {
     mood: transition.mood ?? base.mood,
     capabilities: [...(contract.baseline?.capabilities ?? state.capabilities)],
     limitations: [...limitations].slice(-maxLimitations),
+    relation,
   };
 
   return { state: next, changed: !sameState(state, next), reason: eventType };
@@ -196,6 +212,7 @@ export function renderStateContext(contract, state) {
     mood: state.mood,
     capabilities: [...state.capabilities],
     limitations: [...state.limitations],
+    relation: state.relation,
   };
   const voice = contract.voice?.[state.mood] ?? '';
   return [
@@ -238,16 +255,17 @@ export function createPersonaState(contract, options = {}) {
       mood: state.mood,
       capabilities: [...state.capabilities],
       limitations: [...state.limitations],
+      relation: state.relation,
     };
   }
 
-  function observe(eventType) {
+  function observe(eventType, event) {
     if (typeof eventType !== 'string' || eventType.trim() === '') {
       stats.ignored += 1;
       return null;
     }
     stats.events += 1;
-    const result = deriveState(contract, state, eventType);
+    const result = deriveState(contract, state, eventType, event);
     if (!result.changed) {
       stats.ignored += 1;
       if (stats.ignoredTypes[eventType] !== undefined || Object.keys(stats.ignoredTypes).length < IGNORED_TYPE_LIMIT) {
@@ -499,7 +517,8 @@ export function apply(ctx, config) {
   const handler = (envelope, payload) => {
     const eventType = eventTypeOf(envelope);
     if (eventType === null) return;
-    persona.observe(eventType);
+    // Die Nutzlast reist mit: relation.updated liest daraus die Stufe (lesend).
+    persona.observe(eventType, payload ?? envelope);
 
     // Triggerwort-Abgleich. Der Text liegt in der Nutzlast (zweites Argument),
     // nicht im Envelope — beide werden geprueft, der Envelope bleibt Rückfall.

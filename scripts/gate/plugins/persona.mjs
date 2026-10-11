@@ -19,14 +19,14 @@ export const id = 'persona';
 
 export const STATE_CONTRACT_ID = 'shinon.persona-state/v1';
 
-/** Die sechs Felder, die der Zustand nach außen hat — mehr nicht. */
-export const STATE_FIELDS = ['identity', 'stance', 'uncertainty', 'mood', 'capabilities', 'limitations'];
+/** Die sieben Felder, die der Zustand nach außen hat — mehr nicht. */
+export const STATE_FIELDS = ['identity', 'stance', 'uncertainty', 'mood', 'capabilities', 'limitations', 'relation'];
 
 /**
  * Die Event-Typen, die die Persona MODELLIERT — nicht die des Spines.
  *
- * Der Spine spricht inzwischen vierzehn Typen (neun Pfade + fünf Carrier-Typen
- * aus DSH); die Persona bildet neun davon auf Zustände ab. Die beiden Mengen
+ * Der Spine spricht inzwischen zweiundzwanzig Typen (zwölf Pfade + zehn
+ * Carrier-Typen); die Persona bildet zehn davon auf Zustände ab. Die beiden Mengen
  * sind bewusst NICHT gleich: `deriveState` ignoriert unbekannte Typen
  * (fail-closed), und ein Übergang für `request.header` wäre ein Zustand ohne
  * Bedeutung. Jeder Typ hier MUSS ein Typ des Spines sein — das prüft
@@ -42,6 +42,7 @@ export const PERSONA_EVENT_TYPES = [
   'gate.passed',
   'gate.failed',
   'action.blocked',
+  'relation.updated',
 ];
 
 /** Pflicht-Token im Laufzeitcode (Existenz der Fähigkeit, nicht ihre Qualität). */
@@ -88,6 +89,21 @@ export function stateContractIssues(contract, file) {
     issues.push(`${file}: baseline.capabilities fehlt oder ist leer`);
   }
   if (!Array.isArray(baseline.limitations)) issues.push(`${file}: baseline.limitations fehlt`);
+
+  // Die gelesene Relation: Stufen benannt, Start eine davon, Übergang vorhanden.
+  // Nur lesend — die forbidden-Liste bleibt unverändert (kein Schreiben).
+  const relation = contract.relation ?? {};
+  const levels = relation.levels ?? [];
+  if (levels.length === 0 || levels.some((level) => !isText(level))) {
+    issues.push(`${file}: relation.levels fehlt oder ist leer`);
+  } else {
+    if (!levels.includes(relation.initial)) {
+      issues.push(`${file}: relation.initial ${JSON.stringify(relation.initial)} steht nicht in relation.levels`);
+    }
+    if (!levels.includes(baseline.relation)) {
+      issues.push(`${file}: baseline.relation ${JSON.stringify(baseline.relation)} steht nicht in relation.levels`);
+    }
+  }
 
   const transitions = contract.transitions ?? {};
   for (const type of PERSONA_EVENT_TYPES) {
