@@ -36,7 +36,14 @@ jobs:
         run: node scripts/commit-guard.mjs --ci
 
       - name: Regeln selbst testen (ohne Abhängigkeiten)
-        run: node --test scripts/gate/tests/*.test.mjs
+        # DSH-Abhängige Tests (uebergabe, store, prompter-contract, …) brauchen
+        # `dsh` im PATH; ohne ihn meldet der Test sichtbar einen Skip (REGEL:
+        # ein Skip ist kein Grün). Deshalb: `npm install` mit der lock-Datei —
+        # `npm ci` ist die saubere Form, keine neuen Auflösungen.
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          node --test scripts/gate/tests/*.test.mjs
 
       # Die Einzeltests der Codemon-Engine brauchen kein DSH, keinen Browser und
       # kein Modell — sie laufen hier mit, weil sie sonst nur auf dem Rechner
