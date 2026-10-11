@@ -42,3 +42,11 @@ Thumbs.db
 coverage/
 .eslintcache
 *.tsbuildinfo
+
+# Session-Eval-Logs — nie committen (DSH-Session-Logs, Attachments, Tmp).
+# Plan-Daten (.session-eval/*.md) bleiben absichtlich tracked.
+.session-eval/logs-decompressed/
+.session-eval/*.jsonl
+.session-eval/*.zip
+.session-eval/tmp/
+attachments/
