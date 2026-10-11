@@ -1,0 +1,131 @@
+{
+  "contract": "shinon.signal-rules/v1",
+  "note": "Die Signal-Tabelle als Daten. Sieben Signale (die Plan-Tabelle), fuenf beobachtbare Quellen — alle intern, aus dem DSH-Ereignisstrom, kein Browser. Was hier nicht steht, wird nicht erkannt; was keinen Pol hat, wird gezaehlt und nie gewertet. Kein Deckel, kein Zaehler-Limit, keine Sekunden-Regel: nur Inhalt und Reihenfolge entscheiden.",
+  "limits": {
+    "note": "Bewusst OHNE Grenzen: kein Trust-Ceiling, kein Rate-Limit pro Sitzung. Die einzige Zahl hier ist die Uebersetzung von Staerke in einen Faktor (hoch = doppeltes Basis-Delta, mittel = einfaches, niedrig = halbes).",
+    "strengths": {
+      "high": 2,
+      "medium": 1,
+      "low": 0.5
+    }
+  },
+  "reading": {
+    "note": "Wie die Nutzlast gelesen wird. Gemessen an den echten DSH-Sitzungsereignissen: ein MENSCH traegt data.source.kind = 'user' (mit rpcId und clientTimeZone), Harness-Text traegt 'agent-instructions' bzw. 'runtime-context' und denselben Ereignistyp user/message — ohne diese Marke zaehlt Harness-Text als Nachricht. Der Text steht in data.content als Blockliste.",
+    "humanMarker": {
+      "path": "data.source.kind",
+      "fallbackPath": "source.kind",
+      "equals": "user"
+    },
+    "textBlocks": {
+      "path": "data.content",
+      "type": "text",
+      "fallbackPath": "text"
+    },
+    "similarity": {
+      "minShared": 3,
+      "minRatio": 0.6,
+      "minTokenLength": 3,
+      "note": "Wiederholung wird am INHALT gemessen, nicht an der Uhr: genug gemeinsame und genug ueberlappende Woerter mit der letzten Frage derselben Sitzung. Kein Zeitfenster, keine Sekundenregel. Benannte Grenze: Woerter unter minTokenLength fallen weg, Fuellwoerter zaehlen mit — die Verfeinerung (Thema ueber den Projekt-Index) ist ein eigener Zug, bis dahin wird eine themenfremde Frage nicht gewertet."
+    }
+  },
+  "sourcesNote": "Beobachtbare Quellen, geschluesselt nach dem Event-Typ, den der Spine emittiert; `native` ist der DSH-Typ, aus dem er entsteht. Was hier nicht steht, erzeugt kein Signal.",
+  "sources": {
+    "feedback.rated": {
+      "native": "feedback/message-put",
+      "kind": "score",
+      "replaces": true,
+      "ratingPath": "item.rating",
+      "subjectPath": "item.messageId",
+      "byRating": {
+        "positive": "copy",
+        "negative": "selffix"
+      }
+    },
+    "feedback.retracted": {
+      "native": "feedback/message-delete",
+      "kind": "retract",
+      "signal": "dismiss",
+      "subjectPath": "messageId"
+    },
+    "feedback.noted": {
+      "native": "feedback/record",
+      "kind": "note",
+      "signal": null,
+      "reason": "Bemerkung ohne Pol: beobachtet und gezaehlt, aber nie gewertet (fail-closed, kein Raten)."
+    },
+    "message.received": {
+      "native": "user/message",
+      "kind": "score",
+      "signal": "rephrase",
+      "humanOnly": true,
+      "subjectPath": "data.id",
+      "subjectFallbackPath": "id"
+    },
+    "turn.end": {
+      "native": "turn/end",
+      "kind": "score",
+      "reasonPath": "reason.kind",
+      "subjectPath": "turn",
+      "subjectPrefix": "turn:",
+      "byReason": {
+        "completed": "accept",
+        "aborted": "dismiss"
+      }
+    }
+  },
+  "signals": {
+    "copy": {
+      "observable": true,
+      "source": "feedback.rated",
+      "type": "feedback.approval",
+      "strength": "medium",
+      "subject": "message",
+      "label": "zustimmung:bewertung",
+      "note": "Das ausdrueckliche positive Urteil des Menschen zu EINER Antwort. Die reine Kopier-Geste hat intern keine Quelle (der Browser-Beobachter ist gestrichen) — dieses Urteil steht dafuer, und es ist widerrufbar."
+    },
+    "adopt": {
+      "observable": false,
+      "reason": "Braucht den Turn-Diff (workspaceChanges): welche Dateien hat ein Turn geaendert, ohne dass ein Werkzeug sie geschrieben hat. Eigener Zug — bis dahin wird nicht geraten."
+    },
+    "selffix": {
+      "observable": true,
+      "source": "feedback.rated",
+      "type": "feedback.correction",
+      "strength": "high",
+      "subject": "message",
+      "label": "korrektur:bewertung",
+      "note": "Das ausdrueckliche negative Urteil des Menschen. Die zweite Haelfte des Plans (Aenderung am gelieferten Pfad) braucht wie 'adopt' den Turn-Diff."
+    },
+    "rephrase": {
+      "observable": true,
+      "source": "message.received",
+      "type": "feedback.correction",
+      "strength": "medium",
+      "subject": "question",
+      "label": "wiederholung:frage",
+      "note": "Die Frage kommt inhaltlich wieder (gemeinsame Woerter ueber der Schwelle) — die Antwort hat nicht getragen. Nur Menschen-Text zaehlt."
+    },
+    "accept": {
+      "observable": true,
+      "source": "turn.end",
+      "type": "feedback.approval",
+      "strength": "low",
+      "subject": "turn",
+      "label": "abschluss:completed",
+      "note": "Ein Turn endet regulaer (reason.kind = completed). Schwaechste Zustimmung: sie sagt nur, dass nichts abgebrochen wurde."
+    },
+    "dismiss": {
+      "observable": true,
+      "source": "turn.end",
+      "type": "feedback.correction",
+      "strength": "medium",
+      "subject": "turn",
+      "label": "abbruch:user",
+      "note": "Abgebrochener Turn (reason.kind = aborted, Abbruch durch den Menschen) — und der Widerruf eines Urteils: feedback.retracted nimmt die Zeile zurueck, die dieselbe messageId eingebracht hat. Der Widerruf rechnet exakt: die Zeile verschwindet, die Tafel wird aus dem Rest neu nachgerechnet."
+    },
+    "nextq": {
+      "observable": false,
+      "reason": "Thema-gleich/neu braucht die Index-Ueberschneidung (gemeinsame Dateien und Begriffe) — eigener Zug. Bis dahin wird eine neue, themenfremde Frage nicht gewertet."
+    }
+  }
+}

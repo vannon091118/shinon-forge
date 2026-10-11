@@ -60,3 +60,10 @@ jobs:
       # des Autors liefen. Messwert: unter einer Sekunde.
       - name: Codemon-Engine testen (Mathematik, Beute, Keyframes)
         run: node --test packages/codingmon/test/*.test.mjs
+
+      # Die Signaltests des Scorings sind ebenso abhaengigkeitsfrei: sie fahren
+      # den reinen Kern (Signal rein, Scorecard-Wert raus, Widerruf, fail-closed).
+      # Der Weg ueber beide Pakete (Spine -> Scoring -> Tafel) laeuft ohnehin in
+      # den Gate-Tests oben mit.
+      - name: Scoring-Signale testen (rein, ohne DSH)
+        run: node --test packages/scoring/test/*.test.mjs

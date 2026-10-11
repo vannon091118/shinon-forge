@@ -16,6 +16,13 @@
  *      gegen sie getestet.
  *   4. Aktivierung: das Profil muss das Bundle laden, sonst läuft das
  *      Scoring nie (dieselbe Regel wie beim Persona-Gate).
+ *   5. Signal-Vertrag (K5, fail-closed): die Signaltabelle trägt genau die
+ *      sieben Zeilen, jede beobachtbare Zeile nennt eine Quelle, die es im
+ *      Spine wirklich gibt und die er wirklich erreicht, jede nicht
+ *      beobachtbare Zeile nennt ihren Grund, keine Zeile verspricht ein Signal
+ *      ohne Zulieferer — und die Quelle eines Signals ist ein NATIVER DSH-Typ,
+ *      den der Carrier abbildet. Kein Deckel, kein Zähler-Limit, keine
+ *      Sekundenregel in den Daten.
  *
  * Die reinen Funktionen sind ohne node_modules testbar; die Tests liegen in
  * scripts/gate/tests/scoring.test.mjs.
@@ -29,12 +36,48 @@ export const id = 'scoring';
 export const SCORING_CONTRACT_ID = 'shinon.scoring-state/v1';
 export const PROFILE_CONTRACT_ID = 'shinon.technical-profile/v1';
 export const TRIGGERS_CONTRACT_ID = 'shinon.skill-triggers/v1';
+export const SIGNAL_RULES_CONTRACT_ID = 'shinon.signal-rules/v1';
 
-/** Die drei Dateien, die der Scoring-Code beschreiben darf — alle anderen nicht. */
+/**
+ * Die vier Dateien, die der Scoring-Code beschreiben darf — alle anderen nicht.
+ * `signal-rules.json` ist die Signaltabelle (K5); ohne sie hier wäre der Pfad
+ * im Host-Code ein Befund, obwohl er der Vertrag ist.
+ */
 export const WRITABLE_ASSETS = [
   'assets/scoring-state.json',
   'assets/technical-profile.json',
   'assets/skill-triggers.json',
+  'assets/signal-rules.json',
+];
+
+/** Die sieben Signale der Plan-Tabelle — genau diese, keine mehr. */
+export const SIGNAL_IDS = ['adopt', 'accept', 'copy', 'dismiss', 'nextq', 'rephrase', 'selffix'];
+
+/** Die drei Arten, die eine Quelle haben kann: werten, zurücknehmen, nur notieren. */
+export const SOURCE_KINDS = ['note', 'retract', 'score'];
+
+/** Die Stärken, die die Tabelle führt (Faktor = Vielfaches des Basis-Deltas). */
+export const STRENGTH_IDS = ['high', 'low', 'medium'];
+
+/**
+ * Regeln, die hier NICHT stehen dürfen.
+ *
+ * Ein Vertrauens-Deckel (0.8), ein Zähler-Limit pro Sitzung oder eine
+ * Sekunden-Regel sind Grenzen, die niemand gesetzt hat — sie stünden der
+ * Absicht entgegen, dass Vertrauen mit der Laufzeit aus Ergebnissen wächst und
+ * dass der INHALT entscheidet, nicht die Uhr. Das Gate prüft die Abwesenheit,
+ * weil eine Zahl in einer Datendatei sonst still wieder eingeführt wird.
+ */
+export const FORBIDDEN_RULE_KEYS = [
+  'trustCeiling',
+  'trustCap',
+  'rateLimit',
+  'maxPublishedSignalsPerSession',
+  'maxSignalsPerSession',
+  'maxSignals',
+  'windowSeconds',
+  'maxSeconds',
+  'maxAgeSeconds',
 ];
 
 /** Lesbar zusätzlich: der reine Kern und die eingefrorene Replay-Fixture. */
@@ -209,6 +252,170 @@ export function contractIssues(scoring, profile, triggers, spine, file) {
   return issues;
 }
 
+/** Jeden Schlüsselnamen im Dokument sammeln (auch verschachtelt). */
+function keyPaths(value, prefix = '') {
+  if (value === null || typeof value !== 'object') return [];
+  const found = [];
+  for (const [key, entry] of Object.entries(value)) {
+    const path = prefix === '' ? key : `${prefix}.${key}`;
+    found.push(path);
+    found.push(...keyPaths(entry, path));
+  }
+  return found;
+}
+
+/**
+ * Die Signaltabelle prüfen (K5): genau sieben Zeilen, jede mit einem
+ * erreichbaren Zulieferer oder einem benannten Grund, und keine erfundene
+ * Quelle.
+ *
+ * Was hier fail-closed heißt: eine Zeile, die `observable: true` sagt und deren
+ * Signaltyp nicht im Scorecard-Vertrag steht, wäre ein Wert, den niemand
+ * berechnen kann. Eine Zeile, deren natives Ereignis der Spine nicht abbildet,
+ * wäre ein Signal, das nie entstehen kann. Beides ist ein Befund, kein
+ * stiller Ausfall.
+ */
+export function signalRuleIssues(rules, scoring, spine, file) {
+  const issues = [];
+  const at = (detail) => `${file}: ${detail}`;
+  if (typeof rules !== 'object' || rules === null) return [at('kein Objekt')];
+  if (rules.contract !== SIGNAL_RULES_CONTRACT_ID) {
+    issues.push(at(`contract muss "${SIGNAL_RULES_CONTRACT_ID}" sein (ist ${JSON.stringify(rules.contract)})`));
+  }
+  if (typeof scoring !== 'object' || scoring === null) return [...issues, at('Scorecard-Vertrag fehlt')];
+
+  // Kein Deckel, kein Limit, keine Sekundenregel — benannt, nicht weggelassen.
+  for (const path of keyPaths(rules)) {
+    const leaf = path.split('.').pop();
+    if (FORBIDDEN_RULE_KEYS.includes(leaf)) issues.push(at(`${path} ist verboten: Deckel, Zähler-Limit und Sekundenregeln gehören nicht in die Signaltabelle`));
+  }
+
+  const strengths = rules.limits?.strengths ?? {};
+  for (const id of STRENGTH_IDS) {
+    const factor = strengths[id];
+    if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 0) {
+      issues.push(at(`limits.strengths.${id} muss eine Zahl > 0 sein (ist ${JSON.stringify(factor)})`));
+    }
+  }
+
+  const reading = rules.reading ?? {};
+  if (!isText(reading.humanMarker?.path) || !isText(reading.humanMarker?.equals)) {
+    issues.push(at('reading.humanMarker braucht path und equals — ohne Marke wäre Harness-Text eine Nachricht'));
+  }
+  if (!isText(reading.textBlocks?.path)) issues.push(at('reading.textBlocks.path fehlt'));
+  const similarity = reading.similarity ?? {};
+  for (const key of ['minShared', 'minRatio', 'minTokenLength']) {
+    if (typeof similarity[key] !== 'number' || !Number.isFinite(similarity[key])) {
+      issues.push(at(`reading.similarity.${key} muss eine Zahl sein`));
+    }
+  }
+
+  // Die sieben Zeilen — genau diese, keine mehr und keine weniger.
+  const signals = rules.signals ?? {};
+  const ids = Object.keys(signals);
+  if (ids.length !== SIGNAL_IDS.length) {
+    issues.push(at(`signals muss genau ${SIGNAL_IDS.length} Zeilen tragen (ist ${ids.length}: ${ids.join(', ')})`));
+  }
+  for (const id of SIGNAL_IDS) {
+    if (signals[id] === undefined) issues.push(at(`Signal ${id} fehlt in signals`));
+  }
+  for (const id of ids) {
+    if (!SIGNAL_IDS.includes(id)) issues.push(at(`Signal ${id} steht nicht in der Plan-Tabelle`));
+  }
+
+  const spineEvents = spine?.events ?? {};
+  const reachable = new Set([
+    ...Object.values(spine?.signals ?? {}),
+    ...Object.values(spine?.carrier?.typeMap ?? {}),
+  ]);
+
+  const referenced = new Set();
+  for (const [id, definition] of Object.entries(signals)) {
+    if (definition === null || typeof definition !== 'object') {
+      issues.push(at(`signals.${id} ist kein Objekt`));
+      continue;
+    }
+    if (typeof definition.observable !== 'boolean') issues.push(at(`signals.${id}.observable muss ein Boolean sein`));
+    if (definition.observable === false) {
+      if (!isText(definition.reason)) issues.push(at(`signals.${id} ist nicht beobachtbar, nennt aber keinen Grund`));
+      if (definition.type !== undefined || definition.strength !== undefined) {
+        issues.push(at(`signals.${id} ist nicht beobachtbar und darf trotzdem keinen Typ/keine Stärke nennen`));
+      }
+      continue;
+    }
+    if (definition.observable !== true) continue;
+    if (!isText(definition.source)) issues.push(at(`signals.${id}.source fehlt`));
+    if (!isText(definition.label)) issues.push(at(`signals.${id}.label fehlt (ein Signal ohne Text im Scorecard-Ereignis)`));
+    if (!isText(definition.subject)) issues.push(at(`signals.${id}.subject fehlt`));
+    if (!isText(definition.type) || scoring.events?.[definition.type] === undefined) {
+      issues.push(at(`signals.${id}.type ${JSON.stringify(definition.type)} steht nicht im Scorecard-Vertrag`));
+    }
+    if (!STRENGTH_IDS.includes(definition.strength)) {
+      issues.push(at(`signals.${id}.strength muss eine der Stärken sein (${STRENGTH_IDS.join(', ')})`));
+    }
+  }
+
+  for (const [type, source] of Object.entries(rules.sources ?? {})) {
+    if (source === null || typeof source !== 'object') {
+      issues.push(at(`sources.${type} ist kein Objekt`));
+      continue;
+    }
+    // Nur ein Ereignis, das der Spine kennt UND erreicht: sonst feuert die Regel nie.
+    if (spineEvents[type] === undefined) {
+      issues.push(at(`Quelle ${type} steht nicht im Spine — eine Regel auf ein Ereignis, das es nicht gibt`));
+    } else if (!reachable.has(type)) {
+      issues.push(at(`Quelle ${type} hat keinen Signal-/Carrier-Pfad im Spine — sie kann nie entstehen`));
+    }
+    if (!isText(source.native)) {
+      issues.push(at(`sources.${type}.native fehlt (der native DSH-Typ muss benannt sein)`));
+    } else if (spine?.carrier?.typeMap?.[source.native] === undefined) {
+      issues.push(at(`sources.${type}.native ${JSON.stringify(source.native)} ist im Carrier nicht abgebildet`));
+    }
+    if (!SOURCE_KINDS.includes(source.kind)) {
+      issues.push(at(`sources.${type}.kind muss ${SOURCE_KINDS.join(' | ')} sein`));
+      continue;
+    }
+    const claims = [];
+    if (typeof source.signal === 'string') claims.push(source.signal);
+    for (const map of ['byRating', 'byReason']) {
+      if (source[map] === undefined) continue;
+      if (source[map] === null || typeof source[map] !== 'object') {
+        issues.push(at(`sources.${type}.${map} muss ein Objekt sein`));
+        continue;
+      }
+      for (const [key, signal] of Object.entries(source[map])) claims.push(`${signal} (${map}.${key})`);
+    }
+    if (source.kind === 'score' && claims.length === 0) {
+      issues.push(at(`sources.${type} wertet, sagt aber nicht welches Signal`));
+    }
+    if (source.kind === 'retract' && !isText(source.subjectPath)) {
+      issues.push(at(`sources.${type} nimmt zurück, nennt aber keinen subjectPath`));
+    }
+    if (source.kind === 'note' && claims.length > 0) {
+      issues.push(at(`sources.${type} ist nur eine Notiz und darf kein Signal beanspruchen`));
+    }
+    for (const claim of claims) {
+      const signal = claim.includes(' ') ? claim.split(' ')[0] : claim;
+      referenced.add(signal);
+      const definition = signals[signal];
+      if (definition === undefined) {
+        issues.push(at(`sources.${type} nennt ${JSON.stringify(claim)} — dieses Signal gibt es nicht`));
+      } else if (definition.observable !== true) {
+        issues.push(at(`sources.${type} nennt ${signal}, das die Tabelle als nicht beobachtbar führt`));
+      }
+    }
+  }
+
+  // Keine Zeile ohne Zulieferer: ein beobachtbares Signal, das niemand erzeugt,
+  // sieht im Vertrag wie eine Fähigkeit aus und ist in Wahrheit toter Text.
+  for (const id of SIGNAL_IDS) {
+    if (signals[id]?.observable === true && !referenced.has(id)) {
+      issues.push(at(`Signal ${id} ist als beobachtbar geführt, aber keine Quelle erzeugt es`));
+    }
+  }
+  return issues;
+}
+
 function readSources(base) {
   const files = ['index.js', 'client.js'];
   const assetsDir = join(base, 'assets');
@@ -244,6 +451,7 @@ export function check(ctx) {
   const scoring = own('assets/scoring-state.json', 'Scorecard-Vertrag');
   const profile = own('assets/technical-profile.json', 'Technik-Profil');
   const triggerDoc = own('assets/skill-triggers.json', 'Skill-Trigger');
+  const rules = own('assets/signal-rules.json', 'Signaltabelle (K5)');
   const eventsPkg = ctx.packages.find((candidate) => candidate.dir === 'events');
   let spine = null;
   if (!eventsPkg) {
@@ -262,6 +470,10 @@ export function check(ctx) {
 
   if (scoring && profile && triggerDoc && spine) {
     issues.push(...contractIssues(scoring, profile, triggerDoc, spine, 'assets/scoring-state.json'));
+  }
+
+  if (spine && rules && scoring) {
+    issues.push(...signalRuleIssues(rules, scoring, spine, 'assets/signal-rules.json'));
   }
 
   // Profil muss das Bundle aktivieren, sonst läuft das Scoring nie.

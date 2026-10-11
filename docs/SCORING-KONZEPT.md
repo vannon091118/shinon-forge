@@ -106,43 +106,55 @@ nächsten relevanten Task?** Das ist die Lade-Logik:
 - **Lade-Regel:** Wie wird die Relevanz gemessen — durch Thema-Tag, durch den
   Scoring-Trigger (K6), oder beides?
 
-### 1.4 K5-Signal-Quellen: was ist log-gültig, was braucht die UI (Klärung 2026-10-11)
+### 1.4 K5-Signal-Quellen: intern und nativ — kein Browser (Ist-Stand Zug 1, 2026-10-11)
 
-Die K5-Signal-Tabelle (§2.1) ist als Vertrag geschlossen. Die **praktische
-Auswertung** (17 Sessions, DSH-Session-v4-Logs, `k5-plan-report.md`) hat die
-7 Signale nach **Quellen-Fähigkeit** geteilt — das ist die Unterscheidung, die
-bestimmt, was K5.0 emittieren **kann** und was K5.1 (UI-Registry) braucht:
+**Korrektur der Vorfassung.** Diese Sektion hat vier Signale als „braucht eine
+UI-Registry" geführt und den Browser-Beobachter als Weg beschrieben. Beides ist
+verworfen: der Agent soll nicht von einer Plattform abhängen, und **DSH schreibt
+die Urteile des Menschen selbst** — sie lagen nur in `carrier.ignoredTypes`.
+Zug 1 bildet sie im Spine ab (`feedback/record`, `feedback/message-put`,
+`feedback/message-delete` → `feedback.noted`, `feedback.rated`,
+`feedback.retracted`) und liest sie host-seitig. Kein Browser, kein DOM, keine
+30 Plattformen.
 
-| Signal | DSH-Log-Event? | Quelle | K5.0 (nur Log) emittiert? |
-|---|---|---|---|
-| 1. Kopieren | **nein** (kein `clipboard`-DOM-Event) | UI-Registry | **Nein** (fail-closed) |
-| 2. Übernahme | **nein** (Agenten-eigene `tool/call`, kein User-Adoption-Event) | UI-Registry / Git-Diff | **Nein** (fail-closed) |
-| 3. Selbstkorrektur | **nein** (kein DOM-Mutation-Event) | UI-Registry | **Nein** (fail-closed) |
-| 4. Umformulierung | **JA** (`user/message` < 90 s nach `assistant stop`) | Host-Log | **Ja** |
-| 5. Akzeptanz | **JA** (`turn/end reason.kind == 'completed'`) | Host-Log | **Ja** |
-| 6. Verwerfung | **nein** (kein `turn/end rejected`) | UI-Registry / Checkpoint-Rollback | **Nein** (fail-closed) |
-| 7. Nächste Frage | **JA, aber unvollständig** (braucht Scope-Erkennung) | Host-Log (Lücke) | **Nein** (K5.1, Scope-Regel fehlt) |
+Die Tabelle liegt jetzt als **Daten** in `packages/scoring/assets/signal-rules.json`;
+was dort keinen Zulieferer hat, steht ausdrücklich als nicht beobachtbar:
 
-**K5.0 emittiert also nur die zwei log-gültigen Signale: Umformulierung (#4) und
-Akzeptanz (#5).** Die übrigen fünf sind in `signal-rules.json` als Vertrag notiert,
-werden aber erst emittiert, wenn die UI-Registry (K5.1) oder die Scope-Regel steht.
-Das ist die **fail-closed-Regel**: was nicht erkannt werden kann, wird nicht gerochen.
+| Signal | Interne Quelle (gemessen) | Emittiert? |
+|---|---|---|
+| 1. Kopieren | es gibt kein internes Kopier-Ereignis. Stattdessen das **ausdrückliche Urteil** des Menschen zu EINER Antwort (`feedback/message-put`, `rating: positive`) | **Ja** (Zustimmung, mittel) |
+| 2. Übernahme | braucht den Turn-Diff (`workspace/changes` + `ctx.workspaceChanges`): welche Dateien hat ein Turn geändert, ohne dass ein Werkzeug sie schrieb? | **Nein** (fail-closed, eigener Zug) |
+| 3. Selbstkorrektur | negatives Urteil (`rating: negative`) | **Ja** (Korrektur, hoch); die zweite Hälfte (Änderung am gelieferten Pfad) braucht wie #2 den Turn-Diff |
+| 4. Umformulierung | `user/message` mit `data.source.kind === 'user'` und inhaltlicher Überlappung mit der letzten Frage derselben Sitzung | **Ja** (Korrektur, mittel) |
+| 5. Akzeptanz | `turn/end` mit `reason.kind === 'completed'` | **Ja** (Zustimmung, niedrig) |
+| 6. Verwerfung | Abbruch durch den Menschen (`reason.kind === 'aborted'`) und der **Widerruf** eines Urteils (`feedback/message-delete`) | **Ja** (Korrektur mittel / Widerruf rechnet exakt zurück) |
+| 7. Nächste Frage | braucht die Thema-Regel über den Projekt-Index (gemeinsame Dateien und Begriffe) | **Nein** (eigener Zug) |
+
+Dazu eine Quelle ohne Pol: die Sitzungsbemerkung (`feedback/record`) wird
+**beobachtet und gezählt, aber nie gewertet** — sie trägt keine Richtung, und was
+nicht erkennbar ist, wird nicht geraten (fail-closed).
+
+**Keine Sekundenregel.** Die 90-s-Regel der Vorfassung ist gestrichen: ob eine
+Frage wiederkommt, entscheidet der INHALT (gemeinsame und überlappende Wörter,
+Schwellen als Daten). Gemessen an den echten Ereignissen trägt Harness-Text
+(`system-reminder`, Runtime-Kontext) denselben Typ `user/message` wie ein Mensch —
+nur `data.source.kind === 'user'` unterscheidet sie, und genau das prüft der
+Übersetzer.
+
+**Kein Deckel** (gesetzt am 2026-10-11): Trust-Ceiling und Zähler-Limit aus §4
+kommen nicht in die Daten; das Gate lehnt solche Schlüssel in der Signaltabelle ab.
 
 **Korrekt-Simulation (nur #4 + #5, exakte `scoring-core.js`-Regeln, 17 Sessions):**
 `88b60337` trust = 0.6914, correctness = 1.0000 — **knapp unter der `autonomy`-
 Schwelle (trust > 0.7)**. Die ursprünglich falsche Übernahme-Zählung (79 Fälle aus
 Agenten-eigenen `tool/call`-Events) hatte trust auf 0.93 gezogen; die Korrektur
-zeigt: **K5.0 gamet die Autonomie nicht.** Die echte Gamed-Maschinen-Gefahr
-(entsteht durch massives Copy/Adoption-Rauschen) wird erst relevant, wenn die
-UI-Registry (K5.1) die vier fehlenden Quellen liefert.
+zeigt: die log-gültige Teilmenge gamet die Autonomie nicht.
 
-**Web-Beleg (k5-web-research.md):** Cursor Router nutzt exakt dieses Prinzip —
+**Web-Beleg (`k5-web-research.md`):** Cursor Router nutzt dasselbe Prinzip —
 *„Moving on to the next task is a strong positive signal, while correcting the
 agent is a strong negative one."* (cursor.com/blog/how-cursor-router-works).
-Kursors fehlende Erkennungsquellen (Edit/Verwerfung) lösen per **Hooks**
-(`beforeReadFile`/`afterFileEdit`, deterministisch, stdio-JSON) und
-**Checkpoint-Rollback** (Restore = implizites Verwerfen). Das ist der konkrete
-Weg für K5.1 — nicht LLM-Interpretation.
+Der dortige Weg (Hooks, Checkpoint-Rollback) bleibt als Beleg dafür stehen, wie
+andere die fehlenden Quellen lösen — er ist **nicht** der Plan dieses Repos.
 
 ### 1.2 Skill-Prüfung am Ende der Session (K7c, neu)
 

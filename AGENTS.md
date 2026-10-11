@@ -36,10 +36,11 @@ Run from repo root:
 
 **Ist-Zustand:** Welche dieser Läufe Exit 0 liefern, mit welchen Zählungen, und warum
 welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wiederholen.
-- `npm test` → `node --test packages/codingmon/test/*.test.mjs && dsh-test.mjs &&
-  validate-test.mjs && pack-test.mjs && dsh-profile-test.mjs` (die schnellen Einzeltests
-  laufen zuerst, damit eine kaputte Tabelle vor `pack-test` auffällt). Dieselben Tests
-  laufen in `.github/workflows/commit-guard.yml` auf jedem Push/PR.
+- `npm test` → `node --test packages/codingmon/test/*.test.mjs && node --test
+  packages/scoring/test/*.test.mjs && dsh-test.mjs && validate-test.mjs && pack-test.mjs &&
+  dsh-profile-test.mjs` (die schnellen Einzeltests laufen zuerst, damit eine kaputte
+  Tabelle vor `pack-test` auffällt). Dieselben Tests laufen in
+  `.github/workflows/commit-guard.yml` auf jedem Push/PR.
 - `node scripts/dsh-test.mjs` → static gate: manifest, name contract, `index.js`,
   `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution (exit 0/1).
 - `node scripts/pack-test.mjs` → per-package distribution test: `npm pack` → unpack →

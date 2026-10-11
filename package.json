@@ -25,7 +25,7 @@
     "branding": "node scripts/branding-check.mjs",
     "idioms": "node scripts/sync-idioms.mjs",
     "idioms:check": "node scripts/sync-idioms.mjs --check",
-    "test": "node --test packages/codingmon/test/*.test.mjs && node scripts/dsh-test.mjs && node scripts/validate-test.mjs && node scripts/pack-test.mjs && node scripts/dsh-profile-test.mjs",
+    "test": "node --test packages/codingmon/test/*.test.mjs && node --test packages/scoring/test/*.test.mjs && node scripts/dsh-test.mjs && node scripts/validate-test.mjs && node scripts/pack-test.mjs && node scripts/dsh-profile-test.mjs",
     "test:hook": "node packages/hook/test/replay.test.mjs && node --test scripts/gate/tests/hook-pre-step.test.mjs",
     "test:codingmon": "node --test packages/codingmon/test/*.test.mjs",
     "test:scoring": "node --test packages/scoring/test/*.test.mjs",
