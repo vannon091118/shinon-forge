@@ -1,0 +1,28 @@
+{
+  "contract": "shinon.skill-triggers/v1",
+  "note": "Die Trigger in Reihenfolge: der erste passende feuert. Bedingungen lesen die VERÖFFENTLICHTEN Werte (cooling), der Skill muss im Technik-Profil stehen.",
+  "triggers": [
+    {
+      "id": "correction-caution",
+      "dimension": "correctness",
+      "op": "below",
+      "threshold": 0.35,
+      "skill": "caution",
+      "text": "Achtung: zuletzt korrigiert — erst prüfen, dann behaupten."
+    },
+    {
+      "id": "trust-autonomy",
+      "dimension": "trust",
+      "op": "above",
+      "threshold": 0.7,
+      "skill": "autonomy",
+      "text": "Vertrauen hoch — direkt liefern, kein Rückfragen."
+    },
+    {
+      "id": "relation-anchor",
+      "relation": "anchor",
+      "skill": "briefing",
+      "text": "Anker erreicht — Lage kurz zusammenfassen."
+    }
+  ]
+}
