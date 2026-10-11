@@ -62,7 +62,8 @@
     "@shinon/key-router": "workspace:*",
     "@shinon/narrative": "workspace:*",
     "@shinon/shinon-forge": "workspace:*",
-    "@shinon/popup": "workspace:*"
+    "@shinon/popup": "workspace:*",
+    "@shinon/scoring": "workspace:*"
   },
   "repository": {
     "type": "git",

@@ -1,0 +1,5 @@
+- insert:
+    - id: shinon-scoring
+      name: '@shinon/scoring'
+      config:
+        eventsChannel: 'shinon/event'
