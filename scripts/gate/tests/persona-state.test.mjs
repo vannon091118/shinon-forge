@@ -154,7 +154,10 @@ test('persona: jeder modellierte Typ ist ein Typ des Spines, und die Lücke ist 
     SPINE_EVENTS.filter((type) => !PERSONA_EVENT_TYPES.includes(type)).sort(),
     [
       'developer.message',
+      'feedback.approval',
+      'feedback.correction',
       'inbox.spliced',
+      'relation.updated',
       'request.header',
       'session.titled',
       'step.end',
