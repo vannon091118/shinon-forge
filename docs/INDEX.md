@@ -71,7 +71,7 @@ gilt nicht als Nachmessung.
 | [`packages/narrative/README.md`](../packages/narrative/README.md) | current | 2026-10-10 | Paket-Doku Narrative Engine |
 | [`packages/shinon-forge/README.md`](../packages/shinon-forge/README.md) | current | 2026-10-10 | Paket-Doku Shinon Forge |
 | [`PLAN.md`](../PLAN.md) | plan | 2026-10-11 | Umsetzungsplan des Umbaus (jeder Schritt trägt seinen eigenen Status) |
-| [`docs/SCORING-KONZEPT.md`](SCORING-KONZEPT.md) | plan | 2026-10-11 | Scoring-Konzept: K1–K4 als Ist, K5–K8 als Ziel — implizite Signale (Zug 1: native interne Quellen aus dem DSH-Verlauf, kein Browser), Vorlieben-Trennung, taktische/Master Skills, ohne Deckel |
+| [`docs/SCORING-KONZEPT.md`](SCORING-KONZEPT.md) | plan | 2026-10-11 | Scoring-Konzept: K1–K4 als Ist, K5–K8 als Ziel — implizite Signale (Zug 1: native interne Quellen aus dem DSH-Verlauf, kein Browser), Dauerhaftigkeit über die SQLite des Projekt-Index (Zug 2, §2.5), Vorlieben-Trennung, taktische/Master Skills, ohne Deckel |
 | [`LICENSE`](../LICENSE) | current | 2026-10-11 | eigene Lizenz (MIT, `Copyright (c) 2026 Vannon`) — kein Markdown, deshalb ohne Statusblock |
 | [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) | current | 2026-10-11 | Fremdhinweise, getrennt vom eigenen Copyright (A12) |
 | [`vendor/MODIFICATIONS.md`](../vendor/MODIFICATIONS.md) | current | 2026-10-11 | Änderungslog des vendorten DSH-Anteils (Schritt 3.2) |

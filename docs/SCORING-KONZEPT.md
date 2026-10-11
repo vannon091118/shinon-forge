@@ -29,7 +29,8 @@
 | Kern (K3) | `scoring-core.js`: replay, applyEvent, evaluateTriggers, deterministisch | bleibt die **einzige** Rechenschicht; K5 speist sie mit Signalen |
 | Gate (K4) | Schreib-Scope, Trigger-Vertrag, konservativ | bleibt die Schranke für die **Scorecard-Schicht** (lesend) |
 | Skills | statisch (`technical-profile.json`: caution/autonomy/briefing) | **werdend durch Agent-Reflexion** (K7), nicht durch Trigger |
-| Emittierung | fehlt (Scorecard steht bei `initial`) | **K5** schließt diese Lücke |
+| Emittierung | fehlt (Scorecard steht bei `initial`) | **K5** schließt diese Lücke (Zug 1: gebaut) |
+| Dauerhaftigkeit | fehlt — der Stand lebte im Arbeitsspeicher des Hosts und war nach jedem Neustart weg | **Zug 2: gebaut** — Protokoll, Zuordnung und Tafel liegen in der SQLite des Projekt-Index (§2.5) |
 | Vorlieben | getrennt (K8, Memory-Store) | bleibt getrennt, nie in der Scorecard |
 
 ### Die drei Ebenen (Trennungsregel)
@@ -277,7 +278,66 @@ Entscheidungen muss möglich sein (dafür die `stance: critical` in B3).
 Das bestehende **Indexierungs-Feature für Prompter-Max** sammelt schon Daten —
 die Grundlage, auf der K5 (Signale → Scorecard) und K8 (Fakten → Memory) aufbauen.
 Es vereinfacht das Nutzererlebnis, auch wenn nicht immer klar ist, welche Daten
-erfasst werden.
+erfasst werden. Für **K5 ist diese Grundlage seit Zug 2 gebaut** (§2.5): der Stand
+liegt in derselben SQLite, die der Index für das Projekt führt. Für **K8** steht
+die Ablage damit bereit — der Fakten-Store selbst (Konsolidierung, hartes Limit)
+ist noch nicht gebaut.
+
+### 2.5 Dauerhaftigkeit: der Index als Ablage (Ist-Stand Zug 2, 2026-10-11)
+
+**Korrektur der Vorfassung.** §1.4 hat die Ohren gebaut — der Stand lebte danach
+im Arbeitsspeicher des Hosts und war nach jedem Neustart weg. Das widersprach der
+Absicht, die dieses Dokument in §2.3 selbst formuliert: „Dein Agent lernt, wer du
+bist." Ein Agent, der jede Sitzung bei `initial` beginnt, lernt nichts. Zug 2 legt
+den Stand deshalb dorthin, wo das Projekt ohnehin eine Datenbank hat.
+
+**Wo.** `~/.shinon/indexes/<projekt-hash>/index.sqlite`, Tabelle `memory`. Ein
+Namensraum (`shinon.scoring/ledger-v1`) und drei Zeilenarten: `record` (eine
+Protokollzeile **mit Betreff**), `memo` (Zustand je Sitzung), `summary` (die
+gerechnete Tafel und die Zahl der Bemerkungen). Das Scoring schreibt **selbst
+nichts** — kein Pfad, kein Dateisystem, keine Datenbank in diesem Paket (das Gate
+prüft es). Es liest den zweiten, schmalen Dienst des Index: `shinon_index_store`
+(`shinon.project-index/store-v1`) mit genau zwei Operationen, `load` und `save`.
+
+**Warum ein zweiter Dienst.** Die Abfrage (`shinon_index_query`,
+`resolveContext`) ist per Test auf genau ihre zwei Schlüssel festgenagelt. Sie zu
+erweitern hieße, jedem Leser des Kontexts ein Schreib-Modul in die Hand zu geben.
+Zwei Namen, zwei Verträge, zwei Berechtigungen.
+
+**Warum die Ablage einen Index-Neuaufbau überlebt.** Alles andere im Index ist
+**Ableitung** — Dateien, Symbole, Kanten, Chunks entstehen aus dem Projekt, und
+ein `SCHEMA_VERSION`-Sprung verwirft sie bewusst (`1 → 2` in Zug 2, weil die
+Tabelle dazukam). Die Ablage ist das Gegenteil: ein Urteil lässt sich nirgends
+nachlesen. Sie trägt ihre eigene Fassung (`MEMORY_VERSION`) und wird nur von
+dieser verworfen — nicht vom Index.
+
+**Was der Stand trägt.** Das Protokoll ist die **Wahrheit**, die Tafel ist daraus
+**gerechnet** (`replay`). Deshalb wirkt der Widerruf auch nach dem Neustart exakt,
+und deshalb trifft späte Kritik die richtige frühere Aufgabe: die Zuordnung
+(`session_id` + Betreff) reist mit, und ein zweites Urteil zu **derselben** Antwort
+**ersetzt** die erste Zeile, statt eine zweite daneben zu legen.
+
+**Sitzungen enden mit dem Prozess.** DSH kennt im Spine kein Sitzungsende-Ereignis.
+Statt eines zu erfinden, schließt der Host beim Beenden alle offenen Sitzungen
+(`closeAllSessions`), und ein neues `session.created` schließt genau eine. Der
+Merkzettel geht dabei, das Protokoll bleibt — Evidenz ist keine Sitzung. Eine
+Hülle ohne Frage wird gar nicht erst geschrieben: sie wäre Ballast, der sich über
+die Laufzeit zu einer Zeile je Sitzung summierte.
+
+**Fail-closed, drei benannte Richtungen:** kein Dienst → im Speicher weiterrechnen
+(kein Fehler); fremder Dienst (falscher Vertrag oder fehlende Operationen) → nicht
+benutzen; nicht lesbarer Index → **leer starten, aber laufen**, mit dem Grund im
+Protokoll. Ein kaputter Index hält den Host nicht an und darf auch nicht so tun,
+als sei er heil.
+
+**Grenzen, benannt.** (1) Je Signal wird der ganze Namensraum neu geschrieben;
+der Aufwand wächst mit der Zahl der Signale eines Projekts (nicht je Token). Ein
+inkrementelles Anhängen bräuchte stabile Zeilen-Identitäten über Läufe hinweg,
+die es noch nicht gibt. (2) `stats` (beobachtet, Gründe, Zähler) bleibt Sache des
+Prozesses, nicht der Ablage: dauerhaft sind Protokoll, Merkzettel, Tafel und
+Bemerkungen. (3) Ein LIVE gemessener Neustart im gebooteten Host steht aus — die
+Kette ist über die echten `apply()`-Schnittstellen beider Pakete an einem Host
+mit echtem `provide`/`get` belegt (`scripts/gate/tests/scoring-memory.test.mjs`).
 
 ---
 

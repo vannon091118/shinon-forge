@@ -9,9 +9,11 @@ import {
   indexPath,
   indexStats,
   openIndex,
+  readMemory,
   resolveContext,
   runIndex,
   runIndexInWorker,
+  writeMemory,
 } from './assets/index-core.js';
 
 /**
@@ -28,15 +30,30 @@ import {
  * symbols, edges, references, touches, chunks + FTS5, ausserhalb des Repos unter
  * ~/.shinon/indexes/<project-hash>/index.sqlite.
  *
- * WAS ER ANBIETET: eine Abfrage-Faehigkeit aus Plan §14/§17 — `ctx.provide`
- * unter `QUERY_SERVICE`. Das ist die Naht zum Prompt-Enhancer, und sie ist
- * bewusst SCHMAL: ein Vertragsname und EINE Operation (`resolveContext`).
- * Kein Dateihandle, kein Schema, kein Lauf — wer mehr braucht, importiert den
- * Kern; wer einen Kontext braucht, fragt hier.
+ * WAS ER ANBIETET: ZWEI Faehigkeiten, jede schmal und jede ueber `ctx.provide`.
+ *
+ *   1. `QUERY_SERVICE` (Plan §14/§17) — EIN Vertragsname und EINE Operation
+ *      (`resolveContext`). Das ist die Naht zum Prompt-Enhancer. Kein
+ *      Dateihandle, kein Schema, kein Lauf — wer mehr braucht, importiert den
+ *      Kern; wer einen Kontext braucht, fragt hier.
+ *   2. `STORE_SERVICE` (Zug 2) — zwei Operationen (`load`, `save`) auf einem
+ *      Namensraum. Das ist die Naht zum Scoring, und sie ist die Antwort auf
+ *      eine gemessene Luecke: der Index war reine Ableitung (Dateien, Symbole,
+ *      Kanten — aus dem Projekt wieder herstellbar), dem Scoring fehlte jeder
+ *      Ort fuer das, was NICHT herstellbar ist: Urteile, ihre Zuordnung und der
+ *      daraus gerechnete Stand. Bis dahin lebte das im Arbeitsspeicher eines
+ *      Hosts und war nach jedem Neustart weg.
  *
  * WARUM ALS DIENST UND NICHT ALS IMPORT: die Pakete dieses Repos referenzieren
- * einander nicht. Der Enhancer liest die Faehigkeit optional ueber `ctx.get`;
- * fehlt sie, ist MAX nur ueber eine Datei zu haben statt gar nicht.
+ * einander nicht. Enhancer und Scoring lesen ihre Faehigkeit optional ueber
+ * `ctx.get`; fehlt sie, ist MAX nur ueber eine Datei zu haben statt gar nicht —
+ * und das Scoring rechnet im Speicher weiter, statt zu verschwinden.
+ *
+ * WARUM ZWEI DIENSTE UND NICHT EINER MIT VIER OPERATIONEN: die schmale Form der
+ * Abfrage ist per Test festgenagelt (`contract` + `resolveContext`, genau diese
+ * beiden Schluessel). Sie zu erweitern hiesse, jedem Leser des Kontexts ein
+ * Schreib-Modul in die Hand zu geben. Zwei Namen, zwei Vertraege, zwei
+ * Berechtigungen — dasselbe Prinzip wie bei den Marken-Slots.
  */
 
 export * from './assets/index-core.js';
@@ -50,6 +67,86 @@ export const QUERY_CONTRACT = 'shinon.project-index/query-v1';
  * dass beide Seiten denselben Namen fuehren.
  */
 export const QUERY_SERVICE = 'shinon_index_query';
+
+/**
+ * Vertragsname der Ablage-Faehigkeit (Zug 2).
+ */
+export const STORE_CONTRACT = 'shinon.project-index/store-v1';
+
+/**
+ * Der Dienstname der Ablage. Bewusst NEBEN `shinon_index_query` und nicht als
+ * dessen Erweiterung: der Abfrage-Vertrag ist schmal und gepinnt.
+ */
+export const STORE_SERVICE = 'shinon_index_store';
+
+/** Ein Namensraum ist die Adresse eines Standes — ohne ihn gibt es keine. */
+const validNamespace = (namespace) => typeof namespace === 'string' && namespace.trim() !== '';
+
+/**
+ * Die Ablage-Faehigkeit bauen: einen Namensraum lesen, einen Namensraum
+ * schreiben. Mehr nicht.
+ *
+ * Die Rueckgaben sind ausdruecklich dreiwertig, weil der Unterschied zwischen
+ * „nichts da" und „nicht lesbar" die ganze Aussage ist:
+ *
+ *   load  { ok: true, state: null }   es gibt (noch) keinen Index — ehrliche
+ *                                     Leere. Nichts ist verloren, nichts ist
+ *                                     kaputt: hier war noch nie ein Stand.
+ *   load  { ok: true, state: {…} }    der Stand (records, memos, scorecard,
+ *                                     notes, broken).
+ *   load  { ok: false, error }        die Datei ist da, aber unbrauchbar. Ein
+ *                                     Fehler, kein stilles Nichts — der Aufrufer
+ *                                     entscheidet, ob er leer startet.
+ *   save  { ok: true, rows }          geschrieben (ein Aufruf, eine Transaktion).
+ *   save  { ok: false, error }        nicht geschrieben; der alte Stand steht.
+ *
+ * `save` legt die Datei AN, `load` nicht: schreiben ist unsere eigene Ablage
+ * (sie darf ihr Zuhause bauen), lesen waere sonst ein erfundener Index —
+ * dieselbe Regel wie bei der Abfrage. Ein Namensraum ist Pflicht: ohne ihn
+ * waere die Ablage ein namenloser Haufen, und niemand koennte sie wiederfinden.
+ */
+export function createStoreService({ indexFile }) {
+  const withIndex = (namespace, work) => {
+    let db = null;
+    try {
+      db = openIndex(indexFile);
+      return work(db);
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error) };
+    } finally {
+      // Ein Fehler beim Schliessen aendert die Antwort nicht mehr — und ein
+      // Handle, das den Prozess ueberlebt, waere ein Leck.
+      if (db !== null) {
+        try {
+          db.close();
+        } catch {
+          /* die Antwort steht schon */
+        }
+      }
+    }
+  };
+
+  return {
+    contract: STORE_CONTRACT,
+    /**
+     * Den Stand eines Namensraums lesen. Erzeugt KEINEN Index: fehlt die Datei,
+     * ist die Antwort `null` und nicht ein leerer Index.
+     *
+     * Der Namensraum wird ZUERST geprueft: ein Aufruf ohne Adresse ist ein
+     * Fehler, und die ehrliche Leere („kein Index") darf ihn nicht verdecken.
+     */
+    load(namespace) {
+      if (!validNamespace(namespace)) return { ok: false, error: 'MISSING_NAMESPACE' };
+      if (!existsSync(indexFile)) return { ok: true, state: null };
+      return withIndex(namespace, (db) => ({ ok: true, state: readMemory(db, namespace) }));
+    },
+    /** Den Stand eines Namensraums schreiben (ersetzt ihn vollstaendig). */
+    save(namespace, state) {
+      if (!validNamespace(namespace)) return { ok: false, error: 'MISSING_NAMESPACE' };
+      return withIndex(namespace, (db) => ({ ok: true, rows: writeMemory(db, namespace, state) }));
+    },
+  };
+}
 
 /**
  * Die Abfrage-Faehigkeit bauen.
@@ -184,9 +281,15 @@ export function apply(ctx, config) {
   const releaseQuery = canProvide
     ? ctx.provide(QUERY_SERVICE, createQueryService({ indexFile: file }))
     : null;
+  const releaseStore = canProvide ? ctx.provide(STORE_SERVICE, createStoreService({ indexFile: file })) : null;
   const queryState = canProvide
     ? `Abfrage ${QUERY_SERVICE} bereitgestellt (${QUERY_CONTRACT})`
     : `Abfrage ${QUERY_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
+  // Zwei Faehigkeiten, zwei Zeilen: wer im Log liest, dass die Ablage fehlt,
+  // soll nicht raten muessen, welche der beiden gemeint ist.
+  const storeState = canProvide
+    ? `Ablage ${STORE_SERVICE} bereitgestellt (${STORE_CONTRACT})`
+    : `Ablage ${STORE_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
 
   /** Ein Bericht ist erst vollstaendig, wenn der Index auch zaehlbar ist. */
   const announce = (report, where) => {
@@ -222,12 +325,17 @@ export function apply(ctx, config) {
     start().catch((error) => console.error(`[shinon-project-index] Lauf abgebrochen (${error?.message ?? error}) — der vorige Stand bleibt stehen`));
   });
 
-  if (config.trace) console.log(`[shinon-project-index] Aktiviert — ${CONTRACT}, ${file}, Lauf nach dem Start (${config.worker ? 'Worker' : 'Host'}), Schutz an (Plan §13), ${queryState}`);
+  if (config.trace) {
+    console.log(`[shinon-project-index] Aktiviert — ${CONTRACT}, ${file}, Lauf nach dem Start (${config.worker ? 'Worker' : 'Host'}), Schutz an (Plan §13)`);
+    console.log(`[shinon-project-index] ${queryState}`);
+    console.log(`[shinon-project-index] ${storeState}`);
+  }
 
   // Ein noch nicht gestarteter Lauf wird gestoppt; ein laufender schreibt zu
   // Ende, weil ein halber Index schlimmer waere als ein fertiger.
   return () => {
     clearImmediate(pending);
     if (typeof releaseQuery === 'function') releaseQuery();
+    if (typeof releaseStore === 'function') releaseStore();
   };
 }

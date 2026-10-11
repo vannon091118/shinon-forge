@@ -271,13 +271,22 @@ test('Schema: die sechs Primärdaten aus Plan §9 sind namentlich vorhanden', ()
     assert.equal(one(db, `select count(*) as n from "${table}"`).n, 0, `${table} beginnt leer`);
   }
   assert.ok(tables.has(bundle.FTS_TABLE), 'die FTS5-Spiegelung der Chunks fehlt');
+  // Die Ablage (Zug 2) gehoert zum Schema, ist aber KEIN Primaerdatum: sie ist
+  // nicht aus dem Projekt herstellbar und wird deshalb beim Index-Neuaufbau
+  // nicht verworfen (der Fall steht in scripts/gate/tests/scoring-memory.test.mjs).
+  assert.ok(tables.has(bundle.MEMORY_TABLE), 'die Ablage fehlt');
+  assert.equal(one(db, `select count(*) as n from ${bundle.MEMORY_TABLE}`).n, 0, 'die Ablage beginnt leer');
   const meta = bundle.indexMeta(db);
   assert.deepEqual(meta.contract, bundle.CONTRACT);
   assert.deepEqual(meta.schema_version, String(bundle.SCHEMA_VERSION));
   assert.deepEqual(meta.indexer_version, String(bundle.INDEXER_VERSION), 'der Index kennt die Fassung seiner Extraktion');
 
   assert.equal(bundle.CONTRACT, 'shinon.project-index/v1', 'der Vertragsname ist die Zusage an Leser');
-  assert.equal(bundle.SCHEMA_VERSION, 1);
+  // 2 seit Zug 2: die Tabelle `memory` (Ablage) ist dazugekommen. Eine
+  // Tabellenaenderung erhoeht diese Zahl, sonst benutzt ein bestehender Index
+  // still die alte Form — genau die Regel, die der Kopf nennt.
+  assert.equal(bundle.SCHEMA_VERSION, 2);
+  assert.equal(bundle.MEMORY_VERSION, 1, 'die Ablage fuehrt ihre eigene Fassung');
   db.close();
 });
 
@@ -992,11 +1001,14 @@ test('Mount: der Lauf startet nach dem Mount, ein abgemounteter Lauf schreibt ni
   const file = bundle.indexPath(indexRoot, project);
   const quiet = collector();
   try {
-    // Ein Mount, der vor dem Lauf abgeräumt wird, darf nichts schreiben.
+    // Ein Mount, der vor dem Lauf abgeräumt wird, darf nichts schreiben. Der
+    // Mount meldet seinen Zustand SOFORT (Aktivierung und die zwei
+    // Faehigkeiten, Zug 2) — was nach dieser Zeile kommt, wäre ein LAUF.
     const abandoned = bundle.apply({}, bundle.Config({ root: project, indexRoot }));
+    const announced = quiet.lines.length;
     abandoned();
     await new Promise((resolve) => setTimeout(resolve, 300));
-    assert.deepEqual(quiet.lines.filter((line) => !line.includes('Aktiviert')), [], 'kein Lauf nach dem Abräumen');
+    assert.deepEqual(quiet.lines.slice(announced), [], 'kein Lauf nach dem Abräumen');
     assert.equal(existsSync(indexRoot), false, 'und keine Indexwurzel');
 
     const dispose = bundle.apply({}, bundle.Config({ root: project, indexRoot }));

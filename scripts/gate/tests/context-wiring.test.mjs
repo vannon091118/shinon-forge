@@ -11,8 +11,11 @@
  * Enhancer in einem Profil ohne Index gar nicht geladen).
  *
  * Vier Ebenen, bewusst getrennt:
- *   1. Die Faehigkeit des Index: GENAU EINE Operation, ein Vertragsname, und
- *      ohne Index eine ehrliche Leere (null) statt eines leeren Index.
+ *   1. Die Faehigkeiten des Index: seit Zug 2 sind es ZWEI — die Abfrage
+ *      (`resolveContext`, der Kontext fuer MAX) und die Ablage (`load`/`save`,
+ *      das dauerhafte Gedaechtnis des Scorings). Jede ist schmal, jede hat
+ *      ihren eigenen Vertragsnamen, und ohne Index gibt die Abfrage eine
+ *      ehrliche Leere (null) statt eines leeren Index.
  *   2. Die Naht als Daten: Dienstname und Vertragsname stimmen in beiden Paketen
  *      ueberein — gepinnt von AUSSEN, weil kein Paket das andere liest.
  *   3. Der echte Durchlauf: beide Bundles an einem echten Cordis-Context, echter
@@ -31,7 +34,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 
-const PACKAGES = ['prompter', 'project-index'];
+const PACKAGES = ['prompter', 'project-index', 'scoring'];
 const ROOT = new URL('../../../', import.meta.url);
 
 /** Beide Bundles isoliert laden, mit dem ECHTEN Schemastery der DSH-Installation. */
@@ -64,6 +67,7 @@ process.on('exit', () => {
 });
 const prompter = loaded.prompter;
 const index = loaded['project-index'];
+const scoring = loaded.scoring;
 const dshRequire = createRequire(join(dshRoot(), 'package.json'));
 const { Context } = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/cordis')).href);
 
@@ -116,16 +120,22 @@ function indexed(project, label) {
 
 // ── 1. Die Faehigkeit des Index ─────────────────────────────────────────────
 
-test('Index: die angebotene Faehigkeit ist schmal und traegt einen Vertragsnamen', () => {
+test('Index: die angebotenen Faehigkeiten sind schmal und tragen einen Vertragsnamen', () => {
   const provided = [];
   const ctx = { provide: (name, value) => { provided.push({ name, value }); return () => {}; } };
   const dispose = quiet(() => index.apply(ctx, index.Config({ root: fixture('schmal'), indexRoot: workDir('schmal-index'), worker: false, trace: false })));
 
-  assert.equal(provided.length, 1, 'genau eine Faehigkeit');
-  assert.equal(provided[0].name, index.QUERY_SERVICE);
-  assert.deepEqual(Object.keys(provided[0].value).sort(), ['contract', 'resolveContext'], 'schmal: Vertragsname und EINE Operation');
-  assert.equal(provided[0].value.contract, index.QUERY_CONTRACT);
-  assert.equal(typeof provided[0].value.resolveContext, 'function');
+  const names = provided.map((entry) => entry.name).sort();
+  assert.deepEqual(names, [index.QUERY_SERVICE, index.STORE_SERVICE].sort(), 'genau zwei Faehigkeiten');
+  const query = provided.find((entry) => entry.name === index.QUERY_SERVICE).value;
+  assert.deepEqual(Object.keys(query).sort(), ['contract', 'resolveContext'], 'schmal: Vertragsname und EINE Operation');
+  assert.equal(query.contract, index.QUERY_CONTRACT);
+  assert.equal(typeof query.resolveContext, 'function');
+  const store = provided.find((entry) => entry.name === index.STORE_SERVICE).value;
+  assert.deepEqual(Object.keys(store).sort(), ['contract', 'load', 'save'], 'die Ablage: zwei Operationen, kein Schema');
+  assert.equal(store.contract, index.STORE_CONTRACT);
+  assert.equal(typeof store.load, 'function');
+  assert.equal(typeof store.save, 'function');
   dispose();
 });
 
@@ -163,6 +173,14 @@ test('Naht: Dienst- und Vertragsname stimmen in beiden Paketen ueberein', () => 
   assert.equal(prompter.INDEX_CONTRACT, index.QUERY_CONTRACT, 'derselbe Vertragsname');
   assert.equal(prompter.INDEX_BUDGET_TOKENS, index.DEFAULT_CONTEXT_BUDGET, 'dasselbe Budget als Default');
   assert.deepEqual(prompter.inject, ['llm'], 'kein Injektionszwang fuer den Index (sonst kein Enhancer ohne Index)');
+
+  // Die zweite Naht (Zug 2): kein Paket liest das andere, also pinnt der Test
+  // auch hier beide Seiten — Dienstname, Vertragsname und ein Namensraum, der
+  // wirklich einer ist.
+  assert.equal(scoring.INDEX_STORE_SERVICE, index.STORE_SERVICE, 'derselbe Dienstname');
+  assert.equal(scoring.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
+  assert.equal(typeof scoring.LEDGER_NAMESPACE, 'string');
+  assert.ok(scoring.LEDGER_NAMESPACE.length > 0, 'ohne Namensraum gaebe es keine Adresse');
 });
 
 // ── 3./4. Der echte Durchlauf und die Quelle im Datensatz ───────────────────

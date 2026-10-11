@@ -435,20 +435,37 @@ export function translateSignal(envelope, payload, rules, session = {}) {
  *
  * Zustand je Sitzung ist das, was ein Signal braucht — nichts weiter: die
  * zuletzt gesehene Frage (fuer die Wiederholung) und zwei Zaehler fuer die Spur.
- * Er wird nicht dauerhaft gelagert; `forgetSession` und `dispose` raeumen ihn
- * auf, und ein neues `session.created` setzt die Sitzung zurueck. (DSH kennt im
- * Spine kein Sitzungsende-Ereignis — das ist eine benannte Luecke, kein stiller
- * Speicher: der Host raeumt auf, wenn er es weiss.)
+ * `forgetSession` raeumt ihn auf, ein neues `session.created` schliesst die
+ * Sitzung ab (der Merkzettel geht, es entsteht KEINE leere Huelle — eine Huelle
+ * ohne Inhalt waere nur Ballast, der sich ueber die Laufzeit ansammelt), und
+ * `closeAllSessions` schliesst alle offenen, wenn der Host endet. DSH kennt im
+ * Spine kein Sitzungsende-Ereignis — das ist eine benannte Luecke, und deshalb
+ * ist der PROZESS die Grenze: was der Host noch weiss, schliesst er selbst ab,
+ * statt eine Ereignisform zu erfinden, die es nicht gibt.
  *
  * Die Tafel entsteht aus dem Protokoll: `replay` ueber alle Zeilen. Ein Widerruf
  * ist damit exakt — die Zeile faellt weg, der Rest wird neu gerechnet, und altes
- * Evidence verblasst weiter nach dem Vertrag.
+ * Evidence verblasst weiter nach dem Vertrag. Genau diese Eigenschaft traegt den
+ * Neustart: das Protokoll ist die Wahrheit, die Tafel ist daraus hergeleitet,
+ * und was nicht mehr im Protokoll steht, zaehlt auch nach dem Laden nicht mehr.
+ *
+ * WAS HIER NICHT HINEINGEHOERT: das Schreiben. Der Sammler kennt keine Datei,
+ * keine Datenbank und keine Zeit. Er MELDET seinen Stand (`onPersist`) — wohin
+ * er geht, entscheidet der Host. Ein reiner Kern, der den Rueckruf nicht
+ * bekommt, verhaelt sich exakt wie vorher (er rechnet im Speicher).
+ *
+ * EINE HUELLE OHNE INHALT IST KEIN ZUSTAND: im Speicher entsteht fuer jede
+ * Sitzung, die ein Ereignis hatte, ein Merkzettel (auch ohne Frage — die
+ * Zaehler brauchen ihn). Geschrieben wird er nur, wenn er eine Frage kennt: er
+ * ist sonst nur Ballast, der sich ueber die Laufzeit zu einer Zeile je Sitzung
+ * summierte, und er sagt nichts, was nicht schon "kein Merkzettel" sagt.
  */
-export function createSignalCollector({ contracts, rules } = {}) {
+export function createSignalCollector({ contracts, rules, onPersist = null } = {}) {
   const initial = initialState(contracts?.scoring ?? {});
   const sessions = new Map();
   let records = [];
   let notes = 0;
+  let dropped = 0;
   const stats = { observed: 0, scored: 0, retracted: 0, noted: 0, silent: 0, reasons: {} };
 
   const count = (reason) => {
@@ -466,18 +483,44 @@ export function createSignalCollector({ contracts, rules } = {}) {
 
   const scorecard = () => replay(contracts, initial, records.map((record) => record.event)).scorecard;
 
+  /** Die Merkzettel, die einen Stand SIND — Hüllen ohne Frage zaehlen nicht. */
+  const memoList = () =>
+    [...sessions.values()].filter((state) => state.previousQuestion !== '').map((state) => ({ ...state }));
+
+  /**
+   * Den Stand melden. Reine Weitergabe: der Kern kopiert, der Host schreibt.
+   * Der Grund (`why`) steht mit dabei, damit im Protokoll nachlesbar ist,
+   * WELCHE Aenderung den Schreibvorgang ausgeloest hat — sonst waere eine
+   * Schreibspur ohne Anlass.
+   */
+  const persist = (why) => {
+    if (typeof onPersist !== 'function') return;
+    onPersist({
+      why,
+      records: records.map((record) => ({ ...record })),
+      memos: memoList(),
+      scorecard: scorecard(),
+      notes,
+    });
+  };
+
   return {
     observe(envelope, payload) {
       stats.observed += 1;
       const sessionId = typeof envelope?.session_id === 'string' ? envelope.session_id : '';
 
-      // Ein neues Sitzungsereignis setzt den Merkzettel dieser Sitzung zurueck.
-      if (envelope?.event_type === 'session.created' && sessionId !== '') sessions.delete(sessionId);
-      const session = sessionId === '' ? {} : sessionOf(sessionId);
+      // Ein neues Sitzungsereignis schliesst die Sitzung ab: der Merkzettel
+      // geht, und es wird KEINE leere Huelle angelegt — die wieder anzulegen
+      // hiesse, sie fuer immer zu behalten. Gemeldet wird nur, wenn wirklich
+      // etwas wegfiel: ein abgeschlossenes Nichts ist keine Aenderung.
+      const sessionCreated = envelope?.event_type === 'session.created' && sessionId !== '';
+      const sessionEnded = sessionCreated && sessions.delete(sessionId);
+      const session = sessionId === '' || sessionCreated ? {} : sessionOf(sessionId);
 
       const outcome = translateSignal(envelope, payload, rules, session);
       if (outcome.reason !== null) count(outcome.reason);
-      if (sessionId !== '' && outcome.question !== undefined) {
+      const memoChanged = sessionId !== '' && outcome.question !== undefined;
+      if (memoChanged) {
         session.previousQuestion = outcome.question;
         session.questions += 1;
       }
@@ -485,6 +528,7 @@ export function createSignalCollector({ contracts, rules } = {}) {
       if (outcome.kind === 'note') {
         stats.noted += 1;
         notes += 1;
+        persist('note');
         return { outcome, removed: 0, scorecard: scorecard() };
       }
       if (outcome.kind === 'retract' && outcome.subject !== null) {
@@ -492,6 +536,7 @@ export function createSignalCollector({ contracts, rules } = {}) {
         records = records.filter((record) => !(record.session_id === sessionId && record.subject === outcome.subject));
         stats.retracted += 1;
         if (sessionId !== '') session.signals += 1;
+        persist('retract');
         return { outcome, removed: before - records.length, scorecard: scorecard() };
       }
       if (outcome.kind === 'score' && outcome.event !== null) {
@@ -511,10 +556,65 @@ export function createSignalCollector({ contracts, rules } = {}) {
         });
         stats.scored += 1;
         if (sessionId !== '') session.signals += 1;
+        persist('score');
         return { outcome, removed: 0, scorecard: scorecard() };
       }
+      // Kein Signal, aber moeglicherweise ein neuer Merkzettel oder eine
+      // geschlossene Sitzung: auch das ist Zustand und wird gemeldet.
+      if (memoChanged) persist('memo');
+      else if (sessionEnded) persist('session');
       stats.silent += 1;
       return { outcome, removed: 0, scorecard: scorecard() };
+    },
+    /**
+     * Den Stand aus der Ablage uebernehmen — nur beim Start, und fail-closed.
+     *
+     * Nur was die Form einer Protokollzeile hat, wird uebernommen; alles andere
+     * wird GEZAEHLT (`rejected`) und fallengelassen. Ein fremder oder kaputter
+     * Stand darf keine Tafel ergeben, die niemand gerechnet hat — aber er darf
+     * auch nicht still verschwinden. Was hier hereinkommt, ist bereits geprueft
+     * (`translateSignal` hat die Ereignisform erzeugt), deshalb ist die Pruefung
+     * eine Formpruefung und keine zweite Auslegung.
+     */
+    hydrate(state) {
+      const rawRecords = Array.isArray(state?.records) ? state.records : [];
+      const rawMemos = Array.isArray(state?.memos) ? state.memos : [];
+      let kept = 0;
+      let rejected = 0;
+      const next = [];
+      for (const record of rawRecords) {
+        if (typeof record?.event?.type !== 'string' || typeof record?.session_id !== 'string') {
+          rejected += 1;
+          continue;
+        }
+        next.push({
+          session_id: record.session_id,
+          subject: typeof record.subject === 'string' ? record.subject : null,
+          signal: typeof record.signal === 'string' ? record.signal : null,
+          kind: 'score',
+          factor: typeof record.factor === 'number' && Number.isFinite(record.factor) ? record.factor : 1,
+          event: record.event,
+          detail: record.detail !== null && typeof record.detail === 'object' ? record.detail : {},
+        });
+        kept += 1;
+      }
+      records = next;
+      sessions.clear();
+      for (const memo of rawMemos) {
+        if (typeof memo?.id !== 'string' || memo.id === '') {
+          rejected += 1;
+          continue;
+        }
+        sessions.set(memo.id, {
+          id: memo.id,
+          previousQuestion: typeof memo.previousQuestion === 'string' ? memo.previousQuestion : '',
+          questions: Number.isFinite(memo.questions) ? memo.questions : 0,
+          signals: Number.isFinite(memo.signals) ? memo.signals : 0,
+        });
+      }
+      if (Number.isFinite(state?.notes)) notes = state.notes;
+      dropped += rejected;
+      return { records: kept, memos: sessions.size, rejected };
     },
     /** Die Tafel, wie sie aus dem Protokoll folgt (inkl. Injektion und Digest). */
     result() {
@@ -527,15 +627,36 @@ export function createSignalCollector({ contracts, rules } = {}) {
     records: () => records.map((record) => ({ ...record })),
     session: (sessionId) => (sessions.has(sessionId) ? { ...sessions.get(sessionId) } : null),
     sessions: () => [...sessions.keys()],
-    stats: () => ({ ...stats, reasons: { ...stats.reasons }, notes, records: records.length }),
+    /** Der ganze Stand — genau die Form, die die Ablage traegt. */
+    state: () => ({
+      records: records.map((record) => ({ ...record })),
+      memos: memoList(),
+      scorecard: scorecard(),
+      notes,
+    }),
+    stats: () => ({ ...stats, reasons: { ...stats.reasons }, notes, dropped, records: records.length }),
     /** Den Merkzettel EINER Sitzung aufraeumen (das Protokoll bleibt die Evidenz). */
     forgetSession(sessionId) {
-      return sessions.delete(sessionId);
+      const existed = sessions.delete(sessionId);
+      if (existed) persist('session');
+      return existed;
+    },
+    /**
+     * Alle offenen Sitzungen schliessen — der Host ruft das, wenn er endet.
+     * Das Protokoll bleibt (es ist Evidenz), der Merkzettel geht: Sitzungen
+     * enden mit dem Prozess, weil der Spine kein Sitzungsende kennt.
+     */
+    closeAllSessions() {
+      const open = sessions.size;
+      sessions.clear();
+      if (open > 0) persist('session-end');
+      return open;
     },
     dispose() {
       sessions.clear();
       records = [];
       notes = 0;
+      dropped = 0;
     },
   };
 }
