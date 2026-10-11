@@ -209,11 +209,12 @@ Statusklassen — und was sie hier bedeuten:
 | Marker-Regeln in Vertrag + Host + Client | **Verified** | `node --test scripts/gate/tests/markers.test.mjs` → Exit 0 |
 | Event-Spine gegen die eingefrorene Fixture | **Verified** | `node --test scripts/gate/tests/events-spine.test.mjs` → Exit 0 |
 | Codemon-Kernmathematik, Kompositor-Regel, Client-Durchstich im vm | **Verified** | `npm run test:codingmon` → Exit 0 (überspringt sichtbar, was DSH-Bausteine braucht) |
-| Distributionstest (`npm pack` → Isolat → Load) | **Verified** (76 von 76) | `node scripts/pack-test.mjs` → Exit 0 |
-| Web-UI-Boot in Chromium + Panel-Beleg | **Verified** (7 von 7) | `dsh --profile shinon` + `node scripts/panel-check.mjs --url … --token …` → Exit 0 |
-| Gate-Engine `--full` | **Verified** (18 von 18; gehaltene Versionsaufteilung ist deklariert, Undeklariertes bleibt rot) | `npm run gate:full` → Exit 0 |
-| Gate-Tests (reine Gate-Logik) | **Verified** (306 von 306; braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
-| Volle Kette | **Verified** (29 → 98 → 9 → 76 → 3 grün) | `npm test` → Exit 0 |
+| Distributionstest (`npm pack` → Isolat → Load) | **Verified** | `node scripts/pack-test.mjs` → Exit 0 |
+| Web-UI-Boot in Chromium + Panel-Beleg | **Verified** | `dsh --profile shinon` + `node scripts/panel-check.mjs --url … --token …` → Exit 0 |
+| Gate-Engine `--full` | **Verified** (alle Gates grün; die Versions-Regel folgt aus dem Manifest des Pakets, Undeklariertes bleibt rot) | `npm run gate:full` → Exit 0 |
+| Gate-Tests (reine Gate-Logik) | **Verified** (braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
+| Skalierung: Kopie des Baums + 20 neue Plugins durch die ganze Kette | **Verified** | `npm run scale:check` → Exit 0 |
+| Volle Kette | **Verified** | `npm test` → Exit 0 |
 | Echter Modellaufruf | **Nicht geprüft** | `docs/ZAHLEN.md` §4 |
 
 Zählungen, Exit-Codes und die Ursachen jedes roten Befunds stehen **nur** in
@@ -240,6 +241,7 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 | `npm start [-- …]` · `shinon [-- …]` | der Einstieg ([`bin/shinon.mjs`](bin/shinon.mjs), auch als `bin`-Feld im Manifest): heilt Node ≥ 22 selbst, findet `dsh` auch außerhalb des PATH und **nennt dessen Herkunft**, startet das Profil; `--check` prüft nur die Startfähigkeit. `scripts/start.mjs` bleibt als kompatibler Aufruf und importiert dieselbe Umsetzung |
 | `npm run verify:panel` | Panel-Beleg über `scripts/panel-check.mjs` (braucht jsdom) |
 | `npm run stages` | Startstufen/Ready-Zeile aus `scripts/open.mjs` nachvollziehen |
+| `npm run scale:check` | Skalierungsnachweis: Kopie des Baums + `--plugins N` (Standard 20) neue Klon-Pakete durch Idiome, Gate, `gate:full`, Gate-Tests, Distribution und Build — braucht Node ≥ 22, nicht Teil von `npm test` |
 | `npm run commit:guard -- …` | Commit-Regeln prüfen (`--ci`, `--last n`, `--range`, `--all`) |
 | `npm run hooks:install` | Git-Hooks aktivieren (einmal pro Klon) |
 | `npm run update` | echte Registry-Prüfung (Maximum nach Semver) ins kanonische Profil; offline UNGEPRÜFT statt „keine Updates"; Install-Pfad live ungeprüft |

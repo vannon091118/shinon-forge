@@ -28,7 +28,7 @@ import {
 
 const ROOT = repo.ROOT;
 const CHECK = process.argv.includes('--check');
-const summary = `${regionCount()} Blöcke in ${regionFiles().length} Dateien`;
+const summary = `${regionCount(ROOT)} Blöcke in ${regionFiles(ROOT).length} Dateien`;
 
 function allIssues() {
   return HALVES.flatMap((half) => idiomIssues(ROOT, half));

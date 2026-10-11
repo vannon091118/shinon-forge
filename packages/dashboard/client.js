@@ -448,7 +448,7 @@ window.__ModuleLoader__.load({
           return { workspaces: read(WORKSPACE_SERVICE), sessions: read(SESSION_SERVICE) };
         };
 
-        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
+        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test) params={"table":"MENU_DE","key":"menu.dashboard","label":"Shinon Dashboard"}
         // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
         // Locale-Dienst gilt die deutsche Tabelle.
         const MENU_DE = { 'menu.dashboard': 'Shinon Dashboard' };

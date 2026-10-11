@@ -62,7 +62,7 @@ test('kein Klammerzugriff `ctx[…]` in Client-Hälften (F-m)', () => {
 test('jeder Fallback-Schlüssel hat GENAU EINEN Eintrag im Wörterbuch von locale-de', () => {
   // Hier OHNE String-Leerung: die Schlüssel SIND Strings (stripComments lässt sie stehen).
   const dictionary = stripComments(readFileSync(join(ROOT, 'packages', OWNER, 'client.js'), 'utf8'));
-  const keys = regionsOf('client.js')
+  const keys = regionsOf(ROOT, 'client.js')
     .map((region) => region.params?.key)
     .filter((key) => typeof key === 'string');
   assert.ok(keys.length >= 5, `erwartet mindestens 5 Fallback-Schlüssel, gefunden ${keys.length}`);

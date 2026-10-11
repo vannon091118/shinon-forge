@@ -1543,7 +1543,7 @@ window.__ModuleLoader__.load({
         // Das Pet bleibt in seinen eigenen Flaechen (Panel, XP-Leiste, Arena);
         // eine Marke gibt dieser Client nach aussen nicht heraus.
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, CodingmonPanel));
-        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
+        // >>> shinon:dsh-idiom locale-fallback/menu — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test) params={"table":"MENU_DE","key":"menu.codingmon","label":"Codingmon"}
         // Menü-Label aus der Registry (Besitzer: @shinon/locale-de); ohne
         // Locale-Dienst gilt die deutsche Tabelle.
         const MENU_DE = { 'menu.codingmon': 'Codingmon' };

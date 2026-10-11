@@ -29,7 +29,7 @@ window.__ModuleLoader__.load({
     // Locale-Dienst gilt der deutsche statische Wert. 't' wird in apply()
     // gebunden, weil erst dort ein ctx existiert; die Komponente liest pro
     // Rendern und folgt so dem aktiven Locale ohne Re-Registrierung.
-    // >>> shinon:dsh-idiom locale-fallback/static — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
+    // >>> shinon:dsh-idiom locale-fallback/static — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test) params={"table":"TOKEN_DE","key":"token.fallback","label":"Token: --"}
     const TOKEN_DE = { 'token.fallback': 'Token: --' };
     let t = (key) => TOKEN_DE[key] ?? key;
     // <<< shinon:dsh-idiom locale-fallback/static
@@ -60,7 +60,7 @@ window.__ModuleLoader__.load({
         registry.set('@shinon/token-usage', { label: 'Token-Nutzung', kind: 'client', panel: 'shinon-token-usage' });
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/token-usage' } }));
 
-        // >>> shinon:dsh-idiom locale-fallback/bind — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
+        // >>> shinon:dsh-idiom locale-fallback/bind — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test) params={"table":"TOKEN_DE"}
         // Gelesen wird `ctx.get?.('locale')`, NICHT `ctx.locale`: ein direkter
         // Dienst-Zugriff ist am Cordis-Proxy durch `inject` gesperrt und wirft
         // ('cannot get property "locale" without inject') — das kostete dieser
