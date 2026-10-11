@@ -1,0 +1,75 @@
+{
+  "id": "scoring-replay-demo",
+  "contracts": {
+    "scoring": "shinon.scoring-state/v1",
+    "profile": "shinon.technical-profile/v1",
+    "triggers": "shinon.skill-triggers/v1"
+  },
+  "note": "Aufgezeichneter Korrektur-Verlauf: sechs Korrekturen treiben correctness auf 0 (veröffentlicht nach der 3. und 6.), danach setzt relation.updated die Stufe trusted — ohne zu veröffentlichen (Kühlen: published ≠ raw nach dem 7.). Die expected-Werte sind eingefroren — ändert sich das Replay, wird dieser Test rot und der Vertrag muss bewusst nachgezogen werden.",
+  "initial": {
+    "scores": {
+      "correctness": 0.5,
+      "trust": 0.5
+    },
+    "published": {
+      "correctness": 0.5,
+      "trust": 0.5
+    },
+    "relation": "known",
+    "signals": 0,
+    "ignored": 0,
+    "signalsSincePublish": 0
+  },
+  "stream": [
+    {
+      "type": "feedback.correction",
+      "payload": { "session_id": "sess-1", "correction": "falscher Pfad" }
+    },
+    {
+      "type": "feedback.correction",
+      "payload": { "session_id": "sess-1", "correction": "falsche Zahl" }
+    },
+    {
+      "type": "feedback.correction",
+      "payload": { "session_id": "sess-1", "correction": "falscher Befehl" }
+    },
+    {
+      "type": "feedback.correction",
+      "payload": { "session_id": "sess-1", "correction": "falscher Schluss" }
+    },
+    {
+      "type": "feedback.correction",
+      "payload": { "session_id": "sess-1", "correction": "falscher Ton" }
+    },
+    {
+      "type": "feedback.correction",
+      "payload": { "session_id": "sess-1", "correction": "falscher Test" }
+    },
+    {
+      "type": "relation.updated",
+      "payload": { "session_id": "sess-1", "relation": "trusted" }
+    }
+  ],
+  "expected": {
+    "scorecard": {
+      "scores": {
+        "correctness": 0.01,
+        "trust": 0.2203
+      },
+      "published": {
+        "correctness": 0,
+        "trust": 0.2146
+      },
+      "relation": "trusted",
+      "signals": 7,
+      "ignored": 0
+    },
+    "injection": {
+      "trigger": "correction-caution",
+      "skill": "caution",
+      "text": "Achtung: zuletzt korrigiert — erst prüfen, dann behaupten.",
+      "reason": "TRIGGER:correction-caution"
+    },
+    "digest": "sc_d6b3d4377a06e5e9"
+  }
+}

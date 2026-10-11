@@ -141,9 +141,9 @@ test('persona: die Übergänge sind genau die Event-Typen, die die Persona model
 });
 
 test('persona: jeder modellierte Typ ist ein Typ des Spines, und die Lücke ist benannt', () => {
-  // Teilmenge, nicht Gleichheit: der Spine spricht vierzehn Typen, die Persona
-  // neun. Ein Typ, den die Persona einführt und der Spine nicht kennt, wäre eine
-  // zweite Sprache — und muss rot sein.
+  // Teilmenge, nicht Gleichheit: der Spine spricht zweiundzwanzig Typen, die
+  // Persona zehn. Ein Typ, den die Persona einführt und der Spine nicht kennt,
+  // wäre eine zweite Sprache — und muss rot sein.
   for (const type of PERSONA_EVENT_TYPES) {
     assert.ok(SPINE_EVENTS.includes(type), `${type} ist kein Event-Typ des Spines`);
   }
@@ -154,6 +154,8 @@ test('persona: jeder modellierte Typ ist ein Typ des Spines, und die Lücke ist 
     SPINE_EVENTS.filter((type) => !PERSONA_EVENT_TYPES.includes(type)).sort(),
     [
       'developer.message',
+      'feedback.approval',
+      'feedback.correction',
       'inbox.spliced',
       'request.header',
       'session.titled',
@@ -239,10 +241,11 @@ test('persona: Baseline ist der dokumentierte Ausgangszustand', () => {
     mood: 'idle',
     capabilities: ['analysis', 'verification'],
     limitations: [],
+    relation: 'known',
   });
 });
 
-test('persona: jeder der neun Übergänge ergibt den dokumentierten Zustand', () => {
+test('persona: jeder statische Übergang ergibt den dokumentierten Zustand', () => {
   const expected = {
     'session.created': ['curious', []],
     'message.received': ['curious', []],
@@ -287,7 +290,31 @@ test('persona: session.created setzt den Zustand zurück', () => {
   assert.equal(state.mood, 'curious');
 });
 
-test('persona: der Kontext trägt genau die sechs Felder plus Stimme', () => {
+test('persona: relation.updated liest die Stufe aus dem Event (nur lesend)', () => {
+  const start = bundle.initialState(contract);
+  assert.equal(start.relation, 'known');
+
+  const trusted = bundle.deriveState(contract, start, 'relation.updated', { relation: 'trusted' });
+  assert.equal(trusted.changed, true);
+  assert.equal(trusted.state.relation, 'trusted');
+  assert.equal(trusted.state.mood, start.mood, 'kein statischer Stimmungswechsel');
+
+  const same = bundle.deriveState(contract, trusted.state, 'relation.updated', { relation: 'trusted' });
+  assert.equal(same.changed, false, 'dieselbe Stufe ist keine Änderung');
+
+  const unknown = bundle.deriveState(contract, start, 'relation.updated', { relation: 'trust+1' });
+  assert.equal(unknown.changed, false);
+  assert.equal(unknown.reason, 'UNKNOWN_RELATION');
+  assert.deepEqual(unknown.state, start);
+
+  // Der echte Bundle-Pfad: Event auf dem Spine-Kanal aktualisiert den Kontext.
+  const host = connect();
+  host.dispatch('shinon/event', { event_type: 'relation.updated', relation: 'anchor' });
+  assert.equal(host.stateOf().relation, 'anchor');
+  host.dispose();
+});
+
+test('persona: der Kontext trägt genau die sieben Felder plus Stimme', () => {
   const context = bundle.renderStateContext(contract, bundle.initialState(contract));
   const parsed = bundle.stateFromContext(context);
   assert.deepEqual(Object.keys(parsed), STATE_FIELDS);
@@ -314,6 +341,7 @@ test('persona: apply registriert die Identity-Abschnitte und einen Zustandsabsch
     mood: 'idle',
     capabilities: ['analysis', 'verification'],
     limitations: [],
+    relation: 'known',
   });
   host.dispose();
 });

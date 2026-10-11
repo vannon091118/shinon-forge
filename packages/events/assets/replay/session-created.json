@@ -269,6 +269,48 @@
         "contract": "shinon.event-spine/v1",
         "trace_id": "trc_7f29246f9d9f"
       }
+    },
+    {
+      "signal": "shinon/feedback/correction",
+      "payload": { "session_id": "sess-1", "correction": "falscher Pfad, richtig: docs/INDEX.md" },
+      "expect": {
+        "event_id": "evt_bd3ad4aced33ace8",
+        "event_type": "feedback.correction",
+        "session_id": "sess-1",
+        "source": "shinon.feedback",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:1bd8c8d03ee63a98",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_dd706fc2fb0b"
+      }
+    },
+    {
+      "signal": "shinon/feedback/approval",
+      "payload": { "session_id": "sess-1", "approval": "so passt es" },
+      "expect": {
+        "event_id": "evt_eb10717813b0eaae",
+        "event_type": "feedback.approval",
+        "session_id": "sess-1",
+        "source": "shinon.feedback",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:00013e86eb7dba9c",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_93ea8e07c7ba"
+      }
+    },
+    {
+      "signal": "shinon/relation/updated",
+      "payload": { "session_id": "sess-1", "relation": "trust+1" },
+      "expect": {
+        "event_id": "evt_da44cda841488464",
+        "event_type": "relation.updated",
+        "session_id": "sess-1",
+        "source": "shinon.relation",
+        "timestamp": "2026-10-07T12:00:00.000Z",
+        "payload_ref": "sha256:3f974d0f5a5daf5e",
+        "contract": "shinon.event-spine/v1",
+        "trace_id": "trc_8fd7496a0720"
+      }
     }
   ],
   "ignored": [

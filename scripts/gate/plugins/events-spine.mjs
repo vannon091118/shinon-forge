@@ -53,6 +53,9 @@ export const ENVELOPE_FIELDS = [
  * `step.start`/`step.end` sind dabei eine Korrektur: sie hingen vorher an
  * tool.requested/tool.completed und hätten damit bei jedem Schritt einen
  * Tool-Aufruf behauptet, den es nicht gab.
+ *
+ * Dazu drei shinon-eigene Signaltypen für die Scoring-Schicht: `feedback.*`
+ * (Korrektur/Zustimmung aus dem Verlauf) und `relation.updated` (Beziehungsstand).
  */
 export const EVENT_TYPES = [
   'session.created',
@@ -74,6 +77,9 @@ export const EVENT_TYPES = [
   'gate.passed',
   'gate.failed',
   'action.blocked',
+  'feedback.correction',
+  'feedback.approval',
+  'relation.updated',
 ];
 
 /** Verwerfungsgründe der Laufzeit — nur diese Codes darf die Fixture nennen. */

@@ -47,6 +47,9 @@
       "events-spine": {
         "prefixes": ["packages/events/", "docs/contracts/events.json", "docs/probes/events-spine.json", "profiles/"]
       },
+      "scoring": {
+        "prefixes": ["packages/scoring/", "scripts/gate/plugins/scoring.mjs", "scripts/gate/tests/scoring.test.mjs", "profiles/"]
+      },
       "markers": {
         "prefixes": ["packages/markers/", "docs/contracts/markers.json", "profiles/", "scripts/gate/plugins/markers.mjs", "scripts/gate/tests/markers.test.mjs"]
       },

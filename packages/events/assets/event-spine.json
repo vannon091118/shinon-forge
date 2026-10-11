@@ -48,7 +48,10 @@
     "shinon/tool/completed": "tool.completed",
     "shinon/gate/passed": "gate.passed",
     "shinon/gate/failed": "gate.failed",
-    "shinon/action/blocked": "action.blocked"
+    "shinon/action/blocked": "action.blocked",
+    "shinon/feedback/correction": "feedback.correction",
+    "shinon/feedback/approval": "feedback.approval",
+    "shinon/relation/updated": "relation.updated"
   },
   "carrier": {
     "signal": "session/event",
@@ -231,6 +234,21 @@
       "source": "shinon.policy",
       "phase": "verdict",
       "payload": ["session_id", "action", "reason"]
+    },
+    "feedback.correction": {
+      "source": "shinon.feedback",
+      "phase": "feedback",
+      "payload": ["session_id", "correction"]
+    },
+    "feedback.approval": {
+      "source": "shinon.feedback",
+      "phase": "feedback",
+      "payload": ["session_id", "approval"]
+    },
+    "relation.updated": {
+      "source": "shinon.relation",
+      "phase": "relation",
+      "payload": ["session_id", "relation"]
     }
   },
   "forbidden": [

@@ -1,0 +1,10 @@
+{
+  "contract": "shinon.technical-profile/v1",
+  "note": "Das Technik-Profil: was diese Schicht kann und welche Skills sie auslösen darf. Ein Trigger feuert nur, wenn sein Skill hier steht — sonst wird er übersprungen.",
+  "capabilities": ["read", "verify"],
+  "skills": ["caution", "autonomy", "briefing"],
+  "limits": {
+    "maxTriggers": 3,
+    "note": "Mehr als drei Trigger trägt kein Vertrag — die Liste bleibt eine Entscheidung, kein Katalog."
+  }
+}

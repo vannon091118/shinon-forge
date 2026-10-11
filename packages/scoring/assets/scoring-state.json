@@ -1,0 +1,36 @@
+{
+  "contract": "shinon.scoring-state/v1",
+  "note": "Der Scoring-Vertrag: Dimensionen, Event-Wirkung, Vergessen und Kühlen. Konservativ gegen Reward-Sparsität (0–3 Signale/Session): Korrekturen wiegen schwerer als Zustimmung, altes Evidence verblasst langsam (decay), und die Injektion liest nur veröffentlichte Werte — veröffentlicht wird alle cooling.interval Signale, nicht pro Event.",
+  "dimensions": {
+    "correctness": { "initial": 0.5, "min": 0, "max": 1 },
+    "trust": { "initial": 0.5, "min": 0, "max": 1 }
+  },
+  "events": {
+    "feedback.approval": {
+      "payload": ["session_id", "approval"],
+      "delta": { "correctness": 0.06, "trust": 0.03 }
+    },
+    "feedback.correction": {
+      "payload": ["session_id", "correction"],
+      "delta": { "correctness": -0.09, "trust": -0.05 }
+    },
+    "relation.updated": {
+      "payload": ["session_id", "relation"],
+      "relation": true
+    }
+  },
+  "decay": {
+    "rate": 0.02,
+    "toward": "initial",
+    "note": "Pro bekanntem Event wandert jede Dimension um rate Richtung initial — VOR dem Delta. Vergessen ist langsam: ein einzelnes altes Lob sperrt keinen Wert."
+  },
+  "cooling": {
+    "interval": 3,
+    "note": "Veröffentlicht (published) wird alle 3 Signale. Die Injektionsentscheidung liest nur published — eine Session mit 1–2 Signalen ändert noch keinen Eingriff."
+  },
+  "relation": {
+    "levels": ["stranger", "known", "trusted", "anchor"],
+    "initial": "known",
+    "note": "relation.updated setzt genau eine benannte Stufe; Unbenanntes wird fail-closed ignoriert."
+  }
+}
