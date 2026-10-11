@@ -64,8 +64,14 @@ import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 /** Vertragsname des Index. */
 export const CONTRACT = 'shinon.project-index/v1';
 
-/** Fassung des Schemas; ein anderer Wert macht einen vorhandenen Index ungueltig. */
-export const SCHEMA_VERSION = 1;
+/**
+ * Fassung des Schemas; ein anderer Wert macht einen vorhandenen Index ungueltig.
+ *
+ * Angehoben von 1 auf 2 (Zug 2): die Ablage `memory` ist eine neue Tabelle im
+ * Index. Nach der Regel dieses Kopfes erhoeht eine Tabellenaenderung diese Zahl
+ * — sonst benutzte ein bestehender Index still die alte Form.
+ */
+export const SCHEMA_VERSION = 2;
 
 /**
  * Fassung der EXTRAKTION — der Grund, warum es diesen Marker gibt:
@@ -95,6 +101,40 @@ export const PRIMARY_TABLES = ['files', 'symbols', 'edges', 'references', 'touch
 
 /** Die Volltextspiegelung der Chunks. */
 export const FTS_TABLE = 'chunks_fts';
+
+/**
+ * Die Ablage der NICHT herleitbaren Daten (Zug 2).
+ *
+ * Warum eine eigene Tabelle und nicht ein Feld im Index: alles andere in dieser
+ * Datei ist ABGELEITET — Dateien, Symbole, Kanten, Chunks entstehen aus dem
+ * Projekt und sind aus ihm wieder herstellbar (SCHEMA_VERSION steigt, der
+ * naechste Lauf baut sie neu). Was hier liegt, ist das Gegenteil: die
+ * Bewertungen des Menschen, ihre Zuordnung und der daraus gerechnete Stand
+ * lassen sich nirgends nachlesen. Ein Index-Neuaufbau darf sie deshalb NICHT
+ * verwerfen — die Ablage traegt ihre eigene Fassung (MEMORY_VERSION), und nur
+ * deren Wechsel wirft sie weg.
+ *
+ * Der Index kennt den INHALT nicht: eine Zeile ist ein Namensraum, eine Art,
+ * ein Schluessel und ein JSON-Dokument. Was darin steht, ist Sache des Lesers
+ * (der Scoring-Host legt dort Protokoll, Merkzettel und Tafel ab). Diese
+ * Trennung ist der Grund, warum die Ablage kein zweites Scoring-Schema im
+ * Index versteckt: der Index transportiert, der Leser versteht.
+ *
+ * GRENZE, benannt: je Signal wird der ganze Namensraum neu geschrieben. Die
+ * Zeilenzahl ist die Zahl der Signale eines Projekts (gemessen: zweistellig je
+ * Sitzung, nicht je Token) — der Aufwand waechst mit dem Protokoll und ist
+ * damit bewusst nicht inkrementell. Ein inkrementelles Append braucht stabile
+ * Zeilen-Identitaeten ueber Laeufe hinweg; die gibt es heute nicht.
+ */
+export const MEMORY_TABLE = 'memory';
+
+/**
+ * Fassung der ABLAGE (nicht des Index und nicht der Extraktion).
+ * Erhoehen heisst: die Zeilenform der Ablage hat sich geaendert und ein alter
+ * Stand waere nicht mehr lesbar — dann wird die Ablage verworfen, nicht der
+ * Index (und umgekehrt: SCHEMA_VERSION verwirft den Index, nicht die Ablage).
+ */
+export const MEMORY_VERSION = 1;
 
 /** Verzeichnisse, die nie betreten werden: Fremdcode, Historie, Sitzungsdaten. */
 export const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', '.cache', 'storages', 'coverage', '.turbo']);
@@ -353,6 +393,10 @@ export const SCHEMA = [
   `create table if not exists chunks(path text not null, start_line integer not null, end_line integer not null, body text not null, primary key(path, start_line))`,
   `create virtual table if not exists ${FTS_TABLE} using fts5(path, body, tokenize = 'porter')`,
   `create table if not exists ${SECRET_TABLE}(path text not null, line integer not null, kind text not null, primary key(path, line, kind))`,
+  // Die Ablage: ein Namensraum, eine Art ('record' | 'memo' | 'summary'), ein
+  // Schluessel und ein JSON-Dokument. `ordinal` ordnet die Zeilen eines
+  // Protokolls, `doc` ist der Vertrag des Lesers — hier steht kein Feld davon.
+  `create table if not exists ${MEMORY_TABLE}(namespace text not null, kind text not null, ref text not null, ordinal integer not null default 0, doc text not null, primary key(namespace, kind, ref))`,
 ];
 
 /** Projektkennung: stabil ueber Laeufe, abhaengig vom aufgeloesten Pfad. */
@@ -705,6 +749,7 @@ export function openIndex(file) {
     contract: metaValue(db, 'contract'),
     schema_version: metaValue(db, 'schema_version'),
     indexer_version: metaValue(db, 'indexer_version'),
+    memory_version: metaValue(db, 'memory_version'),
   };
   // Ein LEERER Index ist kein fremder Index: geprueft wird nur, was schon gebaut war.
   const built = stored.contract !== null || stored.schema_version !== null;
@@ -718,12 +763,19 @@ export function openIndex(file) {
     for (const table of [FTS_TABLE, SECRET_TABLE, ...PRIMARY_TABLES]) db.exec(`drop table if exists "${table}"`);
   }
 
+  // Die Ablage wird NUR von ihrer eigenen Fassung verworfen. Der Neuaufbau oben
+  // trifft sie ausdruecklich nicht: was aus dem Projekt wieder herstellbar ist,
+  // darf ein Fassungssprung kosten — was der Mensch geurteilt hat, nicht.
+  if (stored.memory_version !== null && stored.memory_version !== String(MEMORY_VERSION)) {
+    db.exec(`drop table if exists ${MEMORY_TABLE}`);
+  }
   for (const statement of SCHEMA) db.exec(statement);
   // Eine Datei, die gerade Tabellen verloren hat, traegt deren Bytes noch. Der
   // Index ist abgeleitete Kopie — ein Neuzusammenzug kostet hier nur Zeit.
   if (rebuilt) db.exec('vacuum');
   setMeta(db, 'schema_version', String(SCHEMA_VERSION));
   setMeta(db, 'indexer_version', String(INDEXER_VERSION));
+  setMeta(db, 'memory_version', String(MEMORY_VERSION));
   setMeta(db, 'contract', CONTRACT);
   return db;
 }
@@ -734,6 +786,7 @@ export function indexMeta(db) {
     contract: metaValue(db, 'contract'),
     schema_version: metaValue(db, 'schema_version'),
     indexer_version: metaValue(db, 'indexer_version'),
+    memory_version: metaValue(db, 'memory_version'),
     root: metaValue(db, 'root'),
     symbols_digest: metaValue(db, 'symbols_digest'),
     updated_at_ms: metaValue(db, 'updated_at_ms'),
@@ -1054,6 +1107,96 @@ export function indexStats(db) {
 export function secretFindings(db, path) {
   const sql = `select path, line, kind from ${SECRET_TABLE}${path === undefined ? '' : ' where path = ?'} order by path, line`;
   return path === undefined ? db.prepare(sql).all() : db.prepare(sql).all(path);
+}
+
+/**
+ * Die Ablage EINES Namensraums lesen — `null`, wenn dort nichts steht.
+ *
+ * Drei Zusagen halten den Unterschied zwischen „leer" und „kaputt":
+ *
+ *   keine Zeile   `null`. Kein erfundenes leeres Protokoll: "hier war noch
+ *                 nichts" ist eine andere Aussage als "hier stand nichts mehr".
+ *   kaputte Zeile GEZAEHLT und uebergangen (`broken`), nicht geworfen: ein
+ *                 einzelner unlesbarer Eintrag darf die ganze Ablage nicht
+ *                 unbrauchbar machen — und still verschwinden darf er auch
+ *                 nicht. Der Aufrufer nennt die Zahl im Protokoll.
+ *   Reihenfolge   folgt `ordinal`, nicht der Einfuegereihenfolge: dieselbe
+ *                 Folge von Signalen ergibt dieselbe Tafel, auch ueber einen
+ *                 Neustart hinweg.
+ *
+ * Was ein Dokument BEDEUTET, weiss diese Funktion nicht — sie liefert die drei
+ * Arten getrennt zurueck und ueberlaesst das Lesen dem Aufrufer.
+ */
+export function readMemory(db, namespace) {
+  const rows = db
+    .prepare(`select kind, ref, ordinal, doc from ${MEMORY_TABLE} where namespace = ? order by kind asc, ordinal asc, ref asc`)
+    .all(namespace);
+  if (rows.length === 0) return null;
+  const records = [];
+  const memos = [];
+  let summary = null;
+  let broken = 0;
+  for (const row of rows) {
+    let doc;
+    try {
+      doc = JSON.parse(row.doc);
+    } catch {
+      broken += 1;
+      continue;
+    }
+    if (row.kind === 'record') records.push({ ordinal: row.ordinal, doc });
+    else if (row.kind === 'memo') memos.push(doc);
+    else if (row.kind === 'summary') summary = doc;
+    else broken += 1;
+  }
+  return {
+    records: records.sort((a, b) => a.ordinal - b.ordinal).map((entry) => entry.doc),
+    memos,
+    scorecard: summary?.scorecard ?? null,
+    notes: typeof summary?.notes === 'number' ? summary.notes : 0,
+    broken,
+  };
+}
+
+/**
+ * Die Ablage EINES Namensraums schreiben — ein Aufruf, eine Transaktion.
+ *
+ * Der Aufruf ERSETZT den Namensraum: was nicht mehr in `state` steht, ist
+ * danach nicht mehr da. Genau das braucht ein Widerruf — die Zeile faellt weg,
+ * und niemand rechnet daneben ein Gegen-Delta. Faellt irgendetwas um, rollt die
+ * Transaktion zurueck: ein halb geschriebener Stand waere schlimmer als der
+ * alte, weil er wie ein ganzer aussieht.
+ *
+ * Die drei Arten sind bewusst die einzigen: `record` (eine Zeile des
+ * Protokolls, mit `ordinal` in der Reihenfolge des Eingangs), `memo` (Zustand
+ * je Sitzung, geschluesselt nach `ref`) und `summary` (der Stand, der aus dem
+ * Protokoll folgt). Ein Dokument ohne Nummer ist hier nicht vorgesehen.
+ */
+export function writeMemory(db, namespace, state = {}) {
+  const records = Array.isArray(state?.records) ? state.records : [];
+  const memos = Array.isArray(state?.memos) ? state.memos : [];
+  const summary = { scorecard: state?.scorecard ?? null, notes: typeof state?.notes === 'number' ? state.notes : 0 };
+  db.exec('begin');
+  try {
+    db.prepare(`delete from ${MEMORY_TABLE} where namespace = ?`).run(namespace);
+    const insert = db.prepare(`insert into ${MEMORY_TABLE}(namespace, kind, ref, ordinal, doc) values (?, ?, ?, ?, ?)`);
+    let written = 0;
+    records.forEach((record, index) => {
+      insert.run(namespace, 'record', String(index), index, JSON.stringify(record ?? null));
+      written += 1;
+    });
+    memos.forEach((memo, index) => {
+      insert.run(namespace, 'memo', String(memo?.id ?? index), 0, JSON.stringify(memo ?? null));
+      written += 1;
+    });
+    insert.run(namespace, 'summary', '', 0, JSON.stringify(summary));
+    written += 1;
+    db.exec('commit');
+    return written;
+  } catch (error) {
+    db.exec('rollback');
+    throw error;
+  }
 }
 
 /**

@@ -153,9 +153,22 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - Reload helpers were removed (2026-10-10: three files, no callers, stale `web`-profile target). HMR runs through the DSH process itself.
 - `token-usage` and `better-errors` are config-only (their `apply()` only logs); `openapi`
   has a contract but no server and is **not** enabled in the profile. `dashboard` is **not**
-  a placeholder: it reads the real `workspaces`/`sessions` services (evidence:
+  a  placeholder: it reads the real `workspaces`/`sessions` services (evidence:
   `docs/probes/workspace-list.json`). The `dead-package` gate flags any package missing from
   the profile.
+- The Project Index offers **two** narrow capabilities, each with its own contract name:
+  `shinon_index_query` (`resolveContext`, Plan §14/§17 — the MAX context) and
+  `shinon_index_store` (`load`/`save` on one namespace, `shinon.project-index/store-v1` — the
+  Scoring's durable memory, Zug 2). Never widen the first one: the context seam is pinned by
+  test to exactly `['contract', 'resolveContext']`, so a *second* narrow service is the
+  answer, never a bigger one. The `memory` table is the only part of the index that is **not**
+  derived from the project (judgements, their subject, the computed scorecard), so a
+  `SCHEMA_VERSION` rebuild drops the index tables **only**, while `MEMORY_VERSION` invalidates
+  the memory: a new index table raises `SCHEMA_VERSION`, a new memory column or row kind
+  raises `MEMORY_VERSION`. Both sides of each seam are pinned from outside by
+  `scripts/gate/tests/context-wiring.test.mjs` (names) and
+  `scripts/gate/tests/scoring-memory.test.mjs` (behaviour: signal → value → restart →
+  retraction → late criticism → corrupt index).
 - Documentation: every Markdown file carries a status block, and hard numbers (packages,
   layers, test counts, versions) have exactly **one** owner. Read `docs/INDEX.md` §2 and
   `docs/ZAHLEN.md` before writing a number into any document — nothing in the gate

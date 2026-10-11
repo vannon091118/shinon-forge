@@ -17,6 +17,15 @@ import { readFileSync } from 'node:fs';
  * DSH selbst schreibt (Urteil je Antwort, Widerruf, Sitzungsbemerkung,
  * Menschen-Text, Turn-Ende). Was intern keine Quelle hat, steht in der Tabelle
  * als nicht beobachtbar — und wird nie geraten.
+ *
+ * DIE ABLAGE (Zug 2): dieser Host SCHREIBT SELBST NICHTS — kein Dateisystem,
+ * keine Datenbank, kein `Date.now` (das Gate haelt das fest). Der Stand geht
+ * ueber den zweiten, schmalen Dienst des Projekt-Index (`shinon_index_store`,
+ * `shinon.project-index/store-v1`) in die SQLite, die der Index ohnehin fuer das
+ * Projekt fuehrt — und wird beim Start von dort wieder gelesen. Fehlt der Dienst
+ * (ein Profil ohne Project Index) oder ist er unbrauchbar, rechnet das Scoring
+ * unveraendert im Speicher weiter: die Ablage ist eine Verstaerkung, keine
+ * Bedingung.
  */
 
 export {
@@ -35,7 +44,24 @@ export {
   translateSignal,
   createSignalCollector,
 } from './assets/scoring-core.js';
-import { initialState as coreInitialState, createSignalCollector } from './assets/scoring-core.js';
+import { canonicalize, initialState as coreInitialState, createSignalCollector } from './assets/scoring-core.js';
+
+/**
+ * Die Naht zur Ablage (Zug 2) — als Namen an EINER Stelle, weil kein Paket das
+ * andere liest: der Projekt-Index fuehrt `STORE_SERVICE`/`STORE_CONTRACT` mit
+ * demselben Wortlaut, und `scripts/gate/tests/context-wiring.test.mjs` pinnt die
+ * Gleichheit beider Seiten. Ein Literal hier und eines dort waeren zwei
+ * Wahrheiten; gepinnt sind sie eine.
+ */
+export const INDEX_STORE_SERVICE = 'shinon_index_store';
+export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
+
+/**
+ * Der Namensraum der Ablage: EIN Namensraum je Projekt, und der Index gehoert
+ * genau einem Projekt (die Datei ist aus dem Wurzelpfad gehasht). Deshalb steht
+ * hier kein zweiter Projektbezeichner — der Ort ist die Zuordnung.
+ */
+export const LEDGER_NAMESPACE = 'shinon.scoring/ledger-v1';
 
 /** Leere Scorecard: der Stub läuft dann lesend, aber ohne Werte. */
 const EMPTY_SCORING = { contract: 'shinon.scoring-state/unloaded', dimensions: {}, events: {}, relation: { levels: [], initial: null } };
@@ -90,7 +116,105 @@ export function apply(ctx, config) {
 
   const initial = coreInitialState(scoring);
   const dimensions = Object.keys(initial.scores).length;
-  const collector = createSignalCollector({ contracts, rules });
+
+  // ── Die Ablage: das dauerhafte Gedaechtnis ────────────────────────────────
+  //
+  // Vier Fail-Richtungen, jede benannt — und keine davon haelt den Host an:
+  //
+  //   kein Dienst       kein Gedaechtnis in diesem Profil. Das Scoring rechnet
+  //                     im Speicher weiter, als waere nichts: kein Fehler.
+  //   fremder Dienst    wer den Namen traegt, muss den Vertrag UND beide
+  //                     Operationen tragen. Sonst wird er nicht benutzt.
+  //   nicht lesbar      LEER starten (die Tafel steht bei initial) mit dem
+  //                     GRUND im Protokoll. Ein kaputter Index darf den Host
+  //                     nicht anhalten — und nicht so tun, als sei er heil.
+  //   nicht schreibbar  warnen und weiterrechnen: der laufende Prozess ist
+  //                     wichtiger als die Ablage.
+  // Einmal gefunden, bleibt gefunden. Ein NICHT gefundener Dienst wird dagegen
+  // erneut gefragt: die Mount-Reihenfolge eines Profils ist keine Zusage, und
+  // eine Abfrage ist ein Nachschlagen im Dienstverzeichnis — kein Aufwand.
+  let store = null;
+  const resolveStore = () => {
+    if (store !== null) return store;
+    let found = null;
+    try {
+      found = typeof ctx?.get === 'function' ? ctx.get(INDEX_STORE_SERVICE) ?? null : null;
+    } catch (error) {
+      console.warn(`[shinon-scoring] Ablage nicht abfragbar (${error?.message ?? error}) — der Stand bleibt im Speicher`);
+      found = null;
+    }
+    if (
+      found !== null &&
+      (found.contract !== INDEX_STORE_CONTRACT || typeof found.load !== 'function' || typeof found.save !== 'function')
+    ) {
+      console.warn(`[shinon-scoring] Fremder Dienst unter ${INDEX_STORE_SERVICE} (Vertrag ${String(found?.contract)}) — der Stand bleibt im Speicher`);
+      found = null;
+    }
+    store = found;
+    return store;
+  };
+
+  /** Den gemeldeten Stand in die Ablage schreiben — reine Weitergabe plus Spur. */
+  const writeState = (snapshot) => {
+    const target = resolveStore();
+    if (target === null) return;
+    let answer;
+    try {
+      answer = target.save(LEDGER_NAMESPACE, snapshot);
+    } catch (error) {
+      console.warn(`[shinon-scoring] Ablage nicht beschreibbar (${error?.message ?? error}) — der Stand bleibt im Speicher`);
+      return;
+    }
+    if (answer === null || typeof answer !== 'object' || answer.ok !== true) {
+      console.warn(`[shinon-scoring] Ablage nicht beschreibbar (${answer?.error ?? 'unbekannte Antwort'}) — der Stand bleibt im Speicher`);
+    }
+  };
+
+  const collector = createSignalCollector({ contracts, rules, onPersist: writeState });
+
+  /**
+   * Den Stand EINMAL aus der Ablage holen.
+   *
+   * WARUM NICHT NUR IM `apply`: die Reihenfolge, in der ein Profil seine
+   * Bundles mountet, ist keine Zusage. Der erste echte Gebrauch liegt sicher
+   * hinter ALLEN Mounts — deshalb wird hier geladen, wenn der Dienst schon da
+   * ist, und sonst beim ersten Lesen erneut gefragt. Danach ist die Frage
+   * entschieden: ein Profil ohne Index zahlt dafuer je Ereignis EIN Nachschlagen
+   * im Dienstverzeichnis, sonst nichts.
+   */
+  let memoryLoaded = false;
+  const loadState = () => {
+    if (memoryLoaded) return null;
+    const target = resolveStore();
+    if (target === null) return null;
+    memoryLoaded = true;
+    let answer;
+    try {
+      answer = target.load(LEDGER_NAMESPACE);
+    } catch (error) {
+      console.warn(`[shinon-scoring] Stand nicht lesbar (${error?.message ?? error}) — Start ohne Gedaechtnis`);
+      return null;
+    }
+    if (answer === null || typeof answer !== 'object' || answer.ok !== true) {
+      console.warn(`[shinon-scoring] Stand nicht lesbar (${answer?.error ?? 'unbekannte Antwort'}) — Start ohne Gedaechtnis`);
+      return null;
+    }
+    const state = answer.state;
+    if (state === null || state === undefined) return null;
+    const adopted = collector.hydrate(state);
+    // Die gespeicherte Tafel ist EVIDENZ, nicht Wahrheit: sie muss mit der
+    // Rechnung uebereinstimmen. Weicht sie ab, gilt das Protokoll — es ist die
+    // Quelle — und die Abweichung steht im Protokoll, statt still zu bleiben.
+    if (state.scorecard !== null && state.scorecard !== undefined && canonicalize(state.scorecard) !== canonicalize(collector.scorecard())) {
+      console.warn('[shinon-scoring] Gespeicherte Tafel weicht von der Rechnung ab — die Rechnung gilt, das Protokoll ist die Wahrheit');
+    }
+    if (adopted.rejected > 0) {
+      console.warn(`[shinon-scoring] ${adopted.rejected} unlesbare Eintraege in der Ablage uebergangen`);
+    }
+    console.log(`[shinon-scoring] Stand geladen: ${adopted.records} Signale, ${adopted.memos} offene Sitzungen, ${state.notes ?? 0} Bemerkungen`);
+    return adopted;
+  };
+  loadState();
 
   /**
    * Die Ohren: der Spine emittiert `(envelope, payload)` auf dem Kanal. Zwei
@@ -106,6 +230,10 @@ export function apply(ctx, config) {
     try {
       const dispose = ctx.on(config.eventsChannel, (envelope, payload) => {
         try {
+          // Die Ablage erscheint spaetestens mit dem ersten Ereignis sicher da:
+          // mountet das Profil den Index NACH dem Scoring, wird der Stand hier
+          // nachgeholt. Danach ist die Frage entschieden (memoryLoaded).
+          if (!memoryLoaded) loadState();
           collector.observe(envelope, payload);
         } catch (error) {
           console.warn(`[shinon-scoring] Signal verworfen (${error?.name ?? 'Error'}: ${error?.message ?? error})`);
@@ -125,16 +253,41 @@ export function apply(ctx, config) {
       `Ohren auf ${config.eventsChannel}: ${sources} Quellen, ${signals} Signale` +
       `${listening === null ? ' (NICHT angebunden — die Tafel bleibt stehen)' : ''}`,
   );
+  // Eine Zeile fuer die Ablage, und zwar die WAHRHEIT: sie nennt den gefundenen
+  // Dienst nur, wenn er wirklich einer ist (Vertrag geprueft).
+  console.log(
+    `[shinon-scoring] Ablage: ${resolveStore() === null ? `kein Gedaechtnis (${INDEX_STORE_SERVICE} nicht angeboten — der Stand bleibt im Speicher)` : `${INDEX_STORE_SERVICE} (${INDEX_STORE_CONTRACT}, Namensraum ${LEDGER_NAMESPACE})`}`,
+  );
 
   return {
     contracts,
     initial,
     collector,
     /** Ein Ereignis von Hand zufuehren (Tests, Replay, naechster Zug). */
-    observe: (envelope, payload) => collector.observe(envelope, payload),
-    scorecard: () => collector.scorecard(),
+    observe: (envelope, payload) => {
+      if (!memoryLoaded) loadState();
+      return collector.observe(envelope, payload);
+    },
+    /** Den Stand aus der Ablage laden (fuer Tests und einen spaeten Mount). */
+    loadState,
+    // JEDE Abfrage des Standes holt ihn vorher, wenn das noch nicht geschehen
+    // ist: mountet das Profil den Index nach dem Scoring, findet der erste
+    // LESER den Stand — nicht erst das erste Ereignis.
+    /** Der ganze Stand — Protokoll, Merkzettel, Tafel, Bemerkungen. */
+    state: () => {
+      if (!memoryLoaded) loadState();
+      return collector.state();
+    },
+    scorecard: () => {
+      if (!memoryLoaded) loadState();
+      return collector.scorecard();
+    },
     dispose: () => {
       if (listening !== null) listening();
+      // Sitzungen enden mit dem Prozess: erst schliessen (die Ablage traegt den
+      // Rest), dann den Speicher leeren. Umgekehrt waere der Merkzettel weg,
+      // ohne dass ihn jemand abgeschlossen haette.
+      collector.closeAllSessions();
       collector.dispose();
       console.log('[shinon-scoring] Deaktiviert');
     },

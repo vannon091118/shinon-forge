@@ -223,10 +223,15 @@ test('scoring-signale: der Merkzettel je Sitzung ist begrenzt und wird aufgeräu
   assert.deepEqual(collector.sessions().sort(), ['sess-a', 'sess-b']);
   assert.equal(collector.session('sess-a').previousQuestion, QUESTION);
 
-  // Ein neues Sitzungsereignis setzt genau diese Sitzung zurück.
+  // Ein neues Sitzungsereignis SCHLIESSEN diese Sitzung ab: der Merkzettel geht
+  // (und es entsteht keine leere Hülle — sonst sammelte sich über die Laufzeit
+  // eine Zeile je Sitzung an), die andere Sitzung bleibt unberührt.
   collector.observe({ event_type: 'session.created', session_id: 'sess-a' }, { session_id: 'sess-a' });
-  assert.equal(collector.session('sess-a').previousQuestion, '');
+  assert.equal(collector.session('sess-a'), null, 'eine abgeschlossene Sitzung hinterlässt keinen Merkzettel');
   assert.equal(collector.session('sess-b').previousQuestion, QUESTION);
+  // Und dieselbe Frage gilt danach wieder als erste Frage, nicht als Wiederholung.
+  const reopened = collector.observe(...Object.values(human(QUESTION, { id: 'msg-neu', sessionId: 'sess-a' })));
+  assert.equal(reopened.outcome.reason, 'FIRST_QUESTION');
 
   // Der Host kann aufräumen; die Evidenz (das Protokoll) bleibt davon unberührt.
   const records = collector.stats().records;
@@ -237,6 +242,101 @@ test('scoring-signale: der Merkzettel je Sitzung ist begrenzt und wird aufgeräu
   collector.dispose();
   assert.deepEqual(collector.sessions(), []);
   assert.equal(collector.stats().records, 0);
+});
+
+// ── 4b. Die Ablage: der Kern MELDET, der Host schreibt ───────────────────────
+
+/** Ein Sammler mit einem Sink, der die Meldungen mitschreibt (der Host in klein). */
+const collectorWithSink = () => {
+  const seen = [];
+  const collector = core.createSignalCollector({ contracts, rules, onPersist: (snapshot) => seen.push(snapshot) });
+  return { collector, seen };
+};
+
+test('scoring-ablage: der Kern meldet seinen Stand, statt ihn zu schreiben', () => {
+  const { collector, seen } = collectorWithSink();
+  assert.equal(seen.length, 0, 'ohne Ereignis kein Schreibvorgang');
+
+  collector.observe(...Object.values(rating('ans-1', 'positive')));
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].why, 'score', 'der Grund steht mit dabei');
+  assert.equal(seen[0].records.length, 1);
+  assert.equal(seen[0].records[0].subject, 'ans-1', 'die Zuordnung geht mit in die Ablage');
+  assert.deepEqual(seen[0].scorecard, collector.scorecard(), 'gemeldet wird die Tafel, die gilt');
+
+  // Eine Bemerkung ändert die Tafel nicht, aber den Stand — also wird sie gemeldet.
+  collector.observe(...Object.values(note()));
+  assert.equal(seen.at(-1).why, 'note');
+  assert.equal(seen.at(-1).notes, 1);
+
+  // Ein unbekanntes Ereignis ändert nichts — und wird deshalb nicht gemeldet.
+  const before = seen.length;
+  collector.observe(envelope('mood.changed'), { session_id: 'sess-1' });
+  assert.equal(seen.length, before, 'kein Schreibvorgang ohne Änderung');
+
+  // Der Widerruf meldet den Stand OHNE die Zeile — die Ablage trägt die Wahrheit.
+  collector.observe(...Object.values(retract('ans-1')));
+  assert.equal(seen.at(-1).why, 'retract');
+  assert.equal(seen.at(-1).records.length, 0);
+});
+
+test('scoring-ablage: der geladene Stand trägt den ganzen Weg (Neustart im Kern)', () => {
+  const source = collectorOf();
+  source.observe(...Object.values(rating('ans-1', 'positive')));
+  source.observe(...Object.values(human(QUESTION)));
+  const snapshot = source.state();
+  assert.equal(snapshot.records.length, 1);
+  assert.equal(snapshot.memos.length, 1);
+
+  // Ein frischer Sammler, derselbe Stand: gleiche Tafel, gleiches Protokoll,
+  // gleicher Merkzettel — und der Widerruf wirkt danach genauso exakt.
+  const fresh = collectorOf();
+  assert.deepEqual(fresh.hydrate(snapshot), { records: 1, memos: 1, rejected: 0 });
+  assert.deepEqual(fresh.scorecard(), source.scorecard());
+  assert.equal(fresh.state().records[0].subject, 'ans-1');
+  assert.equal(fresh.session('sess-1').previousQuestion, QUESTION);
+  fresh.observe(...Object.values(retract('ans-1')));
+  assert.deepEqual(fresh.scorecard().scores, { correctness: 0.5, trust: 0.5 });
+});
+
+test('scoring-ablage: ein fremder Stand wird gezählt und fallengelassen (fail-closed)', () => {
+  const source = collectorOf();
+  source.observe(...Object.values(rating('ans-1', 'positive')));
+  source.observe(...Object.values(human(QUESTION)));
+  const good = source.state();
+  assert.equal(good.memos.length, 1, 'ein Merkzettel mit Frage ist ein Stand');
+
+  const fresh = collectorOf();
+  const adopted = fresh.hydrate({
+    ...good,
+    records: [good.records[0], { nur: 'unsinn' }, null],
+    memos: [...good.memos, { ohne: 'id' }],
+  });
+  // Drei Fremdkörper: zwei ohne Ereignisform (darunter ein null) und einer ohne Sitzung.
+  assert.deepEqual(adopted, { records: 1, memos: 1, rejected: 3 }, 'was keine Zeile ist, wird gezählt');
+  assert.equal(fresh.stats().dropped, 3, 'und ist nicht still verschwunden');
+  assert.equal(fresh.scorecard().scores.correctness, 0.56, 'die eine echte Zeile wird gerechnet');
+  // Ein ganz fremder Stand ergibt einen leeren, aber laufenden Sammler.
+  const stranger = collectorOf();
+  assert.deepEqual(stranger.hydrate({ records: 'kein Feld', memos: 7 }), { records: 0, memos: 0, rejected: 0 });
+  assert.deepEqual(stranger.scorecard().scores, { correctness: 0.5, trust: 0.5 });
+});
+
+test('scoring-ablage: das Ende des Hosts schließt die Sitzungen und wird gemeldet', () => {
+  const { collector, seen } = collectorWithSink();
+  collector.observe(...Object.values(human(QUESTION)));
+  assert.equal(seen.at(-1).why, 'memo', 'der Merkzettel geht in die Ablage');
+  const before = seen.length;
+
+  assert.equal(collector.closeAllSessions(), 1);
+  assert.equal(seen.length, before + 1, 'das Ende des Hosts wird gemeldet');
+  assert.equal(seen.at(-1).why, 'session-end');
+  assert.equal(seen.at(-1).memos.length, 0, 'kein Merkzettel überlebt das Ende');
+  assert.equal(seen.at(-1).records.length, 0, 'und es wird nichts erfunden');
+
+  // Nichts offen, nichts zu melden: ein leeres Aufräumen ist keine Änderung.
+  assert.equal(collector.closeAllSessions(), 0);
+  assert.equal(seen.length, before + 1);
 });
 
 // ── 5. Die Tabelle ist deckelfrei und der Kern bleibt rein ───────────────────
