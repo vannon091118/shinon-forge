@@ -47,6 +47,27 @@ export const SnapshotSchema = z.object({
   }),
   /** Zeitstempel des Clients (ISO-8601), falls er einen mitschickt. */
   savedAt: z.string().optional(),
+  /**
+   * Abgeschlossene Agent-Schritte, wie der Client sie zuletzt vom Host gelesen
+   * hat (`readActivity`). Der Client besitzt die Zahl persistent (localStorage
+   * plus dieser Spiegel); der Host zaehlt fluichtig und fuellt beim Mergen auf.
+   * Default 0: ein Stand der Fassung 2 ohne dieses Feld bleibt lesbar.
+   */
+  completions: z.number().int().nonnegative().default(0),
+  /**
+   * Das wilde Codemon, wie der Client es sieht — oder `null`. Der Kampf selbst
+   * (`battle`) bleibt reine Browsersache und geht nicht auf die Platte des
+   * Hosts; das Wild schon, damit ein Neustart es nicht verdampfen laesst (J2).
+   */
+  wild: z.object({
+    /** Spezies-Schluessel (Client-Vokabular, hier nur Text). */
+    speciesId: z.string().min(1),
+    /** Stufe des Wilden (ganzzahlig, mindestens 1). */
+    level: z.number().int().min(1),
+    /** Verbleibende und maximale HP (Zahlen, keine BigInt). */
+    hp: z.number().nonnegative(),
+    maxHp: z.number().positive(),
+  }).nullable().default(null),
 });
 
 /**
@@ -56,6 +77,21 @@ export const SnapshotSchema = z.object({
 export const StoredSnapshotSchema = SnapshotSchema.extend({
   /** Zeitstempel des HOSTS: nicht Teil des Spielstands, nur Nachweis des Schreibvorgangs. */
   storedAt: z.string(),
+});
+
+/**
+ * Der Aktivitaetsstand des Hosts (die Antwort auf `readActivity`). Reine
+ * Primitiven aus der Host-Realm: Typert lehnt Realm-fremde Prototypen ab, und
+ * auf der Leitung gibt es ohnehin keine. Der Client entscheidet daraus rein
+ * (`spawnFor`), ob ein Ball faellt.
+ */
+export const ActivitySchema = z.object({
+  /** Abgeschlossene Agent-Schritte seit dem Start des Hosts (plus Spiegel-Startwert). */
+  completions: z.number().int().nonnegative(),
+  /** Laeuft gerade ein Agent (`running`-Status gesehen, `idle` noch nicht). */
+  running: z.boolean(),
+  /** Zeitstempel der Antwort (ISO-8601, Host-Uhr). */
+  at: z.string(),
 });
 
 /**

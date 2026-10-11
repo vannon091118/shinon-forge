@@ -66,7 +66,13 @@ async function boot(mediumRoot) {
   return ctx;
 }
 
-/** Ein Stand, wie ihn der Client spaeter schickt. */
+/**
+ * Ein Stand, wie ihn der Client spaeter schickt — Fassung 2 PLUS die
+ * Wild-Felder (J2): `completions`/`wild` gehoeren seit dem Wild-Spawn zum
+ * Vertrag (`snapshot-schema.js`), mit Default 0/null. Die Fixture nennt sie
+ * explizit, damit `deepEqual` den VOLLEN Datensatz prueft statt die Defaults
+ * zu uebersehen.
+ */
 const snapshot = (over = {}) => ({
   schemaVersion: 2,
   species: 'nullpointer',
@@ -78,6 +84,8 @@ const snapshot = (over = {}) => ({
   hits: 12,
   loot: { schrott: 3, brauchbar: 1, shiny: 0 },
   savedAt: '2026-10-08T10:00:00.000Z',
+  completions: 0,
+  wild: null,
   ...over,
 });
 
@@ -119,6 +127,8 @@ test('Zusage: ein Stand, der den Vertrag verletzt, wirft und beruehrt das Medium
     { name: 'negative Siege', over: { wins: -1 } },
     { name: 'Beute-Stufe fehlt', over: { loot: { schrott: 0, brauchbar: 0 } } },
     { name: 'Spezies leer', over: { species: '' } },
+    { name: 'Wild ohne Stufe', over: { wild: { speciesId: 'nullpointer', level: 0, hp: 10, maxHp: 10 } } },
+    { name: 'negative Schrittzahl', over: { completions: -2 } },
   ];
   for (const { name, over } of broken) {
     await assert.rejects(() => store1.write(snapshot(over)), name);

@@ -239,6 +239,13 @@ window.__ModuleLoader__.load({
       return svg;
     }
 
+    // >>> generated-sprites — Quelle: packages/codingmon/assets/sprites/*.grid (schreiben: `node scripts/assets/build-sprites.mjs --embed`; prueft: packages/codingmon/test/sprites.test.mjs)
+    const SPRITE_GRIDS = {"bufferoverflow-back":"................................\n................................\n................................\n................................\n................................\n................................\n.............KKKKKKK............\n...........KKKPPPPPKKK..........\n..........KKPPPPPPPPPKK.........\n.........KKPPPPPPPPPPPKK........\n........KKPPPPPPPPPPPPPKK.......\n........KPPPPPPPPPPPPPPPK.......\n.......KKPPPPPPPPPPPPPPPKK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KKPPPPPPPPPPPPPPPKK......\n.......KKPPPPPPPPPPPPPPPK.......\n.......KKKPPPPPPPPPPPPPKK.......\n.......K.KKPPPPPPPPPPPKKK.......\n.......K..KKPPPPPPPPPKK.K.V.....\n.......K...KKKPPPPPKKK..KV......\n.......KPPPPPKKKKKKKPPPKK.......\n.......KPPPPPPPPPPPPPPPPK.......\n.......KPPPPPPPPPPPPPPPPK.......\n.......KKKKKKKKKKKKKKKKKK.......\n................................\n................................\n................................\n................................","bufferoverflow-front":"................................\n................................\n................................\n................................\n................................\n................................\n.............KKKKKKK............\n...........KKKVVVVVKKK..........\n..........KKVVVVVVVVVKK.........\n.........KKVVVVVVVVVVVKK........\n........KKVVVVVVVVVVVVVKK.......\n........KVVVVVVVVVVVVVVVK.......\n.......KKVVVVVVVVVVVVVVVKK......\n.......KVVVVKWKVVVKWKVVVVK......\n.......KVVVVWKWVVVWKWVVVVK......\n.......KVVVVKWKVVVKWKVVVVK......\n.......KVVVVVVVVVVVVVVVVVK......\n.......KVVVVVVVVVVVVVVVVVK......\n.....VVVVVVVVVVVVVVVVVVVKK......\n.....K.KKVVVVVVVVVVVVVVVVVV.....\n.......KKKVVVVVVVVVVVVVKK.K.....\n.......K.KKVVVVVVVVVVVKKK.......\n.......K..KKVVVVVVVVVKK.K.......\n.......K...KKKVVVVVKKK..K.......\n.......KPPPPPKKKKKKKPPPPK.......\n.......KPPPPPPPPPPPPPPPPK.......\n.......KPPPPPPPPPPPPPPPPK.......\n.......KKKKKKKKKKKKKKKKKK.......\n................................\n................................\n................................\n................................","deadlock-back":"................................\n................................\n................................\n................................\n................................\n..........V.....V....V..........\n..........K.....K....K..........\n........KKKKKKKKKKKKKKKK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KKKKKKKKKKKKKKKK........\n........KKKKKKKKKKKKKKKK........\n........KKKKKKKKKKKKKKKK........\n........KKKKKKKKKKKKKKKK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK.V......\n........KPPPPPPPPPPPPPPKV.......\n........KPPPPPPPPPPPPPKK........\n........KPPPPPPPPPPPPPPK........\n........KKKKKKKKKKKKKKKK........\n................................\n................................\n................................\n................................\n................................","deadlock-front":"................................\n................................\n................................\n................................\n...........IIIIIIIIII...........\n...........IIIIIIIIII...........\n...........I........I...........\n........KKKKKKKKKKKKKKKK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPKWKPPPKWKPPK........\n........KPPPWKWPPPWKWPPK........\n........KPPPKWKPPPKWKPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KKKKKKKKKKKKKKKK........\n........KKIIIIIIIIIIIIKK........\n........KKIIIIIIIIIIIIKK........\n........KKKKKKKKKKKKKKKK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KKKKKKKKKKKKKKKK........\n................................\n................................\n................................\n................................\n................................","heisenbug-back":"................................\n................................\n................................\n................................\n................................\n................................\n...........V........V...........\n...........K........K...........\n..........K.K.K.K.K.K.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.V.......\n...........P.P.P.P.P.P.V........\n.........KP.P.P.P.P.PKK.........\n..........K.K.K.K.K.K.K.........\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................","heisenbug-front":"................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n..........K.K.K.K.K.K.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.PWK.PWK.P.K.........\n...........P.KKP.KKP.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n...........P.P.P.P.P.P..........\n.........KP.P.P.P.P.P.K.........\n..........K.K.K.K.K.K.K.........\n................................\n................................\n................................\n................................\n................................\n................................\n................................\n................................","memoryleak-back":"................................\n................................\n................................\n................................\n............V.......V...........\n............KKKKKKKKK...........\n...........KKKPPPPPKKK..........\n..........KKPPPPPPPPPKK.........\n.........KKPPPPPPPPPPPKK........\n........KKPPPPPPPPPPPPPKK.......\n........KPPPPPPPPPPPPPPPK.......\n.......KKPPPPPPPPPPPPPPPKK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KPPPPPPPPPPPPPPPPPK......\n.......KKPPPPPPPPPPPPPPPKK......\n........KPPPPPPPPPPPPPPPK.V.....\n........KKPPPPPPPPPPPPPKKV......\n.........KKPPPPPPPPPPPKKK.......\n..........KKPPPPPPPPPKK.........\n..........PKKKPPPPPKKKP.........\n..........P..KKKPKKK..P.........\n..........P.....P.....K.........\n..........K.....P...............\n................P...............\n................K...............\n................................\n................................\n................................\n................................","memoryleak-front":"................................\n................................\n................................\n................................\n................................\n.............KKKKKKK............\n...........KKKVVVVVKKK..........\n..........KKVVVVVVVVVKK.........\n.........KKVWVVVVVVVVVKK........\n........KKVWVVVVVVVVVVVKK.......\n........KVVVVVVVVVVVVVVVK.......\n.......KKVVVVVVVVVVVVVVVKK......\n.......KVVVVKWKVVVKWKVVVVK......\n.......KVVVVWKWVVVWKWVVVVK......\n.......KVVVVKWKVVVKWKVVVVK......\n.......KVVVVVVVVVVVVVVVVVK......\n.......KVVVVVVVVVVVVVVVVVK......\n.......KKVVVVVVVVVVVVVVVKK......\n........KVVVVVVVVVVVVVVVK.......\n........KKVVVVVVVVVVVVVKK.......\n.........KKVVVVVVVVVVVKK........\n..........KKVVVVVVVVVKK.........\n..........VKKKVVVVVKKKV.........\n..........V..KKKVKKK..V.........\n..........V.....V.....K.........\n..........K.....V...............\n................V...............\n................K...............\n................................\n................................\n................................\n................................","nullpointer-back":"................................\n................................\n................................\n................................\n................................\n..........V.....V.....V.........\n..........K.....K.....K.........\n...............KPK..............\n..............KPPPK.............\n.............KPPPPPK............\n............KPPPPPPPK...........\n...........KPPPPPPPPPK..........\n..........KPPPPPKPPPPPK.........\n.........KPPPPPKPKPPPPPK........\n........KPPPPPKPPPKPPPPPK.......\n.......KPPPPPKPPPPPKPPPPPK......\n......KPPPPPKPPPPPPPKPPPPPK.....\n.......KPPPPPKPPPPPKPPPPPK......\n........KPPPPPKPPPKPPPPPK.......\n.........KPPPPPKPKPPPPPK........\n..........KPPPPPKPPPPPK.........\n...........KPPPPPPPPPK..........\n............KPPPPPPPK......V....\n.............KPPPPPK......V.....\n..............KPPPK.....KK......\n...............KPK..............\n................K...............\n................................\n................................\n................................\n................................\n................................","nullpointer-front":"................................\n................................\n................................\n.............IIIIIII............\n................I...............\n...............I................\n................K...............\n...............KVK..............\n..............KVWVK.............\n.............KVVVVVK............\n............KVVVVVVVK...........\n...........KVVVVVVVVVK..........\n..........KVVVVVVVVVVVK.........\n.........KVVVVKKKKKVVVVK........\n........KVVVVKKVVVKKVVVVK.......\n.......KVVVVVKVVVVVKVVVVVK......\n......KVVVVVVKVVKVVKVVVVVVK.....\n.......KVVVVVKVVVVVKVVVVVK......\n........KVVVVKKVVVKKVVVVK.......\n.........KVVVVKKKKKVVVVK........\n..........KVVVVVVVVVVVK.........\n...........KVVVVVVVVVK..........\n............KVVVVVVVK...........\n.............KVVVVVK............\n..............KVWVK.............\n...............KVK..............\n................K...............\n................................\n................................\n................................\n................................\n................................","offbyone-back":"................................\n................................\n................................\n...............V................\n...............K................\n.............KKKKKK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPKKKKK.........\n.............KPPPPKPPPK.........\n.............KPPPPKKKKK.........\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.............\n.............KPPPPK.V...........\n.............KPPPPKV............\n.............KPPPKK.............\n.............KPPPPK.............\n.............KKKKKK.............\n................................\n................................\n................................\n................................\n................................","offbyone-front":"................................\n................................\n................................\n................................\n................................\n.............KKKKKK.............\n.............KIIIIK.............\n.............KKKKKK.............\n.............KIIIIK.............\n.............KIKWKK.............\n.............KIWKWK.............\n.............KIKWKK.............\n.............KIIIIKKKKK.........\n.............KIIIIKWWWK.........\n.............KIIIIKKKKK.........\n.............KIIIIK.............\n.............KIIIIK.............\n.............KIIIIK.............\n.............KIIIIK.............\n.............KIIIIK.............\n.............KIIIIK.............\n.............KIIIIK.............\n.............KIIIIK.............\n.............KIIIIK.............\n.............KIIIIK.............\n.............KIIIIK.............\n.............KKKKKK.............\n................................\n................................\n................................\n................................\n................................","racecondition-back":"................................\n................................\n................................\n...........V.......V............\n...........K.......K............\n..........KP........KP..........\n..........KP........KP..........\n...........KP......KP...........\n...........KP......KP...........\n............KP....KP............\n............KP....KP............\n............KP....KP............\n.............KP..KP.............\n.............KP..KP.............\n.............KP..KP.............\n..............KPKP..............\n..............KPKP..............\n...............KP...............\n...............KP...............\n...............KP...............\n..............KPKP..............\n..............KPKP..............\n..............KPKP.......V......\n.............KP..KP.....V.......\n.............KP..KP...KK........\n............KP....KP............\n............KP....KP............\n................................\n................................\n................................\n................................\n................................","racecondition-front":"................................\n................................\n................................\n................................\n................................\n..........KI........KV..........\n..........KI........KV..........\n...........KI......KV...........\n...........KI......KV...........\n............KI....KV............\n............KI....KV............\n............KWK...KV............\n............WKW..KV.............\n............KWK..KV.............\n.............KI..KV.............\n..............KIKV..............\n..............KIKKWK............\n...............KVWKW............\n...............KVKWK............\n...............KV...............\n..............KVKI..............\n..............KVKI..............\n..............KVKI..............\n.............KV..KI.............\n.............KV..KI.............\n............KV....KI............\n............KV....KI............\n................................\n................................\n................................\n................................\n................................","recursion-back":"................................\n................................\n................................\n................................\n........V..............V........\n........K..............K........\n......KKKKKKKKKKKKKKKKKKKK......\n......K..................K......\n......K..................K......\n......K..PPPPPPPPPPPPPP..K......\n......K..P............P..K......\n......K..P............P..K......\n......K..P..PPPPPPPP..P..K......\n......K..P..PKKKKKKP..P..K......\n......K..P..PKKKKKKP..P..K......\n......K..P..PKKKKKKP..P..K......\n......K..P..PKKKKKKP..P..K......\n......K..P..PKKKKKKP..P..K......\n......K..P..PKKKKKKP..P..K......\n......K..P..PPPPPPPP..P..K......\n......K..P............P..K......\n......K..P............P..K......\n......K..PPPPPPPPPPPPPP..K.V....\n......K..................KV.....\n......K.................KK......\n......KKKKKKKKKKKKKKKKKKKK......\n................................\n................................\n................................\n................................\n................................\n................................","recursion-front":"................................\n................................\n................................\n................................\n................................\n................................\n......KKKKKKKKKKKKKKKKKKKK......\n......KW.................K......\n......K..................K......\n......K..VVVVVVVVVVVVVV..K......\n......K..VW...........V..K......\n......K..V............V..K......\n......K..V..IIIIIIII..V..K......\n......K..V..IKKKKKKI..V..K......\n......K..V..IKKKKKKI..V..K......\n......K..V..IKKKWKKI..V..K......\n......K..V..IKKWKWKI..V..K......\n......K..V..IKKKWKKI..V..K......\n......K..V..IKKKKKKI..V..K......\n......K..V..IIIIIIII..V..K......\n......K..V............V..K......\n......K..V............V..K......\n......K..VVVVVVVVVVVVVV..K......\n......K..................K......\n......K..................K......\n......KKKKKKKKKKKKKKKKKKKK......\n................................\n................................\n................................\n................................\n................................\n................................","segfault-back":"................................\n................................\n................................\n................................\n................................\n..........K...........K.........\n...........P.........P..........\n...........P.........P..........\n............P...K...P...........\n............P...P...P...........\n.............P..P..P............\n.............P.KKK.P..K.........\n..........KP.KKKKKKKPP..........\n............PKKKKKKK............\n............KKKKKKKKK...........\n.....KPPPPPPKKKKKKKKKPPPPPPK....\n............KKKKKKKKK...........\n.............KKKKKKK............\n...........PPKKKKKKKPP..........\n..........K...PKKK.P..K.........\n.............P..P..P......V.....\n.............P..P...P....V......\n............P...K...P..KK.......\n............P........P..........\n...........P.........P..........\n...........K..........K.........\n................................\n................................\n................................\n................................\n................................\n................................","segfault-front":"................................\n................................\n................................\n................................\n................................\n..........K...........K.........\n...........V.........V..........\n...........V.........V..........\n............V...K...V...........\n............V...V...V...........\n............KKKKVKKKK...........\n.............V.KKK.V..K.........\n..........KV.KKKKKKKVV..........\n............VKWKKKWK............\n............KWKWKWKWK...........\n.....KVVVVVVKKWKKKWKKVVVVVVK....\n............KKKKKKKKK...........\n.............KKKKKKK............\n...........VVKKKKKKKVV..........\n..........K...VKKK.V..K.........\n.............V..V..V............\n.............V..V...V...........\n............V...K...V...........\n............V........V..........\n...........V.........V..........\n...........K..........K.........\n................................\n................................\n................................\n................................\n................................\n................................","stackoverflow-back":"................................\n................................\n................................\n................................\n............V......V............\n............K......K............\n............KKKKKKKK............\n............KPPPPPPK............\n............KPPPPPPK............\n............KKKKKKKK............\n............KPPPPPPK............\n............KPPPPPPK............\n............KKKKKKKK............\n..........KKKKKKKKKKKK..........\n..........KPPPPPPPPPPK..........\n..........KPPPPPPPPPPK..........\n..........KPPPPPPPPPPK..........\n..........KPPPPPPPPPPK..........\n..........KPPPPPPPPPPK..........\n..........KKKKKKKKKKKK..........\n........KKKKKKKKKKKKKKKK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK.V......\n........KPPPPPPPPPPPPPPKV.......\n........KPPPPPPPPPPPPPKK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KKKKKKKKKKKKKKKK........\n................................\n................................\n................................\n................................","stackoverflow-front":"................................\n................................\n................................\n................................\n................................\n................................\n............KKKKKKKK............\n............KPPPPPPK............\n............KKWKPKWK............\n............KWKWPWKW............\n............KKWKPKWK............\n............KPPPPPPK............\n............KKKKKKKK............\n..........KKKKKKKKKKKK..........\n..........KPPPPPPPPPPK..........\n..........KPPPPPPPPPPK..........\n..........KPPPPPPPPPPK..........\n..........KPPPPPPPPPPK..........\n..........KPPPPPPPPPPK..........\n..........KKKKKKKKKKKK..........\n........KKKKKKKKKKKKKKKK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KWPPPPPPPPPPPPPK........\n........KWPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KPPPPPPPPPPPPPPK........\n........KKKKKKKKKKKKKKKK........\n................................\n................................\n................................\n................................"};
+    // <<< generated-sprites
+    // >>> generated-ui — Quelle: packages/codingmon/assets/ui/*.svg (schreiben: `node scripts/assets/build-sprites.mjs --embed`; prueft: packages/codingmon/test/sprites.test.mjs)
+    const UI_SVG = {"ball":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\" fill=\"none\" stroke=\"#A855F7\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"16\" cy=\"16\" r=\"13\"/><path d=\"M3.5,16h7M21.5,16h7\"/><circle cx=\"16\" cy=\"16\" r=\"4.5\"/><path d=\"M17.0,16.0L17.0,16.4L16.9,16.7L16.7,17.0L16.3,17.3L15.9,17.4L15.4,17.3L14.9,17.1L14.6,16.7L14.4,16.2L14.3,15.6L14.5,15.1L14.8,14.6L15.3,14.2L16.0,14.0L16.6,14.0L17.3,14.3L17.9,14.8L18.2,15.4L18.4,16.2L18.3,17.0L17.9,17.7L17.2,18.3L16.4,18.7L15.5,18.7L14.6,18.5L13.8,17.9L13.2,17.1L12.9,16.1L13.0,15.1L13.4,14.1\" stroke-width=\"1.2\"/></svg>\n","spiral":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\" fill=\"none\" stroke=\"#A855F7\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M17.0,16.0L17.1,16.2L17.2,16.5L17.2,16.8L17.1,17.1L16.9,17.4L16.6,17.7L16.3,17.9L15.9,18.1L15.4,18.2L14.9,18.1L14.4,18.0L14.0,17.7L13.5,17.3L13.2,16.8L12.9,16.2L12.8,15.6L12.8,14.9L13.0,14.2L13.3,13.6L13.8,13.0L14.4,12.5L15.1,12.1L15.9,11.8L16.8,11.8L17.7,11.9L18.6,12.2L19.4,12.7L20.1,13.4L20.7,14.2L21.1,15.2L21.3,16.2L21.2,17.3L21.0,18.4L20.5,19.5L19.8,20.4L18.9,21.2L17.8,21.8L16.6,22.2L15.3,22.3L14.0,22.2L12.7,21.8L11.5,21.1L10.5,20.2L9.6,19.0L9.0,17.7L8.7,16.2L8.6,14.7L8.9,13.2L9.5,11.8L10.4,10.4L11.6,9.3L13.0,8.4L14.6,7.8L16.3,7.6L18.0,7.7L19.7,8.1L21.3,8.9L22.7,10.1L23.9,11.5L24.8,13.1L25.3,15.0L25.5,16.9L25.2,18.8L24.6,20.7L23.6,22.5L22.2,24.0L20.5,25.2L18.6,26.0L16.5,26.5L14.3,26.5L12.2,26.1L10.2,25.2L8.3,23.9L6.8,22.3L5.5,20.3L4.8,18.1L4.4,15.8L4.6,13.4L5.2,11.1L6.3,8.9\"/></svg>\n","step-bestehen":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\" fill=\"none\" stroke=\"#A855F7\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"16\" cy=\"14\" r=\"8\"/><path d=\"M12.5,14l2.5,2.5L19.5,11\"/><path d=\"M9,22l-2,4M23,22l2,4M12,24.5l-1.5,4M20,24.5l1.5,4\"/></svg>\n","step-denken":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\" fill=\"none\" stroke=\"#A855F7\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8,6h13a5,5 0 0 1 5,5v5a5,5 0 0 1-5,5h-8l-4,4v-4H8a5,5 0 0 1-5-5v-5a5,5 0 0 1 5-5z\"/><circle cx=\"12\" cy=\"14\" r=\"0.6\" fill=\"#A855F7\"/><circle cx=\"16\" cy=\"14\" r=\"0.6\" fill=\"#A855F7\"/><circle cx=\"20\" cy=\"14\" r=\"0.6\" fill=\"#A855F7\"/></svg>\n","step-handeln":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\" fill=\"none\" stroke=\"#A855F7\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M17,3L8,17h6l-1,12L23,13h-6l0,-10z\"/></svg>\n","step-lernen":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\" fill=\"none\" stroke=\"#A855F7\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M16,8c-2.5,-2 -6,-2.5 -9,-1v15c3,-1.5 6.5,-1 9,1c2.5,-2 6,-2.5 9,-1V7c-3,-1.5 -6.5,-1 -9,1z\"/><path d=\"M16,8v15\"/></svg>\n","step-pruefen":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\" fill=\"none\" stroke=\"#A855F7\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"14\" cy=\"14\" r=\"8\"/><path d=\"M20,20l6,6\"/><path d=\"M11,14l2.2,2.2L17.5,12\"/></svg>\n"};
+    // <<< generated-ui
+
     // ── 1. ESKALATION (Spiegel des Host-Vertrags) ─────────────────
     // Bewusst dupliziert: Client- und Host-Bundle teilen keinen Code, und ein
     // Import quer ueber Pakete ist in diesem Repo nicht erlaubt. Die Probe
@@ -462,6 +469,37 @@ window.__ModuleLoader__.load({
     const bestMove = (level, speciesId) =>
       abilitiesFor(level, speciesId).slice().sort((a, b) => b.power - a.power)[0] ?? ABILITIES[0];
 
+    // ── SPAWN (Spiegel von assets/mechanik.js: SPAWN_EVERY/spawnFor/effectiveness)
+    // Bewusst dupliziert wie der Rest dieses Vertrags (siehe Abschnitt 1): das
+    // Bundle teilt keinen Code mit `assets/`. `durchstich.test.mjs` vergleicht
+    // beide Seiten Zahl fuer Zahl, damit die Dopplung nicht auseinanderlaeuft.
+    // WEG b (Zwischenloesung, freigegeben): Der Host meldet keine Schritte
+    // zurueck (der Remote-Beitrag ist clientseitig nicht mountbar — Liste fest
+    // einkompiliert), also zaehlt der Client LOKALE Arbeitsschritte
+    // (`localSteps`: jeder Token-Takt mit Ertrag ist einer). Rate und
+    // Determinismus bleiben: derselbe Zaehler ergibt dasselbe Wild.
+    const SPAWN_EVERY = 3;
+    const spawnFor = (completions, level) => {
+      const done = Math.max(0, Math.floor(completions ?? 0));
+      if (done <= 0 || done % SPAWN_EVERY !== 0) return null;
+      const lvl = Math.max(1, Math.floor(level ?? 1));
+      const speciesId = SPECIES_IDS[(done * 7 + 3) % SPECIES_IDS.length];
+      return {
+        speciesId,
+        element: SPECIES[speciesId].family,
+        level: Math.max(1, lvl + ((done % 3) - 1)),
+      };
+    };
+    /**
+     * Die Typwirkung als Zeichen statt Tabelle: dieselbe Zahl wie
+     * `resolveAttack` nachschlaegt, mit Symbol (`x1,5` + Pfeil). Die
+     * Kampfansicht zeigt das, keine Matrix.
+     */
+    const effectiveness = (attackerElement, defenderElement) => {
+      const factor = (ELEMENT_CHART[attackerElement] ?? ELEMENT_CHART.spark)[defenderElement] ?? 1;
+      return { factor, symbol: factor > 1 ? '▲' : factor < 1 ? '▼' : '●' };
+    };
+
     // ── 3. PACING (kuenstliche Rundendauer) ─────────────────────────────────
     const PACING = { delayMs: 3000, lockedText: 'Codermon ist im Kampf, warte auf das Ergebnis' };
     /**
@@ -526,6 +564,25 @@ window.__ModuleLoader__.load({
       losses: 0,
       round: 0,
       battle: null,
+      /**
+       * Abgeschlossene Agent-Schritte (J3) und das wilde Codemon (J2): Der Host
+       * zaehlt fluichtig, der Client besitzt die Zahl persistent — `pollActivity`
+       * hebt sie auf das Maximum, `toHost` spiegelt sie in den Spiegel. `wild`
+       * ist `null` oder `{ speciesId, level, hp, maxHp }`; der KAMPF (`battle`)
+       * bleibt Browsersache und geht nie auf die Platte des Hosts.
+       */
+      completions: 0,
+      wild: null,
+      /**
+       * WEG b: lokal gezaehlte Arbeitsschritte (ein Token-Takt mit Ertrag ist
+       * einer) und der Verbrauchsstand des Spawns. `spawnedAt` verhindert die
+       * Dauerschleife: Nach Kampf oder Flucht steht der Zaehler noch auf dem
+       * Vielfachen — ohne Marke kaeme der Ball sofort wieder.
+       */
+      localSteps: 0,
+      spawnedAt: 0,
+      /** Das letzte Kampfergebnis fuer `conversation.chat.turnTail` (oder null). */
+      lastResult: null,
       log: [],
       /**
        * Der Lebenslauf. `damageTotal` ist die Summe allen Schadens und wird als
@@ -560,13 +617,44 @@ window.__ModuleLoader__.load({
       if (!SPECIES[state.species]) state.species = SPECIES_IDS[0];
       if (!Number.isFinite(state.xp) || state.xp < 0) state.xp = 0;
       if (!Number.isFinite(state.round) || state.round < 0) state.round = 0;
+      // Ein korrupter Token-Hochstand schenkt einmalig XP (`peakTokens: -999`)
+      // oder legt die Bruecke still (kein Wert) — beides faellt auf 0 zurueck.
+      if (!Number.isFinite(state.peakTokens) || state.peakTokens < 0) state.peakTokens = 0;
+      if (!Number.isInteger(state.completions) || state.completions < 0) state.completions = 0;
+      if (!Number.isInteger(state.localSteps) || state.localSteps < 0) state.localSteps = 0;
+      if (!Number.isInteger(state.spawnedAt) || state.spawnedAt < 0) state.spawnedAt = 0;
+      // Ein Ergebnis aus einer fremden Fassung ist kein Ergebnis: Ausgang,
+      // Art und Stufe muessen stimmen, sonst steht im Chat ein Sieg ueber nichts.
+      const result = state.lastResult;
+      const resultOk = result !== null && typeof result === 'object'
+        && (result.outcome === 'win' || result.outcome === 'loss' || result.outcome === 'flee')
+        && SPECIES[result.speciesId] !== undefined
+        && Number.isInteger(result.level) && result.level >= 1;
+      state.lastResult = resultOk
+        ? { outcome: result.outcome, speciesId: result.speciesId, level: result.level, reward: Math.max(0, Math.floor(result.reward ?? 0)), at: result.at ?? null }
+        : null;
+      // Ein Wild aus einer fremden Fassung ist kein Wild: Art, Stufe und HP
+      // muessen stimmen, sonst steht hier ein Kampf gegen nichts (J2 ohne Luege).
+      const wild = state.wild;
+      const wildOk = wild !== null && typeof wild === 'object'
+        && SPECIES[wild.speciesId] !== undefined
+        && Number.isInteger(wild.level) && wild.level >= 1
+        && Number.isFinite(wild.hp) && wild.hp >= 0
+        && Number.isFinite(wild.maxHp) && wild.maxHp >= 1;
+      state.wild = wildOk
+        ? { speciesId: wild.speciesId, level: wild.level, hp: Math.min(wild.hp, wild.maxHp), maxHp: wild.maxHp }
+        : null;
       try {
         state.damageTotal = BigInt(raw?.damageTotal ?? 0);
       } catch {
         state.damageTotal = 0n;
       }
       if (state.damageTotal < 0n) state.damageTotal = 0n;
-      for (const key of ['hits', 'peakHit', 'digits', 'sinceShiny', 'rejections']) {
+      // Siege/Niederlagen stroemen in Anzeige UND Host-Spiegel: ein Stand mit
+      // `{wins:'viele'}` ergab sonst den Zaehler „viele1" (String-Concat statt
+      // Sieg) und fiel beim Host durch die Ganzzahl-Pruefung. Wie die Beute
+      // wird auch hier WERT geprueft, nicht nur Existenz.
+      for (const key of ['wins', 'losses', 'hits', 'peakHit', 'digits', 'sinceShiny', 'rejections']) {
         if (!Number.isFinite(state[key]) || state[key] < 0) state[key] = 0;
       }
       if (state.digits < 1) state.digits = 1;
@@ -585,6 +673,14 @@ window.__ModuleLoader__.load({
       const usable = battle !== null && typeof battle === 'object' && SPECIES[battle.speciesId]
         && Number.isFinite(battle.hp) && Number.isFinite(battle.maxHp);
       state.battle = usable ? battle : null;
+      // Das Log ist Anzeige, kein Vertrag: ein korrupter Eintrag (keine
+      // Zeichenkette, kein Array) wuerde die naechste Mutation (`note` streut
+      // das Log) oder die Kampf-Textbox (`TypeLine` schneidet zu) werfen
+      // lassen. Fremde Zeilen fallen weg, echte bleiben — vor dem Sperr-Zweig,
+      // der das Log ebenfalls streut.
+      state.log = Array.isArray(state.log)
+        ? state.log.filter((line) => typeof line === 'string').slice(0, 40)
+        : [];
       // Eine Sperre haengt an einem Timer, und der ueberlebt das Neuladen nicht.
       // Ein Stand mit gesetzter Sperre waere eine Wartezeit ohne Uhr: der Spieler
       // wartete fuer immer. Also faellt der Zug, und das Log sagt es.
@@ -631,6 +727,8 @@ window.__ModuleLoader__.load({
      */
     const HOST_NAMESPACE = 'codingmon';
     const HOST_METHOD = 'writeSnapshot';
+    /** Die Lese-Methode derselben Naht (Quelle: `assets/uebergabe.js`). */
+    const HOST_ACTIVITY_METHOD = 'readActivity';
     let clientCtx = null;
     let hostMirror = { sent: 0, lastAt: null, lastLevel: null, error: null, reason: 'kein Kanal' };
 
@@ -661,6 +759,13 @@ window.__ModuleLoader__.load({
           hits: store.hits,
           loot: { ...store.loot },
           savedAt: new Date().toISOString(),
+          completions: Math.max(0, Math.floor(store.completions)),
+          wild: store.wild === null ? null : {
+            speciesId: store.wild.speciesId,
+            level: store.wild.level,
+            hp: store.wild.hp,
+            maxHp: store.wild.maxHp,
+          },
         };
         // Die Methode liefert ein RemoteResult: { ok: true, value } oder
         // { ok: false, error }. Der Fehlerzweig ist ein ERGEBNIS, kein Wurf —
@@ -758,7 +863,90 @@ window.__ModuleLoader__.load({
 
     function tickTokens() {
       const gained = xpFromTokens();
-      if (gained > 0) award(gained, null);
+      if (gained > 0) {
+        award(gained, null);
+        // WEG b: Ertrag heisst Arbeit — ein lokaler Schritt, dann die Spawn-Pruefung.
+        store.localSteps += 1;
+        checkSpawn();
+        persist();
+        emit();
+      }
+    }
+
+    // ── Wild-Spawn und Herausforderung (WEG b) ─────────────────────────────
+    /**
+     * Die Spawn-Pruefung: deterministisch aus (`localSteps`, Stufe). Gibt es
+     * ein Wild, steht kein anderes, laeuft kein Kampf und ist dieser Stand
+     * noch nicht verbraucht, faellt der Ball. Reine Auswertung plus EIN
+     * Schreibvorgang — dieselbe Funktion treibt der Takt wie der Hand-Trigger.
+     */
+    function checkSpawn() {
+      const wild = spawnFor(store.localSteps, level());
+      if (wild === null || store.localSteps <= store.spawnedAt) return null;
+      if (store.wild !== null || store.battle !== null || store.lock !== null) return null;
+      const stats = statsAt(wild.speciesId, wild.level);
+      store.wild = { speciesId: wild.speciesId, level: wild.level, hp: stats.hp, maxHp: stats.hp };
+      store.spawnedAt = store.localSteps;
+      note(`Ein wilder ${SPECIES[wild.speciesId].label} L${wild.level} erscheint!`);
+      persist();
+      toHost();
+      emit();
+      return { ...store.wild };
+    }
+
+    /**
+     * Die Herausforderung: ein Klick auf das Wild oeffnet den Kampf — als Zug
+     * ueber die bestehende Sperre (`beginTurn('start', …)`), mit derselben
+     * verzoegerten Eroeffnung wie `startBattle`. Der Ball ist verbraucht,
+     * sobald der Zug steht.
+     */
+    function challengeWild() {
+      if (store.wild === null || store.battle !== null) return null;
+      if (!guard('challenge')) return null;
+      const wild = store.wild;
+      const stats = statsAt(wild.speciesId, wild.level);
+      const arena = {
+        speciesId: wild.speciesId,
+        element: SPECIES[wild.speciesId].family,
+        level: wild.level,
+        stats,
+        reward: rewardFor(wild.level),
+      };
+      const lock = beginTurn('start', { arena });
+      if (lock === null) return null;
+      store.wild = null;
+      store.round += 1;
+      note(`Du forderst ${SPECIES[wild.speciesId].label} L${wild.level} heraus!`);
+      persist();
+      return { locked: true, until: lock.until, arena };
+    }
+
+    /** Flucht vor dem Wilden: der Ball bleibt aus, bis der Zaehler weitergeht. */
+    function fleeWild() {
+      if (store.wild === null || store.battle !== null || store.lock !== null) return null;
+      const wild = store.wild;
+      store.wild = null;
+      note(`${SPECIES[wild.speciesId].label} entkommt — der Wald ist wieder still`);
+      persist();
+      emit();
+      return { fled: wild.speciesId };
+    }
+
+    /**
+     * Rueckzug aus dem Kampf (J4): abbrechbar, sobald der Agent fertig ist —
+     * und davor. Kein Sieg, keine Niederlage, volle HP. Nur ausserhalb eines
+     * laufenden Zuges.
+     */
+    function fleeBattle() {
+      const battle = store.battle;
+      if (battle === null || battle.over !== null || store.lock !== null) return null;
+      store.battle = null;
+      store.hp = maxHp();
+      store.lastResult = { outcome: 'flee', speciesId: battle.speciesId, level: battle.level, reward: 0, at: Date.now() };
+      note(`Rueckzug gegen ${SPECIES[battle.speciesId].label} L${battle.level} — das Codemon rappelt sich wieder auf`);
+      persist();
+      emit();
+      return { fled: battle.speciesId };
     }
 
     // ── 3. PACING: der Zug sperrt den Zustand ───────────────────────────────
@@ -966,6 +1154,14 @@ window.__ModuleLoader__.load({
      */
     function finish(outcome, battle) {
       battle.over = outcome;
+      // Das Ergebnis endet im Chat (`conversation.chat.turnTail` liest es).
+      store.lastResult = {
+        outcome,
+        speciesId: battle.speciesId,
+        level: battle.level,
+        reward: outcome === 'win' ? battle.reward : 0,
+        at: Date.now(),
+      };
       if (outcome === 'win') {
         store.wins += 1;
         const reward = battle.reward;
@@ -1025,6 +1221,45 @@ window.__ModuleLoader__.load({
       const tinted = svg.replace(/hsl\((\d+)/g, `hsl(${species.hue}`);
       spriteCache.set(key, tinted);
       return tinted;
+    }
+
+    /**
+     * Das ECHTE Sprite einer Spezies (Gen-1): Vorder-/Rueckseite aus dem
+     * eingebetteten 32x32-Gitter (`SPRITE_GRIDS`, Quelle:
+     * `assets/sprites/*.grid`, Drift-Test `sprites.test.mjs`). Ein `<rect>` je
+     * horizontalem Lauf — dieselbe Verdichtung wie der Generator. Die Palette
+     * ist hier als Literal wiederholt (Bundle ohne Import, siehe Abschnitt 1);
+     * Quelle: `scripts/assets/build-sprites.mjs` (PALETTE).
+     */
+    const GRID_PALETTE = { K: '#0B0F14', V: '#A855F7', P: '#7C3AED', I: '#6366F1', W: '#E0E7FF' };
+    function gridSvg(speciesId, side, size) {
+      const key = `grid:${speciesId}:${side}:${size}`;
+      const cached = spriteCache.get(key);
+      if (cached !== undefined) return cached;
+      const grid = SPRITE_GRIDS[`${speciesId}-${side}`] ?? SPRITE_GRIDS[`${SPECIES_IDS[0]}-${side}`] ?? SPRITE_GRIDS[`${SPECIES_IDS[0]}-front`];
+      const rows = grid.split('\n');
+      let pixels = '';
+      for (let y = 0; y < rows.length; y += 1) {
+        const row = rows[y];
+        let x = 0;
+        while (x < row.length) {
+          const ch = row[x];
+          if (ch === '.' || GRID_PALETTE[ch] === undefined) { x += 1; continue; }
+          let end = x + 1;
+          while (end < row.length && row[end] === ch) end += 1;
+          pixels += `<rect x="${x}" y="${y}" width="${end - x}" height="1" fill="${GRID_PALETTE[ch]}"/>`;
+          x = end;
+        }
+      }
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="${size}" height="${size}" `
+        + `shape-rendering="crispEdges" class="__cm_sprite" data-species="${speciesId}" data-side="${side}">${pixels}</svg>`;
+      spriteCache.set(key, svg);
+      return svg;
+    }
+    /** Das UI-SVG als Bild (`ball`, `spiral`, Schritt-Symbole aus UI_SVG). */
+    function uiSvg(name, size) {
+      const raw = UI_SVG[name] ?? UI_SVG.ball;
+      return raw.replace('<svg ', `<svg width="${size}" height="${size}" `);
     }
 
     // ── Das Pet als Marke ───────────────────────────────────────────────────
@@ -1127,95 +1362,10 @@ window.__ModuleLoader__.load({
             h('span', { className: '__cm_stat-v' }, formatNumber(value)))));
     }
 
-    /** Eine Seite der Arena: Figur, Name, Level, HP-Balken, Werte. */
-    function ArenaSide({ side, speciesId, level: lvl, hp, maxHp: top, stats: values }) {
-      return h('div', { className: `__cm_side __cm_side--${side}` },
-        h('span', { dangerouslySetInnerHTML: { __html: speciesGlyph(speciesId, lvl, 56) } }),
-        h('div', { className: '__cm_side-id' },
-          h('strong', null, SPECIES[speciesId].label),
-          h('span', { className: '__cm_sub' }, `L${lvl}`),
-          h(Bar, { value: hp, max: top, tone: side === 'enemy' ? 'enemy' : 'hp' }),
-          h('span', { className: '__cm_sub' },
-            `HP ${formatNumber(Math.max(0, hp))}/${formatNumber(top)} · ATK ${formatNumber(values.atk)} · DEF ${formatNumber(values.def)}`)),
-      );
-    }
-
-    /**
-     * Die Arena: Gegner, eigenes Codemon und die Knoepfe der Faehigkeiten.
-     * Ein Klick ist eine Runde. Ist der Gegner am Zug, sind die Knoepfe
-     * gesperrt — die Anzeige sagt, warum.
-     */
-    function Arena({ s, lvl, myStats, abilities, onUse, onStart, onRest }) {
-      const battle = s.battle;
-      const locked = s.lock !== null;
-      const myTurn = battle !== null && battle.over === null && battle.turn === 'challenger';
-      return h('section', { className: '__cm_arena' },
-        h('h3', null, 'Arena'),
-        // Die Sperre ist sichtbar: ein Balken, der genau die Vertragsdauer
-        // laeuft, der Absagesatz aus dem Vertrag und der Zaehler der kalten
-        // Abweisungen. Kein Klick wird eingereiht.
-        locked ? h('div', { className: '__cm_lock' },
-          h('span', { className: '__cm_lock-text' }, PACING.lockedText),
-          h('span', { className: '__cm_lock-track' },
-            h('span', { className: '__cm_lock-fill', style: { animationDuration: `${roundDelayMs}ms` } })),
-          h('span', { className: '__cm_sub' },
-            `Zug ${s.lock.action} — ${s.rejections} abgewiesene Eingabe${s.rejections === 1 ? '' : 'n'}`)) : null,
-        battle === null
-          ? h('p', { className: '__cm_sub' }, 'Kein Gegner. Ein Klick stellt einen — die Runde waechst mit jedem Kampf.')
-          : h('div', { className: '__cm_board' },
-            h(ArenaSide, {
-              side: 'enemy',
-              speciesId: battle.speciesId,
-              level: battle.level,
-              hp: battle.hp,
-              maxHp: battle.maxHp,
-              stats: battle.stats,
-            }),
-            h('span', { className: '__cm_vs' }, 'VS'),
-            h(ArenaSide, {
-              side: 'own',
-              speciesId: s.species,
-              level: lvl,
-              hp: s.hp,
-              maxHp: myStats.hp,
-              stats: myStats,
-            })),
-        h('div', { className: '__cm_actions' },
-          abilities.map((ability) => h('button', {
-            key: ability.id,
-            type: 'button',
-            className: '__cm_move',
-            disabled: locked || (battle !== null && !myTurn),
-            title: battle === null
-              ? 'Erst einen Gegner stellen'
-              : `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}${inheritedAbilities(s.species).includes(ability.id) ? ' · geerbt (Reine Linie)' : ''}`,
-            onClick: () => onUse(ability.id),
-          },
-            h('span', { className: '__cm_move-name' }, ability.label),
-            h('span', { className: '__cm_move-meta' },
-              `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}${inheritedAbilities(s.species).includes(ability.id) ? ' · Erbe' : ''}`))),
-        ),
-        h('div', { className: '__cm_actions' },
-          h('button', {
-            type: 'button',
-            className: '__cm_btn',
-            disabled: locked || battle !== null,
-            onClick: onStart,
-          }, battle === null ? 'Naechster Gegner' : `Gegner: ${SPECIES[battle.speciesId].label} L${battle.level}`),
-          h('button', {
-            type: 'button',
-            className: '__cm_btn',
-            disabled: locked || battle !== null,
-            onClick: onRest,
-          }, 'Rast (+HP)'),
-          h('span', { className: '__cm_sub' }, locked
-            ? 'gesperrt — das Ergebnis kommt verzoegert'
-            : battle === null
-              ? `${formatNumber(Math.max(0, s.hp))}/${formatNumber(myStats.hp)} HP`
-              : (battle.turn === 'challenger' ? 'Du bist am Zug' : 'Gegner ist am Zug'))),
-      );
-    }
-
+    // ENTFERNT (WEG b): `Arena` + `ArenaSide` (`__cm_arena` im Panel `main`)
+    // sind ins Dock gezogen (`WildDock`/`DockBattle`) — der Kampf laeuft im
+    // Chat-Bereich. `startBattle`, `rest` und `useAbility` bleiben: als
+    // Fenster-API und fuer den Dock-Kampf.
     /**
      * ESKALATION: was eine Stufe ausmacht. Die Zahlen stehen formatiert da,
      * weil die Aussage die Zahl ist: Schwelle, Werte und Lohn wachsen
@@ -1264,16 +1414,15 @@ window.__ModuleLoader__.load({
         cursor = LINEAGE[cursor].ancestor;
       }
       const abilityLabel = (id) => (ABILITIES.find((ability) => ability.id === id) ?? { label: id }).label;
+      // Keine Matrix: die eigene Zeile als Zeichen (`×1,5 ▲` statt Tabelle).
+      const row = Object.keys(ELEMENTS).map((defender) => {
+        const hit = effectiveness(element, defender);
+        return `${ELEMENTS[defender].label} ×${String(hit.factor).replace('.', ',')} ${hit.symbol}`;
+      }).join(' · ');
       return h('div', { className: '__cm_block' },
         h('h3', null, 'Regelwerk (statisch)'),
-        h('table', { className: '__cm_table' },
-          h('thead', null, h('tr', null,
-            h('th', null, 'Angreifer / Ziel'),
-            ...Object.keys(ELEMENTS).map((id) => h('th', { key: id }, ELEMENTS[id].label)))),
-          h('tbody', null, Object.keys(ELEMENTS).map((attacker) => h('tr', { key: attacker },
-            h('td', null, ELEMENTS[attacker].label),
-            Object.keys(ELEMENTS).map((defender) => h('td', { key: defender }, `${ELEMENT_CHART[attacker][defender]}x`)))))),
         h('ul', { className: '__cm_facts' },
+          h('li', { key: 'wirkung' }, `Wirkung (${ELEMENTS[element].label}): ${row}`),
           h('li', { key: 'own' },
             `Eigenes Element: ${ELEMENTS[element].label} — schlaegt ${ELEMENTS[ELEMENTS[element].beats].label}, verliert gegen ${ELEMENTS[ELEMENTS[element].losesTo].label}`),
           h('li', { key: 'synergy' },
@@ -1315,26 +1464,196 @@ window.__ModuleLoader__.load({
           s.log.slice(0, 12).map((line, index) => h('li', { key: `${index}-${line}` }, line))));
     }
 
+    /**
+     * Die Kampf-Textbox: tippt die letzte Log-Zeile Zeichen fuer Zeichen
+     * (Gen-1), mit blinkendem Cursor. Reine Darstellung — der Text steht,
+     * bevor das erste Zeichen faellt. Mit `prefers-reduced-motion` oder ohne
+     * Timer-Umgebung steht die Zeile sofort da.
+     */
+    function TypeLine({ text }) {
+      const [shown, setShown] = React.useState(text);
+      React.useEffect(() => {
+        if (shown !== text) return undefined;
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+        setShown('');
+        let i = 0;
+        const timer = window.setInterval(() => {
+          i += 1;
+          setShown(text.slice(0, i));
+          if (i >= text.length) window.clearInterval(timer);
+        }, 24);
+        return () => window.clearInterval(timer);
+      }, [text]);
+      return h('p', { className: '__cm_type' }, shown, h('span', { className: '__cm_cursor' }, '▌'));
+    }
+
+    /**
+     * Die Sperre als eigene Zeile: Balken ueber die Vertragsdauer, Absagesatz
+     * aus dem Vertrag, Zaehler der kalten Abweisungen. Auch ohne Kampf — ein
+     * beginnender Zug (`start`, `challenge`) hat noch kein `battle`.
+     */
+    function LockNotice({ s }) {
+      if (s.lock === null) return null;
+      return h('div', { className: '__cm_lock' },
+        h('span', { className: '__cm_lock-text' }, PACING.lockedText),
+        h('span', { className: '__cm_lock-track' },
+          h('span', { className: '__cm_lock-fill', style: { animationDuration: `${roundDelayMs}ms` } })),
+        h('span', { className: '__cm_sub' },
+          `Zug ${s.lock.action} — ${s.rejections} abgewiesene Eingabe${s.rejections === 1 ? '' : 'n'}`));
+    }
+
+    /**
+     * Der Kampf im Dock (Gen-1): Gegner von vorn, eigenes von hinten — ECHTE
+     * Sprites aus den Gittern, keine Familien-Platzhalter. Der HP-Balken
+     * leert sich ueber die Breiten-Transition, der Treffer schuettelt ueber
+     * einen Neuaufbau (`key` = HP: neues HP, neue Einblendung, Wackeln plus
+     * Blinken). Ergebnis, Schaden und Log kommen aus `damage` — hier steht
+     * nur, was der Zustand schon weiss.
+     */
+    function DockBattle({ s, lvl }) {
+      const battle = s.battle;
+      const mine = statsAt(s.species, lvl);
+      const learned = abilitiesFor(lvl, s.species);
+      const locked = s.lock !== null;
+      const myTurn = battle.over === null && battle.turn === 'challenger';
+      const eff = effectiveness(SPECIES[s.species].family, battle.element);
+      const factor = String(eff.factor).replace('.', ',');
+      return h('div', { className: '__cm_dock __cm_fight', 'data-plugin': PLUGIN },
+        h(LockNotice, { s }),
+        h('div', { className: '__cm_board' },
+          h('div', { className: '__cm_side __cm_side--enemy' },
+            h('span', {
+              key: `enemy-${battle.hp}`,
+              className: '__cm_hit',
+              dangerouslySetInnerHTML: { __html: gridSvg(battle.speciesId, 'front', 64) },
+            }),
+            h('div', { className: '__cm_side-id' },
+              h('strong', null, `${SPECIES[battle.speciesId].label} L${battle.level}`),
+              h(Bar, { value: battle.hp, max: battle.maxHp, tone: 'enemy' }),
+              h('span', { className: '__cm_sub' }, `HP ${formatNumber(Math.max(0, battle.hp))}/${formatNumber(battle.maxHp)}`))),
+          h('span', { className: '__cm_vs' }, 'VS'),
+          h('div', { className: '__cm_side __cm_side--own' },
+            h('span', {
+              key: `own-${s.hp}`,
+              className: '__cm_hit',
+              dangerouslySetInnerHTML: { __html: gridSvg(s.species, 'back', 64) },
+            }),
+            h('div', { className: '__cm_side-id' },
+              h('strong', null, `${s.name} L${lvl}`),
+              h(Bar, { value: s.hp, max: mine.hp, tone: 'hp' }),
+              h('span', { className: '__cm_sub' }, `HP ${formatNumber(Math.max(0, s.hp))}/${formatNumber(mine.hp)}`))),
+        ),
+        h('p', { className: '__cm_sub' },
+          `Wirkung ${ELEMENTS[SPECIES[s.species].family].label} → ${ELEMENTS[battle.element].label}: ×${factor} ${eff.symbol}`),
+        h('div', { className: '__cm_actions' },
+          learned.map((ability) => h('button', {
+            key: ability.id,
+            type: 'button',
+            className: '__cm_move',
+            disabled: locked || !myTurn,
+            title: `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}`,
+            onClick: () => useAbility(ability.id),
+          },
+            h('span', { className: '__cm_move-name' }, ability.label),
+            h('span', { className: '__cm_move-meta' }, `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}`))),
+        ),
+        h('div', { className: '__cm_actions' },
+          h('button', {
+            type: 'button',
+            className: '__cm_btn',
+            disabled: locked || battle.over !== null,
+            onClick: () => fleeBattle(),
+          }, 'Rückzug'),
+          h('span', { className: '__cm_sub' }, locked
+            ? 'gesperrt — das Ergebnis kommt verzoegert'
+            : (battle.turn === 'challenger' ? 'Du bist am Zug' : 'Gegner ist am Zug'))),
+        h(TypeLine, { text: s.log[0] ?? '…' }),
+      );
+    }
+
+    /**
+     * Ball, Wurf und Wild im Dock: Der Ball (Shinon-Ball aus UI_SVG) fliegt
+     * per CSS ein und verblasst, das Wilde blendet verzoegert ein — ohne einen
+     * einzigen Timer im Zustand. Ein Klick fordert heraus, der zweite Knopf
+     * laesst entkommen. Leerstand rendert nichts.
+     */
+    function WildDock() {
+      const s = useStore();
+      const lvl = levelFor(s.xp);
+      if (s.battle !== null) return h(DockBattle, { s, lvl });
+      // Ein beginnender Zug hat noch keinen Kampf, aber eine Sperre — und die
+      // ist sichtbar, nicht ein leeres Dock. Die Knoepfe stehen dabei, kalt
+      // gesperrt: kein Klick wird eingereiht.
+      if (s.lock !== null) {
+        const learned = abilitiesFor(lvl, s.species);
+        return h('div', { className: '__cm_dock __cm_fight', 'data-plugin': PLUGIN },
+          h(LockNotice, { s }),
+          h('div', { className: '__cm_actions' },
+            learned.map((ability) => h('button', {
+              key: ability.id,
+              type: 'button',
+              className: '__cm_move',
+              disabled: true,
+              title: 'Gesperrt — das Ergebnis kommt verzoegert',
+              onClick: () => useAbility(ability.id),
+            },
+              h('span', { className: '__cm_move-name' }, ability.label),
+              h('span', { className: '__cm_move-meta' }, `${ability.kind} · ${ability.stat.toUpperCase()} ${ability.power}`))),
+          ));
+      }
+      if (s.wild === null) return null;
+      const wild = s.wild;
+      const label = SPECIES[wild.speciesId].label;
+      return h('div', { className: '__cm_dock', 'data-plugin': PLUGIN },
+        h('button', {
+          type: 'button',
+          className: '__cm_wild',
+          title: `${label} L${wild.level} herausfordern`,
+          onClick: () => challengeWild(),
+        },
+          h('span', { className: '__cm_ball', dangerouslySetInnerHTML: { __html: uiSvg('ball', 40) } }),
+          h('span', { className: '__cm_wild-sprite', dangerouslySetInnerHTML: { __html: gridSvg(wild.speciesId, 'front', 64) } }),
+          h('span', { className: '__cm_sub' }, `Ein wilder ${label} L${wild.level} erscheint!`),
+          h('span', { className: '__cm_sub' }, 'Klicken zum Kämpfen')),
+        h('button', {
+          type: 'button',
+          className: '__cm_btn',
+          onClick: () => fleeWild(),
+        }, 'Fliehen'),
+      );
+    }
+
+    /**
+     * Das Kampfergebnis fuer `conversation.chat.turnTail`: eine Zeile je
+     * beendeten Kampf, gelesen aus `lastResult`. Kein Kampf, keine Zeile.
+     */
+    function BattleResult() {
+      const s = useStore();
+      if (s.lastResult === null) return null;
+      const result = s.lastResult;
+      const label = SPECIES[result.speciesId].label;
+      const text = result.outcome === 'win'
+        ? `Sieg gegen ${label} L${result.level} — +${formatNumber(result.reward)} XP`
+        : result.outcome === 'loss'
+          ? `K.o. gegen ${label} L${result.level} — das Codemon rappelt sich wieder auf`
+          : `Rückzug gegen ${label} L${result.level}`;
+      return h('div', { className: '__cm_result', 'data-plugin': PLUGIN },
+        h('span', { className: '__cm_result-mark', dangerouslySetInnerHTML: { __html: speciesGlyph(result.speciesId, result.level, 18) } }),
+        h('span', null, text));
+    }
+
     function CodingmonPanel() {
       const s = useStore();
       const lvl = levelFor(s.xp);
-      const mine = statsAt(s.species, lvl);
       // Angezeigt wird die EXAKTE Leiter, gerechnet die schnelle Number-Fassung.
       const exact = statsAtExact(s.species, lvl);
-      const learned = abilitiesFor(lvl, s.species);
 
+      // Der Kampf wohnt im Dock (WildDock), nicht hier: `main` zeigt Stand,
+      // Regelwerk ohne Tabelle, Beute und Bilanz.
       return h('div', { className: '__cm_panel' },
         h(PetHead, { s, lvl, onPick: pickSpecies }),
         h(StatsGrid, { stats: exact }),
-        h(Arena, {
-          s,
-          lvl,
-          myStats: mine,
-          abilities: learned,
-          onUse: useAbility,
-          onStart: startBattle,
-          onRest: rest,
-        }),
         h(EscalationBlock, { s, lvl }),
         h(Rulebook, { s }),
         h(DropLedger, { s }),
@@ -1379,9 +1698,8 @@ window.__ModuleLoader__.load({
       .__cm_stat-k { font-size: 10px; letter-spacing: .1em; color: var(--dsw-alias-label-secondary, #9aa); }
       .__cm_stat-v { font-size: 15px; font-weight: 700; }
       .__cm_block { margin-bottom: 14px; }
-      .__cm_block h3, .__cm_arena h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+      .__cm_block h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
         color: var(--dsw-alias-label-secondary, #9aa); }
-      .__cm_arena { margin-bottom: 14px; }
       .__cm_board { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center;
         padding: 10px; border-radius: 8px; background: var(--dsw-alias-bg-layer-1, rgba(255,255,255,.04));
         border: 1px solid rgba(124,58,237,.25); }
@@ -1418,16 +1736,55 @@ window.__ModuleLoader__.load({
       @keyframes __cm_lock-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
       .__cm_facts { list-style: none; margin: 0 0 8px; padding: 0; font-size: 12px; }
       .__cm_facts li { padding: 2px 0; color: var(--dsw-alias-label-secondary, #9aa); }
-      .__cm_table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
-      .__cm_table th, .__cm_table td { padding: 3px 6px; text-align: left;
-        border-bottom: 1px solid rgba(255,255,255,.08); }
-      .__cm_table th { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
-        color: var(--dsw-alias-label-secondary, #9aa); }
+      /* Dock: Ball, Wild und Kampf im Chat-Bereich (Gen-1). Alle Keyframes
+         bewegen nur transform und opacity (Compositor-Regel, siehe
+         animation.test.mjs) — kein margin/top/left im Keyframe. */
+      .__cm_dock { display: flex; align-items: center; gap: 10px; width: 100%;
+        padding: 6px 8px; margin-bottom: 6px; border-radius: 8px;
+        background: #0B0F14; border: 1px solid rgba(168,85,247,.45);
+        color: #E0E7FF;
+        font-family: var(--shinon-font-body, ui-sans-serif, system-ui, sans-serif); font-size: 12px; }
+      .__cm_fight { flex-direction: column; align-items: stretch; }
+      .__cm_wild { display: flex; align-items: center; gap: 10px; background: none; border: none;
+        color: inherit; font: inherit; cursor: pointer; padding: 0; text-align: left; }
+      .__cm_ball { display: inline-flex; transform-origin: center;
+        animation-name: __cm_throw; animation-duration: 1.1s; animation-timing-function: ease-in;
+        animation-fill-mode: forwards; }
+      @keyframes __cm_throw {
+        0% { transform: translate(26px, -10px) rotate(-40deg); opacity: 0; }
+        30% { transform: translate(12px, -4px) rotate(-12deg); opacity: 1; }
+        70% { transform: translate(0, 2px) rotate(8deg); opacity: 1; }
+        100% { transform: translate(0, 0) rotate(0); opacity: 0; } }
+      .__cm_wild-sprite { display: inline-flex; opacity: 0;
+        animation-name: __cm_wild-in; animation-duration: .4s; animation-timing-function: ease-out;
+        animation-delay: 1s; animation-fill-mode: forwards; }
+      @keyframes __cm_wild-in {
+        from { opacity: 0; transform: scale(.6); }
+        to { opacity: 1; transform: scale(1); } }
+      .__cm_sprite { image-rendering: pixelated; }
+      .__cm_hit { display: inline-flex; animation-name: __cm_hit; animation-duration: .45s; }
+      @keyframes __cm_hit {
+        0% { transform: translateX(0); opacity: 1; }
+        25% { transform: translateX(-6px); opacity: .2; }
+        50% { transform: translateX(5px); opacity: 1; }
+        75% { transform: translateX(-3px); opacity: .4; }
+        100% { transform: translateX(0); opacity: 1; } }
+      .__cm_type { margin: 6px 0 0; padding: 6px 8px; border-radius: 6px; min-height: 2.2em;
+        background: rgba(255,255,255,.05); border: 1px solid rgba(168,85,247,.35);
+        font-size: 12px; color: #E0E7FF; }
+      .__cm_cursor { color: #A855F7; animation-name: __cm_blink; animation-duration: 1s;
+        animation-iteration-count: infinite; }
+      @keyframes __cm_blink { 50% { opacity: 0; } }
+      .__cm_result { display: flex; align-items: center; gap: 8px; padding: 4px 8px;
+        font-size: 12px; color: #E0E7FF; }
       .__cm_milestones { margin: 6px 0 0; padding-left: 18px; font-size: 12px;
         color: var(--shinon-violet-light, #A855F7); }
       @media (prefers-reduced-motion: reduce) {
         .__cm_bar-fill, .__cm_expbar-fill { transition: none; }
         .__cm_lock-fill { animation: none; transform: scaleX(1); }
+        .__cm_ball, .__cm_wild-sprite, .__cm_hit, .__cm_cursor { animation: none; }
+        .__cm_ball { opacity: 0; }
+        .__cm_wild-sprite { opacity: 1; }
       }
     `);
 
@@ -1460,6 +1817,13 @@ window.__ModuleLoader__.load({
           arena: (round) => arenaFor(level(), round ?? store.round),
           start: () => startBattle(),
           use: (id) => useAbility(id),
+          /** WEG b: lokale Trigger-Funktion — dieselbe Pruefung wie der Takt. */
+          trigger: () => checkSpawn(),
+          /** Ein Klick auf das Wilde: der Kampf oeffnet sich im Dock. */
+          challenge: () => challengeWild(),
+          /** Flucht vor dem Wilden / Rueckzug aus dem Kampf (J4). */
+          flee: () => fleeWild(),
+          fleeBattle: () => fleeBattle(),
           rest,
           pick: (id) => pickSpecies(id),
           addXp: (xp) => award(xp, `+${xp} XP (manuell)`),
@@ -1512,6 +1876,10 @@ window.__ModuleLoader__.load({
               return { text: value.text, digits: value.digits, safe: value.safe };
             },
             rollLoot: (uniform) => rollLoot(uniform).id,
+            /** Der Wild-Spawn als reine Funktion (Spiegel von mechanik.js). */
+            spawnFor: (done, level) => spawnFor(done, level),
+            /** Die Typwirkung als Zeichen (Spiegel von mechanik.js). */
+            effectiveness: (attacker, defender) => effectiveness(attacker, defender),
             resolveAttack: (abilityId, speciesId, defenderSpeciesId, level) => {
               const ability = ABILITIES.find((entry) => entry.id === abilityId) ?? ABILITIES[0];
               const own = statsAt(speciesId, level);
@@ -1572,6 +1940,23 @@ window.__ModuleLoader__.load({
           id: 'shinon-exp-bar',
           order: 20,
         }, ExpBar));
+        // SLOT-ENTSCHEIDUNG (Auftrag Abschnitt 4, Schritt 2 — belegt vor Code):
+        // Ball, Wild und Kampf wohnen in `conversation.composer.dock` — live
+        // sichtbar, waehrend der Agent arbeitet, geteilt mit der EXP-Leiste
+        // (kein Single-Slot-Konflikt). Das Ergebnis liegt zusaetzlich in
+        // `conversation.chat.turnTail` (Liste, erscheint nach dem Turn).
+        // `conversation.chat.node` (`keyed`) ist ausgeschlossen:
+        // `replaceRisk: shadows-shipped-ui` — keine Begruendung, kein Knoten.
+        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+          name: 'conversation.composer.dock',
+          id: 'shinon-wild-dock',
+          order: 21,
+        }, WildDock));
+        ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
+          name: 'conversation.chat.turnTail',
+          id: 'shinon-battle-result',
+          order: 5,
+        }, BattleResult));
 
         // XP aus dem Token-Zaehler. Der Takt ist bewusst traege: das Pet soll
         // den Agenten nicht ausbremsen. Kaempfe laufen NUR auf Klick.

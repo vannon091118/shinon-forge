@@ -96,6 +96,46 @@ export function apply(ctx, config) {
   // deshalb in einer EIGENEN Zeile — er kann erst nach dem ersten `await`
   // bekannt sein, und eine Aktivierungszeile, die ihn vorher behauptet, waere
   // geraten.
+  // ── Aktivitaet: abgeschlossene Agent-Schritte (J3) ───────────────────────
+  //
+  // Das Spawn-Signal kommt aus laufender Agent-Arbeit, und die Quelle ist
+  // DSHs EIGENER Loop (`agent/status` aus `dsh-agent-loop`) — kein Shinon-Paket
+  // muss dafuer aktiv sein. Ein `running` -> `idle`-Wechsel zaehlt einen
+  // ABGESCHLOSSENEN Schritt; der Client fragt den Zaehler ueber `readActivity`
+  // und rechnet rein (`spawnFor`), ob ein Ball faellt. `ctx.emit` erreicht den
+  // Browser nicht — deshalb fragt der Client, statt dass der Host schiebt.
+  const activity = { completions: 0, running: false };
+  /** Den Zaehler in den Spiegel heben (nur ergaenzen, nie erfinden). */
+  const persistCompletions = () => {
+    if (mirror === null) return;
+    try {
+      const stored = mirror.read();
+      if (stored === null) return;
+      const completions = Math.max(stored.completions ?? 0, activity.completions);
+      if (completions === stored.completions) return;
+      mirror.write({ ...stored, completions }).catch((error) => {
+        console.error(`[shinon-codingmon] Aktivitaet nicht abgelegt — ${error?.message ?? error}`);
+      });
+    } catch (error) {
+      console.error(`[shinon-codingmon] Aktivitaet nicht lesbar — ${error?.message ?? error}`);
+    }
+  };
+  const offStatus = typeof ctx?.on === 'function' ? ctx.on('agent/status', (event) => {
+    const status = event?.status;
+    if (status === 'running') {
+      activity.running = true;
+      return;
+    }
+    if (status !== 'idle') return;
+    if (activity.running) {
+      activity.running = false;
+      activity.completions += 1;
+      persistCompletions();
+    } else {
+      activity.running = false;
+    }
+  }) : null;
+
   let mirror = null;
   const mirrorReady = (async () => {
     if (typeof ctx?.storageDomain?.open !== 'function') {
@@ -105,6 +145,9 @@ export function apply(ctx, config) {
     try {
       const { openPetStore, PET_DOMAIN } = await import('./assets/pet-store.js');
       mirror = await openPetStore(ctx);
+      // Der Spiegel kennt den Stand vom letzten Lauf: der Zaehler faengt dort
+      // an, nicht bei null — sonst verlöre jeder Host-Neustart die Rate (J2).
+      activity.completions = Math.max(0, mirror.read()?.completions ?? 0);
       if (typeof ctx?.provide === 'function') {
         ctx.provide(STORE_SERVICE, {
           contract: STORE_CONTRACT,
@@ -117,7 +160,7 @@ export function apply(ctx, config) {
       // Handle, und ein Dienst ohne Ablage waere ein Endpunkt, der annimmt und
       // nichts aufbewahrt — der schlimmere Fehler als ein fehlender Endpunkt.
       const { mountPetRemote } = await import('./assets/pet-remote.js');
-      mountPetRemote(ctx, mirror);
+      mountPetRemote(ctx, mirror, activity);
       const stored = mirror.read();
       console.log(`[shinon-codingmon] Spiegel aktiv — Domain ${PET_DOMAIN.name} v${PET_DOMAIN.version}, `
         + `Empfaenger ${UEBERGABE_ENDPOINT}, `
@@ -135,6 +178,9 @@ export function apply(ctx, config) {
     // Der Abbau wartet das Oeffnen ab: sonst bliebe ein Handle offen, wenn der
     // Loader genau waehrend des Mounts entlaedt.
     await mirrorReady;
+    try {
+      if (typeof offStatus === 'function') offStatus();
+    } catch { /* der Lauscher ist weg, der Zaehler mit ihm */ }
     try {
       await mirror?.close();
     } catch (error) {
