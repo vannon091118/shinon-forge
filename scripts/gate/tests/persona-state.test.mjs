@@ -141,7 +141,7 @@ test('persona: die Übergänge sind genau die Event-Typen, die die Persona model
 });
 
 test('persona: jeder modellierte Typ ist ein Typ des Spines, und die Lücke ist benannt', () => {
-  // Teilmenge, nicht Gleichheit: der Spine spricht zweiundzwanzig Typen, die
+  // Teilmenge, nicht Gleichheit: der Spine spricht fünfundzwanzig Typen, die
   // Persona zehn. Ein Typ, den die Persona einführt und der Spine nicht kennt,
   // wäre eine zweite Sprache — und muss rot sein.
   for (const type of PERSONA_EVENT_TYPES) {
@@ -156,6 +156,9 @@ test('persona: jeder modellierte Typ ist ein Typ des Spines, und die Lücke ist 
       'developer.message',
       'feedback.approval',
       'feedback.correction',
+      'feedback.noted',
+      'feedback.rated',
+      'feedback.retracted',
       'inbox.spliced',
       'request.header',
       'session.titled',

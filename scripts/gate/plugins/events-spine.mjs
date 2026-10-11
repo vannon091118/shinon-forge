@@ -56,6 +56,13 @@ export const ENVELOPE_FIELDS = [
  *
  * Dazu drei shinon-eigene Signaltypen für die Scoring-Schicht: `feedback.*`
  * (Korrektur/Zustimmung aus dem Verlauf) und `relation.updated` (Beziehungsstand).
+ *
+ * Und drei NATIVE Urteile des Menschen, die der Carrier liefert: `feedback.noted`
+ * (Sitzungsbemerkung), `feedback.rated` (Urteil je Antwort mit messageId) und
+ * `feedback.retracted` (Widerruf dieses Urteils). Sie waren bewusst ignoriert,
+ * bis die Scoring-Schicht sie als Signale brauchte; jetzt sind sie abgebildet
+ * und aus `ignoredTypes` entfernt (ein Typ ist entweder abgebildet oder
+ * ignoriert — das Gate prüft genau das).
  */
 export const EVENT_TYPES = [
   'session.created',
@@ -71,6 +78,9 @@ export const EVENT_TYPES = [
   'system.message',
   'workspace.changed',
   'session.titled',
+  'feedback.noted',
+  'feedback.rated',
+  'feedback.retracted',
   'claim.created',
   'tool.requested',
   'tool.completed',

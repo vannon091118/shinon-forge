@@ -57,7 +57,7 @@
     "signal": "session/event",
     "verified": true,
     "typePath": "type",
-    "note": "Vierzehn Typen, jeder einzeln gegen die generierte Liste der installierten DSH-Fassung belegt (KNOWN_SESSION_EVENT_TYPES, dsh-session/lib/types/known-event-types.js). Der frühere fünfzehnte Eintrag session.created trug eine Punkt-Form, die in keiner DSH-Fassung vorkommt (DSH deklariert 'session/created' ausschließlich als Hook) und ist deshalb aus der Tabelle entfernt — der Event-Typ bleibt über das Signal shinon/session/created erreichbar. Die Payload-Pflichtfelder sind die echten DSH-Feldnamen: tool/call liefert name und arguments, tool/result liefert message — ein Feld 'tool' gibt es in DSH nicht.",
+    "note": "Siebzehn Typen, jeder einzeln gegen die generierte Liste der installierten DSH-Fassung belegt (KNOWN_SESSION_EVENT_TYPES, dsh-session/lib/types/known-event-types.js). Drei davon sind die internen Urteile des Menschen (feedback/record, feedback/message-put, feedback/message-delete): sie waren zuerst in ignoredTypes und sind jetzt abgebildet, weil die Scoring-Schicht sie als Signale braucht — sie kommen ohne Browser und ohne Plattform-Zusatz aus. Der frühere fünfzehnte Eintrag session.created trug eine Punkt-Form, die in keiner DSH-Fassung vorkommt (DSH deklariert 'session/created' ausschließlich als Hook) und ist deshalb aus der Tabelle entfernt — der Event-Typ bleibt über das Signal shinon/session/created erreichbar. Die Payload-Pflichtfelder sind die echten DSH-Feldnamen: tool/call liefert name und arguments, tool/result liefert message — ein Feld 'tool' gibt es in DSH nicht.",
     "typeMap": {
       "user/message": "message.received",
       "assistant/message": "message.completed",
@@ -72,7 +72,10 @@
       "developer/message": "developer.message",
       "system/message": "system.message",
       "workspace/changes": "workspace.changed",
-      "session/title": "session.titled"
+      "session/title": "session.titled",
+      "feedback/record": "feedback.noted",
+      "feedback/message-put": "feedback.rated",
+      "feedback/message-delete": "feedback.retracted"
     },
     "verifiedTypes": [
       "user/message",
@@ -88,7 +91,10 @@
       "developer/message",
       "system/message",
       "workspace/changes",
-      "session/title"
+      "session/title",
+      "feedback/record",
+      "feedback/message-put",
+      "feedback/message-delete"
     ],
     "ignoredTypes": [
       "assistant/attempt",
@@ -103,9 +109,6 @@
       "compaction/end",
       "compaction/prune",
       "deliverables/presented",
-      "feedback/record",
-      "feedback/message-put",
-      "feedback/message-delete",
       "goal/change",
       "hook/invoked",
       "hook/result",
@@ -137,7 +140,7 @@
       "tool/ptc-dispatch-start",
       "web/deepseek-search-llm-request"
     ],
-    "ignoredNote": "Bekannte DSH-Typen, die der Spine absichtlich NICHT abbildet. Sie werden still verworfen (kein onDrop, keine Warnung im Log) und in stats.ignored/ignoredTypes gezählt — sichtbar, aber ohne Log-Flut. Die Liste ist vollständig für die installierte Fassung: deren generierte Liste KNOWN_SESSION_EVENT_TYPES (dsh-session/lib/types/known-event-types.js, 59 Einträge) ist mengengleich mit packages/core/session/src/known-event-types.ts auf master 5badb150 (kein Unterschied in beide Richtungen); 14 dieser Typen sind oben abgebildet, die restlichen 45 stehen hier. Ein NEUER DSH-Typ ist nicht hier und warnt deshalb weiter als UNKNOWN_SIGNAL. Ein Typ darf nie zugleich in typeMap und in ignoredTypes stehen."
+    "ignoredNote": "Bekannte DSH-Typen, die der Spine absichtlich NICHT abbildet. Sie werden still verworfen (kein onDrop, keine Warnung im Log) und in stats.ignored/ignoredTypes gezählt — sichtbar, aber ohne Log-Flut. Die Liste ist vollständig für die installierte Fassung: deren generierte Liste KNOWN_SESSION_EVENT_TYPES (dsh-session/lib/types/known-event-types.js, 59 Einträge) ist mengengleich mit packages/core/session/src/known-event-types.ts auf master 5badb150 (kein Unterschied in beide Richtungen); 17 dieser Typen sind oben abgebildet, die restlichen 42 stehen hier. Ein NEUER DSH-Typ ist nicht hier und warnt deshalb weiter als UNKNOWN_SIGNAL. Ein Typ darf nie zugleich in typeMap und in ignoredTypes stehen."
   },
   "events": {
     "session.created": {
@@ -204,6 +207,21 @@
       "source": "dsh.session",
       "phase": "metadata",
       "payload": ["session_id"]
+    },
+    "feedback.noted": {
+      "source": "dsh.feedback",
+      "phase": "feedback",
+      "payload": ["session_id"]
+    },
+    "feedback.rated": {
+      "source": "dsh.feedback",
+      "phase": "feedback",
+      "payload": ["session_id", "item.messageId", "item.rating"]
+    },
+    "feedback.retracted": {
+      "source": "dsh.feedback",
+      "phase": "feedback",
+      "payload": ["session_id", "messageId"]
     },
     "claim.created": {
       "source": "shinon.claims",

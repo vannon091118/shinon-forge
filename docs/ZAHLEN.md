@@ -22,15 +22,15 @@ der sie gemessen wurden.
 
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Pakete unter `packages/` | **19** | `ls packages \| wc -l` | 0 |
+| Pakete unter `packages/` | **20** (die Zeile war um ein Paket veraltet — `packages/scoring` ist hinzugekommen; nachgemessen am 2026-10-11 mit dem genannten Befehl) | `ls packages \| wc -l` | 0 |
 | Profile unter `profiles/` | **2** (`shinon`, `headless`; `web` am 2026-10-11 nach `docs/archive/legacy-profiles/web/` archiviert — ein Laufzeitrest `profiles/web/.plugin-manager/` liegt noch untracked da) | `git ls-files profiles \| cut -d/ -f2 \| sort -u \| wc -l` | 0 |
-| Bundle-Layer im Profil `shinon` | **19**, gemessen 2026-10-11 01:26 — die Zeile hat sich am 2026-10-11 dreimal bewegt: `dsh-experimental-schedule-bundle` entfernt (nicht installiert, in keiner Lock-Datei, kein `# == `-Kopf im Dump — die Ebene konnte sich nicht auflösen, Schritt 2.4), `dsh-experimental-voice-input-bundle` entfernt (der **einzige** First-Use-Download, A4/C7, Schritt 3.1 — Begründung: [docs/audit/DSH_SUBSET_3-1.md](audit/DSH_SUBSET_3-1.md) §5), danach `dsh-experimental-inspector-profile` **hinzugefügt** (nicht in diesem Durchgang; ein zweiter Schreiber hat die Zeile am 2026-10-11 um 01:18 gesetzt — Verdikt offen, §7 desselben Dokuments) | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.length"` | 0 |
-| davon eigene (`@shinon/*`) | **14** | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.filter(b=>b.startsWith('@shinon/')).length"` | 0 |
+| Bundle-Layer im Profil `shinon` | **20** (am 2026-10-11 nachgemessen; die Zeile stand auf 19, weil ein Paket-Bundle hinzugekommen war), gemessen zuvor 2026-10-11 01:26 mit 19 — die Zeile hat sich am 2026-10-11 dreimal bewegt: `dsh-experimental-schedule-bundle` entfernt (nicht installiert, in keiner Lock-Datei, kein `# == `-Kopf im Dump — die Ebene konnte sich nicht auflösen, Schritt 2.4), `dsh-experimental-voice-input-bundle` entfernt (der **einzige** First-Use-Download, A4/C7, Schritt 3.1 — Begründung: [docs/audit/DSH_SUBSET_3-1.md](audit/DSH_SUBSET_3-1.md) §5), danach `dsh-experimental-inspector-profile` **hinzugefügt** (nicht in diesem Durchgang; ein zweiter Schreiber hat die Zeile am 2026-10-11 um 01:18 gesetzt — Verdikt offen, §7 desselben Dokuments) | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.length"` | 0 |
+| davon eigene (`@shinon/*`) | **15** | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.filter(b=>b.startsWith('@shinon/')).length"` | 0 |
 | davon fremde | **5** (`@deepseek-ai/dsh-base`, `dsh-web-app`, `dsh-experimental-auto-review`, `dsh-experimental-agent-team-profile`, `dsh-experimental-inspector-profile`) | dieselbe Liste | 0 |
 | Vendorte Dateien unter `vendor/` | **22** (20 Paketdateien aus `@deepseek-ai/dsh@0.2.1-alpha.2` + `MANIFEST.json` + `MODIFICATIONS.md`; Herkunft und `sha256` je Datei: [vendor/dsh/MANIFEST.json](vendor/dsh/MANIFEST.json)) | `find vendor -type f \| wc -l` | 0 |
 | Pakete **nicht** im Profil | **5** (`key-router`, `narrative`, `openapi`, `popup`, `shinon-forge`) — alle fünf erklären ihre Zurückstellung selbst (`"dsh": { "inactive": true }` im eigenen Manifest, gelesen von `dead-package`) | `ls packages` gegen die Liste oben | 0 |
 | Version des Repos | **0.2.0** | `node -p "require('./package.json').version"` | 0 |
-| Paketversionen | **16× `1.0.0`, 3× `0.1.0`** (`0.1.0`: `key-router`, `narrative`, `shinon-forge`) — verteilt **ohne** zentrale Liste: die Zeile folgt aus dem eigenen Manifest (`dsh.inactive` darf `0.1.0` führen, sonst `1.0.0`; Regel im `doctor`) | `node -e "for (const d of require('fs').readdirSync('packages')) console.log(require('./packages/'+d+'/package.json').version)"` | 0 |
+| Paketversionen | **17× `1.0.0`, 3× `0.1.0`** (`0.1.0`: `key-router`, `narrative`, `shinon-forge`) — verteilt **ohne** zentrale Liste: die Zeile folgt aus dem eigenen Manifest (`dsh.inactive` darf `0.1.0` führen, sonst `1.0.0`; Regel im `doctor`) | `node -e "for (const d of require('fs').readdirSync('packages')) console.log(require('./packages/'+d+'/package.json').version)"` | 0 |
 | DSH installiert | **0.2.0-rc.2** | `dsh --version` | 0 |
 | DSH-Pin im Root-Manifest | **0.2.1-alpha.1** | `node -p "require('./package.json').dependencies['@deepseek-ai/dsh']"` | 0 |
 | Schemastery (deklariert) | `~3.18.4` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
@@ -51,20 +51,21 @@ lesen genau diese Datei.
 
 | Lauf | Ergebnis | Exit | Befehl |
 |---|---|---|---|
-| Gate (statisch) | 100 bestanden, **0** fehlgeschlagen | 0 | `node scripts/dsh-test.mjs` |
+| Gate (statisch) | 105 bestanden, **0** fehlgeschlagen (am 2026-10-11 um fuenf Prüfungen der Signaltabelle gewachsen) | 0 | `node scripts/dsh-test.mjs` |
 | Regel-Fixtures | 9 bestanden, **0** fehlgeschlagen | 0 | `node scripts/validate-test.mjs` |
-| Profiltest | 3 bestanden, **0** fehlgeschlagen (19 Layer, 14 Repo-Bundles) | 0 | `node scripts/dsh-profile-test.mjs` |
+| Profiltest | 3 bestanden, **0** fehlgeschlagen (20 Layer, 15 Repo-Bundles) | 0 | `node scripts/dsh-profile-test.mjs` |
 | Profil-Konfiguration im echten Dump | 55 Layer-Köpfe / 205 Einträge (Repo-`dsh@0.2.1-alpha.1` zuerst im PATH; das globale `0.2.0-rc.2` liefert dieselben Köpfe, aber 201 Einträge — Fassungsfalle, [docs/audit/DSH_SUBSET_3-1.md](audit/DSH_SUBSET_3-1.md) §6), `shinon-task-router.activate: false`, `permission.defaultPreset: workspace-write` (Preset `workspace-write: {sandbox: workspace-write, approval: ask}`), `agent-default-model: agnes/agnes-2.5-flash`, `ui-settings-general.welcomeNoticeVersion: 2026-09-28.1` (als String gelesen) | 0 | `DSH_HOME=$PWD dsh --profile shinon --dump-config` |
 | Spike Produktprofil `resolvedProfile` (Schritt 3.3) | **11** Zusagen, **11** grün (3 Bündel gelöst und gemountet, `fiber.state === 2`, `profileContext.dir` = Spike-Verzeichnis, kein Schlüsselwert in der Ausgabe) | 0 | `node scripts/spike-resolved-profile.mjs` (Repo-`dsh` zuerst im PATH) |
 | Frischer Klon: `npm install` + `npm start` (Schritt 3.4) | **731** Pakete installiert, Start **ohne** `dsh` im PATH (`command -v dsh` → NEIN), Herkunft `Repo-Installat`, dsh `0.2.1-alpha.1` | 0 | in einer Arbeitsbaum-Kopie ohne `node_modules`/`dist`/`logs`: `npm install`, dann `env -i … npm start -- --check` |
 | Frischer Klon ohne pnpm-Spuren (Schritt 3.5) | **0** pnpm-Dateien im Klon, kein `packageManager`-Feld, **731** Pakete, Lockfile nach dem Install **byteidentisch** zum getrackten, `npm start -- --check` grün (`pnpm` und `dsh` nicht im PATH) | 0 | in einer Arbeitsbaum-Kopie ohne `profiles/`: `npm install`, dann `env -i … npm start -- --check` |
 | Vendoring `vendor/dsh` (Schritt 3.2) | **20** Dateien verglichen, **0** Abweichungen gegen das Registry-Tarball (Dateiliste und `sha256` je Datei identisch; Manifest: [vendor/dsh/MANIFEST.json](vendor/dsh/MANIFEST.json)) | 0 | `npm pack @deepseek-ai/dsh@0.2.1-alpha.2` → entpacken → Datei-für-Datei-Vergleich |
-| Distributionstest (jetzt `npm pack`, Schritt 3.5) | **76** bestanden, **0** fehlgeschlagen (19 Pakete × 4 Stufen) in **6,5 s** (Pool 6; vor dem Umbau sequenziell ≈ 22 s) | 0 | `node scripts/pack-test.mjs` |
-| Build (`dist/`) | 19 Pakete, 96 Dateien, 915735 Bytes | 0 | `npm run build` |
+| Distributionstest (jetzt `npm pack`, Schritt 3.5) | **80** bestanden, **0** fehlgeschlagen (20 Pakete × 4 Stufen) in **11,2 s** (Pool 6; der sequenzielle Lauf vor dem Umbau ≈ 22 s) | 0 | `node scripts/pack-test.mjs` |
+| Build (`dist/`) | 20 Pakete, 153 Dateien, 1142862 Bytes | 0 | `npm run build` |
 | **Skalierungslauf** (Kopie des Baums + **20** neue Pakete = 39, alle selbst als `dsh.inactive` erklärt): Idiom-Schreiber → statisches Gate → Gate-Engine `--full` → Gate-Tests → Distributionstest → Build | **6 von 6** Stufen grün — Gate **200** bestanden/0, `gate:full` 18 grün/0, Gate-Tests **328**/0, Distribution **156**/0, Build 39 Pakete/196 Dateien; Dauer ≈ 98 s | 0 | `npm run scale:check` (Nachweis: [docs/audit/SKALIERUNG_2026-10-11.md](audit/SKALIERUNG_2026-10-11.md)) |
 | Gate-Engine `--full` | 18 Gates gelaufen, 18 grün; die Branding-Stufe meldet ohne Flag einen sichtbaren Skip, mit `--branding` läuft sie (siehe nächste Zeile) | 0 | `npm run gate:full` |
 | Branding-Wirkung im echten Chromium | **28** bestanden, **0** fehlgeschlagen (ausgeliefertes `dist/packages/core/client.js`, `/usr/bin/google-chrome`) | 0 | `npm run branding` · `node scripts/gate/engine.mjs --full --branding` |
-| Gate-Tests | **328** bestanden, 0 rot, 0 übersprungen | 0 | `node --test scripts/gate/tests/*.test.mjs` mit Node v22.23.3 und Repo-`dsh` (0.2.1-alpha.1) zuerst im PATH |
+| Gate-Tests | **352** bestanden, 0 rot, 0 übersprungen (am 2026-10-11 um 14 Zusagen gewachsen: 9 der Signaltabelle, 5 des Wegs Spine→Scoring→Tafel, dazu die Pflege benannter Listen) | 0 | `node --test scripts/gate/tests/*.test.mjs` mit Node v22.23.3 und Repo-`dsh` (0.2.1-alpha.1) zuerst im PATH |
+| Scoring-Tests (Kern + Signale) | **28** bestanden, 0 rot, 0 übersprungen (15 Replay, 13 Signale) | 0 | `npm run test:scoring` |
 | Client-Aktivierung + Marke (Wache 1–3) | 6 bestanden, **0** rot | 0 | `node --test scripts/gate/tests/client-activation.test.mjs` |
 | Client-Locale + `ctx`-Zugriff (Schritt 2.6) | 6 bestanden, **0** rot (3 Zusagen dieser Datei + 3 der Nachbarwachen im selben Lauf) | 0 | `node --test scripts/gate/tests/client-locale.test.mjs` |
 | Codingmon-Tests | **32** bestanden, **0** rot, 0 übersprungen (32) | 0 | `npm run test:codingmon` |
@@ -85,8 +86,8 @@ Repo zuerst im PATH (vor einem fremden globalen `dsh`, sonst misst `message-ingr
 falsche Fassung), vollständiger Lock-Baum. Unter der Standard-Shell (Node v18, ohne PATH)
 bleibt der Lauf rot — das ist dann Umgebungs-Rot, kein Code-Rot.
 
-**Volle Kette:** `npm test` führt Codingmon-Tests → Gate → Fixtures → Distribution →
-Profil in dieser Reihenfolge aus (`package.json`) und lief in diesem Durchlauf
+**Volle Kette:** `npm test` führt Codingmon-Tests → Scoring-Tests (Kern + Signale) →
+Gate → Fixtures → Distribution → Profil in dieser Reihenfolge aus (`package.json`) und lief in diesem Durchlauf
 vollständig durch (Exit 0) — damit läuft auch `dsh-profile-test` innerhalb von
 `npm test` mit.
 
