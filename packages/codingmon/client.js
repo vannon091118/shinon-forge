@@ -805,9 +805,19 @@ window.__ModuleLoader__.load({
      * Liest den Sitzungs-Token-Zaehler aus der Oberflaeche. Genommen wird der
      * groesste je gesehene Wert (der Zaehler waechst monoton), damit ein
      * Neu-Rendern nicht doppelt zaehlt.
+     *
+     * Die Lese-Reihenfolge ist wichtig: erst der SHINON-Counter (Sidebar,
+     * `data-plugin="@shinon/token-usage"`), dann eine Sidebar-Counter-Klasse
+     * der gelieferten DSH-UI (`.dsw-token-display`, `.dsw-token-usage`, …),
+     * und zuletzt der breite Regex ueber die ganze Oberflaeche. Jede Ebene
+     * liefert einen Wert, und `Math.max` ueber alle Ebenen — das Maximum
+     * bleibt die eine Quelle, aber der breite Regex wird nicht mehr die
+     * einzige: wenn der Sidebar-Counter eine Session-Zahl zeigt und der
+     * Chat einen Turn-Counter, nimmt der breite Regex das Maximum beider
+     * und zahlt XP doppelt. Die Schichten koennen diese Luecke nicht mehr
+     * schliessen, aber sie mindern den Schaden.
      */
-    function readTokenTotal() {
-      const text = document.body?.innerText ?? '';
+    function parseTokenText(text) {
       let total = 0;
       const pattern = /([0-9][0-9.,]*)\s*([KkMm])?\s*tok\b/g;
       let match;
@@ -818,6 +828,21 @@ window.__ModuleLoader__.load({
         total = Math.max(total, raw * scale);
       }
       return Math.round(total);
+    }
+
+    function readTokenTotal() {
+      let total = 0;
+      // Ebene 1: der SHINON-Counter in der Sidebar (stabil, eigenes Plugin).
+      const shinonCounter = document.querySelector('[data-plugin="@shinon/token-usage"]');
+      if (shinonCounter?.textContent) total = Math.max(total, parseTokenText(shinonCounter.textContent));
+      // Ebene 2: gelieferte DSH-UI-Counter-Klassen (Sitzungs-Counter der Sidebar).
+      for (const selector of ['.dsw-token-usage', '.dsw-token-display', '[data-testid="token-usage"]']) {
+        const el = document.querySelector(selector);
+        if (el?.textContent) total = Math.max(total, parseTokenText(el.textContent));
+      }
+      // Ebene 3: breiter Fallback ueber die ganze Oberflaeche (wie vorher).
+      total = Math.max(total, parseTokenText(document.body?.innerText ?? ''));
+      return total;
     }
 
     function xpFromTokens() {
@@ -1300,12 +1325,19 @@ window.__ModuleLoader__.load({
       const next = threshold(lvl + 1);
       const prev = threshold(lvl);
       const pct = Math.max(0, Math.min(100, Math.round(((s.xp - prev) / Math.max(1, next - prev)) * 100)));
+      // Idle-Wander: der Sprite laeuft HIN UND HER, wenn kein Kampf laeuft und
+      // keine Sperre steht (also wirklich idle). Bei Kampf/Sperre steht er.
+      const idle = s.battle === null && s.lock === null;
       return h('div', {
         className: '__cm_expbar',
         title: `${s.name} · ${SPECIES[s.species].label} · Level ${lvl} · ${s.wins} Siege`,
         'data-plugin': PLUGIN,
       },
-        h('span', { className: '__cm_expbar-pet', dangerouslySetInnerHTML: { __html: speciesGlyph(s.species, lvl, 18) } }),
+        h('span', {
+          className: '__cm_expbar-wander',
+          'data-wander': idle ? 'on' : 'off',
+          'aria-hidden': 'true',
+        }, h('span', { className: '__cm_expbar-pet', dangerouslySetInnerHTML: { __html: speciesGlyph(s.species, lvl, 18) } })),
         h('span', { className: '__cm_expbar-lvl' }, `LV ${lvl}`),
         h('span', { className: '__cm_expbar-track' },
           h('span', { className: '__cm_expbar-fill', style: { width: `${pct}%` } })),
@@ -1725,6 +1757,22 @@ window.__ModuleLoader__.load({
       .__cm_expbar-track { flex: 1; height: 7px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,.12); }
       .__cm_expbar-fill { display: block; height: 100%; background: var(--shinon-gradient, linear-gradient(115deg,#7C3AED,#6366F1)); transition: width .3s ease; }
       .__cm_expbar-meta { color: var(--dsw-alias-label-secondary, #9aa); white-space: nowrap; }
+      /* Idle-Wander: das Pet laeuft im XP-Leisten-Block hin und her.
+         NUR transform (Compositor-Regel, siehe animation.test.mjs) —
+         kein left/top/margin im Keyframe. prefers-reduced-motion schaltet
+         es ab. */
+      .__cm_expbar-wander { position: relative; width: 72px; height: 28px; flex: none; overflow: hidden; }
+      .__cm_expbar-wander svg { position: absolute; left: 4px; top: 4px; }
+      .__cm_expbar-wander[data-wander="on"] svg {
+        animation-name: __cm_wander; animation-duration: 7s;
+        animation-timing-function: ease-in-out; animation-iteration-count: infinite;
+        transform: translateX(0); }
+      @keyframes __cm_wander {
+        0%   { transform: translateX(0) scaleX(1); }
+        42%  { transform: translateX(34px) scaleX(1); }
+        50%  { transform: translateX(34px) scaleX(-1); }
+        92%  { transform: translateX(0) scaleX(-1); }
+        100% { transform: translateX(0) scaleX(1); } }
       /* Die Sperre: Balken, Absagesatz, Zaehler der kalten Abweisungen. */
       .__cm_lock { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin-bottom: 10px;
         border-radius: 6px; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35); }
@@ -1782,7 +1830,8 @@ window.__ModuleLoader__.load({
       @media (prefers-reduced-motion: reduce) {
         .__cm_bar-fill, .__cm_expbar-fill { transition: none; }
         .__cm_lock-fill { animation: none; transform: scaleX(1); }
-        .__cm_ball, .__cm_wild-sprite, .__cm_hit, .__cm_cursor { animation: none; }
+        .__cm_ball, .__cm_wild-sprite, .__cm_hit, .__cm_cursor,
+        .__cm_expbar-wander svg { animation: none; }
         .__cm_ball { opacity: 0; }
         .__cm_wild-sprite { opacity: 1; }
       }

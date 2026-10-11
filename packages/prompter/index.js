@@ -368,7 +368,11 @@ export const Config = z.object({
    * Profil gilt, das Paket hat nur einen Vorgabewert.
    */
   indexBudgetTokens: z.number().default(INDEX_BUDGET_TOKENS),
-  /** Obergrenze der Antwort. Die Antwort ist ein JSON-Objekt, kein Aufsatz. */
+  /**
+   * Obergrenze der Antwort. 0 = kein Limit (unbegrenzte Thinking-Tokens);
+   * die DSH-GenerateOptions-Datei kennt kein `maxTokens: undefined`, aber
+   * das Fehlen des Felds ist die saubere „kein Limit"-Form.
+   */
   maxTokens: z.number().default(1200),
   /** Deterministisch: derselbe Prompt soll denselben Vorschlag ergeben. */
   temperature: z.number().default(0),
@@ -616,7 +620,10 @@ export function buildEnhancerRequest({ text, mode, contract, config, context = n
     model: config.model,
     system: resolved.system,
     messages: [{ role: 'user', content }],
-    maxTokens: config.maxTokens,
+    // `maxTokens: 0` = kein Limit (unbegrenzte Thinking-Tokens). Das Feld
+    // fehlt aus der GenerateOptions-Datei, wenn 0 steht — die LLM-Route
+    // liest es nicht, sondern lässt die Antwort frei laufen.
+    ...(config.maxTokens > 0 ? { maxTokens: config.maxTokens } : {}),
     temperature: config.temperature,
     signal,
   };
@@ -965,7 +972,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   return messages === null ? decision : { ...decision, messages };
 }
 
-/** Entscheidung emittieren. Einzige Wirkung des Listeners neben der Prompt-Ersetzung. */
+/** Entscheidung emittieren und in die Fenster-Konvention schreiben. */
 function report(ctx, config, record) {
   if (!config.trace) return;
   if (record.outcome !== 'accepted') {
@@ -980,6 +987,22 @@ function report(ctx, config, record) {
     // ist gefallen, die Spur ist Nebensache — sie darf den Schritt nicht mitreissen.
     console.error(`[shinon-prompter] Spur nicht zustellbar (${error?.message}) — Entscheidung bleibt`);
   }
+  // Fenster-Konvention: die letzten Entscheidungen (max. 20) in `window.__shinonPrompterTrace`
+  // spiegeln, damit das Client-Panel sie ohne Host-Zugriff liest. Fail-open.
+  try {
+    const w = globalThis?.window;
+    if (w !== undefined) {
+      const list = Array.isArray(w.__shinonPrompterTrace) ? w.__shinonPrompterTrace : [];
+      list.unshift({
+        outcome: record.outcome,
+        mode: record.mode,
+        reasons: record.reasons?.slice(0, 5) ?? [],
+        context_source: record.context_source ?? null,
+        at: record.session_id ? Date.now() : null,
+      });
+      w.__shinonPrompterTrace = list.slice(0, 20);
+    }
+  } catch { /* die Spur ist Nebensache; das Fenster darf den Schritt nicht brechen */ }
 }
 
 /**
