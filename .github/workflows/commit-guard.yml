@@ -39,10 +39,20 @@ jobs:
         # DSH-Abhängige Tests (uebergabe, store, prompter-contract, …) brauchen
         # `dsh` im PATH; ohne ihn meldet der Test sichtbar einen Skip (REGEL:
         # ein Skip ist kein Grün). Deshalb: `npm install` mit der lock-Datei —
-        # `npm ci` ist die saubere Form, keine neuen Auflösungen.
+        # `npm ci` ist die saubere Form, keine neuen Auflösungen. `dsh` ist ein
+        # Workspace-Paket (package.json bin) und liegt nach `npm install` in
+        # `node_modules/.bin/dsh`; das wird in den PATH gelegt.
         run: |
           set -euo pipefail
-          npm ci --no-audit --no-fund
+          npm install --no-audit --no-fund
+          # dsh im PATH: der Binärpfad des DSH-Pakets (link: oder normal).
+          if [ -f "node_modules/.bin/dsh" ]; then
+            ln -sf "$(pwd)/node_modules/.bin/dsh" /tmp/dsh-bin 2>/dev/null || true
+            export PATH="/tmp:$(dirname "$(readlink -f node_modules/.bin/dsh)"):$PATH"
+          fi
+          # Fallback: node directly.
+          export PATH="$(pwd)/node_modules/.bin:$PATH"
+          dsh --version || echo "WARNUNG: dsh nicht verfügbar — dsh-Tests werden sichtbar skippen"
           node --test scripts/gate/tests/*.test.mjs
 
       # Die Einzeltests der Codemon-Engine brauchen kein DSH, keinen Browser und
