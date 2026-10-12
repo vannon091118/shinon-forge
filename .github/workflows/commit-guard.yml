@@ -67,3 +67,7 @@ jobs:
       # den Gate-Tests oben mit.
       - name: Scoring-Signale testen (rein, ohne DSH)
         run: node --test packages/scoring/test/*.test.mjs
+
+      # Same engine and policy as local checks; missing compiler/config/source coverage fails closed.
+      - name: TypeScript Gate (pinned compiler + source coverage)
+        run: npm run typecheck

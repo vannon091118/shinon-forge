@@ -67,6 +67,24 @@ export function shouldRunLocal(id, policy = POLICY) {
   return policy.engine.local.includes(id);
 }
 
+/** Normalize legacy issue-array plugins and richer status-bearing plugins. */
+export function normalizePluginResult(result) {
+  if (Array.isArray(result)) return { issues: result, status: 'pass', detail: '' };
+  if (result && typeof result === 'object' && Array.isArray(result.issues)) {
+    const status = typeof result.status === 'string' ? result.status : 'pass';
+    if (!['pass', 'not-applicable', 'fail'].includes(status)) {
+      return { issues: ['Plugin returned an unsupported status'], status: 'fail', detail: '' };
+    }
+    return {
+      issues: result.issues,
+      status,
+      detail: typeof result.detail === 'string' ? result.detail : '',
+    };
+  }
+  if (result == null) return { issues: [], status: 'pass', detail: '' };
+  return { issues: ['Plugin returned neither an issue array nor a valid result object'], status: 'fail', detail: '' };
+}
+
 export async function loadPlugins() {
   const files = readdirSync(PLUGIN_DIR).filter((f) => f.endsWith('.mjs')).sort();
   const plugins = [];
@@ -80,6 +98,12 @@ export async function loadPlugins() {
 
 async function main() {
   const args = process.argv.slice(2);
+  const onlyIndex = args.indexOf('--only');
+  const only = onlyIndex >= 0 ? args[onlyIndex + 1] : null;
+  if (onlyIndex >= 0 && (!only || only.startsWith('--'))) {
+    console.error('Usage: node scripts/gate/engine.mjs --only <plugin-id>');
+    process.exit(2);
+  }
   const localOnly = args.includes('--local');
   const release = args.includes('--release');
   const forceFull = release || args.includes('--full') || args.includes('--push');
@@ -95,30 +119,42 @@ async function main() {
     process.exit(1);
   }
 
-  const mode = localOnly ? 'LOCAL' : release ? 'RELEASE' : forceFull ? 'FULL' : 'SLICE';
+  if (only && !plugins.some((plugin) => plugin.id === only)) {
+    console.error(`Unknown gate plugin: ${only}`);
+    process.exit(2);
+  }
+
+  const mode = only ? `ONLY:${only}` : localOnly ? 'LOCAL' : release ? 'RELEASE' : forceFull ? 'FULL' : 'SLICE';
   console.log(`🦊 Shinon Gate — ${mode} — ${changed.length} geänderte Dateien · ${packages.length} Pakete`);
 
   let failed = 0;
   let ran = 0;
   let skipped = 0;
+  let notApplicable = 0;
 
   for (const plugin of plugins) {
-    const run = localOnly
-      ? shouldRunLocal(plugin.id)
-      : shouldRun(plugin.id, changed, forceFull);
+    const run = only
+      ? plugin.id === only
+      : localOnly
+        ? shouldRunLocal(plugin.id)
+        : shouldRun(plugin.id, changed, forceFull);
     if (!run) {
       console.log(`⏭️  ${plugin.id} — geskippt (kein relevanter Slice)`);
       skipped++;
       continue;
     }
     ran++;
-    let issues;
+    let outcome;
     try {
-      issues = plugin.check(ctx) || [];
+      outcome = normalizePluginResult(plugin.check(ctx));
     } catch (error) {
-      issues = [`Plugin-Fehler: ${error.message}`];
+      outcome = normalizePluginResult([`Plugin-Fehler: ${error.message}`]);
     }
-    if (issues.length === 0) {
+    const { issues } = outcome;
+    if (outcome.status === 'not-applicable' && issues.length === 0) {
+      console.log(`ℹ️  ${plugin.id} — NOT_APPLICABLE${outcome.detail ? ` — ${outcome.detail}` : ''}`);
+      notApplicable++;
+    } else if (issues.length === 0) {
       console.log(`✅ ${plugin.id}`);
     } else {
       console.error(`💥 ${plugin.id} — ${issues.length} Problem(e)`);
@@ -146,7 +182,7 @@ async function main() {
 
   console.log(
     `\n${failed + brandingFailed === 0 ? '✅' : '💥'} Verdict: ${failed + brandingFailed === 0 ? 'PASS' : 'FAIL'} — ` +
-      `${ran} gelaufen, ${skipped} geskippt, ${failed} fehlgeschlagen` +
+      `${ran} gelaufen, ${skipped} geskippt, ${notApplicable} nicht anwendbar, ${failed} fehlgeschlagen` +
       (branding ? `, Branding-Messung ${brandingFailed === 0 ? 'grün' : 'rot'}` : ', Branding-Messung nicht gelaufen'),
   );
   process.exit(failed + brandingFailed > 0 ? 1 : 0);

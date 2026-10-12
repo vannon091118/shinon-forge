@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matchesSlice, shouldRun, shouldRunLocal } from '../engine.mjs';
+import { matchesSlice, shouldRun, shouldRunLocal, normalizePluginResult } from '../engine.mjs';
 import { parsePolicy, validateCoverage, validateLocalSubset } from '../policy.mjs';
 
 const policy = {
@@ -63,4 +63,16 @@ test('validateLocalSubset: local muss Teilmenge von always sein', () => {
   const bad = { version: 1, engine: { always: ['manifest'], local: ['contract'], slices: {} } };
   assert.equal(validateLocalSubset(bad).length, 1);
   assert.equal(validateLocalSubset(policy).length, 0);
+});
+
+test('normalizePluginResult preserves legacy arrays and distinguishes NOT_APPLICABLE', () => {
+  assert.deepEqual(normalizePluginResult([]), { issues: [], status: 'pass', detail: '' });
+  assert.deepEqual(normalizePluginResult(['broken']), { issues: ['broken'], status: 'pass', detail: '' });
+  assert.deepEqual(
+    normalizePluginResult({ status: 'not-applicable', detail: 'no TypeScript source yet', issues: [] }),
+    { status: 'not-applicable', detail: 'no TypeScript source yet', issues: [] },
+  );
+  assert.equal(normalizePluginResult({ status: 'not-applicable', issues: ['real error'] }).issues.length, 1);
+  assert.equal(normalizePluginResult({ status: 'unknown', issues: [] }).status, 'fail');
+  assert.equal(normalizePluginResult({ malformed: true }).status, 'fail');
 });
