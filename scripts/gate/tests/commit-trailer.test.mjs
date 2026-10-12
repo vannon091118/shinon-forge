@@ -23,12 +23,14 @@ import {
   FORBIDDEN_LINES,
   VANNON_TRAILER,
   checkMessage,
+  countWords,
   hasVannonTrailer,
   isForbiddenFooterLine,
   swapTrailer,
 } from '../../lib/commit-text.mjs';
 import {
   FORBIDDEN_SAMPLE,
+  LONG_BODY,
   VALID_SAMPLE,
   hookIssues,
   ruleIssues,
@@ -116,13 +118,70 @@ test('commit: gültige Nachricht mit Trailer geht durch', () => {
 test('commit: Trailer wird mit Bindestrich und anderem Whitespace erkannt', () => {
   const folded = VANNON_TRAILER.replace('—', '-').replace(/\s+/g, '  ');
   assert.equal(hasVannonTrailer(withTrailer(folded)), true);
-  assert.equal(checkMessage(withTrailer(folded)).ok, true);
+  assert.equal(checkMessage(`${LONG_BODY}\n\n${folded}\n`).ok, true);
 });
 
 test('commit: Kommentarzeilen zählen nicht als Footer', () => {
   assert.equal(isForbiddenFooterLine('# Generated with Codebuff 🤖'), false);
-  const message = `Titel\n\nBody.\n\n# Bitte beachten\n\n${VANNON_TRAILER}\n`;
+  const message = `Titel\n\n${LONG_BODY}\n\n# Bitte beachten\n\n${VANNON_TRAILER}\n`;
   assert.equal(checkMessage(message).ok, true);
+});
+
+// ── 1b. Wort-Regel (150+ Wörter, Daten namentlich, Bildsprache) ─────────────
+
+test('commit: Wort-Regel — kurze Nachricht wird abgelehnt, lange geht durch', () => {
+  const short = withTrailer('Titel\n\nEin kurzer Body ohne Umfang.');
+  const result = checkMessage(short);
+  assert.equal(result.ok, false);
+  assert.ok(result.violations.some((violation) => violation.includes('Wort-Regel: Nachricht zu kurz')));
+  assert.equal(checkMessage(VALID_SAMPLE).ok, true);
+});
+
+test('commit: Wort-Regel — 150 Wörter stehen, 149 fallen', () => {
+  const words150 = ['Start scripts/lib/commit-text.mjs 32/0 wie ein Wächter', ...Array(144).fill('Wort')].join(' ');
+  assert.equal(countWords(words150), 150);
+  assert.equal(checkMessage(withTrailer(words150)).ok, true);
+  const words149 = ['Start scripts/lib/commit-text.mjs 32/0 wie ein Wächter', ...Array(143).fill('Wort')].join(' ');
+  assert.equal(countWords(words149), 149);
+  const result = checkMessage(withTrailer(words149));
+  assert.equal(result.ok, false);
+  assert.ok(result.violations.some((violation) => violation.includes('zu kurz')));
+});
+
+test('commit: Wort-Regel — anonyme Zahlen ohne Herkunft zählen nicht als Daten', () => {
+  const filler = Array(160).fill('Wort').join(' ');
+  const anonymous = withTrailer(`Titel\n\n${filler} wie ein Wächter, alles besser, 401 Dinge.`);
+  const result = checkMessage(anonymous);
+  assert.equal(result.ok, false);
+  assert.ok(result.violations.some((violation) => violation.includes('namentlich')));
+  assert.ok(!result.violations.some((violation) => violation.includes('zu kurz')));
+  assert.ok(!result.violations.some((violation) => violation.includes('Bildsprache')));
+});
+
+test('commit: Wort-Regel — trockener Bericht ohne Bild fällt, jede Datenform steht', () => {
+  const filler = Array(160).fill('Wort').join(' ');
+  const dry = withTrailer(`Titel\n\n${filler} scripts/lib/commit-text.mjs 32/0.`);
+  const dryResult = checkMessage(dry);
+  assert.equal(dryResult.ok, false);
+  assert.ok(dryResult.violations.some((violation) => violation.includes('Bildsprache')));
+  for (const proof of ['scripts/lib/commit-text.mjs', '3add4879a8b6fc28', '401/401', 'Exit 0', 'Run 37571432238', '#127']) {
+    const message = withTrailer(`Titel\n\n${filler} wie ein Wächter mit ${proof}.`);
+    assert.equal(checkMessage(message).ok, true, `abgelehnt trotz Beleg: ${proof}`);
+  }
+});
+
+test('commit: Wort-Regel — Trailer und #-Zeilen füttern den Zähler nicht', () => {
+  const words = ['Start scripts/lib/commit-text.mjs 32/0 wie ein Wächter', ...Array(144).fill('Wort')].join(' ');
+  const padded = `${words}\n\n# ${Array(60).fill('Kommentar').join(' ')}\n\n${VANNON_TRAILER}\n`;
+  assert.equal(countWords(padded), 150);
+  assert.equal(checkMessage(padded).ok, true);
+});
+
+test('commit: Wort-Regel — Footer- und Wort-Verstöße werden getrennt gemeldet', () => {
+  const result = checkMessage(FORBIDDEN_SAMPLE);
+  assert.equal(result.ok, false);
+  assert.ok(result.violations.some((violation) => violation.includes('Footer') || violation.includes('co-authored-by')));
+  assert.ok(!result.violations.some((violation) => violation.includes('Wort-Regel')), 'der lange Body darf keinen Wort-Verstoß tragen');
 });
 
 test('commit: Tausch entfernt die Signatur und ist idempotent', () => {

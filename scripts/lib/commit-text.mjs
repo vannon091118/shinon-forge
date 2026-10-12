@@ -5,10 +5,13 @@
  * Damit erzwingen lokaler Hook, Gate und CI dieselben Regeln, ohne sie zu
  * duplizieren (wie Feed-the-Floors lib/commit-text.mjs, hier für Shinon).
  *
- * Zwei Regeln, beide fail-closed:
+ * Drei Regeln, alle fail-closed:
  *   1. Kein KI-Footer. Nie — und in keiner Schreibweise: `with`/`by`, eine oder
  *      mehrere Leerzeichen, Tabs, optionaler Doppelpunkt.
  *   2. Der Vannon-Trailer ist Pflicht — er ersetzt jede Maschinen-Signatur.
+ *   3. Die Wort-Regel: mindestens 150 Wörter (ohne Trailer und `#`-Zeilen),
+ *      alle Daten namentlich genannt (Pfad, SHA, Messung, Exit oder Run/PR)
+ *      und Bildsprache Pflicht (Vergleichs-/Bildmarker aus fester Liste).
  *
  * Der Trailer ist bewusst ein Datenwert an EINER Stelle: ändert sich die
  * Schreibweise, ändert sich hier etwas, und CI, Hook, Gate und Tests ziehen mit.
@@ -92,6 +95,95 @@ export function forbiddenLabelsOf(line) {
   return labels;
 }
 
+/**
+ * Regel 3: die Wort-Regel. Eine Commit-Nachricht erzählt die Änderung — kein
+ * Stichwort, keine anonyme Zahl. Drei Zusagen, alle am Inhalt (ohne Trailer
+ * und ohne `#`-Kommentarzeilen, die git ohnehin abschneidet):
+ *
+ *   1. Umfang: mindestens WORD_MIN Wörter (Whitespace-getrennt; Zahlwörter und
+ *      Code zählen mit — dokumentiert, nicht geraten).
+ *   2. Daten namentlich: mindestens eine konkrete Referenz aus
+ *      NAMED_DATA_PATTERNS (Pfad mit Endung, SHA, Messung `12/3`, Exit oder
+ *      Run/PR/Issue). Eine Zahl ohne Herkunft ist kein Beleg.
+ *   3. Bildsprache: mindestens ein Vergleichs-/Bildmarker aus
+ *      BILDSPRACHE_MARKERS. Die Liste ist bewusst eng und fest: Der Wächter
+ *      prüft einen Marker, kein Stilgefühl — was drinsteht, steht in
+ *      `docs/COMMIT-REGELN.md`, und was nicht drinsteht, zählt nicht.
+ */
+export const WORD_MIN = 150;
+
+/** Konkrete Referenzen: je ein Muster, je ein Name für die Meldung. */
+export const NAMED_DATA_PATTERNS = [
+  { re: /[\w.~\-]+\/[\w.~\/-]+\.\w{1,8}\b/, label: 'Pfad mit Endung (z. B. scripts/lib/commit-text.mjs)' },
+  { re: /\b[0-9a-f]{7,40}\b/, label: 'Commit-SHA (7–40 Hexzeichen)' },
+  { re: /\b\d+\s*\/\s*\d+\b/, label: 'Messung (z. B. 401/401)' },
+  { re: /\bexit\s+\d+\b/i, label: 'Exit-Angabe (z. B. Exit 0)' },
+  { re: /\b(run|pr|issue|commit)\s+#?\d+\b/i, label: 'Run/PR/Issue/Commit mit Nummer' },
+  { re: /#\d+/, label: 'Nummernverweis (#127)' },
+];
+
+/**
+ * Feste Bildmarker. Enge Liste mit Wortgrenzen statt freier Stilprüfung:
+ * `wie der Test zeigt` zählt nicht — `wie ein` schon. Wer einen Marker
+ * vermisst, trägt ihn hier ein (mit Test), statt ihn zu behaupten.
+ */
+export const BILDSPRACHE_MARKERS = [
+  'wie ein',
+  'wie eine',
+  'wie einem',
+  'wie einer',
+  'wie eines',
+  'als wäre',
+  'als ob',
+  'als sei',
+  'gleich einem',
+  'gleich einer',
+  'bildlich',
+  'metapher',
+  'szene:',
+  'bild:',
+];
+
+/** Inhaltszeilen: ohne Trailer-Zeilen und ohne `#`-Kommentare. */
+function contentText(raw) {
+  return String(raw ?? '')
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (trimmed === '' || trimmed.startsWith('#')) return false;
+      return !fold(trimmed).includes(TRAILER_FOLDED);
+    })
+    .join('\n');
+}
+
+/** Wörter zählen (Whitespace-getrennt). Exportiert, damit Tests die Grenze pinnen. */
+export function countWords(raw) {
+  return contentText(raw)
+    .split(/\s+/)
+    .filter((word) => word !== '').length;
+}
+
+/**
+ * Verstöße gegen die Wort-Regel (leer ⇒ Umfang, Daten und Bildsprache stehen).
+ */
+export function wordViolations(raw) {
+  const content = contentText(raw);
+  const violations = [];
+  const words = countWords(raw);
+  if (words < WORD_MIN) {
+    violations.push(`Wort-Regel: Nachricht zu kurz — ${words} Wörter, mindestens ${WORD_MIN} verlangt (Trailer und #-Zeilen zählen nicht)`);
+  }
+  if (!NAMED_DATA_PATTERNS.some(({ re }) => re.test(content))) {
+    violations.push(
+      `Wort-Regel: keine Daten namentlich genannt — verlangt ist mindestens eines: ${NAMED_DATA_PATTERNS.map(({ label }) => label).join('; ')}`,
+    );
+  }
+  const lowered = `\n${content.toLowerCase()}\n`;
+  if (!BILDSPRACHE_MARKERS.some((marker) => lowered.includes(marker))) {
+    violations.push(`Wort-Regel: keine Bildsprache — verlangt ist ein Vergleichs-/Bildmarker: ${BILDSPRACHE_MARKERS.join(', ')}`);
+  }  return violations;
+}
+
 /** Ist diese Zeile ein verbotener Footer? */
 export function isForbiddenFooterLine(line) {
   return forbiddenLabelsOf(line).length > 0;
@@ -127,6 +219,7 @@ export function checkMessage(raw) {
   if (!hasTrailer) {
     violations.push(`Vannon-Trailer fehlt — erwartet als letzte Zeile: ${VANNON_TRAILER}`);
   }
+  for (const violation of wordViolations(text)) violations.push(violation);
   return { ok: violations.length === 0, violations, hasTrailer };
 }
 

@@ -3,7 +3,7 @@
 > **Status:** current — Regeln und ihre Durchsetzung. **Stand:** 2026-10-08
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
-Zwei Regeln. Beide fail-closed. Keine Ausnahmen, kein Schalter.
+Drei Regeln. Alle fail-closed. Keine Ausnahmen, kein Schalter.
 
 ## 1. Kein KI-Footer. Nie.
 
@@ -38,6 +38,30 @@ created by VANNON — Volatile Agent Needing No Other Nonsense, Never Overly Nic
 
 Whitespace und Gedankenstriche werden gefaltet (`–`/`-` sind gleichwertig),
 der Trailer zählt in den letzten drei inhaltlichen Zeilen.
+
+## 3. Die Wort-Regel ist Pflicht
+
+Eine Commit-Nachricht erzählt die Änderung — kein Stichwort, keine anonyme
+Zahl. Drei Zusagen, geprüft am Inhalt (ohne Trailer, ohne `#`-Zeilen):
+
+1. **Umfang:** mindestens **150 Wörter** (Whitespace-getrennt; Zahlwörter und
+   Code zählen mit).
+2. **Daten namentlich:** mindestens eine konkrete Referenz — Pfad mit Endung
+   (`scripts/lib/commit-text.mjs`), Commit-SHA (7–40 Hexzeichen), Messung
+   (`401/401`), Exit-Angabe (`Exit 0`) oder Nummer (`Run 37571432238`, `#127`).
+   Eine Zahl ohne Herkunft ist kein Beleg.
+3. **Bildsprache:** mindestens ein Vergleichs-/Bildmarker aus der festen Liste
+   in `scripts/lib/commit-text.mjs` (`BILDSPRACHE_MARKERS`: `wie ein`,
+   `wie eine`, `als wäre`, `als ob`, `bildlich`, `Metapher`, `Szene:` …).
+   Die Liste ist bewusst eng: Der Wächter prüft einen Marker, kein
+   Stilgefühl. Wer einen Marker vermisst, trägt ihn dort ein — mit Test —,
+   statt ihn zu behaupten.
+
+Die Muster stehen in `scripts/lib/commit-text.mjs` (`WORD_MIN`,
+`NAMED_DATA_PATTERNS`, `BILDSPRACHE_MARKERS`, `wordViolations`). Es gibt genau
+eine Quelle; Hook, Gate und CI lesen dieselbe. Der lokale prepare-Hook tauscht
+nur Footer — 150 Wörter schreiben kann er nicht; die Wort-Regel gilt deshalb
+**nur fail-closed** (commit-msg-Hook und CI lehnen ab, niemand repariert).
 
 ## Durchsetzung
 

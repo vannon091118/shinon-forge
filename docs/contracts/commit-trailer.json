@@ -1,7 +1,7 @@
 {
-  "name": "Commit-Regeln — kein KI-Footer, Vannon-Trailer Pflicht",
+  "name": "Commit-Regeln — kein KI-Footer, Vannon-Trailer Pflicht, Wort-Regel",
   "status": "IMPLEMENTED",
-  "note": "Regeln, Hook-Kette, Gate-Plugin und Bereichs-Scan sind gebaut und getestet (32 Tests in scripts/gate/tests/commit-trailer.test.mjs — u. a. 330 Signatur-Varianten und die Tausch/Prüfungs-Invariante), commit-trailer-Gate, npm run commit:guard). Der CI-Weg entscheidet den Bereich selbst (--ci → scripts/lib/ci-range.mjs) und wird nie enger. Ein echter GitHub-Actions-Lauf ist bestätigt: Run 37571432238 (push auf main, 2026-10-07) hat den Bereich 'cab7d50..c08fd96 (Push: before..after)' aufgelöst, den Commit sauber gemeldet und alle 94 Gate-Tests gefahren — grün. Lokal ebenso verifiziert: Hooks haben beim eigenen Commit gegriffen (prepare tauscht, commit-msg prüft). Offen: ein roter CI-Lauf (ein Verstoß im gepushten Bereich) ist nur offline in temporären Repos belegt, nicht in CI; und die zwei Alt-Commits vor diesem Wächter verletzen die Regel noch (sichtbar über npm run commit:guard -- --all).",
+  "note": "Regeln, Hook-Kette, Gate-Plugin und Bereichs-Scan sind gebaut und getestet (38 Tests in scripts/gate/tests/commit-trailer.test.mjs — u. a. 330 Signatur-Varianten, die Tausch/Prüfungs-Invariante und sechs Wort-Regel-Tests), commit-trailer-Gate, npm run commit:guard). Der CI-Weg entscheidet den Bereich selbst (--ci → scripts/lib/ci-range.mjs) und wird nie enger. Ein echter GitHub-Actions-Lauf ist bestätigt: Run 37571432238 (push auf main, 2026-10-07) hat den Bereich 'cab7d50..c08fd96 (Push: before..after)' aufgelöst, den Commit sauber gemeldet und alle 94 Gate-Tests gefahren — grün. Lokal ebenso verifiziert: Hooks haben beim eigenen Commit gegriffen (prepare tauscht, commit-msg prüft). Offen: ein roter CI-Lauf (ein Verstoß im gepushten Bereich) ist nur offline in temporären Repos belegt, nicht in CI; und die Alt-Commits vor der Wort-Regel verletzen sie noch — jeder kurze Commit der Historie fällt unter `npm run commit:guard -- --all` jetzt zusätzlich durch die Wort-Regel (Umfang, Daten, Bild), nicht nur die zwei, die schon den Trailer verletzten.",
   "evidence": [
     "gh run list → Commit-Wächter & Persona-Runtime … Shinon Commit Guard … push … success (37571432238, 9s)",
     "npm test / npm run gate:full / npm run build lokal grün; .githooks aktiv über core.hooksPath=.githooks"
@@ -33,6 +33,15 @@
       "trace": ".github/workflows/commit-guard.yml (push/pull_request/workflow_dispatch, kein paths, kein continue-on-error) → scripts/commit-guard.mjs --ci → scripts/lib/ci-range.mjs.",
       "replay": "Der Test baut temporäre Git-Repos und fährt --ci mit echter GitHub-Umgebung: auflösbares before ⇒ Spanne, Null-SHA ohne Kontext ⇒ volle Historie, Pull Request ⇒ Basis..Head; Exit-Codes gemessen.",
       "invariant": "Der Workflow enthält push:, pull_request:, keinen paths-Filter und kein continue-on-error — das prüft das Gate-Plugin am Dateiinhalt. Und resolveCiRange liefert in jedem unbestimmten Fall die volle Historie statt eines Teilbereichs."
+    },
+    {
+      "positive": "Jede Commit-Nachricht erzählt die Änderung: mindestens 150 Wörter im Inhalt (ohne Trailer, ohne #-Zeilen), alle Daten namentlich genannt (Pfad mit Endung, SHA, Messung 12/3, Exit oder Run/PR/Issue-Nummer) und Bildsprache Pflicht (Vergleichs-/Bildmarker aus der festen BILDSPRACHE_MARKERS-Liste). Lokal tauscht prepare-commit-msg nur Footer — Prosa schreibt kein Hook; die Wort-Regel gilt nur fail-closed.",
+      "forbidden": "Ein Stichwort-Commit, eine anonyme Zahl ohne Herkunft, ein trockener Bericht ohne Bildmarker; ein Hook, der die Wort-Regel zu reparieren versucht.",
+      "fallback": "Keiner — im Zweifel wird abgelehnt, nicht durchgelassen. Wer einen Marker vermisst, trägt ihn mit Test in BILDSPRACHE_MARKERS ein.",
+      "error": "Wort-Regel-Verstoß mit Zählung (z. B. 7 Wörter, mindestens 150 verlangt) bzw. benannter Lücke (Daten, Bildsprache) — Exit 1.",
+      "trace": "scripts/lib/commit-text.mjs (WORD_MIN, NAMED_DATA_PATTERNS, BILDSPRACHE_MARKERS, wordViolations → checkMessage); Fixtures LONG_BODY/VALID_SAMPLE/FORBIDDEN_SAMPLE in scripts/gate/plugins/commit-trailer.mjs.",
+      "replay": "Sechs Wort-Regel-Tests: kurz/lang, 150/149-Grenze, anonyme Zahlen, jede Datenform, Trailer-Abzug, getrennte Footer/Wort-Meldung.",
+      "invariant": "countWords zählt Trailer und #-Zeilen nie mit; FORBIDDEN_SAMPLE unterscheidet sich von VALID_SAMPLE nur durch den Footer."
     },
     {
       "positive": "Der Mechanismus selbst ist geprüft: das commit-trailer-Gate führt die eingefrorene Signatur gegen die echten Regeln aus und verlangt die Ablehnung.",

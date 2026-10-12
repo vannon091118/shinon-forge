@@ -1,7 +1,8 @@
 /**
  * commit-trailer — der Wächter über den Wächter.
  *
- * Die Commit-Regeln sind ein Vertrag: kein KI-Footer, Vannon-Trailer Pflicht.
+ * Die Commit-Regeln sind ein Vertrag: kein KI-Footer, Vannon-Trailer Pflicht,
+ * Wort-Regel (150+ Wörter, Daten namentlich, Bildsprache).
  * Dieses Plugin prüft nicht die Historie (das tut der Guard im CI-Job),
  * sondern dass der Mechanismus tatsächlich existiert und fail-closed ist:
  *
@@ -25,18 +26,45 @@ import { checkMessage, swapTrailer, VANNON_TRAILER, FORBIDDEN_LINES } from '../.
 
 export const id = 'commit-trailer';
 
+/**
+ * Ein gültiger Body: 150+ Wörter, Daten namentlich, Bildsprache drin.
+ * Beide Fixtures teilen ihn — die verbotene unterscheidet sich NUR durch den
+ * Footer. Damit beweist der Tausch genau eines: Der Footer war der Verstoß,
+ * nicht die Kürze (die Wort-Regel greift für beide gleich).
+ */
+export const LONG_BODY = [
+  'Commit-Wächter: die Wort-Regel gilt ab diesem Commit für jede Nachricht',
+  '',
+  'Drei Zusagen stehen jetzt nebeneinander wie ein Dreiklang aus Umfang, Herkunft und Bild.',
+  'Erstens verlangt der Wächter mindestens 150 Wörter im Inhalt, gemessen in scripts/lib/commit-text.mjs',
+  'mit der Funktion countWords, die den Vannon-Trailer und alle #-Zeilen vorher abzieht, damit',
+  'weder die Signatur noch auskommentierte Git-Hinweise den Zähler füttern wie ein stiller Gast am Buffet.',
+  'Zweitens müssen alle Daten namentlich genannt sein: mindestens ein Pfad mit Endung, ein Commit-SHA,',
+  'eine Messung im Format 32/0, eine Exit-Angabe wie Exit 0 oder eine Nummer wie Run 37571432238.',
+  'Eine Zahl ohne Herkunft ist kein Beleg, sie hängt in der Luft wie ein Satz ohne Verb und fällt durch.',
+  'Drittens ist Bildsprache Pflicht: mindestens ein Vergleichs- oder Bildmarker aus der festen Liste in',
+  'BILDSPRACHE_MARKERS, zum Beispiel wie ein Wächter, als wäre jede Zeile ein Versprechen, oder bildlich gesprochen.',
+  'Die Liste ist bewusst eng, damit der Wächter einen Marker prüft und kein Stilgefühl wie ein Kritiker im Feuilleton.',
+  'Geprüft wird das alles in scripts/gate/tests/commit-trailer.test.mjs, das nach diesem Commit 38 Tests fährt:',
+  'die alten 32 plus sechs neue für Umfang, Daten, Bildsprache, die 150/149-Grenze, den Abzug von Trailer und',
+  'Kommentaren sowie die getrennte Zählung von Footer- und Wort-Verstößen. Der Guard läuft mit Exit 0 genau dann,',
+  'wenn alle drei Regeln gleichzeitig stehen wie drei Beine eines Hockers, der erst dann nicht wackelt.',
+  'Wer einen Marker vermisst, trägt ihn in BILDSPRACHE_MARKERS ein wie ein Wort ins Wörterbuch, mit Test dazu,',
+  'statt ihn zu behaupten — im Zweifel wird abgelehnt, nicht durchgelassen, als wäre Nachsicht ein Fehler.',
+].join('\n');
+
 /** Die Signatur, die niemals in einem Commit landen darf — als Testfall eingefroren. */
 export const FORBIDDEN_SAMPLE = [
   'Wave 2: irgendein Feature',
   '',
-  'Ein Body.',
+  LONG_BODY,
   '',
   'Generated with Codebuff 🤖',
   'Co-Authored-By: Codebuff <noreply@codebuff.com>',
 ].join('\n');
 
-/** Eine gültige Nachricht: Body + Trailer. */
-export const VALID_SAMPLE = ['Etwas ändern', '', 'Warum es geändert wurde.', '', VANNON_TRAILER].join('\n');
+/** Eine gültige Nachricht: langer Body + Trailer. */
+export const VALID_SAMPLE = ['Etwas ändern', '', LONG_BODY, '', VANNON_TRAILER].join('\n');
 
 const REQUIRED_FILES = [
   'scripts/lib/commit-text.mjs',
