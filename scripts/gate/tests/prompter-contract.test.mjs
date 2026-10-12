@@ -117,10 +117,11 @@ function connect(config = {}, { llm, services } = {}) {
     ...(services === undefined ? {} : { get: (name) => services[name] }),
     ...(llm === undefined ? {} : { llm }),
   };
-  // `notesPath: ''` als Harness-Vorgabe: diese Datei prueft Modus-Vertrag,
-  // Annahme-Regeln und Isolation, und deren Aufrufe tragen ihren Block genau.
-  // Wer die Zettel pruefen will, gibt einen eigenen Pfad mit (Abschnitt 7).
-  const resolved = bundle.Config({ notesPath: '', ...config });
+  // `notesPath: ''` und `skillsPath: ''` als Harness-Vorgabe: diese Datei prueft
+  // Modus-Vertrag, Annahme-Regeln und Isolation, und deren Aufrufe tragen ihren
+  // Block genau. Wer die Zettel pruefen will, gibt einen eigenen Pfad mit
+  // (Abschnitt 7). Wer Skills prueft, gibt `skillsPath` mit (Zug 6).
+  const resolved = bundle.Config({ notesPath: '', skillsPath: '', ...config });
   const dispose = quiet(() => bundle.apply(host, resolved));
   return { ctx, records, config: resolved, dispose };
 }
@@ -373,7 +374,7 @@ test('MAX: der definierte Kontext wird angenommen und als Datenblock gerendert',
   assert.equal(llm.calls.length, 1);
   const request = llm.calls[0];
   assert.equal(request.system, bundle.POLICIES.MAX, 'MAX benutzt die MAX-Policy');
-  assert.equal(request.messages[0].content.length, 2, 'Roh-Prompt plus Kontextblock');
+  assert.equal(request.messages[0].content.length, 2, 'Roh-Prompt plus Kontextblock — ohne Zettel/Skills/Ton steht kein Stand');
 
   const block = request.messages[0].content[1].text;
   assert.ok(block.startsWith('<untrusted_project_context>'), 'der Block ist markiert');
@@ -1016,6 +1017,10 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     // Der Vorgabewert steht als Konstante des Pakets hier GEPINNT — ein
     // stiller Wechsel des Ordners waere ein Lauf ohne seine Lessons.
     notesPath: bundle.NOTES_DIR_DEFAULT,
+    // Neu mit der Skill-Selektion (Zug 6): das Verzeichnis der Skills im Projekt.
+    // Die Vorgabe steht als Konstante des Pakets, GEPINNT — ein stiller Wechsel
+    // des Ordners waere ein Lauf ohne seine Skills.
+    skillsPath: bundle.SKILLS_DIR_DEFAULT,
     maxTokens: 1200,
     temperature: 0,
     timeoutMs: 15000,
@@ -1307,7 +1312,7 @@ test('Zettel: der passende Zettel steht als eigener Block im Aufruf und im Daten
   assert.ok(request.messages[0].content[2].text.startsWith('<shinon_stand>'), 'der Stand ist ein eigener Block');
   assert.ok(request.messages[0].content[2].text.includes('<zettel thema="prompter">'));
   assert.ok(request.messages[0].content[2].text.includes('bei: Eine Pruefung steht an'));
-  assert.deepEqual(records[0].stand, { stance: null, tone: 'none', tendencies: [], notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null } });
+  assert.deepEqual(records[0].stand, { stance: null, tone: 'none', tendencies: [], notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null }, skills: { loaded: [], reason: 'SKILLS_OFF' } });
   dispose();
 });
 
@@ -1319,6 +1324,8 @@ test('Zettel: ein fremdes Thema laedt nicht — mit Grund, nicht still', async (
 
   await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
 
+  // Ein Zettel ohne Treffer und ohne Skills ergibt KEINEN Stand — die Lücke
+  // ist ehrlich (kein `<shinon_stand>` im Aufruf), nicht ein leerer Block.
   assert.equal(llm.calls[0].messages[0].content.length, 2, 'kein Stand ohne passenden Zettel');
   assert.deepEqual(records[0].stand.notes.loaded, []);
   assert.deepEqual(records[0].stand.notes.reasons, ['THEMA_NICHT_IM_KONTEXT']);
@@ -1418,6 +1425,7 @@ test('Stand: Haltung und Tendenzen stehen im selben Block wie die Zettel', async
     tone: 'scoring',
     tendencies: ['korrektur hoch', 'zustimmung niedrig'],
     notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null },
+    skills: { loaded: [], reason: 'SKILLS_OFF' },
   });
   dispose();
 });

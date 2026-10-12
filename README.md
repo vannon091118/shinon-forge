@@ -6,7 +6,7 @@
 <br/>
 
 <!-- STATUS BOARD — Zahlen sind hier bewusst NICHT wiederholt; Eigentümer ist docs/ZAHLEN.md -->
-<a href="https://github.com/vannon091118/shinon-forge/releases"><img src="https://img.shields.io/badge/version-v0.2.0-7B2FF7?style=for-the-badge&logo=git&logoColor=white" alt="Version (Spiegel von package.json)"/></a>&nbsp;
+<a href="https://github.com/vannon091118/shinon-forge/releases"><img src="https://img.shields.io/badge/version-v0.3.0-7B2FF7?style=for-the-badge&logo=git&logoColor=white" alt="Version (Spiegel von package.json)"/></a>&nbsp;
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6B7280?style=for-the-badge" alt="MIT"/></a>&nbsp;
 <a href="package.json"><img src="https://img.shields.io/badge/node-%5E22.19.0%20%7C%7C%20%3E%3D24-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node (Spiegel von package.json, Zahl: docs/ZAHLEN.md §1)"/></a>&nbsp;
 <a href="docs/INDEX.md"><img src="https://img.shields.io/badge/DOKU-INDEX-1D4ED8?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Doku-Index"/></a>&nbsp;
@@ -23,7 +23,7 @@
 
 ---
 
-> **Status:** current — Einstieg in das Repository. **Stand:** 2026-10-10
+> **Status:** current — Einstieg in das Repository. **Stand:** 2026-10-12
 > **Dokumentation:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 ---
@@ -151,7 +151,7 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 | **[@shinon/project-index](packages/project-index)** | persistenter Projektindex (files, symbols, edges, FTS) außerhalb des Repos | ✅ |
 | **[@shinon/codingmon](packages/codingmon)** | Pet-/Kampf-System mit dauerhaftem Zustand und Client→Host-Naht | ✅ |
 | **[@shinon/key-router](packages/key-router)** | Key-Pool mit 429-Rotation und Eskalationszeiten | — |
-| **[@shinon/narrative](packages/narrative)** | Chronicle, Arcs, Relationships, Composite State | — |
+| **[@shinon/narrative](packages/narrative)** | Chronicle, Arcs, Relationships, Composite State (Zug 5 aktiviert) | ✅ |
 | **[@shinon/shinon-forge](packages/shinon-forge)** | Memory Sync, Global Runner, Engine Adapters | — |
 | **[@shinon/better-errors](packages/better-errors)** | Config-Ebene ohne Logik: `apply()` loggt nur | ✅ |
 | **[@shinon/token-usage](packages/token-usage)** | zeigt im Sidebar-Fuß die Token-Zahl des JÜNGSTEN Turns (aus dessen eigenen Ereignissen gefaltet, dieselbe Zahl wie DSHs Turn-Zeile) und im Titel daneben die Sitzungssumme (DSH-Sitzungs-Projektion `tokenUsage`, dieselbe Zahl wie DSHs Fußpille) | ✅ |
@@ -159,10 +159,11 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 | **[@shinon/popup](packages/popup)** | zeigt Original/Ergebnis/Prozess im `conversation.composer.dock` | — |
 
 Die Spalte „Profil“ ist gemessen aus `profiles/shinon/package.json` (Zahl: `docs/ZAHLEN.md` §1).
-Fünf Pakete stehen nicht darin (`key-router`, `narrative`, `openapi`, `popup`,
+Vier Pakete stehen nicht darin (`key-router`, `openapi`, `popup`,
 `shinon-forge`) — bei `openapi` ist das eine dokumentierte Entscheidung
-(`docs/ARCHITECTURE.md` §4); für die übrigen vier ist in diesem Baum **kein** Grund
-verzeichnet. Alle 19 Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
+(`docs/ARCHITECTURE.md` §4); die übrigen tragen selbst
+`"dsh": { "inactive": true }` im eigenen Manifest (`dead-package`-Gate).
+Alle 19 Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
 allein `dsh.profile.bundles` im Profil.
 
 ---
@@ -257,8 +258,8 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
   `codingmon-store` rot statt zu überspringen), einer ist ein bewusstes Verhalten
   (`message-ingress` verweigert die Zusage gegen eine ungeprüfte DSH-Fassung).
 - **Versionsangleich der Pakete** (16× `1.0.0`, 3× `0.1.0`) — deshalb meldet `doctor` Drift.
-- **Fünf nicht aktivierte Pakete** (`key-router`, `narrative`, `openapi`, `popup`,
-  `shinon-forge`): entscheiden, ob sie ins Profil kommen. Alle fünf sind gebaut und
+- **Vier nicht aktivierte Pakete** (`key-router`, `openapi`, `popup`,
+  `shinon-forge`): entscheiden, ob sie ins Profil kommen. Alle vier sind gebaut und
   laden im Distributionstest; keines ist vergessen, aber keines ist aktiv.
 - **Native App** (Stufe 1 scharf, 2–4 Konzept): [`docs/STARTER-PLAN.md`](docs/STARTER-PLAN.md).
 - **Belege nachziehen**, wo nur ältere Messungen existieren: `docs/probes/` nennt je

@@ -122,11 +122,20 @@ export const INDEX_BUDGET_TOKENS = 6000;
 /** Vertragsname der Zettel-Regeln (Zug 4). */
 export const NOTE_RULES_CONTRACT = 'shinon.note-rules/v1';
 
+/** Vertragsname der Skill-Regeln (Zug 6). */
+export const SKILL_RULES_CONTRACT = 'shinon.skill-rules/v1';
+
 /** Wo die Regeln des Veredlers liegen (relativ zum Paket, wie der Kontextpfad). */
 export const NOTE_RULES_PATH = './assets/note-rules.json';
 
+/** Wo die Skill-Regeln liegen (relativ zum Paket). */
+export const SKILL_RULES_PATH = './assets/skill-rules.json';
+
 /** Der Vorgabewert des Zettel-Verzeichnisses (relativ zum Arbeitsverzeichnis). */
 export const NOTES_DIR_DEFAULT = 'generated-skills';
+
+/** Der Vorgabewert des Skill-Verzeichnisses (relativ zum Arbeitsverzeichnis). */
+export const SKILLS_DIR_DEFAULT = '.agents/skills';
 
 /** Vertragsname des Stand-Blocks (Zug 4/5). */
 export const STAND_CONTRACT = 'shinon.stand/v1';
@@ -408,6 +417,13 @@ export const Config = z.object({
    */
   notesPath: z.string().default(NOTES_DIR_DEFAULT),
   /**
+   * Verzeichnis der Skills (Zug 6), relativ zum ARBEITSVERZEICHNIS.
+   *
+   * Dieselbe Regel wie die Zettel: die Skills gehoeren dem PROJEKT, nicht dem
+   * Tarball. Leer heisst: keine Skills laden (fail-open, `skills: null`).
+   */
+  skillsPath: z.string().default(SKILLS_DIR_DEFAULT),
+  /**
    * Budget des Index-Kontexts. Der Enhancer deckelt selbst — der Wert aus dem
    * Profil gilt, das Paket hat nur einen Vorgabewert.
    */
@@ -501,6 +517,113 @@ export function readNotes(config, rules) {
 }
 
 /**
+ * Die Regeln der Skill-Selektion (Zug 6) laden und gegen ihren Vertragsnamen
+ * pruefen — dieselbe Bauform wie die Zettel-Regeln. Ein fehlendes Verzeichnis
+ * ist kein Defekt: Skills gehoeren dem PROJEKT, nicht dem Tarball, und ein
+ * Projekt ohne .agents/skills lauft einfach ohne Skill-Block (fail-open).
+ */
+export function loadSkillRules(path = SKILL_RULES_PATH) {
+  return loadJsonContract(path, SKILL_RULES_CONTRACT, (parsed) => parsed);
+}
+
+/** Das Skill-Verzeichnis auflösen — relativ zum ARBEITSVERZEICHNIS. */
+function skillsDir(config) {
+  return isAbsolute(config.skillsPath) ? config.skillsPath : join(process.cwd(), config.skillsPath);
+}
+
+/**
+ * Ein Skill lesen: Name + Beschreibung + Use-When aus seinem Ordner.
+ *
+ * Ein Skill liegt in `.agents/skills/<name>/` mit einer `SKILL.md` (Frontmatter
+ * oder freier Text). Das Feld, das die Auswahl steuert, ist die BESCHREIBUNG
+ * (name + description + use-when) — nicht der Inhalt. Wie bei den Zetteln gilt:
+ * nur was geladen wird, geht in den Block; was nicht passt, bleibt außen vor.
+ *
+ * Fail-Richtungen, wie beim Zettel: ein unlesbarer Ordner landet in `skipped`,
+ * nicht in der Liste. Ein leerer Ordner ergibt `reason: SKILLS_EMPTY`, nicht
+ * einen still leeren Block.
+ */
+export function readSkills(config, rules) {
+  const reading = rules?.reading ?? {};
+  if (typeof config?.skillsPath !== 'string' || config.skillsPath === '') return { skills: [], skipped: [], reason: 'SKILLS_OFF' };
+  const dir = skillsDir(config);
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch (error) {
+    return { skills: [], skipped: [], reason: `SKILLS_UNREADABLE:${error?.code ?? 'ERROR'}` };
+  }
+
+  const skills = [];
+  const skipped = [];
+  for (const entry of entries.filter((dirEntry) => dirEntry.isDirectory()).map((dirEntry) => dirEntry.name).sort()) {
+    const file = join(dir, entry, 'SKILL.md');
+    let text;
+    try {
+      text = readFileSync(file, 'utf8');
+    } catch (error) {
+      skipped.push({ file: entry, reason: `NICHT_LESBAR:${error?.code ?? 'ERROR'}` });
+      continue;
+    }
+    // Ein Skill trägt Name + Beschreibung in den ersten Zeilen; ohne sie gibt
+    // es nichts zu selektieren. Die Selektion selbst (haystack-match) entscheidet,
+    // welches Skill geladen wird — dieselbe Regel wie bei den Zetteln.
+    const lines = text.split('\n');
+    const name = entry;
+    const description = lines.find((line) => line.trim() !== '' && !line.startsWith('#')) ?? '';
+    skills.push({ name, description, path: file });
+  }
+  if (skills.length === 0) return { skills: [], skipped, reason: 'SKILLS_EMPTY' };
+
+  const maxSkills = Number.isFinite(reading.maxSkills) ? reading.maxSkills : 4;
+  const minHits = Number.isFinite(reading.minHits) ? reading.minHits : 1;
+  return { skills: skills.slice(0, maxSkills), skipped, reason: null, minHits };
+}
+
+/**
+ * Die passenden Skills wählen — über die Beschreibung, nicht über eine Uhr.
+ *
+ * Dieselbe Rechnung wie `selectNotes`: Begriffe der Beschreibung müssen im
+ * Haystack (Prompt + Kontext) vorkommen. Mehr Treffer zuerst, bei Gleichstand
+ * alphabetisch. Ein Skill, dessen Beschreibung niemand auflösen kann, lädt
+ * nicht (fail-closed, eigener Grund).
+ * @param skills - `{ name, description, path }`, so wie der Host sie liest.
+ * @returns { loaded, skipped } — geladene Skills und die übrigen mit Grund.
+ */
+export function selectSkills(skills = [], haystack = [], reading = {}) {
+  const minLength = typeof reading.minTokenLength === 'number' ? reading.minTokenLength : 4;
+  const minHits = typeof reading.minHits === 'number' ? reading.minHits : 1;
+  const words = new Set(tokens(haystack.join(' '), minLength));
+
+  const scored = [];
+  const skipped = [];
+  for (const skill of skills) {
+    if (skill === null || typeof skill !== 'object') {
+      skipped.push({ file: skill, reason: 'KEIN_SKILL' });
+      continue;
+    }
+    const marks = tokens(`${skill.name} ${skill.description}`, minLength);
+    if (marks.length === 0) {
+      skipped.push({ file: skill.name, reason: 'SKILL_OHNE_BESCHREIBUNG' });
+      continue;
+    }
+    const hits = marks.filter((mark) => words.has(mark)).length;
+    if (hits < minHits) {
+      skipped.push({ file: skill.name, reason: 'SKILL_NICHT_IM_KONTEXT' });
+      continue;
+    }
+    scored.push({ ...skill, hits });
+  }
+
+  scored.sort((left, right) => right.hits - left.hits || left.name.localeCompare(right.name));
+  const maxSkills = typeof reading.maxSkills === 'number' ? reading.maxSkills : Infinity;
+  for (const entry of scored.slice(maxSkills)) {
+    skipped.push({ file: entry.name, reason: 'UEBER_DEM_LIMIT' });
+  }
+  return { loaded: scored.slice(0, maxSkills), skipped };
+}
+
+/**
  * Den Stand dieses Schritts bauen: die passenden Zettel aus dem AUFGELOESTEN
  * Kontext (dieselbe Naht, die auch den MAX-Kontext liefert).
  *
@@ -535,14 +658,40 @@ export function standFor(config, runtime, promptText, context, toneState = null)
     ? { loaded: [], skipped: [] }
     : selectNotes(read.notes, haystack, runtime.noteRules.reading ?? {});
   const notes = selected.loaded.map((entry) => entry.note);
-  const block = renderStand({ contract: STAND_CONTRACT, stance, tendencies, notes });
+
+  // Skill-Selektion (Zug 6): dieselbe haystack-Prüfung wie die Zettel, ein
+  // eigener Regeldatensatz. Ein fehlendes Skill-Verzeichnis ist kein Defekt
+  // (fail-open); ein unlesbarer Ordner landet in skipped. Die Skills tragen
+  // den Block, nicht den Inhalt.
+  const skillsOff = typeof config?.skillsPath !== 'string' || config.skillsPath === '';
+  let skillRead;
+  if (skillsOff || (runtime?.skillRules ?? null) === null) {
+    skillRead = { loaded: [], skipped: [], reason: skillsOff ? 'SKILLS_OFF' : 'SKILLS_NO_RULES' };
+  } else {
+    const read = readSkills(config, runtime.skillRules);
+    skillRead = read.skills.length > 0
+      ? selectSkills(read.skills, haystack, runtime.skillRules.reading ?? {})
+      : { loaded: [], skipped: [], reason: read.reason ?? 'SKILLS_EMPTY' };
+  }
+
+  const block = renderStand({
+    contract: STAND_CONTRACT,
+    stance,
+    tendencies,
+    notes,
+    skills: skillRead.loaded,
+    skillsContract: SKILL_RULES_CONTRACT,
+  });
+
   return {
     block,
     stance,
     tendencies,
     tone: toneState?.source ?? 'none',
     thema: notes.map((note) => note.thema),
-    skipped: [...read.skipped, ...selected.skipped],
+    skills: skillRead.loaded.map((skill) => skill.name),
+    skillReason: skillRead.reason,
+    skipped: [...read.skipped, ...selected.skipped, ...skillRead.skipped],
     reason: read.reason,
   };
 }
@@ -563,6 +712,10 @@ export function standTrace(stand) {
     tone: stand.tone,
     tendencies: stand.tendencies.map((entry) => `${entry.klasse} ${entry.stufe}`),
     notes: { loaded: stand.thema, skipped: stand.skipped.length, reasons, reason: stand.reason },
+    skills: {
+      loaded: stand.skills ?? [],
+      reason: stand.skillReason ?? null,
+    },
   };
 }
 
@@ -1288,8 +1441,20 @@ export function apply(ctx, config) {
     }
   }
 
+  // Die Skill-Regeln werden ebenfalls EINMAL beim Mounten geladen. Ein fehlendes
+  // .agents/skills/ ist KEIN Defekt: Skills gehören dem Projekt, nicht dem
+  // Enhancer, und ein Projekt ohne Skills läuft einfach ohne Skill-Block (fail-open).
+  let skillRules = null;
+  if (config.skillsPath !== '') {
+    try {
+      skillRules = loadSkillRules();
+    } catch (error) {
+      console.error(`[shinon-prompter] Skill-Regeln nicht verwendbar (${error?.message}) — kein Skill wird geladen`);
+    }
+  }
+
   assertVocabulary('context state', contextState, CONTEXT_STATES);
-  const runtime = { context, contextState, noteRules };
+  const runtime = { context, contextState, noteRules, skillRules };
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
 
   const route = config.provider === '' || config.model === '' ? 'ohne Route (inaktiv)' : `${config.provider}/${config.model}`;

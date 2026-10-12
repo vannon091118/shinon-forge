@@ -243,8 +243,9 @@ export function renderStand(stand) {
   if (!isRecord(stand)) return null;
   const tens = Array.isArray(stand.tendencies) ? stand.tendencies : [];
   const notes = Array.isArray(stand.notes) ? stand.notes : [];
+  const skills = Array.isArray(stand.skills) ? stand.skills : [];
   const hasStance = stand.stance !== null && stand.stance !== undefined;
-  if (!hasStance && tens.length === 0 && notes.length === 0) return null;
+  if (!hasStance && tens.length === 0 && notes.length === 0 && skills.length === 0) return null;
 
   const lines = ['<shinon_stand>'];
   if (typeof stand.contract === 'string' && stand.contract !== '') {
@@ -260,6 +261,13 @@ export function renderStand(stand) {
     lines.push(`immer: ${escapeText(note.immer)}`);
     lines.push(`weil: ${escapeText(note.weil)}`);
     lines.push('</zettel>');
+  }
+  if (skills.length > 0) {
+    lines.push(`<selected_skills contract="${escapeText(typeof stand.skillsContract === 'string' ? stand.skillsContract : 'shinon.skill-rules/v1')}">`);
+    for (const skill of skills) {
+      lines.push(`  <skill name="${escapeText(skill.name)}">${escapeText(skill.description)}</skill>`);
+    }
+    lines.push('</selected_skills>');
   }
   lines.push('</shinon_stand>');
   return lines.join('\n');
