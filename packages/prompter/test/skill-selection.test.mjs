@@ -19,7 +19,7 @@ function skillRoot() {
 function writeSkill(root, name, description) {
   const dir = join(root, name);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'SKILL.md'), \`---\nname: \${name}\ndescription: \${description}\n---\n\n# \${name}\nBody deliberately excluded from the selector.\n\`);
+  writeFileSync(join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: ${description}\n---\n\n# ${name}\nBody deliberately excluded from the selector.\n`);
 }
 
 const reading = { maxSkills: 4, minHits: 1, minTokenLength: 4, stopWords: ['please', 'can', 'you', 'kannst', 'mir', 'bitte', 'helfen'] };
