@@ -1,6 +1,6 @@
 # Handshake — TypeScript Gate
 
-> **Status:** implementation pushed; hosted CI result to be recorded after the workflow run.  
+> **Status:** implemented, pushed, and verified by GitHub Actions.  
 > **Date:** 2026-10-12  
 > **Scope:** `vannon091118/shinon-forge`
 
@@ -31,5 +31,8 @@ This is gate infrastructure, not a JavaScript-to-TypeScript migration. The exist
 
 ## Validation record
 
-- Local test command and result: recorded after running the suite.
-- GitHub Actions result for the implementation commit: recorded after hosted CI finishes.
+- GitHub Actions run: [Shinon Commit Guard #38195941529](https://github.com/vannon091118/shinon-forge/actions/runs/38195941529) — **success**.
+- Gate suite: `407 passed, 0 failed, 0 skipped`; the real-compiler fixture passed for valid TypeScript, rejected the deliberate `TS2322` type mismatch, and detected a first-party file omitted from the compiler program.
+- Additional CI test steps: Codemon `46 passed, 0 failed, 0 skipped`; Scoring `42 passed, 0 failed, 0 skipped`.
+- TypeScript gate: **PASS / NOT_APPLICABLE**. The compiler version, strict configuration, and source inventory were verified; the application currently contains no first-party TypeScript files. This is explicitly not claimed as a successful application typecheck.
+- Commit checked by the CI run: `7ff21da38a7faf54b56224d6dd128ddf4b824260`.
