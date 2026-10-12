@@ -19,12 +19,12 @@ function skillRoot() {
 function writeSkill(root, name, frontmatter) {
   const dir = join(root, name);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'SKILL.md'), `---\\nname: ${name}\\n${frontmatter}\\n---\\n\\n# ${name}\\nBody deliberately excluded from the selector.\\n`);
+  writeFileSync(join(dir, 'SKILL.md'), \`---\nname: \${name}\n\${frontmatter}\n---\n\n# \${name}\nBody deliberately excluded from the selector.\n\`);
 }
 
 test('readSkills parses description from YAML frontmatter, including folded values', () => {
   const root = skillRoot();
-  writeSkill(root, 'z-special', 'description: >-\\n  Quartz runtime\\n  dependency resolver');
+  writeSkill(root, 'z-special', 'description: >-\n  Quartz runtime\n  dependency resolver');
   const result = readSkills({ skillsPath: root }, { reading: { maxSkills: 1, minHits: 1 } });
 
   assert.equal(result.skills.length, 1);
@@ -56,7 +56,7 @@ test('a skill without a description is reported instead of selected by folder na
   const root = skillRoot();
   const dir = join(root, 'no-description');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'SKILL.md'), '---\\nname: no-description\\n---\\n\\n# No description\\n');
+  writeFileSync(join(dir, 'SKILL.md'), '---\nname: no-description\n---\n\n# No description\n');
 
   const result = readSkills({ skillsPath: root }, { reading: { maxSkills: 1, minHits: 1 } });
   assert.equal(result.skills.length, 0);

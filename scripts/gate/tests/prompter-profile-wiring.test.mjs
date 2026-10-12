@@ -9,11 +9,11 @@ test('MAX bundle uses the runtime index instead of the invalid context placehold
   const bundle = readFileSync(bundlePatch, 'utf8');
   const profile = readFileSync(profilePatch, 'utf8');
 
-  assert.match(bundle, /^\\s*mode:\\s*MAX\\s*$/m, 'MAX remains the selected mode');
+  assert.match(bundle, /^\s*mode:\s*MAX\s*$/m, 'MAX remains the selected mode');
   assert.doesNotMatch(
     bundle,
-    /^\\s*contextPath:\\s*['"]?\\.\\/assets\\/max-context\\.json['"]?\\s*$/m,
+    /^\s*contextPath:\s*['"]?\.\/assets\/max-context\.json['"]?\s*$/m,
     'the invalid schema placeholder must not shadow the runtime index',
   );
-  assert.doesNotMatch(profile, /^\\s*contextPath:/m, 'profile layer must not reintroduce a static context file');
+  assert.doesNotMatch(profile, /^\s*contextPath:/m, 'profile layer must not reintroduce a static context file');
 });

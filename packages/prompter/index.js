@@ -541,13 +541,13 @@ function skillsDir(config) {
  */
 function readSkillDescription(text) {
   const source = String(text ?? '');
-  const frontmatter = /^---[ \\t]*\\r?\\n([\\s\\S]*?)\\r?\\n---[ \\t]*(?:\\r?\\n|$)/.exec(source);
+  const frontmatter = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(source);
   if (frontmatter) {
-    const lines = frontmatter[1].split(/\\r?\\n/);
-    const index = lines.findIndex((line) => /^description\\s*:/i.test(line));
+    const lines = frontmatter[1].split(/\r?\n/);
+    const index = lines.findIndex((line) => /^description\s*:/i.test(line));
     if (index === -1) return '';
 
-    let value = lines[index].replace(/^description\\s*:/i, '').trim();
+    let value = lines[index].replace(/^description\s*:/i, '').trim();
     if (value === '' || /^[>|][+-]?$/.test(value)) {
       const folded = value.startsWith('>');
       const parts = [];
@@ -557,16 +557,16 @@ function readSkillDescription(text) {
           if (parts.length > 0) parts.push('');
           continue;
         }
-        if (!/^[ \\t]+/.test(line)) break;
+        if (!/^[ \t]+/.test(line)) break;
         parts.push(line.trim());
       }
-      value = parts.join(folded ? ' ' : '\\n').trim();
+      value = parts.join(folded ? ' ' : '\n').trim();
     } else if (value.startsWith('"') && value.endsWith('"')) {
       try { value = JSON.parse(value); } catch { value = value.slice(1, -1); }
     } else if (value.startsWith("'") && value.endsWith("'")) {
       value = value.slice(1, -1).replace(/''/g, "'");
     } else {
-      value = value.replace(/[ \\t]+#.*$/, '').trim();
+      value = value.replace(/[ \t]+#.*$/, '').trim();
     }
     return typeof value === 'string' ? value.trim() : '';
   }
@@ -574,7 +574,7 @@ function readSkillDescription(text) {
   // Legacy Skills mit freiem Text dürfen weiterhin die erste sinnvolle Zeile
   // als Beschreibung verwenden. YAML-Trenner und Markdown-Überschriften zählen
   // ausdrücklich nicht als Beschreibung.
-  return source.split(/\\r?\\n/)
+  return source.split(/\r?\n/)
     .map((line) => line.trim())
     .find((line) => line !== '' && line !== '---' && !line.startsWith('#')) ?? '';
 }
