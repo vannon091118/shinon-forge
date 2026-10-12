@@ -644,7 +644,13 @@ export function readSkills(config, rules) {
 export function selectSkills(skills = [], haystack = [], reading = {}) {
   const minLength = typeof reading.minTokenLength === 'number' ? reading.minTokenLength : 4;
   const minHits = typeof reading.minHits === 'number' ? reading.minHits : 1;
-  const words = new Set(tokens(haystack.join(' '), minLength));
+  const stopWords = new Set((Array.isArray(reading.stopWords) ? reading.stopWords : [])
+    .map((word) => String(word).toLocaleLowerCase()));
+  const meaningfulTokens = (value) => tokens(value, minLength)
+    .filter((token) => !stopWords.has(token));
+  const words = new Set(meaningfulTokens(haystack.join(' ')));
+  const normalizePhrase = (value) => tokens(value, 1).join(' ');
+  const explicitText = ` ${normalizePhrase(reading.explicitText ?? '')} `;
 
   const scored = [];
   const skipped = [];
@@ -653,20 +659,27 @@ export function selectSkills(skills = [], haystack = [], reading = {}) {
       skipped.push({ file: skill, reason: 'KEIN_SKILL' });
       continue;
     }
-    const marks = tokens(`${skill.name} ${skill.description}`, minLength);
+    const marks = meaningfulTokens(`${skill.name} ${skill.description}`);
     if (marks.length === 0) {
       skipped.push({ file: skill.name, reason: 'SKILL_OHNE_BESCHREIBUNG' });
       continue;
     }
+    const namePhrase = normalizePhrase(skill.name);
+    const explicitlyNamed = namePhrase !== '' && explicitText.includes(` ${namePhrase} `);
     const hits = marks.filter((mark) => words.has(mark)).length;
-    if (hits < minHits) {
+    if (!explicitlyNamed && hits < minHits) {
       skipped.push({ file: skill.name, reason: 'SKILL_NICHT_IM_KONTEXT' });
       continue;
     }
-    scored.push({ ...skill, hits });
+    scored.push({ ...skill, hits, explicitlyNamed });
   }
 
-  scored.sort((left, right) => right.hits - left.hits || left.name.localeCompare(right.name));
+  // Ein im eigentlichen Nutzerprompt benannter Skill gewinnt vor reinem
+  // Wort-Overlap. Die Namen aus Projektkontext/Dateipfaden gelten nicht als
+  // explizite Nutzeranweisung.
+  scored.sort((left, right) => Number(right.explicitlyNamed) - Number(left.explicitlyNamed)
+    || right.hits - left.hits
+    || left.name.localeCompare(right.name));
   const maxSkills = typeof reading.maxSkills === 'number' ? reading.maxSkills : Infinity;
   for (const entry of scored.slice(maxSkills)) {
     skipped.push({ file: entry.name, reason: 'UEBER_DEM_LIMIT' });
@@ -721,7 +734,10 @@ export function standFor(config, runtime, promptText, context, toneState = null)
   } else {
     const read = readSkills(config, runtime.skillRules);
     skillRead = read.skills.length > 0
-      ? selectSkills(read.skills, haystack, runtime.skillRules.reading ?? {})
+      ? selectSkills(read.skills, haystack, {
+          ...(runtime.skillRules.reading ?? {}),
+          explicitText: promptText,
+        })
       : { loaded: [], skipped: [], reason: read.reason ?? 'SKILLS_EMPTY' };
   }
 

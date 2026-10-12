@@ -1,6 +1,6 @@
 # Handshake: Prompter-Kontext und Skill-Selektion
 
-**Status:** Auf `main` committed. Zielgerichtete Sandbox-Tests und aktueller Commit-Guard sind grün; `npm test` wurde nicht vollständig ausgeführt. Der nächste Agent soll Änderungen nachvollziehen, nicht neu erraten.
+**Status:** Folgepaket in Arbeit; die Prompter-Änderungen unten sind jetzt ergänzt. DSH-PATH-Härtung und Launcher-Verdrahtung sind ebenfalls geändert. Der Commit-Guard läuft nach dem Push; ein vollständiger lokaler `npm test`-Lauf war in dieser Sandbox wegen fehlender GitHub-DNS-Auflösung und fehlendem Repository-Checkout nicht möglich.
 **Ausgangspunkt:** `main` bei `3add4879a8b6fc28549eb5c5d1c9aa9947eaa399`.
 **Ziel:** MAX muss den Laufzeit-Project-Index erreichen können; Skill-Auswahl muss auf echten Frontmatter-Metadaten und dem vollständigen Kandidatensatz arbeiten.
 
@@ -58,3 +58,48 @@ Der Push-Workflow **Shinon Commit Guard** für Commit `14d3185b7122c9c16331dfc13
 4. Entferne kein Ranking-Limit: `maxSkills` gehört nach dem Ranking, nicht vor die Kandidatenliste.
 5. Aktualisiere diesen Handshake mit tatsächlichen CI-Zahlen und konkreten Commit-SHA, sobald die Prüfungen abgeschlossen sind. Keine Statusklasse „Verified“ ohne Beleg.
 
+
+
+## Folgepaket: Plan Phasen 0–4 (2026-10-12)
+
+### Phase 0 — Skill-Selektion
+
+- `readSkills()` liefert weiterhin alle Kandidaten; das Limit gilt erst in `selectSkills()`.
+- Die Selektionsfunktion entfernt konfigurierbare Stopwörter aus Prompt und Skill-Metadaten.
+- Ein Skill, der im **Nutzerprompt** explizit benannt ist (Slug oder ausgeschriebene Wörter), wird vor reinem Token-Overlap priorisiert. Namen, die nur aus Projektpfaden oder Indexkontext stammen, zählen nicht als explizite Nutzerbenennung.
+- `skill-selection.test.mjs` prüft das echte Verzeichnis-/Dateisystem über temporäre Verzeichnisse: Frontmatter, spätes relevantes Skill, explizite Namenspriorität, Smalltalk ohne Treffer und fehlende Beschreibung.
+- **Datenlimit:** Im Repo war kein echtes Session-Log auffindbar. Die Stopwortliste ist daher eine überprüfbare generische DE/EN-Baseline, ausdrücklich NICHT als aus realen Prompts gemessen markiert. Sobald ein Session-Log verfügbar ist, die Liste anhand tatsächlicher Fehlselektionen nachjustieren.
+
+### Phase 1 — Doppel-Install / reproduzierbarer Start
+
+- Aktiver DSH-Pin bleibt `@deepseek-ai/dsh@0.2.1-alpha.1`; kein zweiter Vendor-Pfad für eine ungeklärte alpha.2-Kopie wird aktiviert.
+- `dshBinary()` akzeptiert standardmäßig die Repo-Installation bzw. den bereits vorgesehenen Vendor-Pfad. PATH-/Prefix-Fallback ist nur noch mit `SHINON_ALLOW_PATH_DSH=1` verfügbar.
+- `scripts/open.mjs` und der optionale Desktop-Launcher verwenden denselben `dshBinary()`-Resolver wie `bin/shinon.mjs`. Der Desktop-Launcher benötigt dadurch nicht länger ein separat global installiertes `dsh`.
+- Terminal-Start bleibt `shinon` (nach Installation des Pakets/CLI-Bins) beziehungsweise `npm start`; optionales Icon: `npm run desktop:launcher`.
+- Noch offen: YAML-Test-Resolver `dshRoot()/dshHarnessDir()` zentralisieren, Fixture-Node-Modules symlinken und PATH-entfernte Abnahme. Das muss im vollständigen Checkout mit installierten Dependencies laufen.
+- `schemastery@3.18.5-alpha.1` wird in diesem Commit **nicht** blind in Manifeste gepinnt: ohne Registry-Zugriff kann das Lockfile nicht neu erzeugt oder die Kompatibilität nachgewiesen werden. Aktueller Stand bleibt `~3.18.4`; das ist ein klar markierter Restposten, keine erledigte Phase.
+
+### Phase 2 — Persona und Mood (offen)
+
+- Die gewünschte feste/überschreibbare Stance muss mit dem vorhandenen Scoring-Vertrag auf genau eine Prompt-Zeile abgebildet werden. Der Satz „Niix ist fest“ ist als Entscheidung nicht eindeutig genug für eine sichere Verhaltensänderung; bis zur Klärung wird weder Baseline noch Scoring still überschrieben.
+- `gate.*` und `claim.created` werden nicht entfernt, solange ihre Produzenten-/Replay-Kette nicht am realen Event-Spine nachgewiesen wurde.
+- Dynamische Prompt-Blöcke und Zeichenbudget brauchen eine gemessene Laufzeitprobe, nicht eine geschätzte Kürzung.
+
+### Phase 3 — Prompter und Index (offen)
+
+- Trace-Zustand `index: absent|building|ready` sowie selbstständiger Index-Build bei erstem MAX-Bedarf bleiben offen. Sie ändern Laufzeitverhalten und benötigen einen echten DSH-Event-Replay-Test.
+- Die zwei fehlenden Skills `cordis-composition-reference` und `cordis-plugin-development` wurden nicht erfunden oder aus fremden Quellen kopiert; Skill-Quelle/Version muss zuerst geklärt werden. Nutzerumgebungs-Skills bleiben gemäß Entscheidung ausgeschlossen.
+
+### Phase 4 — Hygiene (offen)
+
+- Provider-`displayName`, generierte Dashboard-`EXPECTED`, `@shinon/core`-Config, generierte Zahlen, Skip-Verdict und Codingmon-Dependency-Klassifikation sind noch nicht geändert. Jede Änderung braucht ihren jeweiligen Daten-/Gate-Vertrag; keine breite Massenänderung ohne Installationslauf.
+
+## Folgepaket: Dateien
+
+- `packages/prompter/index.js` — explizite Skill-Namenspriorität und Stopwortfilter
+- `packages/prompter/assets/skill-rules.json` — generische DE/EN-Stopwortliste (vorläufig, nicht session-gemessen)
+- `packages/prompter/test/skill-selection.test.mjs` — 5 gezielte Dateisystem-Regressionstests
+- `scripts/lib/dsh.mjs` — globaler PATH-/Prefix-Fallback nur mit `SHINON_ALLOW_PATH_DSH=1`
+- `scripts/open.mjs` — denselben DSH-Resolver wie CLI verwenden
+- `scripts/desktop-launcher.mjs` — optionales Desktop-Icon ohne globale DSH-PATH-Abhängigkeit
+- `docs/handshakes/2026-10-12-prompter-context-skill-fixes.md` — Planentscheidungen, Grenzen und offene Abnahmen

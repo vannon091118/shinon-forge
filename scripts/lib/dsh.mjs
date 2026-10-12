@@ -117,6 +117,11 @@ function prefixRoot() {
 export function dshRoot() {
   const local = localRootCandidates()[0];
   if (local !== undefined) return local;
+
+  // Global/PATH DSH is an explicit compatibility escape hatch. The default
+  // startup contract is repo-local install or the repository vendor path.
+  if (process.env.SHINON_ALLOW_PATH_DSH !== '1') return null;
+
   const bin = findOnPath('dsh');
   if (bin !== null) {
     const dir = packageRootOfShim(bin);

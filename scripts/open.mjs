@@ -25,7 +25,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
-import { findOnPath } from './lib/yaml.mjs';
+import { dshBinary, dshSource } from './lib/dsh.mjs';
 import { DEFAULT_PORT_BASE, parsePort, pickFreePort } from './lib/port.mjs';
 import * as os from 'node:os';
 
@@ -43,11 +43,12 @@ if (profileName === null) {
   process.exit(2);
 }
 
-const dsh = findOnPath('dsh');
+const dsh = dshBinary();
 if (dsh === null) {
-  console.error('💥 open: `dsh` nicht im PATH — zuerst installieren (siehe AGENTS.md)');
+  console.error('💥 open: kein Repo-/Vendor-DSH gefunden. Im Repo `npm install` ausführen; globale Nutzung nur mit SHINON_ALLOW_PATH_DSH=1.');
   process.exit(2);
 }
+const source = dshSource();
 
 /** Öffner je Plattform — Tabelle statt verschachtelter Ternaere. */
 const PLATFORM_OPENERS = {
@@ -105,7 +106,7 @@ try {
 
 console.log('═══════════════════════════════════');
 console.log('  Shinon Forge — 1-Click-Start');
-console.log(`  Profil: ${profileName}    dsh: ${dsh}`);
+console.log(`  Profil: ${profileName}    dsh: ${source?.kind ?? 'unbekannt'} — ${dsh.slice(1).join(' ')}`);
 console.log(`  Port: ${PORT === 0 ? '0 (vom Betriebssystem gewählt)' : PORT}${PORT === 0 || PORT === requested.port ? '' : ` (erster freier ab ${DEFAULT_PORT_BASE})`}`);
 if (ephemeral && ARGS_NETWORK) console.log(`  Hinweis: --network braucht eine bekannte Nummer, --port 0 wurde zu ${PORT} aufgelöst`);
 if (ARGS_NETWORK) console.log('  Netzwerk-Modus aktiv (--network: SSH-Tunnel für externen Zugriff)');
@@ -126,7 +127,7 @@ if (ARGS_NETWORK) {
   console.log(`\n🔗 Netzwerk: ${lan ?? 'keine nicht-loopback-IP'} — Use SSH-Tunnel (z.B. ssh -R 18765:localhost:${PORT} tunnel@host) für externen Zugriff. DSH blockiert --host 0.0.0.0 aus Sicherheitsgründen.\n`);
 }
 
-const child = spawn(dsh, args, {
+const child = spawn(dsh[0], [...dsh.slice(1), ...args], {
   cwd: root,
   env: { ...process.env, DSH_HOME: root },
   stdio: ['inherit', 'pipe', 'inherit'],

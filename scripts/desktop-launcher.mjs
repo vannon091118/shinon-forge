@@ -22,7 +22,7 @@ import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import * as repo from './lib/repo.mjs';
-import { findOnPath } from './lib/yaml.mjs';
+import { dshBinary, dshSource } from './lib/dsh.mjs';
 
 const ROOT = repo.ROOT;
 const HOME = homedir();
@@ -49,8 +49,9 @@ const fail = (msg, code = 1) => {
 const profileName = repo.activeProfile();
 if (profileName === null) fail('kein --profile im dev-Skript (package.json) gefunden');
 
-const dsh = findOnPath('dsh');
-if (dsh === null) fail('`dsh` nicht im PATH — der Desktop-Eintrag braucht ihn (AGENTS.md)');
+const dsh = dshBinary();
+if (dsh === null) fail('kein Repo-/Vendor-DSH gefunden. Im Repo `npm install` ausführen; globale Nutzung nur mit SHINON_ALLOW_PATH_DSH=1.');
+const source = dshSource();
 
 // Node-Absolute-Pfad für Exec=: findOnPath sucht im PATH (dsh-Logik, nicht
 // node:logik), node ist im PATH (Repo-Voraussetzung), absolut aufgelöst.
@@ -74,7 +75,7 @@ function buildDesktopFile() {
     'Type=Application',
     `Name=${APP_NAME}`,
     `GenericName=Shinon Forge DSH-Shell`,
-    `Comment=Startet DSH mit dem aktiven Profil und öffnet die UI im Browser (1-Click, kein Terminal)`,
+    `Comment=Startet Shinon mit dem aktiven Profil und öffnet die UI im Browser (1-Click, kein Terminal)`,
     `Exec=${execLine}`,
     `Path=${ROOT}`,
     'Terminal=false',
@@ -112,7 +113,7 @@ if (UNINSTALL) {
 // ── Installation ──────────────────────────────────────────────────────────────
 console.log('═══════════════════════════════════');
 console.log(`  Shinon Forge — Desktop-Icon für 1-Click-Start`);
-console.log(`  Profil: ${profileName}    dsh: ${dsh}`);
+console.log(`  Profil: ${profileName}    dsh: ${source?.kind ?? 'unbekannt'} — ${dsh.slice(1).join(' ')}`);
 console.log(`  node:  ${node}`);
 console.log('═══════════════════════════════════\n');
 
