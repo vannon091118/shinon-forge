@@ -1,6 +1,6 @@
 # Handshake: Prompter-Kontext und Skill-Selektion
 
-**Status:** Fixes vorbereitet und im Quelltext verankert; der nächste Agent soll die Änderungen nachvollziehen, nicht neu erraten.
+**Status:** Auf `main` committed. Zielgerichtete Sandbox-Tests und aktueller Commit-Guard sind grün; `npm test` wurde nicht vollständig ausgeführt. Der nächste Agent soll Änderungen nachvollziehen, nicht neu erraten.
 **Ausgangspunkt:** `main` bei `3add4879a8b6fc28549eb5c5d1c9aa9947eaa399`.
 **Ziel:** MAX muss den Laufzeit-Project-Index erreichen können; Skill-Auswahl muss auf echten Frontmatter-Metadaten und dem vollständigen Kandidatensatz arbeiten.
 
@@ -46,7 +46,9 @@ node --test scripts/gate/tests/context-wiring.test.mjs
 npm test
 ```
 
-Die Sandbox konnte GitHub nicht direkt auflösen (`git clone` scheitert mit `Could not resolve host: github.com`), und der Projektbaum samt `node_modules` war dort nicht vorhanden. Deshalb wurde die vollständige Repository-Suite vor dem Push nicht als lokal grün ausgegeben. Die neuen Regressionstests liegen im Repository und werden auf dem Push von CI geprüft; Status muss anhand der tatsächlichen Workflow-Läufe nachgesehen werden.
+Die Sandbox konnte GitHub nicht direkt auflösen (`git clone` scheiterte mit `Could not resolve host: github.com`; der vollständige Projektbaum samt `node_modules` stand deshalb lokal nicht bereit. Die isolierte Sandbox-Prüfung des extrahierten Parsing-/Ranking-Verhaltens lief mit `node --test /mnt/data/shinon-focused-validation.test.mjs` erfolgreich: **5/5 Tests, Exit 0**. Das ist ein gezielter Verhaltenstest und ausdrücklich **kein** Lauf der originalen Repo-Dateien oder von `npm test`.
+
+Der Push-Workflow **Shinon Commit Guard** für Commit `14d3185b7122c9c16331dfc1350ef747d4e15061` wurde erfolgreich abgeschlossen: [GitHub Actions Run 38192734263](https://github.com/vannon091118/shinon-forge/actions/runs/38192734263). Die drei im Workflow protokollierten Testbatches meldeten **401/401**, **46/46** und **42/42** erfolgreich, jeweils ohne Fehlschlag. Das belegt den Guard-Lauf, nicht die komplette `npm test`-Suite; diese bleibt bis zu einem echten Voll-Repository-Lauf ungeprüft. Zwischenzeitliche fehlgeschlagene Guard-Runs auf den beiden vorherigen Commits wurden nach Fehleranalyse korrigiert.
 
 ## Anweisung an den nächsten Agenten
 
