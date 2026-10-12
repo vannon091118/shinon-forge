@@ -532,6 +532,54 @@ function skillsDir(config) {
 }
 
 /**
+ * Beschreibung aus einer SKILL.md lesen, ohne einen YAML-Parser einzuschleppen.
+ *
+ * Unterstützt die Frontmatter-Formen, die Skills hier verwenden: einzeilig,
+ * einfache/doppelte Quotes und gefaltete/literale YAML-Skalare. Der Body bleibt
+ * unangetastet; Skills liefern in diesem Vertrag Metadaten, nicht ihren ganzen
+ * Anweisungsinhalt.
+ */
+function readSkillDescription(text) {
+  const source = String(text ?? '');
+  const frontmatter = /^---[ \\t]*\\r?\\n([\\s\\S]*?)\\r?\\n---[ \\t]*(?:\\r?\\n|$)/.exec(source);
+  if (frontmatter) {
+    const lines = frontmatter[1].split(/\\r?\\n/);
+    const index = lines.findIndex((line) => /^description\\s*:/i.test(line));
+    if (index === -1) return '';
+
+    let value = lines[index].replace(/^description\\s*:/i, '').trim();
+    if (value === '' || /^[>|][+-]?$/.test(value)) {
+      const folded = value.startsWith('>');
+      const parts = [];
+      for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+        const line = lines[cursor];
+        if (line.trim() === '') {
+          if (parts.length > 0) parts.push('');
+          continue;
+        }
+        if (!/^[ \\t]+/.test(line)) break;
+        parts.push(line.trim());
+      }
+      value = parts.join(folded ? ' ' : '\\n').trim();
+    } else if (value.startsWith('"') && value.endsWith('"')) {
+      try { value = JSON.parse(value); } catch { value = value.slice(1, -1); }
+    } else if (value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1).replace(/''/g, "'");
+    } else {
+      value = value.replace(/[ \\t]+#.*$/, '').trim();
+    }
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  // Legacy Skills mit freiem Text dürfen weiterhin die erste sinnvolle Zeile
+  // als Beschreibung verwenden. YAML-Trenner und Markdown-Überschriften zählen
+  // ausdrücklich nicht als Beschreibung.
+  return source.split(/\\r?\\n/)
+    .map((line) => line.trim())
+    .find((line) => line !== '' && line !== '---' && !line.startsWith('#')) ?? '';
+}
+
+/**
  * Ein Skill lesen: Name + Beschreibung + Use-When aus seinem Ordner.
  *
  * Ein Skill liegt in `.agents/skills/<name>/` mit einer `SKILL.md` (Frontmatter
@@ -565,19 +613,22 @@ export function readSkills(config, rules) {
       skipped.push({ file: entry, reason: `NICHT_LESBAR:${error?.code ?? 'ERROR'}` });
       continue;
     }
-    // Ein Skill trägt Name + Beschreibung in den ersten Zeilen; ohne sie gibt
-    // es nichts zu selektieren. Die Selektion selbst (haystack-match) entscheidet,
-    // welches Skill geladen wird — dieselbe Regel wie bei den Zetteln.
-    const lines = text.split('\n');
-    const name = entry;
-    const description = lines.find((line) => line.trim() !== '' && !line.startsWith('#')) ?? '';
-    skills.push({ name, description, path: file });
+    // SKILL.md nutzt normalerweise YAML-Frontmatter. Freier Text bleibt als
+    // kompatibler Fallback erlaubt; ein kaputter/fehlender Beschreibungseintrag
+    // wird benannt übersprungen, statt "---" oder "name:" als Treffer zu verwenden.
+    const description = readSkillDescription(text);
+    if (description === '') {
+      skipped.push({ file: entry, reason: 'BESCHREIBUNG_FEHLT' });
+      continue;
+    }
+    skills.push({ name: entry, description, path: file });
   }
   if (skills.length === 0) return { skills: [], skipped, reason: 'SKILLS_EMPTY' };
 
-  const maxSkills = Number.isFinite(reading.maxSkills) ? reading.maxSkills : 4;
+  // Nicht hier begrenzen: maxSkills gilt NACH dem Relevanzranking in selectSkills.
+  // Alphabetisch abgeschnittene Kandidaten koennen sonst niemals gewinnen.
   const minHits = Number.isFinite(reading.minHits) ? reading.minHits : 1;
-  return { skills: skills.slice(0, maxSkills), skipped, reason: null, minHits };
+  return { skills, skipped, reason: null, minHits };
 }
 
 /**
