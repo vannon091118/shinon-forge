@@ -19,7 +19,7 @@ function skillRoot() {
 function writeSkill(root, name, frontmatter) {
   const dir = join(root, name);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'SKILL.md'), \`---\nname: \${name}\n\${frontmatter}\n---\n\n# \${name}\nBody deliberately excluded from the selector.\n\`);
+  writeFileSync(join(dir, 'SKILL.md'), `---\nname: ${name}\n${frontmatter}\n---\n\n# ${name}\nBody deliberately excluded from the selector.\n`);
 }
 
 test('readSkills parses description from YAML frontmatter, including folded values', () => {

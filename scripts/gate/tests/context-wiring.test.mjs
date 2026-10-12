@@ -230,7 +230,7 @@ function connect({ config = {}, llm, service } = {}) {
   // `notesPath: ''` heisst: die Zettel sind hier AUS. Diese Datei prueft die
   // Kontext-Naht, und deren Aufruf traegt genau EINEN Block. Die Zettel haben
   // ihre eigene Datei (prompter-notes.test.mjs) und einen eigenen Block.
-  const dispose = quiet(() => prompter.apply(ctx, prompter.Config({ provider: 'p', model: 'm', mode: 'MAX', notesPath: '', ...config })));
+  const dispose = quiet(() => prompter.apply(ctx, prompter.Config({ provider: 'p', model: 'm', mode: 'MAX', notesPath: '', skillsPath: '', ...config })));
   return { ctx, records, dispose };
 }
 
