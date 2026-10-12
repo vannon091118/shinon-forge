@@ -103,3 +103,10 @@ Der Push-Workflow **Shinon Commit Guard** für Commit `14d3185b7122c9c16331dfc13
 - `scripts/open.mjs` — denselben DSH-Resolver wie CLI verwenden
 - `scripts/desktop-launcher.mjs` — optionales Desktop-Icon ohne globale DSH-PATH-Abhängigkeit
 - `docs/handshakes/2026-10-12-prompter-context-skill-fixes.md` — Planentscheidungen, Grenzen und offene Abnahmen
+
+
+## CI-Nachtrag — Testdatei-Rename am 2026-10-12
+
+- `package.json` verweist auf `scripts/shinon-test.mjs` und `scripts/shinon-profile-test.mjs`; die alten `dsh-*.mjs`-Dateien wurden entfernt.
+- Der Commit-Guard-Lauf #127 schlug nicht wegen dieser Pfade fehl, sondern weil der Commit `c2fa87da` den verpflichtenden Vannon-Trailer in seiner Commit-Nachricht nicht enthielt.
+- Künftige direkte Commits müssen den vom Repository vorgeschriebenen Trailer als letzte Commit-Nachrichtenzeile enthalten. Der aktuelle Commit-Guard prüft Commit-Metadaten; ein nachfolgender korrekt signierter Commit macht den bereits fehlgeschlagenen Lauf nicht rückwirkend grün.
