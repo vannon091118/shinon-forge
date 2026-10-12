@@ -1,0 +1,9 @@
+{
+  "contract": "shinon.skill-note/v1",
+  "version": 1,
+  "thema": "gate",
+  "bei": "Eine neue Datendatei kommt in den assets-Ordner eines Pakets",
+  "immer": "den Dateinamen in der Whitelist des Gate-Plugins dieses Pakets eintragen, sonst gilt er als fremde Schreibspur",
+  "weil": "das Paket-Gate jede Datei unter assets gegen eine feste Liste prueft und eine unbekannte Datei ein Befund ist, kein Zugestaendnis",
+  "beleg": "packages/scoring/assets/tendency-rules.json, aufgenommen in scripts/gate/plugins/scoring.mjs (Zug 3)"
+}

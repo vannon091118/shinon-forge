@@ -315,6 +315,20 @@ function subjectOf(payload, source) {
 }
 
 /**
+ * Der Faktor einer Stufe — die EINE Uebersetzung von Staerke in Gewicht.
+ *
+ * Die Zahlen stehen in der Signaltabelle (`limits.strengths`), nicht im Code:
+ * hoch = doppeltes Basis-Delta, mittel = einfaches, niedrig = halbes. Ist die
+ * Stufe unbekannt, gilt 1 — der Vertragswert, nicht ein geratener Faktor.
+ * Zugleich die einzige Stelle, an der `applyEvent` sein `weight` herbekommt:
+ * eine zweite Delta-Tabelle gibt es nicht.
+ */
+export function strengthFactor(rules, strengthId) {
+  const factor = rules?.limits?.strengths?.[strengthId];
+  return typeof factor === 'number' && Number.isFinite(factor) && factor > 0 ? factor : 1;
+}
+
+/**
  * Ein Ereignis des Spines in ein Signal uebersetzen. Rein: der Sitzungszustand
  * kommt als Argument herein, nicht als Modulzustand.
  *
@@ -346,7 +360,6 @@ export function translateSignal(envelope, payload, rules, session = {}) {
     return { ...empty, reason: `UNKNOWN_SOURCE:${type}` };
   }
   const signals = rules?.signals ?? {};
-  const strengths = rules?.limits?.strengths ?? {};
   const label = (id) => (typeof signals?.[id]?.label === 'string' ? signals[id].label : id);
 
   // Beobachtet, ohne Pol: gezaehlt, nie gewertet.
@@ -409,7 +422,7 @@ export function translateSignal(envelope, payload, rules, session = {}) {
     }
   }
 
-  const factor = typeof strengths[definition.strength] === 'number' ? strengths[definition.strength] : 1;
+  const factor = strengthFactor(rules, definition.strength);
   const field = definition.type === 'feedback.correction' ? 'correction' : 'approval';
   const subject = subjectOf(payload, source) || null;
 
@@ -427,6 +440,98 @@ export function translateSignal(envelope, payload, rules, session = {}) {
       weight: factor,
       payload: { session_id: sessionId, [field]: label(signalId) },
     },
+  };
+}
+
+/**
+ * Die Tendenz aus dem Protokoll ableiten — rein und datengetrieben.
+ *
+ * Warum das hier steht und nicht in der Persona: die Tendenz ist eine Aussage
+ * ueber das PROTOKOLL (was ist passiert), nicht ueber den Ton (wie klingt das).
+ * Wer sie liest — Prompter, Persona — entscheidet ueber die Wirkung; hier steht
+ * nur die Rechnung. Kein `Math.random`, kein `Date.now`, kein Modell: dieselben
+ * Zeilen ergeben dieselbe Tendenz.
+ *
+ * Was die Regeln liefern (`assets/tendency-rules.json`):
+ *   classes   — welche Signale eine Klasse speisen und welchen Pol sie traegt
+ *   levels    — Anteil → Wort, absteigend; die letzte Stufe traegt 0
+ *   stances   — geordnete Bedingungen ueber diese Worte; die erste passende gilt
+ *   minSignals— darunter wird NICHTS behauptet (fail-closed, kein Duennschluss)
+ *
+ * ZWEI ZAHLEN, nicht eine: `signals` ist das GANZE Protokoll (ehrliche Summe),
+ * `counted` ist die Evidenzlage, auf der die Anteile und die Mindestevidenz
+ * rechnen — naemlich die Zeilen, die eine Klasse auch liest. Eine Zeile aus
+ * einer aelteren Regel (ein Signal, das heute keine Klasse fuehrt) darf die
+ * Anteile nicht verwaessern, aber sie darf auch keine Haltung erzeugen; sie
+ * steht als `unmatched` sichtbar da. Zurueckgenommenes zaehlt gar nicht mit:
+ * ein Widerruf nimmt die Zeile aus dem Protokoll, und was nicht mehr dasteht,
+ * faerbt die Tendenz nicht.
+ * @param tendency - der Vertrag `assets/tendency-rules.json`.
+ * @param records - die Protokollzeilen des Sammlers (`kind: 'score'`).
+ * @returns { contract, ready, signals, counted, unmatched, counts, shares, levels, stance, reason }
+ */
+export function deriveTendency(tendency, records = []) {
+  const classes = Array.isArray(tendency?.classes) ? tendency.classes : [];
+  const levels = Array.isArray(tendency?.levels) ? tendency.levels : [];
+  const stances = Array.isArray(tendency?.stances) ? tendency.stances : [];
+  const minSignals = typeof tendency?.minSignals === 'number' && Number.isFinite(tendency.minSignals) ? tendency.minSignals : Infinity;
+
+  const members = new Map();
+  for (const klass of classes) {
+    if (klass === null || typeof klass !== 'object' || typeof klass.id !== 'string') continue;
+    members.set(klass.id, new Set(Array.isArray(klass.signals) ? klass.signals : []));
+  }
+
+  const counts = {};
+  for (const id of members.keys()) counts[id] = 0;
+  let signals = 0;
+  let counted = 0;
+  for (const record of records ?? []) {
+    if (record?.kind !== 'score' || typeof record?.signal !== 'string') continue;
+    signals += 1;
+    let read = false;
+    for (const [id, set] of members) {
+      if (!set.has(record.signal)) continue;
+      counts[id] += 1;
+      read = true;
+    }
+    if (read) counted += 1;
+  }
+
+  const shares = {};
+  const levelOf = {};
+  for (const [id, count] of Object.entries(counts)) {
+    const share = counted === 0 ? 0 : round4(count / counted);
+    shares[id] = share;
+    levelOf[id] = levels.find((level) => typeof level?.minShare === 'number' && share >= level.minShare)?.id ?? null;
+  }
+
+  const ready = counted >= minSignals;
+  let stance = null;
+  if (ready) {
+    for (const candidate of stances) {
+      const when = candidate?.when;
+      const matches =
+        when === undefined ||
+        (when !== null && typeof when === 'object' && Object.entries(when).every(([id, level]) => levelOf[id] === level));
+      if (matches) {
+        stance = candidate?.id ?? null;
+        break;
+      }
+    }
+  }
+
+  return {
+    contract: typeof tendency?.contract === 'string' ? tendency.contract : null,
+    ready,
+    signals,
+    counted,
+    unmatched: signals - counted,
+    counts: { ...counts },
+    shares,
+    levels: levelOf,
+    stance,
+    reason: ready ? null : `THIN_EVIDENCE:${counted}/${minSignals}`,
   };
 }
 
@@ -625,6 +730,23 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
       return replay(contracts, initial, records.map((record) => record.event)).injection;
     },
     records: () => records.map((record) => ({ ...record })),
+    /**
+     * Die Zeile zu EINEM Betreff — die Antwort auf „was gilt fuer diese Aufgabe?".
+     *
+     * Das ist die Leseseite der Nachrechnung: der Betreff (Sitzung + Kennung,
+     * `turn:`-Praefix eingeschlossen) reist mit jeder Zeile, deshalb trifft
+     * spaete Kritik dieselbe Aufgabe wie das fruehe Urteil — und ein zweites
+     * Urteil ZU DERSELBEN Antwort ersetzt die erste Zeile, statt eine zweite
+     * daneben zu legen (siehe `observe`). Der Widerruf braucht genau dieselbe
+     * Zuordnung; ohne Betreff gibt es keine Zuordnung, dann steht hier null.
+     */
+    judgementOf(subject) {
+      if (typeof subject !== 'string' || subject === '') return null;
+      for (let index = records.length - 1; index >= 0; index -= 1) {
+        if (records[index].subject === subject) return { ...records[index] };
+      }
+      return null;
+    },
     session: (sessionId) => (sessions.has(sessionId) ? { ...sessions.get(sessionId) } : null),
     sessions: () => [...sessions.keys()],
     /** Der ganze Stand — genau die Form, die die Ablage traegt. */

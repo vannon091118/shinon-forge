@@ -101,11 +101,31 @@ nächsten relevanten Task?** Das ist die Lade-Logik:
    taktischen Skill gespeichert (nicht in Memory, weil es pro Task typisch ist).
    Nächstes Mal lädt das Modell den gepatchten Skill und ist „schon drin".
 
-**Offen (Vannon entscheidet):**
-- **Ablage-Ort:** `generated-skills/` (eigenes, versioniertes Verzeichnis, getrennt
-  von `technical-profile.json`) oder patch in die bestehende Skill-Datei?
-- **Lade-Regel:** Wie wird die Relevanz gemessen — durch Thema-Tag, durch den
-  Scoring-Trigger (K6), oder beides?
+**Entschieden (Zug 4, 2026-10-12):**
+
+- **Ablage-Ort: `generated-skills/`** — ein eigenes, versioniertes Verzeichnis,
+  getrennt von `technical-profile.json`. **Eine Datei je Zettel** (`.json`), kein
+  Unterordner. Schreiben und Lesen sind getrennt: die Zettel schreibt das
+  **arbeitende Modell** mit seinen eigenen Werkzeugen (es sieht die Pitfalls),
+  der **Veredler** liest und prüft sie (er sieht die Muster) — und er erzeugt
+  keinen einzigen. Format, Grenzen und Prüfregeln stehen als **Daten** in
+  `packages/prompter/assets/note-rules.json` (`shinon.note-rules/v1`); die
+  Beschreibung des Verzeichnisses ist `generated-skills/README.md` und
+  wiederholt keine Zahl aus den Regeln. Der Kern
+  (`packages/prompter/assets/note-core.js`) ist importfrei und ohne Uhr:
+  dieselben Zettel, dieselbe Auswahl, dieselben Befunde.
+- **Lade-Regel: die Thema-Marke aus dem aufgelösten Kontext** — nicht der
+  Scoring-Trigger, nicht die Zeit. Ein Zettel lädt, wenn seine `thema`-Marke im
+  Kontext dieses Schritts vorkommt (Projekt, Pfade, Symbole, Randbedingungen,
+  Touches, Abhängigkeiten) oder im Prompt. Ohne Kontext lädt **kein** Zettel: ein
+  Zettel, dessen Thema niemand aufgelöst hat, ist ein Zettel ohne Anlass. Geladen
+  wird höchstens `reading.maxNotes`, die meisten Treffer zuerst, bei Gleichstand
+  alphabetisch — die Auswahl ist bei gleichem Kontext dieselbe.
+- **Der Weg in den Prompt:** die passenden Zettel reisen als eigener Block
+  (`<shinon_stand>`) neben dem Kontextblock, aus **derselben Naht**
+  (`resolveContext` des Projekt-Index). Der Entscheidungsdatensatz des Schritts
+  nennt, was geladen wurde (`notes.loaded`) und warum nicht (`notes.reasons`) —
+  eine stille Lücke gibt es nicht.
 
 ### 1.4 K5-Signal-Quellen: intern und nativ — kein Browser (Ist-Stand Zug 1, 2026-10-11)
 
@@ -157,22 +177,37 @@ agent is a strong negative one."* (cursor.com/blog/how-cursor-router-works).
 Der dortige Weg (Hooks, Checkpoint-Rollback) bleibt als Beleg dafür stehen, wie
 andere die fehlenden Quellen lösen — er ist **nicht** der Plan dieses Repos.
 
-### 1.2 Skill-Prüfung am Ende der Session (K7c, neu)
+### 1.2 Skill-Prüfung (K7c) — was wirklich geprüft wird (Ist-Stand Zug 4, 2026-10-12)
 
-Der Prompter (Context-Index, keine persistierten Fakten) prüft am **Ende einer
-Session** die taktischen Skills:
+Der Veredler (Context-Index, keine persistierten Fakten) prüft die Sammlung der
+Zettel. Drei Befunde, jeder als **Daten** in `note-rules.json#review` — die
+Etiketten sind die Worte des Befunds:
 
-- **Konsolidierung:** Zwei taktische Skills, die dasselbe beschreiben → ein Master
-  Skill, der beide vereint.
-- **Spezifität-Prüfung:** Ein taktischer Skill ist zu breit (gilt für alles) →
-  wird verworfen. Ein Skill ist zu eng (gilt für einen Fall) → bleibt taktisch,
-  wird nicht zu Master.
-- **Duplikat-Erkennung:** Zwei taktische Skills, die sich widersprechen → einer
-  wird verworfen, der andere bleibt (oder beide werden zu einem neuen Skill).
+- **zu spitz** (`review.tooNarrow`): der Zettel gilt für EINEN Fall — er nennt ein
+  Datum, eine Sitzungs-Kennung, einen absoluten Pfad oder mehr als `maxPaths`
+  konkrete Dateien. Eine Regel für einen Tag ist ein Log, keine Lesson.
+- **zu breit** (`review.tooBroad`): die Anweisung trägt zu wenige eigene Begriffe
+  (nach Abzug der benannten Füllwörter) und gilt damit für alles.
+- **doppelt** (`review.duplicate`): zwei Zettel desselben Themas sagen dasselbe —
+  gemessen am INHALT (gemeinsame Begriffe und Anteil, wie bei der
+  Wiederholungserkennung), nicht am Dateinamen.
 
-Der Prompter **erzeugt keine** taktischen Skills — er **prüft und konsolidiert**
-das, was das arbeitende Modell erzeugt hat. Das hält die Trennung: das arbeitende
-Modell sieht die Pitfalls, der Prompter sieht die Muster.
+**Nicht geprüft, und das steht so da:** ob zwei Zettel sich WIDERSPRECHEN. Ein
+Widerspruch braucht ein Verständnis der Aussage, und das hat hier kein Modell.
+Ein Befund behauptet nur, was er messen kann.
+
+**Der Auslöser ist ehrlich benannt:** DSH kennt im Spine **kein**
+Sitzungsende-Ereignis (dieselbe Lücke, an der sich das Scoring orientiert). Eine
+Prüfung an einem erfundenen Ereignis wäre eine Behauptung, deshalb ist sie ein
+**Befehl**: `npm run notes:check` ist Exit 0 bei „kein Befund" und Exit 1 mit
+jedem Befund (Datei, Art, Grund) — auch für eine Datei, die gar kein Zettel IST
+(sie würde sonst stillschweigend nie laden). Geprüft wird mit DENSELBEN reinen
+Funktionen, die der Veredler beim Laden benutzt: ein zweiter Prüfer wäre ein
+zweiter Maßstab.
+
+Der Veredler **erzeugt keine** Zettel und ändert keinen — er lädt und prüft das,
+was das arbeitende Modell erzeugt hat. Das hält die Trennung: das arbeitende
+Modell sieht die Pitfalls, der Veredler sieht die Muster.
 
 ### 1.3 Trigger-Korrektur (K6)
 Erkennt der Lauf, dass ein Skill am falschen Ort geladen wurde (Kontext verschwendet),
@@ -330,14 +365,34 @@ benutzen; nicht lesbarer Index → **leer starten, aber laufen**, mit dem Grund 
 Protokoll. Ein kaputter Index hält den Host nicht an und darf auch nicht so tun,
 als sei er heil.
 
-**Grenzen, benannt.** (1) Je Signal wird der ganze Namensraum neu geschrieben;
-der Aufwand wächst mit der Zahl der Signale eines Projekts (nicht je Token). Ein
-inkrementelles Anhängen bräuchte stabile Zeilen-Identitäten über Läufe hinweg,
-die es noch nicht gibt. (2) `stats` (beobachtet, Gründe, Zähler) bleibt Sache des
-Prozesses, nicht der Ablage: dauerhaft sind Protokoll, Merkzettel, Tafel und
-Bemerkungen. (3) Ein LIVE gemessener Neustart im gebooteten Host steht aus — die
-Kette ist über die echten `apply()`-Schnittstellen beider Pakete an einem Host
-mit echtem `provide`/`get` belegt (`scripts/gate/tests/scoring-memory.test.mjs`).
+**Grenzen, benannt, mit Messung (2026-10-11).** (1) Je Signal wird der ganze
+Namensraum neu geschrieben. GEMESSEN (`node scripts/store-cost.mjs`, Belege in
+[docs/probes/store-cost.json](probes/store-cost.json)): der Aufwand wächst **nicht**
+nennenswert mit der Zahl der Signale — über 1 000 Zeilen kostet eine Zeile 0,03 ms
+(`writeMemory` 58,6 ms bei 10 Zeilen, 100,0 ms bei 1 000, 516,8 ms bei 20 000),
+während JEDER Aufruf ~291 ms Öffnen trägt (davon **306 ms in vier
+Metatransaktionen**, gemessen an einer nachgebauten, gegen den echten Aufruf
+kreuzgeprüften Zerlegung) plus 34–126 ms WAL-Checkpoint. **Entscheidung: das
+Neuschreiben ist nicht der Fehler, und inkrementelles Anhängen ist als Antwort auf
+die Zeilenzahl nicht nötig.** Es wäre zwar 12- bis 15-mal billiger je Signal
+(46,8/36,6 ms gegen 571,3/793,8 ms bei n=10/100), aber dieser Gewinn kommt aus dem
+EINEN gehaltenen Index und der EINEN Transaktion, nicht aus den gesparten Zeilen —
+er zahlt weiter ein fsync je Signal (~33 ms). Wenn die ~0,6–0,8 s je Signal fallen
+sollen (so viel kostet ein `save` auf einer Kopie der laufenden 12,96-MB-Datei),
+ist der billigere Hebel: den Index über die Laufzeit halten und die vier
+Metaschreibungen nur bei echter Änderung fahren. Ein Anhängen bliebe der zweite
+Weg, verlangt aber gezieltes Löschen beim Widerruf, einen Zähler statt eines
+Array-Index für `ordinal` und eine neue Leserordnung — Semantikwechsel für einen
+Gewinn, den der gehaltene Index ohne sie hat. Nicht gebaut, weil nicht nötig.
+(2) `stats` (beobachtet, Gründe, Zähler) bleibt Sache des Prozesses, nicht der
+Ablage: dauerhaft sind Protokoll, Merkzettel, Tafel und Bemerkungen. (3) Der LIVE
+gemessene Neustart im gebooteten Host ist nachgeholt (2026-10-11, §2 der Zahlen):
+`dsh --profile shinon` aus der CLI, ein echtes Urteil über die echte UI, ein
+Widerruf, SIGTERM — und der nächste Host meldet `Stand geladen: 1 Signale, 1 offene
+Sitzungen, 0 Bemerkungen` und schreibt auf dem geladenen Stand weiter (`turn:1` aus
+dem ERSTEN Host stand danach neben zwei neuen Zeilen). Die Kette bleibt zusätzlich
+über die echten `apply()`-Schnittstellen beider Pakete an einem Host mit echtem
+`provide`/`get` belegt (`scripts/gate/tests/scoring-memory.test.mjs`).
 
 ---
 
@@ -372,33 +427,73 @@ Session-Ende — er ist der Konsolidierer, nicht der Erzeuger.
 **K5.0 zuerst (log-gültig, 2 Signale), dann K5.1 (UI-Registry, 5 Signale).**
 K5.0 ist lesend und sofort umsetzbar (Umformulierung + Akzeptanz reichen für die
 erste Scorecard). K5.1 ist der Schritt, der die Gamed-Maschinen-Relevanz erst
-produziert (Copy/Adoption-Rauschen) und deshalb die Gaming-Schranken braucht.
+produziert (Copy/Adoption-Rauschen) — was es auffängt, sind nicht erfundene
+Schranken, sondern die drei Mechanismen aus §4: Faktor, Widerruf, Vergessen.
 
 ---
 
-## 4. Gamed-Trust: der Schutzmechanismus (Klärung 2026-10-11)
+## 4. Die drei echten Mechanismen (ersetzt Trust-Ceiling und Rate-Limit, Zug 3, 2026-10-12)
 
-**Die Gefahr (aus K5-Log-Simulation + Web-Recherche):** Wenn K5.1 die UI-Registry
-liefert, kann ein User durch systematisches Kopieren/Adoptieren die `trust`-
-Scorecard über die `autonomy`-Schwelle (0.7) schieben — ohne inhaltlich besser zu
-werden. Das ist der **Reward-Hacking-Fall** (generisches RLHF-Problem,
+**Die Gefahr bleibt dieselbe (aus K5-Log-Simulation + Web-Recherche):** Wenn K5.1
+die UI-Registry liefert, kann ein User durch systematisches Kopieren/Adoptieren die
+`trust`-Scorecard über die `autonomy`-Schwelle (0.7) schieben — ohne inhaltlich
+besser zu werden. Das ist der **Reward-Hacking-Fall** (generisches RLHF-Problem,
 `k5-web-research.md` §2: keine Shinon-spezifische zitierte Quelle, aber industry-
 bekannt).
 
-**Was die Architektur schon enthält (ausreichend, aber mit einer Lücke):**
-- **Asymmetrie:** Korrektur (−0.18 high) wiegt schwerer als Zustimmung (+0.12 high).
-- **decay + cooling:** Veröffentlicht wird nur alle 3 Signale, altes Evidence verblasst.
-- **Vordefinierte, diff-basierte Signale (keine LLM-Erkennung):** Nicht zu "überzeugen".
+**Die frühere Antwort darauf ist gestrichen.** Ein Trust-Ceiling (0.8) und ein
+Rate-Limit (10 Approvals/Session) waren zwei erfundene Zahlen. Keine Messung trug
+sie; sie standen in derselben Runde im Vertrag, in der die Schicht als „liest,
+rechnet nach, erfindet nichts" beschrieben wurde. Und sie treffen den Falschen:
+ein Deckel bei 0.8 fällt erst auf, wenn jemand lange und ehrlich arbeitet, während
+ein stiller Rauschen-Strom unter jedem Limit bleibt; ein Limit auf die ANZAHL der
+Signale zählt Menge, wo der Vertrag Qualität messen will (und macht die zehnte
+ehrliche Zustimmung wertlos). Beide sind raus — aus `scoring-state.json` und aus
+`technical-profile.json`. Was bleibt, sind drei Mechanismen, die es im Code
+wirklich gibt; ihre Zahl lebt nicht in dieser Konzeptdatei, sondern im jeweiligen
+Vertrag, und das Gate löst jeden in `tendency-rules.json#mechanisms` benannten Ort
+auf (`scripts/gate/plugins/scoring.mjs`), damit kein Papier-Mechanismus stehen
+bleibt.
 
-**Die Lücke (fehlende harte Schranken, neu in `technical-profile.json`/`scoring-state.json`):**
-
-| Schranke | Wert | Wirkung |
+| Mechanismus | Wo die Zahl lebt | Was er wirklich tut |
 |---|---|---|
-| **Trust-Ceiling** | `published.trust` max **0.8** (kein 1.0) | Autonomie-Schwelle (0.7) ist erreichbar, aber nicht "perfekt" gambar — ein Rauschen-Stream kommt nicht über 0.8. |
-| **Rate-Limit** | max **10** published `approval`-Signale pro Session | Über Rauschen-Quoten hinaus wiegen weitere Approvals nichts mehr (decay-only). |
-| **Korrektur-Priorität** | eine `correction` (high) hebt 2× `approval` (high) | Schon durch die Asymmetrie, aber jetzt **explizit** im `scoring-state.json` dokumentiert. |
+| **Faktor** (Gewichtung) | `signal-rules.json#limits.strengths` | Die Stärke eines Signals (schwach/mittel/stark) wird zum **Multiplikator auf das Vertragsdelta**, nicht zu einer zweiten Delta-Tabelle. Das Urteil eines Menschen setzt die Klasse (`feedback.rated`, `feedback.retracted`); ein Signal ohne benannte Stärke bekommt **keinen** Faktor (`null`) und erzeugt kein Ereignis. Die Asymmetrie — Korrektur wiegt schwerer als Zustimmung — ist damit eine Eigenschaft der Tabelle, keine handgepflegte zweite Zahl. |
+| **Widerruf** | `signal-rules.json#sources.feedback.retracted` | Ein Widerruf nimmt **genau eine Zeile** aus dem Protokoll; die Tafel wird aus dem Rest neu gerechnet und steht danach wieder auf dem Wert von vorher (gemessen bis zur letzten Nachkommastelle: `scoring-signale` und `scoring-memory`). Zurückgenommenes zählt auch für die Tendenz nicht mehr. Das ist die ehrliche Antwort auf Gaming: der Mensch darf zurücknehmen, und die Maschine vergisst das Geschenk mit. |
+| **Vergessen** | `scoring-state.json#decay` | Pro **bekanntem** Ereignis wandert jede Dimension um `rate` Richtung `initial` — **vor** dem Delta. Nichts ist endgültig und nichts muss es sein: ein Rauschen-Strom verblasst von selbst, während echte Leistung immer wieder neu verdient wird. Kein Sekunden-Zähler, keine Uhr — vergessen wird pro Ereignis, nicht pro Zeit. |
 
-**Offen (Vannon entscheidet):** Diese drei Schranken eintragen (in `scoring-state.json`
-`cooling.maxPublishedSignalsPerSession` + `technical-profile.json` `limits.trustCeiling: 0.8`)
-**vor** K5.1, damit die UI-Registry nicht ohne Schutz gestartet wird. K5.0 (log-gültig)
-braucht sie nicht (nur 2 Signale, kein Rauschen-Quotient).
+**Was NICHT dazugekommen ist:** keine Sekundenregel, kein Zähler-Limit, kein Deckel,
+keine Laufzeit-Entscheidung. Fehlt einem Signal die Stärke, wird es nicht geraten.
+Steht ein Ereignis nicht im Vertrag, ändert es nichts (`UNKNOWN_EVENT`) und wird nur
+gezählt. Die drei Mechanismen sind die ganze Rechnung — die Tafel ist aus dem
+Protokoll hergeleitet, und was nicht mehr im Protokoll steht, zählt auch nach dem
+Neustart nicht mehr (§2.5).
+
+### 4.1 Die Tendenz — aus dem Protokoll, nicht aus dem Ton (Zug 3)
+
+Die Tendenz beantwortet eine Frage über das **Protokoll** (was ist passiert), nicht
+über den Ton (wie klingt das). Sie steht deshalb im Kern und nicht in der Persona:
+wer sie liest — Prompter, Persona — entscheidet über die Wirkung; gerechnet wird sie
+hier. Alle Regeln liegen als **Daten** in `packages/scoring/assets/tendency-rules.json`
+(`shinon.tendency-rules/v1`), die Ableitung selbst ist eine reine Funktion
+(`deriveTendency` in `packages/scoring/assets/scoring-core.js`): gleiche Zeilen,
+gleiche Tendenz —
+kein `Math.random`, kein `Date.now`, kein Modell.
+
+- **Klassen** (`classes`): welche Signale eine Klasse speist und welchen **Pol** sie
+trägt — `korrektur` (negative: `selffix`, `rephrase`, `dismiss`) und `zustimmung`
+  (positive: `copy`, `accept`). Ein Signal ohne Klasse ist keine Haltung, sondern
+  eine Zeile aus einer älteren Regel: sie steht als `unmatched` sichtbar da.
+- **Stufen** (`levels`): Anteil → Wort, absteigend, die letzte Stufe trägt 0.
+- **Haltungen** (`stances`): geordnete Bedingungen über diese Worte; die erste
+  passende gilt, die **letzte muss bedingungslos sein**. Die Reihenfolge IST die
+  Asymmetrie der Haltung: `kritisch` steht vor `zustimmend`, deshalb kippt eine
+  50/50-Lage zur Korrektur hin und nie zur Zustimmung.
+- **Mindestevidenz** (`minSignals`): darunter wird **nichts** behauptet
+  (`ready: false`, `THIN_EVIDENCE:2/3`) — kein Dünnschluss aus zwei Zeilen.
+
+Zwei Zahlen, nicht eine: `signals` ist das ganze Protokoll (ehrliche Summe),
+`counted` ist die Evidenzlage, auf der Anteile und Mindestevidenz rechnen — nämlich
+die Zeilen, die eine Klasse auch liest. Eine zurückgenommene Zeile zählt in keiner
+von beiden. Die Prüfung des Vertrags (Klassen, Stufen, Haltungen, Herkünfte, jeden
+Mechanismus-Ort) ist Gate-Arbeit (`scripts/gate/plugins/scoring.mjs`), die Rechnung
+ist Kern-Arbeit — dieselbe Trennung wie bei den Signalen.

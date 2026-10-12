@@ -1,5 +1,12 @@
 import z from '@deepseek-ai/schemastery';
 
+// Die reine Regel (Faltung, Prozent, Form) liegt in assets/token-core.js: ohne bare
+// Imports, damit ihre Unit-Tests auch ohne node_modules laufen (Konvention,
+// packages/project-index + packages/codingmon). Hier re-exportiert, damit die
+// oeffentlichen Namen des Pakets dieselben bleiben — und damit der
+// Distributionstest die Datei im Tarball einfordert.
+export * from './assets/token-core.js';
+
 // Keine Einstellungen: der Client rendert unabhaengig von Werten dieser Ebene.
 // `enabled`, `showInSidebar` und `showDetailed` sind entfallen. packages/token-usage/cordis.patch.yml
 // schreibt sie noch (ausserhalb dieses Slices).

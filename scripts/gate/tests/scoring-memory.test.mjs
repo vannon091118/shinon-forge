@@ -204,8 +204,9 @@ test('memory: die Ablage ist eine zweite, schmale Faehigkeit — die Abfrage ble
   const indexRoot = workDir('naht-index');
   const api = await mount({ root: project, indexRoot });
 
-  // Der Host hat GENAU zwei Faehigkeiten, und jede ist schmal.
-  assert.deepEqual([...api.host.services.keys()].sort(), ['shinon_index_query', 'shinon_index_store']);
+  // Der Host hat GENAU drei Faehigkeiten, und jede ist schmal: die Abfrage und
+  // die Ablage kommen vom Index, der Ton vom Scoring (Zug 5).
+  assert.deepEqual([...api.host.services.keys()].sort(), ['shinon_index_query', 'shinon_index_store', 'shinon_scoring_state']);
   const query = api.host.services.get(index.QUERY_SERVICE);
   assert.deepEqual(Object.keys(query).sort(), ['contract', 'resolveContext'], 'die Abfrage bleibt eine Operation');
   assert.equal(query.contract, index.QUERY_CONTRACT);
@@ -459,3 +460,52 @@ test('memory: auch wenn das Scoring ZUERST mountet, kommt der Stand an', async (
 // Am Ende die echte Konsole zurueckgeben, wie die Nachbardateien: das Stummschalten
 // gilt fuer diesen Lauf, nicht fuer den Prozess.
 process.on('exit', () => Object.assign(console, realConsole));
+
+// ── 5. Der Ton als schmale Faehigkeit (Zug 5) ────────────────────────────────
+//
+// Der Veredler und die Persona wollen den TON lesen (Haltung, Stufen), nicht die
+// Tafel. Deshalb bietet das Scoring genau EINE Operation an, und sie gibt `null`,
+// solange es nichts zu sagen gibt. Dieselbe Bauform wie die Abfrage des Index:
+// optional, schmal, mit geprueftem Vertragsnamen — die Namen beider Seiten pinnt
+// `context-wiring.test.mjs`.
+
+test('ton: der Stand ist eine Faehigkeit mit EINER Operation — und ohne Signal sagt sie nichts', async () => {
+  const project = fixture('ton-schmal');
+  const api = await mount({ root: project, indexRoot: workDir('ton-schmal-index') });
+
+  const service = api.host.services.get(scoring.SCORING_SERVICE);
+  assert.ok(service !== undefined, 'der Ton wird angeboten');
+  assert.deepEqual(Object.keys(service).sort(), ['contract', 'read'], 'genau Vertragsname und EINE Operation');
+  assert.equal(service.contract, scoring.SCORING_SERVICE_CONTRACT);
+  // Ohne ein einziges Signal gibt es keinen Ton: `null` statt einer Haltung
+  // ueber eine Lage, die es nicht gibt.
+  assert.equal(service.read(), null, 'kein Signal, keine Haltung');
+
+  // Die ERSTE Frage ist kein Signal (sie ist der Anfang, nicht eine Korrektur) —
+  // der Ton bleibt also leer, bis wirklich etwas passiert ist.
+  api.host.dispatch('session/event', SESSION, humanMessage(QUESTION));
+  assert.equal(service.read(), null, 'eine erste Frage ist noch keine Lage');
+
+  // Ein Urteil wiegt schwerer und traegt die Korrektur-Klasse.
+  api.scoring.observe(
+    { event_type: 'feedback.rated', session_id: 'sess-1' },
+    { session_id: 'sess-1', item: { messageId: 'msg-1', rating: 'negative' } },
+  );
+  const read = service.read();
+  assert.equal(read.signals, 1, 'das Urteil ist das erste Signal');
+  assert.ok(Array.isArray(read.tendencies), 'die Stufen sind eine Liste');
+  for (const entry of read.tendencies) {
+    assert.equal(typeof entry.klasse, 'string');
+    assert.equal(typeof entry.stufe, 'string');
+    assert.equal(typeof entry.share, 'number');
+  }
+  // Unter der Mindestevidenz wird NICHTS behauptet — der Grund steht dabei.
+  assert.equal(read.ready, false);
+  assert.equal(read.stance, null);
+  assert.match(read.reason, /^THIN_EVIDENCE:/);
+
+  // Der Ton ist HERGELEITET: dieselbe Frage, dieselbe Antwort — kein Speichern.
+  assert.deepEqual(service.read(), read, 'zweimal gelesen ist zweimal dasselbe');
+  assert.equal(storedState(api).scorecard !== undefined, true, 'die Tafel liegt weiter in der Ablage — der Ton nicht');
+  shutdown(api);
+});

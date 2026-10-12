@@ -1,0 +1,56 @@
+{
+  "contract": "shinon.note-rules/v1",
+  "note": "Die Regeln des Veredlers fuer die Zettel (Zug 4). Erzeugt werden Zettel vom ARBEITENDEN Modell mit seinen eigenen Werkzeugen; hier steht nur, wie sie gelesen und geprueft werden. Alles ist DATEN: Form, Grenzen, Thema-Marke und die drei Pruefungen. Kein Modell, kein Zufall, keine Uhr — dieselben Zettel ergeben dieselbe Auswahl und dieselben Befunde.",
+  "format": {
+    "dir": "generated-skills",
+    "contract": "shinon.skill-note/v1",
+    "version": 1,
+    "extension": ".json",
+    "required": ["contract", "version", "thema", "bei", "immer", "weil", "beleg"],
+    "note": "Ein Zettel ist EINE Datei in EINEM Verzeichnis. 'bei' ist der Ausloeser (wann gilt er), 'immer' die Anweisung (was dann), 'weil' der Grund, 'beleg' wo er gelernt wurde. 'thema' ist die Marke, an der er geladen wird.",
+    "limits": {
+      "thema": 60,
+      "bei": 200,
+      "immer": 200,
+      "weil": 300,
+      "beleg": 200
+    }
+  },
+  "reading": {
+    "note": "Gelesen wird aus DERSELBEN Naht, die schon den Indexkontext liefert: die Thema-Marke wird gegen den aufgeloesten Kontext geprueft (Projekt, Pfade, Symbole, Randbedingungen, Touches, Abhaengigkeiten) und zusaetzlich gegen den Prompt. Ohne Kontext wird KEIN Zettel geladen (fail-closed, eigener Grund) — ein Zettel, dessen Thema niemand aufgeloest hat, ist ein Zettel ohne Anlass.",
+    "maxNotes": 3,
+    "minHits": 1,
+    "minTokenLength": 4
+  },
+  "review": {
+    "note": "Die drei Pruefungen des Veredlers. Er PRUEFT und meldet — er erzeugt nichts und aendert nichts (dieselbe Trennung wie bei den Signalen: der Kern rechnet, der Host handelt). Jeder Befund nennt Datei, Art und den ausloesenden Text.",
+    "tooNarrow": {
+      "label": "zu spitz",
+      "note": "Ein Zettel gilt fuer EINEN Fall: er haengt an einem Datum, an einer Sitzung, an einem absoluten Pfad — oder er nennt mehr als maxPaths konkrete Dateien. Eine Regel, die nur fuer einen Tag gilt, ist ein Log, keine Lesson.",
+      "maxPaths": 2,
+      "pathPattern": "[A-Za-z0-9_][A-Za-z0-9_./-]*\\.[A-Za-z0-9]{1,5}",
+      "fields": ["bei", "immer"],
+      "forbidden": [
+        { "id": "datum", "pattern": "\\b\\d{4}-\\d{2}-\\d{2}\\b", "why": "ein Datum bindet den Zettel an einen Tag" },
+        { "id": "sitzung", "pattern": "\\bsession-[0-9a-f]{4,}\\b", "why": "eine Sitzungs-Kennung bindet ihn an einen Lauf" },
+        { "id": "heimatpfad", "pattern": "(^|[\\s\"'(])/(home|Users)/", "why": "ein absoluter Pfad bindet ihn an eine Maschine" }
+      ]
+    },
+    "tooBroad": {
+      "label": "zu breit",
+      "note": "Ein Zettel gilt fuer alles: die Anweisung traegt zu wenige eigene Begriffe. Gezaehlt werden Begriffe in 'immer', die keine Fuellwoerter sind und mindestens minTermLength Zeichen haben — unter minTerms sagt die Anweisung nichts, was nicht ohnehin gilt.",
+      "minTerms": 3,
+      "minTermLength": 4,
+      "stopWords": [
+        "also", "andere", "anderen", "auch", "aufpassen", "beim", "bitte", "dabei", "damit", "dann", "darauf", "das", "dass", "dem", "den", "denn", "der", "des", "dessen", "dies", "diese", "diesem", "diesen", "dieser", "dieses", "doch", "dort", "durch", "eine", "einem", "einen", "einer", "eines", "einfach", "etwas", "falls", "gilt", "immer", "its", "jede", "jeden", "jeder", "jedes", "kann", "kein", "keine", "keinen", "man", "mehr", "muss", "müssen", "nach", "nicht", "nie", "noch", "nur", "oder", "ohne", "sich", "sein", "seine", "seinen", "soll", "sollen", "sonst", "sowie", "statt", "ueber", "über", "und", "wenn", "werden", "wieder", "wird", "with", "your", "zum", "zur", "zwei", "zwischen"
+      ]
+    },
+    "duplicate": {
+      "label": "doppelt",
+      "note": "Zwei Zettel desselben Themas sagen dasselbe: die Anweisungen teilen mindestens minShared Begriffe UND mindestens den Anteil minShare der kuerzeren Anweisung. Gemessen am Inhalt, nicht am Dateinamen — dieselbe Regel wie bei der Wiederholungserkennung.",
+      "minShared": 2,
+      "minShare": 0.5,
+      "minTokenLength": 4
+    }
+  }
+}

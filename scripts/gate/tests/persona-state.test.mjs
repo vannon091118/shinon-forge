@@ -53,7 +53,7 @@ const bundle = await loadBundle();
  * Fake-Host: kennt ausschließlich `on` (Events) und `inject` (System-Prompt).
  * Jeder Zugriff auf etwas anderes wirft — genau das ist die Grenze.
  */
-function createHost() {
+function createHost(services = {}) {
   const handlers = new Map();
   const sections = [];
   const calls = [];
@@ -85,9 +85,16 @@ function createHost() {
       handlers.set(name, handler);
       return () => handlers.delete(name);
     },
-    inject(services, callback) {
-      calls.push(`inject:${services.join(',')}`);
+    inject(names, callback) {
+      calls.push(`inject:${names.join(',')}`);
       callback(child);
+    },
+    // Die EINE optionale Leseabfrage, die der echte Host auch hat (Zug 5: der
+    // Ton des Scorings). Sie ist LESEND und nur da, wenn ein Test etwas anbietet:
+    // ohne Dienste gibt es nichts zu holen, und kein Test kann darueber handeln.
+    get(name) {
+      calls.push(`get:${name}`);
+      return services[name];
     },
   };
   const dispatch = (channel, payload) => {
@@ -113,9 +120,9 @@ function quiet(fn) {
   }
 }
 
-const connect = () =>
+const connect = (services = {}) =>
   quiet(() => {
-    const host = createHost();
+    const host = createHost(services);
     const dispose = bundle.apply(host.ctx, {
       statePath: './assets/persona-state.json',
       eventsChannel: 'shinon/event',
@@ -377,14 +384,19 @@ test('persona: unbekanntes Event lässt den Kontext unberührt', () => {
   host.dispose();
 });
 
-test('persona: der Fake-Host kennt nur on und inject — nichts anderes wurde benutzt', () => {
+test('persona: der Fake-Host kennt on, inject und EINE optionale Leseabfrage — nichts anderes', () => {
   const host = connect();
-  assert.deepEqual(Object.keys(host.ctx).sort(), ['inject', 'on']);
+  // `get` ist dazugekommen, als die Tendenz gelesen wurde (Zug 5) — und es ist
+  // LESEND. Der Host bleibt ohne jede Faehigkeit zum Handeln: kein Modell, kein
+  // Werkzeug, kein Schreiben.
+  assert.deepEqual(Object.keys(host.ctx).sort(), ['get', 'inject', 'on']);
   for (const call of host.calls) {
-    assert.ok(/^(on|inject|effect|getSectionOrder|section):?/.test(call), `unerwarteter Aufruf: ${call}`);
+    assert.ok(/^(on|inject|effect|getSectionOrder|section|get):?/.test(call), `unerwarteter Aufruf: ${call}`);
   }
   assert.ok(host.calls.includes('on:shinon/event'));
   assert.ok(host.calls.some((call) => call === 'inject:systemPrompt'));
+  // Und die eine Abfrage fragt genau nach dem Ton — nach nichts anderem.
+  assert.deepEqual([...new Set(host.calls.filter((call) => call.startsWith('get:')))], [`get:${bundle.SCORING_SERVICE}`]);
   host.dispose();
 });
 
@@ -405,4 +417,78 @@ test('persona: zwei Hosts führen getrennte Zustände', () => {
   assert.equal(b.stateOf().mood, 'idle');
   a.dispose();
   b.dispose();
+});
+
+// ── 5. Die Tendenz (Zug 5) ───────────────────────────────────────────────────
+//
+// Die Haltung kommt vom Scoring, der Klang steht im Zustandsvertrag. Hier wird
+// beides geprueft: die Uebersetzung selbst, die Gleichheit der Haltungs-Namen
+// ueber die Paketgrenze — und der echte Weg in den System-Prompt.
+
+/** Die Haltungen, die das Scoring wirklich erzeugen kann (seine eigene Tabelle). */
+const scoringTendency = JSON.parse(
+  readFileSync(join(PACKAGE_DIR, '../scoring/assets/tendency-rules.json'), 'utf8'),
+);
+
+test('Tendenz: dieselben Haltungen auf beiden Seiten', () => {
+  const fromScoring = scoringTendency.stances.map((stance) => stance.id).sort();
+  const fromPersona = Object.keys(contract.tendency.voices).sort();
+  assert.deepEqual(fromPersona, fromScoring,
+    'eine Haltung ohne Klang waere stumm, ein Klang ohne Haltung erfunden');
+});
+
+test('Tendenz: Ton, Tempo und Härte kommen aus dem Vertrag — oder der Abschnitt faellt weg', () => {
+  const tone = { stance: 'kritisch', tendencies: [{ klasse: 'korrektur', stufe: 'hoch' }] };
+  const text = bundle.renderTendency(contract, tone);
+  assert.match(text, /^## Tendenz \(gelesen, nicht behauptet\)/);
+  assert.match(text, /Haltung: kritisch/);
+  assert.match(text, /Lage: korrektur hoch/);
+  assert.match(text, /Ton: trocken, direkt/);
+  assert.match(text, /Tempo: langsam/);
+  assert.match(text, /Härte: hoch/);
+
+  // Kein Ton, unbekannte Haltung, kaputte Form: es wird NICHTS behauptet.
+  assert.equal(bundle.renderTendency(contract, null), null);
+  assert.equal(bundle.renderTendency(contract, { stance: null }), null);
+  assert.equal(bundle.renderTendency(contract, { stance: '' }), null);
+  assert.equal(bundle.renderTendency(contract, { stance: 'siegesgewiss' }), null, 'unbekannte Haltung: kein erfundener Ton');
+  assert.equal(bundle.renderTendency(contract, 'kritisch'), null, 'ein String ist kein Ton');
+  // Ohne Stufen bleibt die Lage weg, der Rest steht.
+  const ohneLage = bundle.renderTendency(contract, { stance: 'neutral' });
+  assert.equal(ohneLage.includes('Lage:'), false);
+  assert.match(ohneLage, /Härte: mittel/);
+});
+
+test('Tendenz: mit Ton-Dienst steht der Abschnitt im Prompt, ohne ihn nicht', () => {
+  const stance = scoringTendency.stances[0].id;
+  const service = {
+    contract: bundle.SCORING_SERVICE_CONTRACT,
+    read: () => ({ stance, tendencies: [{ klasse: 'korrektur', stufe: 'hoch' }], signals: 4, ready: true, reason: null }),
+  };
+
+  const withTone = connect({ [bundle.SCORING_SERVICE]: service });
+  const tendencySection = withTone.sections.find((entry) => entry.name === 'shinon:tendency');
+  assert.ok(tendencySection !== undefined, 'der Abschnitt wird registriert');
+  assert.match(tendencySection.text, new RegExp(`Haltung: ${stance}`));
+  assert.equal(tendencySection.order, 9000 - 3, 'vor dem Zustandsabschnitt');
+  withTone.dispose();
+
+  // Ohne Dienst: kein Abschnitt — und keine erfundene Haltung.
+  const without = connect();
+  assert.equal(without.sections.some((entry) => entry.name === 'shinon:tendency'), false);
+  without.dispose();
+});
+
+test('Tendenz: ein fremder Dienst unter dem Namen wird gemeldet, nicht gelesen', () => {
+  const errors = [];
+  const realError = console.error;
+  console.error = (...args) => errors.push(args.join(' '));
+  try {
+    const connectForeign = connect({ [bundle.SCORING_SERVICE]: { contract: 'shinon.fremd/v1', read: () => ({ stance: 'kritisch' }) } });
+    assert.equal(connectForeign.sections.some((entry) => entry.name === 'shinon:tendency'), false);
+    assert.ok(errors.some((line) => line.includes('verletzt den Vertrag')), errors.join(' | '));
+    connectForeign.dispose();
+  } finally {
+    console.error = realError;
+  }
 });

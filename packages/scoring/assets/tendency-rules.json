@@ -1,0 +1,37 @@
+{
+  "contract": "shinon.tendency-rules/v1",
+  "note": "Die Tendenz-Ableitung als DATEN, nicht als Laufzeit-Entscheidung. Klassen sagen, WIE gelesen wird (welches Signal speist sie, welchen Pol es traegt); Stufen uebersetzen einen Anteil in ein Wort; Haltungen sind geordnete Regeln ueber diese Worte — die erste passende gilt, die letzte muss bedingungslos sein. Die REIHENFOLGE ist die einzige Asymmetrie, die die Haltung braucht: 'kritisch' steht vor 'zustimmend', deshalb kippt eine 50/50-Lage zur Korrektur hin und nie zur Zustimmung. Unter minSignals wird NICHTS behauptet (fail-closed). Kein Deckel, kein Zaehler-Limit, keine Sekundenregel — die Zeit entscheidet nie, nur Inhalt und Reihenfolge.",
+  "mechanisms": {
+    "note": "Die drei Mechanismen der Rechnung und WO ihre Zahl lebt. Zug 3 hat Trust-Ceiling und Rate-Limit ersetzt: sie waren ungemessene Erfindungen. Uebrig bleiben drei Mechanismen, die es im Code wirklich gibt — das Gate prueft, dass jeder hier benannte Ort aufloest.",
+    "weight": { "label": "Faktor", "where": "signal-rules.json#limits.strengths" },
+    "retract": { "label": "Widerruf", "where": "signal-rules.json#sources.feedback.retracted" },
+    "forget": { "label": "Vergessen", "where": "scoring-state.json#decay" }
+  },
+  "classes": [
+    {
+      "id": "korrektur",
+      "pole": "negative",
+      "label": "Korrektur",
+      "signals": ["selffix", "rephrase", "dismiss"],
+      "note": "Was gegen die letzte Antwort spricht: ausdrueckliche Ablehnung (selffix), inhaltliche Wiederholung (rephrase), Abbruch oder Widerruf (dismiss)."
+    },
+    {
+      "id": "zustimmung",
+      "pole": "positive",
+      "label": "Zustimmung",
+      "signals": ["copy", "accept"],
+      "note": "Was fuer sie spricht: das ausdrueckliche positive Urteil (copy) und der regulaere Abschluss (accept)."
+    }
+  ],
+  "levels": [
+    { "id": "hoch", "minShare": 0.5 },
+    { "id": "mittel", "minShare": 0.25 },
+    { "id": "niedrig", "minShare": 0 }
+  ],
+  "stances": [
+    { "id": "kritisch", "when": { "korrektur": "hoch" } },
+    { "id": "zustimmend", "when": { "zustimmung": "hoch" } },
+    { "id": "neutral" }
+  ],
+  "minSignals": 3
+}

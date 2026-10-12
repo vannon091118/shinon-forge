@@ -220,6 +220,12 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
     [
       { kind: 'import', target: '@deepseek-ai/schemastery' },
       { kind: 'import', target: 'node:fs' },
+      // Zug 4/5: das Paket liest die Zettel und baut den Stand. Beide Kanten
+      // sind gewollt — `node:path` fuer das Verzeichnis, der Kern fuer die
+      // Regeln — und stehen hier, damit eine neue Kante auffaellt, statt
+      // stillschweigend dazuzukommen.
+      { kind: 'import', target: 'node:path' },
+      { kind: 'import', target: './assets/note-core.js' },
     ],
     'Kanten sind Importe; externe Ziele bleiben drin, weil sie importiert werden',
   );

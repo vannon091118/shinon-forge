@@ -181,6 +181,12 @@ test('Naht: Dienst- und Vertragsname stimmen in beiden Paketen ueberein', () => 
   assert.equal(scoring.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
   assert.equal(typeof scoring.LEDGER_NAMESPACE, 'string');
   assert.ok(scoring.LEDGER_NAMESPACE.length > 0, 'ohne Namensraum gaebe es keine Adresse');
+
+  // Die dritte Naht (Zug 5): der Ton. Der Veredler liest die Haltung ueber
+  // dieselbe Bauform (optionales `get`, gepruefter Vertragsname); die Namen
+  // muessen auf beiden Seiten dieselben sein, sonst bleibt der Block stumm.
+  assert.equal(prompter.SCORING_SERVICE, scoring.SCORING_SERVICE, 'derselbe Dienstname');
+  assert.equal(prompter.SCORING_SERVICE_CONTRACT, scoring.SCORING_SERVICE_CONTRACT, 'derselbe Vertragsname');
 });
 
 // ── 3./4. Der echte Durchlauf und die Quelle im Datensatz ───────────────────
@@ -221,7 +227,10 @@ function connect({ config = {}, llm, service } = {}) {
   ctx.provide('llm', llm);
   if (service !== undefined) ctx.provide(prompter.INDEX_SERVICE, service);
   ctx.on(prompter.DECISION_CHANNEL, (record) => records.push(record));
-  const dispose = quiet(() => prompter.apply(ctx, prompter.Config({ provider: 'p', model: 'm', mode: 'MAX', ...config })));
+  // `notesPath: ''` heisst: die Zettel sind hier AUS. Diese Datei prueft die
+  // Kontext-Naht, und deren Aufruf traegt genau EINEN Block. Die Zettel haben
+  // ihre eigene Datei (prompter-notes.test.mjs) und einen eigenen Block.
+  const dispose = quiet(() => prompter.apply(ctx, prompter.Config({ provider: 'p', model: 'm', mode: 'MAX', notesPath: '', ...config })));
   return { ctx, records, dispose };
 }
 

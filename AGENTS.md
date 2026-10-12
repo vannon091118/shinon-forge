@@ -25,6 +25,14 @@ remote, so `npm run sync` cannot work as written.
   refuses to assert against the unverified fassung. Both numbers: `docs/ZAHLEN.md` §1.
   `npm run dev` and the profile test need `dsh` on PATH. Run with `DSH_HOME=$PWD`
   (the `dev` script does this).
+- Der Arbeits-Schlüssel für echte Modell-Turns liegt in `.env` im Repo-Root (gitignoriert,
+  `chmod 600`) — **nie committen, nie ausgeben, nie in eine Antwort kopieren.** `dsh` lädt
+  die Datei beim Start selbst (Projekt-Ebene und Harness-Home; mit `DSH_HOME=$PWD` ist das
+  dieselbe Datei), die Route ist `agnes/agnes-3.0-flash` (`apiKeyEnv: AGNES_API_KEY` im
+  Profil). Wer einen e2e-Lauf braucht, nimmt sie; **„kein Schlüssel" ist kein Grund mehr,
+  eine Messung zu verschieben** — der erste Durchlauf (echter Boot, echtes Urteil, Widerruf,
+  Host-Ende, Neustart) steht in `docs/ZAHLEN.md` §2, die Belege in
+  `docs/probes/store-cost.json`.
 - `package-lock.json` is versioned and **is** the source of resolution; the root
   `package.json` carries `workspaces: ["packages/*"]` and the local packages are bound
   with the `workspace:*` protocol. Measured: `npm install` on a fresh checkout is

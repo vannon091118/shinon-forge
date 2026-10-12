@@ -41,10 +41,12 @@ export {
   normalizeTokens,
   overlapOf,
   humanText,
+  strengthFactor,
   translateSignal,
+  deriveTendency,
   createSignalCollector,
 } from './assets/scoring-core.js';
-import { canonicalize, initialState as coreInitialState, createSignalCollector } from './assets/scoring-core.js';
+import { canonicalize, initialState as coreInitialState, createSignalCollector, deriveTendency } from './assets/scoring-core.js';
 
 /**
  * Die Naht zur Ablage (Zug 2) — als Namen an EINER Stelle, weil kein Paket das
@@ -63,6 +65,20 @@ export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
  */
 export const LEDGER_NAMESPACE = 'shinon.scoring/ledger-v1';
 
+/**
+ * Die Naht zum TON (Zug 5) — der Stand als schmale Faehigkeit.
+ *
+ * Wer den Ton eines Schritts lesen will (der Veredler fuer seinen Stand-Block,
+ * die Persona fuer Haltung und Haerte), braucht NICHT die Tafel: er braucht die
+ * HALTUNG und ihre Stufen. Deshalb genau ZWEI Felder — `contract` und EINE
+ * Operation `read` — und `read` gibt `null` zurueck, solange nichts zu sagen
+ * ist. Dieselbe Bauform wie die Abfrage des Index, aus demselben Grund: kein
+ * Paket liest ein anderes, und der Vertragsname wird auf beiden Seiten geprueft.
+ * Die Gleichheit der Namen pinnt `scripts/gate/tests/context-wiring.test.mjs`.
+ */
+export const SCORING_SERVICE = 'shinon_scoring_state';
+export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
+
 /** Leere Scorecard: der Stub läuft dann lesend, aber ohne Werte. */
 const EMPTY_SCORING = { contract: 'shinon.scoring-state/unloaded', dimensions: {}, events: {}, relation: { levels: [], initial: null } };
 const EMPTY_PROFILE = { contract: 'shinon.technical-profile/unloaded', capabilities: [], skills: [], limits: {} };
@@ -73,6 +89,13 @@ const EMPTY_TRIGGERS = { contract: 'shinon.skill-triggers/unloaded', triggers: [
  * Die Tafel steht dann still, stattSignale zu erfinden (fail-closed).
  */
 const EMPTY_RULES = { contract: 'shinon.signal-rules/unloaded', limits: { strengths: {} }, sources: {}, signals: {} };
+
+/**
+ * Ohne Tendenz-Regeln gibt es keine Tendenz — dann wird KEINE behauptet.
+ * Eine leere Tabelle ergibt `ready: false` mit benanntem Grund, nicht einen
+ * stillen Vorgabewert (fail-closed, wie ueberall in dieser Schicht).
+ */
+const EMPTY_TENDENCY = { contract: 'shinon.tendency-rules/unloaded', classes: [], levels: [], stances: [], minSignals: Infinity };
 
 /** Vertragsdaten aus dem Paket laden. */
 export function loadScorecard(relPath) {
@@ -92,6 +115,12 @@ export const Config = z.object({
    * Zeile hier, kein Umbau.
    */
   rulesPath: z.string().default('./assets/signal-rules.json'),
+  /**
+   * Tendenz-Regeln (Zug 3): wie aus dem Protokoll eine Haltung wird — Klassen,
+   * Stufen, Bedingungen, Mindestevidenz. Ebenfalls Daten; die Rechnung selbst
+   * ist `deriveTendency` im Kern.
+   */
+  tendencyPath: z.string().default('./assets/tendency-rules.json'),
   /** Replay-Fixture — Beweis, dass derselbe Strom reproduzierbar ist. */
   replayPath: z.string().default('./assets/replay/scoring-demo.json'),
   /** Kanal, auf dem der Event-Spine seine Envelopes emittiert. */
@@ -112,6 +141,7 @@ export function apply(ctx, config) {
   const profile = loadOrWarn('Technik-Profil', config.technicalPath, EMPTY_PROFILE);
   const triggers = loadOrWarn('Skill-Trigger', config.triggersPath, EMPTY_TRIGGERS);
   const rules = loadOrWarn('Signaltabelle', config.rulesPath, EMPTY_RULES);
+  const tendency = loadOrWarn('Tendenz-Regeln', config.tendencyPath, EMPTY_TENDENCY);
   const contracts = { scoring, profile, triggers };
 
   const initial = coreInitialState(scoring);
@@ -134,6 +164,37 @@ export function apply(ctx, config) {
   // erneut gefragt: die Mount-Reihenfolge eines Profils ist keine Zusage, und
   // eine Abfrage ist ein Nachschlagen im Dienstverzeichnis — kein Aufwand.
   let store = null;
+
+  /**
+   * Die Zeile ueber die Ablage — und zwar die Wahrheit.
+   *
+   * GEMESSEN im echten Boot (2026-10-11, `dsh --profile shinon`): der Index
+   * mountet NACH dem Scoring. Beim Mounten stand hier deshalb „kein Gedaechtnis
+   * … der Stand bleibt im Speicher", waehrend derselbe Lauf mit dem ersten
+   * Signal in genau diese Ablage schrieb (belegt: `Stand geladen: 1 Signale`
+   * im naechsten Boot). Ein Satz, der eine Frage beantwortet, die zu diesem
+   * Zeitpunkt noch offen ist, ist keine Auskunft.
+   *
+   * Deshalb jetzt: gefunden wird sofort genannt (das ist ein Fakt), NICHT
+   * gefunden erst beim ersten echten Gebrauch — dort liegt der Blick hinter
+   * allen Mounts, und dort ist „kein Gedaechtnis" eine Aussage statt einer
+   * Vermutung. Ein Boot ohne ein einziges Signal nennt die Ablage gar nicht:
+   * eine Zeile, die nichts weiss, ist besser als eine, die etwas behauptet.
+   */
+  let mountProbe = true;
+  let decided = false;
+  const announceStore = () => {
+    if (decided) return;
+    if (store !== null) {
+      decided = true;
+      console.log(`[shinon-scoring] Ablage: ${INDEX_STORE_SERVICE} (${INDEX_STORE_CONTRACT}, Namensraum ${LEDGER_NAMESPACE})`);
+      return;
+    }
+    if (mountProbe) return;
+    decided = true;
+    console.log(`[shinon-scoring] Ablage: kein Gedaechtnis (${INDEX_STORE_SERVICE} nicht angeboten — der Stand bleibt im Speicher)`);
+  };
+
   const resolveStore = () => {
     if (store !== null) return store;
     let found = null;
@@ -151,6 +212,7 @@ export function apply(ctx, config) {
       found = null;
     }
     store = found;
+    announceStore();
     return store;
   };
 
@@ -248,21 +310,60 @@ export function apply(ctx, config) {
 
   const sources = Object.keys(rules.sources ?? {}).length;
   const signals = Object.keys(rules.signals ?? {}).length;
+  const classes = Array.isArray(tendency.classes) ? tendency.classes.length : 0;
+  const levels = Array.isArray(tendency.levels) ? tendency.levels.length : 0;
   console.log(
     `[shinon-scoring] Verträge geladen (${dimensions} Dimensionen, ${triggers.triggers?.length ?? 0} Trigger, nur lesend) — ` +
       `Ohren auf ${config.eventsChannel}: ${sources} Quellen, ${signals} Signale` +
+      `; Tendenz aus ${classes} Klassen, ${levels} Stufen, ab ${Number.isFinite(tendency.minSignals) ? tendency.minSignals : '∞'} Signalen` +
       `${listening === null ? ' (NICHT angebunden — die Tafel bleibt stehen)' : ''}`,
   );
-  // Eine Zeile fuer die Ablage, und zwar die WAHRHEIT: sie nennt den gefundenen
-  // Dienst nur, wenn er wirklich einer ist (Vertrag geprueft).
+  // Der Mount-Blick auf die Ablage: er nennt sie, wenn sie schon da ist, und
+  // schweigt, wenn die Mount-Reihenfolge die Frage noch offen laesst. Entschieden
+  // wird sie beim ersten echten Gebrauch (siehe announceStore).
+  resolveStore();
+  mountProbe = false;
+
+  // ── Der Ton als Faehigkeit ────────────────────────────────────────────────
+  //
+  // Die Tendenz ist HERGELEITET (aus dem Protokoll), also wird sie hier gelesen
+  // und nicht gespeichert; `read` rechnet bei jedem Aufruf neu. Ein Host ohne
+  // `ctx.provide` ist kein Fehler des Laufs — dann wird der Ton eben nicht
+  // angeboten, und das steht im Log.
+  const canProvide = typeof ctx?.provide === 'function';
+  const standService = {
+    contract: SCORING_SERVICE_CONTRACT,
+    read: () => {
+      if (!memoryLoaded) loadState();
+      const derived = deriveTendency(tendency, collector.records());
+      // Nichts behauptet, nichts erfunden: ohne ein einziges Signal gibt es
+      // keinen Ton. `null` ist die ehrliche Antwort, `stance: null` waere eine
+      // Aussage ueber eine Lage, die es nicht gibt.
+      if (derived.signals === 0) return null;
+      return {
+        stance: derived.stance,
+        ready: derived.ready,
+        reason: derived.reason,
+        tendencies: Object.entries(derived.levels).map(([klasse, stufe]) => ({
+          klasse,
+          stufe,
+          share: derived.shares[klasse] ?? 0,
+        })),
+        signals: derived.signals,
+      };
+    },
+  };
+  const releaseStand = canProvide ? ctx.provide(SCORING_SERVICE, standService) : null;
   console.log(
-    `[shinon-scoring] Ablage: ${resolveStore() === null ? `kein Gedaechtnis (${INDEX_STORE_SERVICE} nicht angeboten — der Stand bleibt im Speicher)` : `${INDEX_STORE_SERVICE} (${INDEX_STORE_CONTRACT}, Namensraum ${LEDGER_NAMESPACE})`}`,
+    `[shinon-scoring] Ton: ${SCORING_SERVICE} (${SCORING_SERVICE_CONTRACT}) ${canProvide ? 'angeboten' : 'NICHT angeboten (der Host hat kein ctx.provide)'}`,
   );
 
   return {
     contracts,
     initial,
     collector,
+    /** Der angebotene Ton — fuer Tests und den spaeten Mount. */
+    standService,
     /** Ein Ereignis von Hand zufuehren (Tests, Replay, naechster Zug). */
     observe: (envelope, payload) => {
       if (!memoryLoaded) loadState();
@@ -282,7 +383,18 @@ export function apply(ctx, config) {
       if (!memoryLoaded) loadState();
       return collector.scorecard();
     },
+    /**
+     * Die Tendenz — aus dem Protokoll abgeleitet, nie gespeichert.
+     *
+     * Die Tafel (`scorecard`) und die Tendenz sind beide HERGELEITET; nur das
+     * Protokoll ist Evidenz. Deshalb braucht die Tendenz keine eigene Fassung in
+     * der Ablage: was geladen wird, erzeugt sie beim Lesen neu. Eine unter
+     * `minSignals` duenne Lage ergibt `ready: false` und `stance: null` — dann
+     * behauptet niemand eine Haltung.
+     */
+    tendency: () => deriveTendency(tendency, collector.records()),
     dispose: () => {
+      if (typeof releaseStand === 'function') releaseStand();
       if (listening !== null) listening();
       // Sitzungen enden mit dem Prozess: erst schliessen (die Ablage traegt den
       // Rest), dann den Speicher leeren. Umgekehrt waere der Merkzettel weg,

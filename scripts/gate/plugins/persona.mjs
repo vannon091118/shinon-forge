@@ -113,6 +113,24 @@ export function stateContractIssues(contract, file) {
     if (!PERSONA_EVENT_TYPES.includes(type)) issues.push(`${file}: unbekannter Übergang ${type}`);
   }
 
+  // Die Klangregeln der Tendenz (Zug 5): die Persona liest die HALTUNG vom
+  // Scoring und uebersetzt sie hier in Ton, Tempo und Haerte. Geprueft wird die
+  // Vollstaendigkeit der Uebersetzung — WELCHE Haltungen es gibt, steht in der
+  // Tabelle des Scorings und wird von aussen gepinnt (persona-state.test.mjs).
+  const tendency = contract.tendency;
+  if (tendency !== undefined) {
+    const voices = tendency?.voices ?? {};
+    const stances = Object.keys(voices);
+    if (stances.length === 0) {
+      issues.push(`${file}: tendency.voices ist leer — dann kann keine Haltung klingen`);
+    }
+    for (const stance of stances) {
+      for (const field of ['ton', 'tempo', 'haerte']) {
+        if (!isText(voices[stance]?.[field])) issues.push(`${file}: tendency.voices.${stance}.${field} fehlt`);
+      }
+    }
+  }
+
   const voice = contract.voice ?? {};
   const moods = new Set([baseline.mood, ...Object.values(transitions).map((transition) => transition?.mood)].filter(isText));
   for (const mood of moods) {

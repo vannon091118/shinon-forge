@@ -1,5 +1,15 @@
 import z from '@deepseek-ai/schemastery';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
+import { parseNote, renderStand, reviewNotes, selectNotes, tokens } from './assets/note-core.js';
+
+/**
+ * Der Zettel-Kern wird RE-EXPORTIERT, nicht nachgebaut: die reinen Funktionen
+ * (lesen, waehlen, pruefen, rendern) sind ohne node_modules testbar, die
+ * Host-Anbindung (Verzeichnis lesen) bleibt hier. Dieselbe Teilung wie bei
+ * `@shinon/scoring` (Kern + Host) — die oeffentlichen Namen bleiben dieselben.
+ */
+export { parseNote, renderStand, reviewNotes, selectNotes, tokens };
 
 /**
  * shinon-prompter — der interne One-Shot Prompt Enhancer.
@@ -93,8 +103,33 @@ export const INDEX_SERVICE = 'shinon_index_query';
 /** Der Vertragsname, den die Faehigkeit fuehren muss. */
 export const INDEX_CONTRACT = 'shinon.project-index/query-v1';
 
+/**
+ * Die Ton-Faehigkeit des Scorings (Zug 5) — optional, wie die Abfrage des Index.
+ *
+ * Der Stand-Block traegt zwei Dinge: die passenden ZETTEL (aus dem Verzeichnis)
+ * und die HALTUNG samt Tendenzen (aus dem Scoring). Beide reiten auf demselben
+ * optionalen `ctx.get`-Weg: kein `inject`, damit der Veredler auch in einem
+ * Profil ohne Scoring montiert — dann gibt es eben keinen Ton, und das steht im
+ * Entscheidungsdatensatz. Die Namen sind mit `@shinon/scoring` gepinnt
+ * (`scripts/gate/tests/context-wiring.test.mjs`).
+ */
+export const SCORING_SERVICE = 'shinon_scoring_state';
+export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
+
 /** Budget des MAX-Kontexts. Derselbe Wert wie der Vorgabewert des Index (§14). */
 export const INDEX_BUDGET_TOKENS = 6000;
+
+/** Vertragsname der Zettel-Regeln (Zug 4). */
+export const NOTE_RULES_CONTRACT = 'shinon.note-rules/v1';
+
+/** Wo die Regeln des Veredlers liegen (relativ zum Paket, wie der Kontextpfad). */
+export const NOTE_RULES_PATH = './assets/note-rules.json';
+
+/** Der Vorgabewert des Zettel-Verzeichnisses (relativ zum Arbeitsverzeichnis). */
+export const NOTES_DIR_DEFAULT = 'generated-skills';
+
+/** Vertragsname des Stand-Blocks (Zug 4/5). */
+export const STAND_CONTRACT = 'shinon.stand/v1';
 
 /**
  * Operationen, die eine ANFORDERUNG ändern. Sie sind in jedem Modus verboten —
@@ -364,6 +399,15 @@ export const Config = z.object({
   /** Kontext-Quelle fuer MAX (leer = kein Kontext, MAX wird abgelehnt). */
   contextPath: z.string().default(''),
   /**
+   * Verzeichnis der Zettel (Zug 4), relativ zum ARBEITSVERZEICHNIS des Laufs.
+   *
+   * Nicht relativ zum Paket: die Zettel gehoeren dem PROJEKT, an dem gearbeitet
+   * wird, nicht dem Tarball. Ein ausgerolltes Paket liegt unter `node_modules` —
+   * dort schreibt kein Modell. Leer heisst: nicht lesen (dann laedt kein Zettel,
+   * und der Entscheidungsdatensatz sagt das mit `notes: null`).
+   */
+  notesPath: z.string().default(NOTES_DIR_DEFAULT),
+  /**
    * Budget des Index-Kontexts. Der Enhancer deckelt selbst — der Wert aus dem
    * Profil gilt, das Paket hat nur einen Vorgabewert.
    */
@@ -388,6 +432,183 @@ export const Config = z.object({
  * Grund, MAX zu sperren, statt halb gefüllt weiterzumachen.
  */
 export function loadContext(path) {
+  return loadJsonContract(path, CONTEXT_CONTRACT, (parsed) => ContextSchema(parsed));
+}
+
+/**
+ * Die Regeln des Veredlers laden und gegen ihren Vertragsnamen pruefen.
+ *
+ * Wirft bei einem unlesbaren oder fremden Datensatz — der Aufrufer sperrt dann
+ * das Lesen der Zettel, statt mit erfundenen Grenzen weiterzumachen. Eine
+ * fehlende Grenze waere hier besonders teuer: sie entscheidet, WAS geladen wird.
+ */
+export function loadNoteRules(path = NOTE_RULES_PATH) {
+  return loadJsonContract(path, NOTE_RULES_CONTRACT, (parsed) => parsed);
+}
+
+/**
+ * Das Verzeichnis der Zettel aufloesen — relativ zum ARBEITSVERZEICHNIS.
+ * Ein absoluter Pfad bleibt absolut (eine ausdrueckliche Angabe wird geehrt).
+ */
+function notesDir(config) {
+  return isAbsolute(config.notesPath) ? config.notesPath : join(process.cwd(), config.notesPath);
+}
+
+/**
+ * Die Zettel eines Laufs lesen — Datei fuer Datei, in Namensreihenfolge.
+ *
+ * Kein Cache, und das ist Absicht: die Zettel SCHREIBT das arbeitende Modell
+ * WAEHREND des Laufs. Ein Zwischenspeicher muesste an einer Uhr oder an einer
+ * Aenderungszeit haengen, um eine geaenderte Datei zu bemerken — beides gibt es
+ * hier nicht. Ein paar kleine Dateien je Schritt kosten weniger als ein
+ * veralteter Stand.
+ *
+ * Was nicht gelesen werden kann, verschwindet nicht: es steht als Grund in
+ * `skipped`. Eine stille Luecke waere hier die teure Variante — ein Modell, das
+ * ohne seinen Zettel arbeitet und nicht weiss, warum.
+ * @returns { notes, skipped, reason } — `notes` sind gepruefte Zettel mit Datei.
+ */
+export function readNotes(config, rules) {
+  const format = rules?.format ?? {};
+  if (typeof config?.notesPath !== 'string' || config.notesPath === '') return { notes: [], skipped: [], reason: 'NOTES_OFF' };
+  const dir = notesDir(config);
+  const extension = typeof format.extension === 'string' ? format.extension : '.json';
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch (error) {
+    return { notes: [], skipped: [], reason: `NOTES_UNREADABLE:${error?.code ?? 'ERROR'}` };
+  }
+
+  const notes = [];
+  const skipped = [];
+  for (const name of names.filter((entry) => entry.endsWith(extension)).sort()) {
+    let text;
+    try {
+      text = readFileSync(join(dir, name), 'utf8');
+    } catch (error) {
+      skipped.push({ file: name, reason: `NICHT_LESBAR:${error?.code ?? 'ERROR'}` });
+      continue;
+    }
+    const parsed = parseNote(text, format);
+    if (!parsed.ok) {
+      skipped.push({ file: name, reason: parsed.reason });
+      continue;
+    }
+    notes.push({ file: name, note: parsed.note });
+  }
+  return { notes, skipped, reason: null };
+}
+
+/**
+ * Den Stand dieses Schritts bauen: die passenden Zettel aus dem AUFGELOESTEN
+ * Kontext (dieselbe Naht, die auch den MAX-Kontext liefert).
+ *
+ * Der Heuhaufen ist bewusst NICHT der Dateiinhalt: die Thema-Marke wird gegen
+ * Projekt, Pfade, Symbole, Randbedingungen, Touches, Abhaengigkeiten und den
+ * Prompt geprueft. Dateiinhalte wuerden jeden Zettel laden, dessen Thema
+ * irgendwo im Projekt vorkommt — und damit jeden.
+ */
+export function standFor(config, runtime, promptText, context, toneState = null) {
+  const tone = toneState?.tone ?? null;
+  const stance = typeof tone?.stance === 'string' ? tone.stance : null;
+  const tendencies = Array.isArray(tone?.tendencies) ? tone.tendencies : [];
+
+  // Zwei Gruende, in dieser Reihenfolge: abgeschaltet ist eine Entscheidung,
+  // fehlende Regeln sind ein Defekt. Ohne Regeln kein Zettel — welche Marke
+  // passt und wie viele laden duerfen, steht NUR in der Regeldatei; ohne sie
+  // waere jede Auswahl geraten.
+  const off = typeof config?.notesPath !== 'string' || config.notesPath === '';
+  const read = off || (runtime?.noteRules ?? null) === null
+    ? { notes: [], skipped: [], reason: off ? 'NOTES_OFF' : 'NOTES_NO_RULES' }
+    : readNotes(config, runtime.noteRules);
+  const haystack = [
+    promptText,
+    context?.project ?? '',
+    ...(context?.files ?? []).map((file) => file?.path ?? ''),
+    ...(context?.symbols ?? []),
+    ...(context?.constraints ?? []),
+    ...(context?.touches ?? []),
+    ...(context?.dependencies ?? []),
+  ];
+  const selected = off || (runtime?.noteRules ?? null) === null
+    ? { loaded: [], skipped: [] }
+    : selectNotes(read.notes, haystack, runtime.noteRules.reading ?? {});
+  const notes = selected.loaded.map((entry) => entry.note);
+  const block = renderStand({ contract: STAND_CONTRACT, stance, tendencies, notes });
+  return {
+    block,
+    stance,
+    tendencies,
+    tone: toneState?.source ?? 'none',
+    thema: notes.map((note) => note.thema),
+    skipped: [...read.skipped, ...selected.skipped],
+    reason: read.reason,
+  };
+}
+
+/**
+ * Der Stand als Feld des Entscheidungsdatensatzes — kurz und ohne Inhalt.
+ *
+ * Benannt wird, was WIRKTE (Haltung, Stufen, geladene Marken) und was nicht
+ * (Gruende). Den Text selbst traegt die Spur nicht: der Entscheidungsdatensatz
+ * reist als Ereignis durch den Host, und ein Prompt-Block hat dort nichts zu
+ * suchen.
+ */
+export function standTrace(stand) {
+  if (stand === null || stand === undefined) return null;
+  const reasons = [...new Set(stand.skipped.map((entry) => entry.reason))].sort();
+  return {
+    stance: stand.stance,
+    tone: stand.tone,
+    tendencies: stand.tendencies.map((entry) => `${entry.klasse} ${entry.stufe}`),
+    notes: { loaded: stand.thema, skipped: stand.skipped.length, reasons, reason: stand.reason },
+  };
+}
+
+/**
+ * Den Ton beim Scoring holen — optional, mit geprueftem Vertrag.
+ *
+ * Vier Richtungen, jede benannt, genau wie beim Index: kein Dienst (`none`),
+ * fremder Vertrag (`invalid`), eine Antwort, die keine ist (`invalid`), oder ein
+ * gelesener Ton (`scoring`). Ein FEHLENDER Dienst ist der Normalfall in einem
+ * Profil ohne Scoring und kein Grund zum Abbruch — ein fremder Dienst unter
+ * diesem Namen dagegen ist einer, und deshalb wird er einmal laut gemeldet.
+ */
+function readTone(ctx, runtime) {
+  let service;
+  try {
+    service = typeof ctx?.get === 'function' ? ctx.get(SCORING_SERVICE) : undefined;
+  } catch {
+    service = undefined;
+  }
+  if (service === undefined || service === null) return { tone: null, source: 'none' };
+  if (service.contract !== SCORING_SERVICE_CONTRACT || typeof service.read !== 'function') {
+    if (!runtime.toneWarned) {
+      runtime.toneWarned = true;
+      console.error(`[shinon-prompter] ${SCORING_SERVICE} verletzt den Vertrag ${SCORING_SERVICE_CONTRACT} — kein Ton im Stand`);
+    }
+    return { tone: null, source: 'invalid' };
+  }
+  let raw;
+  try {
+    raw = service.read();
+  } catch (error) {
+    console.error(`[shinon-prompter] Ton nicht lesbar (${error?.message ?? error}) — kein Ton im Stand`);
+    return { tone: null, source: 'invalid' };
+  }
+  // `null` heisst: es gibt nichts zu sagen (kein Signal). Kein Ton ist hier die
+  // richtige Antwort — nicht ein leerer.
+  if (raw === null || raw === undefined) return { tone: null, source: 'none' };
+  if (typeof raw !== 'object') return { tone: null, source: 'invalid' };
+  return { tone: raw, source: 'scoring' };
+}
+
+/**
+ * Eine JSON-Datei ueber ihren Vertragsnamen laden und pruefen — EIN Weg fuer
+ * beide Dateien dieses Pakets. Wirft mit Grund; die Aufrufer behandeln das.
+ */
+function loadJsonContract(path, contract, validate) {
   // Lesen UND parsen liegen im try: eine fehlende oder gesperrte Datei ist ein
   // eigener Grund (ENOENT/EACCES) und nicht "kein gueltiges JSON" — vorher nannte
   // die Meldung fuer beide Faelle die falsche Ursache.
@@ -395,15 +616,18 @@ export function loadContext(path) {
   try {
     raw = readFileSync(new URL(path, import.meta.url), 'utf8');
   } catch (error) {
-    throw new Error(`${CONTEXT_CONTRACT}: Datei nicht lesbar (${error?.code ?? error?.message})`);
+    throw new Error(`${contract}: Datei nicht lesbar (${error?.code ?? error?.message})`);
   }
   let parsed;
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error(`${CONTEXT_CONTRACT}: kein gueltiges JSON (${error?.message})`);
+    throw new Error(`${contract}: kein gueltiges JSON (${error?.message})`);
   }
-  return ContextSchema(parsed);
+  if (contract !== CONTEXT_CONTRACT && parsed?.contract !== contract) {
+    throw new Error(`${contract}: fremder Vertrag ${JSON.stringify(parsed?.contract)}`);
+  }
+  return validate(parsed);
 }
 
 // #region zwilling:letzte-menschliche-nachricht — Besitzer: packages/prompter/index.js
@@ -608,12 +832,19 @@ export function renderContext(context) {
  * ist Daten, und das Modell soll ihn als Daten lesen. MIN und MID bekommen ihn
  * gar nicht — ihr Modus kennt keine Projektkenntnis.
  */
-export function buildEnhancerRequest({ text, mode, contract, config, context = null, signal }) {
+export function buildEnhancerRequest({ text, mode, contract, config, context = null, stand = null, signal }) {
   // Beide Aufrufwege sind erlaubt: der Lauf uebergibt den bereits aufgeloesten
   // Modus, ein Einzeltest den Namen. Der Name wird hier genau einmal aufgeloest.
   const resolved = contract ?? resolveMode(mode);
   const content = [{ type: 'text', text }];
   if (resolved.needsContext && context !== null) content.push({ type: 'text', text: renderContext(context) });
+  // Der Stand ist ein EIGENER Block neben dem Kontext (Zug 4/5): der Kontext
+  // sind Dateien, der Stand ist, was Shinon ueber sich weiss. Zwei Marken, weil
+  // es zwei Fragen sind — und weil ein leerer Stand gar nicht erst angehaengt
+  // wird (renderStand gibt dann null zurueck).
+  if (resolved.needsContext && stand !== null && stand.block !== null) {
+    content.push({ type: 'text', text: stand.block });
+  }
 
   return {
     provider: config.provider,
@@ -675,7 +906,7 @@ export function replacePrompt(messages, original, text) {
  * Gibt den Ausgang zurueck statt ihn zu werfen, damit der Aufrufer genau eine
  * Fail-Richtung hat.
  */
-async function enhance(ctx, contract, config, prompt, context, signal) {
+async function enhance(ctx, contract, config, prompt, context, stand, signal) {
   if (typeof config.provider !== 'string' || config.provider === '' || typeof config.model !== 'string' || config.model === '') {
     return { outcome: 'unavailable', reasons: ['NO_ROUTE'], result: null };
   }
@@ -688,7 +919,7 @@ async function enhance(ctx, contract, config, prompt, context, signal) {
 
   let text;
   try {
-    text = await collectStream(ctx.llm.stream(buildEnhancerRequest({ text: prompt, contract, config, context, signal: combined })));
+    text = await collectStream(ctx.llm.stream(buildEnhancerRequest({ text: prompt, contract, config, context, stand, signal: combined })));
   } catch (error) {
     return { outcome: 'rejected', reasons: [`LLM_FAILED:${error?.name ?? 'Error'}`], result: null };
   }
@@ -715,9 +946,9 @@ async function enhance(ctx, contract, config, prompt, context, signal) {
  * Die Grenze ist bewusst schmal: Fehler von `next()` sind NICHT unsere Fehler
  * und werden hier nicht gefangen (siehe onPreStep).
  */
-async function enhanceGuarded(ctx, contract, config, prompt, context, signal) {
+async function enhanceGuarded(ctx, contract, config, prompt, context, stand, signal) {
   try {
-    return await enhance(ctx, contract, config, prompt, context, signal);
+    return await enhance(ctx, contract, config, prompt, context, stand, signal);
   } catch (error) {
     const name = error?.constructor?.name ?? 'Error';
     // Der Grund bleibt kurz (INTERNAL_ERROR:<Name>), die Ursache steht im Log:
@@ -941,12 +1172,18 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     // MAX ohne Kontext gibt es nicht: Code-Referenzen und Touches waeren
     // erfunden. Also wird der Modus abgelehnt, nicht weichgespuelt.
     const outcome = { outcome: 'unavailable', reasons: [supply.reason], result: null };
-    report(ctx, config, decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId));
+    report(ctx, config, { ...decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId), stand: null });
     return next();
   }
 
   const contextUsed = contract.needsContext;
-  const outcome = await enhanceGuarded(ctx, contract, config, prompt.text, supply.context, payload.signal);
+  // Der Stand wird aus dem AUFGELOESTEN Kontext gebaut — dieselbe Naht, die den
+  // Kontext geliefert hat, kein zweiter Weg. Ohne Kontext kein Stand (dann hat
+  // kein Zettel einen Anlass, und die Thema-Marke waere geraten). Der Ton kommt
+  // aus der zweiten schmalen Faehigkeit (Scoring); fehlt sie, fehlt der Ton,
+  // nicht der Stand.
+  const stand = contextUsed ? standFor(config, runtime, prompt.text, supply.context, readTone(ctx, runtime)) : null;
+  const outcome = await enhanceGuarded(ctx, contract, config, prompt.text, supply.context, stand, payload.signal);
 
   // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
   // und darf nicht in einen zweiten next() umgedeutet werden.
@@ -965,7 +1202,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   const recorded = effect.replacePrompt && messages === null
     ? { ...outcome, outcome: 'rejected', reasons: effect.missingMessage }
     : outcome;
-  report(ctx, config, decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed));
+  report(ctx, config, { ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand) });
 
   // Verworfen, nicht verfuegbar oder die Nachricht war nicht auffindbar: der
   // Roh-Prompt gilt unveraendert.
@@ -1039,14 +1276,27 @@ export function apply(ctx, config) {
 
   // Der Zustand wird hier EINMAL gegen sein Vokabular geprueft: danach ist
   // `contextState` ein bekannter Wert, und `contextLabel` braucht keinen Fallback.
+  // Die Zettel-Regeln werden EINMAL beim Mounten geladen (wie der Kontext):
+  // eine fehlende Regeldatei sperrt das Lesen der Zettel, nicht den Enhancer.
+  // Was sie nicht sperrt, ist ein Zettel: ohne Regeln laedt keiner.
+  let noteRules = null;
+  if (config.notesPath !== '') {
+    try {
+      noteRules = loadNoteRules();
+    } catch (error) {
+      console.error(`[shinon-prompter] Zettel-Regeln nicht verwendbar (${error?.message}) — es wird kein Zettel geladen`);
+    }
+  }
+
   assertVocabulary('context state', contextState, CONTEXT_STATES);
-  const runtime = { context, contextState };
+  const runtime = { context, contextState, noteRules };
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
 
   const route = config.provider === '' || config.model === '' ? 'ohne Route (inaktiv)' : `${config.provider}/${config.model}`;
   const mode = resolveMode(config.mode);
   const contextInfo = mode.needsContext ? `context=${contextState}` : `context=${contextState} (${mode.mode} nutzt ihn nicht)`;
-  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, ${route}, ${contextInfo}, index=${INDEX_SERVICE} optional ohne inject)`);
+  const notesInfo = config.notesPath === '' ? 'notes=off' : `notes=${notesDir(config)}${noteRules === null ? ' (ohne Regeln)' : ''}`;
+  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, ${route}, ${contextInfo}, ${notesInfo}, index=${INDEX_SERVICE} optional ohne inject)`);
 
   return () => {
     if (typeof dispose === 'function') dispose();

@@ -197,6 +197,7 @@ profiles/shinon/package.json         (Aktivierung: dsh.profile.bundles)
 | `npm run stages` (`scripts/stages.mjs`)| Startstufen und READY-Zeile des Starters nachvollziehen                                         |
 | `npm run scale:check` (`scripts/scale-check.mjs`) | Skalierungsnachweis: Kopie des Baums + N neue Pakete (`--plugins N`) durch die ganze Kette; nicht Teil von `npm test` |
 | `npm run verify:panel` (`scripts/panel-check.mjs`) | Panel-Beleg über das gebaute Client-Bundle (braucht jsdom)                          |
+| `node scripts/store-cost.mjs` (`--signals`/`--rows`/`--chain`) | Kosten der Ablage (`shinon_index_store`) bei vielen Signalen: Zeilen-Skalierung, Zerlegung eines Schreibens, Neuschreiben gegen Anhängen, Ganzkette — echter Dienst und echter Sammler, erzeugte Signale, temporärer Ort |
 
 **Ist-Zustand:** Welche dieser Läufe heute Exit 0 liefern und welche rot sind, steht
 in `docs/ZAHLEN.md` §2/§3. Diese Datei behauptet keine Testergebnisse.

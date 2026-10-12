@@ -1,6 +1,6 @@
 {
   "name": "@shinon/narrative",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Narrative Engine — Chronicle, Arcs, Relationships, Composite State",
   "private": true,
   "type": "module",
@@ -17,7 +17,6 @@
     "@deepseek-ai/schemastery": "~3.18.4"
   },
   "dsh": {
-    "inactive": true,
     "bundle": {
       "patch": "./cordis.patch.yml"
     },

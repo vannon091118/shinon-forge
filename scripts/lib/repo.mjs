@@ -516,6 +516,32 @@ export const SOURCE_TWINS = [
       { jsonPath: 'contract', literal: 'string' },
     ],
   },
+  {
+    // Der Schluessel, unter dem DSH die berechneten Token je Sitzung fuehrt
+    // (Sitzungs-Projektion `tokenUsage` aus @deepseek-ai/dsh-token-meter). Der
+    // Besitzer der Rechnung ist das assets-Core; die Client-Haelfte kann es
+    // nicht importieren und traegt den Namen als Literal. Drift waere hier
+    // teuer: eine Anzeige mit falschem Schluessel faellt still auf den
+    // Ersatztext zurueck und sieht aus wie "keine Daten".
+    rule: 'Projektions-Schluessel der Token-Anzeige',
+    kind: 'literals',
+    owner: 'packages/token-usage/assets/token-core.js',
+    mirror: 'packages/token-usage/client.js',
+    values: [{ export: 'TOKEN_USAGE_KEY', literal: 'string' }],
+  },
+  {
+    // Die Rechnung der Token-Anzeige selbst: die Faltung der Turn-Ereignisse,
+    // die Prozent-Regel und die Form. Sie steht im Core (unit-testbar, ohne
+    // node_modules) und als bytegleiche Region in der Client-Haelfte, die das
+    // Core nicht importieren kann (ein Client-Bundle zieht React per `require`).
+    // Ein Test gegen DSHs eigene Funktionen kann nur die Kopie im Core pruefen —
+    // diese Region ist der Beweis, dass die Haelfte im Browser dieselbe ist.
+    rule: 'Regel der Token-Anzeige (Turn-Faltung, Prozent, Form)',
+    kind: 'region',
+    marker: 'zwilling:token-turn',
+    owner: 'packages/token-usage/assets/token-core.js',
+    mirror: 'packages/token-usage/client.js',
+  },
 ];
 
 /** Der Text zwischen `// #region <marker>` und `// #endregion <marker>` (oder null). */
@@ -534,10 +560,22 @@ const jsLiteral = (value) => `'${value
   .replace(/\n/g, '\\n')
   .replace(/\t/g, '\\t')}'`;
 
-/** Ein `export const NAME = '…'` als Wert (oder null). */
+/**
+ * Ein `export const NAME = '…'` als Wert (oder null).
+ *
+ * Die zweite, gleichwertige Schreibweise zaehlt mit: eine Deklaration
+ * `const NAME = '…'`, die die Datei in einer `export { … }`-Liste herausgibt.
+ * Beide verlangen dieselbe Zusage (der Name ist deklariert UND ausgeliefert),
+ * und der Grund fuer die zweite ist real: derselbe Text steht als Region auch im
+ * Client-Bundle in einem Funktionsrumpf, wo `export` ein Syntaxfehler waere. Ein
+ * fehlendes `export` bleibt ein Issue — die Liste wird mitgeprueft.
+ */
 function exportedString(text, name) {
-  const found = new RegExp(`export const ${name} = '([^']*)'`).exec(text);
-  return found === null ? null : found[1];
+  const direct = new RegExp(`export const ${name} = '([^']*)'`).exec(text);
+  if (direct !== null) return direct[1];
+  const declared = new RegExp(`(?:^|\\n)const ${name} = '([^']*)'`).exec(text);
+  if (declared === null) return null;
+  return new RegExp(`export \\{[^}]*\\b${name}\\b[^}]*\\}`).test(text) ? declared[1] : null;
 }
 
 /** Ein Punktpfad in geparsten Vertragsdaten. */

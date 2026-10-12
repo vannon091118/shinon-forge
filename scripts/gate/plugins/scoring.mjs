@@ -1,7 +1,16 @@
 /**
- * scoring — Scorecard, Decay, Relation. Lesen, nie schreiben.
+ * scoring — Scorecard, Decay, Relation, Tendenz. Lesen, nie schreiben.
  *
- * Drei Zusagen, drei Prüfungen:
+ * DIE ZUSAGE, ehrlich formuliert (Zug 3): der Scoring-Laufzeitcode LIEST. Sein
+ * einziger Ausgang ist der Signal-Anhang im Index — EINE Operation (`save`) auf
+ * dem einen schmalen Dienst, den der Projekt-Index anbietet; dazu genau EIN
+ * `load` beim Start. Alles andere, was diese Schicht hervorbringt (Tafel,
+ * Tendenz, Injektion), ist HERGELEITET und geht nirgendwohin. Frühere Fassungen
+ * dieses Kopfes sprachen von „drei Zusagen" und von einer Schreib-Scope-Grenze,
+ * die den Host nicht nannte: die Weitergabe an die Ablage ist ein Ausgang, und
+ * ein Gate, das ihn verschweigt, prüft ihn auch nicht.
+ *
+ * Sieben Prüfungen:
  *   1. Schreib-Scope: der Scoring-Laufzeitcode enthält keinen einzigen
  *      Schreib-/Ausführungs-/Netz-/Modellaufruf, und jede Pfad-Angabe im Code
  *      bleibt im eigenen Paket auf bekannte Dateien beschränkt. Was nicht
@@ -23,13 +32,24 @@
  *      ohne Zulieferer — und die Quelle eines Signals ist ein NATIVER DSH-Typ,
  *      den der Carrier abbildet. Kein Deckel, kein Zähler-Limit, keine
  *      Sekundenregel in den Daten.
+ *   6. Tendenz-Vertrag (Zug 3): die Tendenz-Regeln tragen ihren Vertragsnamen,
+ *      ihre KLASSEN decken jedes beobachtbare Signal genau einmal ab und kein
+ *      Signal zwei Pole, ihre Stufen sind absteigend und enden bei 0, ihre
+ *      Haltungen sind geordnete Bedingungen über benannte Klassen und Stufen
+ *      (die letzte bedingungslos), die Mindestevidenz ist eine ganze Zahl ≥ 1 —
+ *      und jeder der drei Mechanismen (Faktor, Widerruf, Vergessen) nennt einen
+ *      ORT, der im Vertrag wirklich auflöst. Eine Tendenz ohne Herkunft wäre
+ *      eine Behauptung; ein Mechanismus ohne Ort wäre eine Absichtserklärung.
+ *   7. Ausgang: genau EIN `save` auf dem Dienst der Ablage (der Signal-Anhang)
+ *      und genau EIN `load` beim Start — kein zweites Schreibverb, kein zweiter
+ *      Weg. Das ist die Zusage aus dem Kopf, als Prüfung.
  *
  * Die reinen Funktionen sind ohne node_modules testbar; die Tests liegen in
  * scripts/gate/tests/scoring.test.mjs.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { findForbidden } from '../../lib/source-scan.mjs';
+import { codeOnly, findForbidden } from '../../lib/source-scan.mjs';
 
 export const id = 'scoring';
 
@@ -37,6 +57,28 @@ export const SCORING_CONTRACT_ID = 'shinon.scoring-state/v1';
 export const PROFILE_CONTRACT_ID = 'shinon.technical-profile/v1';
 export const TRIGGERS_CONTRACT_ID = 'shinon.skill-triggers/v1';
 export const SIGNAL_RULES_CONTRACT_ID = 'shinon.signal-rules/v1';
+export const TENDENCY_RULES_CONTRACT_ID = 'shinon.tendency-rules/v1';
+
+/** Die zwei Pole, die eine Tendenz-Klasse tragen darf. */
+export const TENDENCY_POLES = ['negative', 'positive'];
+
+/**
+ * Die drei Mechanismen der Rechnung (§4 des Konzepts) und die Datei, in der ihr
+ * Ort liegen muss. Mehr gibt es nicht: Trust-Ceiling und Rate-Limit sind
+ * ersetzt, weil sie ungemessene Erfindungen waren.
+ */
+export const TENDENCY_MECHANISMS = {
+  weight: 'signal-rules.json',
+  retract: 'signal-rules.json',
+  forget: 'scoring-state.json',
+};
+
+/**
+ * Die Verben, die den EINEN Ausgang der Schicht verletzen würden. `load` und
+ * `save` sind das erlaubte Paar (lesen beim Start, anhängen eines Signals);
+ * jedes andere Schreibverb wäre ein zweiter Weg in die Ablage.
+ */
+export const STORE_VERBS = ['append', 'delete', 'remove', 'insert', 'update', 'put', 'write', 'truncate'];
 
 /**
  * Die vier Dateien, die der Scoring-Code beschreiben darf — alle anderen nicht.
@@ -48,6 +90,7 @@ export const WRITABLE_ASSETS = [
   'assets/technical-profile.json',
   'assets/skill-triggers.json',
   'assets/signal-rules.json',
+  'assets/tendency-rules.json',
 ];
 
 /** Die sieben Signale der Plan-Tabelle — genau diese, keine mehr. */
@@ -416,6 +459,252 @@ export function signalRuleIssues(rules, scoring, spine, file) {
   return issues;
 }
 
+/**
+ * Den Pol eines Signals aus dem VERTRAG lesen — nicht aus seinem Namen.
+ *
+ * Der Pol ist die Richtung, in die das Signal die Dimensionen schiebt, und die
+ * steht als Vorzeichen im Delta der Scorecard. Ein Signal ohne Delta (oder mit
+ * einem Delta, das sich zu 0 aufhebt) hat keinen Pol — dann darf keine Klasse
+ * ihn für sich beanspruchen.
+ * @returns 'positive' | 'negative' | null
+ */
+export function poleOfSignal(scoring, definition) {
+  const deltas = scoring?.events?.[definition?.type]?.delta;
+  if (deltas === null || typeof deltas !== 'object') return null;
+  const sum = Object.values(deltas).reduce((total, value) => total + (typeof value === 'number' ? value : 0), 0);
+  if (!Number.isFinite(sum) || sum === 0) return null;
+  return sum > 0 ? 'positive' : 'negative';
+}
+
+/**
+ * Einen Mechanismus-Ort auflösen: `datei#pfad` muss im benannten Vertrag einen
+ * Wert tragen. Was nicht auflöst, ist eine Absichtserklärung — kein Mechanismus.
+ */
+export function resolveMechanism(where, docs) {
+  if (typeof where !== 'string' || !where.includes('#')) return undefined;
+  const [target, path] = where.split('#');
+  const source = docs?.[target];
+  if (source === undefined || source === null) return undefined;
+  return resolvePath(source, path);
+}
+
+/**
+ * Einen Punktpfad auflösen — und dabei SCHLÜSSEL MIT PUNKT treffen.
+ *
+ * Die Signaltabelle führt ihre Quellen unter `sources["feedback.rated"]`: der
+ * Punkt gehört zum Schlüssel, nicht zum Pfad. Ein naives `split('.')` findet
+ * diesen Ort nie und würde einen Mechanismus als „löst nicht auf" melden,
+ * obwohl er dasteht. Deshalb wird an jeder Stufe zuerst der GANZE Rest als
+ * Schlüssel versucht und erst dann geteilt.
+ */
+function resolvePath(value, path) {
+  if (value === null || typeof value !== 'object') return undefined;
+  const remaining = String(path);
+  if (remaining === '') return value;
+  if (Object.prototype.hasOwnProperty.call(value, remaining)) return value[remaining];
+  const index = remaining.indexOf('.');
+  if (index < 0) return undefined;
+  return resolvePath(value[remaining.slice(0, index)], remaining.slice(index + 1));
+}
+
+/**
+ * Die Tendenz-Regeln prüfen (Zug 3): Vertrag, Klassen, Herkünfte.
+ *
+ * „Klassen und Herkünfte" heißt hier konkret: jede Klasse nennt ihren POL, jedes
+ * von ihr beanspruchte Signal muss es geben, beobachtbar sein und DENSELBEN Pol
+ * im Vertrag tragen (das Vorzeichen seines Deltas, nicht sein Name), kein Signal
+ * darf zwei Klassen speisen, und kein beobachtbares Signal darf übrig bleiben —
+ * sonst rechnet die Tendenz an ihm vorbei. Dazu die Stufen (absteigend, Ende bei
+ * 0), die Haltungen (geordnet, benannte Klasse + Stufe, letzte bedingungslos),
+ * die Mindestevidenz — und die drei Mechanismen mit auflösendem Ort.
+ *
+ * @param tendency - der Vertrag `assets/tendency-rules.json`.
+ * @param rules - die Signaltabelle (Herkunft jedes Signals).
+ * @param scoring - der Scorecard-Vertrag (Pol über das Delta, Vergessen über decay).
+ * @param file - Anzeigename für Befunde.
+ */
+export function tendencyRuleIssues(tendency, rules, scoring, file) {
+  const issues = [];
+  const at = (detail) => `${file}: ${detail}`;
+  if (typeof tendency !== 'object' || tendency === null) return [at('kein Objekt')];
+  if (tendency.contract !== TENDENCY_RULES_CONTRACT_ID) {
+    issues.push(at(`contract muss "${TENDENCY_RULES_CONTRACT_ID}" sein (ist ${JSON.stringify(tendency.contract)})`));
+  }
+  if (typeof rules !== 'object' || rules === null || typeof scoring !== 'object' || scoring === null) {
+    return [...issues, at('Signaltabelle oder Scorecard-Vertrag fehlt — ohne Herkunft keine Tendenz')];
+  }
+
+  // Kein Deckel, kein Limit, keine Sekundenregel — auch hier nicht.
+  for (const path of keyPaths(tendency)) {
+    const leaf = path.split('.').pop();
+    if (FORBIDDEN_RULE_KEYS.includes(leaf)) {
+      issues.push(at(`${path} ist verboten: Deckel, Zähler-Limit und Sekundenregeln gehören nicht in die Tendenz-Regeln`));
+    }
+  }
+
+  // Die drei Mechanismen — und ihr Ort.
+  const mechanisms = tendency.mechanisms ?? {};
+  const docs = { 'signal-rules.json': rules, 'scoring-state.json': scoring };
+  for (const [id, expected] of Object.entries(TENDENCY_MECHANISMS)) {
+    const entry = mechanisms[id];
+    if (entry === null || typeof entry !== 'object') {
+      issues.push(at(`mechanisms.${id} fehlt (${id} lebt in ${expected})`));
+      continue;
+    }
+    if (!isText(entry.label)) issues.push(at(`mechanisms.${id}.label fehlt`));
+    if (!isText(entry.where)) {
+      issues.push(at(`mechanisms.${id}.where fehlt — ein Mechanismus ohne Ort ist eine Behauptung`));
+      continue;
+    }
+    const [target, path] = entry.where.split('#');
+    if (target !== expected) {
+      issues.push(at(`mechanisms.${id}.where nennt ${JSON.stringify(target)}, erwartet wird ${expected}`));
+      continue;
+    }
+    if (resolveMechanism(entry.where, docs) === undefined) {
+      issues.push(at(`mechanisms.${id}.where ${JSON.stringify(entry.where)} löst im Vertrag nicht auf`));
+    }
+  }
+  for (const id of Object.keys(mechanisms)) {
+    if (id === 'note') continue;
+    if (TENDENCY_MECHANISMS[id] === undefined) {
+      issues.push(at(`mechanisms.${id} ist kein benannter Mechanismus (${Object.keys(TENDENCY_MECHANISMS).join(', ')})`));
+    }
+  }
+
+  // Klassen: Pol, Wort, Herkunft — und keine Lücke, kein Doppel.
+  const signals = rules.signals ?? {};
+  const classes = tendency.classes;
+  if (!Array.isArray(classes) || classes.length === 0) issues.push(at('classes fehlt oder ist leer'));
+  const classIds = new Set();
+  const claimed = new Set();
+  for (const [index, klass] of (Array.isArray(classes) ? classes : []).entries()) {
+    const where = `classes[${index + 1}]`;
+    if (!isText(klass?.id)) {
+      issues.push(at(`${where}.id fehlt`));
+      continue;
+    }
+    if (classIds.has(klass.id)) issues.push(at(`${where}.id ${JSON.stringify(klass.id)} ist doppelt`));
+    else classIds.add(klass.id);
+    if (!TENDENCY_POLES.includes(klass.pole)) {
+      issues.push(at(`${where}.pole muss ${TENDENCY_POLES.join(' | ')} sein (ist ${JSON.stringify(klass.pole)})`));
+    }
+    if (!isText(klass.label)) issues.push(at(`${where}.label fehlt (eine Klasse ohne Wort)`));
+    if (!Array.isArray(klass.signals) || klass.signals.length === 0) {
+      issues.push(at(`${where}.signals fehlt oder ist leer`));
+      continue;
+    }
+    for (const signalId of klass.signals) {
+      const definition = signals[signalId];
+      if (definition === undefined) {
+        issues.push(at(`${where} nennt ${JSON.stringify(signalId)} — dieses Signal gibt es nicht`));
+        continue;
+      }
+      if (definition.observable !== true) {
+        issues.push(at(`${where} nennt ${signalId}, das die Tabelle als nicht beobachtbar führt`));
+        continue;
+      }
+      if (claimed.has(signalId)) {
+        issues.push(at(`${where} nennt ${signalId} ein zweites Mal — ein Signal trägt genau EINEN Pol`));
+        continue;
+      }
+      claimed.add(signalId);
+      const pole = poleOfSignal(scoring, definition);
+      if (pole === null) {
+        issues.push(at(`${signalId} hat kein Delta im Scorecard-Vertrag — ohne Vorzeichen kein Pol`));
+      } else if (pole !== klass.pole) {
+        issues.push(at(`${where} trägt den Pol ${klass.pole}, aber ${signalId} schiebt ${pole} (${definition.type})`));
+      }
+    }
+  }
+  for (const [signalId, definition] of Object.entries(signals)) {
+    if (definition?.observable === true && !claimed.has(signalId)) {
+      issues.push(at(`Signal ${signalId} speist keine Klasse — die Tendenz rechnet daran vorbei`));
+    }
+  }
+
+  // Stufen: absteigend, eindeutig, Ende bei 0.
+  const levels = tendency.levels;
+  if (!Array.isArray(levels) || levels.length === 0) issues.push(at('levels fehlt oder ist leer'));
+  const levelIds = new Set();
+  let previous = Infinity;
+  for (const [index, level] of (Array.isArray(levels) ? levels : []).entries()) {
+    const where = `levels[${index + 1}]`;
+    if (!isText(level?.id)) {
+      issues.push(at(`${where}.id fehlt`));
+      continue;
+    }
+    if (levelIds.has(level.id)) issues.push(at(`${where}.id ${JSON.stringify(level.id)} ist doppelt`));
+    else levelIds.add(level.id);
+    if (typeof level.minShare !== 'number' || !(level.minShare >= 0 && level.minShare <= 1)) {
+      issues.push(at(`${where}.minShare muss zwischen 0 und 1 liegen (ist ${JSON.stringify(level.minShare)})`));
+      continue;
+    }
+    if (level.minShare > previous) issues.push(at(`${where}.minShare steigt — die Stufen müssen absteigend stehen`));
+    previous = level.minShare;
+  }
+  if (Array.isArray(levels) && levels.length > 0 && levels[levels.length - 1]?.minShare !== 0) {
+    issues.push(at('die letzte Stufe muss bei 0 liegen — sonst bleibt ein Anteil ohne Wort'));
+  }
+
+  // Haltungen: geordnet, benannte Klasse UND Stufe, letzte bedingungslos.
+  const stances = tendency.stances;
+  if (!Array.isArray(stances) || stances.length === 0) issues.push(at('stances fehlt oder ist leer'));
+  for (const [index, stance] of (Array.isArray(stances) ? stances : []).entries()) {
+    const where = `stances[${index + 1}]`;
+    if (!isText(stance?.id)) issues.push(at(`${where}.id fehlt`));
+    const when = stance?.when;
+    if (when === undefined) continue;
+    if (when === null || typeof when !== 'object') {
+      issues.push(at(`${where}.when muss ein Objekt sein`));
+      continue;
+    }
+    for (const [classId, levelId] of Object.entries(when)) {
+      if (!classIds.has(classId)) issues.push(at(`${where}.when nennt die Klasse ${JSON.stringify(classId)}, die es nicht gibt`));
+      if (!levelIds.has(levelId)) issues.push(at(`${where}.when nennt die Stufe ${JSON.stringify(levelId)}, die es nicht gibt`));
+    }
+  }
+  const last = Array.isArray(stances) && stances.length > 0 ? stances[stances.length - 1] : undefined;
+  if (last !== undefined && last?.when !== undefined) {
+    issues.push(at('die letzte Haltung muss bedingungslos sein — sonst gibt es Lagen ohne Haltung'));
+  }
+
+  // Mindestevidenz: darunter wird nichts behauptet.
+  if (!Number.isInteger(tendency.minSignals) || tendency.minSignals < 1) {
+    issues.push(at(`minSignals muss eine ganze Zahl ≥ 1 sein (ist ${JSON.stringify(tendency.minSignals)})`));
+  }
+  return issues;
+}
+
+/**
+ * Den EINEN Ausgang prüfen (Zusage aus dem Kopf dieser Datei).
+ *
+ * Der Host hängt ein Signal an: ein `save` auf dem Dienst der Ablage. Genau eines
+ * — und genau ein `load` beim Start. Jedes weitere Schreibverb auf einem Dienst
+ * wäre ein zweiter Weg, und ein zweiter Weg wäre eine Zusage, die niemand liest.
+ * Der Kern (assets/*.js) wird hier nicht geprüft: er hat keinen Dienst und keine
+ * Datei (dafür steht `staticIssues`).
+ */
+export function outcomeIssues(sources) {
+  const issues = [];
+  for (const { file, source } of sources) {
+    if (!file.endsWith('index.js')) continue;
+    const code = codeOnly(source);
+    const count = (pattern) => (code.match(pattern) ?? []).length;
+    const saves = count(/\.save\s*\(/g);
+    if (saves !== 1) issues.push(`${file}: die Zusage ist EIN Ausgang — erwartet genau 1 \`save\`, gefunden ${saves}`);
+    const loads = count(/\.load\s*\(/g);
+    if (loads !== 1) issues.push(`${file}: erwartet genau 1 \`load\` beim Start, gefunden ${loads}`);
+    for (const verb of STORE_VERBS) {
+      const hits = count(new RegExp(`\\.${verb}\\s*\\(`, 'g'));
+      if (hits > 0) {
+        issues.push(`${file}: \`${verb}\` auf einem Dienst — der einzige Ausgang ist der Signal-Anhang (\`save\`)`);
+      }
+    }
+  }
+  return issues;
+}
+
 function readSources(base) {
   const files = ['index.js', 'client.js'];
   const assetsDir = join(base, 'assets');
@@ -452,6 +741,7 @@ export function check(ctx) {
   const profile = own('assets/technical-profile.json', 'Technik-Profil');
   const triggerDoc = own('assets/skill-triggers.json', 'Skill-Trigger');
   const rules = own('assets/signal-rules.json', 'Signaltabelle (K5)');
+  const tendencyRules = own('assets/tendency-rules.json', 'Tendenz-Regeln (Zug 3)');
   const eventsPkg = ctx.packages.find((candidate) => candidate.dir === 'events');
   let spine = null;
   if (!eventsPkg) {
@@ -475,6 +765,12 @@ export function check(ctx) {
   if (spine && rules && scoring) {
     issues.push(...signalRuleIssues(rules, scoring, spine, 'assets/signal-rules.json'));
   }
+
+  if (tendencyRules && rules && scoring) {
+    issues.push(...tendencyRuleIssues(tendencyRules, rules, scoring, 'assets/tendency-rules.json'));
+  }
+
+  issues.push(...outcomeIssues(sources));
 
   // Profil muss das Bundle aktivieren, sonst läuft das Scoring nie.
   const profileName = ctx.repo.activeProfile(ctx.root);

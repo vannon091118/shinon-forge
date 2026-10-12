@@ -17,12 +17,33 @@
     },
     "mood": {
       "anti_repeat": true,
-      "pool": ["idle", "curious", "focused", "working", "concerned", "blocked"]
+      "pool": ["idle", "curious", "focused", "working", "concerned", "blocked"],
+      "by_event": {
+        "session.created": "curious",
+        "message.received": "curious",
+        "message.completed": "focused",
+        "claim.created": "focused",
+        "tool.requested": "working",
+        "tool.completed": "focused",
+        "gate.passed": "focused",
+        "gate.failed": "concerned",
+        "action.blocked": "blocked",
+        "relation.updated": "focused"
+      },
+      "fallback": "der naechste Mood der Liste",
+      "note": "Zug 5: der Mood kommt aus `by_event` — die Zuordnung ist DATEN, kein Zufall. Ist der zugeordnete Mood derselbe wie der vorige, nimmt die Regel den naechsten der Liste (anti_repeat), ebenfalls deterministisch: gleiche Historie, gleicher Mood."
+    },
+    "narrator": {
+      "default": "shinon",
+      "by_event_prefix": { "message": "user", "gate": "system", "tool": "shinon" },
+      "note": "Zug 5: wer diesen Takt erzaehlt, entscheidet das Ereignis (Praefix vor dem Punkt), nicht ein Wuerfel."
     },
     "arc": {
       "create": "first_event",
       "freeze": "after N events or explicit",
-      "status": ["active", "archived"]
+      "status": ["active", "archived"],
+      "themes": ["identity", "verification", "creation", "conflict", "resolution", "exploration"],
+      "note": "Zug 5: die Themen stehen hier (vorher im Code). Der Themen-Index kommt aus dem Ereignis-Praefix, nicht aus einem Zufall."
     },
     "relationship": {
       "compute": "co-occurrence + history",
@@ -39,6 +60,7 @@
   ],
   "invariants": [
     "Ein Composite wird nur aus Vorgänger + Event abgeleitet, nie aus Modell oder Zeit.",
+    "Keine Zufallsquelle und keine Uhr: der Mood kommt aus der Tabelle, der Erzaehler aus dem Ereignis.",
     "Die Sequenz wächst monoton: jede(seq) > jede(seq-1).",
     "Arc-Freeze ist deterministisch: gleiche Historie = gleicher Snapshot.",
     "Relationship-State ist abgeleitet, nicht behauptet."

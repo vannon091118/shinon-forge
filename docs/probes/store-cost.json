@@ -1,0 +1,73 @@
+[
+  {
+    "id": "store-cost-neuschreiben-ist-nicht-der-hebel",
+    "claim": "Der Aufwand eines Schreibens in die Ablage wächst NICHT nennenswert mit der Zahl der Zeilen. Er ist fast vollständig ein FESTER Preis je Aufruf: das Öffnen des Index (vier Metaschreibungen, jede ihre eigene Transaktion) und der WAL-Checkpoint beim Schließen. Inkrementelles Anhängen würde damit an der falschen Stelle sparen — die Zeilen sind der billigste Teil des Schreibens, nicht der teuerste.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "packages/project-index/index.js",
+      "scripts/store-cost.mjs"
+    ],
+    "expect": "Wenn die Zeilenzahl der Kostentreiber wäre, müsste `writeMemory` je Zeile etwa konstant bleiben und die Gesamtkosten müssten mit N wachsen. Ist der Preis dagegen fest, muss die Zerlegung eines Schreibens eine Posten zeigen, die von N UNABHÄNGIG ist und den Großteil trägt — und die Kosten je Signal dürfen zwischen kleinen und mittleren N nicht steigen.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN mit `node scripts/store-cost.mjs` (Node v22.23.3, node:sqlite, echter Dienst `createStoreService`, echtes Schema, echte Signaltabelle; Signale erzeugt, Ort temporaer). ZEILEN — `writeMemory` allein, Median aus 3, in mehreren Laeufen uebereinstimmend: 10 Zeilen 58,6 ms · 100 Zeilen 75,2/76,3 ms · 1 000 Zeilen 91,8/92,0/100,0 ms · 5 000 Zeilen 166,9/167,0 ms · 20 000 Zeilen 500,2/516,8/517,0 ms. Je Zeile also 5,86 ms -> 0,76 -> 0,10 -> 0,03 -> 0,03 ms: der Grenzpreis einer Zeile faellt unter 0,03 ms, die erste Zeile kostet allein ~50 ms. ZERLEGUNG eines Schreibens (10 Zeilen, eingelaufen; Klammern = zweiter Lauf): `openIndex` 291,5 ms [291,3] · `writeMemory` 66,7 ms [66,8] · `close` (WAL-Checkpoint) 125,5 ms [33,8]. Die Nachbildung derselben Anweisungen in derselben Reihenfolge (eigene Datei, `SCHEMA` und Fassungskonstanten importiert) summiert 358,9 ms [342,2] und legt den Posten offen: 4x setMeta = 306,4 ms [306,6] — vier winzige `insert or replace` auf die Metatabelle, jede ohne umgebende Transaktion und damit jede mit eigenem fsync; alles andere im Oeffnen (Konstruktor, Pragmas, Zehnfach-`if not exists`, 34 Bytes Schema) liegt zusammen unter 2 ms. KREUZPRUEFUNG: Nachbau-Summe minus sein eigener `close` (33,8 ms) = 325,1 ms gegen echt `openIndex` 291,5 ms — Abweichung im Rauschen, die Zerlegung beschreibt denselben Weg. ERSTER MESSFEHLER, benannt: ein frueherer Nachbau schrieb die Metawerte als '1'; der naechste ECHTE `openIndex` sah damit eine fremde Fassung, verwarf die Tabellen und zog die Datei mit `vacuum` neu zusammen (1 212 ms statt ~300). Der Nachbau schreibt jetzt dieselben Werte wie das Original und laeuft auf eigener Datei. GESAMTKOSTEN JE SIGNAL (echter Dienst, n Schreiben mit wachsendem Stand): n=10 -> 571,3 ms · n=100 -> 793,8 ms · n=1 000 -> 652,6 ms (Median je Schreiben 505,6 / 826,7 / 576,1 ms; die Streuung zwischen den Laeufen kommt von der Last des Begleitmesslaufs). Der Stand waechst dabei von 96 KiB (10 Zeilen) ueber 136 KiB (100) auf 432 KiB (1 000) — die Kosten je Signal wachsen NICHT mit: 571 -> 794 -> 653 ms bei hundertfach groesserem Protokoll. GRENZE: die absoluten Millisekunden sind an diesen Rechner gebunden (was ein fsync hier kostet); uebertragbar ist das Verhaeltnis fest/je Zeile.",
+    "evidence_note": "Millisekunden und Zeilenzahlen aus dem Messskript; kein Dateiinhalt, kein Schlüsselwert."
+  },
+  {
+    "id": "store-cost-anhaengen-ist-billiger-verschwindet-aber-nicht",
+    "claim": "Inkrementelles Anhängen ist je Signal etwa 12- bis 15-mal billiger als das Neuschreiben — aber NICHT, weil es Zeilen spart, sondern weil es den festen Preis je Aufruf vermeidet (ein geöffneter Index, eine Transaktion). Es ist damit eine Antwort auf eine andere Frage als die gestellte: der Gewinn kommt aus dem Halten der Verbindung, nicht aus dem Verzicht auf das Ersetzen.",
+    "targets": [
+      "scripts/store-cost.mjs",
+      "packages/project-index/index.js",
+      "packages/project-index/assets/index-core.js"
+    ],
+    "expect": "Wenn Anhängen nur deshalb billiger wäre, weil es weniger Zeilen schreibt, müsste der Vorteil mit N verschwinden (sein Zeilenanteil wächst ja genauso). Bleibt der Vorteil dagegen konstant groß, ist die feste Aufrufgebühr die Ursache — dann wäre ein gehaltener Index (eine Verbindung je Host) dieselbe Ersparnis ohne Wechsel der Semantik.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, gleiche Signalreihe, zwei Wege, dieselbe SQLite und dasselbe Schema: NEUSCHREIBEN (heutiger Pfad: `delete from memory where namespace = ?` + alle Zeilen + Merkzettel + Zusammenfassung je Signal) n=10 -> 5 712,9 ms gesamt (571,3 ms je Signal), n=100 -> 79 384,5 ms (793,8 ms), n=1 000 -> 652 615,4 ms = 10,9 min (652,6 ms je Signal); ANHAENGEN (eine Protokollzeile einfuegen, Merkzettel und Zusammenfassung ersetzen, alles in EINER Transaktion) n=10 -> 468,3 ms (46,8 ms), n=100 -> 5 465,8 ms (54,7 ms), n=1 000 -> 47 954,8 ms (48,0 ms). Der Abstand waechst also nicht weg: 12x bei n=10, 15x bei n=100, 14x bei n=1 000. WAS DAS NICHT IST: der Zeilenpreis. Die Zeilen kosten laut der Messung darueber 0,03-0,10 ms je Zeile; bei 1 000 Zeilen also ~90 ms von 652 ms — das ist die absolute Obergrenze dessen, was ein Anhaengen je Aufruf an ZEILEN ueberhaupt sparen koennte. Die anderen ~560 ms sind der feste Weg des Dienstes (Oeffnen mit vier Metatransaktionen, Schliessen mit Checkpoint). Anhaengen gewinnt diese ~560 ms, weil es den Index EINMAL oeffnet und je Signal EINE Transaktion faehrt — nicht weil es weniger Zeilen schreibt. WAS EIN WECHSEL KOSTEN WUERDE (aus dem Code, nicht gemessen): der Widerruf braucht dann ein gezieltes `delete` auf die Zeile derselben Antwort (heute faellt er beim vollstaendigen Ersetzen einfach weg), `ordinal` wird ein Zaehler je Namensraum statt eines Array-Index, `readMemory` muss seine Ordnung behalten. UND DIE UNTERGRENZE BLEIBT: auch das Anhaengen zahlt ein fsync je Signal (33,5 ms Median bei n=1 000, gemessen) — unter ~33 ms je Signal kommt kein Weg, solange jedes Signal eine eigene Transaktion ist.",
+    "evidence_note": "Millisekunden je Signal für beide Wege; keine Dateiinhalte."
+  },
+  {
+    "id": "store-cost-ablage-ist-der-ganze-preis-der-kette",
+    "claim": "Im ganzen Weg Signal → Tafel ist die Ablage praktisch die gesamte Rechnung; die Arbeit des Kerns (Übersetzen des Signals, Nachrechnen der Tafel) ist dagegen verschwindend klein. Wer die Kette beschleunigen will, muss die Ablage anfassen — und dort den festen Preis je Aufruf.",
+    "targets": [
+      "packages/scoring/assets/scoring-core.js",
+      "packages/scoring/index.js",
+      "packages/project-index/index.js",
+      "scripts/store-cost.mjs"
+    ],
+    "expect": "Wenn der Kern (voller Replay je Signal) der Treiber wäre, müsste die Zeit OHNE Ablage dieselbe Größenordnung haben wie die mit. Ist die Ablage der Treiber, muss der Anteil nahe 100 % liegen und die Zeit ohne Ablage um Größenordnungen kleiner sein.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN mit dem echten Sammler (`createSignalCollector`, echte Vertraege und Signaltabelle) und dem echten Dienst, dieselbe Ereignisform: 100 echte `feedback.rated`-Ereignisse mit Ablage 48 470,1 ms gesamt, davon 48 261,5 ms in `store.save` = 99,6 %; derselbe Lauf ohne Ablage (derselbe Sammler, `onPersist` fehlt) 58,3 ms fuer alle 100 Signale, also 0,58 ms je Signal. Bei 500 Signalen: 268 793,1 ms gesamt, 264 982,9 ms in der Ablage = 98,6 %; ohne Ablage 815,7 ms (1,63 ms je Signal). Die Rechnung des Kerns — inklusive `scorecard()`, das bei JEDEM Signal die ganze Tafel aus dem Protokoll nachrechnet — kostet hier also 0,6-1,6 ms je Signal und waechst nur langsam (der Replay ist quadratisch, aber mit kleinem Faktor), waehrend die Ablage zwei bis drei Groessenordnungen darueber liegt. ANGEBUNDEN AN DIE ECHTE DATEI: ein `save` auf einer KOPIE der laufenden Index-Datei (12 959 744 Bytes, 3 Protokollzeilen) dauerte 767 / 619 / 661 ms — der echte Boot zahlt also ~0,6-0,8 s je Signal, und zwar im Host-Prozess (synchron, `node:sqlite`), nicht in einem Nebenlaeufer.",
+    "evidence_note": "Millisekunden, Anteile und Dateigröße; kein Dateiinhalt."
+  },
+  {
+    "id": "store-cost-persistenz-im-echten-boot",
+    "claim": "Die Ablage trägt im ECHTEN Boot: ein über die echte Oberfläche abgegebenes Urteil landet als Protokollzeile in der SQLite des Projekt-Index, ein Widerruf nimmt genau diese Zeile zurück, und nach dem Beenden des Hosts steht der Stand im nächsten Host wieder da (er wird dort geladen und fortgeschrieben).",
+    "targets": [
+      "packages/scoring/index.js",
+      "packages/project-index/index.js",
+      "profiles/shinon/cordis.patch.yml",
+      "docs/SCORING-KONZEPT.md"
+    ],
+    "expect": "Ein Boot ohne Browser-Beleg wäre keine Messung. Gefordert ist die ganze Kette mit ECHTEN Teilen: `dsh --profile shinon` aus der CLI, eine echte Modell-Antwort, ein Urteil über die echte UI (nicht über einen Dienst-Aufruf von Hand), ein Widerruf, ein Host-Ende — und danach ein neuer Host, der den Stand lädt. Dazu die Gegenprobe: vor dem Urteil darf die Zeile nicht da sein, nach dem Widerruf muss sie wieder weg sein.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN am 2026-10-11, `DSH_HOME=$PWD dsh --profile shinon --no-open --port 3099` (die 3080 war vom fremden Dev-Server belegt), Bedienung ueber den freien Preview-Browser. Der Boot meldet `Ablage shinon_index_store bereitgestellt` und `Ablage: shinon_index_store (shinon.project-index/store-v1, Namensraum shinon.scoring/ledger-v1)`. ECHTER Modell-Turn (`agnes-3.0-flash`, Antwort 'bereit' in 7 s, 18,2K Token). Die Antwort des Laufs steht als Protokollzeile `subject=turn:1 signal=accept factor=0.5 type=feedback.approval` in `~/.shinon/indexes/198e94143ec87db7/index.sqlite`, Tabelle `memory`, Namensraum `shinon.scoring/ledger-v1`, Scorecard `correctness 0.53 / trust 0.515`. URTEIL ueber die echte UI ('Good response' -> Kategorie 'Task result' -> 'Submit', also `messageFeedback/put` ueber `/api`): neue Zeile `subject=0ce13b2a-da00-4eeb-9a00-5264a841265c signal=copy factor=1`, Scorecard `0.5894 / 0.5447`, `signals 2`. WIDERRUF ueber die echte UI (derselbe Knopf, jetzt 'Remove rating'): die Zeile ist WEG, Scorecard exakt zurueck auf `0.53 / 0.515`, `signals 1`. HOST-ENDE per SIGTERM (Port zu, Prozess weg, ohne dass die Abschaltkette noch loggen konnte). Danach unveraendert in der Datei: 1 Zeile, dieselbe Scorecard, derselbe Merkzettel. NAECHSTER HOST (frische Prozessnummer, derselbe Pfad): `[shinon-scoring] Stand geladen: 1 Signale, 1 offene Sitzungen, 0 Bemerkungen`; nach einem weiteren echten Turn standen 3 Zeilen (`turn:1` aus dem ERSTEN Host mit dabei) mit `signals 3`. Ein DRITTER Host lud `3 Signale` und schrieb weiter bis `5 Signale` (`turn:4`). Die Gegenprobe (Zeile vor dem Urteil nicht da, nach dem Widerruf weg) ist oben mitgelesen.",
+    "evidence_note": "Protokollzeilen der Boots, SQLite-Auszüge (Betreff, Signal, Scorecard) und Zählungen; kein Schlüsselwert, kein Prompt-Inhalt über die Testfrage hinaus."
+  },
+  {
+    "id": "store-cost-mount-zeile-sagte-die-unwahrheit",
+    "claim": "Die Zeile, mit der sich das Scoring beim Mounten über seine Ablage äußerte, war im echten Boot FALSCH: sie meldete „kein Gedaechtnis … der Stand bleibt im Speicher“, während derselbe Lauf mit dem ersten Signal in genau diese Ablage schrieb. Repariert ist sie jetzt so, dass sie nur noch sagt, was zu ihrem Zeitpunkt feststeht.",
+    "targets": [
+      "packages/scoring/index.js",
+      "scripts/gate/tests/scoring-memory.test.mjs"
+    ],
+    "expect": "Eine Auskunft muss zu ihrem Zeitpunkt wahr sein. Beim Mounten ist die Frage nach dem Dienst noch offen (die Mount-Reihenfolge eines Profils ist keine Zusage, der Index mountet nach dem Scoring) — dann darf sie nicht beantwortet werden. Entschieden ist sie beim ersten echten Gebrauch; dort gehört sie hin, und dort muss sie im echten Boot auch erscheinen.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN VORHER (echter Boot, zwei Läufe): Zeile 23 `[shinon-scoring] Ablage: kein Gedaechtnis (shinon_index_store nicht angeboten — der Stand bleibt im Speicher)`, obwohl Zeile 21 derselben Ausgabe `Ablage shinon_index_store bereitgestellt` meldete und die erste Bewertung danach in der SQLite stand. NACHHER (echter Boot, frischer Prozess): beim Mounten steht NUR `[shinon-scoring] Verträge geladen (…)` — keine Aussage über die Ablage bei noch offener Frage (`grep -c 'kein Gedaechtnis'` = 0); mit dem ersten echten Signal erscheint `[shinon-scoring] Ablage: shinon_index_store (shinon.project-index/store-v1, Namensraum shinon.scoring/ledger-v1)` unmittelbar gefolgt von `Stand geladen: 3 Signale, 1 offene Sitzungen, 0 Bemerkungen`. Die Zusage „ein einmal gefundener Dienst bleibt gefunden, ein nicht gefundener wird erneut gefragt“ ist unverändert; geändert ist nur, WANN die Zeile fällt (Übergang statt Mount-Blick). KEIN TEST GEÄNDERT: `npm run test:scoring` 32/32, `node --test scripts/gate/tests/scoring-memory.test.mjs scripts/gate/tests/context-wiring.test.mjs scripts/gate/tests/scoring-signals.test.mjs` 23/23. GRENZE: ein Boot, der nie ein Signal sieht, nennt die Ablage jetzt gar nicht mehr — eine Zeile, die nichts weiß, ist besser als eine, die etwas behauptet.",
+    "evidence_note": "Protokollzeilen vorher/nachher und Testzählungen; keine Dateiinhalte."
+  }
+]

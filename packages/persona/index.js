@@ -226,6 +226,75 @@ export function renderStateContext(contract, state) {
   ].join('\n');
 }
 
+/**
+ * Die Ton-Faehigkeit des Scorings (Zug 5) — optional, wie beim Veredler.
+ *
+ * Die Persona ist LESEND: sie holt die Haltung ueber dasselbe optionale `get`
+ * und rendert daraus einen Abschnitt. Fehlt der Dienst, fehlt der Abschnitt —
+ * geraten wird kein Ton. Die Namen sind mit `@shinon/scoring` gepinnt
+ * (`scripts/gate/tests/context-wiring.test.mjs`).
+ */
+export const SCORING_SERVICE = 'shinon_scoring_state';
+export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
+
+/**
+ * Den Ton beim Scoring lesen — optional und mit geprueftem Vertrag.
+ *
+ * Dieselben vier Richtungen wie beim Veredler, aus demselben Grund: kein Dienst
+ * ist der Normalfall (ein Profil ohne Scoring), ein Fremder unter diesem Namen
+ * ist ein Fehler und wird einmal gemeldet, `null` heisst „es gibt nichts zu
+ * sagen", und alles andere ist der Ton.
+ */
+export function readTone(ctx, warn = () => {}) {
+  let service;
+  try {
+    service = typeof ctx?.get === 'function' ? ctx.get(SCORING_SERVICE) : undefined;
+  } catch {
+    service = undefined;
+  }
+  if (service === undefined || service === null) return null;
+  if (service.contract !== SCORING_SERVICE_CONTRACT || typeof service.read !== 'function') {
+    warn(`${SCORING_SERVICE} verletzt den Vertrag ${SCORING_SERVICE_CONTRACT}`);
+    return null;
+  }
+  try {
+    const read = service.read();
+    return read === undefined ? null : read;
+  } catch (error) {
+    warn(`Ton nicht lesbar (${error?.message ?? error})`);
+    return null;
+  }
+}
+
+/**
+ * Die Tendenz als System-Abschnitt — Ton, Tempo, Haerte aus dem Vertrag.
+ *
+ * Die HALTUNG kommt vom Scoring, die KLANGREGEL steht hier (Vertragsdaten): die
+ * Persona behauptet keinen Ton, sie liest einen. Eine Haltung, die sie nicht
+ * kennt, ergibt `null` — der Abschnitt faellt dann weg, statt leer dazustehen.
+ * `null` ist damit die ehrliche Antwort auf „kein Ton" UND auf „unbekannter
+ * Ton"; in beiden Faellen wird nichts behauptet.
+ */
+export function renderTendency(contract, tone) {
+  if (tone === null || typeof tone !== 'object') return null;
+  const stance = tone.stance;
+  if (typeof stance !== 'string' || stance === '') return null;
+  const voice = contract?.tendency?.voices?.[stance];
+  if (voice === undefined || voice === null) return null;
+  const levels = (Array.isArray(tone.tendencies) ? tone.tendencies : [])
+    .filter((entry) => typeof entry?.klasse === 'string' && typeof entry?.stufe === 'string')
+    .map((entry) => `${entry.klasse} ${entry.stufe}`);
+  return [
+    '## Tendenz (gelesen, nicht behauptet)',
+    '',
+    `Haltung: ${stance}`,
+    ...(levels.length > 0 ? [`Lage: ${levels.join(', ')}`] : []),
+    `Ton: ${voice.ton}`,
+    `Tempo: ${voice.tempo}`,
+    `Härte: ${voice.haerte}`,
+  ].join('\n');
+}
+
 /** Den Zustandsblock aus einem gerenderten Kontext zurücklesen (Verbraucher + Tests). */
 // TODO: [DSH-Refactor] - Text-Round-Trip als API: der Zustand wird gerendert, um ihn per
 // Regex aus dem Markdown wieder einzulesen. Die Regex bindet die Funktion an die exakte
@@ -439,6 +508,14 @@ export function apply(ctx, config) {
   // Der Prompt-Abschnitt wird bei jeder Zustandsänderung neu gesetzt. Vor dem
   // inject ist das ein No-op — der Zustand selbst ist immer schon da.
   let renderPrompt = () => {};
+  // Ein fremder Dienst unter dem Ton-Namen wird EINMAL gemeldet: sonst flutete
+  // jede Zustandsaenderung dieselbe Warnung.
+  let toneWarned = false;
+  const warnedTone = (message) => {
+    if (toneWarned) return;
+    toneWarned = true;
+    console.error(`[shinon-persona] ${message} — kein Ton im Zustand`);
+  };
   // Zuletzt erkanntes Triggerwort. Bleibt stehen, damit die Form nicht mitten
   // im Gespräch wieder in die Abfrage-Haltung zurückkippt.
   let lastTrigger = null;
@@ -487,9 +564,21 @@ export function apply(ctx, config) {
         disposers.push(sp.section({ name, order, text }));
       }
       let stateDisposer = null;
+      let tendencyDisposer = null;
       renderPrompt = () => {
         if (typeof stateDisposer === 'function') stateDisposer();
         stateDisposer = sp.section({ name: 'shinon:state', order: atSuffix - 2, text: renderStateContext(contract, persona.snapshot()) });
+        // Die Tendenz wird bei jedem Neu-Setzen gelesen: die Haltung aendert sich
+        // mit den Signalen des Scorings, nicht mit einem Ereignis der Persona —
+        // deshalb kein zweiter Listener, sondern dieselbe Stelle, an der die
+        // Persona ihren Prompt schreibt. Fehlt der Ton oder ist er unbekannt,
+        // faellt der Abschnitt WEG (kein leerer Abschnitt, keine Behauptung).
+        if (typeof tendencyDisposer === 'function') tendencyDisposer();
+        tendencyDisposer = null;
+        const tendencyText = renderTendency(contract, readTone(ctx, warnedTone));
+        if (tendencyText !== null) {
+          tendencyDisposer = sp.section({ name: 'shinon:tendency', order: atSuffix - 3, text: tendencyText });
+        }
       };
       let triggerDisposer = null;
       renderTrigger = () => {
@@ -502,6 +591,7 @@ export function apply(ctx, config) {
       renderTrigger();
       disposers.push(() => {
         if (typeof stateDisposer === 'function') stateDisposer();
+        if (typeof tendencyDisposer === 'function') tendencyDisposer();
         if (typeof triggerDisposer === 'function') triggerDisposer();
       });
       return () => {
@@ -509,7 +599,9 @@ export function apply(ctx, config) {
       };
     });
 
-    console.log(`[shinon-persona] ${sections.length + 1} Prompt-Abschnitte registriert (inkl. Zustand)`);
+    console.log(
+      `[shinon-persona] ${sections.length + 1} Prompt-Abschnitte registriert (inkl. Zustand; Tendenz zusaetzlich, wenn das Scoring einen Ton liefert)`,
+    );
   });
 
   // Beobachtung: nur der Event-Typ zählt. Die Persona antwortet nie auf ein Event,

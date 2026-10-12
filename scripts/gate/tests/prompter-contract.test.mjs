@@ -105,16 +105,22 @@ const stepPayload = (messages) => ({ agent: { session: { id: 'sess-1' } }, messa
  * Bundle an einen echten Cordis-Context haengen. Der Dispatcher ist echt; nur
  * `llm` ist eine Attrappe, weil der Provider extern ist.
  */
-function connect(config = {}, { llm } = {}) {
+function connect(config = {}, { llm, services } = {}) {
   const ctx = new Context();
   const records = [];
   ctx.on(bundle.DECISION_CHANNEL, (record) => records.push(record));
   const host = {
     on: (...args) => ctx.on(...args),
     emit: (...args) => ctx.emit(...args),
+    // Optionale Faehigkeiten (Scoring-Ton, Zettel): der Host sieht sie ueber
+    // `get` — genau wie der echte Profil-Host. Fehlt `services`, gibt es keine.
+    ...(services === undefined ? {} : { get: (name) => services[name] }),
     ...(llm === undefined ? {} : { llm }),
   };
-  const resolved = bundle.Config(config);
+  // `notesPath: ''` als Harness-Vorgabe: diese Datei prueft Modus-Vertrag,
+  // Annahme-Regeln und Isolation, und deren Aufrufe tragen ihren Block genau.
+  // Wer die Zettel pruefen will, gibt einen eigenen Pfad mit (Abschnitt 7).
+  const resolved = bundle.Config({ notesPath: '', ...config });
   const dispose = quiet(() => bundle.apply(host, resolved));
   return { ctx, records, config: resolved, dispose };
 }
@@ -1006,6 +1012,10 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     // Vorgabewert ist DERSELBE wie der des Index (`DEFAULT_CONTEXT_BUDGET`),
     // deshalb ist er hier gepinnt und nicht nur behauptet.
     indexBudgetTokens: 6000,
+    // Neu mit den Zetteln (Zug 4): das Verzeichnis, aus dem der Veredler liest.
+    // Der Vorgabewert steht als Konstante des Pakets hier GEPINNT — ein
+    // stiller Wechsel des Ordners waere ein Lauf ohne seine Lessons.
+    notesPath: bundle.NOTES_DIR_DEFAULT,
     maxTokens: 1200,
     temperature: 0,
     timeoutMs: 15000,
@@ -1246,5 +1256,217 @@ test('Eingang: eine Nachricht ohne Herkunft gilt nicht als Nutzereingabe', async
   assert.equal(decision, downstream);
   assert.equal(llm.calls.length, 0);
   assert.equal(records.length, 0);
+  dispose();
+});
+
+// ── 7. Der Stand: die Zettel (Zug 4) ────────────────────────────────────────
+//
+// Der Veredler LIEST die Zettel und PRUEFT sie; er erzeugt keinen. Hier wird
+// der echte Weg gefahren: `apply()` an einem echten Cordis-Context, echter
+// Waterfall, echter Aufruf — und die Zettel liegen in einem eigenen Verzeichnis,
+// damit kein Test von der Sammlung dieses Repos abhaengt. Der Stand ist ein
+// EIGENER Block nach dem Kontextblock; fehlt der Kontext, gibt es keinen Stand,
+// und ohne `notesPath` gibt es gar kein Lesen.
+
+const notesRoot = mkdtempSync(join(tmpdir(), 'shinon-prompter-notes-'));
+
+/** Ein Zettel im Vertragsformat — die Grenzen stehen in den Regeln, nicht hier. */
+const note = (thema, over = {}) => JSON.stringify({
+  contract: 'shinon.skill-note/v1',
+  version: 1,
+  thema,
+  bei: 'Eine Pruefung steht an',
+  immer: 'zuerst die Tabelle lesen und dann erst rechnen',
+  weil: 'eine Zahl ohne ihre Tabelle ist eine Behauptung',
+  beleg: 'scripts/gate/tests/prompter-contract.test.mjs',
+  ...over,
+});
+
+/** Ein Zettel-Verzeichnis mit genau den genannten Dateien. */
+function notesFor(label, files) {
+  const dir = join(notesRoot, label);
+  mkdirSync(dir, { recursive: true });
+  for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
+  return dir;
+}
+
+const contextProject = (prompt = 'Bitte pruefe die Pruefung im prompter') => [
+  { id: 'm-1', role: 'user', content: [{ type: 'text', text: prompt }], source: { kind: 'user' } },
+];
+
+test('Zettel: der passende Zettel steht als eigener Block im Aufruf und im Datensatz', async () => {
+  const dir = notesFor('passend', { 'a.json': note('prompter') });
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath, notesPath: dir }, { llm });
+  const claimed = contextProject();
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  const request = llm.calls[0];
+  assert.equal(request.messages[0].content.length, 3, 'Roh-Prompt, Kontextblock, Stand');
+  assert.ok(request.messages[0].content[2].text.startsWith('<shinon_stand>'), 'der Stand ist ein eigener Block');
+  assert.ok(request.messages[0].content[2].text.includes('<zettel thema="prompter">'));
+  assert.ok(request.messages[0].content[2].text.includes('bei: Eine Pruefung steht an'));
+  assert.deepEqual(records[0].stand, { stance: null, tone: 'none', tendencies: [], notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null } });
+  dispose();
+});
+
+test('Zettel: ein fremdes Thema laedt nicht — mit Grund, nicht still', async () => {
+  const dir = notesFor('fremd', { 'a.json': note('zahnradfabrik') });
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath, notesPath: dir }, { llm });
+  const claimed = contextProject();
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(llm.calls[0].messages[0].content.length, 2, 'kein Stand ohne passenden Zettel');
+  assert.deepEqual(records[0].stand.notes.loaded, []);
+  assert.deepEqual(records[0].stand.notes.reasons, ['THEMA_NICHT_IM_KONTEXT']);
+  dispose();
+});
+
+test('Zettel: eine kaputte Datei wird benannt und sperrt den guten Zettel nicht', async () => {
+  const dir = notesFor('kaputt', { 'a.json': note('prompter'), 'b.json': '{ nicht json' });
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath, notesPath: dir }, { llm });
+  const claimed = contextProject();
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(llm.calls[0].messages[0].content.length, 3, 'der gute Zettel laedt trotzdem');
+  assert.deepEqual(records[0].stand.notes.loaded, ['prompter']);
+  assert.equal(records[0].stand.notes.skipped, 1);
+  assert.deepEqual(records[0].stand.notes.reasons, ['KEIN_JSON']);
+  dispose();
+});
+
+test('Zettel: ohne notesPath wird nicht gelesen — der Grund steht im Datensatz', async () => {
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath }, { llm });
+  const claimed = contextProject();
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(llm.calls[0].messages[0].content.length, 2, 'kein Stand');
+  // Abgeschaltet ist ein GRUND, keine Leere: `NOTES_OFF` sagt, dass nicht
+  // gelesen wurde — wer nur [] sieht, weiss nicht, ob es keine Zettel gibt.
+  assert.deepEqual(records[0].stand.notes, { loaded: [], skipped: 0, reasons: [], reason: 'NOTES_OFF' });
+  dispose();
+});
+
+test('Zettel: hoechstens drei laden, die meisten Treffer zuerst', async () => {
+  // Vier Zettel, drei passen doppelt (thema UND ein zweites Wort), einer einfach.
+  const dir = notesFor('limit', {
+    'viel.json': note('prompter'),
+    'b.json': note('pruefung'),
+    'c.json': note('kontext'),
+    'd.json': note('rahmen'),
+  });
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath, notesPath: dir }, { llm });
+  const claimed = contextProject('Bitte pruefe die Pruefung im prompter, der Kontext und der rahmen zaehlen');
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  const block = llm.calls[0].messages[0].content[2].text;
+  const loaded = records[0].stand.notes.loaded;
+  assert.equal(loaded.length, 3, `${loaded.join(', ')}`);
+  assert.ok(block.includes('<zettel thema="prompter">'), 'der Zettel mit den meisten Treffern steht im Block');
+  assert.deepEqual(records[0].stand.notes.reasons, ['UEBER_DEM_LIMIT'], 'der vierte nennt seinen Grund');
+  dispose();
+});
+
+// ── 8. Der Ton im selben Block (Zug 5) ──────────────────────────────────────
+//
+// Haltung und Tendenzen kommen aus dem Scoring — ueber dieselbe Bauform der
+// Naht (optionales `get`, gepruefter Vertragsname). Sie landen im SELBEN Block
+// wie die Zettel: der Kontext sind Dateien, der Stand ist, was Shinon ueber sich
+// weiss, und ein zweiter Block waere eine zweite Wahrheit ueber denselben Schritt.
+
+/** Eine Ton-Faehigkeit in der Form, die @shinon/scoring anbietet. */
+const toneService = (state) => ({
+  [bundle.SCORING_SERVICE]: {
+    contract: bundle.SCORING_SERVICE_CONTRACT,
+    read: () => state,
+  },
+});
+
+const toneState = {
+  stance: 'kritisch',
+  ready: true,
+  reason: null,
+  tendencies: [{ klasse: 'korrektur', stufe: 'hoch', share: 0.6 }, { klasse: 'zustimmung', stufe: 'niedrig', share: 0.1 }],
+  signals: 5,
+};
+
+test('Stand: Haltung und Tendenzen stehen im selben Block wie die Zettel', async () => {
+  const dir = notesFor('mit-ton', { 'a.json': note('prompter') });
+  const llm = fakeLlm(reply(goodResult()));
+  const services = toneService(toneState);
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath, notesPath: dir }, { llm, services });
+  const claimed = contextProject();
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  const block = llm.calls[0].messages[0].content[2].text;
+  assert.equal(llm.calls[0].messages[0].content.length, 3, 'EIN Stand-Block, nicht zwei');
+  assert.ok(block.includes('<haltung>kritisch</haltung>'), 'die Haltung steht im Block');
+  assert.ok(block.includes('<tendenzen>korrektur hoch; zustimmung niedrig</tendenzen>'), 'die Stufen stehen im Block');
+  assert.ok(block.includes('<zettel thema="prompter">'), 'und die Zettel bleiben darin');
+  assert.deepEqual(records[0].stand, {
+    stance: 'kritisch',
+    tone: 'scoring',
+    tendencies: ['korrektur hoch', 'zustimmung niedrig'],
+    notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null },
+  });
+  dispose();
+});
+
+test('Stand: ohne Ton bleibt der Stand — nur die Haltung fehlt', async () => {
+  const dir = notesFor('ohne-ton', { 'a.json': note('prompter') });
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath, notesPath: dir }, { llm });
+  const claimed = contextProject();
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  const block = llm.calls[0].messages[0].content[2].text;
+  assert.equal(block.includes('<haltung>'), false, 'keine erfundene Haltung');
+  assert.ok(block.includes('<zettel thema="prompter">'), 'die Zettel laden trotzdem');
+  assert.equal(records[0].stand.stance, null);
+  assert.equal(records[0].stand.tone, 'none');
+  dispose();
+});
+
+test('Stand: ein fremder Dienst unter dem Namen wird gemeldet, nicht gelesen', async () => {
+  const dir = notesFor('fremder-ton', { 'a.json': note('prompter') });
+  const llm = fakeLlm(reply(goodResult()));
+  const services = { [bundle.SCORING_SERVICE]: { contract: 'shinon.etwas-anderes/v1', read: () => toneState } };
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath, notesPath: dir }, { llm, services });
+  const claimed = contextProject();
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  const block = llm.calls[0].messages[0].content[2].text;
+  assert.equal(block.includes('<haltung>'), false, 'ein fremder Vertrag liefert keinen Ton');
+  assert.equal(records[0].stand.tone, 'invalid');
+  assert.ok(block.includes('<zettel thema="prompter">'), 'der Stand bleibt');
+  dispose();
+});
+
+test('Stand: eine leere Antwort des Scorings ist kein Ton', async () => {
+  const dir = notesFor('leerer-ton', { 'a.json': note('prompter') });
+  const llm = fakeLlm(reply(goodResult()));
+  const services = toneService(null);
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath, notesPath: dir }, { llm, services });
+  const claimed = contextProject();
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  // `null` heisst „nichts zu sagen" (kein Signal) — dieselbe Ehrlichkeit wie
+  // beim Index, der ohne Index `null` gibt statt einer leeren Antwort.
+  assert.equal(records[0].stand.tone, 'none');
+  assert.equal(records[0].stand.stance, null);
+  assert.equal(llm.calls[0].messages[0].content[2].text.includes('<haltung>'), false);
   dispose();
 });
