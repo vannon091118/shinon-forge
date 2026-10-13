@@ -1329,7 +1329,11 @@ test('Zettel: der passende Zettel steht als eigener Block im Aufruf und im Daten
   assert.ok(request.messages[0].content[2].text.startsWith('<shinon_stand>'), 'der Stand ist ein eigener Block');
   assert.ok(request.messages[0].content[2].text.includes('<zettel thema="prompter">'));
   assert.ok(request.messages[0].content[2].text.includes('bei: Eine Pruefung steht an'));
-  assert.deepEqual(records[0].stand, { stance: null, tone: 'none', tendencies: [], notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null }, skills: { loaded: [], reason: 'SKILLS_OFF' } });
+  // `narrative: null` steht im Datensatz, weil kein Composite gelesen wurde —
+  // das Feld ist die Narrative-Lage (Zug 6), und sein Fehlen waere von „es gibt
+  // keine" nicht zu unterscheiden. Die Gegenprobe steht im Test darunter.
+  assert.deepEqual(records[0].stand, { stance: null, tone: 'none', tendencies: [], narrative: null, notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null }, skills: { loaded: [], reason: 'SKILLS_OFF' } });
+  assert.equal(request.messages[0].content[2].text.includes('<narrative'), false, 'ohne Composite kein Narrative-Element');
   dispose();
 });
 
@@ -1441,6 +1445,7 @@ test('Stand: Haltung und Tendenzen stehen im selben Block wie die Zettel', async
     stance: 'kritisch',
     tone: 'scoring',
     tendencies: ['korrektur hoch', 'zustimmung niedrig'],
+    narrative: null,
     notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null },
     skills: { loaded: [], reason: 'SKILLS_OFF' },
   });
@@ -1458,7 +1463,9 @@ test('Stand: ohne Ton bleibt der Stand — nur die Haltung fehlt', async () => {
   const block = llm.calls[0].messages[0].content[2].text;
   assert.equal(block.includes('<haltung>'), false, 'keine erfundene Haltung');
   assert.ok(block.includes('<zettel thema="prompter">'), 'die Zettel laden trotzdem');
+  assert.equal(block.includes('<narrative'), false, 'und keine erfundene Narrative-Lage');
   assert.equal(records[0].stand.stance, null);
+  assert.equal(records[0].stand.narrative, null, 'die Lage fehlt benannt, nicht still');
   assert.equal(records[0].stand.tone, 'none');
   dispose();
 });

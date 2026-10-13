@@ -238,6 +238,14 @@ function escapeText(text) {
  * `<haltung>` ohne Haltung wäre eine Behauptung. Ist nichts davon da, kommt
  * `null` zurück — der Aufrufer hängt dann keinen Block an (kein leerer Block im
  * Prompt).
+ *
+ * ZUG 6 — die Narrative-Lage: der Composite der Narrative Engine kommt als
+ * EIGENES Element `<narrative contract="…">` in den Stand. Er trägt seinen
+ * Vertragsnamen als Herkunft und ist damit als gelesen ausgewiesen; die Engine
+ * sagt selbst `authority: NONE` (abgeleitet ist nicht autoritativ), und dieses
+ * Element behauptet deshalb nichts über die Welt — es sagt, wie der Takt
+ * gelesen wurde. Nur die FELDER, die der Composite wirklich trägt: ein Arc, den
+ * es nicht gibt, wird nicht erfunden.
  */
 export function renderStand(stand) {
   if (!isRecord(stand)) return null;
@@ -245,7 +253,16 @@ export function renderStand(stand) {
   const notes = Array.isArray(stand.notes) ? stand.notes : [];
   const skills = Array.isArray(stand.skills) ? stand.skills : [];
   const hasStance = stand.stance !== null && stand.stance !== undefined;
-  if (!hasStance && tens.length === 0 && notes.length === 0 && skills.length === 0) return null;
+  const narrative = isRecord(stand.narrative) ? stand.narrative : null;
+  const lage = narrative === null
+    ? []
+    : [
+        ['arc', narrative.arc_id],
+        ['erzaehler', narrative.narrator],
+        ['beziehung', narrative.relationship_state],
+        ['stimmung', narrative.mood],
+      ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+  if (!hasStance && tens.length === 0 && notes.length === 0 && skills.length === 0 && lage.length === 0) return null;
 
   const lines = ['<shinon_stand>'];
   if (typeof stand.contract === 'string' && stand.contract !== '') {
@@ -254,6 +271,14 @@ export function renderStand(stand) {
   if (hasStance) lines.push(`<haltung>${escapeText(stand.stance)}</haltung>`);
   if (tens.length > 0) {
     lines.push(`<tendenzen>${tens.map((entry) => `${escapeText(entry.klasse)} ${escapeText(entry.stufe)}`).join('; ')}</tendenzen>`);
+  }
+  if (lage.length > 0) {
+    const origin = typeof stand.narrativeContract === 'string' && stand.narrativeContract !== ''
+      ? ` contract="${escapeText(stand.narrativeContract)}"`
+      : '';
+    lines.push(`<narrative${origin}>`);
+    lines.push(lage.map(([key, value]) => `${key}: ${escapeText(value)}`).join('; '));
+    lines.push('</narrative>');
   }
   for (const note of notes) {
     lines.push(`<zettel thema="${escapeText(note.thema)}">`);

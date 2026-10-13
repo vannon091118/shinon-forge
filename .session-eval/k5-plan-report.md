@@ -5,6 +5,26 @@
 > **Kontext:** K5 = 7 vordefinierte implizite Signale (Kopieren, Übernahme, Selbstkorrektur, Umformulierung, Akzeptanz, Verwerfung, nächste Frage) — diff-basiert, deterministisch, kein LLM.
 > **Regel:** Keine Zahlen erfunden. Was nicht nachgewiesen ist, steht als "nicht nachgewiesen" + warum.
 
+> **NACHTRAG 2026-10-13 — dieser Report ist als AUFGABE erledigt, und zwar anders als hier vorgeschlagen.**
+> Der Befund („niemand emittiert `shinon/feedback/*`") war richtig. Gebaut wurde danach
+> **enger**: kein Emitter auf `shinon/feedback/*`, sondern die Signaltabelle
+> `packages/scoring/assets/signal-rules.json` (7 Signale, 5 beobachtbare Quellen) plus
+> `translateSignal`/`createSignalCollector` in `packages/scoring/assets/scoring-core.js`.
+> Die Quellen sind **native DSH-Typen**, die der Spine über `carrier.typeMap` abbildet
+> (`feedback/message-put` → `feedback.rated`, `feedback/message-delete` → `feedback.retracted`,
+> `feedback/record` → `feedback.noted`, dazu `user/message` und `turn/end`); das Scoring hängt
+> an `shinon/event` und übersetzt dort. **Ein Emitter auf `shinon/feedback/*` ist damit nicht
+> nötig** — die Schleife ist auch ohne ihn geschlossen.
+> Zwei der sieben Signale (`adopt`, `nextq`) sind ausdrücklich als **nicht beobachtbar** geführt,
+> mit benanntem Grund (Turn-Diff bzw. Index-Überschneidung); geraten wird nichts.
+> Das Gate `scoring` prüft die Tabelle fail-closed
+> (`scripts/gate/plugins/scoring.mjs`, `signalRuleIssues`), die Tests laufen in `npm run test:scoring`,
+> und ein lebender Modell-Turn mit Urteil und Widerruf über die echte UI steht in
+> `docs/ZAHLEN.md` §2.
+> **Wer diesen Report als „offene Arbeit" liest, liest ihn falsch.** Offen sind nur die beiden
+> ausdrücklich als nicht beobachtbar geführten Signale — und die brauchen den Turn-Diff bzw.
+> die Index-Überschneidung, also einen eigenen Zug.
+
 ---
 
 ## 0. TL;DR

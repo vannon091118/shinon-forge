@@ -1,8 +1,9 @@
 # PLAN: Shinon Forge Umbau
 
-> **Status:** plan — Umsetzungsplan für den Umbau zum eigenständigen Produkt. **Stand:** 2026-10-11
-> (Fortschritt: 1.3, 1.4, 2.1–2.6, 3.1 und 3.11 sind im Arbeitsbaum erledigt — Nachweise je Schritt
-> bzw. `docs/audit/UMBAU_2026-10-11.md` §7 und `docs/audit/DSH_SUBSET_3-1.md`)
+> **Status:** plan — Umsetzungsplan für den Umbau zum eigenständigen Produkt. **Stand:** 2026-10-13
+> (Fortschritt: 1.3, 1.4, 2.1–2.6, 3.1, 3.11 und 3.12 sind im Arbeitsbaum erledigt — Nachweise je
+> Schritt bzw. `docs/audit/UMBAU_2026-10-11.md` §7 und `docs/audit/DSH_SUBSET_3-1.md`; §3.12 nennt
+> den EINEN offenen Faden des Key-Routers und den Nachtrag vom 2026-10-13)
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 **Stand:** 2026-10-10 · **Basis-Commit:** `91c7e4f` (`main`) · **Arbeitskopie:** `/home/vannon/Dokumente/Projekte/Shinon-forge` ·
@@ -324,7 +325,49 @@ auskommt, ist dagegen gemessen (siehe 3.7 unten).
 - **Nachweis:** Profillauf plus Testläufe je Paket.
 - **Risiko:** hoch / mittel (`popup` war nie ein Renderer; `key-router` speichert Key-Material im Prozessspeicher).
 - **Abhängig von:** 1.1, 3.6
-- **Status:** offen
+- **Status:** **teilweise erledigt (2026-10-13).** `narrative` war seit Zug 5 im Profil, hatte aber **keinen Abnehmer** — der Composite ging ins Leere. Das ist geschlossen: die Persona hört auf `shinon/narrative/state` und rendert `shinon:narrative-arc` (der eigene `mood` bleibt maßgeblich, der Composite wird nicht hineingemischt); Kanal- und Vertragsname sind als Zwillinge in `scripts/lib/repo.mjs` gepinnt, das Gate `narrative` und `scripts/gate/tests/narrative.test.mjs` prüfen die Verdrahtung. `shinon-forge` ist **bewertet** (§3.12.1). **Nachtrag (2026-10-13, zweiter Durchgang): beide Punkte sind gebaut, und der Rest ist benannt.**
+
+**`popup` rendert jetzt.** Der Befund war schlimmer als „nicht aktiviert": der Client sagte in
+seinem eigenen Kopf, dass er nichts rendert, und malte einen `<style>`-Block für Klassen, die
+niemand benutzt. Gebaut ist ein echtes Overlay im Slot `conversation.composer.dock`:
+`packages/popup/assets/trajectory-core.js` faltet das Ereignisfenster der SITZUNG (der Client kann
+keinen Host-Endpunkt registrieren — `uiSession` → `sessions.binding(id)` → `eventSource`, derselbe
+Weg wie `@shinon/token-usage`), die Client-Hälfte trägt dieselbe Faltung als **bytegleiche Region**
+(Zwilling in `scripts/lib/repo.mjs`), den Text liefert `@shinon/locale-de` (`popup.running`, Zahlen
+als Platzhalter), und `scripts/gate/tests/popup-overlay.test.mjs` prüft die Naht (Profil-Slot =
+Client-Literal = Host-Default), das Wörterbuch und das gerenderte Ergebnis.
+
+**`key-router` hat jetzt einen Sicherheitsvertrag.** Gemessen am alten Stand: drei Werkzeuge gaben
+`key.slice(0, 8) + '…'` zurück und jede Log-Zeile trug ein Präfix — was ein Werkzeug zurückgibt,
+landet im Kontext des Modells. Jetzt: das Schema hat **kein** Schlüsselfeld (Namen aus der Umgebung,
+nie Werte; die Profildatei ist versioniert), nach außen geht nur der Poolplatz (`key#1`), jeder
+Log-Aufruf läuft durch `redact`, die Werkzeuge hängen an `ctx.inject(['tools'], …)` — ohne das wirft
+der Cordis-Proxy und die Aktivierung stirbt —, und der Verbindungstest setzt den Schlüssel
+ausschließlich in die Kopfzeilen. Belegt von `packages/key-router/test/pool-core.test.mjs` (11) und
+`scripts/gate/tests/key-router-security.test.mjs` (6, inklusive Kanarienvogel-Schlüssel durch das
+ausgelieferte Paket).
+
+**OFFEN bleibt genau EINER** dieser Fäden, und er ist ein Feature: der Provider-**OVERRIDE** des
+Key-Routers. Er verwaltet den Pool und beantwortet seine Werkzeuge, gibt DSH aber noch keinen
+rotierenden Schlüssel an die Hand; dafür fehlt die LLM-Dienstfläche (welcher Dienst, welche Form)
+und ein Gate an der echten Route. Nicht gemessen, nicht behauptet. `baseUrl` im Profil ist
+deshalb **gespiegelt** (Gate-Test vergleicht sie mit dem `agnes`-Anbieter der Route), damit der
+Verbindungstest denselben Host fragt wie der Lauf.
+
+#### 3.12.1 Verdikt `shinon-forge` (A4: „bewerten", 2026-10-13)
+
+**Ergebnis: `shinon-forge` bleibt `inactive`. Das ist ab jetzt ein Verdikt, kein Versehen.**
+
+Gemessen an `packages/shinon-forge/index.js` (580 Zeilen):
+
+- Es ist das **einzige** Paket dieses Repos, das `node:child_process` importiert (`grep -rln child_process packages/*/index.js` → genau 1 Treffer).
+- Es führt eine Engine-Tabelle mit **neun fremden CLIs** (`claude`, `codex`, `agy`, `muse`, `hermes`, `pi`, `cline`, `grok`, `freebuff-app`) und startet sie per `execFile`.
+- Es registriert **fünf Werkzeuge** (`ctx.tools.register`, Zeilen 546–550) und einen **Intervall-Daemon** (`startRunner`/`stopRunner`, `setInterval` in Zeile 274).
+- Es liest und schreibt außerhalb des Repos (`~/.agents/notion-agent/memory-sync.mjs`, dazu eine Heartbeat-Datei).
+
+Der Kern: **es ist kein DSH-Plugin, sondern eine Bedienerschicht (Operator).** Jede Zusage, die dieses Repo für seine Profil-Plugins pinnt — beobachten statt handeln, keine Uhr, kein fremder Spawn, keine Tool-Registrierung — verletzt es **absichtlich**, weil genau darin sein Zweck liegt. Ein Aktivieren wäre deshalb kein Konfigurationsschritt, sondern eine Umwidmung mit eigenem Sicherheitsvertrag (welche Kommandos, welches `cwd`, welche `env`, wer sieht die Ausgabe, was passiert bei Abbruch) — dieselbe Aufwandsklasse wie der Provider-Teil von `key-router`.
+
+**Damit ist der Passus aus 3.12 („`shinon-forge` ist bewertet, nicht still aktiviert") erfüllt.** `dsh.inactive: true` bleibt die ehrliche Aussage, bis dieser Vertrag steht.
 
 ### 4.1 (F1) Messung unter Linux
 - **Ziel:** entscheiden, ob der Browser der Engpass ist (Tor zu Phase 8).
@@ -497,8 +540,8 @@ auskommt, ist dagegen gemessen (siehe 3.7 unten).
 | npm-Umstellung: `workspace:*` und Lockfile | hoch | hoch | semver-Ranges, Lockfile neu erzeugen, isolierter Install testen |
 | alpha.2-Theme-Erweiterung bricht das Overlay | mittel | mittel | `UPSTREAM_DIFF` §2; am Quelltext lesen, nicht aus Bytes schließen |
 | Downgrade/Upgrade der DSH-Fassung (lokal alpha.1, Ziel alpha.2) | mittel | hoch | erst 3.2, dann Pin anpassen; keine Versionsmischung |
-| `popup` hat keinen Renderer | hoch | niedrig | Renderer als eigene Aufgabe, nicht „aktivieren" nennen |
-| `key-router` hält Key-Material im Prozessspeicher | mittel | hoch | vor Aktivierung Sicherheitsvertrag festlegen (kein Repo, keine Logs) |
+| `popup` hat keinen Renderer | hoch | niedrig | **erledigt (2026-10-13):** echtes Overlay + Zwillings-Region + Gate-Test (§3.12) |
+| `key-router` hält Key-Material im Prozessspeicher | mittel | hoch | **erledigt (2026-10-13):** Vertrag steht — kein Schlüsselfeld im Schema, nur Poolplätze nach außen, jeder Log durch `redact`, Kanarienvogel-Test; OFFEN bleibt der Provider-Override (§3.12) |
 | `shinon-forge` startet fremde Engines (Subprozesse) | mittel | hoch | vor Aktivierung bewerten; Defaults restriktiv |
 | Remote-Beitrag im Client nicht mountbar | mittel | mittel | `UPSTREAM_DIFF` §5.2 Punkt 3 vor 6.1 klären |
 | Kein `dsh` im PATH für Abnahmen | hoch | mittel | lokales `node_modules/@deepseek-ai/dsh` nutzen, Node ≥ 22 |

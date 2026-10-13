@@ -37,6 +37,10 @@ window.__ModuleLoader__.load({
           'menu.markers': 'Shinon Marker',
           'menu.codingmon': 'Codingmon',
           'menu.popup': 'Shinon Popup',
+          // Der Fortschrittstext des Popup-Overlays. Die Platzhalter {step},
+          // {open}, {calls} und {tool} fuellt die Client-Haelfte aus den Zahlen
+          // der Sitzung — die Sprache bleibt hier, die Zahlen kommen von dort.
+          'popup.running': 'Vorgang läuft — Schritt {step}, {open} offen, {calls} Aufrufe, zuletzt {tool}',
         };
         ctx.locale.register('shinon', { en: TEXTS, de: TEXTS });
         

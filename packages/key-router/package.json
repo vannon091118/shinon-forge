@@ -1,6 +1,6 @@
 {
   "name": "@shinon/key-router",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Key Router — Multi-API-Key Pool mit 429-Rotation und Eskalationszeiten",
   "private": true,
   "type": "module",
@@ -16,7 +16,6 @@
     "@deepseek-ai/schemastery": "~3.18.4"
   },
   "dsh": {
-    "inactive": true,
     "bundle": {
       "patch": "./cordis.patch.yml"
     },

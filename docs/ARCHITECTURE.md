@@ -1,9 +1,9 @@
 # Architektur — Shinon Forge
 
-> **Status:** current — verbindliche Konventionen für `packages/`, `profiles/`, `scripts/`. **Stand:** 2026-10-09
+> **Status:** current — verbindliche Konventionen für `packages/`, `profiles/`, `scripts/`. **Stand:** 2026-10-13
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md` (einziger Eigentümer harter Zahlen)
 
-Durchgesetzt von `scripts/lib/repo.mjs`, geprüft von `scripts/dsh-test.mjs` (Gate),
+Durchgesetzt von `scripts/lib/repo.mjs`, geprüft von `scripts/shinon-test.mjs` (Gate),
 `scripts/build.mjs` (Pipeline) und `scripts/validate-test.mjs` (Regel-Fixtures) —
 alle vier nutzen dieselbe Validierungsquelle.
 
@@ -109,7 +109,7 @@ Das Format stammt aus `@deepseek-ai/dsh-app-boot` (`loadProfile` /
   `scripts.dev` (`--profile shinon`) und wird nirgends dupliziert.
 - `profiles/headless` ist das One-shot-Profil (Modell-Route, ein Bundle aus diesem Repo).
 - `docs/archive/legacy-profiles/web/` ist der **archivierte Altbestand** (bis 2026-10-11
-  `profiles/web`): er nannte nur fremde Bundles und **kein** `@shinon/*`-Paket und war kein
+  unter `profiles/web`): er nannte nur fremde Bundles und **kein** `@shinon/*`-Paket und war kein
   zweites kanonisches Profil. Er wird nicht geladen; sein einziger wirksamer Wert
   (`welcomeNoticeVersion`) steht seit 2026-10-11 in `profiles/shinon/cordis.patch.yml`.
 - `dsh.profile.bundles` nennt eigene Bundles als `@shinon/<dir>` und fremde mit ihrem
@@ -168,6 +168,29 @@ unberührt: `@shinon/openapi` bleibt inaktiv.
 | Patch-Werte       | Paket (ausgeliefert) bzw. Profil (überschrieben) | `packages/<dir>/cordis.patch.yml`, `profiles/shinon/cordis.patch.yml` |
 | UI-Zustand        | DSH-Services (`slots`, `styles`, `locale`) | Client-Hälfte              |
 | Zahlen (Bestand, Prüfläufe) | `docs/ZAHLEN.md` | sonst nirgends |
+| Laufzeit-Index (Prompter MAX) | `@shinon/prompter` | `.shinon/prompter-index.json`, gitignoriert |
+| Projekt-Kontext (Persona) | der Nutzer | `.shinon/project-context.md`, getrackt wenn vorhanden |
+| Provenienz-Index (Project Index) | `@shinon/project-index` | `~/.shinon/indexes/<projekt-hash>/index.sqlite`, außerhalb des Repos |
+
+### Der repo-lokale `.shinon/`-Ordner
+
+Zwei verschiedene Orte tragen denselben Namen, und das ist gewollt:
+
+- **`~/.shinon/`** (im HOME, **nicht** im Repo) gehört dem Project Index. Er ist
+  abgeleitet, projektübergreifend, pro Projekt gehasht und liegt bewusst außerhalb
+  des Baums — damit kein Index je mitcommittet wird. Beleg: `docs/probes/project-index.json`.
+- **`.shinon/`** (im Arbeitsverzeichnis, **repo-relativ**) gehört dem Prompter und der
+  Persona. Diesen Ort gibt es nur, wenn ein Paket ihn beim Lauf anlegt oder liest:
+
+| Pfad | Angelegt von | Lebenszyklus | Im Git? |
+|---|---|---|---|
+| `.shinon/.gitkeep` | dieses Repo | bleibt | **getrackt** (hält den Ordner) |
+| `.shinon/prompter-index.json` | `@shinon/prompter` (`autoIndex`, beim ersten Lauf) | abgeleitet, jederzeit neu gebaut; Löschen ist folgenlos | **gitignoriert** |
+| `.shinon/project-context.md` | der Nutzer (Persona liest ihn, legt ihn nie an) | Inhalt, keine Laufzeit | getrackt, sobald vorhanden |
+
+Beide Leser sind **fail-open**: fehlt die Datei, fehlt der Abschnitt bzw. der Index
+wird neu gebaut — kein Fehler, keine stille Falschaussage. Was hier steht, ist die
+Antwort auf „wohin schreibt der Lauf?", nicht eine Zusage über Inhalte.
 
 Fluss:
 
@@ -188,10 +211,10 @@ profiles/shinon/package.json         (Aktivierung: dsh.profile.bundles)
 | Einstieg                               | Aufgabe                                                                                        |
 |----------------------------------------|------------------------------------------------------------------------------------------------|
 | `npm test`                             | Gate → Regel-Fixtures → Distributionstest → Profiltest; stoppt beim ersten Fehler                |
-| `node scripts/dsh-test.mjs`            | Gate: Manifest, Ressourcen, Patch-Schema, Namensvertrag, Syntax, Legacy-Guard, Komposition      |
+| `node scripts/shinon-test.mjs`            | Gate: Manifest, Ressourcen, Patch-Schema, Namensvertrag, Syntax, Legacy-Guard, Komposition      |
 | `node scripts/validate-test.mjs`       | Regel-Fixtures: je Regel muss Gate **und** Build rot werden (Kontrolle bleibt grün)             |
 | `node scripts/pack-test.mjs`           | Distributionstest je Paket: `npm pack` → entpacken → isoliert installieren → laden              |
-| `node scripts/dsh-profile-test.mjs`    | Profiltest: `DSH_HOME=<Repo>` `dsh --profile shinon --dump-config` → alle Bundle-Layer          |
+| `node scripts/shinon-profile-test.mjs`    | Profiltest: `DSH_HOME=<Repo>` `dsh --profile shinon --dump-config` → alle Bundle-Layer          |
 | `npm run gate` / `gate:local` / `gate:full` | modulare Gate-Engine (`scripts/gate/engine.mjs`), Slice-fähig                              |
 | `npm run build` (`scripts/build.mjs`)  | dieselben Regeln + Artefakte nach `dist/` (`manifest.json`, `profile.json`, Paketkopien)        |
 | `npm run stages` (`scripts/stages.mjs`)| Startstufen und READY-Zeile des Starters nachvollziehen                                         |
@@ -214,7 +237,7 @@ Neue Features starten als *plan* und werden erst mit ausführbarem Nachweis *cur
 ## 8. Bewusste Grenzen
 
 - Kein Voll-Boot in der Doku belegt: verifiziert ist die Config-Auflösung
-  (`scripts/dsh-profile-test.mjs`); Web-UI und Modellaufruf brauchen Browser bzw.
+  (`scripts/shinon-profile-test.mjs`); Web-UI und Modellaufruf brauchen Browser bzw.
   Schlüssel und sind in `docs/ZAHLEN.md` §4 als „nicht geprüft“ geführt.
 - Patch-Configs werden **strukturell** validiert, nicht gegen das Schemastery-Schema
   des Pakets (`index.js`) — dafür müssten die Pakete samt `schemastery` geladen werden.

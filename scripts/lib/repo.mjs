@@ -487,6 +487,35 @@ export const SOURCE_TWINS = [
     mirror: 'packages/task-router/index.js',
   },
   {
+    // Die Naht Narrative -> Persona: die Persona kann `@shinon/narrative` nicht
+    // importieren (eigenstaendige Bundles), also traegt sie Kanalname und
+    // Vertragsnamen als Literal. Drift waere hier STILL und teuer: ein falscher
+    // Kanalname hiesse, dass der Abschnitt nie erscheint, und das saehe aus wie
+    // "es gibt keine Narrative" — dieselbe Falle wie beim falschen Token-Schluessel.
+    rule: 'Naht Narrative -> Persona (Kanal + Vertragsname)',
+    kind: 'literals',
+    owner: 'packages/narrative/index.js',
+    mirror: 'packages/persona/index.js',
+    values: [
+      { export: 'STATE_CHANNEL', literal: 'string' },
+      { export: 'STATE_CONTRACT', literal: 'string' },
+    ],
+  },
+  {
+    // Derselbe Besitzer, zweiter Abnehmer: der Veredler kennt den Arc im
+    // MAX-Kontext nur ueber den Stand. Auch er kann `@shinon/narrative` nicht
+    // importieren und traegt die beiden Namen als Literal. Zwei Spiegel, EIN
+    // Besitzer — die Dopplung ist damit drift-geprueft, nicht hoffnungsvoll.
+    rule: 'Naht Narrative -> Prompter (Kanal + Vertragsname)',
+    kind: 'literals',
+    owner: 'packages/narrative/index.js',
+    mirror: 'packages/prompter/index.js',
+    values: [
+      { export: 'STATE_CHANNEL', literal: 'string' },
+      { export: 'STATE_CONTRACT', literal: 'string' },
+    ],
+  },
+  {
     rule: 'Naht-Namen Client -> Host',
     kind: 'literals',
     owner: 'packages/codingmon/assets/uebergabe.js',
@@ -528,6 +557,32 @@ export const SOURCE_TWINS = [
     owner: 'packages/token-usage/assets/token-core.js',
     mirror: 'packages/token-usage/client.js',
     values: [{ export: 'TOKEN_USAGE_KEY', literal: 'string' }],
+  },
+  {
+    // Der Slot, an dem das Popup-Overlay haengt: der Host kennt ihn als
+    // Schema-Default + Profilwert, die Client-Haelfte muss ihn (als eigenes
+    // Bundle ohne `import`) als Literal tragen. Drift waere still und teuer: die
+    // Haelfte registrierte sich in einem Slot, den niemand rendert — das Overlay
+    // existierte und waere unsichtbar, genau der Zustand, den dieses Paket
+    // hinter sich hat.
+    rule: 'Slot des Popup-Overlays',
+    kind: 'literals',
+    owner: 'packages/popup/index.js',
+    mirror: 'packages/popup/client.js',
+    values: [{ export: 'DEFAULT_SLOT', literal: 'string' }],
+  },
+  {
+    // Dasselbe Muster für das Popup-Overlay: die Faltung des Sitzungsfensters
+    // steht im Core (unit-testbar in CI, ohne node_modules) und als bytegleiche
+    // Region in der Client-Hälfte, die den Core nicht importieren kann. Drift
+    // wäre hier still und teuer: eine Anzeige, die andere Ereignisarten liest,
+    // zeigt entweder nichts oder den falschen Vorgang — und beides sieht aus wie
+    // "keine Daten".
+    rule: 'Regel des Popup-Overlays (Faltung des Sitzungsfensters, Lesart)',
+    kind: 'region',
+    marker: 'zwilling:popup-trajectory',
+    owner: 'packages/popup/assets/trajectory-core.js',
+    mirror: 'packages/popup/client.js',
   },
   {
     // Die Rechnung der Token-Anzeige selbst: die Faltung der Turn-Ereignisse,
