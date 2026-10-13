@@ -109,7 +109,7 @@ Das Format stammt aus `@deepseek-ai/dsh-app-boot` (`loadProfile` /
   `scripts.dev` (`--profile shinon`) und wird nirgends dupliziert.
 - `profiles/headless` ist das One-shot-Profil (Modell-Route, ein Bundle aus diesem Repo).
 - `docs/archive/legacy-profiles/web/` ist der **archivierte Altbestand** (bis 2026-10-11
-  unter `profiles/web`): er nannte nur fremde Bundles und **kein** `@shinon/*`-Paket und war kein
+  unter profiles/web): er nannte nur fremde Bundles und **kein** `@shinon/*`-Paket und war kein
   zweites kanonisches Profil. Er wird nicht geladen; sein einziger wirksamer Wert
   (`welcomeNoticeVersion`) steht seit 2026-10-11 in `profiles/shinon/cordis.patch.yml`.
 - `dsh.profile.bundles` nennt eigene Bundles als `@shinon/<dir>` und fremde mit ihrem

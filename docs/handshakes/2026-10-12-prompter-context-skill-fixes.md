@@ -9,7 +9,7 @@
 ### 1. MAX wurde durch eine ungültige Kontextdatei vor dem Index blockiert
 
 - `packages/prompter/cordis.patch.yml` setzte `contextPath: ./assets/max-context.json`.
-- `packages/prompter/assets/max-context.json` ist kein `ContextSchema`-Datensatz. Es enthält stattdessen Metadaten über `shinon.project-index/query-v1`, aber nicht die erforderlichen Felder `project`, `files`, `symbols`, `constraints`, `touches`, `dependencies`.
+- packages/prompter/assets/max-context.json ist kein `ContextSchema`-Datensatz. Es enthält stattdessen Metadaten über `shinon.project-index/query-v1`, aber nicht die erforderlichen Felder `project`, `files`, `symbols`, `constraints`, `touches`, `dependencies`.
 - `apply()` markiert die konfigurierte Datei beim Mount als `invalid`. `maxContext()` kehrt in diesem Zustand mit `CONTEXT_INVALID` zurück, bevor `indexContext()` den optionalen Dienst `shinon_index_query` fragen kann.
 - **Fix:** Die ungültige `contextPath`-Konfiguration wurde entfernt. Der Schemastery-Default ist leer; MAX fragt damit zur Laufzeit den Indexdienst ab. Die unbrauchbare Platzhalterdatei wurde entfernt, damit sie nicht erneut versehentlich aktiviert wird.
 - **Invariante:** Eine später ausdrücklich konfigurierte, aber kaputte Kontextdatei sperrt MAX weiterhin. Das ist beabsichtigtes fail-closed-Verhalten. Der Fix betrifft die falsche Standardverdrahtung, nicht die Sicherheitsregel.
@@ -30,7 +30,7 @@
 
 - Geändert: `packages/prompter/index.js`
 - Geändert: `packages/prompter/cordis.patch.yml`
-- Entfernt: `packages/prompter/assets/max-context.json` (ungültiger, nicht als ContextSchema nutzbarer Platzhalter)
+- Entfernt: packages/prompter/assets/max-context.json (ungültiger, nicht als ContextSchema nutzbarer Platzhalter)
 - Neu: `packages/prompter/test/skill-selection.test.mjs`
 - Neu: `scripts/gate/tests/prompter-profile-wiring.test.mjs`
 - Dieser Handshake: `docs/handshakes/2026-10-12-prompter-context-skill-fixes.md`
@@ -117,7 +117,7 @@ Der Push-Workflow **Shinon Commit Guard** für Commit `14d3185b7122c9c16331dfc13
 - Gemessen: 6 Turns (Turn 1–5 `completed`, Turn 6 bricht bei Step 66 ohne `turn/end` ab — kein Session-Ende-Marker, Export oder Prozess endete mitten im Turn); 119 Steps; 149 Tool-Calls (74 read, 30 edit, 28 bash, 8 grep); 2 `workspace/changes` (Turn 1 und Turn 5); 2 `ask_user_question` (Phasentiefe, Skill-Selektion-Reihenfolge).
 - Token: 2.177.638 gesamt (2.106.928 in / 70.710 out, ~30:1); 13 `compaction/prune` (~61,4K shadowed Tokens) — read-lastige Exploration, teure Sitzung.
 - Robustheit: 3× HTTP-429-Rate-Limit (Free-Tier) in Turn 1, Step 16 — Retry mit Backoff hat gegriffen. 14 Tool-Schema-Fehler (`missing required property "command"` bei bash, `unknown tool "ls"`, fehlende `old_string`/`new_string`/`description`) — der Agent rief Tools wiederholt mit `{"description": …}` statt echtem Schema; erst spät gefangen. Ein `old_string`-Mismatch in `prompter-contract.test.mjs` blieb bis Log-Ende offen.
-- Fehlende Dateien (erwartet, Phasen 2/3 offen): `packages/scoring/assets/persona-state.json` (Turn-3-Read schlägt fehl), `packages/persona/test/` (grep Exit 2).
+- Fehlende Dateien (erwartet, Phasen 2/3 offen): packages/scoring/assets/persona-state.json (Turn-3-Read schlägt fehl), packages/persona/test/ (grep Exit 2).
 - ROT-Grün-Brücke: Während Turn 6 waren `prompter-contract`-Tests rot (MAX-Kontext, Zettel, Stand: u. a. `Roh-Prompt plus Kontextblock`, `3 !== 2`). Genau das fixen die Folgecommits `0551c7f`/`4cf4b0e`/`14d3185`; Guard danach grün (Run 38192734263: 401/401, 46/46, 42/42). Konsistent, kein Widerspruch.
 - Datenlimit-Update (Phase 0): Ein echtes Session-Log existiert jetzt — aber nur ~5 echte, kurze, tippfehlerreiche Nutzerprompts (~323 Wörter). Für eine session-gemessene Stopwortliste weiter zu dünn; die generische DE/EN-Baseline bleibt. Als Beleg für die explizite Namenspriorität (`cfc778f`) taugt das Log dagegen direkt: Nutzerprompt Nr. 8 (`weaster fehler Promter hätte automatisch /dsh-dev-workflow … als skills in Erwägung ziehen sollen`) ist exakt der Fall, den die Namens-vor-Overlap-Regel löst.
 - Node-Falle bestätigt: Der Agent fand wie später erneut nötig `~/.nvm/versions/node/v24.21.0` (Default-PATH liefert v18, DSH-Boot bricht dort mit `parseEnv`-SyntaxError ab).
