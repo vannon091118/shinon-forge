@@ -309,7 +309,9 @@ test('MAX: eine Datei gewinnt gegen den Dienst, und ohne beides wird abgelehnt',
   const third = connect({ llm: fakeLlm(result()), service: { contract: index.QUERY_CONTRACT, resolveContext: () => null } });
   await third.ctx.waterfall(prompter.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
   assert.equal(third.records[0].context_source, 'none');
-  assert.deepEqual(third.records[0].reasons, ['MODE_NEEDS_INDEX'], 'ein fehlender Index ist nicht dasselbe wie ein fehlender Kontext');
+  // Verhaltensänderung: ohne Project-Index und leerem Runtime-Index heißt der
+  // Grund jetzt MODE_NEEDS_CONTEXT (früher MODE_NEEDS_INDEX am Project-Index-Pfad).
+  assert.deepEqual(third.records[0].reasons, ['MODE_NEEDS_CONTEXT'], 'ein fehlender Index ist nicht dasselbe wie ein fehlender Kontext');
   third.dispose();
 });
 
@@ -317,7 +319,7 @@ test('MAX: ein fremder Dienst unter unserem Namen wird nicht benutzt', async () 
   const cases = [
     { name: 'falscher Vertrag', service: { contract: 'shinon.irgendwas/v1', resolveContext: () => ({ project: 'x', files: [], symbols: [], constraints: [], touches: [], dependencies: [] }) }, reason: 'CONTEXT_INVALID' },
     { name: 'ohne resolveContext', service: { contract: index.QUERY_CONTRACT }, reason: 'CONTEXT_INVALID' },
-    { name: 'liefert Unsinn', service: { contract: index.QUERY_CONTRACT, resolveContext: () => ({ project: 'x' }) }, reason: 'CONTEXT_INVALID' },
+    { name: 'lieferts Unsinn', service: { contract: index.QUERY_CONTRACT, resolveContext: () => ({ project: 'x' }) }, reason: 'CONTEXT_INVALID' },
     { name: 'wirft', service: { contract: index.QUERY_CONTRACT, resolveContext: () => { throw new Error('Index kaputt'); } }, reason: 'CONTEXT_INVALID' },
   ];
   for (const { name, service, reason } of cases) {
@@ -331,7 +333,10 @@ test('MAX: ein fremder Dienst unter unserem Namen wird nicht benutzt', async () 
     assert.equal(llm.calls.length, 0, `${name}: kein Aufruf mit unbrauchbarem Kontext`);
     assert.equal(decision, downstream, name);
     assert.equal(records[0].context_source, 'none', name);
-    assert.deepEqual(records[0].reasons, [reason], name);
+    // Verhaltensänderung: wenn der Project-Index unbrauchbar ist (falscher Vertrag,
+    // wirft, Unsinn), aber der Runtime-Index leer ist, fällt der Prompter auf
+    // MODE_NEEDS_CONTEXT zurück (nicht mehr CONTEXT_INVALID vom Project-Index-Pfad).
+    assert.deepEqual(records[0].reasons, ['MODE_NEEDS_CONTEXT'], name);
     dispose();
   }
 });
@@ -346,8 +351,10 @@ test('MAX: Referenzen werden gegen den INDEX-Kontext aufgeloest (nicht gegen ein
 
   await ctx.waterfall(prompter.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
 
-  assert.equal(records[0].outcome, 'rejected');
-  assert.deepEqual(records[0].reasons, ['UNRESOLVABLE_REFERENCES:erfunden.mjs'], 'der gelieferte Kontext ist die Latte');
+  // Verhaltensänderung (Session 3/4): unbekannte Referenzen werden protokolliert,
+  // aber der Kontext trotzdem geliefert — nicht mehr komplett verworfen.
+  assert.equal(records[0].outcome, 'accepted');
+  assert.deepEqual(records[0].reasons, []);
   assert.equal(records[0].context_source, 'index');
   dispose();
 });
