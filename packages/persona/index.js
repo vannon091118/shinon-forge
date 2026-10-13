@@ -321,6 +321,50 @@ export function renderTendency(contract, tone) {
   ].join('\n');
 }
 
+/**
+ * Die Naht zur Narrative Engine (Zug 6) — Kanal- und Vertragsname als LITERAL.
+ *
+ * Warum als Literal und nicht als Import: Pakete dieses Repos duerfen einander zur
+ * Laufzeit nicht importieren (jedes Bundle reist eigenstaendig). Der Besitzer der
+ * beiden Namen ist `@shinon/narrative`; Drift kann deshalb nicht landen, weil
+ * `scripts/lib/repo.mjs` die Zwillinge prueft (SOURCE_TWINS, kind `literals`) —
+ * dieselbe Bauform wie bei den Markern und der Token-Anzeige.
+ */
+export const NARRATIVE_CHANNEL = 'shinon/narrative/state';
+export const NARRATIVE_CONTRACT = 'shinon.narrative/v1';
+
+/**
+ * Den Composite der Narrative Engine als System-Abschnitt rendern.
+ *
+ * Die Beschriftung steht im Vertrag (`narrative.fields`), nicht im Code: ein
+ * neues Feld ist zuerst eine Datenzeile. Was der Composite nicht traegt, wird
+ * ausgelassen; ein Composite ohne darstellbares Feld ergibt `null` — dann faellt
+ * der Abschnitt weg, statt leer dazustehen (dieselbe Ehrlichkeit wie beim Ton).
+ *
+ * Die Persona BEHAUPTET hier nichts: der Abschnitt ist als gelesene Interpretation
+ * ausgewiesen, und der eigene Zustand (stance/mood) bleibt daneben unveraendert
+ * maßgeblich.
+ */
+export function renderNarrative(contract, composite) {
+  if (composite === null || typeof composite !== 'object' || Array.isArray(composite)) return null;
+  const rule = contract?.narrative;
+  if (rule === undefined || rule === null) return null;
+  const labels = rule.fields ?? {};
+  const lines = [];
+  for (const [key, label] of Object.entries(labels)) {
+    const value = composite[key];
+    if (value === undefined || value === null || value === '') continue;
+    lines.push(`- ${label}: ${String(value)}`);
+  }
+  if (lines.length === 0) return null;
+  const header = typeof rule.heading === 'string' && rule.heading !== '' ? rule.heading : '## Narrative Lage';
+  const origin =
+    typeof rule.authority === 'string' && rule.authority !== ''
+      ? `Quelle: ${NARRATIVE_CONTRACT} (authority ${rule.authority} — Interpretation, nicht Autorität)`
+      : null;
+  return [header, '', ...(origin === null ? [] : [origin, '']), ...lines].join('\n');
+}
+
 /** Den Zustandsblock aus einem gerenderten Kontext zurücklesen (Verbraucher + Tests). */
 // TODO: [DSH-Refactor] - Text-Round-Trip als API: der Zustand wird gerendert, um ihn per
 // Regex aus dem Markdown wieder einzulesen. Die Regex bindet die Funktion an die exakte
@@ -562,6 +606,11 @@ export function apply(ctx, config) {
   // im Gespräch wieder in die Abfrage-Haltung zurückkippt.
   let lastTrigger = null;
   let renderTrigger = () => {};
+  // Der zuletzt GELESENE Composite der Narrative Engine. Er ist kein Zustandsfeld
+  // der Persona: die sechs Felder in STATE_FIELDS bleiben die Wahrheit dieser
+  // Schicht, der Composite steht daneben als gelesene Interpretation.
+  let lastNarrative = null;
+  let renderNarrativeSection = () => {};
   const persona = createPersonaState(contract, {
     onChange: () => renderPrompt(),
   });
@@ -650,12 +699,26 @@ export function apply(ctx, config) {
           ? null
           : sp.section({ name: 'shinon:identity-trigger', order: atPrefix + 4, text: renderTriggerContext(lastTrigger) });
       };
+      // Der narrative Abschnitt wird bei jedem gelesenen Composite neu gesetzt —
+      // nicht bei jeder Zustandsaenderung der Persona: die beiden Quellen sind
+      // unabhaengig, und der Abschnitt faellt WEG, wenn es keinen Composite gibt.
+      let narrativeSectionDisposer = null;
+      renderNarrativeSection = () => {
+        if (typeof narrativeSectionDisposer === 'function') narrativeSectionDisposer();
+        narrativeSectionDisposer = null;
+        const narrativeText = renderNarrative(contract, lastNarrative);
+        if (narrativeText !== null) {
+          narrativeSectionDisposer = sp.section({ name: 'shinon:narrative-arc', order: atSuffix - 4, text: narrativeText });
+        }
+      };
       renderPrompt();
       renderTrigger();
+      renderNarrativeSection();
       disposers.push(() => {
         if (typeof stateDisposer === 'function') stateDisposer();
         if (typeof tendencyDisposer === 'function') tendencyDisposer();
         if (typeof triggerDisposer === 'function') triggerDisposer();
+        if (typeof narrativeSectionDisposer === 'function') narrativeSectionDisposer();
       });
       return () => {
         for (const dispose of disposers) dispose();
@@ -663,7 +726,7 @@ export function apply(ctx, config) {
     });
 
     console.log(
-      `[shinon-persona] ${sections.length + 1} Prompt-Abschnitte registriert (inkl. Zustand; Tendenz zusaetzlich, wenn das Scoring einen Ton liefert)`,
+      `[shinon-persona] ${sections.length + 1} Prompt-Abschnitte registriert (inkl. Zustand; Tendenz zusaetzlich, wenn das Scoring einen Ton liefert; Narrative-Lage zusaetzlich, wenn der Kanal ${NARRATIVE_CHANNEL} einen Composite liefert)`,
     );
   });
 
@@ -687,8 +750,23 @@ export function apply(ctx, config) {
   };
   const disposer = typeof ctx?.on === 'function' ? ctx.on(config.eventsChannel, handler) : () => {};
 
+  // ── Die Narrative Engine (Zug 6) ──────────────────────────────────────────
+  //
+  // Sie liest DIESELBEN Spines-Ereignisse und meldet ihren Composite auf einem
+  // EIGENEN Kanal. Bis hierher hatte das niemand abonniert: der Composite ging
+  // ins Leere. Die Persona hoert zu und rendert einen Abschnitt; sie uebernimmt
+  // den Composite NICHT in ihren Zustand (der eigene `mood` bleibt maßgeblich)
+  // und interpretiert ihn nicht um — der Abschnitt ist als gelesen ausgewiesen.
+  const narrativeDisposer = typeof ctx?.on === 'function'
+    ? ctx.on(NARRATIVE_CHANNEL, (composite) => {
+        lastNarrative = composite ?? null;
+        renderNarrativeSection();
+      })
+    : () => {};
+
   return () => {
     if (typeof disposer === 'function') disposer();
+    if (typeof narrativeDisposer === 'function') narrativeDisposer();
     console.log('[shinon-persona] Deaktiviert');
   };
 }

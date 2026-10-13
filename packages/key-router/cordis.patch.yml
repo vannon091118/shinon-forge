@@ -1,24 +1,25 @@
-# @shinon/key-router — Multi-API-Key Pool Rotation
+# @shinon/key-router — Multi-Schlüssel-Pool mit 429-Rotation
 #
 # Architektur:
-#   API-Key-Pool ──▶ Router Service ──▶ LLM Provider (override deepseek-official)
-#                       │
-#                       ▼
-#                 Bei 429 → nächster Key + Backoff
-#                       │
-#                       ▼
-#                 Eskalationszeiten pro Key (initial → maxDelayMs)
+#   Umgebung ──▶ Pool je Anbieter ──▶ Auswahl ──▶ Werkzeuge (status/rotate/probe)
+#                                                   │
+#                                                   ▼
+#                                         bei 429: Cooldown, dann nächster Platz
 #
-# Keys werden über Config oder DEEPSEEK_API_KEY Umgebungsvariable geladen.
-
+# Die Rechnung (Eskalation, Auswahl, Filtern) steht in `assets/pool-core.js` —
+# importfrei und damit in CI testbar (packages/key-router/test/).
+#
+# SCHLÜSSEL KOMMEN AUS DER UMGEBUNG, NIE AUS EINER DATEI.
+#
+# KEINE CONFIG HIER — die wirksamen Werte stehen in
+# `profiles/shinon/cordis.patch.yml`.
+#
+# Sie standen bis 2026-10-13 hier: `providers[].pool` (eine Liste, die
+# Schlüsselmaterial aufgenommen hätte) und `defaultKey`. BEIDE Felder sind weg —
+# nicht aus Ordnung, sondern weil eine Profildatei versioniert ist: ein
+# Schlüssel darin wäre ein Leck mit Ansage. Schlüssel kommen aus der Umgebung
+# (`envNames`, `envPrefix`), und das Schema dieses Pakets hat kein Feld für einen
+# Wert. `scripts/gate/tests/key-router-security.test.mjs` prüft das am Schema.
 - insert:
     - id: shinon-key-router
       name: '@shinon/key-router'
-      config:
-        providers:
-          - id: deepseek-official
-            pool: []
-            initialDelayMs: 2000
-            maxDelayMs: 60000
-            maxRetries: 5
-        defaultKey: ''

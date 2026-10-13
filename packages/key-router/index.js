@@ -1,320 +1,237 @@
 /**
- * @shinon/key-router — Multi-API-Key Pool mit 429-Rotation
+ * @shinon/key-router — Multi-API-Key-Pool mit 429-Rotation (Host-Hälfte).
  *
- * Architektur:
- *   Pool von API-Keys → Router Service → LLM Provider Override
- *   Bei 429: Key wird cooldown-basiert markiert, nächster Key wird probiert
- *   Eskalation: initialDelayMs → maxDelayMs mit exponentiellem Backoff
+ * ARCHITEKTUR
+ *   Umgebung ──▶ Pool (je Anbieter) ──▶ Auswahl ──▶ Werkzeuge
+ *                                            │
+ *                                            └─▶ Verbindungstest (Kopfzeilen)
+ *
+ * Beim 429 wird ein Platz gedeckelt (`initialDelayMs` → `maxDelayMs`,
+ * exponentiell); ein erfolgreicher Lauf baut die Schuld wieder ab. Die Rechnung
+ * steht in `assets/pool-core.js` — importfrei und damit in CI testbar; `index.js`
+ * ist die Naht zum Lauf (Umgebung, Werkzeuge, Log).
+ *
+ * DER SICHERHEITSVERTRAG (drei Zusagen, jede an einer Stelle prüfbar):
+ *
+ *   1. DAS SCHEMA TRÄGT KEIN SCHLÜSSELFELD. Eine Profildatei ist versioniert;
+ *      ein Schlüssel darin wäre ein Leck mit Ansage. Die Namen kommen aus der
+ *      Umgebung (`envNames`, `envPrefix`) — nur die NAMEN stehen in der Config.
+ *   2. NACH AUSSEN GEHT NUR DIE BESCHRIFTUNG DES PLATZES (`key#1`, `key#2`),
+ *      niemals ein Präfix des Schlüssels. Der Grund ist gemessen: was ein
+ *      Werkzeug zurückgibt, landet im Kontext des Modells und in der
+ *      Sitzungstranskription. Ein „Präfix zur Wiedererkennung" ist dort ein
+ *      Leck, kein Komfort — Schlüsselmaterial ist ganz oder gar nicht geheim.
+ *      (Der Zustand VOR dieser Änderung gab `key.slice(0, 8) + '…'` aus drei
+ *      Werkzeugen und in jede Log-Zeile.)
+ *   3. JEDER LOG-EINTRAG GEHT DURCH `redact(...)`. Ein Fehlerobjekt kann den
+ *      Eingabewert tragen; die Umgebungsvariable kann in einer Meldung stehen.
+ *      Damit ist die Zusage eine Funktion und keine Absicht.
+ *
+ * WAS DIESES PAKET NICHT TUT (offen, nicht behauptet): es setzt KEINE LLM-Route
+ * um. Der Provider-Override (DSH einen rotierenden Schlüssel zu geben) fehlt; die
+ * 429-Ereignisse des Laufes abonnierte die alte Fassung über zwei Ereignisnamen
+ * (`llm/error`, `llm/response`), für die es im Baum keinen Emitter gibt — ein
+ * Zuhörer ohne Sender ist eine Behauptung. Entfernt, benannt, nachzuholen: siehe
+ * PLAN.md.
  */
 
-import { createRequire } from 'node:module';
+import z from '@deepseek-ai/schemastery';
 
-const require = createRequire(import.meta.url);
+import {
+  authHeaders,
+  buildEntries,
+  buildProbeRequest,
+  keysFromEnv,
+  markFailed,
+  nextEntry,
+  probeResult,
+  redact,
+  resetSuccess,
+  statusOf,
+} from './assets/pool-core.js';
 
-let z;
-try {
-  z = require('@deepseek-ai/schemastery');
-} catch {
-  // Fallback: minimal schema API für Test-/Offline-Betrieb
-  const makePrimitive = (type) => {
-    const fn = () => {
-      const schema = { type };
-      schema.min = () => schema;
-      schema.max = () => schema;
-      schema.default = (d) => ({ ...schema, default: d });
-      return schema;
-    };
-    return fn;
-  };
-  z = {
-    object: (shape) => {
-      const schema = { shape };
-      schema.default = (d) => ({ ...schema, default: d });
-      return schema;
-    },
-    string: makePrimitive('string'),
-    number: makePrimitive('number'),
-    boolean: makePrimitive('boolean'),
-    array: (item) => {
-      const schema = { type: 'array', item };
-      schema.min = () => schema;
-      schema.max = () => schema;
-      schema.default = (d) => ({ ...schema, default: d });
-      return schema;
-    },
-    union: () => ({}),
-    const: () => ({}),
-  };
-}
-
-// ── Config Schema ─────────────────────────────────────────────────────────────
+/** Das Protokoll des Anbieters — zwei Spielarten, mehr gibt es nicht. */
+export const PROTOCOLS = ['openai-compatible', 'anthropic'];
 
 export const Config = z.object({
   providers: z.array(z.object({
     id: z.string(),
-    pool: z.array(z.string()).default([]),
+    /** Leer heisst: kein Verbindungstest möglich (fail-closed mit Meldung). */
+    baseUrl: z.string().default(''),
+    protocol: z.union([z.const('openai-compatible'), z.const('anthropic')]).default('openai-compatible'),
+    /** Die Modelle, die dieser Anbieter führen soll — leer heisst „frag ihn selbst". */
+    models: z.array(z.string()).default([]),
+    /** Pfad der Modellliste (Verbindungstest). */
+    probePath: z.string().default('/models'),
+    /** Ausdrückliche Umgebungsnamen, in dieser Reihenfolge. */
+    envNames: z.array(z.string()).default([]),
+    /** Sammelt zusätzlich `<prefix>` und `<prefix>_*` (Standard: DEEPSEEK_API_KEY). */
+    envPrefix: z.string().default(''),
     initialDelayMs: z.number().min(500).max(60000).default(2000),
     maxDelayMs: z.number().min(5000).max(300000).default(60000),
     maxRetries: z.number().min(1).max(20).default(5),
   })).default([{
     id: 'deepseek-official',
-    pool: [],
+    baseUrl: '',
+    protocol: 'openai-compatible',
+    models: [],
+    probePath: '/models',
+    envNames: [],
+    envPrefix: 'DEEPSEEK_API_KEY',
     initialDelayMs: 2000,
     maxDelayMs: 60000,
     maxRetries: 5,
   }]),
-  defaultKey: z.string().default(''),
 });
 
-// ── Key Pool State ────────────────────────────────────────────────────────────
+// ── Der Zustand: ein Pool je Anbieter, im Prozess ─────────────────────────────
 
-/**
- * @typedef {object} KeyEntry
- * @property {string} key - Der eigentliche API-Key
- * @property {number} failCount - Anzahl der 429-Fails
- * @property {number} lastFailAt - Timestamp des letzten Fails
- * @property {number} cooldownUntil - Zeitpunkt ab dem Key wieder verwendbar
- */
-
-/** @type {Map<string, KeyEntry[]>} */
+/** @type {Map<string, Array<{key: string, label: string, failCount: number, lastFailAt: number, cooldownUntil: number}>>} */
 const keyPools = new Map();
+/** @type {Map<string, string>} Der zuletzt benutzte Platz je Anbieter (Ausweis, kein Schlüssel). */
+const activeLabels = new Map();
 
-/**
- * Lade Keys aus Config + Environment.
- */
-function buildPool(providerConfig, defaultKey) {
-  const pool = [...providerConfig.pool];
+/** Uhr und Zufall als Argumente — die Rechnung bleibt nachrechenbar (siehe pool-core.js). */
+const now = () => Date.now();
 
-  // Default-Key aus Env hinzufügen wenn vorhanden
-  if (defaultKey && defaultKey.length > 0 && !pool.includes(defaultKey)) {
-    pool.push(defaultKey);
-  }
+/** Alle Schlüsselwerte dieses Prozesses — die Liste, die `redact` bekommt. */
+function allSecrets() {
+  const secrets = [];
+  for (const pool of keyPools.values()) for (const entry of pool) secrets.push(entry.key);
+  return secrets;
+}
 
-  // Environment-Variable DEEPSEEK_API_KEY als Fallback
-  const envKey = process.env.DEEPSEEK_API_KEY;
-  if (envKey && envKey.length > 0 && !pool.includes(envKey)) {
-    pool.push(envKey);
-  }
+/** Eine Zeile ins Log — immer durch den Filter. */
+function say(text) {
+  console.log(redact(text, allSecrets()));
+}
 
-  // Evtl. weitere DEEPSEEK_API_KEY_* Variablen
-  for (const [key, value] of Object.entries(process.env)) {
-    if (key.startsWith('DEEPSEEK_API_KEY_') && value && !pool.includes(value)) {
-      pool.push(value);
-    }
-  }
+function warn(text) {
+  console.warn(redact(text, allSecrets()));
+}
 
-  // Duplikate entfernen und KeyEntries bauen
-  const entries = [...new Set(pool)].map((key) => ({
-    key,
-    failCount: 0,
-    lastFailAt: 0,
-    cooldownUntil: 0,
+/** Den Anbieter-Eintrag der Config suchen (die Werkzeuge kennen nur die id). */
+function providerOf(config, providerId) {
+  return config.providers.find((provider) => provider.id === providerId) ?? null;
+}
+
+/** Einen Pool aus der Umgebung bauen. Leer ist ein Befund, kein Fehler. */
+function loadPool(providerConfig, env) {
+  const entries = buildEntries(keysFromEnv(env, {
+    names: providerConfig.envNames,
+    prefix: providerConfig.envPrefix,
   }));
-
-  return entries;
+  if (entries.length > 0) keyPools.set(providerConfig.id, entries);
+  return entries.length;
 }
 
-/**
- * Berechne Backoff-Delay für einen Key basierend auf Fail-Count.
- */
-function calcBackoff(failCount, initialDelayMs, maxDelayMs) {
-  const exponential = Math.min(initialDelayMs * Math.pow(2, failCount), maxDelayMs);
-  // Jitter hinzufügen (bis zu ±25%)
-  const jitter = exponential * 0.5 * (Math.random() - 0.5);
-  return Math.max(100, Math.min(maxDelayMs, exponential + jitter));
-}
+// ── Werkzeuge ─────────────────────────────────────────────────────────────────
 
-/**
- * Markiere Key als 429-failing.
- */
-function markKeyFailed(providerId, key, initialDelayMs, maxDelayMs) {
-  const pool = keyPools.get(providerId);
-  if (!pool) return null;
-
-  const entry = pool.find((e) => e.key === key);
-  if (!entry) return null;
-
-  entry.failCount += 1;
-  entry.lastFailAt = Date.now();
-
-  const delay = calcBackoff(entry.failCount - 1, initialDelayMs, maxDelayMs);
-  entry.cooldownUntil = Date.now() + delay;
-
-  return { ...entry, delay };
-}
-
-/**
- * Hole nächsten verfügbaren Key aus dem Pool.
- */
-function getNextKey(providerId, forceRotate = false) {
-  const pool = keyPools.get(providerId);
-  if (!pool || pool.length === 0) return null;
-
-  const now = Date.now();
-
-  if (forceRotate) {
-    // Force-Rotate: nimm den ersten verfügbaren oder den mit niedrigstem Fail-Count
-    const available = pool.filter((e) => e.cooldownUntil <= now);
-    if (available.length === 0) {
-      // Alle im Cooldown — nimm den mit dem frühesten cooldownUntil
-      return pool.reduce((a, b) => a.cooldownUntil < b.cooldownUntil ? a : b);
-    }
-    return available.reduce((a, b) => a.failCount <= b.failCount ? a : b);
-  }
-
-  // Normal: nimm Key mit niedrigstem Fail-Count der verfügbar ist
-  const available = pool.filter((e) => e.cooldownUntil <= now);
-  if (available.length === 0) {
-    // Alle im Cooldown — warte auf den frühesten
-    return pool.reduce((a, b) => a.cooldownUntil < b.cooldownUntil ? a : b);
-  }
-  return available.reduce((a, b) => a.failCount <= b.failCount ? a : b);
-}
-
-/**
- * Prüfe ob alle Keys im Cooldown sind.
- */
-function allKeysCoolingDown(providerId) {
-  const pool = keyPools.get(providerId);
-  if (!pool || pool.length === 0) return true;
-  return pool.every((e) => e.cooldownUntil > Date.now());
-}
-
-/**
- * Reset failCount für einen Key (nach erfolgreichem Request).
- */
-function resetKeySuccess(providerId, key) {
-  const pool = keyPools.get(providerId);
-  if (!pool) return;
-
-  const entry = pool.find((e) => e.key === key);
-  if (entry) {
-    entry.failCount = Math.max(0, entry.failCount - 1);
-    entry.cooldownUntil = 0;
-  }
-}
-
-/**
- * Erhalte Pool-Status für UI.
- */
-function getPoolStatus(providerId) {
-  const pool = keyPools.get(providerId);
-  if (!pool) return { total: 0, available: 0, cooling: 0, keys: [] };
-
-  const now = Date.now();
-  return {
-    total: pool.length,
-    available: pool.filter((e) => e.cooldownUntil <= now).length,
-    cooling: pool.filter((e) => e.cooldownUntil > now).length,
-    keys: pool.map((e) => ({
-      key: e.key.slice(0, 8) + '…',
-      failCount: e.failCount,
-      cooldownUntil: e.cooldownUntil > now ? e.cooldownUntil - now : 0,
-    })),
-  };
-}
-
-// ── Tools ─────────────────────────────────────────────────────────────────────
-
-const rotateKeyTool = {
+const rotateTool = {
   name: 'key_router_rotate',
-  description: 'Erzwinge Key-Rotation für einen Provider. Nützlich bei anhaltenden 429s.',
+  description: 'Rotiert den aktiven API-Schlüssel eines Anbieters (nützlich bei anhaltenden 429). Gibt den Poolplatz zurück, nie einen Schlüssel.',
   parameters: z.object({
     providerId: z.string(),
     force: z.boolean().default(true),
   }),
   execute(params) {
-    const key = getNextKey(params.providerId, params.force);
-    if (!key) return { ok: false, error: `Kein Key für Provider ${params.providerId}` };
-    return { ok: true, providerId: params.providerId, activeKey: key.key.slice(0, 8) + '…', poolStatus: getPoolStatus(params.providerId) };
+    const pool = keyPools.get(params.providerId);
+    if (!pool || pool.length === 0) return { ok: false, error: `Kein Pool für Anbieter ${params.providerId}` };
+    const entry = nextEntry(pool, now(), params.force, activeLabels.get(params.providerId) ?? null);
+    if (entry === null) return { ok: false, error: `Kein Platz für Anbieter ${params.providerId}` };
+    activeLabels.set(params.providerId, entry.label);
+    return { ok: true, providerId: params.providerId, active: entry.label, pool: statusOf(pool, now(), entry.label) };
   },
 };
 
-const poolStatusTool = {
+const statusTool = {
   name: 'key_router_status',
-  description: 'Zeige Status aller Key-Pools.',
+  description: 'Zeigt alle Key-Pools: Anzahl, Plätze, Fehlschläge und Cooldowns. Enthält keine Schlüssel.',
   parameters: z.object({}),
   execute() {
-    const statuses = {};
-    for (const [id, pool] of keyPools) {
-      statuses[id] = getPoolStatus(id);
-    }
-    return { ok: true, pools: statuses };
+    const pools = {};
+    for (const [id, pool] of keyPools) pools[id] = statusOf(pool, now(), activeLabels.get(id) ?? null);
+    return { ok: true, pools };
   },
 };
 
-const addKeyTool = {
-  name: 'key_router_add',
-  description: 'Füge einen API-Key zum Pool hinzu.',
+const probeTool = {
+  name: 'key_router_probe',
+  description: 'Verbindungstest eines Anbieters: fragt seine Modellliste ab. Meldet Status und Modelle, nie den Schlüssel.',
   parameters: z.object({
     providerId: z.string(),
-    key: z.string(),
+    model: z.string().default(''),
   }),
-  execute(params) {
-    const providerConfig = Config.shape.providers?.default?.[0];
-    if (!providerConfig) return { ok: false, error: 'Kein Provider konfiguriert' };
-
-    const pool = keyPools.get(params.providerId) || [];
-    if (pool.find((e) => e.key === params.key)) {
-      return { ok: false, error: 'Key bereits im Pool' };
+  async execute(params) {
+    const provider = providerOf(probeTool.config, params.providerId);
+    if (provider === null) return { ok: false, error: `Unbekannter Anbieter ${params.providerId}` };
+    if (provider.baseUrl === '') return { ok: false, error: `Anbieter ${params.providerId} hat keine baseUrl — kein Verbindungstest möglich` };
+    const pool = keyPools.get(params.providerId);
+    if (!pool || pool.length === 0) return { ok: false, error: `Kein Pool für Anbieter ${params.providerId}` };
+    const entry = nextEntry(pool, now(), false, activeLabels.get(params.providerId) ?? null);
+    if (typeof globalThis.fetch !== 'function') return { ok: false, error: 'fetch fehlt — Verbindungstest nicht möglich' };
+    const request = buildProbeRequest(provider, entry.key, '/models');
+    try {
+      const response = await globalThis.fetch(request.url, { method: request.method, headers: request.headers });
+      const result = await probeResult(response, allSecrets());
+      if (result.ok !== true) {
+        markFailed(entry, now(), provider.initialDelayMs, provider.maxDelayMs);
+        return { ok: false, providerId: params.providerId, status: result.status, detail: result.detail, active: entry.label };
+      }
+      resetSuccess(entry);
+      return {
+        ok: true,
+        providerId: params.providerId,
+        active: entry.label,
+        status: result.status,
+        models: result.models,
+        declared: provider.models,
+      };
+    } catch (error) {
+      markFailed(entry, now(), provider.initialDelayMs, provider.maxDelayMs);
+      // Ein Fehler kann die Anfrage tragen — durch den Filter, wie alles andere.
+      return { ok: false, providerId: params.providerId, detail: redact(error?.message ?? 'Netzfehler', allSecrets()) };
     }
-
-    pool.push({ key: params.key, failCount: 0, lastFailAt: 0, cooldownUntil: 0 });
-    keyPools.set(params.providerId, pool);
-
-    return { ok: true, providerId: params.providerId, activeKey: params.key.slice(0, 8) + '…' };
   },
 };
 
-// ── Export ─────────────────────────────────────────────────────────────────────
+/** Der Anbieter-Block, den `probeTool` liest — erst in `apply()` gesetzt. */
+probeTool.config = { providers: [] };
+
+// ── Anwendung ─────────────────────────────────────────────────────────────────
 
 export function apply(ctx, config) {
-  // Pools aufbauen
-  for (const providerConfig of config.providers) {
-    const entries = buildPool(providerConfig, config.defaultKey);
-    if (entries.length > 0) {
-      keyPools.set(providerConfig.id, entries);
-    }
+  probeTool.config = config;
+  keyPools.clear();
+  activeLabels.clear();
+
+  let keys = 0;
+  for (const providerConfig of config.providers) keys += loadPool(providerConfig, process.env);
+
+  const withoutPool = config.providers.filter((provider) => !keyPools.has(provider.id)).map((provider) => provider.id);
+  say(`[shinon-key-router] Aktiviert — ${keyPools.size} Anbieter, ${keys} Plätze`);
+  if (withoutPool.length > 0) {
+    // Fail-closed mit Meldung: kein Platz heisst kein Schlüssel, und der Grund
+    // steht im Log — nicht stumm (die alte Fassung loggte die Zeile nur, wenn
+    // überhaupt ein Pool entstand).
+    warn(`[shinon-key-router] ohne Schlüssel (Umgebung leer): ${withoutPool.join(', ')}`);
   }
 
-  console.log(`[shinon-key-router] Aktiviert — ${keyPools.size} Provider, ${[...keyPools.values()].reduce((s, p) => s + p.length, 0)} Keys`);
-
-  // Tools registrieren
-  ctx.tools.register(rotateKeyTool);
-  ctx.tools.register(poolStatusTool);
-  ctx.tools.register(addKeyTool);
-
-  // LLM-Routing hook: Bei 429-Key-Rotation
-  if (typeof ctx.on === 'function') {
-    ctx.on('llm/error', (event) => {
-      if (event?.error?.code === 'RATE_LIMIT' || event?.error?.status === 429) {
-        const providerId = event?.providerId ?? 'deepseek-official';
-        const currentKey = event?.apiKey?.slice(0, 8);
-        const pool = keyPools.get(providerId);
-        if (pool && pool.length > 1) {
-          const entry = pool.find((e) => e.key === event?.apiKey);
-          if (entry) {
-            const result = markKeyFailed(providerId, entry.key,
-              config.providers.find((p) => p.id === providerId)?.initialDelayMs ?? 2000,
-              config.providers.find((p) => p.id === providerId)?.maxDelayMs ?? 60000
-            );
-            if (result) {
-              console.log(`[shinon-key-router] 429 für Key ${entry.key.slice(0,8)}… → Cooldown ${result.delay}ms`);
-            }
-          }
-        }
-      }
-    });
-
-    ctx.on('llm/response', (event) => {
-      if (event?.providerId && event?.apiKey) {
-        resetKeySuccess(event.providerId, event.apiKey);
-      }
-    });
-  }
+  // Werkzeug-Registrierung über `inject`: ein direkter Dienst-Zugriff wirft am
+  // Cordis-Proxy ohne Deklaration — genau der Fehler, der die Client-Hälften
+  // schon einmal die Aktivierung gekostet hat.
+  ctx.inject(['tools'], (child) => {
+    child.tools.register(rotateTool);
+    child.tools.register(statusTool);
+    child.tools.register(probeTool);
+  });
 
   return () => {
+    const count = keyPools.size;
     keyPools.clear();
-    console.log('[shinon-key-router] Deaktiviert');
+    activeLabels.clear();
+    say(`[shinon-key-router] Deaktiviert — ${count} Pools geleert`);
   };
 }
+
+export { authHeaders };

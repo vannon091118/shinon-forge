@@ -98,6 +98,23 @@ export const PRE_STEP_EVENT = 'agent/pre-step';
 export const DECISION_CHANNEL = 'shinon/prompter/decision';
 
 /**
+ * Die Naht zur Narrative Engine (Zug 6) — Kanal- und Vertragsname als LITERAL.
+ *
+ * Warum als Literal: kein Paket dieses Repos importiert ein anderes zur Laufzeit
+ * (jedes Bundle reist eigenstaendig). Der Besitzer der beiden Namen ist
+ * `@shinon/narrative`; Drift kann deshalb nicht landen, weil `scripts/lib/repo.mjs`
+ * die Zwillinge prueft (SOURCE_TWINS, kind `literals`).
+ *
+ * WARUM DER STAND UND NICHT DER MAX-KONTEXT: der MAX-Kontext ist ein validierter
+ * INPUT (`ContextSchema`, aus der Datei oder dem Project Index) — ihn um ein Feld
+ * zu erweitern waere eine Vertragsaenderung. Der Stand dagegen IST "was Shinon
+ * ueber sich weiss", wird je Schritt gebaut und geht als eigener Block in den
+ * MAX-Request. Der Arc gehoert genau dorthin.
+ */
+export const NARRATIVE_CHANNEL = 'shinon/narrative/state';
+export const NARRATIVE_CONTRACT = 'shinon.narrative/v1';
+
+/**
  * Die Abfrage-Faehigkeit des Project Index (Plan §14/§17).
  *
  * `ctx.get(INDEX_SERVICE)` und KEIN `inject`: der Enhancer soll auch in einem
@@ -739,6 +756,11 @@ export function standFor(config, runtime, promptText, context, toneState = null)
   const tone = toneState?.tone ?? null;
   const stance = typeof tone?.stance === 'string' ? tone.stance : null;
   const tendencies = Array.isArray(tone?.tendencies) ? tone.tendencies : [];
+  // Die Narrative-Lage (Zug 6): der zuletzt GELESENE Composite. Sie kommt aus dem
+  // Ereignis, nicht aus einem Dienst — die Narrative Engine hat genau EINEN
+  // Ausgang, und ein zweiter Leseweg waere ein zweiter Ausgang. Fehlt der
+  // Composite, faellt das Element weg (nichts behauptet).
+  const narrative = typeof runtime?.narrative === 'object' && runtime.narrative !== null ? runtime.narrative : null;
 
   // Zwei Gruende, in dieser Reihenfolge: abgeschaltet ist eine Entscheidung,
   // fehlende Regeln sind ein Defekt. Ohne Regeln kein Zettel — welche Marke
@@ -787,12 +809,21 @@ export function standFor(config, runtime, promptText, context, toneState = null)
     notes,
     skills: skillRead.loaded,
     skillsContract: SKILL_RULES_CONTRACT,
+    narrative,
+    narrativeContract: NARRATIVE_CONTRACT,
   });
 
   return {
     block,
     stance,
     tendencies,
+    narrative: narrative === null
+      ? null
+      : {
+          arc_id: narrative.arc_id ?? null,
+          narrator: narrative.narrator ?? null,
+          relationship_state: narrative.relationship_state ?? null,
+        },
     tone: toneState?.source ?? 'none',
     thema: notes.map((note) => note.thema),
     skills: skillRead.loaded.map((skill) => skill.name),
@@ -817,6 +848,9 @@ export function standTrace(stand) {
     stance: stand.stance,
     tone: stand.tone,
     tendencies: stand.tendencies.map((entry) => `${entry.klasse} ${entry.stufe}`),
+    // Die Narrative-Lage ohne Fliesstext: der Datensatz reist als Ereignis durch
+    // den Host, ein Prompt-Block hat dort nichts zu suchen.
+    narrative: stand.narrative ?? null,
     notes: { loaded: stand.thema, skipped: stand.skipped.length, reasons, reason: stand.reason },
     skills: {
       loaded: stand.skills ?? [],
@@ -1731,8 +1765,16 @@ export function apply(ctx, config) {
   }
 
   assertVocabulary('context state', contextState, CONTEXT_STATES);
-  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules };
+  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules, narrative: null };
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
+
+  // Die Narrative Engine (Zug 6): sie meldet ihren Composite auf einem eigenen
+  // Kanal. Der Veredler HOERT ZU und legt ihn in seinen Stand — bis hierher hatte
+  // den Kanal der Abnehmer im System-Prompt (die Persona), aber MAX wusste nichts
+  // vom laufenden Arc. Der Composite wird nur GELESEN und nicht umgedeutet.
+  const narrativeDispose = ctx.on(NARRATIVE_CHANNEL, (composite) => {
+    runtime.narrative = typeof composite === 'object' && composite !== null ? composite : null;
+  });
 
   const route = config.provider === '' || config.model === '' ? 'ohne Route (inaktiv)' : `${config.provider}/${config.model}`;
   const mode = resolveMode(config.mode);
@@ -1744,10 +1786,11 @@ export function apply(ctx, config) {
   const intentInfo = intentRules !== null
     ? `intent=${intentRules.patterns.length}Patterns`
     : 'intent=off';
-  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, ${route}, ${contextInfo}, ${notesInfo}, ${runtimeInfo}, ${intentInfo})`);
+  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, ${route}, ${contextInfo}, ${notesInfo}, ${runtimeInfo}, ${intentInfo}, narrative=${NARRATIVE_CHANNEL})`);
 
   return () => {
     if (typeof dispose === 'function') dispose();
+    if (typeof narrativeDispose === 'function') narrativeDispose();
     console.log('[shinon-prompter] Deaktiviert — Listener abgemeldet');
   };
 }

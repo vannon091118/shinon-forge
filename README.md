@@ -23,7 +23,7 @@
 
 ---
 
-> **Status:** current — Einstieg in das Repository. **Stand:** 2026-10-12
+> **Status:** current — Einstieg in das Repository. **Stand:** 2026-10-13
 > **Dokumentation:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 ---
@@ -150,20 +150,20 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 | **[@shinon/task-router](packages/task-router)** | liest die validierte Klassifikation des Enhancers | ✅ |
 | **[@shinon/project-index](packages/project-index)** | persistenter Projektindex (files, symbols, edges, FTS) außerhalb des Repos | ✅ |
 | **[@shinon/codingmon](packages/codingmon)** | Pet-/Kampf-System mit dauerhaftem Zustand und Client→Host-Naht | ✅ |
-| **[@shinon/key-router](packages/key-router)** | Key-Pool mit 429-Rotation und Eskalationszeiten | — |
+| **[@shinon/key-router](packages/key-router)** | Key-Pool mit 429-Rotation: Werkzeuge `key_router_status`/`key_router_rotate`/`key_router_probe`, Schlüssel **nur** aus der Umgebung, nach außen nur der Poolplatz (`key#1`) — der Provider-Override fehlt noch | ✅ |
 | **[@shinon/narrative](packages/narrative)** | Chronicle, Arcs, Relationships, Composite State (Zug 5 aktiviert) | ✅ |
 | **[@shinon/shinon-forge](packages/shinon-forge)** | Memory Sync, Global Runner, Engine Adapters | — |
 | **[@shinon/better-errors](packages/better-errors)** | Config-Ebene ohne Logik: `apply()` loggt nur | ✅ |
 | **[@shinon/token-usage](packages/token-usage)** | zeigt im Sidebar-Fuß die Token-Zahl des JÜNGSTEN Turns (aus dessen eigenen Ereignissen gefaltet, dieselbe Zahl wie DSHs Turn-Zeile) und im Titel daneben die Sitzungssumme (DSH-Sitzungs-Projektion `tokenUsage`, dieselbe Zahl wie DSHs Fußpille) | ✅ |
 | **[@shinon/openapi](packages/openapi)** | Vertrag (`openapi.yaml`) vorhanden, **kein** Server — bewusst nicht aktiviert | — |
-| **[@shinon/popup](packages/popup)** | zeigt Original/Ergebnis/Prozess im `conversation.composer.dock` | — |
+| **[@shinon/popup](packages/popup)** | Fortschritts-Overlay im `conversation.composer.dock`: faltet das Ereignisfenster der Sitzung (Schritt, offene Aufrufe, zuletzt benutztes Werkzeug) und übersetzt den Text aus `locale-de` | ✅ |
 
 Die Spalte „Profil“ ist gemessen aus `profiles/shinon/package.json` (Zahl: `docs/ZAHLEN.md` §1).
-Vier Pakete stehen nicht darin (`key-router`, `openapi`, `popup`,
-`shinon-forge`) — bei `openapi` ist das eine dokumentierte Entscheidung
-(`docs/ARCHITECTURE.md` §4); die übrigen tragen selbst
+**Zwei** Pakete stehen nicht darin (`openapi`, `shinon-forge`) — bei `openapi` ist das eine
+dokumentierte Entscheidung (`docs/ARCHITECTURE.md` §4), bei `shinon-forge` ein Verdikt
+(es startet fremde Engines; `PLAN.md` §3.12.1). Beide tragen selbst
 `"dsh": { "inactive": true }` im eigenen Manifest (`dead-package`-Gate).
-Alle 19 Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
+Alle 20 Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
 allein `dsh.profile.bundles` im Profil.
 
 ---
@@ -257,10 +257,13 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
   Einer ist Umgebungsarbeit (`schemastery` fehlt im Root, deshalb wird
   `codingmon-store` rot statt zu überspringen), einer ist ein bewusstes Verhalten
   (`message-ingress` verweigert die Zusage gegen eine ungeprüfte DSH-Fassung).
-- **Versionsangleich der Pakete** (16× `1.0.0`, 3× `0.1.0`) — deshalb meldet `doctor` Drift.
-- **Vier nicht aktivierte Pakete** (`key-router`, `openapi`, `popup`,
-  `shinon-forge`): entscheiden, ob sie ins Profil kommen. Alle vier sind gebaut und
-  laden im Distributionstest; keines ist vergessen, aber keines ist aktiv.
+- **Versionsangleich der Pakete**: die Zeile folgt aus dem eigenen Manifest (`dsh.inactive`
+  darf `0.1.0` führen, sonst `1.0.0`) — gemessen `19× 1.0.0, 1× 0.1.0`, `doctor` ist grün.
+- **Zwei nicht aktivierte Pakete** (`openapi`, `shinon-forge`): beide sind entschieden, nicht
+  vergessen — `openapi` hat einen Vertrag ohne Server, `shinon-forge` startet fremde Engines.
+  `key-router` und `popup` sind am 2026-10-13 aktiviert worden (Overlay bzw. Pool-Werkzeuge).
+  Offen bleibt am Key-Router der Provider-Override: er gibt DSH noch keinen rotierenden
+  Schlüssel an die Hand.
 - **Native App** (Stufe 1 scharf, 2–4 Konzept): [`docs/STARTER-PLAN.md`](docs/STARTER-PLAN.md).
 - **Belege nachziehen**, wo nur ältere Messungen existieren: `docs/probes/` nennt je
   Probe sein Datum.
@@ -273,9 +276,9 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 Shinon-forge/
 ├── packages/                  # jedes Paket = ein Ordner: @shinon/<ordner>  (Anzahl: docs/ZAHLEN.md §1)
 │   ├── core/ persona/ locale-de/ tooltip/ events/ hook/ markers/ dashboard/
-│   ├── prompter/ task-router/ project-index/ codingmon/ key-router/ narrative/
-│   ├── shinon-forge/ better-errors/ token-usage/
-│   └── openapi/ popup/        # bewusst nicht im Profil
+│   ├── prompter/ task-router/ project-index/ codingmon/ key-router/ narrative/ popup/
+│   ├── better-errors/ token-usage/
+│   └── openapi/ shinon-forge/ # bewusst nicht im Profil (Entscheidung bzw. Verdikt)
 ├── profiles/
 │   ├── shinon/                # kanonisches Profil (dsh.profile.bundles, cordis.patch.yml)
 │   ├── headless/              # One-shot-Profil (Modell-Route)

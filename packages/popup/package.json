@@ -15,7 +15,6 @@
     "@deepseek-ai/schemastery": "~3.18.4"
   },
   "dsh": {
-    "inactive": true,
     "bundle": {
       "patch": "./cordis.patch.yml"
     },

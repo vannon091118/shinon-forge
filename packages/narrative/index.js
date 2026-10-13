@@ -36,6 +36,16 @@ import { advance, initialState } from './assets/narrative-core.js';
  *      gebunden (Cordis bietet `provide`, nicht `set`) und hatte keinen Leser.
  *      Was niemand liest, wird nicht angeboten — der Composite geht als Ereignis
  *      `shinon/narrative/state` raus, und das ist der geprüfte Weg.
+ *   5. ZUG 6 — DER LESER IST DA: bis dahin hatte den Kanal niemand abonniert, der
+ *      Composite ging ins Leere (die Engine rechnete, aber niemand sah es). Die
+ *      Persona hoert jetzt auf `STATE_CHANNEL` und rendert daraus ihren Abschnitt
+ *      `shinon:narrative-arc`. Sie uebernimmt den Composite NICHT in ihren eigenen
+ *      Zustand (dessen `mood` bleibt maßgeblich) — der Vertrag sagt `authority:
+ *      NONE`, und ein Abschnitt, der eine Interpretation als Tatsache ausgibt,
+ *      waere genau der Fehler, den `authority` verhindern soll. Kanalname und
+ *      Vertragsname sind auf beiden Seiten LITERALE; die Gleichheit pinnt
+ *      `scripts/lib/repo.mjs` (SOURCE_TWINS) plus
+ *      `scripts/gate/tests/narrative.test.mjs`.
  *
  * Die reinen Funktionen (Mood-Tabelle, Anti-Wiederholung, Arc, Relationship,
  * Composite, Chronik) liegen in `assets/narrative-core.js` — ohne Imports, damit

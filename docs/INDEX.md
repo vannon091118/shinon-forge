@@ -1,6 +1,6 @@
 # Dokumentation — Einstieg und Statusregel
 
-> **Status:** current — **einziger Einstieg** in die Dokumentation. **Stand:** 2026-10-09
+> **Status:** current — **einziger Einstieg** in die Dokumentation. **Stand:** 2026-10-13
 > **Zahlen:** `docs/ZAHLEN.md` (einziger Eigentümer harter Zahlen)
 
 ## 1. Womit man anfängt
@@ -53,11 +53,11 @@ gilt nicht als Nachmessung.
 
 | Dokument | Status | Stand | Zweck |
 |---|---|---|---|
-| [`README.md`](../README.md) | current | 2026-10-09 | Einstieg, Paketübersicht, Projektstatus |
+| [`README.md`](../README.md) | current | 2026-10-13 | Einstieg, Paketübersicht, Projektstatus |
 | [`AGENTS.md`](../AGENTS.md) | current | 2026-10-09 | Arbeitsregeln für Agenten |
-| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-09 | Namespace-, Paket- und Profilkonventionen |
+| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-13 | Namespace-, Paket- und Profilkonventionen; §5 führt den Lebenszyklus von `.shinon/` |
 | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) | current | 2026-10-08 | Commit-Regeln und ihre Durchsetzung |
-| [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-11 | alle harten Zahlen + Befehle |
+| [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-13 | alle harten Zahlen + Befehle |
 | [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) | plan | 2026-10-08 | native App: Stufe 1 scharf, 2–4 Konzept |
 | [`IDEA.md`](../IDEA.md) | plan | 2026-10-07 | rohe Ideensammlung (ohne Überschriftenstruktur) |
 | geplant: starter/README.md (noch nicht existierend, deshalb kein Pfad) | plan | 2026-10-08 | Tauri-Shell (Stufe 2) — gebaut wird nach [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) |
@@ -70,7 +70,7 @@ gilt nicht als Nachmessung.
 | [`docs/legacy-goose-prompts/`](legacy-goose-prompts/) (10 Dateien) | imported | — | übernommene Goose-Prompts |
 | [`packages/narrative/README.md`](../packages/narrative/README.md) | current | 2026-10-10 | Paket-Doku Narrative Engine |
 | [`packages/shinon-forge/README.md`](../packages/shinon-forge/README.md) | current | 2026-10-10 | Paket-Doku Shinon Forge |
-| [`PLAN.md`](../PLAN.md) | plan | 2026-10-11 | Umsetzungsplan des Umbaus (jeder Schritt trägt seinen eigenen Status) |
+| [`PLAN.md`](../PLAN.md) | plan | 2026-10-13 | Umsetzungsplan des Umbaus (jeder Schritt trägt seinen eigenen Status; §3.12 trägt den Nachtrag zur Aktivierung von `popup` und `key-router` und den einen offenen Faden, §3.12.1 das Verdikt zu `shinon-forge`) |
 | [`docs/SCORING-KONZEPT.md`](SCORING-KONZEPT.md) | plan | 2026-10-11 | Scoring-Konzept: K1–K4 als Ist, K5–K8 als Ziel — implizite Signale (Zug 1: native interne Quellen aus dem DSH-Verlauf, kein Browser), Dauerhaftigkeit über die SQLite des Projekt-Index (Zug 2, §2.5), Vorlieben-Trennung, taktische/Master Skills, ohne Deckel |
 | [`LICENSE`](../LICENSE) | current | 2026-10-11 | eigene Lizenz (MIT, `Copyright (c) 2026 Vannon`) — kein Markdown, deshalb ohne Statusblock |
 | [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) | current | 2026-10-11 | Fremdhinweise, getrennt vom eigenen Copyright (A12) |

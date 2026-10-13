@@ -1,13 +1,20 @@
+# KEINE CONFIG HIER — die wirksamen Werte stehen in
+# `profiles/shinon/cordis.patch.yml`:
+#
+#   enabled             true                        der Listener wird registriert
+#   slotName            'conversation.composer.dock' wo das Overlay haengt
+#   trigger             'user/message'              welches Signal einen Eintrag ausloest
+#   trajectoryChannel   'shinon/trajectory'         Kanal der Host-Eintraege
+#
+# Sie standen bis 2026-10-13 hier — wortgleich mit den Schema-Defaults des
+# Pakets und damit wirkungslos: eine id-gezielte Config im Profil ERSETZT die
+# Config des Bundle-Eintrags, sie mischt nicht. `profile-config-override` in
+# scripts/gate/tests/ lehnt diese Doppelung fuer jede id ab.
+#
+# Ohne Profil-Config gilt der Schema-Default des Pakets. Genau einen Wert darf
+# das Profil nicht mehr ändern: `slotName` — die Client-Hälfte kann den Slot nicht
+# importieren und traegt ihn als Literal (`DEFAULT_SLOT` in index.js ist der
+# Besitzer, geprueft von scripts/lib/repo.mjs).
 - insert:
     - id: shinon-popup
       name: '@shinon/popup'
-      config:
-        enabled: true
-        slotName: 'conversation.composer.dock'
-        trigger: 'user/message'
-        showOriginal: true
-        showOutput: true
-        showProcess: true
-        category: 'process-step'
-        color: '#ff8800'
-        trajectoryChannel: 'shinon/trajectory'

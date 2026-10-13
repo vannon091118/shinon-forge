@@ -49,11 +49,11 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   dsh-profile-test.mjs` (die schnellen Einzeltests laufen zuerst, damit eine kaputte
   Tabelle vor `pack-test` auffällt). Dieselben Tests laufen in
   `.github/workflows/commit-guard.yml` auf jedem Push/PR.
-- `node scripts/dsh-test.mjs` → static gate: manifest, name contract, `index.js`,
+- `node scripts/shinon-test.mjs` → static gate: manifest, name contract, `index.js`,
   `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution (exit 0/1).
 - `node scripts/pack-test.mjs` → per-package distribution test: `npm pack` → unpack →
   isolated `npm install` → load. Optional `--keep` retains `/tmp` work dirs for debugging.
-- `node scripts/dsh-profile-test.mjs` → boots `dsh --profile shinon --dump-config` and
+- `node scripts/shinon-profile-test.mjs` → boots `dsh --profile shinon --dump-config` and
   asserts every bundle layer of the profile resolves (count: `docs/ZAHLEN.md` §2).
 - `npm run test:codingmon` → `node --test packages/codingmon/test/*.test.mjs`: isolated
   tests for the Codemon core math (damage dictionaries, weighted loot RNG, ability and

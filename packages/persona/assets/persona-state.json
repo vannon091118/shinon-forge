@@ -81,6 +81,18 @@
       }
     }
   },
+  "narrative": {
+    "note": "Zug 6: die Narrative Engine liest DIESELBEN Spines-Ereignisse und leitet daraus einen Composite ab (Arc, Erzähler, Beziehungsstufe, eigener Mood). Sie ist INTERPRETATION, nie Autorität (`authority: NONE` in ihrem eigenen Vertrag) — deshalb steht dieser Abschnitt NEBEN dem Persona-Zustand und ersetzt WEDER dessen `mood` NOCH dessen `stance`. Der Zustand oben bleibt maßgeblich; hier steht, wie der Takt gelesen wurde. Fehlt das Ereignis, fehlt der Abschnitt: die Persona erfindet keinen Arc.",
+    "heading": "## Narrative Lage (gelesen, nicht behauptet)",
+    "authority": "NONE",
+    "fields": {
+      "arc_id": "Arc",
+      "narrator": "Erzähler",
+      "mood": "Narrative Stimmung (nicht der Persona-Mood oben)",
+      "relationship_state": "Beziehung",
+      "seq": "Takt"
+    }
+  },
   "limits": {
     "maxEvents": 25,
     "maxLimitations": 8

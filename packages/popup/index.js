@@ -1,8 +1,19 @@
 import z from '@deepseek-ai/schemastery';
 
+/**
+ * Der Slot des Overlays — EIN Besitzer fuer zwei Halves.
+ *
+ * Die Client-Haelfte kann diese Datei nicht importieren (ein Client-Bundle ist
+ * eigenstaendig) und traegt den Namen als Literal; diese Konstante ist der
+ * Besitzer, und die Zwillings-Regel in `scripts/lib/repo.mjs` haelt beide Seiten
+ * zeichengleich. Der wirksame Wert steht im Profil — dieser hier ist der
+ * Schema-Default und die Beschriftung der Naht.
+ */
+export const DEFAULT_SLOT = 'conversation.composer.dock';
+
 export const Config = z.object({
   enabled: z.boolean().default(true),
-  slotName: z.string().default('conversation.composer.dock'),
+  slotName: z.string().default(DEFAULT_SLOT),
   trigger: z.union([z.const('agent/pre-step'), z.const('user/message'), z.const('session/event')]).default('user/message'),
   showOriginal: z.boolean().default(true),
   showOutput: z.boolean().default(true),

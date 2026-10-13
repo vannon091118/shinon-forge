@@ -73,6 +73,16 @@
           "profiles/"
         ]
       },
+      "narrative": {
+        "prefixes": [
+          "packages/narrative/",
+          "packages/persona/",
+          "profiles/",
+          "scripts/lib/repo.mjs",
+          "scripts/gate/plugins/narrative.mjs",
+          "scripts/gate/tests/narrative.test.mjs"
+        ]
+      },
       "events-spine": {
         "prefixes": [
           "packages/events/",

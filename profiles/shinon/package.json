@@ -17,7 +17,9 @@
     "@shinon/task-router": "link:../../packages/task-router",
     "@shinon/codingmon": "link:../../packages/codingmon",
     "@shinon/scoring": "link:../../packages/scoring",
-    "@shinon/narrative": "link:../../packages/narrative"
+    "@shinon/narrative": "link:../../packages/narrative",
+    "@shinon/popup": "link:../../packages/popup",
+    "@shinon/key-router": "link:../../packages/key-router"
   },
   "dsh": {
     "profile": {
@@ -40,6 +42,8 @@
         "@shinon/codingmon",
         "@shinon/scoring",
         "@shinon/narrative",
+        "@shinon/popup",
+        "@shinon/key-router",
         "@deepseek-ai/dsh-experimental-auto-review",
         "@deepseek-ai/dsh-experimental-agent-team-profile",
         "@deepseek-ai/dsh-experimental-inspector-profile"
