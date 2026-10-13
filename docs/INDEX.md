@@ -13,6 +13,7 @@
 | Wie sind Commits aufgebaut? | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) |
 | Welche CI-Zweige laufen, welcher Name ist verpflichtend? | [`docs/CI.md`](CI.md) |
 | **Wie viele** Pakete, Layer, Tests? | [`docs/ZAHLEN.md`](ZAHLEN.md) |
+| Wohin geht es, was kostet ein Release? | [`docs/ROADMAP.md`](ROADMAP.md) |
 | Was ist belegt, was nur gemessen-rot? | `docs/probes/`, `docs/contracts/` + `docs/ZAHLEN.md` §2/§3 |
 
 ## 2. Die Statusregel (eine Regel, nicht drei)
@@ -60,6 +61,7 @@ gilt nicht als Nachmessung.
 | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) | current | 2026-10-08 | Commit-Regeln und ihre Durchsetzung |
 | [`docs/CI.md`](CI.md) | current | 2026-10-13 | CI als Schranke: die zehn Zweige, der Anzeigename `Verdikt (fail-closed)` als der eine verpflichtende Statuscheck für `main`, der Setz- und der Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-13 | alle harten Zahlen + Befehle |
+| [`docs/ROADMAP.md`](ROADMAP.md) | plan | 2026-10-13 | kanonische Roadmap: Versionsordnung, Historie, Release-Ziele `0.4.0`/`0.5.0`, `1.0.0`-Kriterien und der `0.1.0`-Pfad |
 | [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) | plan | 2026-10-08 | native App: Stufe 1 scharf, 2–4 Konzept |
 | [`IDEA.md`](../IDEA.md) | plan | 2026-10-07 | rohe Ideensammlung (ohne Überschriftenstruktur) |
 | geplant: starter/README.md (noch nicht existierend, deshalb kein Pfad) | plan | 2026-10-08 | Tauri-Shell (Stufe 2) — gebaut wird nach [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) |
