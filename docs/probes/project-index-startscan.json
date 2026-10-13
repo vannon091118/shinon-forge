@@ -1,0 +1,27 @@
+[
+  {
+    "id": "project-index-startscan-kosten",
+    "claim": "Der Startscan des Projektindex ist auf diesem Repository bezahlbar und der ZWEITE Start fast kostenlos: der kalte Lauf liest den Baum einmal (Rohbytes, nicht Dateizahl), der unveraenderte Lauf liest kein Byte. Die Entscheidung 'nach dem Mount, im Worker' braucht diese Zahlen, sonst ist sie Geschmack.",
+    "targets": [
+      "packages/project-index/index.js",
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Vor dem Urteil muss gemessen sein, was ein vollstaendiger Lauf dieses Repos kostet (Zeit, gelesene Bytes, geschriebene Dateien), was der unveraenderte Lauf kostet, und was der Mount selbst kostet — drei verschiedene Zahlen, die nicht verwechselt werden duerfen.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN am 2026-10-13 gegen DIESES Repository mit dem versionierten Befehl `node scripts/index-scan-cost.mjs` (Node v24.21.0; das Skript misst ueber `runIndex`, `runIndexInWorker` und `apply` aus dem Arbeitsbaum und setzt nur die Uhr — es schreibt in ein temporaeres Indexverzeichnis, der echte Index bleibt unberuehrt). Der erste Durchlauf des Skripts mass 352 Dateien (2572/17/1/2686 ms, readBytes 3 275 816, references 41 595); danach lag das Skript selbst im Baum, und der Lauf, der in docs/ZAHLEN.md steht, mass **353** Dateien: KALTER LAUF **2627 ms**, written 349, hashed 349, readBytes **3 283 899** (rund 3,3 MB), references 40 653, touches 143, symbols 2667, chunks 1681, skipped 2, protected 2. ZWEITER LAUF (nichts veraendert): **21 ms**, unchanged 349, stamped 349, readBytes **0**, written 0, references 0 — der Preis des zweiten Starts ist eine Metadatenpruefung, kein Lesen. MOUNT: `apply()` kehrt nach **1 ms** zurueck (Faehigkeiten bereitgestellt, Lauf nur eingeplant); der Bericht 'Lauf im Worker' kommt nach 2856 ms. Die drei Zahlen gehoeren auseinandergehalten: Mount-Kosten (1 ms), Lauf-Kosten (2,6 s), Wiederholungskosten (21 ms) — wer sie zu einer Zahl verschmilzt, kann nicht mehr begruenden, warum der Lauf NACH dem Mount liegt. DIESELBE Messung zeigt den Schutz und die Ausschlussliste im echten Lauf: '2 uebersprungen [ZU_GROSS=2: .shinon/prompter-index.json, package-lock.json]' — die beiden Groessenausschluesse sind benannt (9 962 714 > 262 144 bzw. 521 512 > 262 144 Bytes), nicht nur gezaehlt. OFFEN: die absoluten Zeiten sind Maschinenzeiten dieser VM; sie belegen Groessenordnungen und das Verhaeltnis kalt/warm/Mount, nicht einen Anspruch auf Millisekunden. Die Dateizahl ist selbst eine bewegliche Zahl (hier: das Messskript kam hinzu und zog sie von 352 auf 353)."
+  },
+  {
+    "id": "project-index-startscan-ereignisschleife",
+    "claim": "Derselbe Lauf BLOCKIERT die Agent-Ereignisschleife, wenn er im Host steht, und laesst sie laufen, wenn er im Worker steht. Genau diese Messung begruendet Plan §12 (Index-Build darf den kritischen Eventloop nicht blockieren) und die Vorgabe `worker: true`.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs"
+    ],
+    "expect": "Vor der Vorgabe muss der Unterschied zwischen Host und Worker an einem laufenden 1-ms-Timer gemessen sein: derselbe Lauf, dieselbe Arbeit, und die Zahl der Timer-Ticks waehrenddessen. Ohne diese Zahl waere 'worker' eine Behauptung.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN am 2026-10-13 auf demselben Baum mit `node scripts/index-scan-cost.mjs`, Zaehler: `setInterval(..., 1)` waehrend des Laufs. LAUF IM WORKER (`runIndexInWorker`): **2631 ms**, **2381 Ticks** gefeuert — die Schleife bleibt bedienbar. LAUF IM HOST (`runIndex`): **2510 ms**, **0 Ticks** — derselbe Aufwand, aber kein einziger Timer kam dran. Das Verhaeltnis der Laufzeiten ist damit irrelevant: die Aussage ist nicht 'der Worker ist schneller' (gemessen ist er mit 2631 gegen 2510 ms sogar etwas langsamer, wie es fuer eine Thread-Grenze zu erwarten ist), sondern 'der Host steht still und der Worker nicht'. Im Mount sichtbar: `apply()` braucht 1 ms, danach feuern waehrend des Worker-Laufs **2478** Ticks (mountTicks), bevor nach 2856 ms der Bericht kommt. Beides ist im Abnahmetest gepinnt: 'Worker: der Lauf laesst den Eventloop laufen, der Lauf im Host blockiert ihn' und 'Mount: der Lauf startet nach dem Mount, ein abgemounteter Lauf schreibt nichts'. OFFEN: die Ticks sind ein grobes Mass (Timer-Koaleszenz); sie belegen 'nicht blockiert' gegen 'blockiert', nicht eine Tick-Rate."
+  }
+]

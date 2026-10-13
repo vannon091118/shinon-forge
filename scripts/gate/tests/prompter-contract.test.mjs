@@ -485,7 +485,8 @@ test('MIN/MID: eine Antwort ohne references wird angenommen, in MAX nicht', asyn
 
   assert.equal(records[0].outcome, 'rejected', 'MAX prueft die Referenzen, also bleibt das Feld dort Pflicht');
   assert.ok(records[0].reasons[0].startsWith('SCHEMA_INVALID'), records[0].reasons[0]);
-  assert.equal(decision, downstream, 'der Roh-Prompt gilt');
+  assert.notEqual(decision, downstream, 'verworfen wird eskaliert, nicht durchgereicht');
+  assert.ok(decision.messages[0].content[0].text.includes('Feedback erforderlich'), 'die Frage steht im Text');
   dispose();
 });
 
@@ -712,18 +713,26 @@ test('Laden: nach dispose und ohne passenden Event-Namen wird nicht registriert'
   }
 });
 
-// ── 7. Bei Verwerfen gilt der Roh-Prompt unveraendert ─────────────────────
+// ── 7. Bei Verwerfen eskaliert der Schritt mit einer Frage ─────────────────
+//
+// Verhaltensänderung (seit 83948d5, nachgezogen in diesem Durchgang): Verworfen
+// heißt NICHT mehr „der Roh-Prompt gilt unverändert". Statt still
+// durchzureichen, baut der Schritt einen Fallback-Prompt, der den User um
+// Präzisierung bittet — mit dem benannten Grund. Das ist keine Annahme,
+// sondern eine Frage (siehe `packages/prompter/index.js`, Eskalations-Zweig).
+// Die Zusagen dieses Blocks sind deshalb: neues Objekt, die Frage steht im
+// Text, der Grund steht dabei, genau ein Datensatz mit `rejected`.
 
-test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async () => {
+test('Eskalation: jeder Fehlschlag wird zur Frage statt zur stillen Durchreiche', async () => {
   const cases = [
-    { name: 'Antwort ohne JSON', behaviour: 'Ich habe nichts geaendert.' },
-    { name: 'Antwort mit kaputtem JSON', behaviour: '{"enhancedPrompt": }' },
-    { name: 'Antwort verletzt das Schema', behaviour: reply({ enhancedPrompt: 'x' }) },
-    { name: 'Absicht nicht erhalten', behaviour: reply(goodResult({ preservedIntent: false })) },
-    { name: 'Anforderung hinzugefuegt', behaviour: reply(goodResult({ addedRequirements: ['mehr'] })) },
-    { name: 'Provider wirft', behaviour: new Error('Provider kaputt') },
+    { name: 'Antwort ohne JSON', behaviour: 'Ich habe nichts geaendert.', reason: 'NO_JSON' },
+    { name: 'Antwort mit kaputtem JSON', behaviour: '{"enhancedPrompt": }', reason: 'INVALID_JSON' },
+    { name: 'Antwort verletzt das Schema', behaviour: reply({ enhancedPrompt: 'x' }), reason: 'SCHEMA_INVALID' },
+    { name: 'Absicht nicht erhalten', behaviour: reply(goodResult({ preservedIntent: false })), reason: 'INTENT_NOT_PRESERVED' },
+    { name: 'Anforderung hinzugefuegt', behaviour: reply(goodResult({ addedRequirements: ['mehr'] })), reason: 'ADDED_REQUIREMENTS' },
+    { name: 'Provider wirft', behaviour: new Error('Provider kaputt'), reason: 'LLM_FAILED' },
   ];
-  for (const { name, behaviour } of cases) {
+  for (const { name, behaviour, reason } of cases) {
     const llm = fakeLlm(behaviour);
     const { ctx, records, dispose } = connect({ ...route }, { llm });
     const claimed = [userMessage()];
@@ -731,7 +740,12 @@ test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async ()
 
     const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
 
-    assert.equal(decision, downstream, `${name}: die Entscheidung muss unveraendert sein`);
+    assert.notEqual(decision, downstream, `${name}: verworfen wird eskaliert, nicht durchgereicht`);
+    assert.equal(decision.kind, 'enter', name);
+    assert.equal(decision.messages.length, 1, name);
+    const text = decision.messages[0].content[0].text;
+    assert.ok(text.includes('Feedback erforderlich'), `${name}: die Frage steht im Text`);
+    assert.ok(text.includes(reason), `${name}: mit dem Grund (${reason})`);
     assert.equal(records.length, 1, `${name}: genau ein Datensatz`);
     assert.ok(records[0].outcome !== 'accepted', `${name}: ${records[0].outcome}`);
     assert.ok(records[0].reasons.length > 0, `${name}: ein Verwerfen braucht einen Grund`);
@@ -741,9 +755,10 @@ test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async ()
 
 /**
  * Das Gate dieses Blocks, Regel fuer Regel aus Plan §7. Die Tabelle ist die
- * Zusage: jede ungueltige oder intent-veraendernde Ausgabe endet beim
- * Roh-Prompt — und zwar mit GENAU einem Aufruf, GENAU einem Datensatz und einer
- * benannten Ursache. Eine Zeile pro Regel, damit eine fehlende Regel auffaellt.
+ * Zusage: jede ungueltige oder intent-veraendernde Ausgabe endet in der
+ * ESKALATION (nicht mehr im stillen Roh-Prompt) — und zwar mit GENAU einem
+ * Aufruf, GENAU einem Datensatz, einer benannten Ursache UND der Frage im
+ * Text. Eine Zeile pro Regel, damit eine fehlende Regel auffaellt.
  */
 test('Roh-Prompt: jede Fallback-Regel aus Plan §7 greift', async () => {
   // `kept` unterscheidet die zwei Arten des Verwerfens: gab es keine
@@ -769,11 +784,15 @@ test('Roh-Prompt: jede Fallback-Regel aus Plan §7 greift', async () => {
 
     const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
 
-    assert.equal(decision, downstream, `${name}: der Roh-Prompt muss gelten`);
+    assert.notEqual(decision, downstream, `${name}: verworfen wird eskaliert, nicht durchgereicht`);
+    assert.equal(decision.kind, 'enter', name);
+    const text = decision.messages[0].content[0].text;
+    assert.ok(text.includes('Feedback erforderlich'), `${name}: die Frage steht im Text`);
+    // Nur der Praefix wird gepinnt: die Wortwahl der Bibliothek ist nicht unser Vertrag.
+    assert.ok(text.includes(reason), `${name}: mit dem Grund (${reason})`);
     assert.equal(llm.calls.length, 1, `${name}: genau ein One-Shot-Aufruf`);
     assert.equal(records.length, 1, `${name}: genau ein Datensatz`);
     assert.equal(records[0].outcome, 'rejected', name);
-    // Nur der Praefix wird gepinnt: die Wortwahl der Bibliothek ist nicht unser Vertrag.
     assert.ok(records[0].reasons[0].startsWith(reason), `${name}: ${records[0].reasons[0]}`);
     assert.equal(records[0].enhancedLength > 0, kept, `${name}: nachvollziehbar, aber nicht verwendet`);
     dispose();
@@ -818,7 +837,13 @@ test('Roh-Prompt: kein interner Fehler bricht den Schritt', async () => {
 
     const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, payload, () => Promise.resolve(downstream));
 
-    assert.equal(decision, downstream, `${name}: der Schritt laeuft weiter`);
+    // Ein Fehler in UNSEREM Code bricht den Schritt nicht — und er wird
+    // ebenfalls zur Frage: der User erfährt, dass etwas schiefging, statt dass
+    // ein unverbesserter Prompt still weiterläuft.
+    assert.notEqual(decision, downstream, `${name}: auch der eigene Fehler eskaliert`);
+    const text = decision.messages[0].content[0].text;
+    assert.ok(text.includes('Feedback erforderlich'), `${name}: die Frage steht im Text`);
+    assert.ok(text.includes('INTERNAL_ERROR'), `${name}: mit dem Grund`);
     assert.equal(records.length, 1, `${name}: genau ein Datensatz`);
     assert.equal(records[0].outcome, 'rejected', name);
     assert.ok(records[0].reasons[0].startsWith('INTERNAL_ERROR'), `${name}: ${records[0].reasons[0]}`);
@@ -949,7 +974,7 @@ test('Ersetzung: keine Nachrichtenform bringt die Ersetzung zum Werfen', () => {
   }
 });
 
-test('Ersetzung: eine nicht auffindbare Nachricht fuehrt zum Roh-Prompt', async () => {
+test('Ersetzung: eine nicht auffindbare Nachricht eskaliert statt durchzureichen', async () => {
   const llm = fakeLlm(reply(goodResult()));
   const { ctx, records, dispose } = connect({ ...route }, { llm });
   const claimed = [userMessage()];
@@ -957,13 +982,17 @@ test('Ersetzung: eine nicht auffindbare Nachricht fuehrt zum Roh-Prompt', async 
 
   const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(fremd));
 
-  // Verhaltensänderung (Session 3/4): MESSAGE_NOT_FOUND eskaliert jetzt mit
-  // Fallback-Prompt statt still durchzureichen.
+  // Verhaltensänderung (Session 3/4, Trägerregel in diesem Durchgang geschlossen):
+  // MESSAGE_NOT_FOUND eskaliert mit Fallback-Prompt statt still durchzureichen.
+  // Der Träger ist die letzte menschliche Nachricht der ENTSCHEIDUNG — die
+  // Ursprungsnachricht steht dort nicht (genau das ist MESSAGE_NOT_FOUND), aber
+  // die Frage des Users steht dort trotzdem.
   assert.notEqual(decision, fremd, 'Fallback-Prompt wird gebaut, nicht durchgereicht');
   assert.equal(records[0].outcome, 'rejected');
   assert.deepEqual(records[0].reasons, ['MESSAGE_NOT_FOUND']);
   const fallbackText = decision.messages[0].content[0].text;
   assert.ok(fallbackText.includes('Feedback erforderlich'), 'Fallback-Prompt enthält Eskalation');
+  assert.ok(fallbackText.includes('MESSAGE_NOT_FOUND'), 'mit dem Grund, der sie ausgelöst hat');
   dispose();
 });
 

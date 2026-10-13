@@ -1623,15 +1623,38 @@ Bitte präzisieren Sie Ihre Anfrage:
 - Gibt es Constraints, die ich beachten muss?
 
 [Roh-Prompt gilt als Fallback]`;
-    return {
-      ...decision,
-      messages: decision?.messages?.map((msg) =>
-        msg === prompt.message ? { ...msg, content: [{ type: 'text', text: fallbackPrompt }] } : msg
-      ) ?? decision?.messages,
-    };
+    const carrier = escalationCarrier(decision?.messages, prompt.message);
+    // Kein Träger, keine Frage: eine Entscheidung ohne Nachrichten (etwa ein
+    // `reject` des Loops) wird nicht geraten — sie gilt, wie sie ist. Vorher
+    // legte der Spread hier ein `messages: undefined`-Feld an, das den Datensatz
+    // nur scheinbar veränderte, und ein MESSAGE_NOT_FOUND baute die Eskalation,
+    // ohne sie irgendwo anzubringen.
+    if (carrier === -1) return decision;
+    const next = decision.messages.slice();
+    next[carrier] = { ...decision.messages[carrier], content: [{ type: 'text', text: fallbackPrompt }] };
+    return { ...decision, messages: next };
   }
 
   return messages === null ? decision : { ...decision, messages };
+}
+
+/**
+ * Der Träger der Eskalation: die Nachricht, deren Text zur Frage wird.
+ *
+ * Zuerst die Identität (der Normalfall: die Entscheidung trägt dieselben
+ * Objekte wie der Schritt), dann die letzte menschliche Nachricht der
+ * Entscheidung — derselbe Begriff, mit dem `readPrompt` den Prompt findet
+ * (Zwillings-Region oben): die Eskalation beantwortet die Frage des Users,
+ * wo immer sie steht. Gibt es keine, gibt es keinen Ort für die Frage.
+ *
+ * @returns der Index des Trägers oder -1.
+ */
+function escalationCarrier(messages, original) {
+  if (!Array.isArray(messages)) return -1;
+  const direct = messages.indexOf(original);
+  if (direct !== -1) return direct;
+  const found = lastHumanMessage(messages);
+  return found === null ? -1 : found.index;
 }
 
 /** Entscheidung emittieren und in die Fenster-Konvention schreiben. */

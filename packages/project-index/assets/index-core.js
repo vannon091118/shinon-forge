@@ -470,30 +470,117 @@ export function inodeStamp(absolute, mtimeMs = null) {
 }
 
 /**
- * Eine Datei als Text lesen. Ein Fehler ist kein Abbruch, sondern ein
- * Ausschluss: eine gesperrte oder zu grosse Datei laesst den Lauf weiterlaufen.
+ * Die Gruende, aus denen der Scan eine Datei oder einen Ordner NICHT aufnimmt.
+ *
+ * Eine feste Liste und kein Freitext: der Bericht soll die Gruende zaehlen
+ * koennen. Ein Ausschluss ohne Namen ist eine Zahl, die nichts erklaert — genau
+ * der Zustand VOR dieser Aenderung, in dem „zu gross", „gesperrt" und
+ * „verschwunden" alle als dieselbe stumme `skipped`-Zahl erschienen.
  */
-function readText(file, maxBytes) {
+export const SCAN_REASONS = [
+  /** Zwischen Auflisten und Lesen verschwunden (oder das `stat` scheiterte). */
+  'VERSCHWUNDEN',
+  /** Kein regulaeres Dateiobjekt (FIFO, Socket, Geraet) — nicht indexierbar. */
+  'KEINE_DATEI',
+  /** Ueber `maxFileBytes`: bewusst uebergangen, nicht fehlgeschlagen. */
+  'ZU_GROSS',
+  /** Vorhanden, aber der Inhalt ist nicht lesbar (Rechte, Encoding, EIO). */
+  'NICHT_LESBAR',
+  /** Ein Ordner liess sich nicht auflisten — sein ganzer Teilbaum fehlt im Index. */
+  'ORDNER_NICHT_LESBAR',
+];
+
+/** Der Fehlercode eines Fehlers, oder null — die Angabe, die ein Befund braucht. */
+function errorCodeOf(error) {
+  return typeof error?.code === 'string' ? error.code : null;
+}
+
+/**
+ * Eine Datei als Text lesen — MIT GRUND, wenn es nicht geht.
+ *
+ * Der Unterschied zu `readText` (unten) ist die Auskunft: ein Ausschluss hat hier
+ * einen NAMEN. Vorher fielen „zu gross" und „nicht lesbar" in denselben null-Rueckgabewert,
+ * und der Aufrufer zaehlte beide als `skipped`. Wer den Bericht las, konnte nicht
+ * unterscheiden, ob eine Datei absichtlich uebergangen wurde (Obergrenze) oder ob ein
+ * Zugriff fehlgeschlagen war (Rechte, I/O) — ein verschwiegener Fehler sieht aus wie
+ * eine Entscheidung. Ein Befund ohne Pfad waere ausserdem nicht nachzugehen.
+ */
+function readTextWithReason(file, maxBytes) {
+  let info;
   try {
-    const info = statSync(file);
-    if (!info.isFile() || info.size > maxBytes) return null;
-    return { text: readFileSync(file, 'utf8'), bytes: info.size, mtimeMs: Math.round(info.mtimeMs) };
-  } catch {
-    return null;
+    info = statSync(file);
+  } catch (error) {
+    return { ok: false, reason: 'VERSCHWUNDEN', detail: errorCodeOf(error) };
+  }
+  if (!info.isFile()) return { ok: false, reason: 'KEINE_DATEI', detail: null };
+  if (info.size > maxBytes) return { ok: false, reason: 'ZU_GROSS', detail: `${info.size}>${maxBytes}` };
+  try {
+    return { ok: true, text: readFileSync(file, 'utf8'), bytes: info.size, mtimeMs: Math.round(info.mtimeMs) };
+  } catch (error) {
+    return { ok: false, reason: 'NICHT_LESBAR', detail: errorCodeOf(error) };
   }
 }
 
-/** Alle indexierbaren Dateien unterhalb von `root`, in stabiler Reihenfolge. */
-export function listFiles(root, extensions = SOURCE_EXTENSIONS) {
+/**
+ * Eine Datei als Text lesen. Ein Fehler ist kein Abbruch, sondern ein
+ * Ausschluss: eine gesperrte oder zu grosse Datei laesst den Lauf weiterlaufen.
+ *
+ * Bleibt als schmale Form bestehen, weil der Referenzdurchgang nur den
+ * Unterschied „Text oder nicht" braucht: dort gibt es keinen Bericht, den ein
+ * Grund bereichern koennte.
+ */
+function readText(file, maxBytes) {
+  const read = readTextWithReason(file, maxBytes);
+  return read.ok ? read : null;
+}
+
+/** Namensvergleich ohne Locale: derselbe Baum ergibt ueberall dieselbe Reihenfolge. */
+const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+
+/** Pfadvergleich ohne Locale — die Reihenfolge des Berichts ist nachrechenbar. */
+const byPath = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * Alle indexierbaren Dateien unterhalb von `root` — in DETERMINISTISCHER
+ * Reihenfolge, und jeder Ausschluss benannt.
+ *
+ * Zwei Zusagen, jede einzeln pruefbar:
+ *
+ *   1. REIHENFOLGE: das Ergebnis ist aufsteigend nach Pfad sortiert. Der
+ *      Durchlauf besucht die Eintraege je Ordner schon namenssortiert, aber erst
+ *      diese Sortierung macht die Reihenfolge eine Funktion der DateiMENGE —
+ *      unabhaengig davon, wie der Baum durchlaufen wurde, in welcher Reihenfolge
+ *      `readdirSync` geantwortet hat und ob ein Ordner tiefer oder flacher lag.
+ *      `localeCompare` waere hier falsch: es haengt von der Locale des Prozesses
+ *      ab, und ein Bericht, der je Rechner anders sortiert, ist kein Nachweis.
+ *   2. AUSSAHME: `onError` bekommt JEDEN ausgelassenen Ordner mit Pfad und Grund.
+ *      Vorher kehrte der Durchlauf bei einem unlesbaren Ordner wortlos um, und
+ *      sein ganzer Teilbaum fehlte im Index — der Bericht sah danach genauso aus
+ *      wie ein Projekt ohne diesen Ordner. Ein stummer Ausfall, der wie ein
+ *      Ergebnis aussieht, ist die teuerste Sorte Befund.
+ *
+ * Der Rueckgabewert bleibt ein Array (die Aufrufer im Repo und in den Proben
+ * erwarten genau das); `onError` ist die optionale dritte Angabe, damit die
+ * Erweiterung nichts bricht.
+ *
+ * @param root - Projektwurzel.
+ * @param extensions - die aufgenommenen Endungen.
+ * @param onError - optionale Senke `({ path, reason, detail })` fuer Auslassungen.
+ */
+export function listFiles(root, extensions = SOURCE_EXTENSIONS, onError = null) {
   const found = [];
+  const report = (path, reason, detail) => {
+    if (typeof onError === 'function') onError({ path, reason, detail });
+  };
   const walk = (dir) => {
     let entries;
     try {
       entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
+    } catch (error) {
+      report(dir, 'ORDNER_NICHT_LESBAR', errorCodeOf(error));
       return;
     }
-    for (const entry of entries.sort((a, b) => (a.name < b.name ? -1 : 1))) {
+    for (const entry of entries.sort(byName)) {
       if (entry.isDirectory()) {
         if (SKIP_DIRS.has(entry.name)) continue;
         walk(join(dir, entry.name));
@@ -505,7 +592,7 @@ export function listFiles(root, extensions = SOURCE_EXTENSIONS) {
     }
   };
   walk(resolve(root));
-  return found;
+  return found.sort(byPath);
 }
 
 /**
@@ -737,6 +824,13 @@ export function openIndex(file) {
   mkdirSync(dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec('pragma journal_mode = wal');
+  // KONTROLLIERTE PERSISTENZ: die Haltbarkeitspolitik wird BENANNT, nicht
+  // geerbt. `synchronous = full` haelt jeden Commit ueber den WAL-Rahmen
+  // dauerhaft, bevor er als fertig gilt (der SQLite-Standard, aber ein
+  // Standard ist keine Zusage: das Paket setzt ihn hier selbst, damit ein
+  // spaeterer Wechsel der Laufzeit-Vorgabe den Index nicht still aufweicht).
+  // Gepinnt von `scripts/gate/tests/project-index.test.mjs` gegen den echten Index.
+  db.exec('pragma synchronous = full');
   // GEMESSEN und deshalb hier: ein `delete` loescht Zeilen, nicht BYTES. Nach dem
   // Entfernen eines Werts stand er im Test weiterhin in den freigegebenen Seiten
   // der Datei. `secure_delete` ueberschreibt den freigegebenen Zellinhalt mit
@@ -915,7 +1009,11 @@ export function updateIndex(db, root, options = {}) {
   const chunkLines = options.chunkLines ?? 40;
   const maxFileBytes = options.maxFileBytes ?? 262144;
   const verify = options.verify ?? 'stamp';
-  const files = listFiles(root, options.extensions ?? SOURCE_EXTENSIONS);
+  /** Jeder Ausschluss MIT Pfad und Grund — die Liste, nicht nur ihre Laenge. */
+  const scanErrors = [];
+  const files = listFiles(root, options.extensions ?? SOURCE_EXTENSIONS, (entry) => {
+    scanErrors.push({ path: toProjectPath(root, entry.path), reason: entry.reason, detail: entry.detail });
+  });
   const report = {
     root: resolve(root),
     verify,
@@ -933,6 +1031,15 @@ export function updateIndex(db, root, options = {}) {
     rehashed: 0,
     written: 0,
     skipped: 0,
+    /**
+     * Die Ausschluesse im Einzelnen: `{ path, reason, detail }`.
+     *
+     * `skipped` bleibt die Zahl (sie steht im Bericht und in Zusagen), aber eine
+     * Zahl ohne Grund ist keine Auskunft. Diese Liste macht aus „1 uebersprungen"
+     * den Satz „`src/x.mjs` war nicht lesbar (EACCES)" — und den Ordner, dessen
+     * Teilbaum fehlt, sichtbar statt still.
+     */
+    scanErrors,
     removed: 0,
     /** Dateien, die als Zugangsdatentraeger erkannt und nie gelesen wurden. */
     protected: 0,
@@ -973,8 +1080,10 @@ export function updateIndex(db, root, options = {}) {
       let info;
       try {
         info = statSync(absolute);
-      } catch {
+      } catch (error) {
+        // Zwischen Auflisten und Lesen verschwunden: ein Befund mit Namen.
         report.skipped += 1;
+        report.scanErrors.push({ path, reason: 'VERSCHWUNDEN', detail: errorCodeOf(error) });
         continue;
       }
       const before = previous.get(path);
@@ -1009,13 +1118,15 @@ export function updateIndex(db, root, options = {}) {
       // gespeicherte Stempel der alte und der naechste Lauf liest erneut —
       // fail-closed statt still veraltet.
       if (stamp === null) stamp = inodeStamp(absolute, Math.round(info.mtimeMs));
-      const file = readText(absolute, maxFileBytes);
-      if (file === null) {
+      const read = readTextWithReason(absolute, maxFileBytes);
+      if (!read.ok) {
         // Eine uebersprungene Datei darf keine alten Zeilen stehen lassen.
         if (before !== undefined) forgetFile(db, path);
         report.skipped += 1;
+        report.scanErrors.push({ path, reason: read.reason, detail: read.detail });
         continue;
       }
+      const file = read;
       report.hashed += 1;
       report.readBytes += file.bytes;
       const digest = createHash('sha256').update(file.text).digest('hex');
@@ -1338,9 +1449,6 @@ export const MAX_CONTEXT_SYMBOLS = 200;
 
 /** Obergrenze der Volltextbegriffe je Abfrage. */
 export const MAX_FTS_TERMS = 8;
-
-/** Ein Pfadvergleich ohne Locale: derselbe Rechner, dieselbe Reihenfolge. */
-const byPath = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 /** Token-Schaetzung eines Textes. */
 export function estimateTokens(text) {

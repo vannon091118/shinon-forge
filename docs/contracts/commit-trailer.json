@@ -28,11 +28,11 @@
     {
       "positive": "CI prüft jeden Push und Pull Request ohne Filter — jeder Commit des Bereichs wird gegen dieselben Regeln geprüft.",
       "forbidden": "Ein paths-/branches-Filter oder eine Bedingung, die den Job überspringt; ein grüner Job bei vorhandenem Verstoß im Bereich.",
-      "fallback": "Ist der Bereich nicht auflösbar (neuer Branch mit Null-SHA, Force-Push, Shallow-Clone, unbekanntes Event, kaputte Event-Datei), prüft der Wächter die volle Historie der Spitze — mehr, nie weniger.",
+      "fallback": "Ist der Bereich nicht auflösbar (Force-Push auf verschwundenen Stand, Shallow-Clone ohne origin/main, unbekanntes Event, kaputte Event-Datei), prüft der Wächter die volle Historie der Spitze — mehr, nie weniger. Ein neuer Branch mit Null-SHA ist seit 2026-10-13 kein unbestimmter Fall mehr, solange origin/main vorliegt: dann gilt Merge-Basis..Spitze (genau das, was der Branch hinzufügt).",
       "error": "Exit 1 mit Liste der Verstöße; der Job bleibt rot, bis die Historie sauber ist.",
       "trace": ".github/workflows/commit-guard.yml (push/pull_request/workflow_dispatch, kein paths, kein continue-on-error) → scripts/commit-guard.mjs --ci → scripts/lib/ci-range.mjs.",
-      "replay": "Der Test baut temporäre Git-Repos und fährt --ci mit echter GitHub-Umgebung: auflösbares before ⇒ Spanne, Null-SHA ohne Kontext ⇒ volle Historie, Pull Request ⇒ Basis..Head; Exit-Codes gemessen.",
-      "invariant": "Der Workflow enthält push:, pull_request:, keinen paths-Filter und kein continue-on-error — das prüft das Gate-Plugin am Dateiinhalt. Und resolveCiRange liefert in jedem unbestimmten Fall die volle Historie statt eines Teilbereichs."
+      "replay": "Der Test baut temporäre Git-Repos und fährt --ci mit echter GitHub-Umgebung: auflösbares before ⇒ Spanne, Null-SHA ohne Hauptlinie ⇒ volle Historie, Null-SHA mit origin/main ⇒ Merge-Basis..Spitze (eigener Fall mit Bare-Remote, Exit 0 trotz Alt-Verstoß in main), Pull Request ⇒ Basis..Head; Exit-Codes gemessen.",
+      "invariant": "Der Workflow enthält push:, pull_request:, keinen paths-Filter und kein continue-on-error — das prüft das Gate-Plugin am Dateiinhalt. Und resolveCiRange liefert in jedem unbestimmten Fall die volle Historie statt eines Teilbereichs; ein neuer Branch mit bestimmbarer Basis ist kein unbestimmter Fall."
     },
     {
       "positive": "Jede Commit-Nachricht erzählt die Änderung: mindestens 150 Wörter im Inhalt (ohne Trailer, ohne #-Zeilen), alle Daten namentlich genannt (Pfad mit Endung, SHA, Messung 12/3, Exit oder Run/PR/Issue-Nummer) und Bildsprache Pflicht (Vergleichs-/Bildmarker aus der festen BILDSPRACHE_MARKERS-Liste). Lokal tauscht prepare-commit-msg nur Footer — Prosa schreibt kein Hook; die Wort-Regel gilt nur fail-closed.",
