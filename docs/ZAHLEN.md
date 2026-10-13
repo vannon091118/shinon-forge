@@ -66,7 +66,7 @@ lesen genau diese Datei.
 | **Skalierungslauf** (Kopie des Baums + **20** neue Pakete = 39, alle selbst als `dsh.inactive` erklärt): Idiom-Schreiber → statisches Gate → Gate-Engine `--full` → Gate-Tests → Distributionstest → Build | **6 von 6** Stufen grün — Gate **200** bestanden/0, `gate:full` 18 grün/0, Gate-Tests **328**/0, Distribution **156**/0, Build 39 Pakete/196 Dateien; Dauer ≈ 98 s | 0 | `npm run scale:check` (Nachweis: [docs/audit/SKALIERUNG_2026-10-11.md](audit/SKALIERUNG_2026-10-11.md)) |
 | Gate-Engine `--full` | **21** Gates gelaufen (am 2026-10-13 nachgemessen: das Gate `narrative` ist hinzugekommen — es prüft den Vertrag, die Laufzeitgrenze UND den Abnehmer des Kanals `shinon/narrative/state`; vorher 20), davon **20** grün und **1** `NOT_APPLICABLE` (`typescript`: es gibt weiterhin keine First-Party-TypeScript-Datei), 0 fehlgeschlagen, 0 geskippt, über **20** Paketen; die Branding-Stufe meldet ohne Flag einen sichtbaren Skip, mit `--branding` läuft sie (siehe nächste Zeile) | 0 | `npm run gate:full` |
 | Branding-Wirkung im echten Chromium | **28** bestanden, **0** fehlgeschlagen (ausgeliefertes `dist/packages/core/client.js`, `/usr/bin/google-chrome`) | 0 | `npm run branding` · `node scripts/gate/engine.mjs --full --branding` |
-| Gate-Tests | **466** Tests, **466** grün, **0** rot, 0 übersprungen (am 2026-10-13 nachgemessen und REPARIERT — **Exit 0**). Korrektur einer Fehldiagnose: die 7 Roten waren **kein** Umgebungs-Rot (Node v24), sondern Inhaltsdrift, und sie wären in CI (Node 22) genauso rot gewesen — genau das war das CI-Rot auf `main` und auf dem Branch. 6 in `prompter-contract.test.mjs`: die Eskalation aus 83948d5 hatte die Zusagen überholt — verworfen heißt seitdem „Frage statt stiller Durchreiche" (`[Feedback erforderlich]` + Grund); die Tests sind auf den neuen Vertrag gebracht (Abschnitt 7), und die Trägerregel ist geschlossen (Identität, sonst letzte menschliche Nachricht der Entscheidung — MESSAGE_NOT_FOUND baute die Frage, ohne sie anzubringen, und legte ein `messages: undefined`-Feld an). 1 in `project-index.test.mjs`: die Skills-Kante `./assets/index-manager.js` aus Zug 6 stand nicht in der pinenden Erwartungsliste (der Test verlangt genau das: auffallen, prüfen, benennen). **2** Tests sind neu: die Bereichs-Regel für neue Branches (`Merge-Basis..Spitze` statt voller Historie) in `scripts/gate/tests/commit-trailer.test.mjs`. Davor stand die Zeile auf **464/457/7** (mit 8 neuen Tests aus key-router-override + Projektindex-Scan) und davor auf **456/449/7** | 0 | `npm run gate:test` — der Lauf braucht `node_modules/.bin` VOR dem PATH (`dshRoot()` sucht `dsh` dort); `node --test scripts/gate/tests/*.test.mjs` allein liefert stattdessen 8 Datei-Fehler |
+| Gate-Tests | **467** Tests, **467** grün, **0** rot, 0 übersprungen (am 2026-10-13 nachgemessen und REPARIERT — **Exit 0**). Korrektur einer Fehldiagnose: die 7 Roten waren **kein** Umgebungs-Rot (Node v24), sondern Inhaltsdrift, und sie wären in CI (Node 22) genauso rot gewesen — genau das war das CI-Rot auf `main` und auf dem Branch. 6 in `prompter-contract.test.mjs`: die Eskalation aus 83948d5 hatte die Zusagen überholt — verworfen heißt seitdem „Frage statt stiller Durchreiche" (`[Feedback erforderlich]` + Grund); die Tests sind auf den neuen Vertrag gebracht (Abschnitt 7), und die Trägerregel ist geschlossen (Identität, sonst letzte menschliche Nachricht der Entscheidung — MESSAGE_NOT_FOUND baute die Frage, ohne sie anzubringen, und legte ein `messages: undefined`-Feld an). 1 in `project-index.test.mjs`: die Skills-Kante `./assets/index-manager.js` aus Zug 6 stand nicht in der pinenden Erwartungsliste (der Test verlangt genau das: auffallen, prüfen, benennen). **2** Tests sind neu: die Bereichs-Regel für neue Branches (`Merge-Basis..Spitze` statt voller Historie) in `scripts/gate/tests/commit-trailer.test.mjs`. Dazu **1** Draht-Test (`scripts/gate/tests/key-router-wire.test.mjs`): echtes `fetch` gegen einen Loopback-Stub beweist Auswahl → Kopfzeilen → 429 → anderer Schlüssel auf dem Draht (Mutationsprobe: ein falscher Kopf lässt ihn rot werden). Davor stand die Zeile auf **464/457/7** (mit 8 neuen Tests aus key-router-override + Projektindex-Scan) und davor auf **456/449/7** | 0 | `npm run gate:test` — der Lauf braucht `node_modules/.bin` VOR dem PATH (`dshRoot()` sucht `dsh` dort); `node --test scripts/gate/tests/*.test.mjs` allein liefert stattdessen 8 Datei-Fehler |
 | Scoring-Tests (Kern + Signale + Ablage) | **42** bestanden, 0 rot, 0 übersprungen (am 2026-10-12 nachgemessen; die Zeile stand auf 32 — die Tendenz-Regeln kamen als eigene Datei hinzu) | 0 | `npm run test:scoring` |
 | Prompter-Tests (Zettel-Kern + Laufzeit-Index + Skills) | **51** bestanden, **0** rot (am 2026-10-13 mit dem Befehl nachgemessen; die Zeile nannte **12** und beschrieb damit nur `note-core` — der Befehl läuft über den ganzen Ordner: `note-core`, `runtime-index`, `skill-injection`, `skill-selection`) | 0 | `npm run test:prompter` |
 | Popup-Tests (Faltung des Sitzungsfensters) | **12** bestanden, **0** rot (gemessene Ereignisform, `turn/end` schliesst, ohne `callId` wird nichts geschlossen, Deckel der Werkzeugliste, Sprach-Schlüssel statt Sprache) — ohne node_modules | 0 | `npm run test:popup` |
@@ -196,19 +196,22 @@ behoben; die uebrigen Befunde sind offen.
   §2 belegt.
 - **Entschieden (2026-10-13):** `narrative`, `popup` und `key-router` sind im Profil;
   `openapi` und `shinon-forge` bleiben inaktiv.
-- **Offen und benannt (2026-10-13):** der Key-Router verwaltet seinen Pool und
-  beantwortet `key_router_status`/`key_router_rotate`/`key_router_probe` — den
-  Provider-**OVERRIDE** hat er nicht: DSH bekommt von ihm noch keinen rotierenden
-  Schlüssel an die Hand. Dafür braucht es die LLM-Dienstfläche (welcher Dienst,
-  welche Form) und ein Gate, das den Override an der echten Route prüft; beides
-  ist hier **nicht** gemessen. Ebenso offen: `openapi` hat einen Vertrag, aber
-  keinen Server.
-- **Ein gefüllter Key-Pool im echten Boot ist nicht belegt** (2026-10-13): der Router
-  liest seinen Pool beim Mount aus `process.env`, und dort stand kein `AGNES_API_KEY`
-  (die Zeile `ohne Schlüssel (Umgebung leer): agnes` stammt aus dem Router selbst). Die
-  Mechanik ist mit gesetzter Umgebungsvariable belegt (Kanarienvogel-Test in
-  `key-router-security.test.mjs`, 11 Kern-Tests) — ob DSH den `.env`-Wert VOR die
-  Plugin-Ebene exportiert oder erst bei der Route auflöst, ist **nicht** gemessen.
+- **Stand Override (2026-10-13, gebaut; Draht-Ebene in diesem Durchgang):** der
+  Provider-**OVERRIDE** existiert und ist verdrahtet — `createResolveOverlay`
+  bedient verwaltete Referenzen aus dem Pool, `agent/request-error` deckelt nach
+  `RATE_LIMIT` (`packages/key-router/index.js`). Belegt: 3 Override-Tests plus
+  **1** Draht-Test (`scripts/gate/tests/key-router-wire.test.mjs`): echter
+  `fetch` gegen einen Loopback-Stub beweist, dass der Request mit dem gewählten
+  Schlüssel läuft und nach 429 mit dem anderen. **Weiter offen:** die 429-Rotation
+  gegen die laufende Route mit echten Schlüsseln. Ebenso offen: `openapi` hat
+  einen Vertrag, aber keinen Server.
+- **Ein gefüllter Key-Pool im echten Boot ist nicht belegt** (2026-10-13): beim
+  Mount stand kein `AGNES_API_KEY` bereit (die Zeile `ohne Schlüssel (Umgebung
+  leer): agnes` stammt aus dem Router selbst). Der Router liest seinen Pool
+  inzwischen aus den Schichten der Startumgebung (`launchEnvironment`: Prozess,
+  Projekt-`.env`, Benutzer-`.env`), nicht mehr aus `process.env` allein — ob DSH
+  den `.env`-Wert VOR die Plugin-Ebene exportiert oder erst bei der Route
+  auflöst, ist **nicht** gemessen.
 - **Das Popup-Overlay ist im Baum geprüft, nicht im Browser gemalt**
   (2026-10-13): die Komponente wird mit der React-Attrappe ausgeführt und ihr
   Baum verglichen, und die Aktivierung am echten Cordis-Proxy prüft
