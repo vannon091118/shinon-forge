@@ -2,14 +2,17 @@
  * @shinon/key-router — Multi-API-Key-Pool mit 429-Rotation (Host-Hälfte).
  *
  * ARCHITEKTUR
- *   Umgebung ──▶ Pool (je Anbieter) ──▶ Auswahl ──▶ Werkzeuge
- *                                            │
- *                                            └─▶ Verbindungstest (Kopfzeilen)
+ *   Startumgebung ──▶ Pool (je Anbieter) ──▶ Auswahl ──┬─▶ Werkzeuge
+ *       (alle 3 Schichten)                             │
+ *                                                      ├─▶ Verbindungstest (Kopfzeilen)
+ *                                                      └─▶ OVERRIDE: `credentials.resolve(ref)`
+ *                                                          bedient die verwalteten Referenzen
+ *                                                          aus dem Pool
  *
  * Beim 429 wird ein Platz gedeckelt (`initialDelayMs` → `maxDelayMs`,
  * exponentiell); ein erfolgreicher Lauf baut die Schuld wieder ab. Die Rechnung
  * steht in `assets/pool-core.js` — importfrei und damit in CI testbar; `index.js`
- * ist die Naht zum Lauf (Umgebung, Werkzeuge, Log).
+ * ist die Naht zum Lauf (Umgebung, Werkzeuge, Override, Log).
  *
  * DER SICHERHEITSVERTRAG (drei Zusagen, jede an einer Stelle prüfbar):
  *
@@ -27,12 +30,19 @@
  *      Eingabewert tragen; die Umgebungsvariable kann in einer Meldung stehen.
  *      Damit ist die Zusage eine Funktion und keine Absicht.
  *
- * WAS DIESES PAKET NICHT TUT (offen, nicht behauptet): es setzt KEINE LLM-Route
- * um. Der Provider-Override (DSH einen rotierenden Schlüssel zu geben) fehlt; die
- * 429-Ereignisse des Laufes abonnierte die alte Fassung über zwei Ereignisnamen
- * (`llm/error`, `llm/response`), für die es im Baum keinen Emitter gibt — ein
- * Zuhörer ohne Sender ist eine Behauptung. Entfernt, benannt, nachzuholen: siehe
- * PLAN.md.
+ * DER OVERRIDE (PLAN.md §3.12): DSH einen rotierenden Schlüssel geben.
+ *
+ * Gemessen am installierten Harness, nicht geraten: die Route löst ihren Schlüssel
+ * pro Aufruf über `ctx.get("credentials").resolve(ref)` auf (fehlt der Dienst, gilt
+ * die Startumgebung), und eine fehlgeschlagene Anfrage läuft als Middleware über
+ * `agent/request-error` (Nutzdaten: provider, failure mit stabilem `code`). Darauf
+ * steht die Klammer: sie bedient genau die Referenzen, die das Profil als
+ * `envNames` nennt, aus dem Pool — alles andere erreicht das Original unverändert
+ * (`createResolveOverlay` in pool-core.js, drei Zusagen). Die 429-Beobachtung ruft
+ * nur `next()` weiter und trifft keine Wiederholungs-Entscheidung — das gehört
+ * `llm-retry`. Was dabei NICHT gemessen ist: eine echte 429-Rotation gegen die
+ * laufende Route (dafür bräuchte es zwei echte Schlüssel und einen erzwungenen
+ * 429 in dieser Umgebung). Benannt in docs/ZAHLEN.md §4, nicht behauptet.
  */
 
 import z from '@deepseek-ai/schemastery';
@@ -41,13 +51,16 @@ import {
   authHeaders,
   buildEntries,
   buildProbeRequest,
+  createResolveOverlay,
   keysFromEnv,
   markFailed,
   nextEntry,
+  observeRequestError,
   probeResult,
   redact,
   resetSuccess,
   statusOf,
+  valuesFromLayers,
 } from './assets/pool-core.js';
 
 /** Das Protokoll des Anbieters — zwei Spielarten, mehr gibt es nicht. */
@@ -115,12 +128,26 @@ function providerOf(config, providerId) {
   return config.providers.find((provider) => provider.id === providerId) ?? null;
 }
 
-/** Einen Pool aus der Umgebung bauen. Leer ist ein Befund, kein Fehler. */
-function loadPool(providerConfig, env) {
-  const entries = buildEntries(keysFromEnv(env, {
-    names: providerConfig.envNames,
-    prefix: providerConfig.envPrefix,
-  }));
+/**
+ * Einen Pool aus der STARTUMGEBUNG bauen — nicht aus `process.env` allein.
+ *
+ * Der gemessene Grund: `.env` liegt nicht im Prozess, sondern in den Schichten
+ * der Startumgebung (`ctx.get('launchEnvironment')`: Prozess, Projekt-`.env`,
+ * Benutzer-`.env`). Wer nur `process.env` liest, findet den Schlüssel aus der
+ * Datei nicht — genau so stand der Pool im echten Boot leer. Die ausdrücklichen
+ * Namen kommen aus allen Schichten (fehlt die Naht, gilt `process.env`); der
+ * Präfix-Scan kann nur den Prozess aufzählen (die Momentaufnahme zählt nicht auf)
+ * und bleibt dort.
+ *
+ * Leer ist ein Befund, kein Fehler.
+ */
+function loadPool(providerConfig, ctx) {
+  const launch = typeof ctx?.get === 'function' ? ctx.get('launchEnvironment') : undefined;
+  const named = launch === undefined
+    ? keysFromEnv(process.env, { names: providerConfig.envNames, prefix: '' })
+    : Object.values(valuesFromLayers(launch, providerConfig.envNames));
+  const scanned = keysFromEnv(process.env, { names: [], prefix: providerConfig.envPrefix });
+  const entries = buildEntries([...named, ...scanned]);
   if (entries.length > 0) keyPools.set(providerConfig.id, entries);
   return entries.length;
 }
@@ -200,13 +227,26 @@ probeTool.config = { providers: [] };
 
 // ── Anwendung ─────────────────────────────────────────────────────────────────
 
+/**
+ * Den gerade bedienten Platz je Anbieter wählen UND als aktiv vermerken — die
+ * Marke, an der ein späterer 429 den richtigen Platz trifft. Lesen ohne
+ * Vermerk wäre ein Zeiger, der nirgendwohin zeigt.
+ */
+function serveEntry(providerId) {
+  const pool = keyPools.get(providerId);
+  if (!pool) return null;
+  const entry = nextEntry(pool, now(), false, activeLabels.get(providerId) ?? null);
+  if (entry !== null) activeLabels.set(providerId, entry.label);
+  return entry;
+}
+
 export function apply(ctx, config) {
   probeTool.config = config;
   keyPools.clear();
   activeLabels.clear();
 
   let keys = 0;
-  for (const providerConfig of config.providers) keys += loadPool(providerConfig, process.env);
+  for (const providerConfig of config.providers) keys += loadPool(providerConfig, ctx);
 
   const withoutPool = config.providers.filter((provider) => !keyPools.has(provider.id)).map((provider) => provider.id);
   say(`[shinon-key-router] Aktiviert — ${keyPools.size} Anbieter, ${keys} Plätze`);
@@ -226,11 +266,63 @@ export function apply(ctx, config) {
     child.tools.register(probeTool);
   });
 
+  // Der OVERRIDE: die Route fragt ihren Schlüssel pro Aufruf über
+  // `credentials.resolve(ref)` — die Klammer bedient die Referenzen, die das
+  // Profil als `envNames` nennt, aus dem Pool. Fehlt der Dienst, gibt es nichts
+  // zu klammern: die Route löst dann selbst über die Startumgebung auf, und der
+  // Router bleibt bei seinen Werkzeugen (fail-closed mit Meldung, nicht stumm).
+  const refToProvider = new Map();
+  for (const providerConfig of config.providers) {
+    if (!keyPools.has(providerConfig.id)) continue;
+    for (const name of providerConfig.envNames) refToProvider.set(name, providerConfig.id);
+  }
+  let overlay = null;
+  if (refToProvider.size > 0) {
+    const credentials = typeof ctx?.get === 'function' ? ctx.get('credentials') : undefined;
+    if (credentials === undefined) {
+      warn('[shinon-key-router] ohne credentials-Dienst — kein Override, nur Werkzeuge');
+    } else {
+      overlay = createResolveOverlay(credentials, {
+        managed: [...refToProvider.keys()],
+        select: (name) => serveEntry(refToProvider.get(name)),
+      });
+      if (overlay === null) {
+        warn('[shinon-key-router] credentials ohne resolve — kein Override, nur Werkzeuge');
+      } else {
+        say(`[shinon-key-router] Override aktiv — ${overlay.names.join(', ')}`);
+      }
+    }
+  }
+
+  // Die 429-Beobachtung: NUR beobachten, dann `next()` weitergeben. Die
+  // Wiederholungs-Entscheidung gehört `llm-retry`; wer hier eingriffe, baute eine
+  // zweite Wiederholungs-Logik über denselben Fehler. Gezählt wird nur die
+  // stabile Klasse `RATE_LIMIT` für einen verwalteten Anbieter — und gedeckelt
+  // wird der Platz, der gerade bedient wurde (die Marke aus `serveEntry`).
+  let stopErrors = () => {};
+  if (overlay !== null && typeof ctx?.on === 'function') {
+    stopErrors = ctx.on('agent/request-error', (payload, next) => {
+      const seen = observeRequestError(payload);
+      if (seen !== null && keyPools.has(seen.provider)) {
+        const label = activeLabels.get(seen.provider);
+        const entry = keyPools.get(seen.provider).find((candidate) => candidate.label === label) ?? null;
+        const providerConfig = providerOf(config, seen.provider);
+        if (entry !== null && providerConfig !== null) {
+          markFailed(entry, now(), providerConfig.initialDelayMs, providerConfig.maxDelayMs);
+          say(`[shinon-key-router] 429 bei ${seen.provider} — ${entry.label} gedeckelt`);
+        }
+      }
+      return typeof next === 'function' ? next() : undefined;
+    });
+  }
+
   return () => {
+    if (typeof stopErrors === 'function') stopErrors();
+    overlay?.restore();
     const count = keyPools.size;
     keyPools.clear();
     activeLabels.clear();
-    say(`[shinon-key-router] Deaktiviert — ${count} Pools geleert`);
+    say(`[shinon-key-router] Deaktiviert — Override zurückgebaut, ${count} Pools geleert`);
   };
 }
 

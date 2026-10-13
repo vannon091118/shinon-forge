@@ -24,14 +24,18 @@ import {
   buildEntries,
   buildProbeRequest,
   calcBackoff,
+  createResolveOverlay,
   keyLabel,
   keysFromEnv,
   markFailed,
   nextEntry,
+  observeRequestError,
   probeResult,
   redact,
+  refNameOf,
   resetSuccess,
   statusOf,
+  valuesFromLayers,
 } from '../assets/pool-core.js';
 
 const CANARY = 'sk-canary-niemals-ausgeben-4711';
@@ -133,6 +137,81 @@ test('key-router: redact entfernt Schlüsselmaterial aus JEDEM Text', () => {
   assert.equal(redact('ohne Schlüssel', [CANARY, '']), 'ohne Schlüssel');
   assert.equal(redact({ toString: () => `Wert ${CANARY}` }, [CANARY]), 'Wert [key]', 'auch nicht-Strings');
   assert.equal(redact('bleibt', undefined), 'bleibt');
+});
+
+test('key-router: valuesFromLayers liest ausdrückliche Namen aus allen Schichten', () => {
+  const launch = {
+    get: (name) => name === 'AGNES_API_KEY'
+      ? { value: 'aus-der-datei', source: 'user-env' }
+      : name === 'LEER'
+        ? { value: '', source: 'process' }
+        : undefined,
+  };
+  assert.deepEqual(valuesFromLayers(launch, ['AGNES_API_KEY', 'FEHLT']), { AGNES_API_KEY: 'aus-der-datei' });
+  assert.deepEqual(valuesFromLayers(launch, ['LEER']), {}, 'ein leerer Wert ist kein Wert');
+  assert.deepEqual(valuesFromLayers(undefined, ['AGNES_API_KEY']), {}, 'ohne Naht gilt nichts');
+  assert.deepEqual(valuesFromLayers({}, ['AGNES_API_KEY']), {}, 'ohne get gilt nichts');
+  assert.deepEqual(valuesFromLayers(launch, 'kein-array'), {});
+});
+
+test('key-router: refNameOf trägt den Namen, nicht die Marke', () => {
+  assert.equal(refNameOf('AGNES_API_KEY'), 'AGNES_API_KEY');
+  // Eine gebrandete Referenz ist zur Laufzeit eine Zeichenkette (brandString gibt
+  // den Wert unverändert zurück) — trotzdem liest sich alles gleich.
+  assert.equal(refNameOf(Object('AGNES_API_KEY')), 'AGNES_API_KEY');
+});
+
+test('key-router: die Klammer bedient Verwaltetes aus dem Pool und gibt den Rest weiter', async () => {
+  const calls = [];
+  const service = { async resolve(ref) { calls.push(String(ref)); return { value: 'original', source: 'file' }; } };
+  const pool = buildEntries([CANARY, 'zweiter']);
+  const overlay = createResolveOverlay(service, {
+    managed: ['AGNES_API_KEY'],
+    select: (name) => (name === 'AGNES_API_KEY' ? pool[0] : null),
+  });
+  assert.ok(overlay !== null);
+  assert.deepEqual(overlay.names, ['AGNES_API_KEY']);
+
+  const served = await service.resolve('AGNES_API_KEY');
+  assert.equal(served.value, CANARY, 'die verwaltete Referenz kommt aus dem Pool');
+  assert.equal(served.source, 'pool');
+  assert.deepEqual(calls, [], 'das Original wurde nicht gefragt');
+
+  const foreign = await service.resolve('ANDERER');
+  assert.equal(foreign.value, 'original', 'Fremdes erreicht das Original');
+  assert.deepEqual(calls, ['ANDERER']);
+
+  overlay.restore();
+  const after = await service.resolve('AGNES_API_KEY');
+  assert.equal(after.value, 'original', 'nach restore sieht der Dienst wieder so aus wie vorher');
+  overlay.restore();
+  assert.equal((await service.resolve('X')).value, 'original', 'restore ist wiederholbar');
+});
+
+test('key-router: ohne Pool fällt die Klammer aufs Original zurück statt zu behaupten', async () => {
+  const service = { async resolve() { return { value: 'original', source: 'file' }; } };
+  const overlay = createResolveOverlay(service, { managed: ['AGNES_API_KEY'], select: () => null });
+  assert.equal((await service.resolve('AGNES_API_KEY')).value, 'original');
+  overlay.restore();
+});
+
+test('key-router: ohne Dienst gibt es keine Klammer', () => {
+  assert.equal(createResolveOverlay(undefined, { managed: ['A'] }), null);
+  assert.equal(createResolveOverlay({}, { managed: ['A'] }), null);
+  assert.equal(createResolveOverlay({ resolve: 'keine-funktion' }, { managed: ['A'] }), null);
+});
+
+test('key-router: beobachtet wird nur RATE_LIMIT für einen benannten Anbieter', () => {
+  assert.deepEqual(
+    observeRequestError({ provider: 'agnes', failure: { code: 'RATE_LIMIT' } }),
+    { provider: 'agnes' },
+  );
+  assert.equal(observeRequestError({ provider: 'agnes', failure: { code: 'TIMEOUT' } }), null, 'kein Wechsel ohne 429');
+  assert.equal(observeRequestError({ provider: 'agnes', failure: { code: 'AUTH' } }), null, 'ein toter Schlüssel leert nicht den Pool');
+  assert.equal(observeRequestError({ provider: 'agnes' }), null);
+  assert.equal(observeRequestError({ failure: { code: 'RATE_LIMIT' } }), null, 'ohne Anbieter kein Ziel');
+  assert.equal(observeRequestError(null), null);
+  assert.equal(observeRequestError('kein-objekt'), null);
 });
 
 test('key-router: authHeaders tragen den Schlüssel nur im Kopf', () => {

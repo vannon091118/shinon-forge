@@ -347,12 +347,7 @@ ausschließlich in die Kopfzeilen. Belegt von `packages/key-router/test/pool-cor
 `scripts/gate/tests/key-router-security.test.mjs` (6, inklusive Kanarienvogel-Schlüssel durch das
 ausgelieferte Paket).
 
-**OFFEN bleibt genau EINER** dieser Fäden, und er ist ein Feature: der Provider-**OVERRIDE** des
-Key-Routers. Er verwaltet den Pool und beantwortet seine Werkzeuge, gibt DSH aber noch keinen
-rotierenden Schlüssel an die Hand; dafür fehlt die LLM-Dienstfläche (welcher Dienst, welche Form)
-und ein Gate an der echten Route. Nicht gemessen, nicht behauptet. `baseUrl` im Profil ist
-deshalb **gespiegelt** (Gate-Test vergleicht sie mit dem `agnes`-Anbieter der Route), damit der
-Verbindungstest denselben Host fragt wie der Lauf.
+**ERLEDIGT (2026-10-13):** der Provider-**OVERRIDE** des Key-Routers ist gebaut — `createResolveOverlay` in `packages/key-router/assets/pool-core.js` bedient die verwalteten `envNames`-Referenzen aus dem Pool (`{ value, source: 'pool' }`), alles andere erreicht das Original; `agent/request-error` deckelt nach `RATE_LIMIT` den bedienten Platz, `llm-retry` behält die Wiederholungs-Entscheidung. Belegt von `packages/key-router/test/pool-core.test.mjs` (17) und `scripts/gate/tests/key-router-override.test.mjs` (3, inklusive Kanarienvogel-Schlüssel durch das ausgelieferte Paket). Was dabei NICHT gemessen ist: eine echte 429-Rotation gegen die laufende Route (zwei echte Schlüssel, erzwungener 429) — benannt in `docs/ZAHLEN.md` §4, nicht behauptet. `baseUrl` im Profil bleibt **gespiegelt** (Gate-Test vergleicht sie mit dem `agnes`-Anbieter der Route), damit der Verbindungstest denselben Host fragt wie der Lauf.
 
 #### 3.12.1 Verdikt `shinon-forge` (A4: „bewerten", 2026-10-13)
 
