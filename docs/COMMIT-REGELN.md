@@ -107,14 +107,28 @@ lokal wurde „repariert", was CI akzeptiert hätte.
 
 ## Im Zweifel mehr prüfen, nie weniger
 
-Der Wächter darf nicht enger werden. Kann er den Bereich nicht bestimmen —
-erster Push eines Branches (`before` ist der Null-SHA), Force-Push auf einen
-verschwundenen Stand, flacher Klon, unbekanntes Event, kaputte Event-Datei —
-dann prüft er die **volle Historie** der Spitze, nicht bloß den Kopf-Commit.
-Die Bereichslogik liegt deshalb in `scripts/lib/ci-range.mjs` (reine Funktion,
-getestet) und nicht als Shell-`if` im Workflow.
+Der Wächter prüft nie weniger, als der Push hinzufügt. Kann er den Bereich
+nicht bestimmen — Force-Push auf einen verschwundenen Stand, flacher Klon ohne
+Hauptlinie, unbekanntes Event, kaputte Event-Datei — dann prüft er die **volle
+Historie** der Spitze, nicht bloß den Kopf-Commit. Die Bereichslogik liegt
+deshalb in `scripts/lib/ci-range.mjs` (reine Funktion, getestet) und nicht als
+Shell-`if` im Workflow.
 
 Ein Wächter, der im Zweifel weniger prüft, ist kein Wächter.
+
+### Neuer Branch: Spitze minus Hauptlinie (2026-10-13)
+
+Der erste Push eines Branches (`before` ist der Null-SHA) fiel früher unter die
+volle Historie — und machte damit **jeden** neuen Branch rot, sobald irgendwo in
+der Vergangenheit ein Commit ohne Trailer stand (gemessen: der Branch-Push
+`358979d` war rot, obwohl seine eigenen Commits sauber waren). Das ist kein
+„mehr prüfen", sondern falsch prüfen: die Hauptlinie wurde bei ihrem eigenen
+Push schon gerichtet. Seit 2026-10-13 gilt deshalb: liegt `origin/main` im Klon
+(CI checkt mit `fetch-depth: 0` aus), prüft der Wächter die Spanne
+**Merge-Basis..Spitze** — genau das, was der Branch hinzufügt, vollständig.
+Fehlt die Basis, gilt weiter die volle Historie (fail-closed). Die Regel oben
+bleibt: unbestimmt ⇒ volle Historie. Neu ist nur, dass ein neuer Branch mit
+bestimmbarer Basis nicht mehr „unbestimmt" heißt.
 
 ## Warum Tausch UND Fail-Closed
 

@@ -226,6 +226,11 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       // stillschweigend dazuzukommen.
       { kind: 'import', target: 'node:path' },
       { kind: 'import', target: './assets/note-core.js' },
+      // Zug 6 (83948d5): die Skills kommen aus einem eigenen Verwalter. Genau
+      // der Fall, fuer den der Kommentar oben steht — die Kante ist
+      // aufgefallen, geprueft (`packages/prompter/index.js`, Skills-Zweig um
+      // `readSkills`/`selectSkills`) und wird hier benannt statt geduldet.
+      { kind: 'import', target: './assets/index-manager.js' },
     ],
     'Kanten sind Importe; externe Ziele bleiben drin, weil sie importiert werden',
   );
@@ -435,6 +440,9 @@ test('Lauf: Vollauf, unveränderter Lauf, aufgefrischte und geänderte Datei', (
     rehashed: 0,
     written: 0,
     skipped: 0,
+    // Kein Ausschluss heisst: die Liste ist leer. Sie ist Teil der Zusage, nicht
+    // ein Nebenfach — wer `skipped` liest, kann hier nachsehen, WARUM.
+    scanErrors: [],
     removed: 0,
     protected: 0,
     protectedKinds: {},
@@ -519,6 +527,13 @@ test('Lauf: eine zu große Datei wird übersprungen und lässt keine alten Zeile
   writeFileSync(big, `export const gross = 2;\n${'// noch mehr Fülltext\n'.repeat(400)}`);
   const report = bundle.updateIndex(db, project, { maxFileBytes: 512 });
   assert.equal(report.skipped, 1, 'die Obergrenze greift beim Lesen');
+  // Und der Ausschluss hat einen NAMEN: Pfad und Grund. Ohne diese zwei Angaben
+  // sähe „1 übersprungen" genauso aus wie ein Rechtefehler — die Zahl allein
+  // verschweigt, ob jemand entschieden hat oder etwas kaputt ist.
+  assert.equal(report.scanErrors.length, 1);
+  assert.equal(report.scanErrors[0].path, 'src/gross.mjs', 'der Befund nennt die Datei');
+  assert.equal(report.scanErrors[0].reason, 'ZU_GROSS', 'und den Grund, nicht nur die Zahl');
+  assert.match(report.scanErrors[0].detail, /^\d+>512$/, 'die Grenze steht dabei: gelesene Größe > erlaubte Größe');
   assert.equal(report.written, 0);
   assert.equal(one(db, 'select count(*) as n from files where path = ?', 'src/gross.mjs').n, 0, 'die alten Zeilen sind weg');
   assert.equal(one(db, 'select count(*) as n from symbols where path = ?', 'src/gross.mjs').n, 0);
@@ -669,6 +684,7 @@ test('Gate: zweimaliger Indexlauf ohne Dateiänderung erzeugt keinen vollständi
     rehashed: 0,
     written: 0,
     skipped: 0,
+    scanErrors: [],
     removed: 0,
     protected: 0,
     protectedKinds: {},
@@ -759,12 +775,31 @@ test('Zeitstempel: verify=stamp schliesst die Luecke, ohne den Baum zu lesen', (
   const target = join(project, 'src/marker.mjs');
   writeFileSync(target, 'export const markerA = 1;\n');
   bundle.updateIndex(db, project, { verify: 'stamp' });
-  const stamp = statSync(target).mtime;
+  // Dieselbe mtime, die auch die Indexdatei fuehrt: die gerundete Millisekunde
+  // (wie im Ersatz-Test unten). Ein rohes `statSync(target).mtime` schneidet die
+  // Sub-Millisekunde ab und laege bei einem Bruchteil >= 0,5 ms um 1 ms neben
+  // dem gespeicherten Wert — dann gruesse `untouched` nicht, und der Lauf zaehlte
+  // kein `suspicious`, obwohl die Luecke gestellt ist.
+  const storedBefore = rows(db, 'select bytes, mtime_ms, stamp from files where path = ?', 'src/marker.mjs')[0];
+  const resetTo = new Date(storedBefore.mtime_ms);
 
   // Gleiche Laenge, anderer Inhalt, mtime zurueckgesetzt: die klassischen Signale
   // sehen nichts, der Stempel muss greifen.
   writeFileSync(target, 'export const markerB = 1;\n');
-  utimesSync(target, stamp, stamp);
+  utimesSync(target, resetTo, resetTo);
+  // Grobe ctime-Aufloesung: fallen Schreiben und Zuruecksetzen in denselben
+  // Dateisystem-Takt (hier gemessen: 4-ms-Raster, s. ctimeNs-Suffix 461614),
+  // ist die Vorbedingung „andere ctime" nicht gestellt und `suspicious` bliebe
+  // 0 — ein Takt-Artefakt, kein Befund. Jedes erneute `utimesSync` stempelt die
+  // ctime auf „jetzt"; mit kurzer Wartezeit rueckt sie sicher in den naechsten
+  // Takt, statt den Test vom Zufall der Millisekunde abhaengen zu lassen.
+  const storedCtime = String(storedBefore.stamp).split(':')[4];
+  let guard = 0;
+  while (statSync(target, { bigint: true }).ctimeNs.toString() === storedCtime && guard++ < 200) {
+    const spinUntil = Date.now() + 10;
+    while (Date.now() < spinUntil) {}
+    utimesSync(target, resetTo, resetTo);
+  }
   const storedRow = rows(db, 'select bytes, mtime_ms, stamp from files where path = ?', 'src/marker.mjs')[0];
   const nowInfo = statSync(target, { bigint: true });
   assert.equal(storedRow.bytes, Number(nowInfo.size), 'die Groesse ist gleich geblieben');
@@ -805,6 +840,17 @@ test('Zeitstempel: ein Signal ohne Inhaltsaenderung ist ein gezaehlter Fehlalarm
 
   const target = join(project, 'src/b.mjs');
   chmodSync(target, 0o600);
+  // Dieselbe Takt-Falle wie im Luecken-Test: faellt das chmod in denselben
+  // ctime-Takt wie die Indexierung, bewegt sich die ctime nicht und das Signal
+  // bliebe aus. Erneut chmodden nach kurzer Wartezeit rueckt sie in den
+  // naechsten Takt.
+  const indexedCtime = String(rows(db, 'select stamp from files where path = ?', 'src/b.mjs')[0].stamp).split(':')[4];
+  let chmodGuard = 0;
+  while (statSync(target, { bigint: true }).ctimeNs.toString() === indexedCtime && chmodGuard++ < 200) {
+    const spinUntil = Date.now() + 10;
+    while (Date.now() < spinUntil) {}
+    chmodSync(target, 0o600);
+  }
 
   const noisy = bundle.updateIndex(db, project, { verify: 'stamp' });
   assert.equal(noisy.suspicious, 1, 'die ctime hat sich bewegt');
@@ -1629,6 +1675,185 @@ test('Mount: der Bericht nennt den Schutz, und er lässt sich nicht abschalten',
     assert.ok(/\d+ Fundstellen redigiert/.test(line), line);
     assert.ok(!line.includes(CANARY.dotenv) && !line.includes(CANARY.credentials), 'aber niemals einen Wert');
     assert.deepEqual(Object.keys(bundle.Config({})).includes('protection'), false, 'der Schutz ist keine Konfiguration');
+  } finally {
+    quiet.restore();
+  }
+});
+
+// ── Zusage: der Scan ist deterministisch und benennt seine Ausschlüsse ───────
+
+/**
+ * Die Reihenfolge ist eine Funktion der DateiMENGE, nicht des Durchlaufs.
+ *
+ * Geprüft wird nicht „es ist sortiert" (das wäre eine Momentaufnahme), sondern
+ * die Eigenschaft, die zählt: zweimal auflisten ergibt dieselbe Folge, und sie
+ * ist gleich der Sortierung der Menge — also unabhängig davon, in welcher
+ * Reihenfolge die Dateien ANGELEGT wurden und wie der Baum durchlaufen wird.
+ * Die Anlage ist deshalb absichtlich durchmischt (tiefe Pfade zuerst).
+ */
+test('Scan: die Dateireihenfolge ist eine Funktion der Dateimenge, nicht des Durchlaufs', () => {
+  const project = join(workDir('ordnung'), 'projekt');
+  const created = [
+    'src/tief/noch-tiefer/z.mjs',
+    'aaa.mjs',
+    'docs/mitte.mjs',
+    'src/a.mjs',
+    'zzz/last.mjs',
+    'B.mjs',
+  ];
+  for (const path of created) {
+    mkdirSync(join(project, path, '..'), { recursive: true });
+    writeFileSync(join(project, path), `export const wert = ${JSON.stringify(path)};\n`);
+  }
+
+  const first = bundle.listFiles(project).map((absolute) => bundle.toProjectPath(project, absolute));
+  const second = bundle.listFiles(project).map((absolute) => bundle.toProjectPath(project, absolute));
+
+  assert.deepEqual(second, first, 'zwei Auflistungen desselben Baums sind identisch');
+  assert.deepEqual(first, [...first].sort(), 'und die Folge ist aufsteigend nach Pfad');
+  assert.deepEqual(
+    first,
+    ['B.mjs', 'aaa.mjs', 'docs/mitte.mjs', 'src/a.mjs', 'src/tief/noch-tiefer/z.mjs', 'zzz/last.mjs'],
+    'Pfadvergleich ohne Locale: Grossbuchstaben vor Kleinbuchstaben, Tiefe ist keine Ordnung',
+  );
+  assert.notDeepEqual(first, created, 'die Anlagereihenfolge ist NICHT die Ausgabereihenfolge — sonst bewiese der Test nichts');
+});
+
+/**
+ * Ein unlesbarer Ordner ist ein BEFUND, kein Nichts.
+ *
+ * Vor dieser Änderung kehrte der Durchlauf dort wortlos um: der ganze Teilbaum
+ * fehlte im Index, und der Bericht sah danach genauso aus wie ein Projekt ohne
+ * diesen Ordner. Der Test stellt das mit `chmod 000` her (läuft als Nicht-root —
+ * als root greifen Dateirechte nicht, dann wäre die Probe leer) und verlangt
+ * Pfad UND Grund.
+ */
+test('Scan: ein unlesbarer Ordner wird benannt, statt still zu fehlen', () => {
+  const project = join(workDir('ordnerfehler'), 'projekt');
+  mkdirSync(join(project, 'src'), { recursive: true });
+  mkdirSync(join(project, 'gesperrt'), { recursive: true });
+  writeFileSync(join(project, 'src/a.mjs'), 'export const alpha = 1;\n');
+  writeFileSync(join(project, 'gesperrt/b.mjs'), 'export const beta = 2;\n');
+
+  const errors = [];
+  chmodSync(join(project, 'gesperrt'), 0o000);
+  let listed;
+  try {
+    listed = bundle.listFiles(project, bundle.SOURCE_EXTENSIONS, (entry) => errors.push(entry));
+  } finally {
+    chmodSync(join(project, 'gesperrt'), 0o755);
+  }
+
+  const paths = listed.map((absolute) => bundle.toProjectPath(project, absolute));
+  assert.deepEqual(paths, ['src/a.mjs'], 'der gesperrte Teilbaum fehlt im Ergebnis');
+  assert.equal(errors.length, 1, 'und genau einmal gemeldet');
+  assert.equal(errors[0].reason, 'ORDNER_NICHT_LESBAR', 'mit dem Grund, der auf den Ordner zeigt');
+  assert.equal(bundle.toProjectPath(project, errors[0].path), 'gesperrt');
+  assert.equal(errors[0].detail, 'EACCES', 'und dem Fehlercode des Betriebssystems');
+
+  // Derselbe Befund steht im Lauf-Bericht — und in der Zeile, die der Host protokolliert.
+  const { file } = fixtureIndex(project, 'ordnerfehler');
+  const db = bundle.openIndex(file);
+  chmodSync(join(project, 'gesperrt'), 0o000);
+  try {
+    const report = bundle.updateIndex(db, project, {});
+    assert.deepEqual(report.scanErrors, [{ path: 'gesperrt', reason: 'ORDNER_NICHT_LESBAR', detail: 'EACCES' }]);
+    assert.equal(report.skipped, 0, 'ein Ordner ist keine Datei: `skipped` bleibt die Dateizahl');
+    assert.deepEqual(rows(db, 'select path from files order by path').map((row) => row.path), ['src/a.mjs']);
+  } finally {
+    chmodSync(join(project, 'gesperrt'), 0o755);
+    db.close();
+  }
+});
+
+/**
+ * Eine unlesbare DATEI trägt denselben Befund an der Stelle, an der bisher nur
+ * eine Zahl stand: `skipped` bleibt (die Zusage, die andere Tests lesen), aber
+ * daneben steht, welche Datei und warum. Der Unterschied ist der ganze Punkt —
+ * „1 übersprungen" konnte eine bewusste Obergrenze sein oder ein Rechtefehler.
+ */
+test('Scan: eine unlesbare Datei wird mit Pfad und Grund gemeldet', () => {
+  const project = join(workDir('dateifehler'), 'projekt');
+  mkdirSync(join(project, 'src'), { recursive: true });
+  writeFileSync(join(project, 'src/a.mjs'), 'export const alpha = 1;\n');
+  const gesperrt = join(project, 'src/gesperrt.mjs');
+  writeFileSync(gesperrt, 'export const beta = 2;\n');
+
+  const { file } = fixtureIndex(project, 'dateifehler');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, {});
+  assert.equal(one(db, 'select count(*) as n from files where path = ?', 'src/gesperrt.mjs').n, 1, 'zunächst indiziert');
+
+  chmodSync(gesperrt, 0o000);
+  try {
+    const report = bundle.updateIndex(db, project, {});
+    assert.equal(report.skipped, 1);
+    assert.equal(report.scanErrors.length, 1, 'genau ein benannter Ausschluss');
+    assert.equal(report.scanErrors[0].path, 'src/gesperrt.mjs');
+    assert.equal(report.scanErrors[0].reason, 'NICHT_LESBAR', 'nicht „zu groß" und nicht stumm');
+    assert.equal(report.scanErrors[0].detail, 'EACCES');
+    assert.equal(
+      one(db, 'select count(*) as n from files where path = ?', 'src/gesperrt.mjs').n,
+      0,
+      'und die alten Zeilen stehen nicht mehr — ein Ausschluss ist kein Weiterbetrieb',
+    );
+  } finally {
+    chmodSync(gesperrt, 0o644);
+    db.close();
+  }
+});
+
+/**
+ * Die Haltbarkeitspolitik steht fest, statt geerbt zu werden.
+ *
+ * „Kontrollierte Persistenz" heißt hier: der Index benennt seine Politiken selbst
+ * und ein Leser kann sie nachsehen. WAL trägt den laufenden Betrieb, `secure_delete`
+ * entfernt den Inhalt gelöschter Zellen aus den freigegebenen Seiten (ohne ihn stand
+ * ein gelöschter Wert weiterhin in der Datei — gemessen, siehe oben), und
+ * `synchronous = full` (Wert 2) macht einen Commit dauerhaft, bevor er als fertig gilt.
+ */
+test('Persistenz: die Politiken des Index stehen fest und sind nachlesbar', () => {
+  const project = join(workDir('persistenz'), 'projekt');
+  mkdirSync(project, { recursive: true });
+  writeFileSync(join(project, 'a.mjs'), 'export const alpha = 1;\n');
+  const { file } = fixtureIndex(project, 'persistenz');
+  const db = bundle.openIndex(file);
+  try {
+    assert.equal(db.prepare('pragma journal_mode').get().journal_mode, 'wal', 'WAL traegt den laufenden Betrieb');
+    assert.equal(Number(db.prepare('pragma secure_delete').get().secure_delete), 1, 'geloeschte Zellen werden ueberschrieben');
+    assert.equal(Number(db.prepare('pragma synchronous').get().synchronous), 2, 'full = 2: ein Commit ist dauerhaft, bevor er als fertig gilt');
+  } finally {
+    db.close();
+  }
+});
+
+/**
+ * „Sichtbar" heißt: die Zeile, die der Host schreibt, nennt Grund UND Pfad.
+ *
+ * Der Bericht ist die einzige Stelle, an der ein Ausschluss überhaupt bemerkt
+ * werden kann — er läuft nach dem Mount und im Worker, also sieht ihn niemand
+ * außer im Protokoll. Deshalb wird hier nicht die Berichtsstruktur geprüft,
+ * sondern die gerenderte Zeile: Grund, Pfad, und (weil eine Obergrenze eine
+ * Entscheidung ist und kein Fehler) weiterhin die Zahl des Ausschlusses.
+ */
+test('Mount: die Berichtszeile nennt jeden Ausschluss mit Grund und Pfad', async () => {
+  const project = join(workDir('sichtbar'), 'projekt');
+  mkdirSync(join(project, 'src'), { recursive: true });
+  writeFileSync(join(project, 'src/klein.mjs'), 'export const klein = 1;\n');
+  // Über jeder Grenze: der Ausschluss ist hier die ABSICHT des Tests, nicht ein Unfall.
+  writeFileSync(join(project, 'src/gross.mjs'), `export const gross = 1;\n${'// Fuelltext\n'.repeat(200)}`);
+  const indexRoot = join(workDir('sichtbar'), 'indexes');
+  const quiet = collector();
+  try {
+    const dispose = bundle.apply({}, bundle.Config({ root: project, indexRoot, maxFileBytes: 512 }));
+    assert.ok(await quiet.waitFor('Lauf im Worker'), `der Lauf muss berichten: ${quiet.lines.join(' | ')}`);
+    dispose();
+    const line = quiet.lines.find((entry) => entry.includes('uebersprungen'));
+    assert.ok(line !== undefined, 'die Berichtszeile ist da');
+    assert.ok(line.includes('1 uebersprungen'), line);
+    assert.ok(line.includes('ZU_GROSS=1'), 'der Grund steht in der Zeile, nicht nur die Zahl');
+    assert.ok(line.includes('src/gross.mjs'), 'und der Pfad, damit der Befund nachzugehen ist');
+    assert.ok(!line.includes('src/klein.mjs'), 'was indiziert wurde, ist kein Ausschluss');
   } finally {
     quiet.restore();
   }

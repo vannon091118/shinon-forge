@@ -1,7 +1,19 @@
 # VERIFICATION_MATRIX — Phase A (nur was LIEF, mit Exit-Code)
 
-> **Status:** current — Phase-A-Audit, gemessen am 2026-10-10 in DIESER Umgebung (Node v18, kein dsh). **Stand:** 2026-10-10
+> **Status:** historical — Phase-A-Audit, gemessen am 2026-10-10 in DIESER Umgebung (Node v18, kein dsh). **Stand:** 2026-10-10
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+>
+> **Nachtrag 2026-10-13: diese Datei ist ein DATIERTER Befund und nicht mehr `current`.**
+> Sie beschreibt eine Umgebung mit Node v18 ohne `dsh` und ohne `node_modules` — die
+> Zahlen darin sind unter dieser Umgebung gemessen und **keine** Aussage über heute.
+> Drei Beispiele: „150 pass … 162 total" in der Zeile `gate:test` stehen heute
+> **464 Tests / 457 grün / 7 rot** (`npm run gate:test`, `docs/ZAHLEN.md` §2); „98
+> bestanden" des statischen Gates stehen heute auf **105** (`node scripts/shinon-test.mjs`);
+> „BLOCKIERT" bei Profil-Boot und Distribution ist mit `dsh` im PATH aufgelöst.
+> Wer den aktuellen Stand braucht, liest `docs/ZAHLEN.md` §2/§3 und
+> [`docs/handshakes/2026-10-13-project-index-scan-und-ci-schranke.md`](../handshakes/2026-10-13-project-index-scan-und-ci-schranke.md).
+> Dieser Block ersetzt keine der Zeilen unten — er sagt, wie sie zu lesen sind: als
+> Momentaufnahme vom 2026-10-10, nicht als Zusage.
 
 | Aussage | Kommando (tatsächlich ausgeführt) | Ergebnis | Status |
 |---|---|---|---|

@@ -347,12 +347,7 @@ ausschließlich in die Kopfzeilen. Belegt von `packages/key-router/test/pool-cor
 `scripts/gate/tests/key-router-security.test.mjs` (6, inklusive Kanarienvogel-Schlüssel durch das
 ausgelieferte Paket).
 
-**OFFEN bleibt genau EINER** dieser Fäden, und er ist ein Feature: der Provider-**OVERRIDE** des
-Key-Routers. Er verwaltet den Pool und beantwortet seine Werkzeuge, gibt DSH aber noch keinen
-rotierenden Schlüssel an die Hand; dafür fehlt die LLM-Dienstfläche (welcher Dienst, welche Form)
-und ein Gate an der echten Route. Nicht gemessen, nicht behauptet. `baseUrl` im Profil ist
-deshalb **gespiegelt** (Gate-Test vergleicht sie mit dem `agnes`-Anbieter der Route), damit der
-Verbindungstest denselben Host fragt wie der Lauf.
+**ERLEDIGT (2026-10-13):** der Provider-**OVERRIDE** des Key-Routers ist gebaut — `createResolveOverlay` in `packages/key-router/assets/pool-core.js` bedient die verwalteten `envNames`-Referenzen aus dem Pool (`{ value, source: 'pool' }`), alles andere erreicht das Original; `agent/request-error` deckelt nach `RATE_LIMIT` den bedienten Platz, `llm-retry` behält die Wiederholungs-Entscheidung. Belegt von `packages/key-router/test/pool-core.test.mjs` (17) und `scripts/gate/tests/key-router-override.test.mjs` (3, inklusive Kanarienvogel-Schlüssel durch das ausgelieferte Paket). Was dabei NICHT gemessen ist: eine echte 429-Rotation gegen die laufende Route (zwei echte Schlüssel, erzwungener 429) — benannt in `docs/ZAHLEN.md` §4, nicht behauptet. `baseUrl` im Profil bleibt **gespiegelt** (Gate-Test vergleicht sie mit dem `agnes`-Anbieter der Route), damit der Verbindungstest denselben Host fragt wie der Lauf.
 
 #### 3.12.1 Verdikt `shinon-forge` (A4: „bewerten", 2026-10-13)
 
@@ -529,6 +524,48 @@ Der Kern: **es ist kein DSH-Plugin, sondern eine Bedienerschicht (Operator).** J
 - **Risiko:** hoch / hoch.
 - **Abhängig von:** 4.1 (positiv), E1–E3 (Verträge eingefroren)
 - **Status:** zurückgestellt — Gate nicht erfüllt
+
+---
+
+## 9. Abnahme je offener Funktion (vorab festgehalten, 2026-10-13)
+
+**Warum diese Tabelle existiert:** eine Abnahme, die erst nach dem Bauen formuliert
+wird, beschreibt hinterher immer, was gebaut wurde. Die folgenden Zeilen stehen
+**vor** der Arbeit fest — je Funktion ein Satz, der entweder wahr oder falsch ist,
+mit dem Ding, an dem man es sieht. Wer eine Zeile ändert, ändert sie hier (und
+nennt den Grund), nicht in einem Bericht.
+
+Ebenfalls festgehalten: **welche Funktionen NICHT offen sind.** `key-router` und
+`popup` sind gebaut, gepinnt und aktiv (§3.12); ihre Kernfunktionen, Sicherheits-
+verträge und Tests sind am 2026-10-13 gemessen (29 Paket-Tests + 15 Gate-Tests,
+grün) — die Forderung „erst aktivieren, wenn Kernfunktion, Sicherheitsvertrag und
+Tests VOLLSTÄNDIG sind" ist damit erfüllt und keine Absichtserklärung mehr.
+
+| # | Funktion | Abnahme (prüfbar) | Wo man es sieht |
+|---|---|---|---|
+| 1.1 | Node ≥ 22 für die Läufe | `engines` erlaubt die laufende Fassung, und die ganze Kette (`npm test`) läuft mit Node 22 auf **Exit 0** | `node -p "JSON.stringify(require('./package.json').engines)"` + `npm test` |
+| 1.2 | `schemastery` auflösbar, keine Versionsmischung | `require.resolve` aus dem Root gelingt **und** die aufgelöste Fassung ist semver-gleich der deklarierten | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` gegen `require.resolve` |
+| 1.5 | Commit `487c559` bewerten | ein geschriebenes Verdikt mit Inhaltsdiff: was er ändert, ob es hier noch gilt, ob er übernommen/verworfen wird | neues Nachweis-Dokument unter `docs/audit/` |
+| 3.6 | `profiles/` durch Code-Konfiguration ersetzen | der Boot mit `resolvedProfile` liefert **dieselben** Layer-Köpfe und Einträge wie der Profil-Boot (Vergleich beider Zählungen, nicht ein grüner Exit) | `--dump-config` gegen den Spike aus §3.3 |
+| 3.8 | Overlay-MVP | die drei offenen Punkte aus `UPSTREAM_DIFF` §5.2 sind **entschieden** (je einer: Slot-Definition, Launcher-only-Patch, Remote-Listen-Extensibilität), und die UI zeigt die Marke im genannten Slot | Entscheidungstabelle + ein Lauf mit `npm run dev` |
+| 3.9 | Live-Verifikation | **ein** echter Modell-Turn gegen die Route `agnes/agnes-3.0-flash` mit Protokoll (Boot, Urteil, Widerruf, Host-Ende, Neustart) und ohne Schlüsselwert im Text | Protokoll unter `docs/probes/` |
+| 3.10 | Docs reduzieren | eine benannte Zielliste mit der Zählung **vorher/nachher** und je gestrichenem Dokument der Grund; keine Zahl ohne Befehl | `docs/ZAHLEN.md` §1 |
+| 4.1 | Messung unter Linux | RSS-Tabelle der Engine im Leerlauf **und** während einer Runde, plus Browser-Vergleich (Chromium gegen Electron), je mit Befehl und Rohwert | `docs/audit/MESSUNG.md` |
+| 4.2 | Aufgabenset | 20–30 Aufgaben, jede mit Ausgangszustand und **maschinell prüfbarem** Ergebnis | `benchmarks/` + Aufgabenliste |
+| 4.3 | Metriken | Erfolgsquote, Erfolg je Token, Zeit und Fehlversuche sind **aus einem Lauf berechenbar** (ein Auswertungsskript liegt vor und rechnet sie) | Metrikdokument + Skript |
+| 4.4 | DSH-Baseline | Rohdaten **je Aufgabe** mit demselben Modell auf demselben Set | `docs/audit/BENCHMARK_DSH.md` |
+| 4.5 | Shinon-Konfiguration messen | dieselbe Form, dieselben Aufgaben — Rohdaten je Aufgabe | `docs/audit/BENCHMARK_SHINON.md` |
+| 4.6 | Feature-Entscheidung | je Feature (Prompt-Enhancer, Task-Router, Index) eine Entscheidung mit dem Messwert, der sie trägt; „behalten" ohne Zahl gilt nicht | Entscheidungstabelle in `docs/audit/` |
+| 6.1 | Persistenz zuerst | ein geschriebener Stand **überlebt einen Neustart** (Test, der wirklich neu startet — nicht nur neu liest) | Testlauf mit Exit-Code |
+| 6.2 | Ereignis-Adapter | der Adapter hängt an `agent/status`, `llm/response`, `llm/error` und **zählt** echte Ereignisse aus einem Lauf; die Aktivierung aus §3.12 ist Voraussetzung und liegt vor | Testlauf mit Zählung |
+| 6.3 | Balancing an erfolgreichen Schritten | Fortschritt hängt an **erfolgreichen Schritten**, nicht an der Tokenmenge (`xpPerToken` ist weg) — Tests weisen die Kopplung **und** ihre Umkehrung nach | `packages/codingmon/test/` |
+| 6.4 | Kampf abbrechbar | ein Spielende beendet den Kampf; der Test belegt das Ende (nicht nur den Abbruch) | Testlauf |
+| 7.1 | Bedienung | drei Standardaufgaben ohne Doku erledigt; jede Fehlermeldung nennt den nächsten Schritt; die internen Begriffe (Profil, Gate, Slice, Stub) stehen nicht mehr in der UI | Protokoll des Erstlaufs |
+| 7.2 | Lokalisierung | kein sichtbarer Text kommt aus einer Fallback-Tabelle; ein Gate-Test wird bei einem hartkodierten Text **rot** (Negativprobe, sonst beweist er nichts) | Gate-Test mit Zählung |
+| 7.3 | QoL | eine Liste mit Status je Punkt im Repo; jeder Punkt ist gelöst oder **bewusst verworfen**, keiner offen ohne Grund | `docs/quality/QOL.md` (neu) |
+| 7.4 | Design aus Tokens | keine festen Farbwerte in Shinon-Flächen — belegt durch einen Grep, der bei einem eingebauten Farbwert rot wird, plus Screenshots vorher/nachher | Screenshots + Grep |
+| 5.1–5.3 | Desktop-Spike, Shell-Protokoll, Single-Binary | **gegated durch 4.1/A10** — solange die Messung den Browser nicht als Engpass belegt, wird hier nichts gebaut; die Abnahme bleibt der Wortlaut oben | `PLAN.md` §4.1 |
+| 8.1–8.4 | Engine-Port | **gegated durch 4.1** (positiv) und E1–E3 (Verträge eingefroren): identisches Ergebnis je Kern gegen die Replay-Fixtures | Fixture-Läufe alt/neu |
 
 ---
 

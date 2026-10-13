@@ -225,6 +225,25 @@ export const Config = z.object({
  * nicht. Wer den Lauf liest, soll sehen, dass Dateien nicht gelesen wurden und
  * Werte ersetzt wurden — ohne dass ein Wert im Protokoll steht.
  */
+/**
+ * Wie viele ausgelassene Pfade der Bericht NAMENTLICH nennt.
+ *
+ * Eine Grenze muss sein (ein Projekt mit tausend Rechtefehlern darf das Log nicht
+ * fluten), aber sie darf nicht verschweigen: was darueber liegt, wird gezaehlt
+ * und als „+N weitere" benannt.
+ */
+const MAX_NAMED_ERRORS = 5;
+
+/** Die Gruende der Auslassungen als zaehlbare Kurzform — Pfade und Namen, nie Inhalte. */
+function scanErrorSummary(errors) {
+  if (!Array.isArray(errors) || errors.length === 0) return '';
+  const kinds = {};
+  for (const error of errors) kinds[error.reason] = (kinds[error.reason] ?? 0) + 1;
+  const named = errors.slice(0, MAX_NAMED_ERRORS).map((error) => error.path).join(', ');
+  const rest = errors.length > MAX_NAMED_ERRORS ? `, +${errors.length - MAX_NAMED_ERRORS} weitere` : '';
+  return ` [${Object.entries(kinds).map(([reason, count]) => `${reason}=${count}`).join(' ')}: ${named}${rest}]`;
+}
+
 // TODO: [DSH-Refactor] - Eine einzige lange String-Konkatenation mit bedingten Teilstuecken
 // inline. Als Feldliste (label, wert, nur-wenn) bauen und einmal rendern — dann ist ein
 // neues Feld eine Datenzeile statt einer Klammeroperation in einem Ausdruck.
@@ -237,7 +256,7 @@ function reportLine(report, stats, where) {
     `${report.rehashed} nur aufgefrischt, ${report.hashed} gelesen (${report.readBytes} Bytes), ` +
     `${report.unchanged} unveraendert${report.stamped > 0 ? ` (${report.stamped} ueber Stempel)` : ''}, ` +
     `${report.falseAlarms > 0 ? `${report.falseAlarms} Fehlalarm(e), ` : ''}` +
-    `${report.removed} entfernt, ${report.skipped} uebersprungen, ` +
+    `${report.removed} entfernt, ${report.skipped} uebersprungen${scanErrorSummary(report.scanErrors)}, ` +
     `Schutz: ${report.protected} nie gelesen${protectedKinds === '' ? '' : ` (${protectedKinds})`}, ` +
     `${report.findings} Fundstellen redigiert, ` +
     `${report.references} Referenzen, ${report.touches} Touches — ${stats?.files ?? '?'} Dateien, ` +

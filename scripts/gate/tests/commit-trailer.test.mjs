@@ -347,14 +347,29 @@ test('ci-range: auflösbare Basis ergibt eine Spanne', () => {
   assert.equal(pr.range, 'base1..head1');
 });
 
-test('ci-range: jeder unbestimmte Fall ergibt die volle Historie, nie weniger', () => {
-  // Neuer Branch: GitHub schickt den Null-SHA als `before`.
-  const newBranch = resolveCiRange(
-    { GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: eventFile({ before: '0'.repeat(40) }) },
+test('ci-range: ein neuer Branch prüft die Spitze minus Hauptlinie, nie weniger', () => {
+  // Neuer Branch: GitHub schickt den Null-SHA als `before`. Was der Push
+  // hinzufügt, ist die Spitze nach der Merge-Basis mit origin/main — liegt sie
+  // vor (hier: der Stub löst alles auf), wird genau das geprüft, nicht die
+  // volle Historie. Die Hauptlinie wurde bei ihrem eigenen Push schon gerichtet.
+  const added = resolveCiRange(
+    { GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: eventFile({ before: '0'.repeat(40) }), GITHUB_SHA: 'bbb222' },
     alwaysResolvable,
   );
-  assert.equal(newBranch.range, 'HEAD');
+  assert.equal(added.range, 'sha..bbb222');
+  assert.match(added.why, /Merge-Basis/);
 
+  // Ohne Hauptlinie im Klon bleibt es bei der vollen Historie (fail-closed).
+  assert.equal(
+    resolveCiRange(
+      { GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: eventFile({ before: '0'.repeat(40) }) },
+      neverResolvable,
+    ).range,
+    'HEAD',
+  );
+});
+
+test('ci-range: jeder unbestimmte Fall ergibt die volle Historie, nie weniger', () => {
   // Force-Push auf einen verschwundenen Stand.
   assert.equal(
     resolveCiRange({ GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: eventFile({ before: 'weg' }) }, neverResolvable).range,
@@ -371,10 +386,13 @@ test('ci-range: jeder unbestimmte Fall ergibt die volle Historie, nie weniger', 
   // Unbekanntes Event und gar kein Kontext.
   assert.equal(resolveCiRange({ GITHUB_EVENT_NAME: 'schedule' }, alwaysResolvable).range, 'HEAD');
   assert.equal(resolveCiRange({}, alwaysResolvable).range, 'HEAD');
-  // Kaputte Event-Datei: kein stiller Rückfall auf „nichts prüfen".
+  // Kaputte Event-Datei: kein stiller Rückfall auf „nichts prüfen". Liegt die
+  // Hauptlinie vor (hier: der Stub löst alles auf), zählt die Spanne ab der
+  // Merge-Basis — auch eine kaputte Datei ändert nichts daran, WAS der Branch
+  // hinzufügt.
   assert.equal(
     resolveCiRange({ GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: eventFile(null, '{ kaputt') }, alwaysResolvable).range,
-    'HEAD',
+    'sha..HEAD',
   );
 });
 
@@ -502,11 +520,36 @@ test('commit-guard --ci: Footer im neuen Commit ⇒ Exit 1', () => {
 });
 
 test('commit-guard --ci: neuer Branch (Null-SHA) prüft die volle Historie', () => {
+  // Im temporären Repo gibt es kein origin/main — also keine bestimmbar Basis
+  // und damit die volle Historie (fail-closed). Der Fall MIT Hauptlinie steht
+  // im Test darüber (`ci-range: ein neuer Branch prüft die Spitze minus
+  // Hauptlinie`) und im Branch-Fall unten.
   const repo = tempRepo();
   repo.commit(FORBIDDEN_SAMPLE, 'a.txt');
   repo.commit(VALID_SAMPLE, 'b.txt');
   const result = run([GUARD, '--ci'], repo.dir, pushEnv(repo, { before: '0'.repeat(40) }));
   assert.equal(result.status, 1, 'der Alt-Verstoß muss beim ersten Push auffallen');
+});
+
+test('commit-guard --ci: neuer Branch mit Hauptlinie prüft nur, was der Branch hinzufügt', () => {
+  // Der ECHTE Branch-Fall: ein Klon mit origin/main, ein Branch mit einem
+  // sauberen Commit obendrauf — und ein Alt-Verstoß in der Hauptlinie. Vor der
+  // Merge-Basis-Regel war dieser Push rot (volle Historie); jetzt zählt nur
+  // die Spanne Basis..Spitze.
+  const repo = tempRepo();
+  repo.commit(FORBIDDEN_SAMPLE, 'a.txt');
+  repo.git(['branch', '-M', 'main']);
+  const bare = join(mkdtempSync(join(tmpdir(), 'shinon-range-origin-')), 'origin.git');
+  execFileSync('git', ['init', '-q', '--bare', bare]);
+  repo.git(['remote', 'add', 'origin', bare]);
+  repo.git(['push', '-q', 'origin', 'main']);
+  repo.git(['checkout', '-q', '-b', 'zweig']);
+  repo.commit(VALID_SAMPLE, 'b.txt');
+  const base = execFileSync('git', ['merge-base', 'origin/main', 'HEAD'], { cwd: repo.dir, encoding: 'utf8' }).trim();
+  assert.ok(/^[0-9a-f]{40}$/.test(base), 'die Basis ist bestimmbar');
+  const result = run([GUARD, '--ci'], repo.dir, pushEnv(repo, { before: '0'.repeat(40) }));
+  assert.equal(result.status, 0, 'nur der Branch-Commit zählt — der Alt-Verstoß in main bleibt liegen');
+  assert.ok(result.stdout.includes(`${base}..`), 'die geprüfte Spanne beginnt an der Merge-Basis');
 });
 
 test('commit-guard --ci: Pull Request prüft Basis..Head', () => {

@@ -11,6 +11,7 @@
 | Wie baue ich ein Paket, was darf hinein? | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Regeln für Agenten in diesem Repo | [`AGENTS.md`](../AGENTS.md) |
 | Wie sind Commits aufgebaut? | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) |
+| Welche CI-Zweige laufen, welcher Name ist verpflichtend? | [`docs/CI.md`](CI.md) |
 | **Wie viele** Pakete, Layer, Tests? | [`docs/ZAHLEN.md`](ZAHLEN.md) |
 | Was ist belegt, was nur gemessen-rot? | `docs/probes/`, `docs/contracts/` + `docs/ZAHLEN.md` §2/§3 |
 
@@ -57,6 +58,7 @@ gilt nicht als Nachmessung.
 | [`AGENTS.md`](../AGENTS.md) | current | 2026-10-09 | Arbeitsregeln für Agenten |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-13 | Namespace-, Paket- und Profilkonventionen; §5 führt den Lebenszyklus von `.shinon/` |
 | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) | current | 2026-10-08 | Commit-Regeln und ihre Durchsetzung |
+| [`docs/CI.md`](CI.md) | current | 2026-10-13 | CI als Schranke: die zehn Zweige, der Anzeigename `Verdikt (fail-closed)` als der eine verpflichtende Statuscheck für `main`, der Setz- und der Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-13 | alle harten Zahlen + Befehle |
 | [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) | plan | 2026-10-08 | native App: Stufe 1 scharf, 2–4 Konzept |
 | [`IDEA.md`](../IDEA.md) | plan | 2026-10-07 | rohe Ideensammlung (ohne Überschriftenstruktur) |

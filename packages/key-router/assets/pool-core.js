@@ -60,6 +60,125 @@ export function buildEntries(keys) {
   return entries;
 }
 
+// ── Override: die Übergabe an den Lauf ───────────────────────────────────────
+//
+// Die Mechanik, mit der der Pool die Route erreicht (PLAN.md §3.12). Gemessen am
+// installierten Harness (0.2.1-alpha.1), nicht geraten:
+//
+//   - Die Route (`agnes`, `apiKeyEnv: AGNES_API_KEY`) löst ihren Schlüssel pro
+//     Aufruf über `ctx.get("credentials").resolve(ref)` auf; fehlt der Dienst,
+//     gilt die Startumgebung. Der Aufruf ist eine Funktion, kein Wert — jeder
+//     neue Aufruf sieht den aktuellen Poolstand.
+//   - Eine fehlgeschlagene Anfrage läuft als Middleware über
+//     `agent/request-error` (Nutzdaten: provider, failure mit stabilem
+//     `code`, z. B. `RATE_LIMIT` bei 429); wer dort nur beobachtet und `next()`
+//     weitergibt, ändert nichts am Wiederholungsverhalten — das gehört
+//     `llm-retry`.
+//
+// Der Override ist deshalb eine Klammer um genau EINE Methode (`resolve`), die
+// genau die Referenzen bedient, die das Profil nennt, und alles andere an das
+// Original weitergibt. Kein Schreiben in den Tresor (kein
+// Persistenz-Rauschen bei jeder Rotation), kein eigener Wiederholungs-Entscheid.
+
+/**
+ * Werte zu ausdrücklichen Namen aus der Startumgebung lesen.
+ *
+ * `launch` ist die Naht (`ctx.get('launchEnvironment')`, drei Schichten: Prozess,
+ * Projekt-`.env`, Benutzer-`.env`) — oder fehlt, dann gilt nichts. Die Form ist
+ * absichtlich schmal (`{ get(name) }`): was DSH dort liefert (`{ value, source }`)
+ * und was ein Stub liefert, liest sich gleich.
+ *
+ * @param launch - die Startumgebung oder nichts.
+ * @param names - die ausdrücklichen Namen, in Reihenfolge.
+ */
+export function valuesFromLayers(launch, names) {
+  const values = {};
+  if (launch === null || launch === undefined || typeof launch.get !== 'function') return values;
+  for (const name of Array.isArray(names) ? names : []) {
+    if (typeof name !== 'string' || name === '') continue;
+    const hit = launch.get(name);
+    const value = hit !== null && typeof hit === 'object' ? hit.value : hit;
+    if (typeof value === 'string' && value.length > 0) values[name] = value;
+  }
+  return values;
+}
+
+/**
+ * Eine Referenz auf ihren Namen zurückführen.
+ *
+ * Der Harness brandmarkt Referenzen nur zur Compile-Zeit (`brandString` gibt den
+ * Wert unverändert zurück — gemessen in `@deepseek-ai/dsh-brand`); zur Laufzeit
+ * ist eine Referenz eine Zeichenkette. Diese Funktion trägt genau das: kein
+ * Import, kein Vergleich über Identitäten, nur der Name.
+ */
+export function refNameOf(ref) {
+  return typeof ref === 'string' ? ref : String(ref);
+}
+
+/**
+ * Die Klammer um `resolve`: bedient die verwalteten Referenzen aus dem Pool,
+ * gibt alles andere an das Original weiter.
+ *
+ * Drei Zusagen, alle prüfbar: (1) Eine Referenz, die nicht verwaltet wird, erreicht
+ * das Original unverändert — derselbe Aufruf, dasselbe Ergebnis. (2) Eine
+ * verwaltete Referenz ohne Pool (leer, kein Eintrag wählbar) fällt auf das
+ * Original zurück — der Router behauptet nie einen Schlüssel, den er nicht hat.
+ * (3) `restore()` baut die Klammer ab; danach sieht der Dienst wieder genau so
+ * aus wie vorher. Was `select` zurückgibt (`{ key }`), verlässt das Paket nur in
+ * Richtung des fragenden Anbieters — derselbe einzige Ausgang wie die Kopfzeilen
+ * des Verbindungstests.
+ *
+ * @param service - der `credentials`-Dienst (oder etwas, das so aussieht).
+ * @param options - { managed: [Namen], select: (name) => Eintrag|null }.
+ * @returns `{ restore, names }` oder null, wenn es nichts zu klammern gibt.
+ */
+export function createResolveOverlay(service, options = {}) {
+  const original = service?.resolve;
+  if (service === null || service === undefined || typeof original !== 'function') return null;
+  const managed = new Set((Array.isArray(options.managed) ? options.managed : []).map(refNameOf));
+  const select = typeof options.select === 'function' ? options.select : () => null;
+  let active = true;
+  const wrapped = async function (ref) {
+    if (!active || !managed.has(refNameOf(ref))) return original.call(service, ref);
+    const entry = select(refNameOf(ref));
+    if (entry === null || entry === undefined || typeof entry.key !== 'string' || entry.key === '') {
+      return original.call(service, ref);
+    }
+    return { value: entry.key, source: 'pool' };
+  };
+  service.resolve = wrapped;
+  return {
+    names: [...managed],
+    restore() {
+      active = false;
+      if (service.resolve === wrapped) service.resolve = original;
+    },
+  };
+}
+
+/**
+ * Eine fehlgeschlagene Anfrage lesen — der einzige Auslöser der Rotation.
+ *
+ * Gezählt wird NUR die stabile Klasse `RATE_LIMIT` (die Taxonomie des Harness,
+ * gemessen in `@deepseek-ai/dsh-llm`: „route on this, never by parsing
+ * `message`"), und nur für einen benannten Anbieter. Alles andere — Timeouts,
+ * Abbrüche, Auth-Fehler, namenlose Nutzdaten — ist kein Grund zum Wechseln: ein
+ * falscher Wechsel bei einem kaputten Schlüssel würde den gesunden Pool
+ * für einen toten Anbieter leeren.
+ *
+ * @param payload - die Nutzdaten von `agent/request-error`.
+ * @returns `{ provider }` oder null.
+ */
+export function observeRequestError(payload) {
+  if (payload === null || typeof payload !== 'object') return null;
+  const failure = payload.failure;
+  if (failure === null || typeof failure !== 'object') return null;
+  if (failure.code !== 'RATE_LIMIT') return null;
+  const provider = payload.provider;
+  if (typeof provider !== 'string' || provider === '') return null;
+  return { provider };
+}
+
 /**
  * Die Werte zu den NAMEN aus der Umgebung lesen — der einzige Bezug von
  * Schlüsselmaterial in diesem Paket.
