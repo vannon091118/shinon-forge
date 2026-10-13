@@ -167,7 +167,7 @@ const STAGES = [
   },
   {
     name: 'Gate (statisch)',
-    args: ['scripts/dsh-test.mjs'],
+    args: ['scripts/shinon-test.mjs'],
     summary: [/Ergebnisse: \d+ bestanden, \d+ fehlgeschlagen/],
   },
   {

@@ -1,26 +1,20 @@
+# @shinon/prompter — der interne One-Shot Prompt Enhancer am `agent/pre-step`.
+#
+# KEINE CONFIG HIER. Das ist Absicht und die Lehre aus dem Fehler bis 2026-10-13:
+# die id-gezielte Config in `profiles/<profil>/cordis.patch.yml` ERSETZT diese
+# Config, sie mischt nicht. Als hier `mode: MAX` samt Route stand und das Profil
+# den Eintrag nur wegen `skillsPath` anfasste, fiel alles auf Schema-Defaults
+# zurueck (MIN, leere Route) — der Enhancer mountete, meldete `NO_ROUTE` und
+# veredelte nichts. Die Werte sahen wirksam aus und waren es nie.
+#
+# Wirksame Werte gehoeren ins PROFIL (Repo-Regel: das Paket traegt Schema-Defaults,
+# das Profil die Entscheidungen). Wer den Prompter konfigurieren will, aendert
+# `profiles/<profil>/cordis.patch.yml` — und `profile-config-override.test.mjs`
+# lehnt eine Config in beiden Ebenen ab, damit diese Falle nicht zurueckkommt.
+#
+# Ohne Profil-Config gilt der Schema-Default `mode: MIN` mit leerer Route: kein
+# Aufruf, `NO_ROUTE`, Roh-Prompt. Das ist die sichere Richtung — ein Enhancer,
+# der nichts tut, ist besser als einer, der still das Falsche tut.
 - insert:
     - id: shinon-prompter
       name: '@shinon/prompter'
-      config:
-        observeEvents: ['agent/pre-step']
-        # MIN = nur Rechtschreibung, Grammatik, Zeichensetzung, minimale Struktur.
-        mode: MAX
-        # Route des One-Shot-Childs. Leer heisst: KEIN Aufruf — der Enhancer
-        # haengt am Schritt, meldet 'NO_ROUTE' und der Roh-Prompt gilt.
-        # Zum Aktivieren hier eine Route des Profils eintragen, z. B.
-        #   provider: agnes
-        #   model: agnes-2.5-flash
-        # Das ist eine bewusste Entscheidung, weil damit pro Nutzer-Schritt ein
-        # zusaetzlicher Modellaufruf entsteht.
-        provider: agnes
-        model: agnes-2.5-flash
-        # MAX: Kontext kommt vom Project Index (shinon.project-index/query-v1)
-        # über ctx.get('shinon_index_query'). Index muss aktiv sein (profile verify: stamp).
-        # contextPath bleibt absichtlich leer: max-context.json war nur ein
-        # Platzhalter und verletzt ContextSchema. Ein gesetzter, kaputter Dateipfad
-        # sperrt MAX vor der Index-Abfrage. Der echte Kontext kommt zur Laufzeit
-        # über ctx.get('shinon_index_query').
-        maxTokens: 0  # Kein Token-Limit: 0 = unlimitierte Thinking-Tokens (MAX).
-        temperature: 0.3
-        timeoutMs: 15000
-        trace: true

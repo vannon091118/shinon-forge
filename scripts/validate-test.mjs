@@ -109,7 +109,7 @@ function run(script, root) {
 const results = [];
 const control = fixtureRoot('control');
 {
-  const gate = run('dsh-test.mjs', control);
+  const gate = run('shinon-test.mjs', control);
   const build = run('build.mjs', control);
 
   // Die Kontrolle darf keine feste Zahl erwarten: Gate-Checks und Paketanzahl
@@ -128,7 +128,7 @@ const control = fixtureRoot('control');
 
 RULES.forEach((rule, index) => {
   const root = fixtureRoot(`rule-${index + 1}`, rule.break);
-  results.push({ name: rule.name, gate: run('dsh-test.mjs', root), build: run('build.mjs', root), expected: rule.pattern, broken: true });
+  results.push({ name: rule.name, gate: run('shinon-test.mjs', root), build: run('build.mjs', root), expected: rule.pattern, broken: true });
 });
 
 console.log('═══════════════════════════════════════');

@@ -23,7 +23,7 @@ const DIST = join(repo.ROOT, 'dist');
 function fail(problems) {
   console.error(`\n❌ Build abgebrochen - ${problems.length} Problem(e):`);
   for (const problem of problems) console.error(`   - ${problem}`);
-  console.error('\nDetails: node scripts/dsh-test.mjs');
+  console.error('\nDetails: node scripts/shinon-test.mjs');
   process.exit(1);
 }
 

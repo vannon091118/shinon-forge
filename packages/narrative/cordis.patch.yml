@@ -8,15 +8,21 @@
 #
 # Niemals umgekehrt. Narrative ist Interpretation, nie technische Autorität.
 
+# KEINE CONFIG HIER — die vier wirksamen Werte stehen in
+# `profiles/shinon/cordis.patch.yml`:
+#
+#   eventsChannel       'shinon/event'  Kanal, auf dem der Spine emittiert
+#   chronicleLimit      50              maximale Chronik-Laenge (Hot-Memory)
+#   freezeThreshold     20              nach N Takten wechselt der Arc benannt
+#   relationshipWindow  20              wie viele Ereignisse die Beziehung sieht
+#
+# Sie standen bis 2026-10-13 in BEIDEN Ebenen, wortgleich. Das war kein Fehler
+# in den Werten, aber dieselbe Falle wie beim Prompter: eine id-gezielte Config
+# im Profil ERSETZT die Config des Bundle-Eintrags, sie mischt nicht. Wer hier
+# einen Wert geaendert haette, haette nichts bewirkt. `profile-config-override`
+# in scripts/gate/tests/ lehnt diese Doppelung jetzt fuer jede id ab.
+#
+# Ohne Profil-Config gilt der Schema-Default des Pakets.
 - insert:
     - id: shinon-narrative
       name: '@shinon/narrative'
-      config:
-        # Event-Kanal, auf dem der Spine emittiert
-        eventsChannel: 'shinon/event'
-        # Maximale Chronik-Länge (Hot-Memory)
-        chronicleLimit: 50
-        # Freeze-Schwelle: nach N Events wird ein Arc eingefroren
-        freezeThreshold: 20
-        # Beziehungsfenster: wie viele zurückliegende Events für relationship berechnen
-        relationshipWindow: 20

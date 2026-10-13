@@ -95,7 +95,7 @@ function activationLines(log) {
 const STAGES = {
   /** G1 - statische Struktur: Syntax, Namen, Patch-Schema, Ressourcen, Profil. */
   async G1() {
-    const result = node('dsh-test.mjs');
+    const result = node('shinon-test.mjs');
     // Geprueft wird der VERTRAG (Exit 0 und „0 fehlgeschlagen"), nicht eine eingefrorene Zahl:
     // die Anzahl der Checks waechst mit dem Repo, die Konstante nicht. Der Wert im Detail kommt
     // aus dem Lauf — validate-test.mjs loest dieselbe Falle fuer die Kontrolle.
@@ -106,7 +106,7 @@ const STAGES = {
   /** G2 - Verträge: Regel-Fixtures (rot je Regel) und DSH-Profilauflösung. */
   async G2() {
     const fixtures = node('validate-test.mjs');
-    const profileTest = node('dsh-profile-test.mjs');
+    const profileTest = node('shinon-profile-test.mjs');
     // Wie G1: der Vertrag statt eingefrorener Zaehlwerte — die Zahl der Regeln waechst mit dem Repo.
     const fixtureSummary = /Ergebnisse: (\d+) bestanden, 0 fehlgeschlagen/.exec(fixtures.output);
     const profileSummary = /Ergebnisse: (\d+) bestanden, 0 fehlgeschlagen/.exec(profileTest.output);

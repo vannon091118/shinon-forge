@@ -2,6 +2,15 @@ import z from '@deepseek-ai/schemastery';
 import { readFileSync, readdirSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { parseNote, renderStand, reviewNotes, selectNotes, tokens } from './assets/note-core.js';
+import {
+  createIndex,
+  loadIndex as loadRuntimeIndex,
+  saveIndex as saveRuntimeIndex,
+  indexDirectory as autoIndexDirectory,
+  getContext as runtimeGetContext,
+  matchIntent as runtimeMatchIntent,
+  RUNTIME_INDEX_CONTRACT as RUNTIME_INDEX_CONTRACT_NAME,
+} from './assets/index-manager.js';
 
 /**
  * Der Zettel-Kern wird RE-EXPORTIERT, nicht nachgebaut: die reinen Funktionen
@@ -118,6 +127,9 @@ export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
 
 /** Budget des MAX-Kontexts. Derselbe Wert wie der Vorgabewert des Index (§14). */
 export const INDEX_BUDGET_TOKENS = 6000;
+
+/** Kontextquelle: altes Projekt-Index vs. neuer Runtime-Index. */
+export const CONTEXT_SOURCES_RUNTIME = ['none', 'file', 'index', 'runtime'];
 
 /** Vertragsname der Zettel-Regeln (Zug 4). */
 export const NOTE_RULES_CONTRACT = 'shinon.note-rules/v1';
@@ -440,6 +452,33 @@ export const Config = z.object({
   timeoutMs: z.number().default(15000),
   /** Entscheidungen auf `DECISION_CHANNEL` emittieren. */
   trace: z.boolean().default(true),
+  /**
+   * Runtime-Index aktivieren: der Prompter pflegt SEINEN EIGENEN Index
+   * (hash-basiert, JSON-persistiert) statt sich auf den Project Index zu
+   * verlassen. MAX nutzt ihn als Kontextquelle, wenn der Project Index nicht
+   * verfuegbar ist.
+   */
+  autoIndex: z.boolean().default(false),
+  /**
+   * Verzeichnis, das bei aktiviertem `autoIndex` indiziert wird (relativ zum
+   * ARBEITSVERZEICHNIS). Leer = kein Auto-Index.
+   */
+  indexSourcePath: z.string().default(''),
+  /**
+   * Pfad der Runtime-Index-Datei (relativ zum ARBEITSVERZEICHNIS). Leer =
+   * kein Persistenz, Index lebt nur solange die Sitzung.
+   */
+  indexStoragePath: z.string().default(''),
+  /**
+   * Maximal dateien im Runtime-Index-Kontext. Verhindert explosionsartige
+   * Kontextblöcke bei breiten Suchbegriffen.
+   */
+  indexMaxFiles: z.number().default(20),
+  /**
+   * Intent-Patterns-Datei (relativ zum Paket). Enthält Trigger → Expansion.
+   * Leer = keine Intent-Erweiterung.
+   */
+  intentPatternsPath: z.string().default('./assets/intent-rules.json'),
 });
 
 /**
@@ -979,7 +1018,14 @@ export function acceptance(result, options = {}) {
   const needsContext = options.needsContext === true || MODE_CONTRACT[options.mode]?.needsContext === true;
   if (needsContext && stringList(result.references).length > 0) {
     const unresolvable = resolveReferences(result.references, options.context ?? null);
-    if (unresolvable.length > 0) reasons.push(`UNRESOLVABLE_REFERENCES:${unresolvable.join(',')}`);
+    if (unresolvable.length > 0) {
+      // Unbekannte Referenzen protokollieren, aber Kontext trotzdem liefern:
+      // Der Prompt bleibt funktionsfähig — das Modell ignoriert unbekannte
+      // Referenzen von selbst. Komplettes Verwerfen (alte Logik) war zu
+      // aggressiv: eine einzelne unbekannte Referenz (z. B. Vertrag oder
+      // Mood-Text) hat den gesamten Kontext invalidiert.
+      console.warn(`[shinon-prompter] Unbekannte Referenzen ignoriert: ${unresolvable.join(', ')}`);
+    }
   }
   return { accepted: reasons.length === 0, reasons };
 }
@@ -1019,6 +1065,28 @@ function neutralizeMarkers(text) {
 }
 
 /**
+ * Einen Skills-Block rendern — unabhaengig vom Modus.
+ *
+ * Skills werden IMMER injiziert (Zug 6): unabhaengig davon, ob der Kontext
+ * geliefert wurde oder nicht. Sie geben dem Modell Zugriff auf projekspezifisches
+ * Wissen (Best Practices, Architekturregeln, veraltete Patterns) — immer, nicht
+ * nur in MAX.
+ */
+export function renderSkillsBlock(skills) {
+  if (!Array.isArray(skills) || skills.length === 0) return null;
+  const lines = ['<shinon_skills>'];
+  for (const skill of skills) {
+    if (typeof skill !== 'object' || skill === null) continue;
+    const name = typeof skill.name === 'string' ? skill.name : '';
+    const description = typeof skill.description === 'string' ? skill.description : '';
+    if (name === '') continue;
+    lines.push(`  <skill name="${escapeAttribute(name)}">${escapeAttribute(description)}</skill>`);
+  }
+  lines.push('</shinon_skills>');
+  return lines.join('\n');
+}
+
+/**
  * Den Kontext als `<untrusted_project_context>` rendern (Plan §15). Die
  * Markierung ist eine ANWEISUNG an das Modell, keine Grenze — die Grenze ist,
  * dass der Aufruf keine Fähigkeiten hat.
@@ -1052,7 +1120,7 @@ export function renderContext(context) {
  * ist Daten, und das Modell soll ihn als Daten lesen. MIN und MID bekommen ihn
  * gar nicht — ihr Modus kennt keine Projektkenntnis.
  */
-export function buildEnhancerRequest({ text, mode, contract, config, context = null, stand = null, signal }) {
+export function buildEnhancerRequest({ text, mode, contract, config, context = null, stand = null, skills = null, signal }) {
   // Beide Aufrufwege sind erlaubt: der Lauf uebergibt den bereits aufgeloesten
   // Modus, ein Einzeltest den Namen. Der Name wird hier genau einmal aufgeloest.
   const resolved = contract ?? resolveMode(mode);
@@ -1064,6 +1132,12 @@ export function buildEnhancerRequest({ text, mode, contract, config, context = n
   // wird (renderStand gibt dann null zurueck).
   if (resolved.needsContext && stand !== null && stand.block !== null) {
     content.push({ type: 'text', text: stand.block });
+  }
+  // Skills werden IMMER injiziert (Zug 6): unabhaengig vom Modus, unabhaengig
+  // vom Kontext. Sie geben dem Modell Zugriff auf projekspezifisches Wissen.
+  if (skills !== null && skills.length > 0) {
+    const skillBlock = renderSkillsBlock(skills);
+    if (skillBlock !== null) content.push({ type: 'text', text: skillBlock });
   }
 
   return {
@@ -1126,7 +1200,7 @@ export function replacePrompt(messages, original, text) {
  * Gibt den Ausgang zurueck statt ihn zu werfen, damit der Aufrufer genau eine
  * Fail-Richtung hat.
  */
-async function enhance(ctx, contract, config, prompt, context, stand, signal) {
+async function enhance(ctx, contract, config, prompt, context, stand, skills, signal) {
   if (typeof config.provider !== 'string' || config.provider === '' || typeof config.model !== 'string' || config.model === '') {
     return { outcome: 'unavailable', reasons: ['NO_ROUTE'], result: null };
   }
@@ -1139,7 +1213,7 @@ async function enhance(ctx, contract, config, prompt, context, stand, signal) {
 
   let text;
   try {
-    text = await collectStream(ctx.llm.stream(buildEnhancerRequest({ text: prompt, contract, config, context, stand, signal: combined })));
+    text = await collectStream(ctx.llm.stream(buildEnhancerRequest({ text: prompt, contract, config, context, stand, skills, signal: combined })));
   } catch (error) {
     return { outcome: 'rejected', reasons: [`LLM_FAILED:${error?.name ?? 'Error'}`], result: null };
   }
@@ -1166,9 +1240,9 @@ async function enhance(ctx, contract, config, prompt, context, stand, signal) {
  * Die Grenze ist bewusst schmal: Fehler von `next()` sind NICHT unsere Fehler
  * und werden hier nicht gefangen (siehe onPreStep).
  */
-async function enhanceGuarded(ctx, contract, config, prompt, context, stand, signal) {
+async function enhanceGuarded(ctx, contract, config, prompt, context, stand, skills, signal) {
   try {
-    return await enhance(ctx, contract, config, prompt, context, stand, signal);
+    return await enhance(ctx, contract, config, prompt, context, stand, skills, signal);
   } catch (error) {
     const name = error?.constructor?.name ?? 'Error';
     // Der Grund bleibt kurz (INTERNAL_ERROR:<Name>), die Ursache steht im Log:
@@ -1180,7 +1254,7 @@ async function enhanceGuarded(ctx, contract, config, prompt, context, stand, sig
 
 /** Die Achsen, auf denen der Kontext eines Schritts beschrieben wird. */
 const CONTEXT_STATES = ['absent', 'loaded', 'invalid'];
-const CONTEXT_SOURCES = ['none', 'file', 'index'];
+const CONTEXT_SOURCES = ['none', 'file', 'index', 'runtime'];
 const CONTEXT_REASONS = ['MODE_NEEDS_CONTEXT', 'MODE_NEEDS_INDEX', 'CONTEXT_INVALID'];
 
 /**
@@ -1314,11 +1388,46 @@ function indexContext(ctx, config, text, runtime) {
  * Eine konfigurierte Datei geht dem Index vor (sie ist die ausdrueckliche
  * Angabe), eine KAPUTTE Datei sperrt MAX vollstaendig statt auf den Index
  * auszuweichen: wer eine Quelle benennt, bekommt sie oder einen Grund.
+ *
+ * Fallback: Wenn der Project Index nicht verfuegbar ist, aber der
+ * Runtime-Index geladen wurde, wird dieser genutzt.
  */
 function maxContext(ctx, config, runtime, prompt) {
   if (runtime.contextState === 'invalid') return noContext('CONTEXT_INVALID');
   if (runtime.contextState === 'loaded') return withContext(runtime.context, 'file');
-  return indexContext(ctx, config, prompt.text, runtime);
+
+  // Runtime-Index zuerst: der Prompter pflegt seinen eigenen Index, der
+  // hash-basiert und session-lokal ist. Project-Index nur als Fallback,
+  // wenn der Runtime-Index noch leer ist (noch nichts indexiert wurde).
+  if (runtime.runtimeIndex !== null && runtime.runtimeIndex.entries.size > 0) {
+    try {
+      const ctxData = runtimeGetContext(runtime.runtimeIndex, prompt.text, {
+        maxFiles: config.indexMaxFiles,
+      });
+      const context = ContextSchema({
+        project: 'Shinon-forge',
+        files: ctxData.files,
+        symbols: ctxData.symbols ?? [],
+        constraints: [],
+        touches: [],
+        dependencies: [],
+      });
+      if (!runtime.runtimeIndexSeen) {
+        runtime.runtimeIndexSeen = true;
+        console.log(`[shinon-prompter] MAX-Kontext aus Runtime-Index (${ctxData.count}/${ctxData.totalEntries} Dateien)`);
+      }
+      return withContext(context, 'runtime');
+    } catch (error) {
+      console.error(`[shinon-prompter] Runtime-Index-Kontext fehlerhaft (${error?.message})`);
+      return noContext('CONTEXT_INVALID');
+    }
+  }
+
+  // Project-Index als Fallback: wenn Runtime-Index nicht geladen oder leer.
+  const projectResult = indexContext(ctx, config, prompt.text, runtime);
+  if (projectResult.source !== 'none') return projectResult;
+
+  return noContext('MODE_NEEDS_CONTEXT');
 }
 
 /**
@@ -1351,6 +1460,10 @@ function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contex
     references: result?.references ?? [],
     rawLength,
     enhancedLength: result?.enhancedPrompt?.length ?? 0,
+    // Runtime-Index + Intent-Erweiterung (Zug 7/8): nur wenn aktiviert.
+    expansion: runtime?.expansion ?? null,
+    intentMatch: runtime?.intentMatch ?? null,
+    indexHits: runtime?.indexHits ?? null,
   };
 }
 
@@ -1384,9 +1497,25 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   // System-Prompt kommen aus einer Struktur statt aus fuenf `mode`-Vergleichen.
   const contract = resolveMode(config.mode);
 
+  // Intent-Erweiterung (Zug 8): Kurz-Prompt → Full-Task, bevor Kontext geladen
+  // wird. Nur in MAX, nur wenn Patterns geladen sind, nur bei aktivem Match.
+  // Der erweiterte Text ersetzt prompt.text im One-Shot; der Roh-Text bleibt
+  // in decisionRecord.rawLength erhalten (Originallaenge).
+  let expandedText = prompt.text;
+  if (contract.needsContext && runtime.intentRules !== null) {
+    const match = runtimeMatchIntent(prompt.text, runtime.intentRules);
+    if (match !== null) {
+      expandedText = `${prompt.text}\n\n# Aufgabe\n${match.expansion}`;
+      runtime.intentMatch = match.patternId;
+      console.log(`[shinon-prompter] Intent erkannt: ${match.label} (${match.classification}) — Expansion angewendet`);
+    }
+  }
+
   // EINE Quelle je Schritt, einmal aufgeloest: der Beleg nennt dieselbe Quelle,
   // die den Prompt veredelt hat. Zwei Abfragen koennten zwei Antworten geben.
-  const supply = contract.needsContext ? maxContext(ctx, config, runtime, prompt) : NOT_SUPPLIED;
+  const supply = contract.needsContext
+    ? maxContext(ctx, config, runtime, { ...prompt, text: expandedText })
+    : NOT_SUPPLIED;
 
   if (contract.needsContext && supply.context === null) {
     // MAX ohne Kontext gibt es nicht: Code-Referenzen und Touches waeren
@@ -1402,8 +1531,30 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   // kein Zettel einen Anlass, und die Thema-Marke waere geraten). Der Ton kommt
   // aus der zweiten schmalen Faehigkeit (Scoring); fehlt sie, fehlt der Ton,
   // nicht der Stand.
-  const stand = contextUsed ? standFor(config, runtime, prompt.text, supply.context, readTone(ctx, runtime)) : null;
-  const outcome = await enhanceGuarded(ctx, contract, config, prompt.text, supply.context, stand, payload.signal);
+  const stand = contextUsed ? standFor(config, runtime, expandedText, supply.context, readTone(ctx, runtime)) : null;
+
+  // Skills werden IMMER gelesen (Zug 6): unabhaengig vom Modus, unabhaengig vom
+  // Kontext. Sie geben dem Modell Zugriff auf projekspezifisches Wissen.
+  let skills = [];
+  if (runtime.skillRules !== null) {
+    try {
+      const skillRead = readSkills(config, runtime.skillRules);
+      if (skillRead.skills.length > 0) {
+        const selected = selectSkills(skillRead.skills, [expandedText], {
+          ...(runtime.skillRules.reading ?? {}),
+          explicitText: expandedText,
+        });
+        skills = selected.loaded;
+        if (skills.length > 0) {
+          console.log(`[shinon-prompter] Skills injiziert: ${skills.map((s) => s.name).join(', ')}`);
+        }
+      }
+    } catch (error) {
+      console.warn(`[shinon-prompter] Skills konnten nicht gelesen werden (${error?.message})`);
+    }
+  }
+
+  const outcome = await enhanceGuarded(ctx, contract, config, expandedText, supply.context, stand, skills, payload.signal);
 
   // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
   // und darf nicht in einen zweiten next() umgedeutet werden.
@@ -1424,8 +1575,28 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     : outcome;
   report(ctx, config, { ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand) });
 
-  // Verworfen, nicht verfuegbar oder die Nachricht war nicht auffindbar: der
-  // Roh-Prompt gilt unveraendert.
+  // Verworfen: statt still zum Roh-Prompt zu fallbacken, eskalieren — ein
+  // Prompt, der den User auffordert, seine Anfrage zu praezisieren. Das ist
+  // keine Annahme, sondern eine Frage. Nur 1 von 100 Faelle sollte hier
+  // landen; wenn es haüfiger passiert: der Enhancer ist zu streng.
+  if (messages === null && recorded.outcome === 'rejected') {
+    const fallbackPrompt = `[Feedback erforderlich]
+Der Prompt wurde nicht veredelt. Grund: ${recorded.reasons.join(', ')}.
+
+Bitte präzisieren Sie Ihre Anfrage:
+- Was genau soll erreicht werden?
+- Welche Dateien/Kontext sind relevant?
+- Gibt es Constraints, die ich beachten muss?
+
+[Roh-Prompt gilt als Fallback]`;
+    return {
+      ...decision,
+      messages: decision?.messages?.map((msg) =>
+        msg === prompt.message ? { ...msg, content: [{ type: 'text', text: fallbackPrompt }] } : msg
+      ) ?? decision?.messages,
+    };
+  }
+
   return messages === null ? decision : { ...decision, messages };
 }
 
@@ -1520,15 +1691,60 @@ export function apply(ctx, config) {
     }
   }
 
+  // Runtime-Index (Zug 7): eigenhaend verwaltet, hash-basiert, JSON-persistiert.
+  // Fehlt er, faellt MAX auf den Project Index zurueck (oder bleibt gesperrt).
+  let runtimeIndex = null;
+  if (config.indexStoragePath !== '') {
+    try {
+      runtimeIndex = loadRuntimeIndex(config.indexStoragePath);
+      if (runtimeIndex === null) {
+        runtimeIndex = createIndex();
+        console.log(`[shinon-prompter] Runtime-Index erstellt (neu, ${config.indexStoragePath})`);
+      } else {
+        console.log(`[shinon-prompter] Runtime-Index geladen (${runtimeIndex.entries.size} Eintraege)`);
+      }
+    } catch (error) {
+      console.error(`[shinon-prompter] Runtime-Index nicht ladbar (${error?.message}) — startet leer`);
+      runtimeIndex = createIndex();
+    }
+    // Auto-Index: beim Mount alle Dateien des Source-Verzeichnisses einlesen.
+    if (config.autoIndex && config.indexSourcePath !== '') {
+      try {
+        const result = autoIndexDirectory(runtimeIndex, config.indexSourcePath);
+        console.log(`[shinon-prompter] Auto-Index: ${result.indexed} neu, ${result.skipped} uebersprungen, ${result.errors.length} Fehler`);
+        if (config.indexStoragePath !== '') saveRuntimeIndex(runtimeIndex, config.indexStoragePath);
+      } catch (error) {
+        console.error(`[shinon-prompter] Auto-Index fehlgeschlagen (${error?.message})`);
+      }
+    }
+  }
+
+  // Intent-Patterns (Zug 8): Trigger → Expansion, nur wenn aktiviert.
+  let intentRules = null;
+  if (config.intentPatternsPath !== '') {
+    try {
+      intentRules = loadJsonContract(config.intentPatternsPath, 'shinon.intent-rules/v1', (parsed) => parsed);
+      console.log(`[shinon-prompter] Intent-Patterns geladen (${intentRules.patterns.length} Patterns)`);
+    } catch (error) {
+      console.warn(`[shinon-prompter] Intent-Patterns nicht ladbar (${error?.message}) — keine Expansion`);
+    }
+  }
+
   assertVocabulary('context state', contextState, CONTEXT_STATES);
-  const runtime = { context, contextState, noteRules, skillRules };
+  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules };
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
 
   const route = config.provider === '' || config.model === '' ? 'ohne Route (inaktiv)' : `${config.provider}/${config.model}`;
   const mode = resolveMode(config.mode);
   const contextInfo = mode.needsContext ? `context=${contextState}` : `context=${contextState} (${mode.mode} nutzt ihn nicht)`;
   const notesInfo = config.notesPath === '' ? 'notes=off' : `notes=${notesDir(config)}${noteRules === null ? ' (ohne Regeln)' : ''}`;
-  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, ${route}, ${contextInfo}, ${notesInfo}, index=${INDEX_SERVICE} optional ohne inject)`);
+  const runtimeInfo = runtimeIndex !== null
+    ? `runtimeIndex=${runtimeIndex.entries.size}Eintraege`
+    : 'runtimeIndex=off';
+  const intentInfo = intentRules !== null
+    ? `intent=${intentRules.patterns.length}Patterns`
+    : 'intent=off';
+  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, ${route}, ${contextInfo}, ${notesInfo}, ${runtimeInfo}, ${intentInfo})`);
 
   return () => {
     if (typeof dispose === 'function') dispose();

@@ -2,7 +2,7 @@
 /**
  * scripts/gate/engine.mjs — Shinon Gate Engine (Wave 0)
  *
- * Modularer, slice-fähiger Runner. Ersetzt dsh-test.mjs nicht, sondern ergänzt
+ * Modularer, slice-fähiger Runner. Ersetzt shinon-test.mjs nicht, sondern ergänzt
  * es: derselbe Vertrag (scripts/lib/repo.mjs ist die eine Quelle), aber pro
  * Fähigkeit als eigenes Plugin, ausgewählt über den geänderten Dateipfad.
  *

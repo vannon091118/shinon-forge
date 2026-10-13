@@ -9,7 +9,6 @@
 # of loader patch entries (id-targeted config overrides, disables, and insert
 # lists; `!!js` expressions allowed).
 
-
 # Task Router (Plan §16/§17): die SCHWELLE und die STOP-POLICY sind
 # Entscheidungen, keine Konstanten im Code. Deshalb stehen die wirksamen Werte
 # hier und nicht im Paket, wo nur die Schema-Defaults liegen.
@@ -140,7 +139,7 @@
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
     provider: agnes
-    model: agnes-3.0-flash
+    model: agnes-2.5-flash
 - id: agent-preset-registry
   name: "@deepseek-ai/dsh-agent-preset-registry"
   config:
@@ -187,9 +186,58 @@
     freezeThreshold: 20
     relationshipWindow: 20
 
-# Prompter (Zug 6): die Skill-Selektion. Die Skills liegen im PROJEKT
-# (.agents/skills/), nicht im Tarball. Leer heisst: keine Skills laden
-# (fail-open). Der Default .agents/skills ist der Standardpfad für DSH-Skills.
+# Persona (Zug 1-5): Nur im Shinon-Projekt aktiv — der Check sitzt in apply().
+# Projekt-Kontext wird aus .shinon/project-context.md geladen (falls vorhanden).
+# Leer bleibt = kein Projektkontext (fail-open).
+- id: shinon-persona
+  config:
+    projectContextPath: .shinon/project-context.md
+
+# Prompter (Zug 6) — das Bindeglied. Er ist der EINE Punkt im Schritt, an dem
+# Nutzereingabe, Scoring (Ton/Haltung), Project Index (MAX-Kontext) und die
+# Skills des Projekts zusammenlaufen, bevor der Schritt ans Modell geht.
+#
+# WARUM HIER ALLE WERTE STEHEN UND NICHT IM PAKET: eine id-gezielte Config in
+# DIESER Ebene ERSETZT die Config des Bundle-Eintrags — sie mischt nicht. Genau
+# das war der Fehler bis 2026-10-13: hier stand nur `skillsPath`, und damit war
+# `mode: MAX` samt Route aus `packages/prompter/cordis.patch.yml` weg. Der
+# Prompter mountete mit Schema-Defaults (MIN, leere Route), meldete `NO_ROUTE`
+# und veredelte NIE etwas — sichtbar nur als „der Enhancer ist inaktiv“ im
+# Trace-Panel. Der Fix in 0551c7f (contextPath) war deshalb richtig und
+# wirkungslos: er stand in der Ebene, die ueberschrieben wird.
+#
+# Deshalb gilt hier die Repo-Regel in ihrer scharfen Form: WIRKSAME WERTE STEHEN
+# IM PROFIL, das Paket traegt nur den Insert. Eine Config in beiden Ebenen ist
+# verboten und wird von `scripts/gate/tests/profile-config-override.test.mjs`
+# abgelehnt — nicht nur fuer den Prompter, sondern fuer jede id.
+#
+# mode: MAX fragt den Project Index zur Laufzeit (shinon_index_query). `contextPath`
+# bleibt ABSICHTLICH leer: max-context.json war ein unbrauchbarer Platzhalter, und
+# eine ausdruecklich gesetzte, kaputte Datei sperrt MAX fail-closed VOR der
+# Index-Abfrage.
+#
+# DIE ROUTE IST EINE ENTSCHEIDUNG MIT PREIS: pro Nutzer-Schritt faellt ein
+# zusaetzlicher Modellaufruf an (One-Shot-Child, ohne Tools). Ohne Route gibt es
+# keinen Aufruf — dann meldet der Enhancer `NO_ROUTE` und der Roh-Prompt gilt.
+#
+# Die Skills liegen im PROJEKT (.agents/skills/), nicht im Tarball. Leer heisst:
+# keine Skills laden (fail-open).
 - id: shinon-prompter
   config:
+    observeEvents: [ 'agent/pre-step' ]
+    mode: MAX
+    provider: agnes
+    model: agnes-2.5-flash
     skillsPath: .agents/skills
+    indexBudgetTokens: 6000
+    maxTokens: 0 # 0 = kein Limit (unbegrenzte Thinking-Tokens des One-Shots)
+    temperature: 0.3
+    timeoutMs: 15000
+    trace: true
+    # Runtime-Index (Zug 7): eigenhaend verwaltet, hash-basiert, JSON-persistiert.
+    autoIndex: true
+    indexSourcePath: .
+    indexStoragePath: .shinon/prompter-index.json
+    indexMaxFiles: 20
+    # Intent-Patterns (Zug 8): Trigger → Full-Task-Expansion, default im Paket.
+    intentPatternsPath: ./assets/intent-rules.json

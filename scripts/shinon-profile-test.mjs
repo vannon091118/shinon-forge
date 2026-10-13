@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dsh-profile-test.mjs - Exit Gate fuer das bootfaehige Profil (Block 2)
+ * shinon-profile-test.mjs - Exit Gate fuer das bootfaehige Profil (Block 2)
  *
  * Laedt das aktive Profil genau so, wie DSH es laedt:
  *

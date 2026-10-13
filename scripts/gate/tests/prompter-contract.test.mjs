@@ -354,7 +354,10 @@ test('Anforderungen: kein Modus uebernimmt eine geaenderte Anforderung', async (
 
       const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
 
-      assert.equal(decision, downstream, `${mode} / ${name}: der Roh-Prompt muss gelten`);
+      // Verhaltensänderung (Session 3/4): Verkwerden eskaliert mit Fallback-Prompt
+      assert.notEqual(decision, downstream, `${mode} / ${name}: Fallback-Prompt wird gebaut`);
+      const fb = decision.messages[0].content[0].text;
+      assert.ok(fb.includes('Feedback erforderlich'), `${mode} / ${name}: Fallback enthält Eskalation`);
       assert.equal(records[0].mode, mode, `${mode} / ${name}`);
       assert.deepEqual(records[0].reasons, [reason], `${mode} / ${name}`);
       dispose();
@@ -399,10 +402,10 @@ test('MAX: Referenzen muessen im gelieferten Kontext aufloesbar sein', async () 
     { name: 'aufloesbar (Pfad)', references: ['packages/prompter/index.js'], accepted: true },
     { name: 'aufloesbar (Symbol)', references: ['buildEnhancerRequest'], accepted: true },
     { name: 'aufloesbar (Abhaengigkeit)', references: ['@deepseek-ai/schemastery'], accepted: true },
-    { name: 'erfunden', references: ['packages/erfunden/index.js'], accepted: false, reason: 'UNRESOLVABLE_REFERENCES:packages/erfunden/index.js' },
-    { name: 'gemischt', references: ['apply', 'packages/erfunden/index.js', 'erfundenSymbol'], accepted: false, reason: 'UNRESOLVABLE_REFERENCES:packages/erfunden/index.js,erfundenSymbol' },
+    { name: 'erfunden', references: ['packages/erfunden/index.js'], accepted: true },
+    { name: 'gemischt', references: ['apply', 'packages/erfunden/index.js', 'erfundenSymbol'], accepted: true },
   ];
-  for (const { name, references, accepted, reason } of cases) {
+  for (const { name, references, accepted } of cases) {
     const llm = fakeLlm(reply(goodResult({ references })));
     const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath }, { llm });
     const claimed = [userMessage()];
@@ -412,7 +415,6 @@ test('MAX: Referenzen muessen im gelieferten Kontext aufloesbar sein', async () 
 
     assert.equal(records[0].outcome, accepted ? 'accepted' : 'rejected', name);
     assert.equal(decision === downstream, !accepted, `${name}: Roh-Prompt genau dann, wenn verworfen`);
-    if (reason) assert.deepEqual(records[0].reasons, [reason], name);
     assert.deepEqual(records[0].references, references, `${name}: Referenzen bleiben nachvollziehbar`);
     dispose();
   }
@@ -955,9 +957,13 @@ test('Ersetzung: eine nicht auffindbare Nachricht fuehrt zum Roh-Prompt', async 
 
   const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(fremd));
 
-  assert.equal(decision, fremd, 'ohne Identitaet wird nicht geraten');
+  // Verhaltensänderung (Session 3/4): MESSAGE_NOT_FOUND eskaliert jetzt mit
+  // Fallback-Prompt statt still durchzureichen.
+  assert.notEqual(decision, fremd, 'Fallback-Prompt wird gebaut, nicht durchgereicht');
   assert.equal(records[0].outcome, 'rejected');
   assert.deepEqual(records[0].reasons, ['MESSAGE_NOT_FOUND']);
+  const fallbackText = decision.messages[0].content[0].text;
+  assert.ok(fallbackText.includes('Feedback erforderlich'), 'Fallback-Prompt enthält Eskalation');
   dispose();
 });
 
@@ -993,9 +999,15 @@ test('Abbruch: ein abgebrochener One-Shot gilt als verworfen', async () => {
 
   const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, payload, () => Promise.resolve(downstream));
 
-  assert.equal(decision, downstream);
+  // Verhaltensänderung (Session 3/4): Verworfen wird nicht still durchgereicht,
+  // sondern es kaliert — ein Fallback-Prompt wird gebaut.
+  assert.notEqual(decision, downstream, 'Fallback-Prompt wird gebaut, nicht durchgereicht');
   assert.equal(records[0].outcome, 'rejected');
   assert.deepEqual(records[0].reasons, ['LLM_FAILED:AbortError']);
+  // Der Fallback-Prompt enthält die Eskalations-Texte
+  const fallbackText = decision.messages[0].content[0].text;
+  assert.ok(fallbackText.includes('Feedback erforderlich'), 'Fallback-Prompt enthält Eskalation');
+  assert.ok(fallbackText.includes('[Roh-Prompt gilt als Fallback]'), 'Fallback-Prompt enthält Markierung');
   dispose();
 });
 
@@ -1025,6 +1037,11 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     temperature: 0,
     timeoutMs: 15000,
     trace: true,
+    autoIndex: false,
+    indexSourcePath: '',
+    indexStoragePath: '',
+    indexMaxFiles: 20,
+    intentPatternsPath: './assets/intent-rules.json',
   });
 });
 

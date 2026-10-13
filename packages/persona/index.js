@@ -1,5 +1,25 @@
 import z from '@deepseek-ai/schemastery';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * Prüfen, ob wir uns im Shinon-Projekt befinden.
+ *
+ * Der Projektname wird aus der package.json im Arbeitsverzeichnis gelesen.
+ * Nur im Shinon-Projekt sollen die Persona-Abschnitte injiziert werden —
+ * in anderen Projekten würde das Shinon-interne Daten ungewollt exponieren.
+ */
+function isShinonProject() {
+  try {
+    const pkgPath = join(process.cwd(), 'package.json');
+    if (!existsSync(pkgPath)) return false;
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    return pkg.name === '@shinon/forge';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * @shinon/persona — Identity, State, Voice.
@@ -18,6 +38,10 @@ import { readFileSync } from 'node:fs';
  *
  * Der Zustandsvertrag liegt als Daten in ./assets/persona-state.json — ein
  * neuer Mood oder Übergang ist zuerst eine Datenänderung, kein Code-Umbau.
+ *
+ * WICHTIG: Die Persona wird NUR im Shinon-Projekt aktiv (isShinonProject()).
+ * In anderen Projekten bleibt sie stumm — Shinon-interne Daten werden nicht
+ * in fremde Projekte injiziert.
  */
 
 const IDENTITY = `Du bist Shinon — die handelnde Persona dieser Deployment-Schicht.
@@ -497,9 +521,25 @@ export const Config = z.object({
   statePath: z.string().default('./assets/persona-state.json'),
   /** Kanal, auf dem der Event-Spine seine Envelopes emittiert. */
   eventsChannel: z.string().default('shinon/event'),
+  /**
+   * Pfad zur Projekt-Kontextdatei (relativ zum ARBEITSVERZEICHNIS).
+   *
+   * Diese Datei enthält projekt-spezifische Kontextinformationen, die NUR im
+   * Shinon-Projekt geladen werden. Sie wird als separater Abschnitt injiziert
+   * — ähnlich wie agents.md, aber projektspezifisch. Leer = nicht laden.
+   */
+  projectContextPath: z.string().default(''),
 });
 
 export function apply(ctx, config) {
+  // Projektscope: Persona nur im Shinon-Projekt registrieren.
+  // In anderen Projekten würden Shinon-interne Daten ungewollt exponiert.
+  const inShinonProject = isShinonProject();
+  if (!inShinonProject) {
+    console.log(`[shinon-persona] Nicht im Shinon-Projekt — Persona-Abschnitte werden NICHT registriert`);
+    return () => {};
+  }
+
   let contract = EMPTY_CONTRACT;
   try {
     contract = loadStateContract(config.statePath);
@@ -558,6 +598,27 @@ export function apply(ctx, config) {
     ];
     if (config.includeAugenhoehe) sections.push(['shinon:augenhoehe', atPrefix + 2, AUGENHOEHE]);
     if (config.alwaysKnowIdentity) sections.push(['shinon:identity-overview', atPrefix + 3, config.identityOverview]);
+
+    // Projekt-Kontext (Zug 9): projektspezifische Daten, die NUR im Shinon-Projekt
+    // geladen werden. Der Pfad ist relativ zum ARBEITSVERZEICHNIS — ähnlich wie
+    // agents.md, aber projektspezifisch. Leer = nicht laden.
+    let projectContextText = null;
+    if (config.projectContextPath !== '') {
+      try {
+        const path = isAbsolute(config.projectContextPath)
+          ? config.projectContextPath
+          : join(process.cwd(), config.projectContextPath);
+        if (existsSync(path)) {
+          projectContextText = readFileSync(path, 'utf8').trim();
+          if (projectContextText !== '') {
+            sections.push(['shinon:project-context', atPrefix + 10, projectContextText]);
+            console.log(`[shinon-persona] Projekt-Kontext geladen (${config.projectContextPath})`);
+          }
+        }
+      } catch (error) {
+        console.warn(`[shinon-persona] Projekt-Kontext nicht lesbar (${error?.message})`);
+      }
+    }
 
     child.effect(() => {
       const disposers = [];

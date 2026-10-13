@@ -1,0 +1,48 @@
+{
+  "contract": "shinon.intent-rules/v1",
+  "note": "Intent-Patterns des Prompter. Jedes Pattern hat einen Trigger (deutsch/englisch, case-insensitive), eine Klassifikation und eine Expansion — den Full-Task, der aus dem kurzen Prompt wird. Das Modell entscheidet nie allein: die Liste ist DATEN, nicht Inspiration.",
+  "patterns": [
+    {
+      "id": "update-docs",
+      "label": "Dokumentation aktualisieren",
+      "trigger": ["doku aktualisier", "docs update", "aktualisier doku", "update docs"],
+      "classification": "TRANSFORM",
+      "expansion": "Aktualisiere die vorhandene Dokumentation. Ziel: aktuelle API, Geänderungen seit letztem Release, neue Funktionen. Keine neuen Abschnitte — nur bestehende erweitern und korrigieren."
+    },
+    {
+      "id": "documentation",
+      "label": "Dokumentation erstellen",
+      "trigger": ["doku", "dokumentation", "doc", "readme"],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Erstelle eine Dokumentation für dieses Projekt. Zielgruppe: Entwickler. Umfang: Übersichtsseite, API-Beschreibung, Installationsanleitung. Format: Markdown. Beziehe dich auf existierenden Code und Verträge."
+    },
+    {
+      "id": "tests",
+      "label": "Tests schreiben",
+      "trigger": ["test schreiben", "testschreiben", "schreib tests", "test"],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Schreibe Tests für das aktuelle Feature oder den aktuellen Code. Fokus: Unit-Tests und Integrationstests. Decke Edge Cases ab. Bezug: bestehende Testdateien im Projekt."
+    },
+    {
+      "id": "bugfix",
+      "label": "Bugfix",
+      "trigger": ["fix den bug", "bugfix", "fehler", "reparier", "behoben", "broken"],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Repariere den fehlerhaften Code. Reproduziere das Problem zuerst, identifiziere die Ursache, behebe sie, verifiziere mit Tests. Bezug: existierende Fehlerberichte und Tests."
+    },
+    {
+      "id": "refactor",
+      "label": "Refaktorieren",
+      "trigger": ["refaktor", "refactor", "aufräumen", "clean up", "umstrukturier"],
+      "classification": "TRANSFORM",
+      "expansion": "Refaktorisiere den vorhandenen Code: bessere Struktur, klare Trennung, weniger Duplikation. Erhalt das Verhalten. Keine neuen Features. Bezug: bestehende Architektur und Verträge."
+    },
+    {
+      "id": "read-code",
+      "label": "Code verstehen / erklären",
+      "trigger": ["erklär mir", "erkläre mir", "code verstehen", "was macht", "wie funktioniert"],
+      "classification": "LOOKUP",
+      "expansion": "Erkläre den relevanten Code oder die Architektur. Fokus: warum wurde es so gebaut, welche Verträge gelten, wo sind die kritischen Stellen. Keine Änderungen — nur Verständnis vermitteln."
+    }
+  ]
+}

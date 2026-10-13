@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dsh-test.mjs - das Shinon Forge Gate
+ * shinon-test.mjs - das Shinon Forge Gate
  *
  * Ein Gate statt drei (löst dsh-compat.mjs und tests/basic.test.mjs ab).
  * Prüft dynamisch jedes Paket unter packages/* gegen die Verträge aus
