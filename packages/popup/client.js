@@ -11,8 +11,9 @@
  * Browser-Hälfte kommen aus einer kompilierten Liste in
  * `@deepseek-ai/dsh-api-remotes`, und die Connection-Naht ist reines
  * Anfrage/Antwort (`rpc.call`) ohne Abo. Der Host emittiert seine
- * Trajectory-Einträge weiterhin auf `shinon/trajectory` (index.js) — dieser
- * Client liest sie aber nicht, sondern die SITZUNG selbst:
+ * Trajectory-Einträge weiterhin auf `shinon/trajectory` (index.js), hier als
+ * Probe-API ohne In-Tree-Konsument (siehe Gate-Test `popup-overlay.test.mjs`) —
+ * dieser Client faltet stattdessen die SITZUNG:
  *
  *   ctx.get('uiSession')?.adapter?.current?.getSnapshot()   → welche Sitzung
  *   ctx.get('sessions')?.binding(id)                        → deren Bindung

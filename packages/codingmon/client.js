@@ -21,11 +21,9 @@
  * die AGI (Gleichstand an den Herausforderer). Jede Zahl im Log kommt aus
  * einer reinen Funktion (damage), nicht aus einer Animation.
  *
- * XP: 1 XP pro Token aus dem Zaehler der Oberflaeche — und XP fuer jeden Sieg.
- * Der Token-Zaehler ist bewusst eine BRUECKE und keine saubere Naht: stabil
- * genug fuer ein Pet, aber die erste Stelle, die man ersetzt, sobald der
- * Client eine Store- oder Service-Naht fuer Usage hat. `xpFromTokens()` ist
- * deshalb die einzige Stelle, die die Quelle kennt.
+ * XP: Fortschritt kommt aus erfolgreichen Agent-Completions und Kampfsiegen.
+ * Der Host zaehlt erfolgreiche `turn/end`-Ereignisse; der Client liest diesen
+ * Zaehler und belohnt neue Completions. Tokenverbrauch hat keinen Einfluss auf XP.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/codingmon',
@@ -473,11 +471,9 @@ window.__ModuleLoader__.load({
     // Bewusst dupliziert wie der Rest dieses Vertrags (siehe Abschnitt 1): das
     // Bundle teilt keinen Code mit `assets/`. `durchstich.test.mjs` vergleicht
     // beide Seiten Zahl fuer Zahl, damit die Dopplung nicht auseinanderlaeuft.
-    // WEG b (Zwischenloesung, freigegeben): Der Host meldet keine Schritte
-    // zurueck (der Remote-Beitrag ist clientseitig nicht mountbar — Liste fest
-    // einkompiliert), also zaehlt der Client LOKALE Arbeitsschritte
-    // (`localSteps`: jeder Token-Takt mit Ertrag ist einer). Rate und
-    // Determinismus bleiben: derselbe Zaehler ergibt dasselbe Wild.
+    // Der Host meldet erfolgreiche Completions ueber readActivity; der Client
+    // faltet den absoluten Zaehler rein. `localSteps` ist die zuletzt
+    // konsumierte Completion-Zahl und macht den Spawn idempotent.
     const SPAWN_EVERY = 3;
     const spawnFor = (completions, level) => {
       const done = Math.max(0, Math.floor(completions ?? 0));
@@ -558,26 +554,24 @@ window.__ModuleLoader__.load({
       name: 'Codingmon',
       species: speciesId,
       xp: 0,
-      peakTokens: 0,
       hp: statsAt(speciesId, 1).hp,
       wins: 0,
       losses: 0,
       round: 0,
       battle: null,
       /**
-       * Abgeschlossene Agent-Schritte (J3) und das wilde Codemon (J2): Der Host
-       * zaehlt fluichtig, der Client besitzt die Zahl persistent — `pollActivity`
-       * hebt sie auf das Maximum, `toHost` spiegelt sie in den Spiegel. `wild`
+       * Erfolgreiche Agent-Completions (J3) und das wilde Codemon (J2): Der Host
+       * zaehlt bestaetigte `turn/end`-Ereignisse, der Client waendet die Differenz
+       * aus `readActivity` an und spiegelt den Stand zurueck. `wild`
        * ist `null` oder `{ speciesId, level, hp, maxHp }`; der KAMPF (`battle`)
        * bleibt Browsersache und geht nie auf die Platte des Hosts.
        */
       completions: 0,
       wild: null,
       /**
-       * WEG b: lokal gezaehlte Arbeitsschritte (ein Token-Takt mit Ertrag ist
-       * einer) und der Verbrauchsstand des Spawns. `spawnedAt` verhindert die
-       * Dauerschleife: Nach Kampf oder Flucht steht der Zaehler noch auf dem
-       * Vielfachen — ohne Marke kaeme der Ball sofort wieder.
+       * Letzter Host-Completion-Zaehler und Verbrauchsstand des Spawns.
+       * `spawnedAt` verhindert die Dauerschleife: Nach Kampf oder Flucht steht
+       * der Zaehler noch auf dem Vielfachen — ohne Marke kaeme der Ball sofort wieder.
        */
       localSteps: 0,
       spawnedAt: 0,
@@ -617,9 +611,6 @@ window.__ModuleLoader__.load({
       if (!SPECIES[state.species]) state.species = SPECIES_IDS[0];
       if (!Number.isFinite(state.xp) || state.xp < 0) state.xp = 0;
       if (!Number.isFinite(state.round) || state.round < 0) state.round = 0;
-      // Ein korrupter Token-Hochstand schenkt einmalig XP (`peakTokens: -999`)
-      // oder legt die Bruecke still (kein Wert) — beides faellt auf 0 zurueck.
-      if (!Number.isFinite(state.peakTokens) || state.peakTokens < 0) state.peakTokens = 0;
       if (!Number.isInteger(state.completions) || state.completions < 0) state.completions = 0;
       if (!Number.isInteger(state.localSteps) || state.localSteps < 0) state.localSteps = 0;
       if (!Number.isInteger(state.spawnedAt) || state.spawnedAt < 0) state.spawnedAt = 0;
@@ -800,58 +791,8 @@ window.__ModuleLoader__.load({
     const stats = () => statsAt(store.species, level());
     const maxHp = () => stats().hp;
 
-    // ── XP-Bruecke: 1 XP pro Token ──────────────────────────────────────────
-    /**
-     * Liest den Sitzungs-Token-Zaehler aus der Oberflaeche. Genommen wird der
-     * groesste je gesehene Wert (der Zaehler waechst monoton), damit ein
-     * Neu-Rendern nicht doppelt zaehlt.
-     *
-     * Die Lese-Reihenfolge ist wichtig: erst der SHINON-Counter (Sidebar,
-     * `data-plugin="@shinon/token-usage"`), dann eine Sidebar-Counter-Klasse
-     * der gelieferten DSH-UI (`.dsw-token-display`, `.dsw-token-usage`, …),
-     * und zuletzt der breite Regex ueber die ganze Oberflaeche. Jede Ebene
-     * liefert einen Wert, und `Math.max` ueber alle Ebenen — das Maximum
-     * bleibt die eine Quelle, aber der breite Regex wird nicht mehr die
-     * einzige: wenn der Sidebar-Counter eine Session-Zahl zeigt und der
-     * Chat einen Turn-Counter, nimmt der breite Regex das Maximum beider
-     * und zahlt XP doppelt. Die Schichten koennen diese Luecke nicht mehr
-     * schliessen, aber sie mindern den Schaden.
-     */
-    function parseTokenText(text) {
-      let total = 0;
-      const pattern = /([0-9][0-9.,]*)\s*([KkMm])?\s*tok\b/g;
-      let match;
-      while ((match = pattern.exec(text)) !== null) {
-        const raw = Number(match[1].replace(/[.,]/g, ''));
-        if (!Number.isFinite(raw)) continue;
-        const scale = match[2] ? (match[2].toLowerCase() === 'k' ? 1000 : 1_000_000) : 1;
-        total = Math.max(total, raw * scale);
-      }
-      return Math.round(total);
-    }
-
-    function readTokenTotal() {
-      let total = 0;
-      // Ebene 1: der SHINON-Counter in der Sidebar (stabil, eigenes Plugin).
-      const shinonCounter = document.querySelector('[data-plugin="@shinon/token-usage"]');
-      if (shinonCounter?.textContent) total = Math.max(total, parseTokenText(shinonCounter.textContent));
-      // Ebene 2: gelieferte DSH-UI-Counter-Klassen (Sitzungs-Counter der Sidebar).
-      for (const selector of ['.dsw-token-usage', '.dsw-token-display', '[data-testid="token-usage"]']) {
-        const el = document.querySelector(selector);
-        if (el?.textContent) total = Math.max(total, parseTokenText(el.textContent));
-      }
-      // Ebene 3: breiter Fallback ueber die ganze Oberflaeche (wie vorher).
-      total = Math.max(total, parseTokenText(document.body?.innerText ?? ''));
-      return total;
-    }
-
-    function xpFromTokens() {
-      const total = readTokenTotal();
-      if (total <= store.peakTokens) return 0;
-      const gained = (total - store.peakTokens) * 1; // 1 XP pro Token
-      store.peakTokens = total;
-      return gained;
-    }
+    // XP stammen ausschliesslich aus erfolgreichen Host-Completions; Tokens
+    // werden weder aus dem DOM gelesen noch als Fortschritt interpretiert.
 
     /**
      * Einen Meilenstein feiern — aber nur, wenn wirklich eine Stelle dazukommt.
@@ -886,19 +827,26 @@ window.__ModuleLoader__.load({
       emit();
     }
 
-    function tickTokens() {
-      const gained = xpFromTokens();
-      if (gained > 0) {
-        award(gained, null);
-        // WEG b: Ertrag heisst Arbeit — ein lokaler Schritt, dann die Spawn-Pruefung.
-        store.localSteps += 1;
-        checkSpawn();
-        persist();
-        emit();
-      }
+    function readActivity() {
+      try {
+        const namespace = hostNamespace();
+        const read = namespace?.[HOST_ACTIVITY_METHOD];
+        if (typeof read !== 'function') return;
+        Promise.resolve(read()).then((result) => {
+          if (result?.ok !== true || !Number.isInteger(result.value?.completions)) return;
+          const total = Math.max(0, result.value.completions);
+          const gained = Math.max(0, total - store.completions);
+          if (gained === 0) return;
+          store.completions = total;
+          store.localSteps = total;
+          award(gained, null);
+          checkSpawn();
+          toHost();
+        }).catch(() => {});
+      } catch { /* ohne Remote-Beitrag bleibt der Spielstand unveraendert */ }
     }
 
-    // ── Wild-Spawn und Herausforderung (WEG b) ─────────────────────────────
+    // ── Completion-Spawn und Herausforderung ──────────────────────────────
     /**
      * Die Spawn-Pruefung: deterministisch aus (`localSteps`, Stufe). Gibt es
      * ein Wild, steht kein anderes, laeuft kein Kampf und ist dieser Stand
@@ -2007,12 +1955,12 @@ window.__ModuleLoader__.load({
           order: 5,
         }, BattleResult));
 
-        // XP aus dem Token-Zaehler. Der Takt ist bewusst traege: das Pet soll
-        // den Agenten nicht ausbremsen. Kaempfe laufen NUR auf Klick.
-        const tokenTimer = window.setInterval(tickTokens, 2000);
+        // Nur der Host kann erfolgreiche Completions bestaetigen; fehlende
+        // Remote-Kopplung vergibt folgerichtig keine XP.
+        const activityTimer = window.setInterval(readActivity, 2000);
 
         ctx.effect?.(() => () => {
-          window.clearInterval(tokenTimer);
+          window.clearInterval(activityTimer);
           // Ein laufender Zug haengt an einem Timer, und der Abbau nimmt ihn mit.
           // Sonst feuerte `settle` in ein Bundle, das es nicht mehr gibt, und der
           // Zustand behauptete eine Sperre ohne Uhr — eine Wartezeit ohne Ende.

@@ -499,6 +499,6 @@ export function effectiveness(attackerElement, defenderElement) {
 }
 
 /**
- * Codingmon-Konfiguration (Schemastery).
- * `xpPerToken` ist der Vertrag aus dem Auftrag: jeder Token ist genau 1 XP.
+ * Konfigurationsschema fuer die Host-Haelfte: XP werden aus erfolgreichen
+ * Agent-Completions abgeleitet, nicht aus einer Tokenrate.
  */

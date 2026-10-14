@@ -464,7 +464,7 @@ test('Zusage: Client und Host nennen dieselben Namen (die Dopplung driftet nicht
   assert.equal(host.SNAPSHOT_FIELDS, uebergabe.SNAPSHOT_FIELDS, 'und dieselbe Feldliste');
 });
 
-test('Zusage: agent/status zaehlt abgeschlossene Schritte, readActivity nennt sie', { skip }, async () => {
+test('Zusage: nur turn/end mit reason=completed zaehlt XP-Completions in readActivity', { skip }, async () => {
   const medium = mkdtempSync(join(tmpdir(), 'codingmon-aktivitaet-'));
   const { ctx: host, carrier } = await bootHost(medium);
   const storeFile = join(medium, 'codingmon_pet.json');
@@ -483,26 +483,28 @@ test('Zusage: agent/status zaehlt abgeschlossene Schritte, readActivity nennt si
   assert.equal(idle.value.running, false);
   assert.equal(typeof idle.value.at, 'string');
 
-  // `running` allein zaehlt nichts — erst `idle` danach schliesst den Schritt.
+  // Status-Wechsel allein beweisen keinen erfolgreichen Abschluss.
   host.emit('agent/status', { status: 'running' });
   assert.equal((await read()).value.running, true, 'der Host sieht die laufende Arbeit');
   assert.equal((await read()).value.completions, 0, 'angefangen ist nicht abgeschlossen');
   host.emit('agent/status', { status: 'idle' });
   assert.equal((await read()).value.running, false);
-  assert.equal((await read()).value.completions, 1, 'running -> idle = ein Schritt (J3)');
+  assert.equal((await read()).value.completions, 0, 'running -> idle zaehlt noch keine erfolgreiche Completion');
 
-  // `idle` ohne `running` und fremde Staende zaehlen nicht.
+  const completed = (reason = 'completed') => host.emit('session/event', { id: 's1' }, {
+    type: 'turn/end', data: { turn: 1, reason },
+  });
+  completed('aborted');
+  completed('error');
+  assert.equal((await read()).value.completions, 0, 'abgebrochene oder fehlgeschlagene Turns geben kein XP');
+  completed('completed');
+  assert.equal((await read()).value.completions, 1, 'turn/end mit reason=completed zaehlt eine Completion');
   host.emit('agent/status', { status: 'idle' });
-  host.emit('agent/status', { status: 'kaffee' });
-  assert.equal((await read()).value.completions, 1, 'nur abgeschlossene Arbeit zaehlt');
-  assert.equal((await read()).value.running, false);
+  assert.equal((await read()).value.completions, 1, 'ein zusaetzliches idle zaehlt nicht doppelt');
 
-  // Zwei weitere Schritte: der Zaehler waechst, die Rate folgt den Schritten.
-  for (let i = 0; i < 2; i += 1) {
-    host.emit('agent/status', { status: 'running' });
-    host.emit('agent/status', { status: 'idle' });
-  }
-  assert.equal((await read()).value.completions, 3);
+  completed('completed');
+  completed('completed');
+  assert.equal((await read()).value.completions, 3, 'drei erfolgreiche Abschluesse ergeben drei Completions');
 
   // J2: der Zaehler ueberlebt im Spiegel. Erst braucht es einen Stand — ohne
   // Stand erfindet der Host keinen Datensatz, sondern zaehlt nur fluichtig.
@@ -512,8 +514,7 @@ test('Zusage: agent/status zaehlt abgeschlossene Schritte, readActivity nennt si
   };
   const written = await namespace[uebergabe.UEBERGABE_METHOD](snapshot);
   assert.equal(written.ok, true, 'der Stand liegt auf dem Medium');
-  host.emit('agent/status', { status: 'running' });
-  host.emit('agent/status', { status: 'idle' });
+  completed('completed');
   // Das Ablegen ist async (Medium-Bestaetigung): pollen statt raten.
   const readCompletions = () => JSON.parse(readFileSync(storeFile, 'utf8')).tables.snapshots[store.PET_KEY].completions;
   await until(() => readCompletions() === 4);

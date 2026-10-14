@@ -34,15 +34,12 @@ einen Statusblock:
 | `evidence` | Belegdatei unter `docs/contracts/` oder `docs/probes/` | Status im Datenfeld, kein Kopfblock |
 | `imported` | unverändert übernommener Fremdtext | nicht Teil des kanonischen Satzes |
 
-**Kein Archivordner, keine Löschung.** Der Grund ist gemessen: Pfade aus diesen
-Dokumenten werden von Quelldateien und Tests zitiert
-([packages/tooltip/index.js](../packages/tooltip/index.js) nennt `docs/PLAN.md`,
-`scripts/gate/tests/prompter-contract.test.mjs` nennt `shinon-forge-implementierungsplan.md`).
-Verschieben bräche diese Verweise, ohne dass die Dokumente dadurch wahrer würden.
-Veraltete Dateien werden also **nicht verschoben und nicht gelöscht**, sondern über
-ihren Statusblock als `historical`/`plan` markiert und in der Tabelle unten geführt.
-Wer ein Dokument ersetzt, markiert das alte `historical` und schreibt den Nachfolger
-`current` — es gibt immer genau eine `current`-Fassung je Thema.
+Archivierte oder ersetzte Dokumente werden nicht gelöscht, sondern über ihren
+Status als `historical`/`imported` markiert und in der Tabelle unten geführt.
+Aktuelle Pfade in Quellcode und Tests dürfen beim Verschieben nicht brechen; der
+Prüfbefehl in §4 ist die Abnahme. Wer ein Dokument ersetzt, markiert das alte als
+`historical` und schreibt den Nachfolger `current` — es gibt genau eine
+`current`-Fassung je Thema.
 
 **Nachmessung an einer Probe (`nachtrag`).** Eine Probe wird nicht nachträglich „aktuell"
 gemacht, aber eine ihrer Aussagen kann durch eine spätere Messung überholt sein. Dafür
@@ -59,11 +56,11 @@ gilt nicht als Nachmessung.
 | [`AGENTS.md`](../AGENTS.md) | current | 2026-10-09 | Arbeitsregeln für Agenten |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-13 | Namespace-, Paket- und Profilkonventionen; §5 führt den Lebenszyklus von `.shinon/` |
 | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) | current | 2026-10-08 | Commit-Regeln und ihre Durchsetzung |
-| [`docs/CI.md`](CI.md) | current | 2026-10-13 | CI als Schranke: die zehn Zweige, der Anzeigename `Verdikt (fail-closed)` als der eine verpflichtende Statuscheck für `main`, der Setz- und der Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
+| [`docs/CI.md`](CI.md) | current | 2026-10-13 | CI als Schranke: Zweige und verpflichtender Statuscheck für `main`, Setz- und Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-13 | alle harten Zahlen + Befehle |
 | [`docs/ROADMAP.md`](ROADMAP.md) | plan | 2026-10-13 | kanonische Roadmap: Versionsordnung, Historie, Release-Ziele `0.4.0`/`0.5.0`, `1.0.0`-Kriterien und der `0.1.0`-Pfad |
 | [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) | plan | 2026-10-08 | native App: Stufe 1 scharf, 2–4 Konzept |
-| [`IDEA.md`](../IDEA.md) | plan | 2026-10-07 | rohe Ideensammlung (ohne Überschriftenstruktur) |
+| [`IDEA.md`](../IDEA.md) | current | 2026-10-13 | Kurzidee; Roh-Export archiviert (Pfad in IDEA.md) |
 | geplant: starter/README.md (noch nicht existierend, deshalb kein Pfad) | plan | 2026-10-08 | Tauri-Shell (Stufe 2) — gebaut wird nach [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) |
 | [`docs/FOUNDATION-PLAN.md`](FOUNDATION-PLAN.md) | historical | 2026-10-07 | Fundament-Plan, Wellen 0/2/3 |
 | [`docs/PLAN.md`](PLAN.md) | historical | 2026-10-07 | erster DSH-Mod-Plan (`@shinon/*`, heute) |
@@ -71,7 +68,7 @@ gilt nicht als Nachmessung.
 | [`docs/SYSTEM-ANALYSIS.md`](SYSTEM-ANALYSIS.md) | historical | 2026-10-07 | Tiefenanalyse der Schwester-Systeme |
 | [`shinon-forge-implementierungsplan.md`](../shinon-forge-implementierungsplan.md) | historical | 2026-10-07 | verifizierbarer Implementierungsplan |
 | [`prompts/README.md`](../prompts/README.md) | historical | 2026-10-07 | Prompt-Ablage |
-| [`docs/legacy-goose-prompts/`](legacy-goose-prompts/) (10 Dateien) | imported | — | übernommene Goose-Prompts |
+| [`docs/legacy-goose-prompts/`](legacy-goose-prompts/) | imported | — | übernommene Goose-Prompts |
 | [`packages/narrative/README.md`](../packages/narrative/README.md) | current | 2026-10-10 | Paket-Doku Narrative Engine |
 | [`packages/shinon-forge/README.md`](../packages/shinon-forge/README.md) | current | 2026-10-10 | Paket-Doku Shinon Forge |
 | [`PLAN.md`](../PLAN.md) | plan | 2026-10-13 | Umsetzungsplan des Umbaus (jeder Schritt trägt seinen eigenen Status; §3.12 trägt den Nachtrag zur Aktivierung von `popup` und `key-router` und den einen offenen Faden, §3.12.1 das Verdikt zu `shinon-forge`) |
@@ -80,7 +77,7 @@ gilt nicht als Nachmessung.
 | [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) | current | 2026-10-11 | Fremdhinweise, getrennt vom eigenen Copyright (A12) |
 | [`vendor/MODIFICATIONS.md`](../vendor/MODIFICATIONS.md) | current | 2026-10-11 | Änderungslog des vendorten DSH-Anteils (Schritt 3.2) |
 | [`vendor/dsh/`](../vendor/dsh/) (20 Dateien + `MANIFEST.json`) | imported | 2026-10-11 | unverändert übernommenes Fremdpaket `@deepseek-ai/dsh@0.2.1-alpha.2` — kein Teil des kanonischen Satzes, Herkunft im Manifest |
-| [`docs/audit/`](audit/) — 17 Nachweis-Dokumente: [`SPIKE_3-3.md`](audit/SPIKE_3-3.md), [`EINSTIEG_3-4.md`](audit/EINSTIEG_3-4.md), [`PAKETQUELLE_NPM_3-5.md`](audit/PAKETQUELLE_NPM_3-5.md), [`CHANGELOG.md`](audit/CHANGELOG.md), [`STAND_2026-10-10.md`](audit/STAND_2026-10-10.md), [`UPSTREAM_DIFF.md`](audit/UPSTREAM_DIFF.md), [`ARCHITECTURE_MAP.md`](audit/ARCHITECTURE_MAP.md), [`DEPENDENCY_FINDINGS.md`](audit/DEPENDENCY_FINDINGS.md), [`REPOSITORY_INVENTORY.md`](audit/REPOSITORY_INVENTORY.md), [`SHINON_MIGRATION_MAP.md`](audit/SHINON_MIGRATION_MAP.md), [`VERIFICATION_MATRIX.md`](audit/VERIFICATION_MATRIX.md), [`REPAIR_PLAN.md`](audit/REPAIR_PLAN.md), [`WORKTREE_REVIEW.md`](audit/WORKTREE_REVIEW.md), [`PLUGIN_IDIOME_2-1.md`](audit/PLUGIN_IDIOME_2-1.md), [`UMBAU_2026-10-11.md`](audit/UMBAU_2026-10-11.md), [`DSH_SUBSET_3-1.md`](audit/DSH_SUBSET_3-1.md), [`SKALIERUNG_2026-10-11.md`](audit/SKALIERUNG_2026-10-11.md) | current | je Dokument (Statusblock) | Audit, Reparatur- und Umsetzungs-Nachweise; jeder nennt Messbefehl und Messzeitpunkt |
+| [`docs/audit/`](audit/) | current | je Dokument (Statusblock) | Audit, Reparatur- und Umsetzungs-Nachweise; jeder nennt Messbefehl und Messzeitpunkt |
 
 Nicht in dieser Tabelle: [`docs/archive/legacy-profiles/`](archive/legacy-profiles/) (archivierte
 Profil-Altdateien — kein Markdown, deshalb kein Statusblock) sowie `docs/contracts/` und

@@ -20,7 +20,7 @@ export const Config = z.object({
   showProcess: z.boolean().default(true),
   category: z.string().default('process-step'),
   color: z.string().default('#ff8800'),
-  /** Kanal, auf dem die Trajectory-Einträge den Host verlassen. */
+  /** Probe-API: Out-of-Tree-Testkanal, kein In-Tree-Ende-zu-Ende-Vertrag. */
   trajectoryChannel: z.string().default('shinon/trajectory'),
 });
 

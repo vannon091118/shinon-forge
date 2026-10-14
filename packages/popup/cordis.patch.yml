@@ -4,7 +4,7 @@
 #   enabled             true                        der Listener wird registriert
 #   slotName            'conversation.composer.dock' wo das Overlay haengt
 #   trigger             'user/message'              welches Signal einen Eintrag ausloest
-#   trajectoryChannel   'shinon/trajectory'         Kanal der Host-Eintraege
+#   trajectoryChannel   'shinon/trajectory'         Probe-API ohne In-Tree-Konsument
 #
 # Sie standen bis 2026-10-13 hier — wortgleich mit den Schema-Defaults des
 # Pakets und damit wirkungslos: eine id-gezielte Config im Profil ERSETZT die

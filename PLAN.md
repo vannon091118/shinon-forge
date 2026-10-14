@@ -464,12 +464,21 @@ Der Kern: **es ist kein DSH-Plugin, sondern eine Bedienerschicht (Operator).** J
 
 ### 6.3 (J3) Balancing an erfolgreichen Schritten
 - **Ziel:** kein Bonus für Token-Verschwendung.
-- **Schritte:** Fortschritt an erfolgreiche Schritte koppeln, nicht an die Tokenmenge (heute `xpPerToken`).
-- **Abnahme:** Tests weisen die Kopplung nach.
-- **Nachweis:** erweiterte Tests in `packages/codingmon/test/`.
+- **Schritte:** XP an neue, vom Host bestätigte `turn/end`-Ereignisse mit `reason=completed` koppeln; `agent/status`-Wechsel und Tokenzähler sind keine Erfolgsquelle. `xpPerToken` ist entfernt, weil Tokenmenge Kosten/Usage und nicht erfolgreiche Arbeit misst.
+- **Abnahme:** der Host zählt nur `turn/end` mit `reason=completed`; Codingmon-Tests beweisen: Status/Token allein geben 0 XP, ein neuer erfolgreicher Abschluss gibt genau 1 XP, Abbruch/Fehler geben 0.
+- **Nachweis:** `packages/codingmon/test/durchstich.test.mjs` und `packages/codingmon/test/uebergabe.test.mjs`.
 - **Risiko:** mittel / mittel.
 - **Abhängig von:** 6.2
-- **Status:** offen
+- **Status:** **erledigt im Arbeitsbaum** (2026-10-13) — `npm run test:codingmon` 46/46, Exit 0; DOM-Token-Quelle und `xpPerToken` entfernt. Der Host zählt nur `turn/end` mit `reason=completed`; `running → idle`, Token-only, Abbruch und Fehler geben kein XP, eine neue Completion genau 1 XP.
+
+### 6.5 (J5) §19 `LAST_VERIFIED_FACT` auswertbar machen
+- **Ziel:** der Feldwert benennt einen belegten, zuletzt verifizierten Fortschritt statt leer zu bleiben oder aus Modelltext geraten zu werden.
+- **Schritte:** Der **Loop Guard / Progress Evaluator** ist der alleinige Produzent des Feldes. Er wird durch `turn/end` aufgerufen, wertet nur einen erfolgreich abgeschlossenen Turn aus und übernimmt `LAST_VERIFIED_FACT` ausschließlich aus der vom Evaluator geprüften, herkunftsgebundenen Evidenz (z. B. verifizierter Gate- oder Workspace-Befund); Modelltext ist nie Quelle. Bei fehlender oder widersprüchlicher Evidenz bleibt das Feld leer.
+- **Abnahme:** Gate-Test pinnt den Produzenten `Loop Guard / Progress Evaluator`, das Ereignis `turn/end` mit `reason=completed`, den Evidenz-Quellnachweis und die Herkunftsbindung; ohne Ereignis, bei Abbruch/Fehler, fehlender oder widersprüchlicher Quelle oder Mutation auf Modelltext darf kein Fakt erscheinen.
+- **Nachweis:** neuer §19-Gate-Test plus Tests der Loop-Guard-Projektion; Implementierung ist v0.5.0-Arbeit.
+- **Risiko:** hoch / mittel — unbelegte Selbstbehauptung würde als verifizierter Fakt ausgegeben.
+- **Abhängig von:** Task-Router §18 und §19 Loop Guard im Implementierungsplan.
+- **Status:** geplant für v0.5.0
 
 ### 6.4 (J4) Kampf abbrechbar
 - **Ziel:** kein Spiel, das auf etwas Vorbei wartet.
@@ -558,7 +567,8 @@ Tests VOLLSTÄNDIG sind" ist damit erfüllt und keine Absichtserklärung mehr.
 | 4.6 | Feature-Entscheidung | je Feature (Prompt-Enhancer, Task-Router, Index) eine Entscheidung mit dem Messwert, der sie trägt; „behalten" ohne Zahl gilt nicht | Entscheidungstabelle in `docs/audit/` |
 | 6.1 | Persistenz zuerst | ein geschriebener Stand **überlebt einen Neustart** (Test, der wirklich neu startet — nicht nur neu liest) | Testlauf mit Exit-Code |
 | 6.2 | Ereignis-Adapter | der Adapter hängt an `agent/status`, `llm/response`, `llm/error` und **zählt** echte Ereignisse aus einem Lauf; die Aktivierung aus §3.12 ist Voraussetzung und liegt vor | Testlauf mit Zählung |
-| 6.3 | Balancing an erfolgreichen Schritten | Fortschritt hängt an **erfolgreichen Schritten**, nicht an der Tokenmenge (`xpPerToken` ist weg) — Tests weisen die Kopplung **und** ihre Umkehrung nach | `packages/codingmon/test/` |
+| 6.3 | Balancing an erfolgreichen Schritten | XP kommen aus neu bestätigten `turn/end`-Ereignissen mit `reason=completed`; Tokens, Statuswechsel, Abbruch und Fehler geben kein Completion-XP | `packages/codingmon/test/` |
+| 6.5 | §19 `LAST_VERIFIED_FACT` | Loop Guard / Progress Evaluator erzeugt das Feld nur nach erfolgreicher Evidenzbewertung eines abgeschlossenen Turns; Gate pinnt Ereignis, Produzent, Herkunft und fail-closed-Fälle | v0.5.0: neuer §19-Gate-Test |
 | 6.4 | Kampf abbrechbar | ein Spielende beendet den Kampf; der Test belegt das Ende (nicht nur den Abbruch) | Testlauf |
 | 7.1 | Bedienung | drei Standardaufgaben ohne Doku erledigt; jede Fehlermeldung nennt den nächsten Schritt; die internen Begriffe (Profil, Gate, Slice, Stub) stehen nicht mehr in der UI | Protokoll des Erstlaufs |
 | 7.2 | Lokalisierung | kein sichtbarer Text kommt aus einer Fallback-Tabelle; ein Gate-Test wird bei einem hartkodierten Text **rot** (Negativprobe, sonst beweist er nichts) | Gate-Test mit Zählung |

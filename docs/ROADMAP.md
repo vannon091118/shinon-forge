@@ -3,10 +3,9 @@
 > **Status:** plan — wohin das Repo geht, was ein Release kostet, was 1.0 bedeutet. **Stand:** 2026-10-13
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
-Eine Roadmap, die Zahlen wiederholt, veraltet bei der nächsten Messung. Deshalb
-steht hier **keine** Zahl, die anderswo gemessen wird: Fassungen stehen in den
-Manifesten, harte Zahlen in `docs/ZAHLEN.md`, Abnahmen in `PLAN.md` §9. Hier
-steht nur, was ein Versionswechsel **bedeutet** und was ein Release **kostet**.
+Eine Roadmap, die Bestands- und Testergebnisse wiederholt, veraltet bei der nächsten Messung.
+Harte Zahlen und Messungen stehen ausschließlich in `docs/ZAHLEN.md`; konkrete Abnahmen
+stehen in `PLAN.md` §9. Diese Datei benennt nur Release-Ziele und Versionsbedeutungen.
 
 ## 1. Versionsordnung (eine Regel, zwei Zeilen)
 
@@ -40,9 +39,7 @@ Sieben-Lücken-Handshake (`docs/handshakes/2026-10-13-ci-lauf-gruen-verdict-schr
 
 - Live-429-Rotation mit zwei echten Schlüsseln (ZAHLEN §4: weiter offen)
 - Echter Modell-Turn 3.9 mit Protokoll (PLAN §3.9)
-- Trajectory: In-Tree-Konsument oder Umklassifizierung als Probe-API
-- Planplatz für §19 (`LAST_VERIFIED_FACT` braucht eine Quelle)
-- Codingmon 6.3 (XP an erfolgreichen Schritten, nicht an Tokens)
+- §19 `LAST_VERIFIED_FACT`: Produzent und Gate-Abnahme stehen in `PLAN.md` §6.5; Implementierung bleibt v0.5.0-Ziel
 - `shinon-forge`-Aktivierungsschritt mit Sicherheitsvertrag (siehe §4)
 
 Was aus der Liste in `0.5.0` landet, entscheidet der Betreiber — die Liste

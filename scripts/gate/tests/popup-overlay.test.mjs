@@ -194,3 +194,17 @@ test('popup: ein beendeter Turn ist kein Vorgang', () => {
   const overlay = registered.find((item) => item.options.name === profileSlot()).component;
   assert.equal(render(overlay), null, 'nach dem Turn-Ende bleibt das Overlay leer');
 });
+
+
+test('trajectory: der Host-Kanal ist Probe-API, keine Ende-zu-Ende-Behauptung', () => {
+  const host = read('packages/popup/index.js');
+  const client = read('packages/popup/client.js');
+  const profile = read('profiles/shinon/cordis.patch.yml');
+  assert.match(host, /trajectoryChannel: z\.string\(\)\.default\('shinon\/trajectory'\)/, 'der Host hält den benannten Probe-Kanal');
+  assert.match(host, /ctx\.emit\(config\.trajectoryChannel/, 'der Host emittiert die Probe, wenn ein Test sie beobachtet');
+  assert.match(profile, /trajectoryChannel: 'shinon\/trajectory'/, 'die Profil-Config nennt denselben Probe-Kanal');
+  assert.match(client, /Probe-API ohne In-Tree-Konsument/, 'die Client-Doku stuft den Kanal als Probe-API ein');
+  const clientRuntime = client.slice(client.indexOf('window.__ModuleLoader__.load'));
+  assert.doesNotMatch(clientRuntime, /(?:\.on|\.subscribe)\s*\(\s*['\"]shinon\/trajectory/, 'der Client abonniert den Probe-Kanal nicht');
+  assert.match(client, /readTrajectoryOf\(ctx\).*?eventSource/s, 'das Overlay liest stattdessen das Sitzungsfenster direkt');
+});

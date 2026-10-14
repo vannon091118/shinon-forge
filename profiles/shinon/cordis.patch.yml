@@ -259,10 +259,11 @@
 # mit dem Literal der Haelfte — ein anderer Slot hier wird rot, statt still ins
 # Leere zu rendern.
 #
-# trajectoryChannel bleibt: der Host emittiert die Eintraege weiter (der Vertrag
-# des Pakets, gemessen von scripts/gate/tests/popup-*.test.mjs und den Proben).
-# In diesem Baum liest ihn niemand mehr — das ist eine Aussage ueber den Baum,
-# nicht ueber den Kanal: out-of-tree-Abonnenten und Proben haengen daran.
+# PROBE-API, keine Ende-zu-Ende-Funktion: der Host emittiert auf
+# `shinon/trajectory`, aber in diesem Baum konsumiert kein Paket den Kanal.
+# Das sichtbare Overlay faltet stattdessen das Sitzungsfenster direkt. Der
+# Gate-Test `scripts/gate/tests/popup-overlay.test.mjs` pinnt diese Grenze und
+# verbietet eine Ende-zu-Ende-Behauptung fuer diesen Kanal.
 - id: shinon-popup
   config:
     enabled: true

@@ -21,8 +21,6 @@ export * from './assets/mechanik.js';
 export * from './assets/uebergabe.js';
 
 export const Config = z.object({
-  /** XP pro Token. Der Auftrag sagt 1. */
-  xpPerToken: z.number().description('XP pro Token').min(0).default(1),
   /** XP-Basis der ersten Stufe (kumulativ und multiplikativ). */
   xpPerLevel: z.number().description('XP-Basis der ersten Stufe').min(1).default(XP_BASE),
   /**
@@ -66,7 +64,6 @@ export function apply(ctx, config) {
   // Der Vertrag ist reine Datenweitergabe: keine Zeit, kein Zufall, kein Modell.
   const contract = {
     version: 'shinon.codingmon/v2',
-    xpPerToken: config.xpPerToken,
     xpPerLevel: config.xpPerLevel,
     roundDelayMs: config.roundDelayMs,
     escalation: { factor: ESCALATION.factor, xpBase: XP_BASE, levelCap: LEVEL_CAP, milestones: MILESTONES.slice() },
@@ -96,14 +93,11 @@ export function apply(ctx, config) {
   // deshalb in einer EIGENEN Zeile — er kann erst nach dem ersten `await`
   // bekannt sein, und eine Aktivierungszeile, die ihn vorher behauptet, waere
   // geraten.
-  // ── Aktivitaet: abgeschlossene Agent-Schritte (J3) ───────────────────────
+  // ── Aktivitaet: erfolgreiche Completions (J3) ────────────────────────────
   //
-  // Das Spawn-Signal kommt aus laufender Agent-Arbeit, und die Quelle ist
-  // DSHs EIGENER Loop (`agent/status` aus `dsh-agent-loop`) — kein Shinon-Paket
-  // muss dafuer aktiv sein. Ein `running` -> `idle`-Wechsel zaehlt einen
-  // ABGESCHLOSSENEN Schritt; der Client fragt den Zaehler ueber `readActivity`
-  // und rechnet rein (`spawnFor`), ob ein Ball faellt. `ctx.emit` erreicht den
-  // Browser nicht — deshalb fragt der Client, statt dass der Host schiebt.
+  // `agent/status` beschreibt nur, ob Arbeit laeuft; idle allein ist KEIN
+  // Erfolgsbeleg. XP und Fortschritt entstehen ausschliesslich aus einem
+  // erfolgreichen `turn/end` auf dem DSH-Carrier (`session/event`).
   const activity = { completions: 0, running: false };
   /** Den Zaehler in den Spiegel heben (nur ergaenzen, nie erfinden). */
   const persistCompletions = () => {
@@ -121,19 +115,17 @@ export function apply(ctx, config) {
     }
   };
   const offStatus = typeof ctx?.on === 'function' ? ctx.on('agent/status', (event) => {
-    const status = event?.status;
-    if (status === 'running') {
-      activity.running = true;
-      return;
-    }
-    if (status !== 'idle') return;
-    if (activity.running) {
-      activity.running = false;
-      activity.completions += 1;
-      persistCompletions();
-    } else {
-      activity.running = false;
-    }
+    if (event?.status === 'running') activity.running = true;
+    else if (event?.status === 'idle') activity.running = false;
+  }) : null;
+  const offSessionEvent = typeof ctx?.on === 'function' ? ctx.on('session/event', (...args) => {
+    const event = [...args].reverse().find((value) => value !== null && typeof value === 'object' && value.type === 'turn/end');
+    if (event === undefined) return;
+    const rawReason = event.reason ?? event.data?.reason;
+    const reason = typeof rawReason === 'string' ? rawReason : rawReason?.kind;
+    if (reason !== 'completed') return;
+    activity.completions += 1;
+    persistCompletions();
   }) : null;
 
   let mirror = null;
@@ -180,7 +172,8 @@ export function apply(ctx, config) {
     await mirrorReady;
     try {
       if (typeof offStatus === 'function') offStatus();
-    } catch { /* der Lauscher ist weg, der Zaehler mit ihm */ }
+      if (typeof offSessionEvent === 'function') offSessionEvent();
+    } catch { /* die Lauscher sind weg, der Zaehler mit ihnen */ }
     try {
       await mirror?.close();
     } catch (error) {

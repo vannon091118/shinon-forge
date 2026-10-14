@@ -42,7 +42,6 @@
     "commit:guard": "node scripts/commit-guard.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "update": "node scripts/dsh-update.mjs",
-    "sync": "git fetch upstream && git merge upstream/main",
     "stages": "node scripts/stages.mjs",
     "scale:check": "node scripts/scale-check.mjs",
     "typecheck": "node scripts/gate/engine.mjs --only typescript"

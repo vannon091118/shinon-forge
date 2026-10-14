@@ -72,7 +72,7 @@ const el = () => ({
   classList: { add() {}, contains: () => false },
 });
 
-function boot({ save = null, bodyText = '' } = {}) {
+function boot({ save = null, bodyText = '', activity = null } = {}) {
   const clock = makeClock();
   const storage = {
     data: new Map(),
@@ -118,6 +118,11 @@ function boot({ save = null, bodyText = '' } = {}) {
   const plugin = sandbox.__plugin;
   const slots = [];
   const ctx = {
+    get(name) {
+      if (name === 'remote.codingmon') return activity === null ? undefined : { readActivity: activity };
+      return undefined;
+    },
+    remote: activity === null ? {} : { codingmon: { readActivity: activity } },
     slots: {
       inject: (name, register) => register(),
       register: (options, component) => { slots.push({ options, component }); return () => {}; },
@@ -516,13 +521,13 @@ console.log('══════════════════════�
     && stranded.api.state().log.some((line) => line.includes('Neuladen mitten im Zug')),
     stranded.api.state().log[0]?.slice(0, 80));
 
-  const broken = boot({ save: { xp: 'kaputt', damageTotal: 'nicht-numerisch', loot: null, battle: { speciesId: 'gibtsnicht', hp: 1, maxHp: 1 }, log: 5, wins: 'viele', peakTokens: -999 } });
+  const broken = boot({ save: { xp: 'kaputt', damageTotal: 'nicht-numerisch', loot: null, battle: { speciesId: 'gibtsnicht', hp: 1, maxHp: 1 }, log: 5, wins: 'viele', localSteps: -999 } });
   check('ein kaputter Stand wird repariert statt zu werfen',
     broken.api.state().xp === 0 && broken.api.damageTotal() === '0'
     && broken.api.state().battle === null && broken.api.state().species === 'nullpointer'
     && Object.keys(broken.api.state().loot).length === 3
     && Array.isArray(broken.api.state().log) && broken.api.state().wins === 0
-    && broken.api.state().peakTokens === 0);
+    && broken.api.state().localSteps === 0);
   // Die erste Mutation nach der Reparatur (Levelaufstieg -> `note`) und der
   // erste Sieg (`wins += 1`) duerfen nicht werfen und keine „viele1"-Zaehler
   // bauen — ein Wurf hier liesse die ganze Zusage rot werden.
@@ -599,6 +604,7 @@ console.log('══════════════════════�
   const dockOf = (sim) => sim.slots.find((slot) => slot.options.id === 'shinon-wild-dock').component;
   const tailOf = (sim) => sim.slots.find((slot) => slot.options.id === 'shinon-battle-result').component;
   const fireAll = (sim) => { for (const { fn } of sim.intervals.values()) fn(); };
+  const flush = async () => { await new Promise((resolve) => setImmediate(resolve)); };
   const panelOf = (sim) => sim.slots.find((slot) => slot.options.key === 'shinon-codingmon').component;
 
   // Ohne Arbeit kein Spawn: der Hand-Trigger bei 0 Schritten bleibt zu.
@@ -607,11 +613,24 @@ console.log('══════════════════════�
     idle.api.trigger() === null && idle.api.state().wild === null
     && flat(flatten(dockOf(idle)({}))) === 'null');
 
-  // Drei lokale Schritte: zwei aus der Ablage, einer aus dem Token-Takt.
-  const work = boot({ save: { localSteps: 2 }, bodyText: 'Sitzung: 12.345 tok' });
+  // Tokens ohne bestaetigte Completion geben keine XP und keinen Fortschritt.
+  const tokensOnly = boot({ bodyText: 'Sitzung: 12.345 tok' });
+  fireAll(tokensOnly);
+  await flush();
+  check('Tokenverbrauch allein gibt weder XP noch Completion-Fortschritt',
+    tokensOnly.api.state().xp === 0 && tokensOnly.api.state().completions === 0
+    && tokensOnly.api.state().localSteps === 0);
+
+  // Neue erfolgreiche Host-Completions erzeugen genau entsprechende XP und Spawn-Fortschritt.
+  let completionTotal = 0;
+  const work = boot({ save: { completions: 2, localSteps: 2 }, activity: async () => ({ ok: true, value: { completions: completionTotal } }) });
+  completionTotal = 3;
   fireAll(work);
+  await flush();
   const wild = work.api.state().wild;
   const expected = host.spawnFor(3, work.api.state().level);
+  check('eine neue erfolgreiche Completion vergibt genau ein XP und wird persistiert',
+    work.api.state().xp === 1 && work.api.state().completions === 3 && work.api.state().localSteps === 3);
   check('jeder 3. lokale Schritt oeffnet den Ball (deterministisch wie der Host)',
     wild !== null && wild.speciesId === expected.speciesId && wild.level === expected.level
     && wild.hp === wild.maxHp && wild.hp > 0,
@@ -656,8 +675,9 @@ console.log('══════════════════════�
     work.api.trigger() === null && work.api.state().wild === null);
 
   // Flucht und Rueckzug: abbrechbar, ohne Ergebnis-Schuld.
-  const shy = boot({ save: { localSteps: 5 }, bodyText: 'Arbeit: 99 tok' });
+  const shy = boot({ save: { completions: 5, localSteps: 5 }, activity: async () => ({ ok: true, value: { completions: 6 } }) });
   fireAll(shy);
+  await flush();
   check('Schritt 6 oeffnet den naechsten Ball (die Marke zaehlt weiter)',
     shy.api.state().wild !== null && shy.api.state().localSteps === 6);
   const frozen = shy.storage.getItem('shinon.codingmon/v1');
@@ -672,7 +692,7 @@ console.log('══════════════════════�
   // Zwei identische Laeufe liefern dasselbe Ergebnis — die Animation (reines
   // CSS) kann das Ergebnis nicht bewegen, weil sie den Zustand nie beruehrt.
   const run = () => {
-    const sim = boot({ save: { localSteps: 2 }, bodyText: 'Sitzung: 12.345 tok' });
+    const sim = boot({ save: { completions: 2, localSteps: 2 }, activity: async () => ({ ok: true, value: { completions: 3 } }) });
     fireAll(sim);
     sim.api.challenge();
     sim.clock.advance(3000);

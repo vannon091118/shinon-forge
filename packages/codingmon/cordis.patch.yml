@@ -2,8 +2,6 @@
     - id: shinon-codingmon
       name: '@shinon/codingmon'
       config:
-        # 1 XP pro Token — der Vertrag aus dem Auftrag.
-        xpPerToken: 1
         # XP-Basis je Levelstufe; die Kurve ist kumulativ quadratisch.
         xpPerLevel: 250
         # Wie viele wilde Pets gleichzeitig auf dem Fenster herumlaufen.
