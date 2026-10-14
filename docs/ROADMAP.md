@@ -1,6 +1,6 @@
 # Roadmap — Versionen und Release-Ziele
 
-> **Status:** plan — wohin das Repo geht, was ein Release kostet, was 1.0 bedeutet. **Stand:** 2026-10-13
+> **Status:** plan — wohin das Repo geht, was ein Release kostet, was 1.0 bedeutet. **Stand:** 2026-10-14
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Eine Roadmap, die Bestands- und Testergebnisse wiederholt, veraltet bei der nächsten Messung.
@@ -39,6 +39,7 @@ Sieben-Lücken-Handshake (`docs/handshakes/2026-10-13-ci-lauf-gruen-verdict-schr
 
 - Live-429-Rotation mit zwei echten Schlüsseln (ZAHLEN §4: weiter offen)
 - Echter Modell-Turn 3.9 mit Protokoll (PLAN §3.9)
+- Mobile-first-Prototyp: eigenes schlankes Profil, responsive Client-Schicht, profil-/UI-/Security-CI-Gates und validierte Android-Runtime-Strategie ([docs/MOBILE-PLAN.md](MOBILE-PLAN.md)); kein globaler Paket-Cut vor Messung.
 - §19 `LAST_VERIFIED_FACT`: Produzent und Gate-Abnahme stehen in `PLAN.md` §6.5; Implementierung bleibt v0.5.0-Ziel
 - `shinon-forge`-Aktivierungsschritt mit Sicherheitsvertrag (siehe §4)
 
