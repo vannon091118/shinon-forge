@@ -1,6 +1,6 @@
 # Dokumentation — Einstieg und Statusregel
 
-> **Status:** current — **einziger Einstieg** in die Dokumentation. **Stand:** 2026-10-13
+> **Status:** current — **einziger Einstieg** in die Dokumentation. **Stand:** 2026-10-14
 > **Zahlen:** `docs/ZAHLEN.md` (einziger Eigentümer harter Zahlen)
 
 ## 1. Womit man anfängt
@@ -14,6 +14,7 @@
 | Welche CI-Zweige laufen, welcher Name ist verpflichtend? | [`docs/CI.md`](CI.md) |
 | **Wie viele** Pakete, Layer, Tests? | [`docs/ZAHLEN.md`](ZAHLEN.md) |
 | Wohin geht es, was kostet ein Release? | [`docs/ROADMAP.md`](ROADMAP.md) |
+| Wie werden Mobile-Profil, responsiver Prototyp, Ballastabbau und Android-Shell geplant? | [`docs/MOBILE-PLAN.md`](MOBILE-PLAN.md) |
 | Was ist belegt, was nur gemessen-rot? | `docs/probes/`, `docs/contracts/` + `docs/ZAHLEN.md` §2/§3 |
 
 ## 2. Die Statusregel (eine Regel, nicht drei)
@@ -59,7 +60,8 @@ gilt nicht als Nachmessung.
 | [`docs/CI.md`](CI.md) | current | 2026-10-13 | CI als Schranke: Zweige und verpflichtender Statuscheck für `main`, Setz- und Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-13 | alle harten Zahlen + Befehle |
 | [`docs/ROADMAP.md`](ROADMAP.md) | plan | 2026-10-13 | kanonische Roadmap: Versionsordnung, Historie, Release-Ziele `0.4.0`/`0.5.0`, `1.0.0`-Kriterien und der `0.1.0`-Pfad |
-| [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) | plan | 2026-10-08 | native App: Stufe 1 scharf, 2–4 Konzept |
+| [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) | plan | 2026-10-08 | native App/Tauri: Stufe 1 scharf, 2–4 Konzept |
+| [`docs/MOBILE-PLAN.md`](MOBILE-PLAN.md) | plan | 2026-10-14 | Mobile-Profil, ballastarmes UI, CI-/Sicherheits-Gates und Android-Runtime-Spike |
 | [`IDEA.md`](../IDEA.md) | current | 2026-10-13 | Kurzidee; Roh-Export archiviert (Pfad in IDEA.md) |
 | geplant: starter/README.md (noch nicht existierend, deshalb kein Pfad) | plan | 2026-10-08 | Tauri-Shell (Stufe 2) — gebaut wird nach [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) |
 | [`docs/FOUNDATION-PLAN.md`](FOUNDATION-PLAN.md) | historical | 2026-10-07 | Fundament-Plan, Wellen 0/2/3 |
