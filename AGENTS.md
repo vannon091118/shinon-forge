@@ -10,7 +10,7 @@ plugin bundles under `packages/`, enabled by the canonical profile `profiles/shi
 distribution tests below — the profile boot test also runs `dsh --profile shinon
 --dump-config` against an installed DSH. The repository has git history; its remotes
 are `origin` and `main`, both pointing at this repository — there is **no** `upstream`
-remote, so `npm run sync` cannot work as written.
+remote, so there is deliberately no sync script.
 
 ## Dev environment
 - Node and npm must be on PATH — **npm ist die einzige Paketquelle** (PLAN.md Schritt
@@ -86,7 +86,6 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `npm run gate:test` → `node --test scripts/gate/tests/*.test.mjs` (pure gate logic).
 - `npm run dev` → `dsh --profile shinon`.
 - `npm run update` → `node scripts/dsh-update.mjs` (upstream DSH refresh; see Pitfalls).
-- `npm run sync` → `git fetch upstream && git merge upstream/main`.
 
 ## Conventions
 - A package is identified by its folder: `packages/<dir>/`. All names derive from it and

@@ -6,7 +6,7 @@
 <br/>
 
 <!-- STATUS BOARD — Zahlen sind hier bewusst NICHT wiederholt; Eigentümer ist docs/ZAHLEN.md -->
-<a href="https://github.com/vannon091118/shinon-forge/releases"><img src="https://img.shields.io/badge/version-v0.4.0-7B2FF7?style=for-the-badge&logo=git&logoColor=white" alt="Version (Spiegel von package.json)"/></a>&nbsp;
+<a href="https://github.com/vannon091118/shinon-forge/releases"><img src="https://img.shields.io/badge/version-v0.4.0-7B2FF7?style=for-the-badge&logo=git&logoColor=white" alt="Version (Spiegel von package.json, Zahl: docs/ZAHLEN.md §1)"/></a>&nbsp;
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6B7280?style=for-the-badge" alt="MIT"/></a>&nbsp;
 <a href="package.json"><img src="https://img.shields.io/badge/node-%5E22.19.0%20%7C%7C%20%3E%3D24-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node (Spiegel von package.json, Zahl: docs/ZAHLEN.md §1)"/></a>&nbsp;
 <a href="docs/INDEX.md"><img src="https://img.shields.io/badge/DOKU-INDEX-1D4ED8?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Doku-Index"/></a>&nbsp;
@@ -159,12 +159,12 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 | **[@shinon/popup](packages/popup)** | Fortschritts-Overlay im `conversation.composer.dock`: faltet das Ereignisfenster der Sitzung (Schritt, offene Aufrufe, zuletzt benutztes Werkzeug) und übersetzt den Text aus `locale-de` | ✅ |
 
 Die Spalte „Profil“ ist gemessen aus `profiles/shinon/package.json` (Zahl: `docs/ZAHLEN.md` §1).
-**Zwei** Pakete stehen nicht darin (`openapi`, `shinon-forge`) — bei `openapi` ist das eine
+`openapi` und `shinon-forge` stehen nicht darin — bei `openapi` ist das eine
 dokumentierte Entscheidung (`docs/ARCHITECTURE.md` §4), bei `shinon-forge` ein Verdikt
 (es startet fremde Engines; `PLAN.md` §3.12.1). Beide tragen selbst
 `"dsh": { "inactive": true }` im eigenen Manifest (`dead-package`-Gate).
-Alle 20 Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
-allein `dsh.profile.bundles` im Profil.
+Alle Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
+allein `dsh.profile.bundles` im Profil (Bestandszahlen: `docs/ZAHLEN.md` §1).
 
 ---
 
@@ -214,7 +214,7 @@ Statusklassen — und was sie hier bedeuten:
 | Web-UI-Boot in Chromium + Panel-Beleg | **Verified** | `dsh --profile shinon` + `node scripts/panel-check.mjs --url … --token …` → Exit 0 |
 | Gate-Engine `--full` | **Verified** (alle Gates grün; die Versions-Regel folgt aus dem Manifest des Pakets, Undeklariertes bleibt rot) | `npm run gate:full` → Exit 0 |
 | Gate-Tests (reine Gate-Logik) | **Verified** (braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
-| Skalierung: Kopie des Baums + 20 neue Plugins durch die ganze Kette | **Verified** | `npm run scale:check` → Exit 0 |
+| Skalierung: Kopie des Baums plus Klon-Pakete (`--plugins N`, Standard im Skript) durch die ganze Kette | **Verified** | `npm run scale:check` → Exit 0 |
 | Volle Kette | **Verified** | `npm test` → Exit 0 |
 | Echter Modellaufruf | **Nicht geprüft** | `docs/ZAHLEN.md` §4 |
 
@@ -242,11 +242,10 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 | `npm start [-- …]` · `shinon [-- …]` | der Einstieg ([`bin/shinon.mjs`](bin/shinon.mjs), auch als `bin`-Feld im Manifest): heilt Node ≥ 22 selbst, findet `dsh` auch außerhalb des PATH und **nennt dessen Herkunft**, startet das Profil; `--check` prüft nur die Startfähigkeit. `scripts/start.mjs` bleibt als kompatibler Aufruf und importiert dieselbe Umsetzung |
 | `npm run verify:panel` | Panel-Beleg über `scripts/panel-check.mjs` (braucht jsdom) |
 | `npm run stages` | Startstufen/Ready-Zeile aus `scripts/open.mjs` nachvollziehen |
-| `npm run scale:check` | Skalierungsnachweis: Kopie des Baums + `--plugins N` (Standard 20) neue Klon-Pakete durch Idiome, Gate, `gate:full`, Gate-Tests, Distribution und Build — braucht Node ≥ 22, nicht Teil von `npm test` |
+| `npm run scale:check` | Skalierungsnachweis: Kopie des Baums + `--plugins N` neue Klon-Pakete durch Idiome, Gate, `gate:full`, Gate-Tests, Distribution und Build — braucht Node ≥ 22, nicht Teil von `npm test` (`N` und sein Standard: `scripts/scale-check.mjs`) |
 | `npm run commit:guard -- …` | Commit-Regeln prüfen (`--ci`, `--last n`, `--range`, `--all`) |
 | `npm run hooks:install` | Git-Hooks aktivieren (einmal pro Klon) |
 | `npm run update` | echte Registry-Prüfung (Maximum nach Semver) ins kanonische Profil; offline UNGEPRÜFT statt „keine Updates"; Install-Pfad live ungeprüft |
-| `npm run sync` | derzeit ohne Funktion: braucht ein `upstream`-Remote, das nicht eingerichtet ist (`git fetch upstream` → Exit 128) |
 | `npm run desktop:launcher` | Desktop-Starter (Konzept, siehe [`docs/STARTER-PLAN.md`](docs/STARTER-PLAN.md)) |
 
 ---
@@ -258,8 +257,9 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
   `codingmon-store` rot statt zu überspringen), einer ist ein bewusstes Verhalten
   (`message-ingress` verweigert die Zusage gegen eine ungeprüfte DSH-Fassung).
 - **Versionsangleich der Pakete**: die Zeile folgt aus dem eigenen Manifest (`dsh.inactive`
-  darf `0.1.0` führen, sonst `1.0.0`) — gemessen `19× 1.0.0, 1× 0.1.0`, `doctor` ist grün.
-- **Zwei nicht aktivierte Pakete** (`openapi`, `shinon-forge`): beide sind entschieden, nicht
+  darf `0.1.0` führen, sonst `1.0.0`) — die gemessene Verteilung steht in
+  `docs/ZAHLEN.md` §1, `doctor` ist grün.
+- **Nicht aktivierte Pakete** (`openapi`, `shinon-forge`): beide sind entschieden, nicht
   vergessen — `openapi` hat einen Vertrag ohne Server, `shinon-forge` startet fremde Engines.
   `key-router` und `popup` sind am 2026-10-13 aktiviert worden (Overlay bzw. Pool-Werkzeuge).
   Offen bleibt am Key-Router der Provider-Override: er gibt DSH noch keinen rotierenden
@@ -281,8 +281,7 @@ Shinon-forge/
 │   └── openapi/ shinon-forge/ # bewusst nicht im Profil (Entscheidung bzw. Verdikt)
 ├── profiles/
 │   ├── shinon/                # kanonisches Profil (dsh.profile.bundles, cordis.patch.yml)
-│   ├── headless/              # One-shot-Profil (Modell-Route)
-│   └── web/                   # Altbestand: nur fremde Bundles, kein @shinon/*
+│   └── headless/              # One-shot-Profil (Modell-Route)
 ├── docs/
 │   ├── INDEX.md               # Einstieg + Statusregel für jedes Dokument
 │   ├── ZAHLEN.md              # einziger Eigentümer aller harten Zahlen
@@ -292,8 +291,9 @@ Shinon-forge/
 │   ├── PLAN.md · FOUNDATION-PLAN.md · REPO-ANALYSIS.md · SYSTEM-ANALYSIS.md   # historical
 │   ├── contracts/             # Verträge (JSON, mit Statusfeld)
 │   ├── probes/                # Falsifikations-Proben (JSON, mit Datum)
+│   ├── archive/               # archivierte Altfassungen (u. a. IDEA-raw-export.md)
 │   └── legacy-goose-prompts/  # importierte Fremdtexte
-├── IDEA.md · shinon-forge-implementierungsplan.md   # plan bzw. historical (Statusblock im Kopf)
+├── IDEA.md · shinon-forge-implementierungsplan.md   # current bzw. historical (Statusblock im Kopf)
 ├── scripts/                   # Gate-Engine, Build, Tests, Helfer (gate/, lib/, *.mjs)
 ├── prompts/ · assets/banner.svg
 └── profiles/shinon/          # out-of-tree-Profil (package.json, cordis.patch.yml, cordis.yml)
