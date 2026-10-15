@@ -37,7 +37,7 @@ const valueOf = (flag) => {
 
 const root = repo.ROOT;
 // activeProfile() liest das Manifest (dev-Skript, eine Quelle) — mit Default-Arg.
-const profileName = repo.activeProfile();
+const profileName = valueOf('--profile') ?? repo.activeProfile();
 if (profileName === null) {
   console.error('💥 open: kein --profile im dev-Skript (package.json) gefunden');
   process.exit(2);
@@ -68,6 +68,7 @@ function openBrowser(url) {
 }
 
 const ARGS_NETWORK = process.argv.includes('--network');
+const PRINT_URL = process.argv.includes('--print-url');
 
 // LAN-IP ermitteln (für Netzwerk-Trusted-Host)
 function lanIPv4() {
@@ -150,8 +151,13 @@ child.stdout.on('data', (chunk) => {
     if (PORT !== 0 && served !== '' && Number(served) !== PORT) {
       console.log(`\n⚠️  dsh bedient Port ${served}, gewählt war ${PORT} — dazwischen wurde der Port anderweitig belegt.`);
     }
-    console.log(`\n🌐 1-Click: ${url}\n`);
-    openBrowser(url);
+    if (PRINT_URL) {
+      // Machine-readable handoff. The tokenized URL is a secret; callers must not log it.
+      console.log(`\nSHINON_READY_URL=${url}\n`);
+    } else {
+      console.log(`\n🌐 1-Click: ${url}\n`);
+      openBrowser(url);
+    }
   }
 });
 

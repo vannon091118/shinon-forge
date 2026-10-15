@@ -19,7 +19,9 @@ import { join } from 'path';
 import * as repo from './lib/repo.mjs';
 
 const root = repo.readRoot();
-const profileName = repo.activeProfile(root);
+const profileArg = process.argv.indexOf('--profile');
+const requestedProfile = profileArg >= 0 ? process.argv[profileArg + 1] : undefined;
+const profileName = requestedProfile ?? repo.activeProfile(root);
 const packages = repo.discover(root);
 const profile = repo.resolveProfile(profileName, packages, root);
 

@@ -1,0 +1,32 @@
+{
+  "name": "dsh-profile-mobile",
+  "private": true,
+  "dependencies": {
+    "@shinon/persona": "link:../../packages/persona",
+    "@shinon/core": "link:../../packages/core",
+    "@shinon/events": "link:../../packages/events",
+    "@shinon/locale-de": "link:../../packages/locale-de",
+    "@shinon/better-errors": "link:../../packages/better-errors",
+    "@shinon/token-usage": "link:../../packages/token-usage",
+    "@shinon/prompter": "link:../../packages/prompter",
+    "@shinon/narrative": "link:../../packages/narrative",
+    "@shinon/mobile": "link:../../packages/mobile"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@shinon/persona",
+        "@shinon/core",
+        "@shinon/events",
+        "@shinon/locale-de",
+        "@shinon/better-errors",
+        "@shinon/token-usage",
+        "@shinon/prompter",
+        "@shinon/narrative",
+        "@shinon/mobile"
+      ]
+    }
+  }
+}

@@ -213,3 +213,16 @@ Mobile-Prototyp gilt als **fertig für Nutzerfeedback**, wenn:
 - [dsh-io/dsh-mobile](https://github.com/dsh-io/dsh-mobile) — bestehende Android-App mit Rootfs/proot, WebView, Foreground Service und Android-CI; als Integrationsreferenz prüfen.
 - [android-termux-dsh](https://github.com/cokelaoshi1/android-termux-dsh) — dokumentierte native Abhängigkeits-/Build-Probleme und mobiler CSS-Ansatz; als Gegenprobe, nicht als undifferenziert zu übernehmende Installationsanleitung.
 - [Node.js for Mobile Apps](https://github.com/nakiostudio/nodejs-mobile) — alternative Android-kompatible Node-Einbettung, separat auf DSH- und Native-Addon-Kompatibilität evaluieren.
+
+
+## Mobile-Profile-Implementation (branch: mobile/runtime-profile-0.01)
+
+The first profile slice is represented in code, separate from the desktop profile:
+
+- `profiles/mobile/package.json` declares an explicit allowlist; experimental bundles and the desktop-only packages named in §4 stay excluded.
+- `profiles/mobile/cordis.patch.yml` references `AGNES_API_KEY` by environment-variable name only. No credential is stored in the repository. Profile startup (Gate A) remains independent from a provider call (Gate B).
+- `packages/mobile/` supplies the standard Forge bundle contract and a minimal viewport client. It intentionally does not claim a fully adapted mobile UI; the existing DSH DOM and touch flows still need device/WebView testing.
+- `scripts/shinon-profile-test.mjs --profile mobile` allows the existing profile smoke to select Mobile explicitly; `npm run dev:mobile` starts the shared launcher on that profile and prints a tokenized READY URL for a caller to consume as a secret.
+- `.github/workflows/mobile-profile.yml` tests the allowlist and asks DSH to resolve every layer. Green here is profile/config evidence only, not an Android runtime proof.
+
+**Gate remains open until a fresh install and real Android process reach the tokenized READY URL.** No device handshake is claimed by this code change.
