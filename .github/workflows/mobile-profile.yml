@@ -1,0 +1,32 @@
+name: Shinon Mobile Profile
+
+on:
+  push:
+    branches: [mobile/runtime-profile-0.01]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-profile:
+    name: Mobile profile contract + DSH resolution
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+          cache: npm
+      - name: Install locked dependencies
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Mobile profile contract
+        run: node scripts/mobile-profile-contract-test.mjs
+      - name: Resolve every Mobile DSH layer (no READY claim here)
+        run: node scripts/shinon-profile-test.mjs --profile mobile

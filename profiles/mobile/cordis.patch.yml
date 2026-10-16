@@ -1,0 +1,22 @@
+# Runtime-first mobile profile. The provider key is supplied by the app environment.
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      agnes:
+        displayName: Shinon Forge Agnes
+        apiKeyEnv: AGNES_API_KEY
+        api: openai-completions
+        baseURL: https://apihub.agnes-ai.com/v1
+        models:
+          - id: agnes-2.5-flash
+            name: Agnes 2.5 Flash
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: agnes
+    model: agnes-2.5-flash
+- id: ui-chat
+  name: '@deepseek-ai/dsh-client-ui-chat'
+  config:
+    transcriptView: verbose

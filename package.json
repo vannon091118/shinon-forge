@@ -44,7 +44,9 @@
     "update": "node scripts/dsh-update.mjs",
     "stages": "node scripts/stages.mjs",
     "scale:check": "node scripts/scale-check.mjs",
-    "typecheck": "node scripts/gate/engine.mjs --only typescript"
+    "typecheck": "node scripts/gate/engine.mjs --only typescript",
+    "dev:mobile": "DSH_HOME=$PWD node scripts/open.mjs --profile mobile --print-url",
+    "test:mobile-profile": "node scripts/mobile-profile-contract-test.mjs && node scripts/shinon-profile-test.mjs --profile mobile"
   },
   "dependencies": {
     "@deepseek-ai/dsh": "0.2.1-alpha.1",
@@ -71,7 +73,8 @@
     "@shinon/shinon-forge": "workspace:*",
     "@shinon/popup": "workspace:*",
     "@shinon/scoring": "workspace:*",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "@shinon/mobile": "workspace:*"
   },
   "repository": {
     "type": "git",

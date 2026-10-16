@@ -1,0 +1,5 @@
+- insert:
+    - id: shinon-mobile
+      name: '@shinon/mobile'
+      config:
+        enabled: true
