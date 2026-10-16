@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   EVENT_TYPES as SPINE_EVENTS,
@@ -120,20 +120,23 @@ function quiet(fn) {
   }
 }
 
-const connect = (services = {}) =>
+/** Die Config, die jeder Aufbau teilt — ein Test kann einzelne Werte ersetzen. */
+const baseConfig = {
+  statePath: './assets/persona-state.json',
+  eventsChannel: 'shinon/event',
+  includeAugenhoehe: true,
+  identity: 'IDENT',
+  epistemic: 'EPI',
+  changeClasses: 'CC',
+  determinism: 'DET',
+  discipline: 'DISC',
+  report: 'REP',
+};
+
+const connect = (services = {}, overrides = {}) =>
   quiet(() => {
     const host = createHost(services);
-    const dispose = bundle.apply(host.ctx, {
-      statePath: './assets/persona-state.json',
-      eventsChannel: 'shinon/event',
-      includeAugenhoehe: true,
-      identity: 'IDENT',
-      epistemic: 'EPI',
-      changeClasses: 'CC',
-      determinism: 'DET',
-      discipline: 'DISC',
-      report: 'REP',
-    });
+    const dispose = bundle.apply(host.ctx, { ...baseConfig, ...overrides });
     return { ...host, dispose };
   });
 
@@ -491,4 +494,70 @@ test('Tendenz: ein fremder Dienst unter dem Namen wird gemeldet, nicht gelesen',
   } finally {
     console.error = realError;
   }
+});
+
+// ── 6. Der Projekt-Kontext (Zug 9) ──────────────────────────────────────────
+
+/**
+ * GEMESSEN im echten Profil-Lauf 2026-10-16: JEDER Start meldete
+ * `[shinon-persona] Projekt-Kontext nicht lesbar (isAbsolute is not defined)`.
+ * `isAbsolute` wurde benutzt, aber nie aus `node:path` importiert; der
+ * ReferenceError fiel in das try/catch dieses Blocks, das ihn in eine Warnung
+ * verwandelt — die Persona startete also ohne Projekt-Kontext und sagte es nur
+ * leise. Das Profil setzt `projectContextPath: .shinon/project-context.md`, der
+ * RELATIVE Zweig ist damit der, der in jedem Lauf genommen wird.
+ *
+ * Der Prüfstand ist derselbe wie oben: echter Bundle-Pfad, Fake-Host, und die
+ * registrierten Abschnitte sind von außen lesbar. Ein fehlender Import läßt den
+ * Abschnitt verschwinden — dieser Test wird dann rot.
+ */
+const contextDir = mkdtempSync(join(tmpdir(), 'shinon-persona-ctx-'));
+const contextFixture = (name, value) => {
+  const file = join(contextDir, name);
+  writeFileSync(file, value);
+  return file;
+};
+const projectSection = (host) => host.sections.find((entry) => entry.name === 'shinon:project-context');
+
+test('Projekt-Kontext: ein RELATIVER Pfad wird geladen und steht als Abschnitt im Prompt', () => {
+  const file = contextFixture('relativ.md', 'PROJEKT-KONTEXT-RELATIV gilt nur hier\n');
+  const host = connect({}, { projectContextPath: relative(process.cwd(), file) });
+
+  const section = projectSection(host);
+  assert.ok(section, `Abschnitt fehlt (${host.sections.map((entry) => entry.name).join(', ')})`);
+  assert.match(section.text, /PROJEKT-KONTEXT-RELATIV/, 'der Dateiinhalt steht im Abschnitt');
+  assert.ok(section.order > 10, `der Kontext steht hinter dem Persona-Prefix (order=${section.order})`);
+  // Der Kontext ist ein ZUSATZ: die Persona-Abschnitte bleiben daneben stehen.
+  assert.ok(host.sections.some((entry) => entry.name === 'shinon:identity'), 'die Identity bleibt');
+  host.dispose();
+});
+
+test('Projekt-Kontext: auch ein ABSOLUTER Pfad wird geladen', () => {
+  const file = contextFixture('absolut.md', 'PROJEKT-KONTEXT-ABSOLUT\n');
+  const host = connect({}, { projectContextPath: file });
+
+  const section = projectSection(host);
+  assert.ok(section, 'Abschnitt fehlt');
+  assert.match(section.text, /PROJEKT-KONTEXT-ABSOLUT/);
+  host.dispose();
+});
+
+test('Projekt-Kontext: fehlende oder leere Datei erzeugt keinen Abschnitt — und keinen leeren', () => {
+  const cases = [
+    ['fehlend', relative(process.cwd(), join(contextDir, 'gibt-es-nicht.md'))],
+    ['leer', relative(process.cwd(), contextFixture('leer.md', '   \n\n'))],
+  ];
+  for (const [name, path] of cases) {
+    const host = connect({}, { projectContextPath: path });
+    assert.equal(projectSection(host), undefined, `${name}: kein Abschnitt`);
+    assert.ok(host.sections.length > 0, `${name}: die uebrigen Abschnitte bleiben stehen`);
+    host.dispose();
+  }
+});
+
+test('Projekt-Kontext: ein leerer Pfad in der Config heisst nicht laden', () => {
+  const host = connect({}, { projectContextPath: '' });
+  assert.equal(projectSection(host), undefined);
+  assert.ok(host.sections.some((entry) => entry.name === 'shinon:identity'));
+  host.dispose();
 });

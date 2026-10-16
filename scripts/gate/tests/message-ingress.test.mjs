@@ -68,6 +68,26 @@ function methodBody(source, signature) {
 
 const count = (text, needle) => text.split(needle).length - 1;
 
+/**
+ * Die Host-Module eines Pakets: `index.js` plus die `.js`-Dateien in `assets/`.
+ *
+ * Der Seam-Name ist eine Konstante des Hosts, und seit dem Modulschnitt des
+ * Prompters steht sie in `assets/mode-core.js` statt in `index.js`. Geprueft
+ * wird deshalb ueber die Module, die das Paket wirklich mitbringt — eine feste
+ * Datei waere eine Aussage ueber den Aufbau, nicht ueber den Vertrag.
+ */
+function hostModules(pkg) {
+  const dir = join(REPO, 'packages', pkg);
+  const files = [join(dir, 'index.js')];
+  const assets = join(dir, 'assets');
+  if (existsSync(assets)) {
+    for (const entry of readdirSync(assets).sort()) {
+      if (entry.endsWith('.js')) files.push(join(assets, entry));
+    }
+  }
+  return files;
+}
+
 const loop = dshPackage('@deepseek-ai/dsh-agent-loop');
 const controller = dshPackage('@deepseek-ai/dsh-api-session-controller');
 const client = readFileSync(join(dshPackage('@deepseek-ai/dsh-client-ui-conversation').dir, 'lib/client.js'), 'utf8');
@@ -182,9 +202,14 @@ test('Eingang: unsere Pakete registrieren sich auf dem Seam, den der Loop dispat
   assert.equal(seam, 'agent/pre-step');
 
   for (const pkg of ['hook', 'prompter']) {
-    const source = readFileSync(join(REPO, 'packages', pkg, 'index.js'), 'utf8');
-    assert.ok(source.includes(`export const PRE_STEP_EVENT = '${seam}';`), `@shinon/${pkg}: PRE_STEP_EVENT muss ${seam} sein`);
-    assert.ok(source.includes('ctx.on(PRE_STEP_EVENT'), `@shinon/${pkg}: muss auf dem Seam registrieren`);
+    // Genau EINE Deklaration ueber alle Host-Module des Pakets — ein zweiter Ort
+    // waere eine zweite Wahrheit ueber denselben Namen, und der Wert muss der
+    // Seam sein, den der installierte Loop wirklich dispatcht.
+    const declarations = hostModules(pkg).flatMap((file) => readFileSync(file, 'utf8').match(/export const PRE_STEP_EVENT = '[^']*';/g) ?? []);
+    assert.deepEqual(declarations, [`export const PRE_STEP_EVENT = '${seam}';`], `@shinon/${pkg}: PRE_STEP_EVENT muss genau einmal ${seam} sein`);
+    // Registriert wird in der Host-Haelfte: `index.js` haengt den Listener an.
+    const host = readFileSync(join(REPO, 'packages', pkg, 'index.js'), 'utf8');
+    assert.ok(host.includes('ctx.on(PRE_STEP_EVENT'), `@shinon/${pkg}: muss auf dem Seam registrieren`);
   }
 });
 

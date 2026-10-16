@@ -1,6 +1,6 @@
 import z from '@deepseek-ai/schemastery';
 import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**

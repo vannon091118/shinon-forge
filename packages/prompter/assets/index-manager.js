@@ -26,6 +26,27 @@ export const RUNTIME_INDEX_SERVICE = 'shinon_prompter_index';
 export const DEFAULT_INDEX_PATH = '.shinon/prompter-index.json';
 
 /**
+ * Zeichen je Token und Default-Budget — DIESELBEN Werte wie der Project Index
+ * (Plan §14). Zwei Quellen für dieselbe Grenze wären zwei Wahrheiten: der
+ * Kontextvertrag des Enhancers sagt „Budget in Token", und beide Indexe
+ * müssen dieselbe Rechnung benutzen.
+ */
+export const CHARS_PER_TOKEN = 4;
+export const DEFAULT_CONTEXT_BUDGET = 6000;
+
+/**
+ * Obergrenze der Token-Treffer je Prompt-Wort und Datei.
+ *
+ * Häufigkeit ist ein echtes Relevanzsignal (eine Datei, die ein Wort oft
+ * nennt, gehört eher dazu) — aber ohne Grenze entscheidet die GRÖSSE: gemessen
+ * am 2026-10-16 hatte package-lock.json (521 512 Zeichen) zehntausende Tokens,
+ * die auf "js" oder "der" passten, und stand damit auf Rang 1 für einen Prompt
+ * über den Prompter. Drei Treffer je Wort sind genug Signal, ohne dass eine
+ * Datei allein durch ihren Umfang gewinnt.
+ */
+export const MAX_TOKEN_HITS = 3;
+
+/**
  * Djb2-Hash (synchron, schnell genug für Dateiinhalt).
  * Keine kryptographischen Anforderungen — der Hash dient der Change-Erkennung,
  * nicht der Sicherheit.
@@ -102,42 +123,108 @@ export function isIndexed(index, filePath, content) {
 }
 
 /**
+ * An der Zeilengrenze schneiden. Ein Kontext, der mitten in einer Zeile endet,
+ * ist ein halber Ausdruck; ein ganzer Zeilenrest ist wenigstens lesbar.
+ * Dieselbe Regel wie im Project Index — sonst wäre derselbe Vertrag zweimal
+ * verschieden erfüllt.
+ */
+function cutAtLine(text, room) {
+  if (room <= 0) return '';
+  if (text.length <= room) return text;
+  const cut = text.slice(0, room);
+  const lastBreak = cut.lastIndexOf('\n');
+  return lastBreak === -1 ? cut : cut.slice(0, lastBreak + 1);
+}
+
+/**
  * Den Kontext für einen Prompt zusammenstellen.
  *
  * Liefert alles, was zum Prompt passt — dateipfadt-basiert UND token-basiert.
- * Maximal `maxFiles` Dateien, damit der Kontext nicht explodiert.
- * Matching: Token-Präfix (also "test" trifft auf "tests"), nicht nur exakte Gleichheit.
+ * Maximal `maxFiles` Dateien UND höchstens `budgetTokens` (Default §14) —
+ * beides zusammen, weil eins allein nicht reicht: `maxFiles` begrenzt die
+ * Anzahl, nicht die Grösse, und 20 grosse Dateien sind mehr Inhalt als ein
+ * Modellaufruf in seinem Zeitlimit verarbeiten kann.
+ *
+ * GEMESSEN 2026-10-16 (echter Profil-Lauf): ohne Budget baute der Prompter für
+ * einen 132-Zeichen-Prompt eine Nutzer-Nachricht von 1 457 948 Zeichen
+ * (package-lock.json 521 512, client.js 130 353, …). Der Aufruf lief in sein
+ * eigenes 15-s-Limit, die Antwort kam leer zurück und jedes Verwerfen hiess
+ * `NO_JSON` — der Enhancer kam in MAX nie an. Deshalb: harte Grenze wie §14.
+ *
+ * ZWEI REGELN, die zusammen die Ursache treffen:
+ *   1. Ein Prompt-Wort zählt je Datei höchstens MAX_TOKEN_HITS-mal (nicht je
+ *      Vorkommen im Tokenhaufen dieser Datei). Vorher gewann eine Datei durch
+ *      Grösse: package-lock.json hatte zehntausende Tokens, die alle auf "js"
+ *      oder "der" passten, und damit Rang 1 für einen Prompt über den Prompter.
+ *   2. Das Budget wird nach Anteil verteilt (dieselbe Fairshare-Rechnung wie
+ *      der Project Index), damit eine genannte grosse Datei die kleine
+ *      genannte nicht verdrängt.
  */
 export function getContext(index, promptText, options = {}) {
   const maxFiles = typeof options.maxFiles === 'number' ? options.maxFiles : 20;
+  const budget = Math.max(
+    0,
+    Number.isFinite(options.budgetTokens) ? options.budgetTokens : DEFAULT_CONTEXT_BUDGET,
+  );
+  const charBudget = budget * CHARS_PER_TOKEN;
   const promptTokens = tokenize(promptText, 2); // kürzerer MinLength für Treffer
 
   const scored = [];
   for (const [, entry] of index.entries) {
+    if (typeof entry.content !== 'string') continue;
     let score = 0;
     // Pfad-Treffer (exakt)
     for (const token of promptTokens) {
       if (entry.path.toLocaleLowerCase().includes(token)) score += 3;
     }
-    // Token-Treffer (Präfix: "test" trifft auf "tests", "testen", ...)
-    for (const pt of entry.tokens) {
+    // Token-Treffer (Präfix: "test" trifft auf "tests", "testen", ...) — je
+    // Prompt-Wort höchstens MAX_TOKEN_HITS Punkte pro Datei.
+    const hits = new Map();
+    for (const pt of new Set(entry.tokens)) {
       for (const token of promptTokens) {
-        if (pt.startsWith(token) || token.startsWith(pt)) score += 1;
+        if (!(pt.startsWith(token) || token.startsWith(pt))) continue;
+        const seen = hits.get(token) ?? 0;
+        if (seen >= MAX_TOKEN_HITS) continue;
+        hits.set(token, seen + 1);
+        score += 1;
       }
     }
     if (score > 0) scored.push({ entry, score });
   }
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score || (a.entry.path < b.entry.path ? -1 : 1));
   // Nur Dateien mit echtem Treffer (score > 0) — sonst liefert der Index
   // bei keinem Match alle Einträge und verfälscht den Kontext.
-  const selected = scored.filter((s) => s.score > 0).slice(0, maxFiles).map((s) => s.entry);
+  const ranked = scored.filter((s) => s.score > 0).slice(0, maxFiles);
+
+  // Fairshare in GANZEN Zeichen: jede Datei bekommt den Anteil ihres Rangs,
+  // eine zu grosse wird geschnitten statt ausgelassen, und ein grösseres
+  // Budget liefert immer eine Obermenge.
+  const files = [];
+  let used = 0;
+  let charsLeft = charBudget;
+  let scoreLeft = ranked.reduce((sum, candidate) => sum + candidate.score, 0);
+  for (const candidate of ranked) {
+    const allowance = scoreLeft <= 0 ? 0 : Math.floor(charsLeft * (candidate.score / scoreLeft));
+    scoreLeft -= candidate.score;
+    const room = Math.min(allowance, charsLeft - (files.length === 0 ? 0 : 1));
+    if (room <= 0) continue;
+    const content = cutAtLine(candidate.entry.content, room);
+    if (content === '') continue;
+    files.push({ path: candidate.entry.path, content });
+    used += content.length;
+    charsLeft = charBudget - used - files.length;
+  }
 
   return {
-    files: selected.map((e) => ({ path: e.path, content: e.content })),
-    symbols: [...new Set(selected.flatMap((e) => e.tokens.slice(0, 20)))],
-    count: selected.length,
+    files,
+    // Symbole nur aus den Dateien, die WIRKLICH im Kontext stehen: was oben
+    // weggeschnitten wurde, hat der Aufrufer nicht gesehen.
+    symbols: [...new Set(files.flatMap((file) => (index.entries.get(file.path)?.tokens ?? []).slice(0, 20)))],
+    count: files.length,
     totalEntries: index.entries.size,
+    chars: files.reduce((sum, file) => sum + file.content.length, 0),
+    budgetTokens: budget,
   };
 }
 

@@ -27,7 +27,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -354,10 +354,11 @@ test('Anforderungen: kein Modus uebernimmt eine geaenderte Anforderung', async (
 
       const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
 
-      // Verhaltensänderung (Session 3/4): Verkwerden eskaliert mit Fallback-Prompt
-      assert.notEqual(decision, downstream, `${mode} / ${name}: Fallback-Prompt wird gebaut`);
-      const fb = decision.messages[0].content[0].text;
-      assert.ok(fb.includes('Feedback erforderlich'), `${mode} / ${name}: Fallback enthält Eskalation`);
+      // Verhaltensänderung: Verwerfen eskaliert NICHT mehr mit einem
+      // Fallback-Prompt. Ein Fehler im Enhancer darf den ursprünglichen
+      // Auftrag nicht überschreiben — der Roh-Prompt geht unverändert weiter.
+      assert.equal(decision, downstream, `${mode} / ${name}: Roh-Prompt bleibt erhalten`);
+      assert.equal(records[0].outcome, 'rejected', `${mode} / ${name}: verworfen, nicht angenommen`);
       assert.equal(records[0].mode, mode, `${mode} / ${name}`);
       assert.deepEqual(records[0].reasons, [reason], `${mode} / ${name}`);
       dispose();
@@ -418,6 +419,31 @@ test('MAX: Referenzen muessen im gelieferten Kontext aufloesbar sein', async () 
     assert.deepEqual(records[0].references, references, `${name}: Referenzen bleiben nachvollziehbar`);
     dispose();
   }
+});
+
+/**
+ * Dieselbe Datei, zwei Schreibweisen — die Luecke, die der Profil-Lauf am
+ * 2026-10-16 gezeigt hat.
+ *
+ * Der Pruefstand oben liefert RELATIVE Pfade (`packages/prompter/index.js`), der
+ * Runtime-Index im echten Betrieb ABSOLUTE. Ein Modell nennt eine Datei aber so,
+ * wie ein Mensch sie nennt — mit dem Ergebnis, dass die Referenz auf genau die
+ * Datei, ueber die der Prompt ging, als "unbekannt" protokolliert und verworfen
+ * wurde. Die Regel verlangt einen Treffer an der Verzeichnisgrenze, damit eine
+ * andere Datei gleichen Namens nicht durchrutscht.
+ */
+test('MAX: die relative Schreibweise eines gelieferten ABSOLUTEN Pfads ist aufloesbar', () => {
+  const root = '/home/vannon/Dokumente/Projekte/Shinon-forge';
+  const absolute = {
+    ...dummyContext,
+    files: dummyContext.files.map((file) => ({ ...file, path: `${root}/${file.path}` })),
+  };
+
+  assert.deepEqual(bundle.resolveReferences(['packages/prompter/index.js'], absolute), [], 'die relative Nennung derselben Datei ist bekannt');
+  assert.deepEqual(bundle.resolveReferences([`${root}/packages/prompter/index.js`], absolute), [], 'der absolute Pfad bleibt bekannt');
+  assert.deepEqual(bundle.resolveReferences(['packages/erfunden/index.js'], absolute), ['packages/erfunden/index.js'], 'ein erfundener Pfad bleibt unbekannt');
+  assert.deepEqual(bundle.resolveReferences(['anderes/index.js'], absolute), ['anderes/index.js'], 'gleicher Dateiname in einem anderen Verzeichnis zaehlt nicht');
+  assert.deepEqual(bundle.resolveReferences([`/fremd/packages/prompter/index.js`], absolute), [`/fremd/packages/prompter/index.js`], 'ein fremder absoluter Pfad bleibt unbekannt');
 });
 
 test('MAX: ohne Kontext oder mit unbrauchbarem Kontext wird nicht aufgerufen', async () => {
@@ -485,8 +511,7 @@ test('MIN/MID: eine Antwort ohne references wird angenommen, in MAX nicht', asyn
 
   assert.equal(records[0].outcome, 'rejected', 'MAX prueft die Referenzen, also bleibt das Feld dort Pflicht');
   assert.ok(records[0].reasons[0].startsWith('SCHEMA_INVALID'), records[0].reasons[0]);
-  assert.notEqual(decision, downstream, 'verworfen wird eskaliert, nicht durchgereicht');
-  assert.ok(decision.messages[0].content[0].text.includes('Feedback erforderlich'), 'die Frage steht im Text');
+  assert.equal(decision, downstream, 'der Roh-Prompt gilt');
   dispose();
 });
 
@@ -637,13 +662,37 @@ test('Isolation: der One-Shot-Aufruf traegt keine Tools und keine erfundenen Fel
   assert.equal(request.system, bundle.POLICIES.MIN);
 });
 
+/**
+ * Die Runtime-Module des Pakets: `index.js` plus die `assets/`-Kerne.
+ *
+ * EINE benannte Ausnahme: `index-manager.js` ist der Laufzeit-Index und schreibt
+ * (writeFileSync/mkdirSync) — das ist seine Aufgabe, kein Leck. Alles andere,
+ * insbesondere der One-Shot-Pfad, bleibt ohne Dateisystem, Netz und
+ * Prozess-Exit. Der Modulschnitt hat diese Zusage geteilt, nicht aufgehoben.
+ */
+function runtimeModules() {
+  const assets = join(PACKAGE_DIR, 'assets');
+  return [
+    INDEX_FILE,
+    ...readdirSync(assets).sort().filter((name) => name.endsWith('.js') && name !== 'index-manager.js').map((name) => join(assets, name)),
+  ];
+}
+
 test('Isolation: der Laufzeitcode oeffnet weder Dateisystem noch Netz und gibt keine Tools', () => {
-  const source = readFileSync(INDEX_FILE, 'utf8');
   const forbidden = ['child_process', 'writeFile', 'mkdirSync', 'rmSync', 'unlinkSync', 'execSync', 'spawn(', 'fetch(', 'process.exit', 'ctx.agents', 'ctx.subagents', 'ctx.shell', 'ctx.set('];
-  assert.deepEqual(findForbidden(source, forbidden, { mode: 'module' }), []);
-  assert.deepEqual(findForbidden(source, forbidden), []);
-  // Die Grenze selbst: nirgends wird ein Werkzeugkatalog gebaut oder uebergeben.
-  assert.equal(codeOnly(source).includes('tools'), false, 'kein tools-Feld im Laufzeitcode');
+  const modules = runtimeModules();
+  // Der Scan muss die Module des One-Shot-Pfads wirklich treffen — sonst waere
+  // die Zusage nur noch eine Aussage ueber die Host-Haelfte.
+  for (const required of ['index.js', 'assets/enhancer.js', 'assets/mode-core.js', 'assets/render-context.js', 'assets/result-contract.js', 'assets/schema.js']) {
+    assert.ok(modules.includes(join(PACKAGE_DIR, required)), `${required} fehlt im Isolationstest`);
+  }
+  for (const file of modules) {
+    const source = readFileSync(file, 'utf8');
+    assert.deepEqual(findForbidden(source, forbidden, { mode: 'module' }), [], `${file}: Werkzeug im Laufzeitcode`);
+    assert.deepEqual(findForbidden(source, forbidden), [], `${file}: Werkzeug im Laufzeitcode (Textlauf)`);
+    // Die Grenze selbst: nirgends wird ein Werkzeugkatalog gebaut oder uebergeben.
+    assert.equal(codeOnly(source).includes('tools'), false, `kein tools-Feld im Laufzeitcode (${file})`);
+  }
 });
 
 // ── 6. Das Paket laedt und haengt am Schritt ───────────────────────────────
@@ -713,26 +762,18 @@ test('Laden: nach dispose und ohne passenden Event-Namen wird nicht registriert'
   }
 });
 
-// ── 7. Bei Verwerfen eskaliert der Schritt mit einer Frage ─────────────────
-//
-// Verhaltensänderung (seit 83948d5, nachgezogen in diesem Durchgang): Verworfen
-// heißt NICHT mehr „der Roh-Prompt gilt unverändert". Statt still
-// durchzureichen, baut der Schritt einen Fallback-Prompt, der den User um
-// Präzisierung bittet — mit dem benannten Grund. Das ist keine Annahme,
-// sondern eine Frage (siehe `packages/prompter/index.js`, Eskalations-Zweig).
-// Die Zusagen dieses Blocks sind deshalb: neues Objekt, die Frage steht im
-// Text, der Grund steht dabei, genau ein Datensatz mit `rejected`.
+// ── 7. Bei Verwerfen gilt der Roh-Prompt unveraendert ─────────────────────
 
-test('Eskalation: jeder Fehlschlag wird zur Frage statt zur stillen Durchreiche', async () => {
+test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async () => {
   const cases = [
-    { name: 'Antwort ohne JSON', behaviour: 'Ich habe nichts geaendert.', reason: 'NO_JSON' },
-    { name: 'Antwort mit kaputtem JSON', behaviour: '{"enhancedPrompt": }', reason: 'INVALID_JSON' },
-    { name: 'Antwort verletzt das Schema', behaviour: reply({ enhancedPrompt: 'x' }), reason: 'SCHEMA_INVALID' },
-    { name: 'Absicht nicht erhalten', behaviour: reply(goodResult({ preservedIntent: false })), reason: 'INTENT_NOT_PRESERVED' },
-    { name: 'Anforderung hinzugefuegt', behaviour: reply(goodResult({ addedRequirements: ['mehr'] })), reason: 'ADDED_REQUIREMENTS' },
-    { name: 'Provider wirft', behaviour: new Error('Provider kaputt'), reason: 'LLM_FAILED' },
+    { name: 'Antwort ohne JSON', behaviour: 'Ich habe nichts geaendert.' },
+    { name: 'Antwort mit kaputtem JSON', behaviour: '{"enhancedPrompt": }' },
+    { name: 'Antwort verletzt das Schema', behaviour: reply({ enhancedPrompt: 'x' }) },
+    { name: 'Absicht nicht erhalten', behaviour: reply(goodResult({ preservedIntent: false })) },
+    { name: 'Anforderung hinzugefuegt', behaviour: reply(goodResult({ addedRequirements: ['mehr'] })) },
+    { name: 'Provider wirft', behaviour: new Error('Provider kaputt') },
   ];
-  for (const { name, behaviour, reason } of cases) {
+  for (const { name, behaviour } of cases) {
     const llm = fakeLlm(behaviour);
     const { ctx, records, dispose } = connect({ ...route }, { llm });
     const claimed = [userMessage()];
@@ -740,12 +781,7 @@ test('Eskalation: jeder Fehlschlag wird zur Frage statt zur stillen Durchreiche'
 
     const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
 
-    assert.notEqual(decision, downstream, `${name}: verworfen wird eskaliert, nicht durchgereicht`);
-    assert.equal(decision.kind, 'enter', name);
-    assert.equal(decision.messages.length, 1, name);
-    const text = decision.messages[0].content[0].text;
-    assert.ok(text.includes('Feedback erforderlich'), `${name}: die Frage steht im Text`);
-    assert.ok(text.includes(reason), `${name}: mit dem Grund (${reason})`);
+    assert.equal(decision, downstream, `${name}: die Entscheidung muss unveraendert sein`);
     assert.equal(records.length, 1, `${name}: genau ein Datensatz`);
     assert.ok(records[0].outcome !== 'accepted', `${name}: ${records[0].outcome}`);
     assert.ok(records[0].reasons.length > 0, `${name}: ein Verwerfen braucht einen Grund`);
@@ -754,11 +790,137 @@ test('Eskalation: jeder Fehlschlag wird zur Frage statt zur stillen Durchreiche'
 });
 
 /**
+ * Diagnose-Luecke, gemessen am NO_JSON-Fehlerfall 2026-10-16: der Verwerfungs-
+ * grund landete im Sitzungsverlauf, die TATSAECHLICHE Modellantwort nie — die
+ * Ursache war damit undiagnostizierbar. Der Rohtext muss deshalb auf stderr
+ * stehen, sobald verworfen wird (vollstaendig genug zur Diagnose), und bei
+ * leerer Antwort ausdruecklich als leer benannt werden.
+ */
+test('Diagnose: eine verworfene One-Shot-Antwort wird mit Rohtext protokolliert', async () => {
+  const cases = [
+    { name: 'kein JSON (Prosa)', behaviour: 'Ich kann das nicht in JSON fassen.', reason: 'NO_JSON', empty: false },
+    { name: 'leere Antwort', behaviour: '', reason: 'NO_JSON', empty: true },
+    { name: 'kaputtes JSON', behaviour: '{"enhancedPrompt": }', reason: 'INVALID_JSON', empty: false },
+    { name: 'Policy-Verwurf (Antwort bleibt nachvollziehbar)', behaviour: reply(goodResult({ preservedIntent: false })), reason: 'INTENT_NOT_PRESERVED', empty: false },
+  ];
+  for (const { name, behaviour, reason, empty } of cases) {
+    const llm = fakeLlm(behaviour);
+    const { ctx, records, dispose } = connect({ ...route }, { llm });
+    const claimed = [userMessage()];
+    const downstream = { kind: 'enter', messages: claimed };
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => warnings.push(args.join(' '));
+    let decision;
+    try {
+      decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    assert.equal(decision, downstream, `${name}: Roh-Prompt bleibt erhalten`);
+    assert.equal(records[0].outcome, 'rejected', name);
+    assert.ok(records[0].reasons[0].startsWith(reason), `${name}: ${records[0].reasons[0]}`);
+    const rawLog = warnings.find((line) => line.includes('verworfene One-Shot-Antwort'));
+    assert.ok(rawLog, `${name}: Rohtext-Log fehlt`);
+    assert.ok(rawLog.includes(reason), `${name}: Grund fehlt im Rohtext-Log`);
+    // Die Chunks-Zählung trennt die drei NO_JSON-Ursachen (leer vs. nur
+    // Reasoning vs. Feld-Drift) und muss deshalb IMMER mitkommen.
+    assert.ok(rawLog.includes('Chunks:'), `${name}: Chunks-Zählung fehlt`);
+    // Finish-Grund + Token-Stand: bei antwortlosem Stream der einzige Hinweis
+    // auf provider-seitigen Abbruch vs. Filter vs. Längenstopp.
+    assert.ok(rawLog.includes('Finish:'), `${name}: Finish-/Token-Zeile fehlt`);
+    if (empty) assert.ok(rawLog.includes('leere Antwort'), `${name}: Leere Antwort muss benannt werden`);
+    else assert.ok(rawLog.includes(behaviour.slice(0, 40)), `${name}: Rohtext fehlt im Log`);
+    // Was WIR gefragt haben, gehoert in dieselbe Zeile: sonst ist ein leerer
+    // Stream nicht von einer leeren ANFRAGE zu unterscheiden.
+    assert.ok(rawLog.includes('Anfrage:'), `${name}: Anfrage-Daten fehlen`);
+    assert.ok(rawLog.includes('test-route/test-model'), `${name}: angefragte Route fehlt`);
+    assert.ok(/System=\d+Z, Nutzer=\d+Z/.test(rawLog), `${name}: Prompt-Groessen fehlen`);
+    assert.ok(/Dauer=\d+ms/.test(rawLog), `${name}: Dauer fehlt`);
+    dispose();
+  }
+});
+
+/**
+ * Die im Profil-Lauf GEMESSENE antwortlose Form (2026-10-16): der Provider
+ * lieferte `usage` + `finish` und kein einziges content-Chunk, der Grund kam als
+ * Objekt. Vorher stand im Log `reason=[object Object]` — die eine Information,
+ * die eine antwortlose Antwort noch trug, war unlesbar. Diese Attrappe stellt
+ * genau diese Form her und pinnt, dass sie jetzt vollstaendig dasteht.
+ */
+test('Diagnose: antwortloser Stream (nur usage+finish, Grund als Objekt) wird lesbar protokolliert', async () => {
+  const silent = {
+    calls: [],
+    stream(options) {
+      this.calls.push(options);
+      return (async function* chunks() {
+        yield { type: 'usage', usage: { inputTokens: 0, outputTokens: 0 } };
+        yield { type: 'finish', reason: { type: 'aborted', by: 'timeout' } };
+      })();
+    },
+  };
+  const { ctx, records, dispose } = connect({ ...route }, { llm: silent });
+  const claimed = [userMessage()];
+  const downstream = { kind: 'enter', messages: claimed };
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  try {
+    await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  const rawLog = warnings.find((line) => line.includes('verworfene One-Shot-Antwort'));
+  assert.ok(rawLog, 'Rohtext-Log fehlt');
+  assert.ok(rawLog.includes('Chunks: usage=1, finish=1'), `Chunks-Zählung fehlt oder falsch: ${rawLog}`);
+  assert.ok(rawLog.includes('"type":"aborted"'), `Finish-Grund als Objekt muss lesbar sein: ${rawLog}`);
+  assert.equal(rawLog.includes('[object Object]'), false, 'unlesbarer Objekt-Grund im Log');
+  assert.ok(rawLog.includes('leere Antwort'), 'die Leere muss benannt werden');
+  assert.ok(/Dauer=\d+ms/.test(rawLog), 'Dauer fehlt');
+  assert.ok(rawLog.includes('test-route/test-model'), 'angefragte Route fehlt');
+  assert.equal(records[0].outcome, 'rejected', 'NO_JSON bleibt der Ausgang');
+  dispose();
+});
+
+/**
+ * Der vierte Weg zu „kein Ergebnis“: der Aufruf WIRFT (Zeitlimit, Netzfehler,
+ * Provider-Fehler). Vorher war er voellig stumm — nur ein Grundkuerzel landete im
+ * Datensatz. Jetzt muss Name, Meldung und Dauer dastehen, sonst ist ein Abbruch
+ * durch unser eigenes Zeitlimit nicht von einem Providerfehler zu trennen.
+ */
+test('Diagnose: ein fehlgeschlagener One-Shot wird mit Name, Meldung und Dauer protokolliert', async () => {
+  const boom = new Error('stream aborted after 15000ms');
+  boom.name = 'AbortError';
+  const failing = { calls: [], stream() { throw boom; } };
+  const { ctx, records, dispose } = connect({ ...route }, { llm: failing });
+  const claimed = [userMessage()];
+  const downstream = { kind: 'enter', messages: claimed };
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  try {
+    await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  const failureLog = warnings.find((line) => line.includes('One-Shot fehlgeschlagen'));
+  assert.ok(failureLog, 'Fehler-Log fehlt');
+  assert.ok(failureLog.includes('LLM_FAILED:AbortError'), `Name fehlt: ${failureLog}`);
+  assert.ok(failureLog.includes('stream aborted after 15000ms'), `Meldung fehlt: ${failureLog}`);
+  assert.ok(/Dauer=\d+ms|nach \d+ms/.test(failureLog), `Dauer fehlt: ${failureLog}`);
+  assert.ok(failureLog.includes('test-route/test-model'), `angefragte Route fehlt: ${failureLog}`);
+  assert.equal(records[0].reasons[0], 'LLM_FAILED:AbortError', 'Grund bleibt benannt');
+  dispose();
+});
+
+/**
  * Das Gate dieses Blocks, Regel fuer Regel aus Plan §7. Die Tabelle ist die
- * Zusage: jede ungueltige oder intent-veraendernde Ausgabe endet in der
- * ESKALATION (nicht mehr im stillen Roh-Prompt) — und zwar mit GENAU einem
- * Aufruf, GENAU einem Datensatz, einer benannten Ursache UND der Frage im
- * Text. Eine Zeile pro Regel, damit eine fehlende Regel auffaellt.
+ * Zusage: jede ungueltige oder intent-veraendernde Ausgabe endet beim
+ * Roh-Prompt — und zwar mit GENAU einem Aufruf, GENAU einem Datensatz und einer
+ * benannten Ursache. Eine Zeile pro Regel, damit eine fehlende Regel auffaellt.
  */
 test('Roh-Prompt: jede Fallback-Regel aus Plan §7 greift', async () => {
   // `kept` unterscheidet die zwei Arten des Verwerfens: gab es keine
@@ -784,15 +946,11 @@ test('Roh-Prompt: jede Fallback-Regel aus Plan §7 greift', async () => {
 
     const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
 
-    assert.notEqual(decision, downstream, `${name}: verworfen wird eskaliert, nicht durchgereicht`);
-    assert.equal(decision.kind, 'enter', name);
-    const text = decision.messages[0].content[0].text;
-    assert.ok(text.includes('Feedback erforderlich'), `${name}: die Frage steht im Text`);
-    // Nur der Praefix wird gepinnt: die Wortwahl der Bibliothek ist nicht unser Vertrag.
-    assert.ok(text.includes(reason), `${name}: mit dem Grund (${reason})`);
+    assert.equal(decision, downstream, `${name}: der Roh-Prompt muss gelten`);
     assert.equal(llm.calls.length, 1, `${name}: genau ein One-Shot-Aufruf`);
     assert.equal(records.length, 1, `${name}: genau ein Datensatz`);
     assert.equal(records[0].outcome, 'rejected', name);
+    // Nur der Praefix wird gepinnt: die Wortwahl der Bibliothek ist nicht unser Vertrag.
     assert.ok(records[0].reasons[0].startsWith(reason), `${name}: ${records[0].reasons[0]}`);
     assert.equal(records[0].enhancedLength > 0, kept, `${name}: nachvollziehbar, aber nicht verwendet`);
     dispose();
@@ -837,13 +995,7 @@ test('Roh-Prompt: kein interner Fehler bricht den Schritt', async () => {
 
     const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, payload, () => Promise.resolve(downstream));
 
-    // Ein Fehler in UNSEREM Code bricht den Schritt nicht — und er wird
-    // ebenfalls zur Frage: der User erfährt, dass etwas schiefging, statt dass
-    // ein unverbesserter Prompt still weiterläuft.
-    assert.notEqual(decision, downstream, `${name}: auch der eigene Fehler eskaliert`);
-    const text = decision.messages[0].content[0].text;
-    assert.ok(text.includes('Feedback erforderlich'), `${name}: die Frage steht im Text`);
-    assert.ok(text.includes('INTERNAL_ERROR'), `${name}: mit dem Grund`);
+    assert.equal(decision, downstream, `${name}: der Schritt laeuft weiter`);
     assert.equal(records.length, 1, `${name}: genau ein Datensatz`);
     assert.equal(records[0].outcome, 'rejected', name);
     assert.ok(records[0].reasons[0].startsWith('INTERNAL_ERROR'), `${name}: ${records[0].reasons[0]}`);
@@ -974,7 +1126,7 @@ test('Ersetzung: keine Nachrichtenform bringt die Ersetzung zum Werfen', () => {
   }
 });
 
-test('Ersetzung: eine nicht auffindbare Nachricht eskaliert statt durchzureichen', async () => {
+test('Ersetzung: eine nicht auffindbare Nachricht fuehrt zum Roh-Prompt', async () => {
   const llm = fakeLlm(reply(goodResult()));
   const { ctx, records, dispose } = connect({ ...route }, { llm });
   const claimed = [userMessage()];
@@ -982,17 +1134,18 @@ test('Ersetzung: eine nicht auffindbare Nachricht eskaliert statt durchzureichen
 
   const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(fremd));
 
-  // Verhaltensänderung (Session 3/4, Trägerregel in diesem Durchgang geschlossen):
-  // MESSAGE_NOT_FOUND eskaliert mit Fallback-Prompt statt still durchzureichen.
-  // Der Träger ist die letzte menschliche Nachricht der ENTSCHEIDUNG — die
-  // Ursprungsnachricht steht dort nicht (genau das ist MESSAGE_NOT_FOUND), aber
-  // die Frage des Users steht dort trotzdem.
-  assert.notEqual(decision, fremd, 'Fallback-Prompt wird gebaut, nicht durchgereicht');
+  // Der Ausgang des Enhancers war ANGENOMMEN: genau ein Modellaufruf, und die
+  // Antwort steht mit ihrer Laenge im Datensatz. Erst die fehlende Nachricht macht
+  // daraus `rejected` (der TABELLEN-Wert `missingMessage`, kein zweites Verwerfen
+  // des Modells). Der Test kann deshalb nur ueber diese Umdeutung bestehen und
+  // nicht schon dadurch, dass gar nichts veredelt wurde.
+  assert.equal(llm.calls.length, 1, 'der One-Shot lief genau einmal');
   assert.equal(records[0].outcome, 'rejected');
   assert.deepEqual(records[0].reasons, ['MESSAGE_NOT_FOUND']);
-  const fallbackText = decision.messages[0].content[0].text;
-  assert.ok(fallbackText.includes('Feedback erforderlich'), 'Fallback-Prompt enthält Eskalation');
-  assert.ok(fallbackText.includes('MESSAGE_NOT_FOUND'), 'mit dem Grund, der sie ausgelöst hat');
+  assert.ok(records[0].enhancedLength > 0, 'die angenommene Antwort bleibt im Datensatz nachvollziehbar');
+  // Die Entscheidung geht unveraendert durch: kein Prompt wird eingehaengt.
+  assert.equal(decision, fremd, 'Roh-Prompt bleibt erhalten, nicht ersetzt');
+  assert.equal(decision.messages[0].content[0].text, claimed[0].content[0].text, 'der Text der Nachricht ist unveraendert');
   dispose();
 });
 
@@ -1028,15 +1181,12 @@ test('Abbruch: ein abgebrochener One-Shot gilt als verworfen', async () => {
 
   const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, payload, () => Promise.resolve(downstream));
 
-  // Verhaltensänderung (Session 3/4): Verworfen wird nicht still durchgereicht,
-  // sondern es kaliert — ein Fallback-Prompt wird gebaut.
-  assert.notEqual(decision, downstream, 'Fallback-Prompt wird gebaut, nicht durchgereicht');
+  // Verhaltensänderung: Verworfen wird nicht mehr zu einem Eskalations-Prompt
+  // umgedeutet. Ein abgebrochener One-Shot lässt die Entscheidung unverändert
+  // — der Roh-Prompt geht weiter.
+  assert.equal(decision, downstream, 'Roh-Prompt bleibt erhalten');
   assert.equal(records[0].outcome, 'rejected');
   assert.deepEqual(records[0].reasons, ['LLM_FAILED:AbortError']);
-  // Der Fallback-Prompt enthält die Eskalations-Texte
-  const fallbackText = decision.messages[0].content[0].text;
-  assert.ok(fallbackText.includes('Feedback erforderlich'), 'Fallback-Prompt enthält Eskalation');
-  assert.ok(fallbackText.includes('[Roh-Prompt gilt als Fallback]'), 'Fallback-Prompt enthält Markierung');
   dispose();
 });
 
@@ -1358,11 +1508,7 @@ test('Zettel: der passende Zettel steht als eigener Block im Aufruf und im Daten
   assert.ok(request.messages[0].content[2].text.startsWith('<shinon_stand>'), 'der Stand ist ein eigener Block');
   assert.ok(request.messages[0].content[2].text.includes('<zettel thema="prompter">'));
   assert.ok(request.messages[0].content[2].text.includes('bei: Eine Pruefung steht an'));
-  // `narrative: null` steht im Datensatz, weil kein Composite gelesen wurde —
-  // das Feld ist die Narrative-Lage (Zug 6), und sein Fehlen waere von „es gibt
-  // keine" nicht zu unterscheiden. Die Gegenprobe steht im Test darunter.
-  assert.deepEqual(records[0].stand, { stance: null, tone: 'none', tendencies: [], narrative: null, notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null }, skills: { loaded: [], reason: 'SKILLS_OFF' } });
-  assert.equal(request.messages[0].content[2].text.includes('<narrative'), false, 'ohne Composite kein Narrative-Element');
+  assert.deepEqual(records[0].stand, { stance: null, tone: 'none', tendencies: [], notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null }, skills: { loaded: [], reason: 'SKILLS_OFF' } });
   dispose();
 });
 
@@ -1474,7 +1620,6 @@ test('Stand: Haltung und Tendenzen stehen im selben Block wie die Zettel', async
     stance: 'kritisch',
     tone: 'scoring',
     tendencies: ['korrektur hoch', 'zustimmung niedrig'],
-    narrative: null,
     notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null },
     skills: { loaded: [], reason: 'SKILLS_OFF' },
   });
@@ -1492,9 +1637,7 @@ test('Stand: ohne Ton bleibt der Stand — nur die Haltung fehlt', async () => {
   const block = llm.calls[0].messages[0].content[2].text;
   assert.equal(block.includes('<haltung>'), false, 'keine erfundene Haltung');
   assert.ok(block.includes('<zettel thema="prompter">'), 'die Zettel laden trotzdem');
-  assert.equal(block.includes('<narrative'), false, 'und keine erfundene Narrative-Lage');
   assert.equal(records[0].stand.stance, null);
-  assert.equal(records[0].stand.narrative, null, 'die Lage fehlt benannt, nicht still');
   assert.equal(records[0].stand.tone, 'none');
   dispose();
 });

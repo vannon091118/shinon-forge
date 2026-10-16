@@ -35,6 +35,7 @@
  * Exit:    0 = läuft bzw. geprüft · 2 = Umgebungsfehler (fail-closed)
  */
 import { spawn, spawnSync } from 'node:child_process';
+import { constants as osConstants } from 'node:os';
 import * as repo from '../scripts/lib/repo.mjs';
 import { dshBinary, dshSource, goodNode } from '../scripts/lib/dsh.mjs';
 
@@ -62,9 +63,59 @@ if (runningMajor < 22 && process.env.SHINON_START_REEXEC !== '1') {
     stdio: 'inherit',
     env: { ...process.env, SHINON_START_REEXEC: '1' },
   });
-  resumed.on('exit', (code) => process.exit(code ?? 1));
+  forwardSignalsTo(resumed);
 } else {
   main();
+}
+
+/**
+ * Signale weiterreichen UND den eigenen Status danach korrekt setzen.
+ *
+ * Gemessen 2026-10-16 mit dem reale Einstieg: SIGINT nur auf die Einstiegs-
+ * prozess-Kette ohne Forwarding beendete den Einstieg (Shell meldet 130),
+ * ließ aber Self-Heal-Kind und dsh als Waisen weiterlaufen — Port blieb offen.
+ * Deshalb erhält JEHE Ebene hier ihre Handler: das Kind bekommt dasselbe Signal
+ * (INT/TERM/HUP); stirbt das Kind per Signal, werden die eigenen Listener
+ * entfernt und dasselbe Signal neu aufgelegt. Der Prozess stirbt dann ECHT
+ * signalisiert (Shell: 128+Nummer) und nicht über einen Listener, der sich
+ * selbst neu anstößt — das wäre eine Endlosschleife.
+ */
+function forwardSignalsTo(child) {
+  const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+  for (const signal of signals) {
+    process.on(signal, () => {
+      if (child.exitCode === null && child.signalCode === null) child.kill(signal);
+    });
+  }
+  child.on('exit', (code, signal) => {
+    if (signal !== null) {
+      for (const own of signals) process.removeAllListeners(own);
+      try {
+        process.kill(process.pid, signal);
+      } catch {
+        // Das Signal ist nicht mehr entgegennehmbar (schon behandelt, oder der
+        // Prozess ist bereits beim Sterben): dann per exit gehen — aber mit der
+        // Nummer DIESES Signals. 128+2, 128+1 und 128+15 sind drei verschiedene
+        // Auskuenfte (130/129/143), und eine Shell liest sie: ein hart kodiertes
+        // 128+15 haette einem SIGINT ein SIGTERM angehaengt. Ist die Nummer hier
+        // unbekannt (kein Fall der drei Signale), 15 als benannter Notausgang.
+        process.exit(signalExitCode(signal));
+      }
+    } else {
+      process.exit(code ?? 1);
+    }
+  });
+}
+
+/**
+ * Der Status, den eine Shell fuer „per Signal beendet" liest: 128 + Signalnummer.
+ *
+ * Die Nummern kommen aus `os.constants.signals` statt aus einer eigenen Tabelle —
+ * eine abgeschriebene Liste waere eine zweite Wahrheit ueber dieselbe Sache.
+ */
+export function signalExitCode(signal) {
+  const number = osConstants.signals[signal];
+  return 128 + (typeof number === 'number' ? number : osConstants.signals.SIGTERM);
 }
 
 function main() {
@@ -106,8 +157,5 @@ function main() {
     stdio: 'inherit',
     env: { ...process.env, DSH_HOME: ROOT },
   });
-  child.on('exit', (code, signal) => {
-    if (signal !== null) process.kill(process.pid, signal);
-    else process.exit(code ?? 1);
-  });
+  forwardSignalsTo(child);
 }

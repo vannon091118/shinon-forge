@@ -12,6 +12,11 @@ storages/
 # Lauf selbst und kann es jederzeit neu bauen. Die Projekt-Kontextdatei daneben
 # (.shinon/project-context.md) ist INHALT und wird getrackt; der Ordner selbst
 # liegt als .shinon/.gitkeep im Baum, damit ein frischer Klon ihn hat.
+
+# Runtime-Index des Prompters: absolute Pfade des jeweiligen Rechners und der
+# volle Projektinhalt (gemessen 11 MB). Zustand, keine Quelle — aber NUR die
+# Indexdatei: `.shinon/project-context.md` ist geschriebener Inhalt, den die
+# Persona in den Prompt laedt, und bleibt sichtbar.
 .shinon/prompter-index.json
 
 # Credentials — never commit. Public repo!

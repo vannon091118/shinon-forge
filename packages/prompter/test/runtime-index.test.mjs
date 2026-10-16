@@ -175,6 +175,91 @@ test('getContext: symbols extrahiert Tokens aus den Dateiinhalten', () => {
   assert.ok(ctx.symbols.includes('hello'));
 });
 
+// ── 5b. Budget und Rang — Regression der NO_JSON-Ursache vom 2026-10-16 ─────
+
+/** Zeichensumme der gelieferten Inhalte — die Größe, die der Aufruf bezahlt. */
+const charsOf = (ctx) => ctx.files.reduce((sum, file) => sum + file.content.length, 0);
+
+/**
+ * LIVE GEMESSEN: ohne Budget baute der Prompter für einen 132-Zeichen-Prompt
+ * eine Nutzer-Nachricht von 1 457 948 Zeichen (20 Dateien, package-lock.json
+ * allein 521 512). Der One-Shot lief damit in sein 15-s-Zeitlimit, die Antwort
+ * kam leer zurück und jedes Verwerfen hiess `NO_JSON`. Diese Attrappe stellt
+ * genau diese Lage her: 20 große Dateien, alle mit Treffern.
+ */
+test('getContext: das Budget hält auch bei 20 grossen Treffern', () => {
+  const idx = createIndex();
+  const block = 'test content '.repeat(8000); // ~104 000 Zeichen je Datei
+  for (let i = 0; i < 20; i += 1) indexFile(idx, `gross${i}.js`, `${block}${i}\n`);
+
+  const ctx = getContext(idx, 'test', { maxFiles: 20, budgetTokens: 6000 });
+  assert.equal(ctx.count, 20, 'alle Treffer bleiben im Kontext — geschnitten, nicht ausgelassen');
+  assert.ok(charsOf(ctx) <= 6000 * 4, `Budget 6000 Token = 24000 Zeichen, geliefert ${charsOf(ctx)}`);
+  assert.ok(charsOf(ctx) > 20 * 100, 'und der Kontext ist trotzdem Inhalt, nicht ein Rest von zwanzig Zeichen');
+});
+
+/**
+ * Monotonie: mehr Budget heisst mehr Kontext, nie anderen. Sonst wäre die
+ * Grenze keine Grenze, sondern eine andere Auswahl.
+ */
+test('getContext: ein groesseres Budget liefert eine Obermenge der Dateien', () => {
+  const idx = createIndex();
+  for (let i = 0; i < 8; i += 1) indexFile(idx, `datei${i}.js`, `test ${'x'.repeat(4000)} ende${i}\n`);
+
+  const small = getContext(idx, 'test', { maxFiles: 8, budgetTokens: 200 });
+  const large = getContext(idx, 'test', { maxFiles: 8, budgetTokens: 4000 });
+  const pathsSmall = small.files.map((f) => f.path);
+  const pathsLarge = large.files.map((f) => f.path);
+  assert.ok(pathsSmall.length > 0 && pathsLarge.length > 0, 'beide Budgets liefern Kontext');
+  assert.deepEqual(pathsSmall.filter((p) => !pathsLarge.includes(p)), [], 'das kleine Budget wählt keine Datei, die das grosse nicht hat');
+  assert.ok(charsOf(large) > charsOf(small), 'mehr Budget heisst mehr Inhalt');
+});
+
+/**
+ * Der gemessene Fehlgriff: package-lock.json stand auf Rang 1 für einen Prompt
+ * über den Prompter — nicht wegen Bezug, sondern weil zehntausende seiner
+ * Tokens auf zweibuchstabige Prompt-Wörter passten.
+ */
+test('getContext: eine genannte Datei schlaegt eine riesige Rauschdatei', () => {
+  const idx = createIndex();
+  indexFile(idx, 'packages/prompter/index.js', 'export function verwirftAntwort() { /* NO_JSON Ursache betroffene Zeile */ }\n');
+  const rausch = Array.from({ length: 40000 }, (_, i) => `"paket${i}": "json der die und mit js one"`).join('\n');
+  indexFile(idx, 'package-lock.json', rausch);
+
+  const ctx = getContext(idx, 'Bitte pruefe packages/prompter/index.js: der One-Shot verwirft jede Antwort mit NO_JSON. Nenne die Ursache und die betroffene Zeile.', { maxFiles: 20, budgetTokens: 6000 });
+  assert.equal(ctx.files[0].path, 'packages/prompter/index.js', `Rang 1 ist ${ctx.files[0].path}`);
+  assert.ok(ctx.files[0].content.includes('verwirftAntwort'), 'und die genannte Datei kommt vollstaendig an');
+});
+
+/**
+ * Hart heisst abschneiden, nicht ueberschreiten — und an einer Zeilengrenze:
+ * ein Kontext, der mitten in einem Ausdruck endet, ist ein halber Ausdruck.
+ * Derselbe Vertrag wie im Project Index.
+ */
+test('getContext: geschnitten wird an der Zeilengrenze und als Praefix', () => {
+  const idx = createIndex();
+  const lines = Array.from({ length: 400 }, (_, i) => `const zeile${i} = test;`).join('\n') + '\n';
+  indexFile(idx, 'a.js', lines);
+
+  const ctx = getContext(idx, 'test', { maxFiles: 1, budgetTokens: 200 });
+  assert.equal(ctx.count, 1);
+  const content = ctx.files[0].content;
+  assert.ok(content.length < lines.length, 'die Datei ist geschnitten');
+  assert.equal(content.endsWith('\n'), true, 'an der Zeilengrenze, nicht mitten in der Zeile');
+  assert.equal(lines.startsWith(content), true, 'und der Rest ist ein Praefix der indizierten Datei');
+  assert.ok(content.length > 0, 'ein Schnitt von null Zeichen waere kein Kontext');
+});
+
+/** Eine unbrauchbare Grenze ist eine Grenze: null heisst null, NaN heisst Default. */
+test('getContext: null Token liefert leeren Kontext, NaN den Default', () => {
+  const idx = createIndex();
+  indexFile(idx, 'a.js', 'export const test = 1;\n');
+  assert.equal(getContext(idx, 'test', { budgetTokens: 0 }).count, 0);
+  assert.equal(getContext(idx, 'test', { budgetTokens: -5 }).count, 0, 'eine negative Grenze oeffnet nichts');
+  assert.ok(getContext(idx, 'test', { budgetTokens: Number.NaN }).count > 0, 'NaN faellt auf den Default');
+  assert.ok(getContext(idx, 'test').count > 0, 'ohne Angabe gilt der Default aus §14');
+});
+
 // ── 6. Persistenz ────────────────────────────────────────────────────────────
 
 test('saveIndex/loadIndex: roundtrip mit Vertrag', () => {
