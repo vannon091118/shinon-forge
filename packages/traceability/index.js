@@ -59,7 +59,12 @@ export function configRecord(config) {
   const source = config ?? {};
   const bounded = (value, fallback, min, max) =>
     (typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : fallback);
-  const defaults = Config.parse({});
+  // Schemastery 3.18.4 ruft sein Schema (`.parse` gibt es nicht — gemessen: nur
+  // `typeof schema === 'function'`). Diese Zeile war nie auffällig, weil der
+  // Ladepfad des Profils auf einen Fremd-Prototyp zeigte und `index.js` deshalb
+  // nie geladen wurde; `scripts/gate/tests/bundle-resolution.test.mjs` geht den
+  // echten Weg und hat sie gefunden.
+  const defaults = Config({});
   return {
     contract: TOAST_CONTRACT,
     enabled: source.enabled !== false,

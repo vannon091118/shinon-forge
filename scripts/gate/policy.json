@@ -2,6 +2,7 @@
   "version": 1,
   "engine": {
     "always": [
+      "bundle-resolution",
       "manifest",
       "contract",
       "patch",
@@ -12,6 +13,7 @@
       "typescript"
     ],
     "local": [
+      "bundle-resolution",
       "manifest",
       "contract",
       "patch",

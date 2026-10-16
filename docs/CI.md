@@ -103,7 +103,7 @@ Pfad-/Branch-Filter, kein `continue-on-error: true`, und leitet den Prüfbereich
 nicht selbst im YAML ab (`scripts/lib/ci-range.mjs` tut das, und im Zweifel prüft
 er die **volle** Historie). Das statische Gate (`commit-trailer`) prüft diese
 Eigenschaften am Dateiinhalt, nicht an der Absicht: `npm run gate:full` →
-**Exit 0**, 21 Gates, 0 rot.
+**Exit 0**, 22 Gates, 0 rot (Gates am 2026-10-17 nachgemessen: das Gate `bundle-resolution` ist hinzugekommen — es prüft die Auflösung der Profil-Bündel in `packages/` und wird von `repo.bundleResolutionIssues()` getragen).
 
 **NICHT GEMESSEN:** ob die Branch-Regel in GitHub **gesetzt ist**. Das ist kein
 Dateiinhalt, sondern ein Zustand bei GitHub, und der ist von hier aus nicht
