@@ -278,29 +278,29 @@
     # ^ Die Kanäle sind EIGENE Namen dieses Pakets und keine zweite
     #   Spine-Wahrheit: den Spine-Kanal (`shinon/event`) liest @shinon/narrative.
 
-# Key-Router (Zug 6): der Schlüssel-Pool der Modell-Route.
-#
-# DIE ENTSCHEIDUNG IST DER NAME, NICHT DER WERT: `envNames: [ 'AGNES_API_KEY' ]`
-# nennt die Umgebungsvariable, die die Route ohnehin liest (der `agnes`-Block
-# oben, `apiKeyEnv`). Das Schema dieses Pakets hat KEIN Feld für einen
-# Schlüsselwert, und es darf keines bekommen: eine Profildatei ist versioniert.
-# Vorher stand hier `providers[].pool: []` und `defaultKey: ''` — zwei Felder, die
-# einen Schlüssel aufgenommen hätten. Beide sind entfernt.
-#
-# baseUrl wird GESPIEGELT, nicht erfunden: der Verbindungstest fragt die
-# Modellliste ab und muss denselben Host fragen wie die Route. Der Gate-Test
-# `scripts/gate/tests/key-router-security.test.mjs` vergleicht beide Werte — ein
-# anderer Host hier waere ein zweiter Wahrheitsstand ueber denselben Anbieter.
-#
-# initialDelayMs/maxDelayMs/maxRetries sind die Eskalation bei 429: der erste
-# Fehlschlag wartet 2 s, jeder weitere verdoppelt, gedeckelt bei 60 s, mit
-# ±25 % Jitter (assets/pool-core.js; nachgerechnet in packages/key-router/test/).
-#
-# OFFEN, ausdruecklich (nicht behauptet): der Provider-OVERRIDE fehlt — dieses
-# Paket gibt DSH noch keinen rotierenden Schluessel an die Hand. Es verwaltet den
-# Pool, beantwortet `key_router_status`, `key_router_rotate` und `key_router_probe`
-# und deckelt Plaetze bei 429. Der Override braucht die LLM-Dienstflaeche; siehe
-# PLAN.md.
+    # Key-Router (Zug 6): der Schlüssel-Pool der Modell-Route.
+    #
+    # DIE ENTSCHEIDUNG IST DER NAME, NICHT DER WERT: `envNames: [ 'AGNES_API_KEY' ]`
+    # nennt die Umgebungsvariable, die die Route ohnehin liest (der `agnes`-Block
+    # oben, `apiKeyEnv`). Das Schema dieses Pakets hat KEIN Feld für einen
+    # Schlüsselwert, und es darf keines bekommen: eine Profildatei ist versioniert.
+    # Vorher stand hier `providers[].pool: []` und `defaultKey: ''` — zwei Felder, die
+    # einen Schlüssel aufgenommen hätten. Beide sind entfernt.
+    #
+    # baseUrl wird GESPIEGELT, nicht erfunden: der Verbindungstest fragt die
+    # Modellliste ab und muss denselben Host fragen wie die Route. Der Gate-Test
+    # `scripts/gate/tests/key-router-security.test.mjs` vergleicht beide Werte — ein
+    # anderer Host hier waere ein zweiter Wahrheitsstand ueber denselben Anbieter.
+    #
+    # initialDelayMs/maxDelayMs/maxRetries sind die Eskalation bei 429: der erste
+    # Fehlschlag wartet 2 s, jeder weitere verdoppelt, gedeckelt bei 60 s, mit
+    # ±25 % Jitter (assets/pool-core.js; nachgerechnet in packages/key-router/test/).
+    #
+    # OFFEN, ausdruecklich (nicht behauptet): der Provider-OVERRIDE fehlt — dieses
+    # Paket gibt DSH noch keinen rotierenden Schluessel an die Hand. Es verwaltet den
+    # Pool, beantwortet `key_router_status`, `key_router_rotate` und `key_router_probe`
+    # und deckelt Plaetze bei 429. Der Override braucht die LLM-Dienstflaeche; siehe
+    # PLAN.md.
 - id: shinon-key-router
   config:
     providers:
