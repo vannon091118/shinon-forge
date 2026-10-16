@@ -148,6 +148,17 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   character by character. Never let a literal drift; extend that assertion instead.
 
 ## Pitfalls
+- Ein Profil-Bündel löst über `profiles/<name>/node_modules` auf — **vor** dem Root-`node_modules`.
+  Ein Link dorthin, der aus `packages/` herauszeigt (gemessen 2026-10-17:
+  `@shinon/traceability` → `../../../Projekt Type/traceability-proto`), beschattet das
+  Repo-Paket: `packages/traceability` wird nie geladen, der Boot stirbt am fremden
+  `Config = {}` mit `Cannot read properties of undefined (reading 'validate')`. Die Quelle
+  ist das Profil-Manifest (`dependencies["@shinon/<dir>"]: link:../../packages/<dir>`),
+  repariert wird **nie von Hand**, sondern mit `npm run profile:links` (idempotent,
+  verweigert Fremdpfade mit Exit 2); `node scripts/profile-links.mjs --check` zeigt
+  Abweichungen, das Gate `bundle-resolution` und jeder Doctor-Befund lesen dieselbe Regel
+  (`repo.bundleResolutionIssues()`). Ein FEHLENDER Link ist kein Befund — ein frischer Klon
+  hat kein `profiles/<name>/node_modules`; ein vorhandener, der woandershin zeigt, ist einer.
 - `dist/` is generated — never hand-edit it; `npm run build` regenerates it wholesale.
 - The legacy string `dsh-mod` must not appear in any runtime artifact
   (`index.js`/`client.js`/`cordis.patch.yml`, profiles) — the gate's legacy-guard fails on it.

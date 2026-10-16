@@ -42,6 +42,7 @@
     "gate:test": "node --test scripts/gate/tests/*.test.mjs",
     "commit:guard": "node scripts/commit-guard.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
+    "profile:links": "node scripts/profile-links.mjs",
     "update": "node scripts/dsh-update.mjs",
     "stages": "node scripts/stages.mjs",
     "scale:check": "node scripts/scale-check.mjs",

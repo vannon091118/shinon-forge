@@ -27,7 +27,7 @@
  *               (scripts/lib/plugin-idioms.mjs) — und keine Kopie daneben
  */
 import { execFileSync } from 'child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, realpathSync, statSync } from 'fs';
 import { dirname, join, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { loadYaml } from './yaml.mjs';
@@ -779,6 +779,148 @@ export function foreignBundleTarget(name, manifest, profileDir) {
   if (found === null) return null;
   const target = resolve(profileDir, found[1]);
   return isInside(PACKAGES_DIR, target) ? null : target;
+}
+
+/**
+ * Der installierte Link eines Bündels im Profil — ohne zu werfen.
+ *
+ * Drei Fälle, die sich unterscheiden MÜSSEN, weil sie drei Auskünfte sind:
+ *   `null`     nichts installiert (ein frischer Klon hat kein node_modules)
+ *   `link`     ein Symlink; `target` ist sein aufgelöstes Ziel
+ *   `broken`   ein Symlink ins Leere; `target` ist sein ROHTEXT (er zeigt irgendwohin)
+ *   `real`     kein Symlink, sondern eine echte Kopie — sie folgt dem Manifest nicht
+ *
+ * @param {string} file - Pfad des erwarteten Eintrags.
+ * @returns {{kind: 'link'|'broken'|'real', target: string}|null}
+ */
+function installedBundle(file) {
+  let stats;
+  try {
+    stats = lstatSync(file);
+  } catch {
+    return null;
+  }
+  if (!stats.isSymbolicLink()) return { kind: stats.isDirectory() ? 'real' : 'file', target: file };
+  try {
+    return { kind: 'link', target: realpathSync(file) };
+  } catch {
+    return { kind: 'broken', target: readlinkSync(file) };
+  }
+}
+
+/**
+ * Die Bündel-Auflösung des aktiven Profils — die EINE Regel für Gate und Doctor.
+ *
+ * Warum es diese Funktion gibt: ein `shinon`-Start löst jedes Bündel über
+ * `profiles/<name>/node_modules` auf. Ein dort liegender Link, der aus `packages/`
+ * herauszeigt, BESCHATTET das Repo-Paket — Node lädt dann fremden Code, ohne dass
+ * irgendein Gate es merkt (gemessen 2026-10-17: `@shinon/traceability` zeigte auf
+ * `../../../Projekt Type/traceability-proto`, dessen `Config = {}` den Boot mit
+ * `... (reading 'validate')` abriss). Deshalb prüft diese Funktion die Naht, an der
+ * die Beschattung entsteht, und nicht das Paket.
+ *
+ * Geprüft wird, was da ist. Ein FEHLENDER Eintrag ist kein Fehler — ein frischer
+ * Klon hat kein `profiles/<name>/node_modules`, und DSH installiert ihn beim Start
+ * aus dem Manifest. Ein vorhandener Eintrag dagegen muss dem Manifest folgen.
+ *
+ * @param {object} root - Root-Manifest (nur `name` wird gelesen: der Scope).
+ * @param {{profileName?: string, profilesDir?: string, packagesDir?: string, base?: string}} [options]
+ *   Übersteuerungen für Tests (Miniatur-Baum) und Doctor (fremde Wurzel).
+ * @returns {string[]} Befunde; jeder nennt Quelle, aufgelöstes Ziel und Abhilfe.
+ */
+export function bundleResolutionIssues(root = readRoot(), options = {}) {
+  const packagesDir = options.packagesDir ?? PACKAGES_DIR;
+  const profilesDir = options.profilesDir ?? PROFILES_DIR;
+  const base = options.base ?? dirname(packagesDir);
+  const show = (file) => {
+    const rel = relative(base, file);
+    return rel === '' || rel === '..' || rel.startsWith(`..${sep}`) ? file : rel;
+  };
+  const remedy = 'Abhilfe: node scripts/profile-links.mjs (setzt die Links aus den deklarierten link:-Zielen neu)';
+
+  const profileName = options.profileName ?? activeProfile(root);
+  if (profileName === null) return ['kein --profile in scripts.dev — kein Profil zu prüfen'];
+  const profileDir = join(profilesDir, profileName);
+  const manifestFile = join(profileDir, 'package.json');
+  if (!existsSync(manifestFile)) return [`${show(manifestFile)} fehlt — kein Profil zu prüfen`];
+
+  let manifest;
+  try {
+    manifest = readJSON(manifestFile);
+  } catch (error) {
+    return [`${show(manifestFile)} ist kein gültiges JSON: ${error.message}`];
+  }
+  const bundles = manifest?.dsh?.profile?.bundles;
+  if (!Array.isArray(bundles) || bundles.length === 0) {
+    return [`${show(manifestFile)}: dsh.profile.bundles fehlt oder ist leer`];
+  }
+
+  const scope = String(root?.name ?? '').split('/')[0];
+  const source = show(manifestFile);
+  const issues = [];
+  for (const bundle of bundles) {
+    if (typeof bundle !== 'string' || !bundle.startsWith(`${scope}/`)) continue;
+    const spec = manifest.dependencies?.[bundle];
+    if (typeof spec !== 'string') {
+      issues.push(`${bundle}: kein Eintrag in dependencies (Quelle: ${source}) — die Herkunft ist unbekannt; ${remedy}`);
+      continue;
+    }
+    const declared = /^(?:link|file):(.+)$/.exec(spec);
+    if (declared === null) {
+      issues.push(`${bundle}: "${spec}" ist kein link:/file:-Ziel (Quelle: ${source}); ${remedy}`);
+      continue;
+    }
+    const target = resolve(profileDir, declared[1]);
+    if (!isInside(packagesDir, target)) {
+      issues.push(
+        `${bundle} → ${target} zeigt aus ${show(packagesDir)} heraus (Quelle: ${source}: "${spec}") — eine fremde Quelle statt des Repo-Pakets; ${remedy}`,
+      );
+      continue;
+    }
+    const targetManifest = join(target, 'package.json');
+    if (!existsSync(targetManifest)) {
+      issues.push(`${bundle} → ${target} fehlt (Quelle: ${source}: "${spec}"); ${remedy}`);
+      continue;
+    }
+    let targetName = null;
+    try {
+      targetName = readJSON(targetManifest).name;
+    } catch {
+      targetName = null;
+    }
+    if (targetName !== bundle) {
+      issues.push(
+        `${bundle} → ${target} deklariert sich als "${targetName}" (Quelle: ${source}: "${spec}") — fremde Quelle unter erwartetem Pfad`,
+      );
+      continue;
+    }
+
+    const installed = join(profileDir, 'node_modules', ...bundle.split('/'));
+    const entry = installedBundle(installed);
+    if (entry === null) continue; // nichts installiert — kein Fehler
+    if (entry.kind === 'broken') {
+      issues.push(`${show(installed)} → ${entry.target} zeigt ins Leere (Quelle: ${source}: "${spec}"); ${remedy}`);
+      continue;
+    }
+    if (entry.kind === 'real' || entry.kind === 'file') {
+      issues.push(
+        `${show(installed)} ist keine Verknüpfung, sondern eine ${entry.kind === 'file' ? 'Datei' : 'echte Kopie'} — sie folgt dem Manifest nicht (Quelle: ${source}); ${remedy}`,
+      );
+      continue;
+    }
+    if (!isInside(packagesDir, entry.target)) {
+      issues.push(
+        `${show(installed)} → ${entry.target} liegt ausserhalb von ${show(packagesDir)} und beschattet ${bundle} (Quelle: ${source}: "${spec}"); ${remedy}`,
+      );
+      continue;
+    }
+    if (entry.target !== realpathSync(target)) {
+      issues.push(
+        `${show(installed)} → ${entry.target} zeigt nicht auf ${realpathSync(target)} (Quelle: ${source}: "${spec}"); ${remedy}`,
+      );
+    }
+  }
+  return issues;
 }
 
 export function resolveProfile(profileName, packages, root = readRoot()) {
