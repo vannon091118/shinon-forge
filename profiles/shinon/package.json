@@ -3,23 +3,24 @@
   "private": true,
   "dependencies": {
     "@shinon/better-errors": "link:../../packages/better-errors",
+    "@shinon/codingmon": "link:../../packages/codingmon",
     "@shinon/core": "link:../../packages/core",
     "@shinon/dashboard": "link:../../packages/dashboard",
     "@shinon/events": "link:../../packages/events",
+    "@shinon/hook": "link:../../packages/hook",
+    "@shinon/key-router": "link:../../packages/key-router",
     "@shinon/locale-de": "link:../../packages/locale-de",
     "@shinon/markers": "link:../../packages/markers",
+    "@shinon/narrative": "link:../../packages/narrative",
     "@shinon/persona": "link:../../packages/persona",
+    "@shinon/popup": "link:../../packages/popup",
+    "@shinon/project-index": "link:../../packages/project-index",
+    "@shinon/prompter": "link:../../packages/prompter",
+    "@shinon/scoring": "link:../../packages/scoring",
+    "@shinon/task-router": "link:../../packages/task-router",
     "@shinon/token-usage": "link:../../packages/token-usage",
     "@shinon/tooltip": "link:../../packages/tooltip",
-    "@shinon/hook": "link:../../packages/hook",
-    "@shinon/prompter": "link:../../packages/prompter",
-    "@shinon/project-index": "link:../../packages/project-index",
-    "@shinon/task-router": "link:../../packages/task-router",
-    "@shinon/codingmon": "link:../../packages/codingmon",
-    "@shinon/scoring": "link:../../packages/scoring",
-    "@shinon/narrative": "link:../../packages/narrative",
-    "@shinon/popup": "link:../../packages/popup",
-    "@shinon/key-router": "link:../../packages/key-router"
+    "@shinon/traceability": "link:../../packages/traceability"
   },
   "dsh": {
     "profile": {
@@ -46,7 +47,8 @@
         "@shinon/key-router",
         "@deepseek-ai/dsh-experimental-auto-review",
         "@deepseek-ai/dsh-experimental-agent-team-profile",
-        "@deepseek-ai/dsh-experimental-inspector-profile"
+        "@deepseek-ai/dsh-experimental-inspector-profile",
+        "@shinon/traceability"
       ]
     }
   }

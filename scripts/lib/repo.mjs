@@ -597,6 +597,36 @@ export const SOURCE_TWINS = [
     owner: 'packages/token-usage/assets/token-core.js',
     mirror: 'packages/token-usage/client.js',
   },
+  {
+    // Die Rechnung der Toast-Anzeige selbst: die Faltung des Ereignisfensters
+    // steht im Core (unit-testbar, ohne node_modules) und als bytegleiche Region
+    // in der Client-Hälfte, die den Core nicht importieren kann. Drift wäre hier
+    // STILL und teuer: eine Anzeige, die andere Record-Typen liest oder die
+    // Schließung ueber callId verliert, zeigt dauerhaft dasselbe — und das sieht
+    // aus wie "der Toast funktioniert nicht".
+    rule: 'Regel der Traceability-Toasts (Faltung des Ereignisfensters)',
+    kind: 'region',
+    marker: 'zwilling:trace-toasts',
+    owner: 'packages/traceability/assets/trace-core.js',
+    mirror: 'packages/traceability/client.js',
+  },
+  {
+    // Die Naht Host -> Browser: der Name des Globals, in das der Host die
+    // WIRKSAMEN Grenzen legt (`webserver/index-inject`, dieselbe Naht wie die
+    // Marker-Grenzen), und der Vertragsname, den der Client liest, um fremde
+    // Datensätze zu verwerfen. Beides kann die Client-Hälfte nicht importieren.
+    // Drift wäre STILL und teuer: die Seite trüge keinen Datensatz (Rückfall auf
+    // den Vertrag) oder wirfe ihn als fremd weg — beides sähe aus wie "die
+    // Profilwerte wirken nicht", und niemand bekäme eine Meldung.
+    rule: 'Naht Host -> Browser (Traceability-Grenzen)',
+    kind: 'literals',
+    owner: 'packages/traceability/index.js',
+    mirror: 'packages/traceability/client.js',
+    values: [
+      { export: 'TRACE_GLOBAL', literal: 'string' },
+      { export: 'TOAST_CONTRACT', literal: 'string' },
+    ],
+  },
 ];
 
 /** Der Text zwischen `// #region <marker>` und `// #endregion <marker>` (oder null). */

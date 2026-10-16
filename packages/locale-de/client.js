@@ -41,6 +41,17 @@ window.__ModuleLoader__.load({
           // {open}, {calls} und {tool} fuellt die Client-Haelfte aus den Zahlen
           // der Sitzung — die Sprache bleibt hier, die Zahlen kommen von dort.
           'popup.running': 'Vorgang läuft — Schritt {step}, {open} offen, {calls} Aufrufe, zuletzt {tool}',
+          // Die sechs Toast-Texte von @shinon/traceability. Der Kern ist
+          // sprachfrei und liefert nur Schluessel + Werte ({name}, {step},
+          // {turn}, {message}) — die Worte stehen hier, beim Eigentuer, und die
+          // Client-Haelfte fuellt sie beim Rendern (idempotente Fallback-Tabelle
+          // TOAST_DE dort traegt als letzten Rückfall toast.error).
+          'toast.tool_call': '{name} wird ausgeführt',
+          'toast.tool_ok': 'Tool fertig',
+          'toast.tool_failed': 'Tool fehlgeschlagen',
+          'toast.step': 'Schritt {step} · Turn {turn}',
+          'toast.error': 'Fehler: {message}',
+          'toast.empty': 'Keine Traceability-Ereignisse',
         };
         ctx.locale.register('shinon', { en: TEXTS, de: TEXTS });
         

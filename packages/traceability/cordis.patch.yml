@@ -1,0 +1,16 @@
+# KEINE CONFIG HIER — die wirksamen Werte stehen in
+# `profiles/shinon/cordis.patch.yml`:
+#
+#   enabled       true   die Grenzen werden ausgeliefert
+#   maxVisible    3      hoechstzahl gleichzeitiger Toats
+#   duration   4000      Anzeigedauer in Millisekunden
+#
+# Eine id-gezielte Config im Profil ERSETZT die Config des Bundle-Eintrags, sie
+# mischt nicht — `profile-config-override` in scripts/gate/tests/ lehnt die
+# Doppelung fuer jede id ab. Ohne Profil-Config gilt der Schema-Default.
+#
+# Der Slot ist KEINE Config: die Client-Haelfte traegt `shell.overlay` als
+# Literal (SLOT_ID in client.js), der Host kennt ihn nicht.
+- insert:
+    - id: shinon-traceability
+      name: '@shinon/traceability'
