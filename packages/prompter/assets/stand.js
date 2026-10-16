@@ -63,6 +63,10 @@ export function standFor(config, runtime, promptText, context, toneState = null)
       : { loaded: [], skipped: [], reason: read.reason ?? 'SKILLS_EMPTY' };
   }
 
+  // Narrative-Lage (Zug 6): der letzte Composite vom Kanal, den `apply` hält.
+  // Fehlt er, bleibt `<narrative>` weg — renderStand erfindet keine Felder.
+  const narrative = runtime?.narrative ?? null;
+
   const block = renderStand({
     contract: STAND_CONTRACT,
     stance,
@@ -70,6 +74,8 @@ export function standFor(config, runtime, promptText, context, toneState = null)
     notes,
     skills: skillRead.loaded,
     skillsContract: SKILL_RULES_CONTRACT,
+    narrative,
+    narrativeContract: narrative === null ? null : runtime.narrativeContract,
   });
 
   return {

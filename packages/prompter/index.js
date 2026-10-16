@@ -24,6 +24,10 @@ import { loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir,
 import { readTone, standFor, standTrace } from './assets/stand.js';
 import { buildEnhancerRequest, collectStream, enhanceGuarded, replacePrompt } from './assets/enhancer.js';
 
+/** Kanal und Vertragsname der Narrative Engine (Zug 6). Literale Spiegel von `@shinon/narrative` (Naht, drift-geprueft). */
+const NARRATIVE_CHANNEL = 'shinon/narrative/state';
+const NARRATIVE_CONTRACT = 'shinon.narrative/v1';
+
 /**
  * Der Zettel-Kern wird RE-EXPORTIERT, nicht nachgebaut: die reinen Funktionen
  * (lesen, waehlen, pruefen, rendern) sind ohne node_modules testbar, die
@@ -540,8 +544,14 @@ export function apply(ctx, config) {
   }
 
   assertVocabulary('context state', contextState, CONTEXT_STATES);
-  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules };
+  // Narrative-Lage (Zug 6): der Composite der Narrative Engine kommt auf einem
+  // EIGENEN Kanal. Der Prompter hält den letzten und gibt ihn in den Stand;
+  // ohne Composite kein <narrative>-Element. Er interpretiert ihn nicht um.
+  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules, narrative: null, narrativeContract: NARRATIVE_CONTRACT };
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
+  const disposeNarrative = ctx.on(NARRATIVE_CHANNEL, (composite) => {
+    runtime.narrative = composite ?? null;
+  });
 
   const route = config.provider === '' || config.model === '' ? 'ohne Route (inaktiv)' : `${config.provider}/${config.model}`;
   const mode = resolveMode(config.mode);
@@ -557,6 +567,7 @@ export function apply(ctx, config) {
 
   return () => {
     if (typeof dispose === 'function') dispose();
+    if (typeof disposeNarrative === 'function') disposeNarrative();
     console.log('[shinon-prompter] Deaktiviert — Listener abgemeldet');
   };
 }
