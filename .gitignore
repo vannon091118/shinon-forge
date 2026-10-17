@@ -62,3 +62,9 @@ coverage/
 .session-eval/*.zip
 .session-eval/tmp/
 attachments/
+
+# Fremde Arbeitsnotizen — bewusst untracked, kein Teil des Repos.
+# (Vergleichsanalysen anderer Projekte; ohne Statusblock, nicht Teil des
+# kanonischen Doku-Satzes aus docs/INDEX.md.)
+docs/FEATURE_ANALYSIS.md
+docs/FEATURE_RANKING.md
