@@ -5,5 +5,7 @@
   "bei": "Ein Mechanismus wird aus einem Konzept gestrichen",
   "immer": "im selben Zug die Pruefung suchen, die ihn festhaelt, und sie auf das Verbot umstellen",
   "weil": "ein gestrichener Mechanismus, dessen Pruefung stehen bleibt, kehrt beim naechsten Schreiben zurueck und niemand merkt es",
-  "beleg": "Trust-Ceiling und Rate-Limit: Paragraph 4 ersetzt, Verbot in scripts/gate/plugins/scoring.mjs (Zug 3)"
+  "beleg": "Trust-Ceiling und Rate-Limit: Paragraph 4 ersetzt, Verbot in scripts/gate/plugins/scoring.mjs (Zug 3)",
+  "herkunft": "Zug 3 (Scoring-Konzept), geschrieben in Commit e94bc02",
+  "datum": "2026-10-12"
 }

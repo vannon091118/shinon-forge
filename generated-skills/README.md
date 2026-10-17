@@ -38,6 +38,12 @@ Die verbindliche Fassung steht **nicht hier**, sondern in
 | `weil` | der Grund: warum das nicht offensichtlich ist |
 | `beleg` | wo er gelernt wurde (Pfad, Test, Sitzung) — damit ein späterer Leser nachsehen kann |
 
+Zwei weitere Felder sind erlaubt, aber freiwillig: `herkunft` (in welchem Zug
+und Commit der Zettel geschrieben wurde) und `datum` (YYYY-MM-DD, aus der
+Git-Historie abgelesen, nie geraten). Der Veredler liest nur die sieben
+Pflichtfelder oben; Herkunft und Datum stehen in der Datei für den menschlichen
+Leser, der wissen will, woher ein Zettel kommt, bevor er ihm vertraut.
+
 ## Wann ein Zettel lädt
 
 Der Titel entscheidet, nicht die Reihenfolge: geprüft wird die `thema`-Marke
