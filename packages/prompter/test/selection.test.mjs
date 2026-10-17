@@ -21,9 +21,9 @@ import assert from 'node:assert/strict';
 import { MAX_UNCERTAINTY, MIN_UNCERTAINTY, SELECTION_CONTRACT, parseSelection, renderCandidates, selectionSystemBrief } from '../assets/selection.js';
 
 const ALLOWED = [
-  { id: 'persona-identity-core', budgetTokens: 600, pflicht: true },
-  { id: 'persona-report', budgetTokens: 200, pflicht: false },
-  { id: 'index-project-context', budgetTokens: 6000, pflicht: false },
+  { id: 'persona-identity-core', budgetTokens: 600, pflicht: true, modus: ['MIN', 'MID', 'MAX'] },
+  { id: 'persona-report', budgetTokens: 200, pflicht: false, modus: ['MID', 'MAX'] },
+  { id: 'index-project-context', budgetTokens: 6000, pflicht: false, modus: ['MAX'] },
 ];
 const TOTAL = 6800;
 
@@ -42,9 +42,14 @@ test('vertrag: gülte Antwort mit korrekten IDs und Budget wird angenommen', () 
     budget: 800,
     uncertainty: 0.2,
   });
-  // Doppelte IDs zählen einmal, Reihenfolge bleibt die Antwort-Reihenfolge.
-  const dedup = parseSelection(answer([{ id: 'persona-report' }, { id: 'persona-report' }]), ALLOWED, { totalBudgetTokens: TOTAL });
-  assert.deepEqual(dedup.selected, ['persona-report']);
+  // Doppelte IDs zählen einmal, Reihenfolge bleibt die Antwort-Reihenfolge —
+  // die Pflicht muss mit dabei sein (sonst greift PFLICHT_FEHLT).
+  const dedup = parseSelection(
+    answer([{ id: 'persona-report' }, { id: 'persona-identity-core' }, { id: 'persona-report' }]),
+    ALLOWED,
+    { totalBudgetTokens: TOTAL },
+  );
+  assert.deepEqual(dedup.selected, ['persona-report', 'persona-identity-core']);
 });
 
 const FAILING = [
@@ -61,6 +66,8 @@ const FAILING = [
   ['Feld kein Objekt', answer(['persona-report']), 'KEINE_ID', { totalBudgetTokens: TOTAL }],
   // 6000 + 600 überschreitet 6500 — der zweite Kandidat wird abgelehnt.
   ['Budget gesprengt', answer([{ id: 'index-project-context' }, { id: 'persona-identity-core' }], 0.1, SELECTION_CONTRACT), 'BUDGET:persona-identity-core', { totalBudgetTokens: 6500 }],
+  ['Modus nicht freigegeben', answer([{ id: 'persona-report' }]), 'NICHT_ERLAUBT:persona-report', { totalBudgetTokens: TOTAL, mode: 'MIN' }],
+  ['Pflicht weggelassen', answer([{ id: 'persona-report' }]), 'PFLICHT_FEHLT:persona-identity-core', { totalBudgetTokens: TOTAL }],
 ];
 
 for (const [name, text, reason, opts] of FAILING) {

@@ -90,11 +90,14 @@ function summarizeTrigger(ausloeser) {
  *   UNSICHERHEIT    kein Zahlwert 0..1 (Vektor der Unsicherheit)
  *   LEERE_AUSWAHL   selected nicht als Array (leer erlaubt — dann greift der Fallback)
  *   ID_UNBEKANNT    id nicht in der erlaubten Liste (der Kern des Vertrags)
+ *   NICHT_ERLAUBT   der Kandidat ist für den gegebenen Modus NICHT freigegeben (id)
+ *   PFLICHT_FEHLT   eine Pflicht-ID fehlt bei nicht-leerer Auswahl (id)
  *   BUDGET          Aufruftrag-Budgetverletzung (Kandidat > Gesamtbudget)
  *
  * @param text     - die Rohantwort (oder ein Objekt, schon geparst)
- * @param allowed - die erlaubten { id, budgetTokens } der Situation
- * @param opts    - { totalBudgetTokens }
+ * @param allowed - die erlaubten { id, budgetTokens, modus?, pflicht? } der Situation
+ * @param opts    - { totalBudgetTokens, mode } — ohne `mode` wird die
+ *                  Modus-Freigabe übersprungen (der Host schickt ihn immer)
  * @returns { ok: true, selected, uncertainty } | { ok: false, reason }
  */
 export function parseSelection(text, allowed = [], opts = {}) {
@@ -141,10 +144,20 @@ export function parseSelection(text, allowed = [], opts = {}) {
     seen.add(id);
     const candidate = known.get(id);
     if (candidate === undefined) return { ok: false, reason: `ID_UNBEKANNT:${id}` };
+    if (typeof opts.mode === 'string' && Array.isArray(candidate.modus) && !candidate.modus.includes(opts.mode)) {
+      return { ok: false, reason: `NICHT_ERLAUBT:${id}` };
+    }
     const cost = typeof candidate.budgetTokens === 'number' ? candidate.budgetTokens : 0;
     if (budget + cost > total) return { ok: false, reason: `BUDGET:${id}` };
     budget += cost;
     ids.push(id);
   }
-  return { ok: true, selected: ids, budget, uncertainty };
+  // Pflicht fehlt nur bei einer WIEDERGEGEBENEN Auswahl: ein leerer Vorschlag
+  // fällt zurück, und die Pflicht lädt die Runtime unabhängig (Slice 2).
+  // Wer wählt und dabei die Pflicht weglässt, verstößt gegen den Vertrag.
+  if (ids.length > 0) {
+    const missing = [...known.values()].find((candidate) => candidate.pflicht === true && !seen.has(candidate.id));
+    if (missing !== undefined) return { ok: false, reason: `PFLICHT_FEHLT:${missing.id}` };
+  }
+  return { ok: true, selected: ids, budget, uncertainty };;
 }
