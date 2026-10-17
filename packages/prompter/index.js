@@ -545,9 +545,16 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     try {
       const skillRead = readSkills(config, runtime.skillRules);
       if (skillRead.skills.length > 0) {
+        // `explicitText` ist der NUTZERTEXT, nicht `expandedText`: die
+        // Intent-Erweiterung stammt aus `assets/intent-rules.json`, also aus
+        // einer Regeldatei. Ein Skill-Name, der nur dort steht, ist keine
+        // ausdrückliche Nennung durch den Menschen — er darf nicht den
+        // Prioritätsrang vor besser passenden Skills bekommen. `stand.js`
+        // übergibt aus demselben Grund `promptText`; beide Stellen antworten
+        // auf dieselbe Frage und müssen dieselbe Antwort geben.
         const selected = selectSkills(skillRead.skills, [expandedText], {
           ...(runtime.skillRules.reading ?? {}),
-          explicitText: expandedText,
+          explicitText: prompt.text,
         });
         skills = selected.loaded;
         if (skills.length > 0) {

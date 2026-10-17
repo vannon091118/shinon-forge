@@ -1763,3 +1763,69 @@ test('Stand: eine leere Antwort des Scorings ist kein Ton', async () => {
   assert.equal(llm.calls[0].messages[0].content[2].text.includes('<haltung>'), false);
   dispose();
 });
+
+// ── 14. Skills: nur der Nutzertext ist eine ausdrückliche Nennung ─────────
+
+/**
+ * Ein Skill, den erst die INTENT-ERWEITERUNG nennt, ist keine Nutzeranweisung.
+ *
+ * Der Enhancer baut in MAX aus `prompt.text` plus der Expansion aus
+ * `assets/intent-rules.json` einen `expandedText`. Bis hierher ging dieser
+ * `expandedText` als `explicitText` in die Skill-Auswahl — dann hätte ein
+ * Skill-Name, der nur in einer Regeldatei steht, als „vom Nutzer genannt"
+ * gegolten und den Prioritätsrang vor besser passenden Skills bekommen. Der
+ * Nutzer hat ihn nie genannt; die Regel hat ihn genannt. `assets/stand.js`
+ * übergibt seit jeher `promptText` — hier wird die zweite Stelle gepinnt.
+ *
+ * Der Fall ist so gebaut, dass die beiden Ausgänge SICHTBAR auseinandergehen:
+ * `a-arch` trifft dreimal (quartz, runtime, architektur), `z-spezial` einmal
+ * (sein eigener Name, aus der Expansion). Mit der alten Übergabe gewinnt
+ * `z-spezial` als „explizit"; mit der richtigen Reihenfolge gewinnt `a-arch`
+ * über die Trefferzahl.
+ */
+test('Skills: die Intent-Expansion nennt keinen Skill „explizit"', async () => {
+  const skillsRoot = mkdtempSync(join(tmpdir(), 'shinon-prompter-skills-'));
+  const writeSkill = (name, description) => {
+    mkdirSync(join(skillsRoot, name), { recursive: true });
+    writeFileSync(join(skillsRoot, name, 'SKILL.md'), `---\nname: ${name}\ndescription: ${description}\n---\n\n# ${name}\n`);
+  };
+  writeSkill('a-arch', 'quartz runtime architektur');
+  writeSkill('z-spezial', 'tempo');
+
+  const intentPath = join(skillsRoot, 'intent-rules.json');
+  writeFileSync(intentPath, JSON.stringify({
+    contract: 'shinon.intent-rules/v1',
+    patterns: [{
+      id: 'arch-pruefen',
+      label: 'Architektur prüfen',
+      trigger: ['prüfe quartz runtime architektur'],
+      classification: 'MULTI_STEP_TASK',
+      expansion: 'Prüfe die quartz runtime architektur. Nutze dafür den Skill z-spezial.',
+    }],
+  }));
+
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, dispose } = connect({
+    ...route,
+    mode: 'MAX',
+    contextPath: dummyContextPath,
+    skillsPath: skillsRoot,
+    intentPatternsPath: intentPath,
+  }, { llm });
+  const claimed = [userMessage('prüfe quartz runtime architektur')];
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  // Nur der SKILL-Block zählt: der expandierte Prompt selbst nennt `z-spezial`
+  // (die Expansion steht wörtlich darin). Ein `indexOf` über den ganzen Request
+  // würde genau die Regeldatei messen, die es nicht sein darf.
+  const request = llm.calls[0].messages[0].content.map((part) => part.text ?? '').join('\n');
+  const block = /<shinon_skills>[\s\S]*?<\/shinon_skills>/.exec(request)?.[0] ?? '';
+  assert.ok(block !== '', `der Skill-Block fehlt im Request: ${request}`);
+  const matched = block.indexOf('a-arch');
+  const named = block.indexOf('z-spezial');
+  assert.ok(matched >= 0 && named >= 0, `beide Skills stehen im Block: ${block}`);
+  assert.ok(matched < named, `der dreifach passende Skill steht vor dem, den nur die Expansion nennt: ${block}`);
+  dispose();
+  rmSync(skillsRoot, { recursive: true, force: true });
+});
