@@ -46,6 +46,7 @@
     "commit:check-file": "node scripts/commit-guard.mjs --file",
     "hooks:install": "node scripts/install-hooks.mjs",
     "profile:links": "node scripts/profile-links.mjs",
+    "install:user": "node scripts/install-user.mjs",
     "update": "node scripts/dsh-update.mjs",
     "stages": "node scripts/stages.mjs",
     "scale:check": "node scripts/scale-check.mjs",
