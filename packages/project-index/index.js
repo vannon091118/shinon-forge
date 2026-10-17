@@ -5,10 +5,14 @@ import {
   CONTRACT,
   DEFAULT_CONTEXT_BUDGET,
   DEFAULT_INDEX_ROOT,
+  DEFAULT_LEDGER_FILE,
+  LEDGER_CONTRACT,
   indexMeta,
   indexPath,
   indexStats,
+  migrateMemory,
   openIndex,
+  openLedger,
   readMemory,
   resolveContext,
   runIndex,
@@ -105,11 +109,17 @@ const validNamespace = (namespace) => typeof namespace === 'string' && namespace
  * dieselbe Regel wie bei der Abfrage. Ein Namensraum ist Pflicht: ohne ihn
  * waere die Ablage ein namenloser Haufen, und niemand koennte sie wiederfinden.
  */
-export function createStoreService({ indexFile }) {
-  const withIndex = (namespace, work) => {
+export function createStoreService({ indexFile, ledgerFile }) {
+  // Ohne eigenen Ledger-Pfad wird NICHT stillschweigend in die Indexdatei oder
+  // in das echte Nutzerverzeichnis geschrieben: der Aufruf ist dann ein Fehler.
+  // Eine Attrappe, die heimlich irgendwohin schreibt, waere schlimmer als eine
+  // Absage — dieselbe Regel wie MISSING_NAMESPACE daneben.
+  const hasLedger = typeof ledgerFile === 'string' && ledgerFile.trim() !== '';
+
+  const withLedger = (namespace, work) => {
     let db = null;
     try {
-      db = openIndex(indexFile);
+      db = openLedger(ledgerFile);
       return work(db);
     } catch (error) {
       return { ok: false, error: String(error?.message ?? error) };
@@ -129,21 +139,45 @@ export function createStoreService({ indexFile }) {
   return {
     contract: STORE_CONTRACT,
     /**
-     * Den Stand eines Namensraums lesen. Erzeugt KEINEN Index: fehlt die Datei,
-     * ist die Antwort `null` und nicht ein leerer Index.
+     * Den Stand eines Namensraums lesen. Erzeugt KEINEN Index und KEINEN Ledger:
+     * fehlt die Datei, ist die Antwort `null` und nicht ein leerer Stand.
      *
      * Der Namensraum wird ZUERST geprueft: ein Aufruf ohne Adresse ist ein
-     * Fehler, und die ehrliche Leere („kein Index") darf ihn nicht verdecken.
+     * Fehler, und die ehrliche Leere („keine Ablage") darf ihn nicht verdecken.
+     *
+     * EINMALIGE MIGRATION: hat der Ledger den Stand nicht, der INDEX aber schon
+     * (so stand es bis zur Trennung), wird er hier heruebergeholt — verlustfrei
+     * und in einer Transaktion. Danach meldet `reason` nichts mehr. Das ist
+     * keine stille Datenbewegung: `save` schreibt weiterhin nur in den Ledger.
      */
     load(namespace) {
       if (!validNamespace(namespace)) return { ok: false, error: 'MISSING_NAMESPACE' };
-      if (!existsSync(indexFile)) return { ok: true, state: null };
-      return withIndex(namespace, (db) => ({ ok: true, state: readMemory(db, namespace) }));
+      if (!hasLedger) return { ok: false, error: 'MISSING_LEDGER_FILE' };
+      const fresh = !existsSync(ledgerFile);
+      return withLedger(namespace, (db) => {
+        const migrated = fresh || readMemory(db, namespace) === null
+          ? migrateMemory(db, { fromFile: indexFile, namespace })
+          : { migrated: 0, reason: 'nichts zu migrieren' };
+        // Ein unlesbarer Index VOR der Migration ist ein Fehler, keine Leere:
+        // ob dort ein Stand lag, wissen wir nicht — und das darf die Antwort
+        // nicht verschweigen. Der Aufrufer startet dann leer MIT Grund.
+        if (migrated.error === 'INDEX_UNREADABLE') return { ok: false, error: `INDEX_UNREADABLE: ${migrated.reason}` };
+        const state = readMemory(db, namespace);
+        if (migrated.migrated > 0) return { ok: true, state, migrated: migrated.migrated, migration: migrated.reason };
+        return { ok: true, state };
+      });
     },
     /** Den Stand eines Namensraums schreiben (ersetzt ihn vollstaendig). */
     save(namespace, state) {
       if (!validNamespace(namespace)) return { ok: false, error: 'MISSING_NAMESPACE' };
-      return withIndex(namespace, (db) => ({ ok: true, rows: writeMemory(db, namespace, state) }));
+      if (!hasLedger) return { ok: false, error: 'MISSING_LEDGER_FILE' };
+      return withLedger(namespace, (db) => {
+        // Auch beim Schreiben wird zuerst migriert: wer nur schreibt (ein Host
+        // ohne vorherigen Lesevorgang), darf einen vorhandenen Stand nicht durch
+        // die eigene Schreibung verdraengen, ohne ihn je gesehen zu haben.
+        const migrated = readMemory(db, namespace) === null ? migrateMemory(db, { fromFile: indexFile, namespace }) : { migrated: 0 };
+        return { ok: true, rows: writeMemory(db, namespace, state), migrated: migrated.migrated };
+      });
     },
   };
 }
@@ -184,12 +218,18 @@ export function createQueryService({ indexFile, budgetTokens = DEFAULT_CONTEXT_B
   };
 }
 
-/** Die Konfiguration. Leere Pfade heissen: das laufende Projekt und ~/.shinon/indexes. */
+/** Die Konfiguration. Leere Pfade heissen: das laufende Projekt, der XDG-Cache und die XDG-Daten. */
 export const Config = z.object({
   /** Projektwurzel; leer = Prozessverzeichnis. */
   root: z.string().default(''),
-  /** Wurzel der Indizes; leer = ~/.shinon/indexes. */
+  /** Wurzel der Indizes (WEGWERFBAR); leer = $XDG_CACHE_HOME/shinon/indexes. */
   indexRoot: z.string().default(''),
+  /**
+   * Die DAUERHAFTE Ablage des Scorings; leer = $XDG_DATA_HOME/shinon/ledger.sqlite.
+   * Eigener Pfad, weil eigener Lebenszyklus: der Index darf jederzeit neu gebaut
+   * oder geloescht werden, der Ledger nie.
+   */
+  ledgerFile: z.string().default(''),
   /** Obergrenze je Datei. Groessere Dateien werden uebersprungen und gezaehlt. */
   maxFileBytes: z.number().default(262144),
   /** Fenstergroesse der Chunks in Zeilen. */
@@ -286,6 +326,7 @@ export function apply(ctx, config) {
   const options = {
     root: resolve(config.root === '' ? process.cwd() : config.root),
     indexRoot: resolve(config.indexRoot === '' ? DEFAULT_INDEX_ROOT : config.indexRoot),
+    ledgerFile: resolve(config.ledgerFile === '' || config.ledgerFile === undefined ? DEFAULT_LEDGER_FILE : config.ledgerFile),
     maxFileBytes: config.maxFileBytes,
     chunkLines: config.chunkLines,
     verify: config.verify,
@@ -300,14 +341,16 @@ export function apply(ctx, config) {
   const releaseQuery = canProvide
     ? ctx.provide(QUERY_SERVICE, createQueryService({ indexFile: file }))
     : null;
-  const releaseStore = canProvide ? ctx.provide(STORE_SERVICE, createStoreService({ indexFile: file })) : null;
+  const releaseStore = canProvide
+    ? ctx.provide(STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile }))
+    : null;
   const queryState = canProvide
     ? `Abfrage ${QUERY_SERVICE} bereitgestellt (${QUERY_CONTRACT})`
     : `Abfrage ${QUERY_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
   // Zwei Faehigkeiten, zwei Zeilen: wer im Log liest, dass die Ablage fehlt,
   // soll nicht raten muessen, welche der beiden gemeint ist.
   const storeState = canProvide
-    ? `Ablage ${STORE_SERVICE} bereitgestellt (${STORE_CONTRACT})`
+    ? `Ablage ${STORE_SERVICE} bereitgestellt (${STORE_CONTRACT}, ${LEDGER_CONTRACT}: ${options.ledgerFile})`
     : `Ablage ${STORE_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
 
   /** Ein Bericht ist erst vollstaendig, wenn der Index auch zaehlbar ist. */

@@ -57,9 +57,9 @@
 import { DatabaseSync } from 'node:sqlite';
 import { Worker } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, extname, join, relative, resolve, sep } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 /** Vertragsname des Index. */
 export const CONTRACT = 'shinon.project-index/v1';
@@ -90,11 +90,68 @@ export const SCHEMA_VERSION = 2;
  */
 export const INDEXER_VERSION = 5;
 
-/** Wurzel aller Indizes — ausserhalb jedes Projekts. */
-export const DEFAULT_INDEX_ROOT = join(homedir(), '.shinon', 'indexes');
+/**
+ * Wurzel aller Indizes — ausserhalb jedes Projekts und WEGWERFBAR.
+ *
+ * Der Index ist reine Ableitung (Dateien, Symbole, Kanten, Chunks entstehen aus
+ * dem Projekt und sind aus ihm wieder herstellbar). Er gehoert deshalb in den
+ * CACHE des Nutzers und nicht in die Daten: `SHINON_INDEX_ROOT`, sonst
+ * `$XDG_CACHE_HOME/shinon/indexes`, sonst `~/.cache/shinon/indexes`.
+ *
+ * Die fruehere Fassung lag unter `~/.shinon/indexes` — einem eigenen Ort ohne
+ * Konvention, der bei einem `rm -rf ~/.cache` ueberlebt haette, obwohl er nichts
+ * Dauerhaftes traegt, und der beim Aufraeumen der Nutzerdaten niemandem auffiel.
+ * Dieselbe Regel steht als Dienst in `scripts/lib/paths.mjs` (indexRoot());
+ * `scripts/gate/tests/scan-pruning.test.mjs` pinnt beide Werte gegeneinander,
+ * damit die zwei Orte nicht auseinanderlaufen.
+ */
+export const DEFAULT_INDEX_ROOT = indexRootDefault();
+
+/**
+ * Der DAUERHAFTE Ledger des Scorings — Nutzerurteile und der daraus gerechnete
+ * Stand sind NICHT herstellbar, also gehoeren sie in die Daten des Nutzers:
+ * `SHINON_LEDGER_FILE`, sonst `$XDG_DATA_HOME/shinon/ledger.sqlite`, sonst
+ * `~/.local/share/shinon/ledger.sqlite`.
+ *
+ * Warum NICHT im Index (frueher: Namensraum in index.sqlite): der Index liegt im
+ * Cache. Ein `rm -rf ~/.cache`, ein Projektrechtwechsel oder ein Cache-Aufraeumer
+ * haette dort das Gedaechtnis des Nutzers mitgenommen. Ein Index-Neuaufbau war
+ * schon vorher unschaedlich (eigene MEMORY_VERSION), die Cache-Bereinigung war
+ * es nicht.
+ */
+export const DEFAULT_LEDGER_FILE = ledgerFileDefault();
 
 /** Dateiname je Projekt. */
 export const INDEX_FILE = 'index.sqlite';
+
+/** Vertragsname der dauerhaften Ablage (eine eigene Datei, ein eigener Vertrag). */
+export const LEDGER_CONTRACT = 'shinon.ledger/v1';
+
+/** Der Index liegt im Cache — XDG-Konvention, mit Override. */
+function indexRootDefault(env = process.env) {
+  const override = absoluteFromEnv(env.SHINON_INDEX_ROOT, 'SHINON_INDEX_ROOT');
+  if (override !== null) return override;
+  const base = absoluteFromEnv(env.XDG_CACHE_HOME, 'XDG_CACHE_HOME') ?? join(homedir(), '.cache');
+  return join(base, 'shinon', 'indexes');
+}
+
+/** Der Ledger liegt in den Daten — XDG-Konvention, mit Override. */
+function ledgerFileDefault(env = process.env) {
+  const override = absoluteFromEnv(env.SHINON_LEDGER_FILE, 'SHINON_LEDGER_FILE');
+  if (override !== null) return override;
+  const base = absoluteFromEnv(env.XDG_DATA_HOME, 'XDG_DATA_HOME') ?? join(homedir(), '.local', 'share');
+  return join(base, 'shinon', 'ledger.sqlite');
+}
+
+/**
+ * Ein absoluter Override aus der Umgebung, oder `null`. Ein relativer Wert ist
+ * kein Kandidat: er zeigte je nach Startordner woandershin.
+ */
+function absoluteFromEnv(value, name) {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  if (!isAbsolute(value.trim())) return null;
+  return resolve(value.trim());
+}
 
 /** Die Primaerdaten aus Plan §9, in der Reihenfolge des Plans. */
 export const PRIMARY_TABLES = ['files', 'symbols', 'edges', 'references', 'touches', 'chunks'];
@@ -136,8 +193,16 @@ export const MEMORY_TABLE = 'memory';
  */
 export const MEMORY_VERSION = 1;
 
-/** Verzeichnisse, die nie betreten werden: Fremdcode, Historie, Sitzungsdaten. */
-export const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', '.cache', 'storages', 'coverage', '.turbo']);
+/**
+ * Verzeichnisse, die nie betreten werden: Fremdcode, Historie, Laufzeitdaten,
+ * Werkzeug-Caches. Das ist DIESELBE Menge wie `PRUNE_DIRS` in
+ * `scripts/lib/scan.mjs` — der Kern kann sie nicht importieren (er darf nur
+ * `node:*` laden und wird in jedes Tarball gepackt), deshalb pinnt
+ * `scripts/gate/tests/scan-pruning.test.mjs` beide Listen zeichengenau
+ * gegeneinander. Wer hier etwas ergänzt, muss es dort auch tun (und umgekehrt),
+ * sonst wird der Drift im Gate sichtbar statt still.
+ */
+export const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', '.cache', '.turbo', '.nyc_output', 'coverage', 'storages', 'sessions', 'logs', 'vendor']);
 
 /** Endungen, die als Text indexiert werden. */
 export const SOURCE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.json', '.md', '.yml', '.yaml'];
@@ -820,24 +885,126 @@ const setMeta = (db, key, value) => db.prepare('insert or replace into meta(key,
  * verworfen und neu angelegt: ein stillschweigend weiterbenutzter Index mit
  * anderer Bedeutung waere schlimmer als ein Neuaufbau.
  */
-export function openIndex(file) {
+/**
+ * Die EINE Stelle, an der eine SQLite-Verbindung dieses Pakets aufgesetzt wird.
+ *
+ * Warum als Funktion: Index und Ledger sind zwei Dateien, aber nicht zwei
+ * Datenbanken mit zwei Politiken. Jede Verbindung traegt dieselbe Form:
+ *
+ *   journal_mode = wal   ein Leser blockiert den Schreiber nicht (und umgekehrt)
+ *   synchronous = full   die Haltbarkeit wird BENANNT, nicht geerbt — der
+ *                        SQLite-Standard ist keine Zusage
+ *   secure_delete = on   ein `delete` loescht Zeilen, nicht Bytes (gemessen: nach
+ *                        dem Entfernen eines Werts stand er in den freigegebenen
+ *                        Seiten der Datei weiterhin drin)
+ *   busy_timeout         zwei Prozesse (Host + Worker) warten statt zu scheitern
+ *   foreign_keys = on    die Kanten des Index sind Beziehungen, keine Zahlen
+ *
+ * Gepinnt von `scripts/gate/tests/project-index.test.mjs` gegen die echten Dateien.
+ */
+function openDatabase(file) {
   mkdirSync(dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec('pragma journal_mode = wal');
-  // KONTROLLIERTE PERSISTENZ: die Haltbarkeitspolitik wird BENANNT, nicht
-  // geerbt. `synchronous = full` haelt jeden Commit ueber den WAL-Rahmen
-  // dauerhaft, bevor er als fertig gilt (der SQLite-Standard, aber ein
-  // Standard ist keine Zusage: das Paket setzt ihn hier selbst, damit ein
-  // spaeterer Wechsel der Laufzeit-Vorgabe den Index nicht still aufweicht).
-  // Gepinnt von `scripts/gate/tests/project-index.test.mjs` gegen den echten Index.
   db.exec('pragma synchronous = full');
-  // GEMESSEN und deshalb hier: ein `delete` loescht Zeilen, nicht BYTES. Nach dem
-  // Entfernen eines Werts stand er im Test weiterhin in den freigegebenen Seiten
-  // der Datei. `secure_delete` ueberschreibt den freigegebenen Zellinhalt mit
-  // Nullen, und der Wiederaufbau unten zieht zusaetzlich die ganze Datei neu
-  // zusammen. Ein Schutz, der nur Zeilen entfernt, laesst den Wert im Index.
   db.exec('pragma secure_delete = on');
+  db.exec('pragma busy_timeout = 5000');
+  db.exec('pragma foreign_keys = on');
   db.exec('create table if not exists meta(key text primary key, value text not null)');
+  return db;
+}
+
+/**
+ * Den DAUERHAFTEN Ledger oeffnen (dieselbe Verbindungsform, eine eigene Datei).
+ *
+ * Er traegt nur die Ablage und ihre Fassung: der Index kann jederzeit neu
+ * gebaut werden, der Ledger nie. Ein Fassungssprung der Ablage verwirft sie
+ * (wie beim Index), ein Index-Neuaufbau beruehrt sie nicht — sie liegt nicht
+ * mehr in derselben Datei.
+ */
+export function openLedger(file) {
+  const db = openDatabase(file);
+  const stored = { contract: metaValue(db, 'ledger_contract'), memory_version: metaValue(db, 'memory_version') };
+  const built = stored.contract !== null || stored.memory_version !== null;
+  if (built && (stored.contract !== LEDGER_CONTRACT || stored.memory_version !== String(MEMORY_VERSION))) {
+    db.exec(`drop table if exists ${MEMORY_TABLE}`);
+  }
+  db.exec(`create table if not exists ${MEMORY_TABLE}(namespace text not null, kind text not null, ref text not null, ordinal integer not null default 0, doc text not null, primary key(namespace, kind, ref))`);
+  setMeta(db, 'ledger_contract', LEDGER_CONTRACT);
+  setMeta(db, 'memory_version', String(MEMORY_VERSION));
+  return db;
+}
+
+/**
+ * Einen Stand aus dem INDEX in den Ledger holen — verlustfrei, atomar, idempotent.
+ *
+ * Der Index wird READ-ONLY geoeffnet (`openIndex` wuerde fehlende Tabellen
+ * anlegen und einen fremden Index neu bauen — ein Migrationslauf darf die Quelle
+ * nicht anfassen). Kopiert wird in EINER Transaktion; faellt etwas um, bleibt
+ * der Ledger leer statt halb gefuellt.
+ *
+ * Idempotent ist es, weil VOR dem Schreiben geprueft wird, ob der Ledger den
+ * Namensraum schon hat: der zweite Aufruf tut nichts. Nichts wird geloescht — die
+ * Zeilen des Index bleiben stehen, sie sind die Sicherung (und der naechste
+ * Index-Neuaufbau raeumt sie ohnehin selbst weg).
+ */
+export function migrateMemory(db, { fromFile, namespace }) {
+  if (!existsSync(fromFile)) return { migrated: 0, reason: 'kein Index vorhanden' };
+  if (readMemory(db, namespace) !== null) return { migrated: 0, reason: 'Ledger traegt den Stand bereits' };
+  let source = null;
+  try {
+    source = new DatabaseSync(fromFile, { readOnly: true });
+  } catch (error) {
+    return { migrated: 0, reason: `Index nicht lesbar (${error?.message ?? error})`, error: 'INDEX_UNREADABLE' };
+  }
+  try {
+    let rows;
+    try {
+      rows = source.prepare(`select kind, ref, ordinal, doc from ${MEMORY_TABLE} where namespace = ? order by kind asc, ordinal asc, ref asc`).all(namespace);
+    } catch (error) {
+      const detail = String(error?.message ?? error);
+      // ZWEI Faelle, die nicht dasselbe sind:
+      //   a) Der Index ist da, aber kein SQLite (Text, halb geschrieben): dann
+      //      wissen wir NICHT, ob dort ein Stand liegt — das ist ein Fehler und
+      //      keine Leere. Ein stilles „nichts da" waere hier eine Datenluege.
+      //   b) Der Index ist lesbar, kennt die Ablage aber nicht (aeltere Fassung,
+      //      fremdes Schema): dann gibt es nichts zu holen.
+      if (/not a database|malformed|disk image/i.test(detail)) {
+        return { migrated: 0, reason: `Index unlesbar (${detail})`, error: 'INDEX_UNREADABLE' };
+      }
+      return { migrated: 0, reason: 'Index ohne Ablage-Tabelle' };
+    }
+    if (rows.length === 0) return { migrated: 0, reason: 'Index hat keinen Stand fuer diesen Namensraum' };
+    db.exec('begin');
+    try {
+      const insert = db.prepare(`insert or ignore into ${MEMORY_TABLE}(namespace, kind, ref, ordinal, doc) values (?, ?, ?, ?, ?)`);
+      let migrated = 0;
+      for (const row of rows) {
+        insert.run(namespace, row.kind, row.ref, row.ordinal, row.doc);
+        migrated += 1;
+      }
+      setMeta(db, 'migrated_from', fromFile);
+      setMeta(db, 'migrated_rows', String(migrated));
+      db.exec('commit');
+      return { migrated, reason: `aus ${fromFile}` };
+    } catch (error) {
+      db.exec('rollback');
+      return { migrated: 0, reason: `Migration abgebrochen (${error?.message ?? error})` };
+    }
+  } finally {
+    source.close();
+  }
+}
+
+/**
+ * Den Index oeffnen, das Schema anlegen und die Fassung festhalten.
+ *
+ * Ein vorhandener Index mit fremdem Vertrag oder fremder Schemafassung wird
+ * verworfen und neu angelegt: ein stillschweigend weiterbenutzter Index mit
+ * anderer Bedeutung waere schlimmer als ein Neuaufbau.
+ */
+export function openIndex(file) {
+  const db = openDatabase(file);
 
   const stored = {
     contract: metaValue(db, 'contract'),

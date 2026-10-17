@@ -1,6 +1,6 @@
 # Dokumentation — Einstieg und Statusregel
 
-> **Status:** current — **einziger Einstieg** in die Dokumentation. **Stand:** 2026-10-14
+> **Status:** current — **einziger Einstieg** in die Dokumentation. **Stand:** 2026-10-17
 > **Zahlen:** `docs/ZAHLEN.md` (einziger Eigentümer harter Zahlen)
 
 ## 1. Womit man anfängt
@@ -54,11 +54,11 @@ gilt nicht als Nachmessung.
 | Dokument | Status | Stand | Zweck |
 |---|---|---|---|
 | [`README.md`](../README.md) | current | 2026-10-13 | Einstieg, Paketübersicht, Projektstatus |
-| [`AGENTS.md`](../AGENTS.md) | current | 2026-10-09 | Arbeitsregeln für Agenten |
-| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-13 | Namespace-, Paket- und Profilkonventionen; §5 führt den Lebenszyklus von `.shinon/` |
+| [`AGENTS.md`](../AGENTS.md) | current | 2026-10-17 | Arbeitsregeln für Agenten |
+| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-17 | Namespace-, Paket- und Profilkonventionen; §5 führt den Lebenszyklus von `.shinon/` |
 | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) | current | 2026-10-08 | Commit-Regeln und ihre Durchsetzung |
 | [`docs/CI.md`](CI.md) | current | 2026-10-13 | CI als Schranke: Zweige und verpflichtender Statuscheck für `main`, Setz- und Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
-| [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-13 | alle harten Zahlen + Befehle |
+| [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-17 | alle harten Zahlen + Befehle |
 | [`docs/ROADMAP.md`](ROADMAP.md) | plan | 2026-10-13 | kanonische Roadmap: Versionsordnung, Historie, Release-Ziele `0.4.0`/`0.5.0`, `1.0.0`-Kriterien und der `0.1.0`-Pfad |
 | [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) | plan | 2026-10-08 | native App/Tauri: Stufe 1 scharf, 2–4 Konzept |
 | [`docs/MOBILE-PLAN.md`](MOBILE-PLAN.md) | plan | 2026-10-14 | Mobile-Profil, ballastarmes UI, CI-/Sicherheits-Gates und Android-Runtime-Spike |
@@ -73,12 +73,12 @@ gilt nicht als Nachmessung.
 | [`docs/legacy-goose-prompts/`](legacy-goose-prompts/) | imported | — | übernommene Goose-Prompts |
 | [`packages/narrative/README.md`](../packages/narrative/README.md) | current | 2026-10-10 | Paket-Doku Narrative Engine |
 | [`packages/shinon-forge/README.md`](../packages/shinon-forge/README.md) | current | 2026-10-10 | Paket-Doku Shinon Forge |
-| [`PLAN.md`](../PLAN.md) | plan | 2026-10-13 | Umsetzungsplan des Umbaus (jeder Schritt trägt seinen eigenen Status; §3.12 trägt den Nachtrag zur Aktivierung von `popup` und `key-router` und den einen offenen Faden, §3.12.1 das Verdikt zu `shinon-forge`) |
+| [`PLAN.md`](../PLAN.md) | plan | 2026-10-17 | Umsetzungsplan des Umbaus (jeder Schritt trägt seinen eigenen Status; §3.12 trägt den Nachtrag zur Aktivierung von `popup` und `key-router` und den einen offenen Faden, §3.12.1 das Verdikt zu `shinon-forge`) |
 | [`docs/SCORING-KONZEPT.md`](SCORING-KONZEPT.md) | plan | 2026-10-11 | Scoring-Konzept: K1–K4 als Ist, K5–K8 als Ziel — implizite Signale (Zug 1: native interne Quellen aus dem DSH-Verlauf, kein Browser), Dauerhaftigkeit über die SQLite des Projekt-Index (Zug 2, §2.5), Vorlieben-Trennung, taktische/Master Skills, ohne Deckel |
 | [`LICENSE`](../LICENSE) | current | 2026-10-11 | eigene Lizenz (MIT, `Copyright (c) 2026 Vannon`) — kein Markdown, deshalb ohne Statusblock |
-| [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) | current | 2026-10-11 | Fremdhinweise, getrennt vom eigenen Copyright (A12) |
-| [`vendor/MODIFICATIONS.md`](../vendor/MODIFICATIONS.md) | current | 2026-10-11 | Änderungslog des vendorten DSH-Anteils (Schritt 3.2) |
-| [`vendor/dsh/`](../vendor/dsh/) (20 Dateien + `MANIFEST.json`) | imported | 2026-10-11 | unverändert übernommenes Fremdpaket `@deepseek-ai/dsh@0.2.1-alpha.2` — kein Teil des kanonischen Satzes, Herkunft im Manifest |
+| [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) | current | 2026-10-17 | Fremdhinweise, getrennt vom eigenen Copyright (A12) |
+| [`vendor/MODIFICATIONS.md`](../vendor/MODIFICATIONS.md) | current | 2026-10-17 | Änderungslog des vendorten DSH-Anteils: welche Fassung hier liegt und welcher Code sie lädt (A4 der Release-Abnahme) |
+| [`vendor/dsh/`](../vendor/dsh/) (20 Dateien + `MANIFEST.json`) | imported | 2026-10-17 | unverändert übernommenes Fremdpaket `@deepseek-ai/dsh@0.2.1-alpha.1` — dieselbe Fassung wie Root-Pin, Lock und installierte Binary, kein Teil des kanonischen Satzes, Herkunft im Manifest |
 | [`docs/audit/`](audit/) | current | je Dokument (Statusblock) | Audit, Reparatur- und Umsetzungs-Nachweise; jeder nennt Messbefehl und Messzeitpunkt |
 
 Nicht in dieser Tabelle: [`docs/archive/legacy-profiles/`](archive/legacy-profiles/) (archivierte

@@ -148,10 +148,15 @@ function fixture(label) {
  * setImmediate): danach schreibt niemand mehr ausser den Ablage-Aufrufen selbst,
  * und der Test misst keine zwei Schreiber gleichzeitig.
  */
-async function mount({ root, indexRoot, order = ['events', 'index', 'scoring'] }) {
+async function mount({ root, indexRoot, ledgerFile = join(workDir('ledger'), 'ledger.sqlite'), order = ['events', 'index', 'scoring'] }) {
   const host = createHost();
   const releases = [];
-  const api = { host, root, indexRoot, releases };
+  // Der Ledger liegt seit der Trennung NICHT mehr in der Indexdatei: ein
+  // eigener Pfad, ein eigener Lebenszyklus (Cache vs. Daten). Der Test setzt ihn
+  // ausdruecklich — ohne ihn schreibt die Ablage gar nicht (MISSING_LEDGER_FILE).
+  // Ein NEUSTART uebergibt denselben Pfad: genau das ist die Zusage, dass der
+  // Stand den Host ueberlebt (und nicht die Indexdatei).
+  const api = { host, root, indexRoot, releases, ledgerFile };
   for (const which of order) {
     if (which === 'events') {
       events.apply(host.ctx, {
@@ -164,7 +169,7 @@ async function mount({ root, indexRoot, order = ['events', 'index', 'scoring'] }
     }
     if (which === 'index') {
       api.indexFile = index.indexPath(indexRoot, root);
-      api.releaseIndex = index.apply(host.ctx, index.Config({ root, indexRoot, worker: false, trace: false }));
+      api.releaseIndex = index.apply(host.ctx, index.Config({ root, indexRoot, ledgerFile: api.ledgerFile, worker: false, trace: false }));
     }
     if (which === 'scoring') {
       api.scoring = scoring.apply(host.ctx, scoring.Config({ eventsChannel: 'shinon/event' }));
@@ -192,7 +197,7 @@ const QUESTION = 'Prüfe bitte die Scoring Schicht und die Signaltabelle im Pake
 
 /** Den Stand so lesen, wie der Host ihn liest — ueber den Dienst, nicht ueber die Tabelle. */
 function storedState(api) {
-  const answer = index.createStoreService({ indexFile: api.indexFile }).load(scoring.LEDGER_NAMESPACE);
+  const answer = index.createStoreService({ indexFile: api.indexFile, ledgerFile: api.ledgerFile }).load(scoring.LEDGER_NAMESPACE);
   assert.equal(answer.ok, true, `Ablage nicht lesbar: ${answer.error}`);
   return answer.state;
 }
@@ -225,10 +230,17 @@ test('memory: die Ablage ist eine zweite, schmale Faehigkeit — die Abfrage ble
 
   // Der Vertrag ist nicht nur ein Name: ein Dienst ohne die zwei Operationen
   // waere kein Gedaechtnis, und ein fehlender Namensraum keine Adresse.
-  const direct = index.createStoreService({ indexFile: join(workDir('leer-index'), 'index.sqlite') });
-  assert.deepEqual(direct.load(scoring.LEDGER_NAMESPACE), { ok: true, state: null }, 'ohne Index: ehrliche Leere');
+  const direct = index.createStoreService({
+    indexFile: join(workDir('leer-index'), 'index.sqlite'),
+    ledgerFile: join(workDir('leer-ledger'), 'ledger.sqlite'),
+  });
+  assert.deepEqual(direct.load(scoring.LEDGER_NAMESPACE), { ok: true, state: null }, 'ohne Stand: ehrliche Leere');
   assert.deepEqual(direct.load(''), { ok: false, error: 'MISSING_NAMESPACE' });
   assert.deepEqual(direct.save('', {}), { ok: false, error: 'MISSING_NAMESPACE' });
+  // Ohne eigenen Ledger-Pfad wird NICHT stillschweigend irgendwohin geschrieben.
+  const homeless = index.createStoreService({ indexFile: join(workDir('heimatlos-index'), 'index.sqlite') });
+  assert.deepEqual(homeless.load(scoring.LEDGER_NAMESPACE), { ok: false, error: 'MISSING_LEDGER_FILE' });
+  assert.deepEqual(homeless.save(scoring.LEDGER_NAMESPACE, {}), { ok: false, error: 'MISSING_LEDGER_FILE' });
 
   shutdown(api);
 });
@@ -237,18 +249,23 @@ test('memory: eine fehlende Ablage ist keine — aber sie legt sich ihr Zuhause 
   const project = fixture('zuhause');
   const indexRoot = workDir('zuhause-index');
   const indexFile = index.indexPath(indexRoot, project);
-  assert.equal(existsSync(indexFile), false, 'Ausgangslage: keine Datei');
+  const ledgerFile = join(workDir('zuhause-ledger'), 'ledger.sqlite');
+  assert.equal(existsSync(indexFile), false, 'Ausgangslage: keine Indexdatei');
+  assert.equal(existsSync(ledgerFile), false, 'Ausgangslage: keine Ledgerdatei');
 
-  // LESEN erzeugt keinen Index (dieselbe Regel wie bei der Abfrage).
-  const service = index.createStoreService({ indexFile });
+  // LESEN erzeugt keinen INDEX (dieselbe Regel wie bei der Abfrage). Es legt den
+  // LEDGER an — der ist unsere eigene, dauerhafte Ablage.
+  const service = index.createStoreService({ indexFile, ledgerFile });
   assert.deepEqual(service.load(scoring.LEDGER_NAMESPACE), { ok: true, state: null });
   assert.equal(existsSync(indexFile), false, 'das Lesen materialisiert keinen Index');
+  assert.equal(existsSync(ledgerFile), true, 'der Ledger ist das Zuhause der Ablage');
 
-  // SCHREIBEN darf das: die Ablage ist unsere eigene, sie darf ihr Zuhause bauen.
+  // SCHREIBEN schreibt in den Ledger — und der Index bleibt unberuehrt.
   const written = service.save(scoring.LEDGER_NAMESPACE, { records: [{ session_id: 's', event: { type: 'feedback.approval' } }], memos: [], notes: 1, scorecard: null });
   assert.equal(written.ok, true, `nicht geschrieben: ${written.error}`);
   assert.ok(written.rows >= 2, 'mindestens die Zeile und die Zusammenfassung');
-  assert.equal(existsSync(indexFile), true);
+  assert.equal(existsSync(ledgerFile), true);
+  assert.equal(existsSync(indexFile), false, 'der Ledger schreibt NICHT in die Indexdatei');
   const state = service.load(scoring.LEDGER_NAMESPACE);
   assert.equal(state.ok, true);
   assert.equal(state.state.records.length, 1);
@@ -260,8 +277,9 @@ test('memory: eine fehlende Ablage ist keine — aber sie legt sich ihr Zuhause 
 test('memory: ein Signal werten, den Host neu aufsetzen — der Stand ist noch da', async () => {
   const project = fixture('neustart');
   const indexRoot = workDir('neustart-index');
+  const ledgerFile = join(workDir('neustart-ledger'), 'ledger.sqlite');
 
-  const first = await mount({ root: project, indexRoot });
+  const first = await mount({ root: project, indexRoot, ledgerFile });
   assert.deepEqual(first.scoring.scorecard().scores, { correctness: 0.5, trust: 0.5 }, 'Ausgangslage');
   first.host.dispatch('session/event', SESSION, rated('ans-1', 'positive'));
   const scored = first.scoring.scorecard();
@@ -273,7 +291,7 @@ test('memory: ein Signal werten, den Host neu aufsetzen — der Stand ist noch d
   shutdown(first);
 
   // Neustart: neuer Host, neues Scoring — dieselbe Ablage.
-  const second = await mount({ root: project, indexRoot });
+  const second = await mount({ root: project, indexRoot, ledgerFile });
   assert.deepEqual(second.scoring.scorecard(), scored, 'nach dem Neustart steht der Stand');
   assert.equal(second.scoring.collector.stats().records, 1, 'das Protokoll wurde wieder eingelesen');
   assert.equal(second.scoring.state().records.length, 1);
@@ -286,7 +304,7 @@ test('memory: ein Signal werten, den Host neu aufsetzen — der Stand ist noch d
   assert.equal(storedState(second).records.length, 0, 'auch die Ablage ist leer');
   shutdown(second);
 
-  const third = await mount({ root: project, indexRoot });
+  const third = await mount({ root: project, indexRoot, ledgerFile });
   assert.deepEqual(third.scoring.scorecard().scores, { correctness: 0.5, trust: 0.5 }, 'der Widerruf ueberlebt den Neustart');
   shutdown(third);
 });
@@ -294,8 +312,9 @@ test('memory: ein Signal werten, den Host neu aufsetzen — der Stand ist noch d
 test('memory: spaete Kritik trifft die frueher bewertete Antwort (derselbe Betreff)', async () => {
   const project = fixture('spaet');
   const indexRoot = workDir('spaet-index');
+  const ledgerFile = join(workDir('spaet-ledger'), 'ledger.sqlite');
 
-  const first = await mount({ root: project, indexRoot });
+  const first = await mount({ root: project, indexRoot, ledgerFile });
   first.host.dispatch('session/event', SESSION, rated('ans-1', 'positive'));
   assert.equal(first.scoring.state().records.length, 1);
   shutdown(first);
@@ -303,7 +322,7 @@ test('memory: spaete Kritik trifft die frueher bewertete Antwort (derselbe Betre
   // Der Mensch korrigiert NACH dem Neustart dieselbe Antwort. Ohne die
   // Zuordnung in der Ablage waere das eine zweite, unabhaengige Zeile — die
   // Tafel truege dann Lob und Tadel fuer dieselbe Sache.
-  const second = await mount({ root: project, indexRoot });
+  const second = await mount({ root: project, indexRoot, ledgerFile });
   second.host.dispatch('session/event', SESSION, rated('ans-1', 'negative'));
   const records = second.scoring.state().records;
   assert.equal(records.length, 1, 'dieselbe Antwort traegt genau eine Zeile');
@@ -377,6 +396,9 @@ test('memory: ein kaputter Index ergibt einen leeren, aber laufenden Start', asy
   const before = warnings().length;
   const api = await mount({ root: project, indexRoot });
   const said = warnings().slice(before);
+  // Gemessen (2026-10-17): die Meldung nennt den konkreten Grund. Der Index ist
+  // jetzt nur noch MIGRATIONSQUELLE — aber ob dort ein Stand lag, weiss niemand,
+  // also bleibt es ein Fehler und keine stille Leere.
   assert.ok(
     said.some((line) => line.includes('nicht lesbar')),
     `der Grund muss benannt sein, nicht verschwiegen: ${JSON.stringify(said.slice(-4))}`,
@@ -388,10 +410,19 @@ test('memory: ein kaputter Index ergibt einen leeren, aber laufenden Start', asy
   assert.equal(api.scoring.scorecard().scores.correctness, 0.56, 'der Host laeuft weiter');
   assert.equal(api.scoring.state().records.length, 1, 'im Speicher ist der Stand da');
 
-  // Und die Ablage sagt die Wahrheit ueber sich selbst: kein stilles Nichts.
-  const answer = index.createStoreService({ indexFile }).load(scoring.LEDGER_NAMESPACE);
+  // Die Ablage sagt die Wahrheit ueber ihre QUELLE: ein leerer Ledger vor einem
+  // unlesbaren Index ist ein Fehler und kein stilles Nichts. (Frischer Pfad, denn
+  // die Ablage dieses Laufs hat inzwischen ihren eigenen, gueltigen Stand.)
+  const empty = join(workDir('kaputt-ledger'), 'ledger.sqlite');
+  const answer = index.createStoreService({ indexFile, ledgerFile: empty }).load(scoring.LEDGER_NAMESPACE);
   assert.equal(answer.ok, false);
-  assert.ok(String(answer.error).length > 0, 'ein Fehler ohne Text waere ein Befund ohne Spur');
+  assert.match(String(answer.error), /INDEX_UNREADABLE/, 'der Grund ist unlesbar, nicht „leer"');
+
+  // Und der Stand dieses Laufs selbst ist DAUERHAFT: er steht im Ledger, nicht
+  // im kaputten Index — der Host hat ihn nach dem leeren Start aufgebaut.
+  const persisted = index.createStoreService({ indexFile, ledgerFile: api.ledgerFile }).load(scoring.LEDGER_NAMESPACE);
+  assert.equal(persisted.ok, true, `Stand nicht lesbar: ${persisted.error}`);
+  assert.equal(persisted.state.records.length, 1, 'das Urteil steht im Ledger');
   shutdown(api);
 });
 
@@ -445,15 +476,16 @@ test('memory: die Ablage wird von ihrer eigenen Fassung verworfen, nicht vom Ind
 test('memory: auch wenn das Scoring ZUERST mountet, kommt der Stand an', async () => {
   const project = fixture('reihenfolge');
   const indexRoot = workDir('reihenfolge-index');
+  const ledgerFile = join(workDir('reihenfolge-ledger'), 'ledger.sqlite');
 
-  const first = await mount({ root: project, indexRoot });
+  const first = await mount({ root: project, indexRoot, ledgerFile });
   first.host.dispatch('session/event', SESSION, rated('ans-1', 'positive'));
   const scored = first.scoring.scorecard();
   shutdown(first);
 
   // Scoring zuerst: sein `apply` findet den Dienst noch nicht. Der erste
   // Gebrauch liegt hinter allen Mounts und holt den Stand nach.
-  const swapped = await mount({ root: project, indexRoot, order: ['events', 'scoring', 'index'] });
+  const swapped = await mount({ root: project, indexRoot, ledgerFile, order: ['events', 'scoring', 'index'] });
   assert.deepEqual(swapped.scoring.scorecard(), scored, 'der Stand wurde nachgeholt');
   assert.equal(swapped.scoring.state().records.length, 1);
   shutdown(swapped);

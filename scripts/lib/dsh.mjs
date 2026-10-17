@@ -18,32 +18,22 @@
  *      Git, die Datei ist dokumentiert, nicht gevendert).
  *   c) PATH-Fallback: wie vorher — findOnPath('dsh') (yaml.mjs), damit
  *      bestehende globale Installationen weiterlaufen.
- *   d) Installations-Prefixe aus KNOWN_PREFIXES (nur wenn a–c fehlen):
- *      `npm install -g` legt den `dsh`-Shim unter `<prefix>/bin/` ab, ohne
- *      dass `<prefix>/bin` im PATH stehen muss. Die Liste ist bewusst kurz
- *      und dokumentiert statt geraten — wer DSH anderswo installiert, nutzt
- *      a–c oder legt den Shim auf den PATH.
+ *   d) Installations-Prefixe (nur wenn a–c fehlen): `npm install -g` legt den
+ *      `dsh`-Shim unter `<prefix>/bin/` ab, ohne dass `<prefix>/bin` im PATH
+ *      stehen muss. Die Prefixe werden aus den `node`-Binaries abgeleitet, die
+ *      auf dem PATH liegen (`nodePrefixes()`) — keine Versionsnummer und kein
+ *      Heimpfad steht hier fest; wer DSH anderswo installiert, nutzt a–c oder
+ *      legt den Shim auf den PATH.
+ *
+ * Die Node-Laufzeit selbst kommt aus `runtime.mjs` (verifiziert: Version gegen
+ * `engines.node` UND `node:sqlite`-Rauchtest). Dieses Modul entscheidet nur,
+ * WO dsh liegt — nicht, welcher Node es startet.
  */
-import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, realpathSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join, sep } from 'node:path';
+import { delimiter, dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findOnPath } from './yaml.mjs';
-
-/** Heimverzeichnis (einmal, für KNOWN_PREFIXES). */
-const HOME_DIR = homedir();
-
-/**
- * Bekannte globale Installations-Prefixe (Maschinen-spezifisch, genau EIN Ort
- * für diese Liste statt verstreuter Hartcodierungen in den Skripten):
- * beide wurden am 2026-10-10 auf dieser Maschine nachgewiesen
- * (`<prefix>/bin/{node,dsh}`, dsh-Shim → `<prefix>/lib/node_modules/@deepseek-ai/dsh`).
- */
-export const KNOWN_PREFIXES = [
-  join(HOME_DIR, '.local', 'opt', 'node-v22.23.3-linux-x64'),
-  join(HOME_DIR, '.nvm', 'versions', 'node', 'v24.21.0'),
-];
+import { resolveRuntime } from './runtime.mjs';
 
 /** Repo-Root: scripts/lib/ → zwei Ebenen hoch. */
 export const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -57,29 +47,36 @@ function localRootCandidates() {
   return candidates.filter((candidate) => existsSync(join(candidate, 'lib', 'bin.js')));
 }
 
-/** Major-Version eines Node-Binaries (`null`, wenn nicht lauffähig). */
-function nodeMajor(binary) {
-  try {
-    const found = /^v(\d+)\./.exec(execFileSync(binary, ['--version'], { encoding: 'utf8' }).trim());
-    return found === null ? null : Number(found[1]);
-  } catch {
-    return null;
-  }
+/**
+ * Ein VERIFIZIERTES Node-Binary (Version gegen `engines.node` UND
+ * `node:sqlite`-Rauchtest). Die Auflösung liegt in `runtime.mjs` — hier steht
+ * nur noch der Name, den die Starter benutzen; die frühere Fassung akzeptierte
+ * jede Hauptversion ≥ 22 (also auch 23 und 22.0–22.18) und kannte zwei
+ * festverdrahtete Heimpfade. `null`, wenn kein Kandidat taugt.
+ */
+export function goodNode() {
+  return resolveRuntime().binary;
 }
 
 /**
- * Ein Node-Binary mit Major ≥ 22 (Repo-Vorgabe `engines`): der laufende
- * Prozess zuerst, danach die `node`-Binaries der KNOWN_PREFIXES.
- * `null`, wenn keines existiert — Aufrufer melden das fail-closed.
+ * Installations-Prefixe für ein globales DSH: abgeleitet aus den Node-Binaries,
+ * die der Resolver ohnehin prüft (`<prefix>/bin/node` → `<prefix>`). Keine
+ * Versionsnummer und kein Heimpfad steht hier fest — wer `npm install -g` in
+ * einem anderen Prefix ausführt, wird über denselben PATH gefunden.
  */
-export function goodNode() {
-  const running = Number((process.versions.node ?? '0').split('.')[0]);
-  if (running >= 22) return process.execPath;
-  for (const prefix of KNOWN_PREFIXES) {
-    const binary = join(prefix, 'bin', 'node');
-    if (existsSync(binary) && (nodeMajor(binary) ?? 0) >= 22) return binary;
+export function nodePrefixes(env = process.env) {
+  const prefixes = [];
+  for (const part of String(env.PATH ?? '').split(delimiter)) {
+    if (part === '') continue;
+    const binary = join(part, process.platform === 'win32' ? 'node.exe' : 'node');
+    if (!existsSync(binary)) continue;
+    const prefix = dirname(part);
+    if (!prefixes.includes(prefix)) prefixes.push(prefix);
   }
-  return null;
+  const running = process.execPath;
+  const runningPrefix = dirname(dirname(running));
+  if (existsSync(running) && !prefixes.includes(runningPrefix)) prefixes.push(runningPrefix);
+  return prefixes;
 }
 
 /**
@@ -100,7 +97,7 @@ function packageRootOfShim(shim) {
 
 /** Erster Prefix mit vollständigem dsh-Paket (`null`, wenn keiner). */
 function prefixRoot() {
-  for (const prefix of KNOWN_PREFIXES) {
+  for (const prefix of nodePrefixes()) {
     const root = packageRootOfShim(join(prefix, 'bin', 'dsh'));
     if (root !== null && existsSync(join(root, 'package.json'))) return root;
   }
@@ -162,6 +159,14 @@ export function dshBinary() {
   const bin = join(root, 'lib', 'bin.js');
   if (!existsSync(bin)) return null;
   return [goodNode() ?? process.execPath, bin];
+}
+
+/**
+ * Die verifizierte Laufzeit als Daten (Binary, Version, sqlite, geprüfte
+ * Kandidaten) — für Launcher und Meldungen, die den Pfad zeigen müssen.
+ */
+export function dshRuntime() {
+  return resolveRuntime();
 }
 
 /** Anzahl der Host-/Client-Hälften in einem @deepseek-ai-Verzeichnis (Layout-Logik von yaml.mjs). */

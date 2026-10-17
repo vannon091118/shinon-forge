@@ -55,6 +55,7 @@ import {
   SCHEMA,
   SCHEMA_VERSION,
   openIndex,
+  openLedger,
   writeMemory,
 } from '../packages/project-index/assets/index-core.js';
 import { createSignalCollector } from '../packages/scoring/assets/scoring-core.js';
@@ -110,6 +111,15 @@ const indexFile = (tag) => {
   const dir = join(WORK, tag);
   mkdirSync(dir, { recursive: true });
   return join(dir, 'index.sqlite');
+};
+/**
+ * Der DAUERHAFTE Ledger — seit der Trennung die Datei, in die `save` schreibt.
+ * Gemessen wird sie hier, nicht mehr die Indexdatei: der Index ist Cache.
+ */
+const ledgerFile = (tag) => {
+  const dir = join(WORK, `${tag}-ledger`);
+  mkdirSync(dir, { recursive: true });
+  return join(dir, 'ledger.sqlite');
 };
 const dbBytes = (file) => {
   let total = 0;
@@ -171,13 +181,13 @@ const stateOf = (records, upto) => ({
 
 // ── 1. Zeilen: wächst der Preis des Schreibens mit der Zeilenzahl? ───────────
 function measureRows(max) {
-  const file = indexFile(`rows-${max}`);
-  const store = createStoreService({ indexFile: file });
+  const file = ledgerFile(`rows-${max}`);
+  const store = createStoreService({ indexFile: indexFile(`rows-${max}`), ledgerFile: file });
   const records = recordsFor(max);
   store.save(NAMESPACE, stateOf(records, max)); // Datei anlegen, aufwärmen
   const samples = [];
   for (let i = 0; i < 3; i += 1) {
-    const db = openIndex(file);
+    const db = openLedger(file);
     samples.push(timed(() => writeMemory(db, NAMESPACE, stateOf(records, max))).ms);
     db.close();
   }
@@ -261,8 +271,8 @@ function measureBreakdown(max) {
 
 // ── 3./4. Neuschreiben gegen Anhängen: dieselbe Signalreihe, zwei Wege ───────
 function measureRewrite(max) {
-  const file = indexFile(`rewrite-${max}`);
-  const store = createStoreService({ indexFile: file });
+  const file = ledgerFile(`rewrite-${max}`);
+  const store = createStoreService({ indexFile: indexFile(`rewrite-${max}`), ledgerFile: file });
   const records = recordsFor(max);
   const perSave = [];
   const startedAll = performance.now();
@@ -308,11 +318,11 @@ function appendOne(db, record, ordinal, summary, memo) {
 }
 
 function measureAppend(max) {
-  const file = indexFile(`append-${max}`);
-  const store = createStoreService({ indexFile: file });
+  const file = ledgerFile(`append-${max}`);
+  const store = createStoreService({ indexFile: indexFile(`append-${max}`), ledgerFile: file });
   const records = recordsFor(max);
   store.save(NAMESPACE, stateOf(records, 0)); // Datei anlegen: `load` legt sie nicht an
-  const db = openIndex(file);
+  const db = openLedger(file);
   const perSave = [];
   const startedAll = performance.now();
   for (let i = 1; i <= max; i += 1) {
@@ -333,8 +343,8 @@ function measureAppend(max) {
 
 // ── 5. Ganzkette: echter Sammler + echter Dienst gegen reinen Speicher ──────
 function measureChain(max) {
-  const file = indexFile(`chain-${max}`);
-  const store = createStoreService({ indexFile: file });
+  const file = ledgerFile(`chain-${max}`);
+  const store = createStoreService({ indexFile: indexFile(`chain-${max}`), ledgerFile: file });
   let storeMs = 0;
   let saves = 0;
   const collector = createSignalCollector({

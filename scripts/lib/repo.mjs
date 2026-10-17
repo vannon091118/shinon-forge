@@ -32,6 +32,7 @@ import { dirname, join, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { loadYaml } from './yaml.mjs';
 import { idiomIssues } from './plugin-idioms.mjs';
+import { PRUNE_DIRS, isPruned } from './scan.mjs';
 
 // Generierte Plugin-Bausteine (settings-Registrierung, Locale-Fallback): sie stehen
 // EINMAL in scripts/lib/plugin-idioms.mjs und liegen als markierte Ableitung in den
@@ -355,11 +356,15 @@ export function composeIssues(profileName, profile, packages) {
  */
 export const LEGACY_SCAN_EXTENSIONS = ['.js', '.mjs', '.cjs', '.yml', '.yaml'];
 
-/** Alle Dateien eines Verzeichnisses, rekursiv, ohne node_modules. */
+/**
+ * Alle Dateien eines Verzeichnisses, rekursiv — mit der gemeinsamen
+ * Early-Pruning-Regel (`scan.mjs`): Fremdbaum, Cache, Laufzeitdaten und Symlinks
+ * werden VOR der Rekursion verworfen, nicht nach dem Lesen ihrer Einträge.
+ */
 function walkFiles(dir) {
   const found = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules') continue;
+    if (entry.isSymbolicLink() || isPruned(entry.name)) continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) found.push(...walkFiles(path));
     else if (LEGACY_SCAN_EXTENSIONS.some((extension) => entry.name.endsWith(extension))) found.push(path);
@@ -408,13 +413,17 @@ const PNPM_SCRIPT = /(?:^|[\s&|;(])pnpm(?:\s|$)/;
 const CODE_EXTENSIONS = ['.js', '.mjs', '.cjs'];
 /** Verzeichnisse des eigenen Codes, in denen ein pnpm-Aufruf verboten ist. */
 const CODE_DIRS = ['scripts', 'bin', 'packages'];
-/** Nie durchsucht: Fremdbaum, Git-Interna und generierte Artefakte. */
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'attachments']);
+/**
+ * Nie durchsucht: Fremdbaum, Git-Interna, generierte Artefakte, Laufzeitdaten —
+ * die Liste kommt aus `scan.mjs` (EINE Regel für alle Baumläufe dieses Repos),
+ * plus `attachments`, das nur hier vorkommt. Symlinks werden nie betreten.
+ */
+const SKIP_DIRS = new Set([...PRUNE_DIRS, 'attachments']);
 
 /** Alle Dateien ab `dir`, ohne Fremdbaum, Git-Interna und generierte Artefakte. */
 function walkRepo(dir, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (SKIP_DIRS.has(entry.name)) continue;
+    if (entry.isSymbolicLink() || SKIP_DIRS.has(entry.name)) continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) walkRepo(path, found);
     else found.push(path);

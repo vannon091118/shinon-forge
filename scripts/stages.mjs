@@ -16,6 +16,8 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import * as repo from './lib/repo.mjs';
 import { findOnPath } from './lib/yaml.mjs';
+import { childEnv } from './lib/paths.mjs';
+import { resolveRuntime } from './lib/runtime.mjs';
 
 const root = repo.readRoot();
 const profileName = repo.activeProfile(root);
@@ -39,14 +41,18 @@ function run(file, args, options = {}) {
   }
 }
 
-const node = (script, args = []) => run(process.execPath, [join(repo.ROOT, 'scripts', script), ...args]);
+/** Der VERIFIZIERTE Node (Version gegen `engines` + node:sqlite-Rauchtest). */
+const runtime = resolveRuntime();
+const nodeBinary = runtime.binary ?? process.execPath;
+
+const node = (script, args = []) => run(nodeBinary, [join(repo.ROOT, 'scripts', script), ...args], { env: childEnv(runtime) });
 
 /** Den Stack wirklich hochfahren und auf die Bereitschaftszeile warten. */
 async function boot({ patch } = {}) {
   const dsh = findOnPath('dsh');
   if (dsh === null) return { error: 'dsh nicht im PATH' };
   const args = ['--profile', profileName, ...(patch === undefined ? [] : ['--patch', patch]), '--no-open'];
-  const child = spawn(dsh, args, { cwd: repo.ROOT, env: { ...process.env, DSH_HOME: repo.ROOT } });
+  const child = spawn(dsh, args, { cwd: repo.ROOT, env: childEnv(runtime) });
   let log = '';
   child.stdout.on('data', (chunk) => { log += chunk; });
   child.stderr.on('data', (chunk) => { log += chunk; });
@@ -200,7 +206,7 @@ const STAGES = {
       writeFileSync(broken, '- id: [unterminated\n');
       writeFileSync(invalid, '- id: shinon-tooltip\n  config:\n    tooltipDelay: soon\n');
 
-      const overlay = run(findOnPath('dsh'), ['--profile', profileName, '--patch', broken, '--dump-config'], { env: { ...process.env, DSH_HOME: repo.ROOT } });
+      const overlay = run(findOnPath('dsh'), ['--profile', profileName, '--patch', broken, '--dump-config'], { env: childEnv(runtime) });
       if (overlay.code === 0) return { green: false, detail: 'kaputtes Overlay wurde akzeptiert' };
       if (!overlay.output.includes('failed to parse overlay')) return { green: false, detail: `Overlay-Fehler unklar: ${lastLines(overlay.output, 2)}` };
 
@@ -221,7 +227,7 @@ const STAGES = {
   },
   /** G8 - Replay: zwei Boots verhalten sich gleich, zwei Dumps sind identisch. */
   async G8() {
-    const dumps = [0, 1].map(() => run(findOnPath('dsh'), ['--profile', profileName, '--dump-config'], { env: { ...process.env, DSH_HOME: repo.ROOT } }));
+    const dumps = [0, 1].map(() => run(findOnPath('dsh'), ['--profile', profileName, '--dump-config'], { env: childEnv(runtime) }));
     if (dumps.some((dump) => dump.code !== 0)) return { green: false, detail: '--dump-config nicht grün' };
     if (dumps[0].output !== dumps[1].output) return { green: false, detail: 'zwei Dumps unterscheiden sich' };
 

@@ -64,8 +64,15 @@ export function standFor(config, runtime, promptText, context, toneState = null)
   }
 
   // Narrative-Lage (Zug 6): der letzte Composite vom Kanal, den `apply` hält.
-  // Fehlt er, bleibt `<narrative>` weg — renderStand erfindet keine Felder.
-  const narrative = runtime?.narrative ?? null;
+  // Fehlt er, bleibt `<narrative>` weg — renderStand erfindet keine Felder. Ein
+  // Fremdwert (kein Objekt, oder ein Array) ist KEINE Lage: der Kanal steht jedem
+  // offen, und ein String als Narrative waere eine Lage, die niemand geschrieben
+  // hat. Dieselbe Grenze wie `renderStand` (`isRecord`) — sonst widerspraechen
+  // sich Block ("keine Lage") und Datensatz ("Lage ohne Felder") ueber denselben
+  // Stand.
+  const narrative = typeof runtime?.narrative === 'object' && runtime.narrative !== null && !Array.isArray(runtime.narrative)
+    ? runtime.narrative
+    : null;
 
   const block = renderStand({
     contract: STAND_CONTRACT,
@@ -82,6 +89,17 @@ export function standFor(config, runtime, promptText, context, toneState = null)
     block,
     stance,
     tendencies,
+    // Die Lage als DATENSATZ neben dem Block: die drei benannten Felder reisen
+    // mit der Entscheidung. Dass es keine Lage GIBT, wird `null` genannt und
+    // nicht durch ein fehlendes Feld verschwiegen — sonst waere "kein Composite
+    // gelesen" von "das Feld gibt es nicht" nicht zu unterscheiden.
+    narrative: narrative === null
+      ? null
+      : {
+          arc_id: narrative.arc_id ?? null,
+          narrator: narrative.narrator ?? null,
+          relationship_state: narrative.relationship_state ?? null,
+        },
     tone: toneState?.source ?? 'none',
     thema: notes.map((note) => note.thema),
     skills: skillRead.loaded.map((skill) => skill.name),
@@ -106,6 +124,9 @@ export function standTrace(stand) {
     stance: stand.stance,
     tone: stand.tone,
     tendencies: stand.tendencies.map((entry) => `${entry.klasse} ${entry.stufe}`),
+    // Die Narrative-Lage ohne Fliesstext: der Datensatz reist als Ereignis durch
+    // den Host, ein Prompt-Block hat dort nichts zu suchen.
+    narrative: stand.narrative ?? null,
     notes: { loaded: stand.thema, skipped: stand.skipped.length, reasons, reason: stand.reason },
     skills: {
       loaded: stand.skills ?? [],

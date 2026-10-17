@@ -114,7 +114,7 @@ function parseDshArgs(argv, version, manageDesktopProfile = false) {
 	});
 	if (first === "plugin") {
 		const plugin = program.command("plugin").description("manage a profile's plugins by forwarding the remaining arguments to pnpm in the profile directory");
-		plugin.helpOption("-h, --help", "show this help").passThroughOptions().requiredOption("--profile <name>", "the profile whose plugins to manage (initialized on first use)", selectProfile).allowUnknownOption().argument("[args...]", "pnpm arguments, forwarded verbatim (add <pkg>, remove <pkg>, why <pkg>, ...)").action((args, options) => {
+		plugin.requiredOption("--profile <name>", "the profile whose plugins to manage (initialized on first use)", selectProfile).allowUnknownOption().argument("[args...]", "pnpm arguments, forwarded verbatim (add <pkg>, remove <pkg>, why <pkg>, ...)").action((args, options) => {
 			if (options.profile === "") program.error("error: --profile needs a name");
 			if (!manageDesktopProfile) rejectElectronProfile(plugin, options.profile);
 			if (args.length === 0) program.error("error: plugin needs pnpm arguments to forward (e.g. add <package>)");
