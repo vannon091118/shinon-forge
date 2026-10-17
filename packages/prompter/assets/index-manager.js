@@ -421,6 +421,9 @@ export function matchIntent(promptText, rules) {
       };
     }
   }
-  if (best !== null && isQuestion(text)) return { ...best, expansion: '' };
+  // Eine Frage ist ein Lookup, keine Aufgabe: sonst trug der Entscheidungs-
+  // datensatz (und die Block-Auswahl, die `intentMatchClass` liest) eine
+  // Task-Klassifikation für einen Satz, der nur eine Antwort will.
+  if (best !== null && isQuestion(text)) return { ...best, classification: 'LOOKUP', expansion: '' };
   return best;
 }

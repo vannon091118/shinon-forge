@@ -313,6 +313,7 @@ test('matchIntent: eine Frage wird klassifiziert, aber NIE erweitert', () => {
   const m = matchIntent('Ist "fix den bug" der richtige Trigger?', RULES);
   assert.ok(m, 'die Handlungsphrase ist erkennbar');
   assert.equal(m.patternId, 'bugfix');
+  assert.equal(m.classification, 'LOOKUP', 'eine Frage ist ein Lookup, keine Task-Klassifikation');
   assert.equal(m.expansion, '', 'eine Frage bekommt keinen # Aufgabe-Block');
 });
 
