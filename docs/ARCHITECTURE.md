@@ -1,6 +1,6 @@
 # Architektur — Shinon Forge
 
-> **Status:** current — verbindliche Konventionen für `packages/`, `profiles/`, `scripts/`. **Stand:** 2026-10-13
+> **Status:** current — verbindliche Konventionen für `packages/`, `profiles/`, `scripts/`. **Stand:** 2026-10-17
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md` (einziger Eigentümer harter Zahlen)
 
 Durchgesetzt von `scripts/lib/repo.mjs`, geprüft von `scripts/shinon-test.mjs` (Gate),
@@ -259,8 +259,11 @@ Neue Features starten als *plan* und werden erst mit ausführbarem Nachweis *cur
 - `@deepseek-ai/schemastery` ist im Repo-Root **nicht installiert**; Tests, die es
   brauchen, überspringen sichtbar (Grund im Testnamen) — einer davon wird heute rot
   statt zu überspringen (`docs/ZAHLEN.md` §3.3).
-- Das installierte DSH (`dsh --version`) weicht vom Pin im Root-Manifest ab; genau
-  deshalb verweigert ein Gate-Test seine Zusage gegen die ungeprüfte Fassung.
+- Der Pin im Root-Manifest, das Lockfile, `vendor/dsh` und die installierte Binary
+  tragen **dieselbe** DSH-Fassung (`vendor/MODIFICATIONS.md`, geprüft von
+  `scripts/gate/tests/dsh-pin.test.mjs`); eine **globale** Installation daneben darf
+  abweichen, und ein Gate-Test verweigert seine Zusage, sobald eine andere als die
+  gemessene Fassung geladen wird (`scripts/gate/tests/message-ingress.test.mjs`).
 - `!!js`-Ausdrücke (DSH-YAML-Dialekt) kennt der Validator nicht; die Dateien dieses
   Repos nutzen sie nicht — bewusster blinder Fleck.
 - Das Root-Install hat **eine** Quelle: `package-lock.json` (versioniert, seit Schritt 3.5
