@@ -210,6 +210,11 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   IDs, disallowed blocks, out-of-range uncertainty and unparsable answers are
   rejected fail-closed, and the deterministic selector stays the fallback; the
   agent proposes, the runtime enforces budgets, modes and permissions.
+  The intent expansion (`packages/prompter/assets/intent-rules.json`) is DATA too:
+  a trigger is an imperative phrase, never a bare topic word, and a question is
+  classified but **never** expanded — otherwise the agent answers its own invented
+  task instead of the question. `matchIntent` matches whole phrases (Unicode word
+  boundaries) and returns an empty `expansion` for every question.
 
 ## Pitfalls
 - Ein Profil-Bündel löst über `profiles/<name>/node_modules` auf — **vor** dem Root-`node_modules`.

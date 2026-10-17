@@ -7,7 +7,8 @@
  *   - Hash-basierte Deduplikation: gleicher Inhalt = gleicher Hash = kein Double.
  *   - Token-Präfix-Matching: "test" trifft auf "tests", "testen", ...
  *   - Nur Treffer werden geliefert (score > 0).
- *   - Intent-Matching: Trigger → Expansion, fallthrough null.
+ *   - Intent-Matching: Handlungsphrase → Expansion; Themenwort und Frage → null
+ *     bzw. Klassifikation ohne Expansion (der Agent antwortet, statt zu handeln).
  *
  * Läuft mit `node --test` — kein DSH, kein Netz.
  */
@@ -294,44 +295,43 @@ test('loadIndex: ungültiges JSON wirft', () => {
 
 // ── 7. Intent-Matching ───────────────────────────────────────────────────────
 
-test('matchIntent: Trigger "doku" trifft documentation', () => {
-  const m = matchIntent('mach doku', RULES);
-  assert.ok(m);
-  assert.equal(m.patternId, 'documentation');
-  assert.equal(m.classification, 'MULTI_STEP_TASK');
-  assert.ok(m.expansion.length > 0);
-});
-
-test('matchIntent: Trigger "test" trifft tests', () => {
+test('matchIntent: Handlungsphrase trifft — "schreib tests fuer scoring" ist ein Auftrag', () => {
   const m = matchIntent('schreib tests fuer scoring', RULES);
   assert.ok(m);
   assert.equal(m.patternId, 'tests');
+  assert.equal(m.classification, 'MULTI_STEP_TASK');
+  assert.ok(m.expansion.includes('Tests') || m.expansion.includes('Test'));
 });
 
-test('matchIntent: Trigger "refaktor" trifft refactor', () => {
-  const m = matchIntent('refaktor das ganze', RULES);
-  assert.ok(m);
-  assert.equal(m.patternId, 'refactor');
-  assert.equal(m.classification, 'TRANSFORM');
+test('matchIntent: Themenwort allein trifft nicht — über Doku reden ist kein Doku-Auftrag', () => {
+  assert.equal(matchIntent('mach doku', RULES), null);
+  assert.equal(matchIntent('Werte die Logs aus inkl. Doku und Rework', RULES), null);
+  assert.equal(matchIntent('der Test ist rot', RULES), null);
 });
 
-test('matchIntent: Trigger "bugfix" trifft bugfix', () => {
-  const m = matchIntent('fix den bug in scoring', RULES);
-  assert.ok(m);
+test('matchIntent: eine Frage wird klassifiziert, aber NIE erweitert', () => {
+  const m = matchIntent('Ist "fix den bug" der richtige Trigger?', RULES);
+  assert.ok(m, 'die Handlungsphrase ist erkennbar');
   assert.equal(m.patternId, 'bugfix');
+  assert.equal(m.expansion, '', 'eine Frage bekommt keinen # Aufgabe-Block');
 });
 
-test('matchIntent: Trigger "docs update" trifft update-docs', () => {
-  const m = matchIntent('docs update bitte', RULES);
-  assert.ok(m);
-  assert.equal(m.patternId, 'update-docs');
+test('matchIntent: Frage ohne Handlungsphrase gibt null — "warum ist der test broken?"', () => {
+  assert.equal(matchIntent('warum ist der test broken?', RULES), null);
+  assert.equal(matchIntent('Was macht der Prompter mit langen Prompts?', RULES)?.expansion ?? '', '');
 });
 
-test('matchIntent: Trigger "erklär" trifft read-code', () => {
+test('matchIntent: ganze Phrase, kein Substring — "Testament" ist kein Test', () => {
+  assert.equal(matchIntent('Testament schreiben', RULES), null);
+  assert.equal(matchIntent('docker compose starten', RULES), null);
+});
+
+test('matchIntent: Lookup wird klassifiziert, hat aber keine Expansion', () => {
   const m = matchIntent('erklär mir den code', RULES);
   assert.ok(m);
   assert.equal(m.patternId, 'read-code');
   assert.equal(m.classification, 'LOOKUP');
+  assert.equal(m.expansion, '');
 });
 
 test('matchIntent: kein Treffer gibt null', () => {
@@ -341,18 +341,21 @@ test('matchIntent: kein Treffer gibt null', () => {
 });
 
 test('matchIntent: rules=null gibt null', () => {
-  assert.equal(matchIntent('mach doku', null), null);
-  assert.equal(matchIntent('mach doku', {}), null);
+  assert.equal(matchIntent('schreib tests', null), null);
+  assert.equal(matchIntent('schreib tests', {}), null);
 });
 
 test('matchIntent: case-insensitive', () => {
-  const m = matchIntent('MACH DOKU', RULES);
+  const m = matchIntent('SCHREIB TESTS', RULES);
   assert.ok(m);
-  assert.equal(m.patternId, 'documentation');
+  assert.equal(m.patternId, 'tests');
 });
 
-test('matchIntent: expansion ist der Full-Task-Text', () => {
-  const m = matchIntent('mach doku', RULES);
-  assert.ok(m.expansion.includes('Dokumentation'));
-  assert.ok(m.expansion.includes('Entwickler'));
+test('matchIntent: kein Trigger ist ein nacktes Themenwort', () => {
+  const bare = ['doku', 'doc', 'readme', 'test', 'tests', 'fehler', 'broken'];
+  for (const pattern of RULES.patterns) {
+    for (const trigger of pattern.trigger) {
+      assert.ok(!bare.includes(trigger.toLocaleLowerCase()), `${pattern.id}: "${trigger}" ist ein Themenwort, keine Handlungsphrase`);
+    }
+  }
 });

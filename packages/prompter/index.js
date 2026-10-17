@@ -473,13 +473,21 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   if (contract.needsContext && runtime.intentRules !== null) {
     const match = runtimeMatchIntent(prompt.text, runtime.intentRules);
     if (match !== null) {
-      expandedText = `${prompt.text}\n\n# Aufgabe\n${match.expansion}`;
       runtime.intentMatch = match.patternId;
       runtime.intentMatchClass = match.classification ?? null;
-      console.log(`[shinon-prompter] Intent erkannt: ${match.label} (${match.classification}) — Expansion angewendet`);
+      // Eine Frage/Lookup-Klassifikation hat KEINE Expansion. Dann bleibt der
+      // Prompt unangetastet: der Agent soll antworten, nicht eine Aufgabe
+      // erfinden (die Erweiterung ist ein Angebot, keine Umdeutung).
+      if (match.expansion !== '') {
+        expandedText = `${prompt.text}\n\n# Aufgabe\n${match.expansion}`;
+        console.log(`[shinon-prompter] Intent erkannt: ${match.label} (${match.classification}) — Expansion angewendet`);
+      } else {
+        console.log(`[shinon-prompter] Intent erkannt: ${match.label} (${match.classification}) — keine Expansion`);
+      }
     } else {
-      // Kein Treffer heißt kein Treffer: die Klasse des VORIGEN Schritts darf
-      // nicht stehen bleiben (gemessen als stale intentMatchClass über Schritte).
+      // Kein Treffer heißt kein Treffer: Treffer UND Klasse des VORIGEN Schritts
+      // dürfen nicht stehen bleiben (gemessen als stale intentMatchClass).
+      runtime.intentMatch = null;
       runtime.intentMatchClass = null;
     }
   }

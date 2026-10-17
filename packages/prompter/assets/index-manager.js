@@ -361,25 +361,54 @@ export function writeJsonFile(path, value) {
   writeFileSync(full, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
+/** Fragewörter, mit denen ein Prompt eine Frage ist statt einer Aufgabe. */
+const QUESTION_WORDS = new Set([
+  'was', 'wie', 'warum', 'wieso', 'weshalb', 'wer', 'wo', 'wann', 'welche', 'welcher', 'welches',
+  'welchem', 'welchen', 'wieviel', 'wieviele', 'kann', 'kannst', 'können', 'ist', 'sind', 'hat', 'haben', 'gibt',
+  'why', 'how', 'what', 'which', 'who', 'where', 'when', 'can', 'could', 'is', 'are', 'was', 'were', 'should', 'does', 'do', 'did',
+]);
+
+/** Eine Frage endet mit `?` oder beginnt mit einem Fragewort. */
+function isQuestion(text) {
+  if (text.endsWith('?')) return true;
+  const first = text.split(/[^\p{L}\p{N}]+/u)[0] ?? '';
+  return QUESTION_WORDS.has(first);
+}
+
+/**
+ * Ein Trigger gilt als GANZE Phrase, nicht als Substring: `test` trifft nicht
+ * `Testament`, `doc` nicht `docker`. Unicode-Grenzen, damit Umlaute zählen.
+ */
+function hasPhrase(text, trigger) {
+  const escaped = trigger.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'u').test(text);
+}
+
 /**
  * Prüfen, ob ein Prompt einem der bekannten Intent-Patterns entspricht.
- * Gibt { matched, pattern, expansion, classification } oder null.
+ * Gibt { matched, patternId, label, expansion, classification } oder null.
  *
- * Score-basiert: Patterns mit mehreren Trigger-Treffern gewinnen vor solchen
- * mit nur einem. "update doku" trifft zweimal auf update-docs, einmal auf
- * documentation — also gewinnt update-docs.
+ * Zwei Regeln, beide fail-closed gegenüber der Nutzerabsicht:
+ *   1. Trigger sind Handlungsphrasen (Daten), keine Themenwörter — ein Satz
+ *      über Tests ist kein Auftrag, Tests zu schreiben.
+ *   2. Eine Frage wird höchstens KLASSIFIZIERT, nie erweitert: `expansion` ist
+ *      dann leer, und der Aufrufer hängt keinen `# Aufgabe`-Block an. Sonst
+ *      beantwortet der Agent die Frage nicht, sondern erfindet eine Aufgabe.
+ *
+ * Score-basiert: Patterns mit mehreren Phrasentreffern gewinnen vor solchen
+ * mit nur einem.
  */
 export function matchIntent(promptText, rules) {
   if (!rules || !Array.isArray(rules.patterns)) return null;
-  const lower = String(promptText ?? '').toLocaleLowerCase().trim();
-  if (lower === '') return null;
+  const text = String(promptText ?? '').toLocaleLowerCase().trim();
+  if (text === '') return null;
 
   let best = null;
   let bestScore = 0;
   for (const pattern of rules.patterns) {
     let score = 0;
     for (const trigger of (Array.isArray(pattern.trigger) ? pattern.trigger : [])) {
-      if (lower.includes(trigger.toLocaleLowerCase())) score += 1;
+      if (hasPhrase(text, String(trigger).toLocaleLowerCase())) score += 1;
     }
     if (score > bestScore) {
       bestScore = score;
@@ -392,5 +421,6 @@ export function matchIntent(promptText, rules) {
       };
     }
   }
+  if (best !== null && isQuestion(text)) return { ...best, expansion: '' };
   return best;
 }

@@ -398,6 +398,33 @@ test('MAX: der definierte Kontext wird angenommen und als Datenblock gerendert',
   dispose();
 });
 
+test('MAX: eine Frage wird nicht zur Aufgabe — der Prompt geht wortgleich in den One-Shot', async () => {
+  const llm = fakeLlm(reply(goodResult({ intentClassification: 'LOOKUP' })));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath }, { llm });
+  const claimed = [userMessage('Warum ist der Test broken?')];
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  const sent = llm.calls[0].messages[0].content[0].text;
+  assert.equal(sent, 'Warum ist der Test broken?', 'kein "# Aufgabe"-Block an einer Frage');
+  assert.equal(records[0].intentMatch, null, 'ein Themenwort ist kein Intent-Treffer');
+  dispose();
+});
+
+test('MAX: eine Handlungsphrase wird erweitert — als Angebot an den One-Shot', async () => {
+  const llm = fakeLlm(reply(goodResult({ intentClassification: 'MULTI_STEP_TASK' })));
+  const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath }, { llm });
+  const claimed = [userMessage('schreib tests fuer scoring')];
+
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  const sent = llm.calls[0].messages[0].content[0].text;
+  assert.ok(sent.startsWith('schreib tests fuer scoring\n\n# Aufgabe\n'), 'die Expansion ist angehängt, nicht statt des Prompts');
+  assert.equal(records[0].intentMatch, 'tests');
+  assert.equal(records[0].rawLength, 'schreib tests fuer scoring'.length, 'die Originallaenge bleibt gemessen');
+  dispose();
+});
+
 test('MAX: Referenzen muessen im gelieferten Kontext aufloesbar sein', async () => {
   const cases = [
     { name: 'aufloesbar (Pfad)', references: ['packages/prompter/index.js'], accepted: true },
