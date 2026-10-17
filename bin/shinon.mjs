@@ -35,7 +35,9 @@
  * eine andere Fassung kostet, steht in `vendor/MODIFICATIONS.md`.
  *
  * Aufruf:  shinon [--check] [dsh-Argumente …]      (bzw. `npm start [-- …]`)
- * Exit:    0 = läuft bzw. geprüft · 2 = Umgebungsfehler (fail-closed)
+ *          shinon doctor [--json]                 (Laufzeit-Diagnose, S4)
+ * Exit:    0 = läuft bzw. geprüft bzw. doctor-gesund · 1 = doctor-Befunde
+ *          · 2 = Umgebungsfehler (fail-closed)
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { constants as osConstants } from 'node:os';
@@ -121,7 +123,27 @@ export function signalExitCode(signal) {
   return 128 + (typeof number === 'number' ? number : osConstants.signals.SIGTERM);
 }
 
-function main() {
+async function main() {
+  // S4: `shinon doctor` ist ein EIGENER Unterbefehl (scripts/doctor.mjs) —
+  // read-only Diagnose mit stabilen Codes 0/1/2. Er wird hier abgefangen und
+  // NIEMALS an DSH durchgereicht (ein `doctor` bei DSH wäre ein fremder
+  // Befehl mit fremden Codes). Der Doctor führt kein DSH aus, startet kein
+  // Profil und schreibt nichts.
+  if (passthrough[0] === 'doctor') {
+    const [{ join: joinPath, dirname }, { fileURLToPath }] = await Promise.all([
+      import('node:path'),
+      import('node:url'),
+    ]);
+    const here = dirname(fileURLToPath(import.meta.url));
+    const doctor = joinPath(here, '..', 'scripts', 'doctor.mjs');
+    const child = spawn(runtime.binary ?? process.execPath, [doctor, ...passthrough.slice(1)], {
+      cwd: ROOT,
+      stdio: 'inherit',
+      env: childEnv(runtime),
+    });
+    forwardSignalsTo(child);
+    return;
+  }
   const dsh = dshBinary();
   if (dsh === null) {
     console.error(
