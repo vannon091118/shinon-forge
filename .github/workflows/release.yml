@@ -1,0 +1,85 @@
+name: Shinon Forge Release-Schranke (S5)
+
+# Was dieser Workflow ist: die Abnahme-Schranke für ein Release-Tag, kein
+# Publisher. Er läuft nur auf Tags `v*` und prüft, was PLAN.md §9.1 S5 verlangt —
+# Version/Tag/Lock konsistent, alle Gates grün, Quellarchiv + SHA-256
+# reproduzierbar — und legt das Archiv als Ablauf-Artefakt ab. Er veröffentlicht
+# nichts: das Root-Manifest ist `private: true`, und minimale Publish-Rechte
+# heißen hier gar keine (contents: read).
+#
+# Warum `git archive` statt `npm pack`: die Schranke prüft den AUSGELIEFERTEN
+# Quellbaum (derselbe Baum, den ein Klon sieht), nicht ein Paket-Tarball. Der
+# Archivbau ist deterministisch pro Commit: zwei Läufe desselben SHAs liefern
+# dasselbe SHA-256 (belegt in docs/S5-RELEASE-2026-10-17.md). Der Workflow baut
+# deshalb einmal und vergleicht gegen einen zweiten Lauf — weicht er ab, ist der
+# Baum nicht reproduzierbar und der Zweig wird rot, statt ein Archiv zu
+# behaupten.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release-gate:
+    name: Version/Tag/Lock + Gates + Archiv
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # 1. Version/Tag-Konsistenz: das Tag muss die Fassung aus package.json
+      #    tragen (`v0.4.0` ↔ `"version": "0.4.0"`). Fail-closed statt raten.
+      - name: Tag gegen package.json prüfen
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="$(node -p "require('./package.json').version")"
+          test "$TAG" = "v$VERSION" || { echo "Tag $TAG passt nicht zu package.json ($VERSION)"; exit 1; }
+
+      # 2. Lockfile-Treue: `npm ci` bricht bei Drift zwischen package.json und
+      #    package-lock.json ab, statt sie still aufzulösen.
+      - name: Abhängigkeiten aus dem Lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Profil-Links prüfen (schreibt nichts)
+        run: node scripts/profile-links.mjs --check
+
+      # 3. Alle Gates grün: statisches Gate plus Gate-Tests. Ein roter Zweig
+      #    ist kein Release-Kandidat.
+      - name: Statisches Gate
+        run: node scripts/run-with-node.mjs scripts/shinon-test.mjs
+
+      - name: Gate-Tests
+        run: npm run gate:test
+
+      # 4. Quellarchiv reproduzierbar: zwei Läufe, ein SHA-256. Der Dateiname
+      #    trägt Fassung und Kurz-SHA, damit Archiv und Commit einander nennen.
+      - name: Quellarchiv bauen und Reproduzierbarkeit beweisen
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          ARCH="shinon-forge-${VERSION}-${SHORT_SHA}.tar.gz"
+          git archive --format=tar.gz --prefix="shinon-forge-${VERSION}/" HEAD > "$ARCH"
+          sha256sum "$ARCH" > "$ARCH.sha256"
+          git archive --format=tar.gz --prefix="shinon-forge-${VERSION}/" HEAD > "${ARCH}.zweitlauf"
+          cmp "$ARCH" "${ARCH}.zweitlauf" || { echo "Archiv nicht reproduzierbar"; exit 1; }
+          rm "${ARCH}.zweitlauf"
+          cat "$ARCH.sha256"
+          echo "ARCH=$ARCH" >> "$GITHUB_ENV"
+
+      - name: Archiv + Prüfsumme ablegen
+        uses: actions/upload-artifact@v4
+        with:
+          name: shinon-forge-quellarchiv
+          path: |
+            ${{ env.ARCH }}
+            ${{ env.ARCH }}.sha256
