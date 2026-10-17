@@ -85,7 +85,12 @@ test('zettel-regeln: README, Regeln und Paket sagen dasselbe', () => {
   assert.ok(readme.includes('note-rules.json'), 'die Beschreibung zeigt auf die Regeldatei statt Zahlen zu wiederholen');
   assert.ok(readme.includes('notes:check'), 'der Befehl ist benannt');
   assert.equal(manifest.scripts['notes:check'], 'node scripts/notes-check.mjs');
-  assert.match(manifest.scripts.test, /packages\/prompter\/test\/\*\.test\.mjs/, 'die Zettel-Tests laufen in npm test mit');
+  assert.match(manifest.scripts['test:full'], /packages\/prompter\/test\/\*\.test\.mjs/, 'die Zettel-Tests laufen in der vollen Kette (test:full) mit');
+  // Trennung schnell/lokal vs. voll/CI (2026-10-17): `npm test` ist der schnelle
+  // Pfad, `test:full` die alte Kette. Der langsame Pol (pack-test) darf nie
+  // still in den lokalen Pfad zurückwandern — sonst ist die Trennung nur ein Name.
+  assert.match(manifest.scripts.test, /gate\/engine\.mjs --local/, 'npm test ist der schnelle lokale Pfad');
+  assert.equal(manifest.scripts.test.includes('pack-test.mjs'), false, 'der Distributionstest gehört nicht in npm test');
 });
 
 test('zettel-regeln: ein Vertrag ist Pflicht, und neben den Regeln liegt keine zweite Form', () => {

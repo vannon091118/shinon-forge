@@ -2,7 +2,11 @@
 /**
  * install-hooks.mjs — repo-lokale Git-Hooks für die Commit-Regeln.
  *
- * Zwei Hooks, zwei Richtungen:
+ * Drei Hooks, drei Richtungen:
+ *   pre-commit          fährt die schnelle lokale Linie (`npm test`: statisches
+ *                       Gate + lokale Slices, Sekunden). Der volle Lauf gehört
+ *                       in CI (`test:full`) — wer hier die Kette verlängert,
+ *                       zahlt sie bei jedem Commit. Fail-closed: rot bleibt draußen.
  *   prepare-commit-msg  tauscht verbotene Footer gegen den Vannon-Trailer
  *                       (lokal ist Reparatur erlaubt — sonst wäre jeder
  *                       Agent-Commit Handarbeit).
@@ -24,6 +28,12 @@ const HOOKS_DIR = join(process.cwd(), '.githooks');
 const force = process.argv.includes('--force');
 
 const HOOKS = {
+  'pre-commit': `#!/usr/bin/env sh
+# Shinon pre-commit — die schnelle lokale Linie (Sekunden, nicht Minuten).
+# Der volle Lauf (test:full) gehoert in CI; hier laeuft nur npm test.
+set -e
+npm test
+`,
   'prepare-commit-msg': `#!/usr/bin/env sh
 # Shinon prepare-commit-msg — tauscht verbotene KI-Footer gegen den Vannon-Trailer.
 # Der Hook repariert nur; die Entscheidung trifft commit-msg (fail-closed).

@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Shinon pre-commit — die schnelle lokale Linie (Sekunden, nicht Minuten).
+# Der volle Lauf (test:full) gehoert in CI; hier laeuft nur npm test.
+set -e
+npm test

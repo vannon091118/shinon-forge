@@ -253,7 +253,7 @@ Statusklassen — Befehle stehen hier, Belege in `docs/ZAHLEN.md`:
 | Gate-Engine `--full` | **Verified** (alle Gates grün; die Versions-Regel folgt aus dem Manifest des Pakets, Undeklariertes bleibt rot) | `npm run gate:full` → Exit 0 |
 | Gate-Tests (reine Gate-Logik) | **Verified** (braucht Node ≥ 22 und Repo-`dsh` zuerst im PATH — Details: `docs/ZAHLEN.md` §2) | `node --test scripts/gate/tests/*.test.mjs` → Exit 0 |
 | Skalierung: Kopie des Baums plus Klon-Pakete (`--plugins N`, Standard im Skript) durch die ganze Kette | **Verified** | `npm run scale:check` → Exit 0 |
-| Volle Kette | **Verified** | `npm test` → Exit 0 |
+| Volle Kette | **Verified** | `npm run test:full` → Exit 0 (nur CI/auf Zuruf; lokal läuft `npm test`) |
 | Echter Modellaufruf | **Nicht geprüft** | `docs/ZAHLEN.md` §4 |
 
 Zählungen, Exit-Codes und die Ursachen jedes roten Befunds stehen **nur** in
@@ -267,7 +267,8 @@ Die Befehle aus `package.json` (`scripts`), in der Reihenfolge, in der man sie b
 
 | Befehl | Wirkung |
 |---|---|
-| `npm test` | Volle Kette: Codingmon-Tests → Gate → Fixtures → Distribution → Profil (stoppt beim ersten Fehler) |
+| `npm test` | schneller lokaler Pfad (Sekunden): statisches Gate + lokale Engine-Slices — die einzige Option für den Alltag; stoppt beim ersten Fehler |
+| `npm run test:full` | volle Kette (nur CI/auf Zuruf): Codingmon-Tests → Gate → Fixtures → Distribution → Profil (stoppt beim ersten Fehler) |
 | `node scripts/shinon-test.mjs` | statisches Gate: Manifest, Namensvertrag, `index.js`, `client.js`, `cordis.patch.yml`, Legacy-Guard, Quell-Zwillings-Drift, Profil |
 | `node scripts/validate-test.mjs` | Regel-Fixtures: jede Regel muss Gate **und** Build rot werden |
 | `node scripts/pack-test.mjs` | Distribution je Paket: `npm pack` → entpacken → isoliert installieren → laden |
@@ -284,7 +285,7 @@ Die Befehle aus `package.json` (`scripts`), in der Reihenfolge, in der man sie b
 | `npm run backup:retention` | Aufbewahrung des Sicherungsordners (`--keep`, `--max-age`, `--dry-run`, `--json`; jede Anwendung protokolliert) |
 | `npm run profile:links` | Profil-Links setzen/prüfen (idempotent, Fremdpfade Exit 2) |
 | `npm run stages` | Startstufen/Ready-Zeile aus `scripts/open.mjs` nachvollziehen |
-| `npm run scale:check` | Skalierungsnachweis: Kopie des Baums + `--plugins N` neue Klon-Pakete durch Idiome, Gate, `gate:full`, Gate-Tests, Distribution und Build — braucht Node ≥ 22, nicht Teil von `npm test` (`N` und sein Standard: `scripts/scale-check.mjs`) |
+| `npm run scale:check` | Skalierungsnachweis: Kopie des Baums + `--plugins N` neue Klon-Pakete durch Idiome, Gate, `gate:full`, Gate-Tests, Distribution und Build — braucht Node ≥ 22, eigener Lauf — weder `npm test` noch `test:full` (`N` und sein Standard: `scripts/scale-check.mjs`) |
 | `npm run commit:guard -- …` | Commit-Regeln prüfen (`--ci`, `--last n`, `--range`, `--all`) |
 | `npm run hooks:install` | Git-Hooks aktivieren (einmal pro Klon) |
 | `npm run update` | echte Registry-Prüfung (Maximum nach Semver) ins kanonische Profil; offline UNGEPRÜFT statt „keine Updates"; Install-Pfad live ungeprüft |

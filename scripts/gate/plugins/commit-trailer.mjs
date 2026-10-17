@@ -10,8 +10,10 @@
  *      eine saubere Nachricht MUSS durchgehen, und der Tausch MUSS den Footer
  *      entfernen und den Trailer setzen. Das ist der Beweis, dass die Regeln
  *      wirken — nicht nur, dass eine Datei existiert.
- *   2. Hooks: commit-msg prüft ohne --fix (fail-closed), prepare-commit-msg
- *      tauscht (--fix), der Installer setzt core.hooksPath.
+ *   2. Hooks: pre-commit fährt NUR die schnelle Linie (`npm test` — der volle
+ *      Lauf `test:full` gehört in CI), commit-msg prüft ohne --fix
+ *      (fail-closed), prepare-commit-msg tauscht (--fix), der Installer setzt
+ *      core.hooksPath.
  *   3. CI: der Workflow läuft bei push UND pull_request und hat keinen
  *      paths-Filter — „immer" ist eine Eigenschaft der Datei, nicht ein Versprechen.
  *      Der Prüfbereich kommt aus dem Wächter (--ci), nicht aus Shell-Zeilen im
@@ -73,6 +75,7 @@ const REQUIRED_FILES = [
   'scripts/install-hooks.mjs',
   '.githooks/commit-msg',
   '.githooks/prepare-commit-msg',
+  '.githooks/pre-commit',
   '.github/workflows/commit-guard.yml',
   'docs/COMMIT-REGELN.md',
   'docs/contracts/commit-trailer.json',
@@ -138,6 +141,20 @@ export function hookIssues(hooks, dir = '.githooks') {
   if (!commitMsg.includes('--file')) issues.push(`${dir}/commit-msg: prüft keine Nachricht`);
   if (commitMsg.includes('--fix')) issues.push(`${dir}/commit-msg: enthält --fix — der Prüf-Hook darf nicht reparieren`);
   if (!prepare.includes('--fix')) issues.push(`${dir}/prepare-commit-msg: tauscht die Signatur nicht (--fix fehlt)`);
+  const preCommit = hooks['pre-commit'] ?? '';
+  // Nur Befehlszeilen zählen: ein Kommentar darf den vollen Lauf beim Namen
+  // nennen (Erklärung), ausführen darf ihn nur CI.
+  const preCommitCommands = preCommit
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('#'))
+    .join('\n');
+  if (!preCommitCommands.includes('npm test')) issues.push(`${dir}/pre-commit: fährt nicht die schnelle Linie (npm test fehlt)`);
+  // Die langsamen Pole dürfen nie still in den lokalen Hook wandern — sonst ist
+  // die Trennung schnell/lokal vs. voll/CI nur ein Name und die Hardware zahlt
+  // bei jedem Commit den vollen Lauf.
+  for (const slow of ['test:full', 'pack-test', 'gate:full', 'gate:test', 'scale:check', 'branding']) {
+    if (preCommitCommands.includes(slow)) issues.push(`${dir}/pre-commit: enthält ${slow} — der volle Lauf gehört in CI, nicht in den Commit`);
+  }
   if (!commitMsg.includes('commit-guard.mjs') || !prepare.includes('commit-guard.mjs')) {
     issues.push(`${dir}: Hook ruft den Wächter nicht auf`);
   }
@@ -154,7 +171,7 @@ export function check(ctx) {
   if (issues.length > 0) return issues;
 
   const hooks = {};
-  for (const name of ['commit-msg', 'prepare-commit-msg']) {
+  for (const name of ['commit-msg', 'prepare-commit-msg', 'pre-commit']) {
     hooks[name] = readFileSync(join(root, '.githooks', name), 'utf8');
   }
   issues.push(...hookIssues(hooks));

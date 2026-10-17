@@ -67,6 +67,7 @@ nur Footer — 150 Wörter schreiben kann er nicht; die Wort-Regel gilt deshalb
 
 | Ort | Datei | Verhalten |
 |---|---|---|
+| Lokal, vor dem Commit | `.githooks/pre-commit` | Fährt **nur** die schnelle Linie (`npm test`: statisches Gate + lokale Slices, Sekunden). Der volle Lauf (`test:full`) gehört in CI — das Gate pinnt, dass kein langsamer Pol im Hook steht. |
 | Lokal, vor der Prüfung | `.githooks/prepare-commit-msg` | **Tauscht** verbotene Footer gegen den Vannon-Trailer (`--fix`). |
 | Lokal, verbindlich | `.githooks/commit-msg` | **Fail-closed**: ohne Trailer, mit Footer kein Commit. |
 | CI, immer | `.github/workflows/commit-guard.yml` | Läuft bei jedem `push`, `pull_request` und auf Zuruf (`workflow_dispatch`), ohne `paths`-Filter, ohne `continue-on-error`; ruft `commit-guard.mjs --ci` auf. |

@@ -58,7 +58,8 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 
 | Lauf | Ergebnis | Exit | Befehl |
 |---|---|---|---|
-| Volle Kette | **Exit 0** — Paket-Suiten → statisches Gate → Fixtures → Distribution → Profilboot, in dieser Reihenfolge | 0 | `npm test` |
+| Volle Kette | **Exit 0** — Paket-Suiten → statisches Gate → Fixtures → Distribution → Profilboot, in dieser Reihenfolge (nur CI/auf Zuruf) | 0 | `npm run test:full` |
+| Schneller Pfad (lokal) | **Exit 0** — statisches Gate + lokale Engine-Slices, in dieser Reihenfolge | 0 | `npm test` |
 | Gate (statisch) | **117** bestanden, **0** fehlgeschlagen | 0 | `npm test` bzw. `node scripts/run-with-node.mjs scripts/shinon-test.mjs` |
 | Regel-Fixtures | **9** bestanden, **0** fehlgeschlagen (Kontrolle + 8 Regelbrüche, je Gate *und* Build rot) | 0 | `node scripts/run-with-node.mjs scripts/validate-test.mjs` |
 | Distributionstest | **88** bestanden, **0** fehlgeschlagen (22 Pakete × 4 Stufen) | 0 | `npm test` bzw. `scripts/pack-test.mjs` |

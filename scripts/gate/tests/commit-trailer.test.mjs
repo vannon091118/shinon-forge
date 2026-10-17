@@ -400,10 +400,18 @@ test('commit: die Hook-Kette prüft fail-closed und repariert getrennt', () => {
   const hooks = {
     'commit-msg': readFileSync(join(ROOT, '.githooks/commit-msg'), 'utf8'),
     'prepare-commit-msg': readFileSync(join(ROOT, '.githooks/prepare-commit-msg'), 'utf8'),
+    'pre-commit': readFileSync(join(ROOT, '.githooks/pre-commit'), 'utf8'),
   };
   assert.deepEqual(hookIssues(hooks), []);
   assert.ok(hookIssues({ ...hooks, 'commit-msg': `${hooks['commit-msg']} --fix` }).some((issue) => issue.includes('--fix')));
   assert.ok(hookIssues({ ...hooks, 'prepare-commit-msg': '#!/usr/bin/env sh\n' }).some((issue) => issue.includes('tauscht')));
+  // Trennung schnell/lokal vs. voll/CI: pre-commit fährt nur `npm test`.
+  assert.ok(hookIssues({ ...hooks, 'pre-commit': '#!/usr/bin/env sh\n' }).some((issue) => issue.includes('schnelle Linie')));
+  assert.ok(
+    hookIssues({ ...hooks, 'pre-commit': `${hooks['pre-commit']}\nnpm run test:full\n` }).some((issue) =>
+      issue.includes('test:full'),
+    ),
+  );
 });
 
 // ── 3. Echter Lauf: Datei-Modus ──────────────────────────────────────────────

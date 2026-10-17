@@ -65,12 +65,13 @@ Run from repo root:
 
 **Ist-Zustand:** Welche dieser Läufe Exit 0 liefern, mit welchen Zählungen, und warum
 welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wiederholen.
-- `npm test` → die Paket-Suiten (codingmon, scoring, token-usage, prompter,
-  narrative, popup, key-router, traceability) → statisches Gate
-  (`scripts/shinon-test.mjs`) → Fixtures (`scripts/validate-test.mjs`) →
-  Distribution (`scripts/pack-test.mjs`) → Profilboot
-  (`scripts/shinon-profile-test.mjs`). Die schnellen Einzeltests laufen zuerst,
-  damit eine kaputte Tabelle vor `pack-test` auffällt. Jeder Schritt läuft über
+- `npm test` → the fast local path (seconds): static gate
+  (`scripts/shinon-test.mjs`) → local engine slices
+  (`scripts/gate/engine.mjs --local`). This is the ONLY everyday option locally;
+  the full chain lives in CI. `npm run test:full` → the old full chain: package
+  suites (codingmon, scoring, token-usage, prompter, narrative, popup,
+  key-router, traceability) → static gate → fixtures → distribution → profile
+  boot. Every step runs through
   `scripts/run-with-node.mjs`: das setzt `node_modules/.bin` VOR den PATH und
   re-exect unter einer verifizierten Node ≥ 22, wenn die Shell mit einer älteren
   startet (Range aus `engines.node`, `node:sqlite`-Rauchtest). Ein nacktes
@@ -325,7 +326,7 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - Forbidden: any AI footer (`Generated with Codebuff 🤖`,
   `Co-Authored-By: Codebuff <noreply@codebuff.com>`, Claude/ChatGPT/Copilot/Gemini/…),
   `powered by …`, emoji signatures — and `co-authored-by:` at all.
-- Once per clone: `npm run hooks:install` (prepare-commit-msg swaps, commit-msg blocks).
+- Once per clone: `npm run hooks:install` (pre-commit runs the fast `npm test`, prepare-commit-msg swaps, commit-msg blocks).
   Check with `npm run commit:guard -- --ci | --last n | --range a..b | --all`.
 - **Checkliste VOR dem ersten `git commit`** (alle Punkte, sonst Exit 1):
   1. Kein KI-Footer: kein `Generated with …`, kein `powered by …`, kein

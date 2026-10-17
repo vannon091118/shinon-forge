@@ -225,15 +225,16 @@ profiles/shinon/package.json         (Aktivierung: dsh.profile.bundles)
 
 | Einstieg                               | Aufgabe                                                                                        |
 |----------------------------------------|------------------------------------------------------------------------------------------------|
-| `npm test`                             | Gate → Regel-Fixtures → Distributionstest → Profiltest; stoppt beim ersten Fehler                |
+| `npm test`                             | schneller lokaler Pfad: statisches Gate + lokale Engine-Slices (Sekunden); stoppt beim ersten Fehler |
 | `node scripts/shinon-test.mjs`            | Gate: Manifest, Ressourcen, Patch-Schema, Namensvertrag, Syntax, Legacy-Guard, Komposition      |
 | `node scripts/validate-test.mjs`       | Regel-Fixtures: je Regel muss Gate **und** Build rot werden (Kontrolle bleibt grün)             |
 | `node scripts/pack-test.mjs`           | Distributionstest je Paket: `npm pack` → entpacken → isoliert installieren → laden              |
 | `node scripts/shinon-profile-test.mjs`    | Profiltest: `DSH_HOME=<Repo>` `dsh --profile shinon --dump-config` → alle Bundle-Layer          |
+| `npm run test:full` (`test:full` in `package.json`) | volle Kette (nur CI/auf Zuruf): Paket-Suiten → Gate → Regel-Fixtures → Distributionstest → Profiltest; stoppt beim ersten Fehler |
 | `npm run gate` / `gate:local` / `gate:full` | modulare Gate-Engine (`scripts/gate/engine.mjs`), Slice-fähig                              |
 | `npm run build` (`scripts/build.mjs`)  | dieselben Regeln + Artefakte nach `dist/` (`manifest.json`, `profile.json`, Paketkopien)        |
 | `npm run stages` (`scripts/stages.mjs`)| Startstufen und READY-Zeile des Starters nachvollziehen                                         |
-| `npm run scale:check` (`scripts/scale-check.mjs`) | Skalierungsnachweis: Kopie des Baums + N neue Pakete (`--plugins N`) durch die ganze Kette; nicht Teil von `npm test` |
+| `npm run scale:check` (`scripts/scale-check.mjs`) | Skalierungsnachweis: Kopie des Baums + N neue Pakete (`--plugins N`) durch die ganze Kette; eigener Lauf, weder `npm test` noch `test:full` |
 | `npm run verify:panel` (`scripts/panel-check.mjs`) | Panel-Beleg über das gebaute Client-Bundle (braucht jsdom)                          |
 | `node scripts/store-cost.mjs` (`--signals`/`--rows`/`--chain`) | Kosten der Ablage (`shinon_index_store`) bei vielen Signalen: Zeilen-Skalierung, Zerlegung eines Schreibens, Neuschreiben gegen Anhängen, Ganzkette — echter Dienst und echter Sammler, erzeugte Signale, temporärer Ort |
 

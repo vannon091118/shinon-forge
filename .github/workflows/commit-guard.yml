@@ -260,6 +260,32 @@ jobs:
       - name: TypeScript Gate fahren
         run: npm run typecheck
 
+  # ── Zweig 10: der schnelle Pfad (Sekunden statt Minuten) ────────────────────
+  # `npm test` ist seit 2026-10-17 bewusst NICHT die volle Kette, sondern der
+  # schnelle lokale Pfad (statisches Gate + lokale Engine-Slices). Dieser Zweig
+  # pinnt ihn in CI grün; die volle Kette (`test:full`) fahren die übrigen
+  # Zweige nebeneinander — lokal läuft nur der schnelle Pfad.
+  quick:
+    name: Schnellpfad (npm test, lokal)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Abhängigkeiten installieren (lockfile-treu) und dsh in den PATH legen
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Schnellen Pfad fahren
+        run: npm test
+
   # ── Verdikt: der EINE Name, den eine Branch-Regel verlangen kann ────────────
   # `if: always()` ist der Punkt: ohne ihn würde dieser Job bei einem roten Zweig
   # gar nicht starten, und die Zusammenfassung wäre bei genau den Läufen stumm,
@@ -268,6 +294,7 @@ jobs:
     name: Verdikt (fail-closed)
     needs:
       - commit-guard
+      - quick
       - unit
       - gate-rules
       - static-gate

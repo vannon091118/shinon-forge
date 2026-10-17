@@ -7,12 +7,12 @@
 
 `.github/workflows/commit-guard.yml` läuft bei **jedem** `push` und `pull_request`
 sowie auf Zuruf (`workflow_dispatch`) — ohne `paths`-Filter, ohne
-`continue-on-error`. Neun Zweige tun die Arbeit:
+`continue-on-error`. Zehn Zweige tun die Arbeit:
 
 | Job (id) | Anzeigename | Was er tut |
 |---|---|---|
 | `commit-guard` | Commit-Wächter (Footer + Trailer) | Der Bereichs-Wächter: kein KI-Footer, Vannon-Trailer (Regeln: `docs/COMMIT-REGELN.md`) |
-| `unit` | (Matrix) | Die Paket-Tests (`npm test`-Kette ohne die Regel-Läufe) |
+| `unit` | (Matrix) | Die Paket-Tests (fünf Suiten aus der `test:full`-Kette, ohne die Regel-Läufe) |
 | `gate-rules` | Gate-Tests (Regeln, Verträge, Nähte) | `npm run gate:test` |
 | `static-gate` | Statisches Gate (manifest, name contract, Profile) | `node scripts/shinon-test.mjs` |
 | `fixtures` | Fixtures (Validierung gegen den echten Bau) | `node scripts/validate-test.mjs` |
@@ -20,11 +20,12 @@ sowie auf Zuruf (`workflow_dispatch`) — ohne `paths`-Filter, ohne
 | `profile` | Profilboot (dsh --profile shinon --dump-config) | `node scripts/shinon-profile-test.mjs` |
 | `prompter` | Prompter (Zettel, Skill-Auswahl) | Die Prompter-Zusagen |
 | `typescript` | TypeScript Gate (gepinnter Compiler + Quellüberdeckung) | `npm run typecheck` (heute `NOT_APPLICABLE`: es gibt keine First-Party-`.ts`-Datei — der Lauf validiert Compiler, Pin und `tsconfig`, statt zu schweigen) |
+| `quick` | Schnellpfad (npm test, lokal) | `npm test`: statisches Gate + lokale Engine-Slices — lokal läuft nur dieser Pfad, die volle Kette (`test:full`) nur in CI und auf Zuruf |
 | **`verdict`** | **`Verdikt (fail-closed)`** | Der letzte Job: er liest `needs` und wird rot bei `failure`, `cancelled` **und** `skipped` |
 
-**Warum der zehnte Job existiert:** eine Branch-Regel kann **einen** Namen
+**Warum der elfte Job existiert:** eine Branch-Regel kann **einen** Namen
 verlangen oder eine Liste — aber sie kann nicht „alle" verlangen. Ohne `verdict`
-müsste der Schutz neun Namen kennen und bei jedem neuen Zweig erweitert werden;
+müsste der Schutz zehn Namen kennen und bei jedem neuen Zweig erweitert werden;
 mit `verdict` ist es ein Name, und ein vergessener neuer Zweig fällt auf, weil der
 Job ihn nicht in `needs` hat.
 
@@ -43,8 +44,8 @@ Verdikt (fail-closed)
 
 Das ist der Anzeigename des Jobs (`name:`), nicht die Job-id (`verdict`): GitHub
 verlangt den Namen, den die Oberfläche zeigt. Die id steht in `needs:
-[commit-guard, unit, gate-rules, static-gate, fixtures, distribution, profile,
-prompter, typescript]`.
+[commit-guard, quick, unit, gate-rules, static-gate, fixtures, distribution,
+profile, prompter, typescript]`.
 
 **Setzen (einmalig, mit Rechten am Repository — Handlung des Betreibers, nicht des
 Arbeitsbaums).** Branch-Regeln sind eine Einstellung bei GitHub; sie liegen
@@ -96,7 +97,23 @@ direkten Push auf `main` durch einen Administrator und keinen Force-Push. Wer da
 auch verhindern will, braucht zusätzlich „Do not allow bypassing the above
 settings" in der Oberfläche; die API-Fassung davon ist `enforce_admins` (oben).
 
-## 3. Was hier gemessen ist und was nicht
+## 3. Linien: lokal schnell, CI vollständig
+
+| Linie | Befehl | Was sie leistet | Wo |
+|---|---|---|---|
+| Lokal, immer | `npm test` | statisches Gate (117 Prüfungen: Manifest, Namensvertrag, Ressourcen, Komposition) + lokale Engine-Slices (Bundle-Auflösung, Host-/Client-Hälften, Legacy-Guard, Profil) — Sekunden, ohne Netz, ohne Boot | Alltag, pre-commit-Hook |
+| Lokal, betroffen | `npm run gate` | `always`-Menge + nur die Slices, deren Pfade im Staged-Diff stehen (Paket-Drift, Dead-Package, Persona, Scoring, …) — der volle Katalog läuft nie lokal | vor dem Commit, auf gestagten Änderungen |
+| CI, vollständig | Workflow-Zweige + `Verdikt (fail-closed)` | `test:full`-Kette (alle Paket-Suiten, Fixtures, Distribution, Profilboot) + `gate:test` (568) + TypeScript — die zentrale Testlinie, parallel auf fremder Hardware | jeder Push/PR |
+| Explizit | `test:full`, `gate:full`, `scale:check`, `branding` | volle Läufe auf Zuruf, nie im Alltag und nie im Hook | Nacht, Release, Neugier |
+
+Jede lokale Prüfung ist eine echte Prüfung (kein Skip als Grün, kein
+käufliches Urteil): was sie nicht abdeckt — isolierte Installation
+(`pack-test`), echter Boot (`shinon-profile-test`), Gate-Logik in voller Breite
+(`gate:test`) — deckt CI ab. Wer lokal grün ist und nur betroffene Slices
+anfasst, geht im Regelfall grün durch den Push-Verdict; der Rest ist Sache der
+fremden Hardware, nicht dieser CPU.
+
+## 4. Was hier gemessen ist und was nicht
 
 **GEMESSEN im Arbeitsbaum (2026-10-13):** die Workflow-Datei trägt keine
 Pfad-/Branch-Filter, kein `continue-on-error: true`, und leitet den Prüfbereich
@@ -112,7 +129,7 @@ ist **gebaut**, aber nicht **scharf**. Wer beides verwechselt, hat eine grüne
 Momentaufnahme, die nichts verspricht.
 
 
-## 4. Mobile-Gates — geplant, noch nicht implementiert
+## 5. Mobile-Gates — geplant, noch nicht implementiert
 
 Der Umsetzungspfad steht in [docs/MOBILE-PLAN.md](MOBILE-PLAN.md). Die Namen unten sind **geplante Gate-/CI-Verträge**, keine bereits vorhandenen Jobs und keine grünen Prüfungen:
 
@@ -127,7 +144,7 @@ Der Umsetzungspfad steht in [docs/MOBILE-PLAN.md](MOBILE-PLAN.md). Die Namen unt
 | `android-device-smoke` | Install/Start/Stop, READY, WebView-Reconnect, Crash/Offline und Display-Lock auf Gerät/Emulator. | zunächst report-only; erst mit stabilem Runner verpflichtend. |
 | `mobile-budget` | Kaltstart, installierte Größe, RSS und OOM/Crash unter Last. | zuerst report-only; Grenzwerte nur aus wiederholbaren Messungen ableiten. |
 
-### 4.1 Regeln, damit Mobile nicht an der Schranke vorbeifällt
+### 5.1 Regeln, damit Mobile nicht an der Schranke vorbeifällt
 
 1. Jedes neue Gate bekommt einen Test unter `scripts/gate/tests/` und einen Slice in `scripts/gate/policy.json`. Weil die Engine Plug-ins dynamisch lädt und Policy-/Plug-in-Inventar gegeneinander prüft, müssen beide gleichzeitig geändert werden.
 2. `scripts/validate-test.mjs` bekommt Mutations-Fixtures: der unveränderte Kontrollbaum bleibt grün; ungültige Mobile-Profile müssen sowohl im Gate als auch im Build rot werden.
