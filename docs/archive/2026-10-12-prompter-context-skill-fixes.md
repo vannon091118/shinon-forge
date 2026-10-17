@@ -1,5 +1,7 @@
 # Handshake: Prompter-Kontext und Skill-Selektion
 
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
 **Status:** Folgepaket in Arbeit; die Prompter-Änderungen unten sind jetzt ergänzt. DSH-PATH-Härtung und Launcher-Verdrahtung sind ebenfalls geändert. Der Commit-Guard läuft nach dem Push; ein vollständiger lokaler `npm test`-Lauf war in dieser Sandbox wegen fehlender GitHub-DNS-Auflösung und fehlendem Repository-Checkout nicht möglich.
 **Ausgangspunkt:** `main` bei `3add4879a8b6fc28549eb5c5d1c9aa9947eaa399`.
 **Ziel:** MAX muss den Laufzeit-Project-Index erreichen können; Skill-Auswahl muss auf echten Frontmatter-Metadaten und dem vollständigen Kandidatensatz arbeiten.
@@ -33,7 +35,7 @@
 - Entfernt: packages/prompter/assets/max-context.json (ungültiger, nicht als ContextSchema nutzbarer Platzhalter)
 - Neu: `packages/prompter/test/skill-selection.test.mjs`
 - Neu: `scripts/gate/tests/prompter-profile-wiring.test.mjs`
-- Dieser Handshake: `docs/handshakes/2026-10-12-prompter-context-skill-fixes.md`
+- Dieser Handshake: `docs/archive/2026-10-12-prompter-context-skill-fixes.md`
 
 ## Nachweise und lokale Grenzen
 
@@ -102,7 +104,7 @@ Der Push-Workflow **Shinon Commit Guard** für Commit `14d3185b7122c9c16331dfc13
 - `scripts/lib/dsh.mjs` — globaler PATH-/Prefix-Fallback nur mit `SHINON_ALLOW_PATH_DSH=1`
 - `scripts/open.mjs` — denselben DSH-Resolver wie CLI verwenden
 - `scripts/desktop-launcher.mjs` — optionales Desktop-Icon ohne globale DSH-PATH-Abhängigkeit
-- `docs/handshakes/2026-10-12-prompter-context-skill-fixes.md` — Planentscheidungen, Grenzen und offene Abnahmen
+- `docs/archive/2026-10-12-prompter-context-skill-fixes.md` — Planentscheidungen, Grenzen und offene Abnahmen
 
 
 ## CI-Nachtrag — Testdatei-Rename am 2026-10-12

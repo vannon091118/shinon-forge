@@ -1,6 +1,8 @@
 # PLUGIN_IDIOME_2-1 — zwei Kopien-Familien auf eine Quelle
 
-> **Status:** current — Nachweis zum Plan-Schritt 2.1 (C2), alles hier in diesem Durchlauf gemessen. **Stand:** 2026-10-10
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Nachweis zum Plan-Schritt 2.1 (C2), alles hier in diesem Durchlauf gemessen. **Stand:** 2026-10-10
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md` (einziger Eigentümer harter Zahlen)
 >
 > **Fortschreibung 2026-10-11:** Die Baustein-Parameter stehen seither **nicht** mehr in
@@ -199,14 +201,14 @@ der Generator die einzige schreibende Instanz.
   Regionen bewusst getrennt (Modulebene und `apply()`), dazwischen Prosa.
 - **Drei `current`-Auditdokumente nennen weiterhin „98".** Sie beschreiben ihren
   Messzeitpunkt (Phase A, 2026-10-10, read-only) und werden hier nicht umgeschrieben:
-  [docs/audit/VERIFICATION_MATRIX.md](VERIFICATION_MATRIX.md),
-  [docs/audit/ARCHITECTURE_MAP.md](ARCHITECTURE_MAP.md). Die eine Zahl führt
+  [docs/archive/VERIFICATION_MATRIX.md](VERIFICATION_MATRIX.md),
+  [docs/archive/ARCHITECTURE_MAP.md](ARCHITECTURE_MAP.md). Die eine Zahl führt
   `docs/ZAHLEN.md`.
 - **Nicht committet** (A6 offen), `main` unangetastet, `dist/` regeneriert (ignoriert).
 - **`docs/INDEX.md` §3 listet dieses Dokument nicht.** Das ist keine Auslassung dieses
   Schritts: §3 führt die `docs/audit/`-Dokumente insgesamt nicht (zehn tun es heute
   nicht), die Statusregel aus §2 ist mit dem Kopfblock erfüllt. Erreichbar ist der
-  Nachweis über `PLAN.md` 2.1, `docs/audit/CHANGELOG.md` und `WORKTREE_REVIEW.md` §6.
+  Nachweis über `PLAN.md` 2.1, `docs/archive/CHANGELOG.md` und `WORKTREE_REVIEW.md` §6.
 - **Fünf `docs/ZAHLEN.md`-Zeilen sind in diesem Schritt nachgezogen worden**, weil der
   Schritt sie bewegt: „Gate (statisch)" 98→99, „Gate-Tests" 306→315 (neun statt acht
   Tests in der neuen Datei), „Build (`dist/`)" 905294→909635 Bytes, „Markdown-Dokumente"
@@ -231,4 +233,4 @@ Generiert/geändert: die elf Paketdateien (§1), `scripts/dsh-test.mjs`,
 `scripts/build.mjs`, `scripts/gate/plugins/host-half.mjs`,
 `scripts/gate/plugins/client-half.mjs`, `scripts/lib/repo.mjs`, `package.json`
 (zwei Skripte), `AGENTS.md`, `PLAN.md`, `docs/INDEX.md`, `docs/ZAHLEN.md`,
-`docs/audit/CHANGELOG.md`, `docs/audit/WORKTREE_REVIEW.md` (§6 E4).
+`docs/archive/CHANGELOG.md`, `docs/archive/WORKTREE_REVIEW.md` (§6 E4).

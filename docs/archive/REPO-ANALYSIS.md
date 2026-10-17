@@ -1,5 +1,7 @@
 # Repo-Analyse — alle 31 Repos unter `vannon091118`
 
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
 > **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
 > **Einstieg:** `docs/INDEX.md` · **Zahlen (aktuell):** `docs/ZAHLEN.md`
 

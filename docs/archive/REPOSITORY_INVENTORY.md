@@ -1,6 +1,8 @@
 # REPOSITORY_INVENTORY — Phase A (read-only)
 
-> **Status:** current — Phase-A-Audit, lesend erhoben am 2026-10-10. **Stand:** 2026-10-10
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Phase-A-Audit, lesend erhoben am 2026-10-10. **Stand:** 2026-10-10
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 ## 1. Root, Branch, Commit

@@ -1,6 +1,8 @@
 # WORKTREE_REVIEW — die Pfade des Commits `487c559`, inhaltlich bewertet
 
-> **Status:** current — Phase-P-Nachweis (P3/„B5"), Auftrag aus `PLAN.md` Schritt 1.5. **Stand:** 2026-10-10
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Phase-P-Nachweis (P3/„B5"), Auftrag aus `PLAN.md` Schritt 1.5. **Stand:** 2026-10-10
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 **Zweck:** `487c559` hat fremde Arbeitsbaum-Änderungen „gesichert". Gesichert ist nicht
@@ -27,10 +29,10 @@ gemessenen Beleg oder heißt **UNGEPRÜFT**.
 
 **Warum „31" und „43" beide auftauchen:** Die 31 ist die Zahl, die der Audit **im
 Arbeitsbaum** gezählt hat (`31 modifizierte Dateien + 2 untracked`, Selbstauskunft in
-`docs/audit/REPOSITORY_INVENTORY.md` Zeile 10). Der Commit enthält **mehr** als diesen
+`docs/archive/REPOSITORY_INVENTORY.md` Zeile 10). Der Commit enthält **mehr** als diesen
 Stand: die 7 neuen Audit-Dokumente, die 3 neuen Skripte (davon `scripts/start.mjs`
 nachweislich **später** entstanden — das Inventar erwähnt es an keiner Stelle:
-`git show 487c559:docs/audit/REPOSITORY_INVENTORY.md | grep -c start.mjs` → **0**), die
+`git show 487c559:docs/archive/REPOSITORY_INVENTORY.md | grep -c start.mjs` → **0**), die
 Löschung von `.freebuff/project-id` und eine Modifikation mehr als die Inventar-Zeile
 nennt (32 statt 31). Das Inventar ist sich selbst gegenüber ungenau: es schreibt „6×
 `packages/*/package.json`" und listet **8** Namen, „12× `packages/*/client.js`" gegen
@@ -73,13 +75,13 @@ hinzugefügte Zeile ist eine Kommentarzeile.
 | 2 | `Docs/ZAHLEN.md` | Nachmessung in einem Baum **ohne** Install: Distribution 75/1 rot, Gate-Tests 150/7 rot, volle Kette bricht ab; neue Zeile `Build (dist/)`; §2.1/§3 wachsen um die Branding-Belege | **gewollt** | Diff; der neue Text nennt den Grund selbst („Testdateien byte-identisch mit HEAD"); heutiger Stand derselben Datei: 306/0, 76/0, `gate:full` 18/18 — die Zahlen dieses Commits sind **überholt**, die Aussage „Umgebungs-Rot, kein Code-Rot" bleibt richtig |
 | 3 | `Docs/probes/brand-render.json` | Neues Feld `nachtrag`: das Zeichen ist neu gezeichnet, die Geometrie des Belegs gilt nicht mehr, `result` bleibt `BESTAETIGT` | **fraglich** | Diff; `grep -rl nachtrag docs/probes` → **1** Datei (kein Standardfeld); `docs/INDEX.md` §2 („Proben … werden nicht nachträglich aktuell gemacht, sondern neu gemessen"); `gate:full` grün (probe-twin duldet unbekannte Felder) |
 | 4 | `README.md` | Eine Zeile für `npm start` in der Skript-Tabelle | **gewollt** | Diff; `package.json` `scripts.start` (§3 Nr. 12) |
-| 5 | `docs/audit/ARCHITECTURE_MAP.md` | Neu: Architekturkarte des Bestands | **gewollt** | Datei; als Beleg zitiert in `docs/audit/REPAIR_PLAN.md` |
-| 6 | `docs/audit/CHANGELOG.md` | Neu: Chronik des Audits | **gewollt** | Datei |
-| 7 | `docs/audit/DEPENDENCY_FINDINGS.md` | Neu: Abhängigkeitsbefunde | **gewollt** | Datei |
-| 8 | `docs/audit/REPAIR_PLAN.md` | Neu: priorisierter Reparaturplan; §P0 schützt die 31+2 und stellt **drei Eigentümer-Fragen** (`{en,de}`-Meta behalten? `profiles/web`-Diff Absicht? untracked Skripte verdrahten?), P2-D3 fordert die Verdrahtung der Client-Wachen | **gewollt** — und die Quelle dieses Reviews | Datei §P0, §P2-D3 |
-| 9 | `docs/audit/REPOSITORY_INVENTORY.md` | Neu: Inventar; enthält die Zahl „31 + 2" und die (unpräzise) Aufzählung | **gewollt**, mit Zahlenschwäche | Datei Zeile 10; `grep -c start.mjs` → 0 (Skript fehlt in seiner Liste) |
-| 10 | `docs/audit/SHINON_MIGRATION_MAP.md` | Neu: Referenzgraph | **gewollt** | Datei |
-| 11 | `docs/audit/VERIFICATION_MATRIX.md` | Neu: was lief, mit Exit-Code | **gewollt** | Datei |
+| 5 | `docs/archive/ARCHITECTURE_MAP.md` | Neu: Architekturkarte des Bestands | **gewollt** | Datei; als Beleg zitiert in `docs/archive/REPAIR_PLAN.md` |
+| 6 | `docs/archive/CHANGELOG.md` | Neu: Chronik des Audits | **gewollt** | Datei |
+| 7 | `docs/archive/DEPENDENCY_FINDINGS.md` | Neu: Abhängigkeitsbefunde | **gewollt** | Datei |
+| 8 | `docs/archive/REPAIR_PLAN.md` | Neu: priorisierter Reparaturplan; §P0 schützt die 31+2 und stellt **drei Eigentümer-Fragen** (`{en,de}`-Meta behalten? `profiles/web`-Diff Absicht? untracked Skripte verdrahten?), P2-D3 fordert die Verdrahtung der Client-Wachen | **gewollt** — und die Quelle dieses Reviews | Datei §P0, §P2-D3 |
+| 9 | `docs/archive/REPOSITORY_INVENTORY.md` | Neu: Inventar; enthält die Zahl „31 + 2" und die (unpräzise) Aufzählung | **gewollt**, mit Zahlenschwäche | Datei Zeile 10; `grep -c start.mjs` → 0 (Skript fehlt in seiner Liste) |
+| 10 | `docs/archive/SHINON_MIGRATION_MAP.md` | Neu: Referenzgraph | **gewollt** | Datei |
+| 11 | `docs/archive/VERIFICATION_MATRIX.md` | Neu: was lief, mit Exit-Code | **gewollt** | Datei |
 | 12 | `package.json` | `"start": "node scripts/start.mjs"` | **gewollt**, gemessen wirksam | Diff; `node scripts/start.mjs --check` → Exit 0 (§3 Nr. 43) |
 | 13 | `packages/better-errors/client.js` | Registry-Label `Better Errors` → `Fehler besser` | **fraglich** | Diff; derselbe sichtbare Text steht **doppelt** (`packages/dashboard/client.js:71` und hier); die Manifest-Form lautet drittens `… - Bessere Fehler` → drei Schreibweisen, kein Gate prüft sie |
 | 14 | `packages/better-errors/package.json` | `meta.title`/`meta.description`: String → `{en,de}` | **gewollt**, upstream-belegt | Formprüfung aller 8 Manifeste: `string/string → {en,de}/{en,de}`; `dsh-client-locale/lib/client.js` (`resolveText`: „Plain strings stay verbatim; maps do not consult registered dictionaries", Karte mit **`en`**-Schlüssel); `dsh-client-ui-plugin-manager/lib/client.js` (`packageText`/`rowText` rufen `resolveText(pkg.meta.title)`) |
@@ -149,13 +151,13 @@ Zwei neue Berührungspunkte, beide bewusst offen gelassen:
    → **Entscheidung E2**.
 2. `scripts/branding-check.mjs` ist der **einzige** Wirkungs-Messer für die
    Browser-Fragen der Overlay-Arbeit und hängt an keiner Suite (Nr. 41). Der Reparaturplan
-   schlägt den nicht-blockierenden Nachtjob vor (`docs/audit/REPAIR_PLAN.md` §P2-D3).
+   schlägt den nicht-blockierenden Nachtjob vor (`docs/archive/REPAIR_PLAN.md` §P2-D3).
    → **Entscheidung E3**.
 
 ### 2.4 (C7) Defaults entschärfen
 Der Commit berührt **keine** Defaults und keine Sicherheitskonfiguration. Gemessen:
 `git show --format='' 487c559 | grep -ciE 'permission|approval|dsh-experimental'` → **1**,
-und der Treffer steht in `docs/audit/ARCHITECTURE_MAP.md` als Beschreibungstext
+und der Treffer steht in `docs/archive/ARCHITECTURE_MAP.md` als Beschreibungstext
 („4× `dsh-experimental-*`"), nicht in einer Config. 2.4 bleibt unberührt und unerledigt;
 `permission.defaultPreset` und `task-router activate` sind unverändert. Der einzige
 default-artige Wert des Commits liegt in einem **nicht geladenen** Profil (Nr. 40).
@@ -207,7 +209,7 @@ Wahl; die Optionen bleiben als Beschreibung der Frage stehen.
 | E1 | `profiles/web/…` (heute `docs/archive/legacy-profiles/web/cordis.patch.yml`): Wert `welcomeNoticeVersion` übernehmen oder mit dem Profil fallen lassen? | (a) beim Archivieren in `profiles/shinon` übernehmen, (b) fallen lassen, (c) bis 2.2 unverändert stehen lassen | **(a)** — übernommen, Altprofil archiviert |
 | E2 | `window.__codingmon.PetMark`: Naht anschließen oder streichen? | (a) anschließen (eine sichtbare Fläche benennt sie), (b) streichen, (c) als dokumentierte Fremd-Schnittstelle behalten | **(b)** — gestrichen (kein Leser im Baum) |
 | E3 | `scripts/branding-check.mjs`: verdrahten oder verwerfen? | (a) als nicht-blockierender Nachtjob, (b) in `gate:full` hinter ein Flag, (c) verwerfen (Verlust des Wirkungs-Messers) | **(b)** — `--branding`-Stufe plus `npm run branding`, sonst sichtbarer Skip; erster Lauf 28/0 grün |
-| E4 | Deduplizierung der **Client**-Kopien: welche Form? | (a) Fenster-Konvention wie `window.__mk`, (b) Build-Zeit-Inline über `scripts/`, (c) Kopien bewusst behalten und im Gate gegen Drift prüfen — **umgesetzt in Schritt 2.1 (2026-10-10)**: eine Quelle in `scripts/lib/plugin-idioms.mjs` + generierte Blöcke + Drift-Gate, also (c) mit einer Ableitung statt Handpflege; (a) und (b) erwiesen sich als nicht nötig, (b) zusätzlich als unnötig (gemessen: das Tarball enthält kein `scripts/`). Nachweis: `docs/audit/PLUGIN_IDIOME_2-1.md` | **(c)** — eine Quelle plus generierte Blöcke (2.1, 2026-10-10) |
+| E4 | Deduplizierung der **Client**-Kopien: welche Form? | (a) Fenster-Konvention wie `window.__mk`, (b) Build-Zeit-Inline über `scripts/`, (c) Kopien bewusst behalten und im Gate gegen Drift prüfen — **umgesetzt in Schritt 2.1 (2026-10-10)**: eine Quelle in `scripts/lib/plugin-idioms.mjs` + generierte Blöcke + Drift-Gate, also (c) mit einer Ableitung statt Handpflege; (a) und (b) erwiesen sich als nicht nötig, (b) zusätzlich als unnötig (gemessen: das Tarball enthält kein `scripts/`). Nachweis: `docs/archive/PLUGIN_IDIOME_2-1.md` | **(c)** — eine Quelle plus generierte Blöcke (2.1, 2026-10-10) |
 | E5 | Probe: `nachtrag` als Feld zulassen oder die Probe neu messen? | (a) Feld standardisieren (Datum + Geltungsbereich), (b) Probe nach `docs/probes/` neu schreiben, (c) Feld entfernen und die Geometrie-Aussage streichen | **(a)** — `{date, scope, note}`, vom Gate geprüft |
 | E6 | `en`/`de`-Wörterbuch: dürfen die Hälften identisch sein? | (a) `de` mit echter Übersetzung füllen, (b) auf eine Sprachentabelle reduzieren, (c) so lassen (Menünamen sind Eigennamen) | **(b)** — eine Tabelle für beide Slots (die Schlüssel sind Eigennamen) |
 | E7 | Dieses Dokument in `docs/INDEX.md` registrieren? | (a) ja, im nächsten Schreib-Schritt, (b) nein, bis der Doku-Schnitt (3.10/D9) läuft | **(a)** — registriert; die elf `docs/audit/`-Dokumente und `PLAN.md` ebenfalls |
@@ -254,8 +256,8 @@ git show --shortstat --format='' 487c559
 git show --numstat --format='' 487c559 | sort -k1 -rn
 
 # Wo die „31" herkommt
-git show 487c559:docs/audit/REPOSITORY_INVENTORY.md | sed -n '10,16p'
-git show 487c559:docs/audit/REPOSITORY_INVENTORY.md | grep -c 'start\.mjs'
+git show 487c559:docs/archive/REPOSITORY_INVENTORY.md | sed -n '10,16p'
+git show 487c559:docs/archive/REPOSITORY_INVENTORY.md | grep -c 'start\.mjs'
 
 # Leser der Locale-Schlüssel
 for k in brand.title brand.tagline settings.brandName settings.primaryColor \

@@ -1,6 +1,8 @@
 # Skalierung des Gates — 20 neue Plugins als Messlatte (2026-10-11)
 
-> **Status:** current — Nachweis, was ein neues Plugin kosten darf. **Stand:** 2026-10-11
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Nachweis, was ein neues Plugin kosten darf. **Stand:** 2026-10-11
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md` (§2, Zeile „Skalierungslauf“; dieses Dokument wiederholt keine Zustandszahl)
 
 ## 1. Die Frage

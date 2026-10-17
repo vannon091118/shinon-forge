@@ -212,4 +212,4 @@ Codingmon kann Narrative-Events nutzen, um XP/Battles basierend auf tatsächlich
 ---
 
 *Erstellt: 2026-10-07*  
-*Quelle: SYSTEM-ANALYSIS.md, SyxCraft Commit Layer, DOKI*
+*Quelle: `docs/archive/SYSTEM-ANALYSIS.md`, SyxCraft Commit Layer, DOKI*

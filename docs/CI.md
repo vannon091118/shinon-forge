@@ -75,7 +75,7 @@ gh api "repos/{owner}/{repo}/branches/main/protection" \
 Erwartet: `Verdikt (fail-closed)`.
 
 **GEMESSEN am 2026-10-13 (Durchgang zu `bf003a2`, Run `38474747771`, Beleg:
-`docs/handshakes/2026-10-13-ci-lauf-gruen-verdict-schranke-und-sieben-luecken.md`):**
+`docs/archive/2026-10-13-ci-lauf-gruen-verdict-schranke-und-sieben-luecken.md`):**
 der Schutz ist **nicht gesetzt** — genauer: nicht setzbar von hier. `GET
 .../branches/main/protection` antwortet `401 „Requires authentication"`, `gh`
 ist in der Arbeitsumgebung nicht installiert, kein Admin-Token verfügbar. Es

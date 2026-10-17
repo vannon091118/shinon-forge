@@ -1,6 +1,8 @@
 # REPAIR_PLAN — priorisiert, nach Ursachen (Phase B/C-Vorschlag, nichts umgesetzt)
 
-> **Status:** current — Phase-A-Audit, Vorschlag mit Stand 2026-10-10. **Stand:** 2026-10-10
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Phase-A-Audit, Vorschlag mit Stand 2026-10-10. **Stand:** 2026-10-10
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Reihenfolge = Fundament zuerst. Jede Einheit: Ausgangszustand → Referenzen prüfen → minimal ändern → Verifikation tatsächlich ausführen → Diff kontrollieren.

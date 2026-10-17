@@ -64,7 +64,7 @@ Für Enums gilt die deklarierte Schemastery-Fassung (`docs/ZAHLEN.md` §1): sie 
 
 Es gibt **keine** zentrale Liste, in die sich ein Paket eintragen müsste; das Gate
 liest alles aus dem Baum. Gemessen mit 20 zusätzlichen Paketen (`npm run scale:check`,
-Nachweis: `docs/audit/SKALIERUNG_2026-10-11.md`): ein neues Paket kostet genau das hier.
+Nachweis: `docs/archive/SKALIERUNG_2026-10-11.md`): ein neues Paket kostet genau das hier.
 
 1. Ordner `packages/<dir>/` mit den vier Rollendateien (§2) und den vier
    Vertragsnamen aus §1 (Manifest, Patch `id`/`name`, ModuleLoader-id).

@@ -50,7 +50,7 @@ wenn der Code dafür schon existiert.
 |---|---|---|
 | `0.2.0` | `ffbf721` | bootfähig, Brand-Overlay live, Gate-Engine, Verträge |
 | `0.3.0` | `3add487` | Skill-Selektion + Persona Du-Form + Profil-Update |
-| `0.4.0` | dieser Durchgang | Draht-E2E (`scripts/gate/tests/key-router-wire.test.mjs`), Audit Phase B (`docs/audit/AUDIT_2026-10-13.md`), Pfad-Heilung 33→24, CI-Verdict-Kette mit Run-IDs |
+| `0.4.0` | dieser Durchgang | Draht-E2E (`scripts/gate/tests/key-router-wire.test.mjs`), Audit Phase B (`docs/archive/AUDIT_2026-10-13.md`), Pfad-Heilung 33→24, CI-Verdict-Kette mit Run-IDs |
 
 Abnahme von `0.4.0`: grüner CI-Lauf des Bump-Commits (inkl. `Verdikt (fail-closed)`)
 plus `gate:full` PASS lokal — die Run-ID meldet der Durchgang, nicht dieses
@@ -59,7 +59,7 @@ Dokument (eine vorab eingetragene Nummer wäre eine Behauptung).
 ## 3. Release-Ziele `0.5.0` (Kandidaten, keine Versprechen)
 
 Jeder Punkt hat seine Abnahme bereits — in `PLAN.md` §9 oder im
-Sieben-Lücken-Handshake (`docs/handshakes/2026-10-13-ci-lauf-gruen-verdict-schranke-und-sieben-luecken.md`
+Sieben-Lücken-Handshake (`docs/archive/2026-10-13-ci-lauf-gruen-verdict-schranke-und-sieben-luecken.md`
 §3). Hier steht nur die Liste, damit ein Blick genügt:
 
 - Live-429-Rotation mit zwei echten Schlüsseln (ZAHLEN §4: weiter offen)

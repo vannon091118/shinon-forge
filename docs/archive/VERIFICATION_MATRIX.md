@@ -1,5 +1,7 @@
 # VERIFICATION_MATRIX — Phase A (nur was LIEF, mit Exit-Code)
 
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
 > **Status:** historical — Phase-A-Audit, gemessen am 2026-10-10 in DIESER Umgebung (Node v18, kein dsh). **Stand:** 2026-10-10
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 >
@@ -11,7 +13,7 @@
 > bestanden" des statischen Gates stehen heute auf **105** (`node scripts/shinon-test.mjs`);
 > „BLOCKIERT" bei Profil-Boot und Distribution ist mit `dsh` im PATH aufgelöst.
 > Wer den aktuellen Stand braucht, liest `docs/ZAHLEN.md` §2/§3 und
-> [`docs/handshakes/2026-10-13-project-index-scan-und-ci-schranke.md`](../handshakes/2026-10-13-project-index-scan-und-ci-schranke.md).
+> [`docs/archive/2026-10-13-project-index-scan-und-ci-schranke.md`](../handshakes/2026-10-13-project-index-scan-und-ci-schranke.md).
 > Dieser Block ersetzt keine der Zeilen unten — er sagt, wie sie zu lesen sind: als
 > Momentaufnahme vom 2026-10-10, nicht als Zusage.
 

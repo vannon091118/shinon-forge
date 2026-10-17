@@ -102,7 +102,7 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   and runs idioms → static gate → `gate --full` → gate tests → distribution test → build
   over the copy. The repo tree is never touched; needs Node ≥ 22. Not part of `npm test`
   (it copies the tree and takes about a minute and a half); numbers in `docs/ZAHLEN.md`
-  §2, method in `docs/audit/SKALIERUNG_2026-10-11.md`.
+  §2, method in `docs/archive/SKALIERUNG_2026-10-11.md`.
 - `npm run branding` → the effect measurement for the branding layer in a real Chromium
   (`scripts/branding-check.mjs`, needs a built `dist/` and a browser binary; `--browser
   <path>` or `SHINON_CHROME`). It is NOT one of the gate plugins — the gate engine runs it
@@ -279,7 +279,7 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   checks documentation drift. The inventory block in `docs/ZAHLEN.md` §1 is generated
   (`npm run zahlen:sync`, checked with `npm run zahlen:check`); the run table in §2 is
   measured per pass. History, causes and before/after numbers belong in the commit
-  message, `docs/audit/` or `docs/handshakes/` — not in a table cell.
+  message or `docs/archive/` (the one history folder) — not in a table cell.
 - A Client -> Host endpoint needs someone to SELECT it. Host-side `./typert` discovery exists
   (`dsh-typert-loader`), but the browser client mounts its Remote contributions from a
   hardcoded COMPILED list in `@deepseek-ai/dsh-api-remotes` (25 entries, `$mount`), so an

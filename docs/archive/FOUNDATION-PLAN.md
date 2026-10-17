@@ -1,5 +1,7 @@
 # Fundament-Plan — Shinon Forge auf der DSH-Architektur
 
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
 > **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
 > **Einstieg:** `docs/INDEX.md` · **Zahlen (aktuell):** `docs/ZAHLEN.md`
 
@@ -29,7 +31,7 @@ Jede Report-Behauptung gegen die echten Bäume geprüft — nicht übernommen, b
 
 ## Der eigentliche Kern-Fund: `Shinon_Agent/interface-specs/`
 Der Report will eine „Convergence-Schicht bauen" — **sie existiert schon**, als
-Contract-Suite mit ehrlichem Status (Details: `docs/REPO-ANALYSIS.md`):
+Contract-Suite mit ehrlichem Status (Details: `docs/archive/REPO-ANALYSIS.md`):
 ShinonLLM(0) → Promtguard(1) → KARMA(2) → goal-chain(2b) → LIMEN(3),
 Handoffs HOFF-0001…0008, State(SQLite)/Audit(JSONL)-Trennung, Claim-Status-Mapping.
 Reifegrad dort selbst markiert: LIMEN `IMPLEMENTED`, KARMA `PARTIAL`,

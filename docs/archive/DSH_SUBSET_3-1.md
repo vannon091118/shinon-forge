@@ -1,6 +1,8 @@
 # DSH_SUBSET_3-1 — welcher DSH-Anteil der Boot wirklich braucht
 
-> **Status:** current — Nachweis zu `PLAN.md` Schritt 3.1 (D1). **Stand:** 2026-10-11
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Nachweis zu `PLAN.md` Schritt 3.1 (D1). **Stand:** 2026-10-11
 > **Einstieg:** `docs/INDEX.md` · **Zahlen des Repos:** `docs/ZAHLEN.md`
 
 **Ziel (aus dem Plan):** wissen, welche `@deepseek-ai/dsh-*` der Boot wirklich braucht.

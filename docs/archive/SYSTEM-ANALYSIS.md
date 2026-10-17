@@ -1,5 +1,7 @@
 # Shinon Forge — Systemanalyse und Übergabe
 
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
 > **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
 > **Einstieg:** `docs/INDEX.md` · **Zahlen (aktuell):** `docs/ZAHLEN.md`
 
@@ -670,9 +672,9 @@ Shinon soll eine konsistente Persönlichkeit über Sitzungen hinweg haben, mit E
   - scripts/gate/*
   - docs/contracts/*
   - docs/ARCHITECTURE.md
-  - docs/FOUNDATION-PLAN.md
-  - docs/PLAN.md
-  - docs/REPO-ANALYSIS.md
+  - docs/archive/FOUNDATION-PLAN.md
+  - docs/archive/PLAN-2026-10-07.md
+  - docs/archive/REPO-ANALYSIS.md
   - docs/probes/*
   - README.md
   - IDEA.md

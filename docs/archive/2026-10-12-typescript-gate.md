@@ -1,5 +1,7 @@
 # Handshake — TypeScript Gate
 
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
 > **Status:** implemented, pushed, and verified by GitHub Actions.  
 > **Date:** 2026-10-12  
 > **Scope:** `vannon091118/shinon-forge`

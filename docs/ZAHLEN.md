@@ -12,7 +12,7 @@ Regel: **Kein anderes Dokument nennt eine dieser Zahlen.** README, `AGENTS.md` u
 Dieser Block wird **gemessen, nicht gepflegt**: `npm run zahlen:sync` schreibt ihn aus dem
 Baum, `npm run zahlen:check` vergleicht ohne zu schreiben (Exit 1 bei Abweichung). Alles
 außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile steht in
-`git log` und `docs/audit/`, nicht in der Zelle.
+`git log` und `docs/archive/`, nicht in der Zelle.
 
 <!-- zahlen:bestand:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
@@ -29,12 +29,12 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Schemastery (deklariert) | `~3.18.4` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
 | Node (`engines.node`) | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
 | pnpm-Artefakte (getrackt) | 0 | `git ls-files '*pnpm-workspace.yaml' '*pnpm-lock.yaml' \| wc -l` (Aufrufe: Gate-Prüfung „pnpm-Reste“) | 0 |
-| Markdown-Dokumente (getrackt) | 70 | `git ls-files '*.md' \| wc -l` | 0 |
+| Markdown-Dokumente (getrackt) | 71 | `git ls-files '*.md' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | 6 | `ls docs/contracts/*.json \| wc -l` | 0 |
 | Proben unter `docs/probes/` | 29 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 22 Pakete, 185 Dateien, 1527362 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 22 Pakete, 185 Dateien, 1527394 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -75,7 +75,7 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Key-Router-Tests (Pool-Kern) | **17** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:key-router` |
 | Traceability-Tests | **12** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:traceability` |
 | Idiom-Blöcke | **16** Blöcke in **12** Dateien, deckungsgleich mit `scripts/lib/plugin-idioms.mjs` | 0 | `npm run idioms:check` |
-| Build (`dist/`) | **22** Pakete, **185** Dateien, **1 527 362** Bytes | 0 | `npm run build` |
+| Build (`dist/`) | **22** Pakete, **185** Dateien, **1 527 394** Bytes | 0 | `npm run build` |
 | Bestands-Block dieser Datei | deckungsgleich mit dem Baum | 0 | `npm run zahlen:check` |
 
 **Warum die Umgebung zählt:** `gate:test` und `npm test` brauchen Node ≥ 22 (`node:sqlite`)
@@ -91,7 +91,7 @@ Ein nacktes `node --test …` bleibt der ungeschützte Weg und ist kein Beleg.
 | Kosten der Ablage bei vielen Signalen | 2026-10-11 | 58,6 ms (10 Zeilen) → 500,2–517,0 ms (20 000); 0,03 ms je Zeile; 99,6 % der Kette ist Ablage | [docs/probes/store-cost.json](probes/store-cost.json) |
 | Startscan des Projektindex (353 Dateien) | 2026-10-13 | kalt 2627 ms, unverändert 21 ms, Mount 1 ms, Worker-Bericht 2856 ms | [docs/probes/project-index-startscan.json](probes/project-index-startscan.json) |
 | Branding-Wirkung im echten Chromium | 2026-10-13 | 28 bestanden, 0 fehlgeschlagen | `npm run branding` (braucht `dist/` und Browser) |
-| Skalierungslauf (Kopie + 20 Pakete = 39) | 2026-10-11 | 6 von 6 Stufen grün, ≈ 98 s | [docs/audit/SKALIERUNG_2026-10-11.md](audit/SKALIERUNG_2026-10-11.md) |
+| Skalierungslauf (Kopie + 20 Pakete = 39) | 2026-10-11 | 6 von 6 Stufen grün, ≈ 98 s | [docs/archive/SKALIERUNG_2026-10-11.md](archive/SKALIERUNG_2026-10-11.md) |
 | Frischer Klon: `npm install` + `npm start -- --check` | 2026-10-13 | 731 Pakete, Lockfile byteidentisch, ohne `pnpm`/globales `dsh` | [PLAN.md](../PLAN.md) Schritt 3.4/3.5 |
 | CI-Lauf (Branch-Stand `bf003a2`) | 2026-10-13 | 14 Jobs grün, Conclusion `success` | Run `38474747771` in der Actions-API |
 
@@ -147,5 +147,5 @@ Offen **außerhalb** der Gates (kein Rot, nur ungemessen):
 ## 5. Historie
 
 Reparaturen, Ursachen und Vorher/Nachher-Messungen stehen **nicht** hier, sondern in
-`git log` (Commit-Nachricht mit Datenbeleg), in `docs/audit/` (Nachweise je Durchgang) und
-in `docs/handshakes/` (Übergaben). Diese Datei trägt nur den heutigen Ist-Zustand.
+`git log` (Commit-Nachricht mit Datenbeleg) und in `docs/archive/` (abgeschlossene
+Nachweise und Übergaben). Diese Datei trägt nur den heutigen Ist-Zustand.

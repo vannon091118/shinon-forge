@@ -1,6 +1,8 @@
 # Handshake — CI-Lauf grün inkl. Verdict, Schranke noch nicht scharf, sieben Lücken adjudiziert
 
-> **Status:** current — Übergabe dieses Durchgangs: der grüne Remote-Lauf mit SHA und Run-ID, der Branch-Protection-Blocker mit Copy-paste-Befehl, und zu jeder der sieben gemeldeten Lücken der Befund am Baum plus die konkrete Abnahme. **Stand:** 2026-10-13
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Übergabe dieses Durchgangs: der grüne Remote-Lauf mit SHA und Run-ID, der Branch-Protection-Blocker mit Copy-paste-Befehl, und zu jeder der sieben gemeldeten Lücken der Befund am Baum plus die konkrete Abnahme. **Stand:** 2026-10-13
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 ## 1. Der grüne Lauf (kein lokaler Zähler, sondern der Remote-Beleg)

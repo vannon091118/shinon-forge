@@ -1,6 +1,8 @@
 # Handshake — Projektindex-Scan, Aktivierungsnachweis und CI-Schranke
 
-> **Status:** current — Übergabe dieses Durchgangs: was gebaut, was gemessen, was grün und was rot ist. **Stand:** 2026-10-13
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Übergabe dieses Durchgangs: was gebaut, was gemessen, was grün und was rot ist. **Stand:** 2026-10-13
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Ein Handshake ist die Antwort auf eine Frage, die man nach vier Wochen stellt:

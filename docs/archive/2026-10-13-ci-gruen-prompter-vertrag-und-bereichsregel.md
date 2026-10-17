@@ -1,6 +1,8 @@
 # Handshake — CI grün: Prompter-Vertrag geschlossen, Bereichsregel für neue Branches
 
-> **Status:** current — Übergabe dieses Durchgangs: warum CI rot war, was die Ursache war, was jetzt grün ist. **Stand:** 2026-10-13
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Übergabe dieses Durchgangs: warum CI rot war, was die Ursache war, was jetzt grün ist. **Stand:** 2026-10-13
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Auslöser war ein Wort: „CI ist rot". Gemessen über die öffentliche Runs-API (kein

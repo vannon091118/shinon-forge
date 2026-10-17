@@ -89,4 +89,4 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
 | Pitfalls (Stack-Fallen) | `AGENTS.md` „Pitfalls" + `dsh-bug-muster` |
 | Cordis-Mechaniken | `cordis-architektur` + `docs/research/2026-10-09-cordis-dsh-recherche.md` — **Ziel fehlt in diesem Baum** (offener Posten, STAND §6.4) |
 | Verträge/Probes | `docs/contracts/`, `docs/probes/` |
-| Prompt/Persona-Flächen | `prompts/README.md` (System-Prompt-Registry, keine Datei-Templates) |
+| Prompt/Persona-Flächen | `docs/archive/prompts-README.md` (System-Prompt-Registry, keine Datei-Templates) |

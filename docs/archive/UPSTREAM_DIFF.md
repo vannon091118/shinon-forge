@@ -1,6 +1,8 @@
 # UPSTREAM_DIFF — alpha.1 vs. alpha.2 an den Overlay-Andockstellen
 
-> **Status:** current — Phase-P-Nachweis (P2). **Stand:** 2026-10-10
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Phase-P-Nachweis (P2). **Stand:** 2026-10-10
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 **Zweck:** Dieses Dokument ist der Nachweis für **P2** des Umbauplans. Es vergleicht die

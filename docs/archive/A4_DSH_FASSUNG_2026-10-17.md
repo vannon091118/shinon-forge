@@ -1,6 +1,8 @@
 # A4_DSH_FASSUNG_2026-10-17 — vier Quellen, eine Fassung
 
-> **Status:** current — Nachweis zu Punkt A4 der Release-Abnahme (DSH-Fassung). **Stand:** 2026-10-17
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Nachweis zu Punkt A4 der Release-Abnahme (DSH-Fassung). **Stand:** 2026-10-17
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md` · **Festlegung:** `vendor/MODIFICATIONS.md`
 
 **Ausgangsbefund (gemessen am 2026-10-17, vor dieser Änderung):** vier Stellen nannten
@@ -144,7 +146,7 @@ Ein Umzug auf `0.2.1-alpha.2` ist **nicht** widerlegt, nur nicht klein. Gemessen
 Dump-Zahlen in `docs/ZAHLEN.md` §2 nachziehen.
 
 Der Satz „`0.2.1-alpha.2` als Basis“ in `PLAN.md` A2 meint den **Upstream-Stand der
-Oberfläche** (`ui-theme`, `ui-brand-official`, `locale`, `docs/audit/UPSTREAM_DIFF.md`) —
+Oberfläche** (`ui-theme`, `ui-brand-official`, `locale`, `docs/archive/UPSTREAM_DIFF.md`) —
 nicht das CLI, das dieses Repo zur Laufzeit startet. Beide Rollen sind jetzt getrennt
 benannt; die Entscheidung über die Produktbasis bleibt die des Eigentümers.
 

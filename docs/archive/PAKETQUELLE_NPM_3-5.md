@@ -1,6 +1,8 @@
 # pnpm-Reste entfernt — Schritt 3.5 (protokollfreier Teil) und der messbar gewordene Teil von 3.7
 
-> **Status:** current — Nachweis für die gelöschten pnpm-Dateien, das entfernte
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Nachweis für die gelöschten pnpm-Dateien, das entfernte
 > `packageManager`-Feld und die zwei auf npm umgestellten Aufrufe (Schritt 3.5 / A1)
 > sowie für den Teil von 3.7, der **ohne** die Bindungsentscheidung prüfbar wird.
 > **Stand:** 2026-10-11

@@ -2,7 +2,7 @@
 
 > **Status:** current — welche Fassung hier liegt und wer sie liest. **Stand:** 2026-10-17
 > **Einstieg:** `docs/INDEX.md` · **Zahlen des Repos:** `docs/ZAHLEN.md`
-> **Nachweis mit den wörtlichen Befehlsausgaben:** `docs/audit/A4_DSH_FASSUNG_2026-10-17.md`
+> **Nachweis mit den wörtlichen Befehlsausgaben:** `docs/archive/A4_DSH_FASSUNG_2026-10-17.md`
 
 ## Die eine Fassung (A4 der Release-Abnahme)
 
@@ -80,7 +80,7 @@ Exit 0 bringen, (3) die an alpha.1 gemessenen Zusagen neu messen — mindestens
 `message-ingress`, dazu die Dump-Zahlen (`docs/ZAHLEN.md` §2: andere Fassung, andere
 Eintragszahl). Der Hinweis „`0.2.1-alpha.2` als Basis" in `PLAN.md` A2 meint etwas
 anderes: dort geht es um den **Upstream-Stand der Oberfläche** (`ui-theme`,
-`ui-brand-official`, `locale`, `docs/audit/UPSTREAM_DIFF.md`) — nicht um das CLI, das
+`ui-brand-official`, `locale`, `docs/archive/UPSTREAM_DIFF.md`) — nicht um das CLI, das
 dieses Repo zur Laufzeit startet. Die beiden Dinge sind hier getrennt benannt, statt
 einander zu widersprechen.
 

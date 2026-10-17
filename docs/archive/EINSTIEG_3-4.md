@@ -1,6 +1,8 @@
 # EINSTIEG_3-4 — `bin/shinon.mjs` als echter Einstieg
 
-> **Status:** current — Nachweis zu `PLAN.md` Schritt 3.4 (D4). **Stand:** 2026-10-11
+> **Archiv:** historischer Stand (verschoben 2026-10-17) — keine aktuelle Quelle; Messzeitpunkt und ursprünglicher Status stehen im Kopf darunter.
+
+> **Status:** historical — Nachweis zu `PLAN.md` Schritt 3.4 (D4). **Stand:** 2026-10-11
 > **Einstieg:** `docs/INDEX.md` · **Zahlen des Repos:** `docs/ZAHLEN.md`
 
 ## 1. Was gebaut wurde
@@ -12,7 +14,7 @@
 | `package.json` | `"bin": { "shinon": "bin/shinon.mjs" }` und `"start": "node bin/shinon.mjs"` |
 | [`scripts/lib/dsh.mjs`](../../scripts/lib/dsh.mjs) | neu: `dshSource()` — wertet das Ergebnis von `dshRoot()` am Pfad aus und nennt die **Herkunft** (`Repo-Installat` / `Vendor` / `PATH oder Installations-Prefix`). Die **Reihenfolge** bleibt ausschließlich in `dshRoot()`, sie wird nicht zweitbeschrieben |
 
-**Der Befund, den dieser Schritt schließt:** [`docs/audit/DEPENDENCY_FINDINGS.md`](DEPENDENCY_FINDINGS.md)
+**Der Befund, den dieser Schritt schließt:** [`docs/archive/DEPENDENCY_FINDINGS.md`](DEPENDENCY_FINDINGS.md)
 führt unter **A-INV-03**: „`bin/shinon.mjs` ist ein `console.log`-Stub ohne `bin`-Feld in
 `package.json` und ohne Script-Verweis: der Name `shinon` als CLI ist vorgetäuscht.“ Der
 Stub wurde am 2026-10-10 gelöscht; diese Fassung ist keine Nachahmung davon — sie löst auf,
@@ -65,7 +67,7 @@ genügt):
   auf demselben Rechner mit dem laufenden `dsh --profile shinon` (PID 126619) um Port und
   Sitzungsverzeichnis konkurriert.
 - **Der Einstieg startet weiter mit `--profile <name>`.** Der belegte Weg ohne
-  `$DSH_HOME/profiles/<name>` ([docs/audit/SPIKE_3-3.md](SPIKE_3-3.md)) wird hier erst
+  `$DSH_HOME/profiles/<name>` ([docs/archive/SPIKE_3-3.md](SPIKE_3-3.md)) wird hier erst
   eingehängt, wenn die Profilwerte aus Code kommen (Schritt 3.6) — sonst gäbe es zwei Orte,
   an denen dasselbe Profil definiert ist.
 - **`vendor/dsh` (alpha.2) bleibt unverdrahtet.** Es läuft das Repo-Installat (alpha.1, der
