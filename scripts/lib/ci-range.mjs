@@ -60,7 +60,7 @@ function readEvent(env, fs) {
  * @param {Record<string, string|undefined>} env GitHub-Umgebung.
  * @param {(args: string[]) => string} git Git-Aufruf (wirft bei Fehler).
  * @param {{ existsSync: Function, readFileSync: Function }} [fs]
- * @returns {{ range: string, why: string }} Eine Revision („volle Historie")
+ * @returns {{ range: string, why: string }} Eine Revision („volle Historie“)
  *          oder ein rev-range; `why` beschreibt die Entscheidung fürs Log.
  */
 export function resolveCiRange(env, git, fs = { existsSync, readFileSync }) {
@@ -94,8 +94,15 @@ export function resolveCiRange(env, git, fs = { existsSync, readFileSync }) {
     // keine Schranke, sondern eine Mauer.) Erst wenn auch die Basis fehlt,
     // gilt weiter die volle Historie (fail-closed).
     const base = branchBase(tip, git);
-    if (base !== null && base !== tip) {
-      return { range: `${base}..${tip}`, why: 'neuer Branch / Force-Push: Merge-Basis mit origin/main..Spitze' };
+    if (base !== null) {
+      // Identischer Tip bedeutet: Der Branch enthält keine Commits über main
+      // hinaus. Das ist ein bestimmbarer leerer Diff, kein unbekannter Bereich.
+      return {
+        range: `${base}..${tip}`,
+        why: base === tip
+          ? 'neuer Branch / Force-Push: Spitze entspricht origin/main — keine neuen Commits'
+          : 'neuer Branch / Force-Push: Merge-Basis mit origin/main..Spitze',
+      };
     }
     return { range: tip, why: 'neuer Branch / Force-Push / before unbekannt — volle Historie' };
   }
