@@ -1,6 +1,6 @@
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import z from '@deepseek-ai/schemastery';
-import { dirname, isAbsolute, join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { parseNote, renderStand, reviewNotes, selectNotes, tokens } from './assets/note-core.js';
 import {
   createIndex,
@@ -9,6 +9,7 @@ import {
   indexDirectory as autoIndexDirectory,
   getContext as runtimeGetContext,
   matchIntent as runtimeMatchIntent,
+  writeJsonFile,
   RUNTIME_INDEX_CONTRACT as RUNTIME_INDEX_CONTRACT_NAME,
 } from './assets/index-manager.js';
 
@@ -438,8 +439,9 @@ function proposeBlock(config, runtime, proposal) {
       current = [];
     }
     const next = [...current.filter((entry) => entry.id !== core.block.id), core.block];
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, `${JSON.stringify({ contract: LEARNED_CONTRACT, blocks: next }, null, 2)}\n`);
+    // Der eine Schreibweg (index-manager.js): die Host-Komposition bleibt frei
+    // von Dateisystem-Aufrufen, und die Isolation-Zusage hat eine Adresse.
+    writeJsonFile(path, { contract: LEARNED_CONTRACT, blocks: next });
     if (runtime.blocks !== null) {
       const merged = mergeLearnedBlocks(runtime.blocks.blocks, next);
       const check = validateRegistry({ contract: BLOCKS_CONTRACT, blocks: merged });
@@ -804,6 +806,6 @@ export { renderContext, renderSkillsBlock };
 export { loadContext, loadNoteRules, loadSkillRules, readNotes, readSkills, selectSkills };
 export { standFor, standTrace };
 export { buildEnhancerRequest, collectStream, replacePrompt };
-export { BLOCKS_CONTRACT, BLOCKS_PATH, DEFAULT_TOTAL_BUDGET, SELF_QUESTION_MARKERS, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, buildHaystack, decisionBlocks, matchBlock, selectBlocks, validateRegistry, tokens as blockSelectTokens } from './assets/block-select.js';
+export { BLOCKS_CONTRACT, BLOCKS_PATH, DEFAULT_TOTAL_BUDGET, SELF_QUESTION_MARKERS, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, buildHaystack, candidateBlocks, decisionBlocks, matchBlock, selectBlocks, validateRegistry, tokens as blockSelectTokens } from './assets/block-select.js';
 export { LEARNED_CONTRACT, LEARNED_DEFAULT_PATH, PROPOSE_CONTRACT, PROPOSE_SERVICE, duplicateVsBlocks, mergeLearnedBlocks, validateBlockCore, validateLearnedFile, validateProposalShell } from './assets/block-review.js';
 export { MAX_UNCERTAINTY, MIN_UNCERTAINTY, SELECTION_CONTRACT, parseSelection, renderCandidates, selectionSystemBrief } from './assets/selection.js';

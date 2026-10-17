@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   BLOCKS_CONTRACT,
+  candidateBlocks,
   decisionBlocks,
   matchBlock,
   selectBlocks,
@@ -206,6 +207,108 @@ test('selektor: Gewicht bricht Gleichstand, schlägt nie Treffer', () => {
   const foreign = selectBlocks(REGISTRY, { ...tie, weights: { fremd: { up: 99, down: 0 } } });
   assert.deepEqual(foreign.selected.map((entry) => entry.id), plain, 'fremdes Gewicht wirkt nicht');
   assert.deepEqual(selectBlocks(REGISTRY, { ...tie, weights: null }).selected.map((entry) => entry.id), plain);
+});
+
+test('selektor: Kandidaten sind Modus + Quelle, nicht der Auslöser', () => {
+  const candidates = candidateBlocks(REGISTRY, {
+    mode: 'MAX',
+    available: { contextPresent: true, notesOn: false, skillsOn: false, intentOn: false, narrative: false },
+  }).map((block) => block.id);
+  // Die Quelle ist an: der Kandidat steht zur Wahl, obwohl kein Marker feuert.
+  assert.ok(candidates.includes('index-project-context'));
+  assert.ok(candidates.includes('persona-workaround'));
+  // Die Quelle ist aus: kein Kandidat, egal welcher Modus.
+  assert.ok(!candidates.includes('stand-zettel'));
+  assert.ok(!candidates.includes('skills-block'));
+  // Der Modus ist der zweite Deckel: MAX-Bausteine sind in MIN keine Kandidaten.
+  const min = candidateBlocks(REGISTRY, { mode: 'MIN', available: {} }).map((block) => block.id);
+  assert.ok(!min.includes('index-project-context'));
+  assert.ok(min.includes('persona-identity-core'));
+});
+
+test('selektor: Agentenvorschlag wählt auch unausgelöste Kandidaten, Pflicht bleibt', () => {
+  const base = { mode: 'MAX', promptText: 'refaktoriere den code', context: CONTEXT, available: AVAILABLE };
+  const plain = selectBlocks(REGISTRY, base);
+  assert.ok(!plain.selected.some((entry) => entry.id === 'persona-workaround'), 'ohne Agent kein Workaround');
+
+  const proposed = selectBlocks(REGISTRY, { ...base, includeIds: ['persona-workaround'] });
+  const ids = proposed.selected.map((entry) => entry.id);
+  assert.ok(ids.includes('persona-workaround'), `Agentenwahl fehlt (${ids.join(',')})`);
+  assert.ok(ids.includes('persona-identity-core') && ids.includes('enhancer-system-policy'), 'Pflicht bleibt');
+  assert.equal(proposed.selected.find((entry) => entry.id === 'persona-workaround').reason, 'AGENT');
+  // Ein ausgelöster, aber nicht gewählter Kandidat wird BENANNT, nicht still fallen gelassen.
+  assert.ok(proposed.skipped.some((entry) => entry.id === 'persona-change-classes' && entry.reason === 'AGENT_ABGELEHNT'));
+});
+
+test('selektor: Agentenvorschlag überschreibt weder Modus noch Quelle noch Budget', () => {
+  const min = selectBlocks(REGISTRY, {
+    mode: 'MIN',
+    promptText: '',
+    context: null,
+    available: {},
+    includeIds: ['index-project-context', 'persona-change-classes'],
+  });
+  const minSkipped = Object.fromEntries(min.skipped.map((entry) => [entry.id, entry.reason]));
+  assert.equal(minSkipped['index-project-context'], 'MODUS_FREMD');
+  assert.equal(minSkipped['persona-change-classes'], 'MODUS_FREMD');
+
+  const off = selectBlocks(REGISTRY, {
+    mode: 'MAX',
+    promptText: '',
+    context: null,
+    available: { contextPresent: false, notesOn: false, skillsOn: false, intentOn: false, narrative: false },
+    includeIds: ['stand-zettel'],
+  });
+  assert.equal(Object.fromEntries(off.skipped.map((entry) => [entry.id, entry.reason]))['stand-zettel'], 'QUELLE_FEHLT:zettel');
+
+  const unknown = selectBlocks(REGISTRY, {
+    mode: 'MAX',
+    promptText: 'hallo',
+    context: CONTEXT,
+    available: AVAILABLE,
+    includeIds: ['gibt-es-nicht'],
+  });
+  assert.ok(unknown.skipped.some((entry) => entry.id === 'gibt-es-nicht' && entry.reason === 'AGENT_UNBEKANNT'));
+
+  const tight = selectBlocks(REGISTRY, {
+    mode: 'MAX',
+    promptText: 'refaktoriere den code',
+    context: CONTEXT,
+    available: AVAILABLE,
+    includeIds: ['persona-change-classes', 'persona-determinism'],
+    totalBudgetTokens: 900,
+  });
+  assert.ok(tight.selected.every((entry) => entry.reason === 'PFLICHT'), 'Budget schneidet Agentenwahl');
+  assert.ok(tight.skipped.some((entry) => entry.id === 'persona-determinism' && entry.reason === 'BUDGET_ERSCHOEPFT'));
+});
+
+test('selektor: ein leerer Agentenvorschlag fällt auf denselben deterministischen Weg zurück', () => {
+  const base = { mode: 'MAX', promptText: 'refaktoriere commit seed', context: CONTEXT, available: AVAILABLE };
+  assert.deepEqual(
+    selectBlocks(REGISTRY, { ...base, includeIds: [] }).selected.map((entry) => entry.id),
+    selectBlocks(REGISTRY, base).selected.map((entry) => entry.id),
+  );
+  assert.deepEqual(
+    selectBlocks(REGISTRY, { ...base, includeIds: null }).selected.map((entry) => entry.id),
+    selectBlocks(REGISTRY, base).selected.map((entry) => entry.id),
+  );
+});
+
+test('entscheidungsanteil: die Quellen-Spalte nennt je Id die Herkunft', () => {
+  const record = decisionBlocks(selectBlocks(REGISTRY, {
+    mode: 'MAX',
+    promptText: 'refaktoriere den code',
+    context: CONTEXT,
+    available: AVAILABLE,
+  }));
+  assert.equal(record.blockSources.length, record.blocks.length, 'eine Quelle je gewählter Id');
+  assert.ok(record.blocks.every((id) => typeof id === 'string'), 'blocks bleibt die reine Id-Spalte (Ledger-Vertrag)');
+  assert.ok(record.blockSources.includes('persona-identity-core:persona'));
+  for (const entry of record.blockSources) {
+    const [id, quelle] = entry.split(':');
+    assert.ok(record.blocks.includes(id));
+    assert.notEqual(quelle, 'unbekannt', `Quelle fehlt für ${id}`);
+  }
 });
 
 test('entscheidungsanteil: nur Ids und Gründe — nie Prompt-Text', () => {

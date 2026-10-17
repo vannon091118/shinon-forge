@@ -8,6 +8,7 @@
  */
 import z from '@deepseek-ai/schemastery';
 import { INDEX_BUDGET_TOKENS, MODES, NOTES_DIR_DEFAULT, SKILLS_DIR_DEFAULT } from './mode-core.js';
+import { LEARNED_DEFAULT_PATH } from './block-review.js';
 
 /**
  * Der Resultatvertrag (Plan §7), je Modus.
@@ -199,7 +200,7 @@ export const Config = z.object({
    * dem Tarball. Leer = nicht lesen, nicht schreiben (dann bleibt die
    * Registry, wie sie ausgeliefert wurde).
    */
-  blocksLearnedPath: z.string().default('.shinon/blocks.learned.json'),
+  blocksLearnedPath: z.string().default(LEARNED_DEFAULT_PATH),
 });
 
 

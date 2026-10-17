@@ -391,11 +391,14 @@ test('scoring: ein zweites save, ein zweites load und jedes weitere Schreibverb 
   const withLine = (line) => [...host(), { file: 'packages/scoring/index.js', source: line }];
   const only = (sources) => outcomeIssues(sources);
 
-  // Zwei `save` in EINER Datei: der zweite Weg.
-  const doubleSave = readFileSync(join(ROOT, 'packages/scoring/index.js'), 'utf8').replace('target.save(LEDGER_NAMESPACE, snapshot);', 'target.save(LEDGER_NAMESPACE, snapshot); target.save("x", 1);');
+  // Zwei `save` in EINER Datei: der zweite Weg. ANGEFÜGT statt ersetzt — die
+  // Probe hängt an der Zusage (genau ein Ausgang), nicht am Wortlaut einer
+  // Zeile; ein umbenannter Speicherpfad darf den Test nicht still entwaffnen.
+  const hostSource = readFileSync(join(ROOT, 'packages/scoring/index.js'), 'utf8');
+  const doubleSave = `${hostSource}\ntarget.save('x', 1);\n`;
   assert.ok(only([{ file: 'packages/scoring/index.js', source: doubleSave }]).some((issue) => issue.includes('genau 1 `save`')));
 
-  const doubleLoad = readFileSync(join(ROOT, 'packages/scoring/index.js'), 'utf8').replace('target.load(LEDGER_NAMESPACE);', 'target.load(LEDGER_NAMESPACE); target.load("y");');
+  const doubleLoad = `${hostSource}\ntarget.load('y');\n`;
   assert.ok(only([{ file: 'packages/scoring/index.js', source: doubleLoad }]).some((issue) => issue.includes('genau 1 `load`')));
 
   for (const verb of STORE_VERBS) {

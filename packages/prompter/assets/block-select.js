@@ -141,6 +141,10 @@ export function buildHaystack(promptText, context = null) {
  * Scoring-Dienst), sperrt nicht, sondern matcht über Haystack/Intent/Haltung.
  * Ein Baustein, dessen Quelle BELEGT fehlt, lädt nie (fail-open mit Grund).
  */
+
+/** Bausteine, deren Inhalt eine eigene Pipeline lädt (Gate, kein Zweitleser). */
+const PIPELINE_BLOCKS = ['stand-zettel', 'skills-block', 'intent-expansion'];
+
 function sourceReady(block, available) {
   const a = isRecord(available) ? available : {};
   switch (block.id) {
@@ -175,6 +179,28 @@ function sourceReady(block, available) {
 }
 
 /**
+ * Die KANDIDATEN einer Situation: alles, was Modus und Quelle zulassen —
+ * unabhängig davon, ob ein Auslöser gerade feuert.
+ *
+ * Genau diese Liste bekommt der Selektionsagent (ohne Inhalt, nur id/lage/
+ * budget/ausloeser): er darf nur wählen, was die Runtime ohnehin freigegeben
+ * hat. Dieselben zwei Achsen wie `matchBlock` — eine zweite Wahrheit über die
+ * Freigabe gäbe es sonst, und der Agent könnte einen Modus- oder Quellensperre
+ * umgehen, indem er die id einfach nennt.
+ */
+export function candidateBlocks(registry, opts = {}) {
+  const blocks = Array.isArray(registry?.blocks) ? registry.blocks : [];
+  const candidates = [];
+  for (const block of blocks) {
+    if (typeof block?.id !== 'string' || block.id === '') continue;
+    if (typeof opts.mode === 'string' && Array.isArray(block.modus) && !block.modus.includes(opts.mode)) continue;
+    if (!sourceReady(block, opts.available).ready) continue;
+    candidates.push(block);
+  }
+  return candidates;
+}
+
+/**
  * EINEN Baustein matchen — rein, ohne Modell, ohne Uhr.
  * @returns { selected, hits, reason } — `hits` zählt Haystack-Treffer (Ranking).
  */
@@ -186,6 +212,16 @@ export function matchBlock(block, input = {}) {
   }
   const source = sourceReady(block, input.available);
   if (!source.ready) return { selected: false, hits: 0, reason: source.reason };
+
+  // Pipeline-Bausteine: die Quelle IST der Anlass — ihre Inhalte liegen in
+  // einer eigenen Pipeline (Zettelverzeichnis, Skillordner, Intent-Datei), die
+  // der Host NACH dieser Auswahl lädt. Auslöser-Texte werten hier nichts: wer
+  // regelkonform „an“ ist, wird gewählt (QUELLE_BEREIT), wer aus ist, kam
+  // bereits mit QUELLE_FEHLT heraus. Das ist die Migration: kein zweites
+  // Parallelsystem neben selectNotes/selectSkills, sondern EIN Gate.
+  if (PIPELINE_BLOCKS.includes(block.id)) {
+    return { selected: true, hits: 0, reason: `QUELLE_BEREIT:${block.id}` };
+  }
 
   // Pflicht: immer, ohne Anlass — der einzige Baustein ohne Warum.
   if (ausloeser.immer === true || block?.pflicht === true) {
@@ -243,8 +279,18 @@ export function matchBlock(block, input = {}) {
   if (block?.quelle === 'narrative' && input.available?.narrative === true) {
     return { selected: true, hits: 0, reason: 'QUELLE_BEREIT:narrative' };
   }
+  if (block?.quelle === 'project-index' && input.available?.contextPresent === true) {
+    return { selected: true, hits: 0, reason: 'QUELLE_BEREIT:kontext' };
+  }
   if (typeof ausloeser.datei === 'string' && input.available?.projectContextFile === true) {
     return { selected: true, hits: 0, reason: 'QUELLE_BEREIT:datei' };
+  }
+  // Ein temperierter DIENST allein löst nichts aus, aber EIN GELESENER TON
+  // schon: `available.tone` sagt, dass das Scoring eine echte Haltung lieferte
+  // — dann steht der Stand-Haltungsbaustein zur Wahl (und Budget/Gewicht dürfen
+  // ihn noch abschneiden). Ohne gelesenen Ton bleibt es beim leisen Versagen.
+  if (typeof ausloeser.dienst === 'string' && input.available?.tone === true) {
+    return { selected: true, hits: 0, reason: 'QUELLE_BEREIT:ton' };
   }
 
   return { selected: false, hits: 0, reason: 'NICHT_AUSGELOEST' };
@@ -270,18 +316,37 @@ function weightScore(weights, id) {
  *
  * @param registry - validierte Registry (`validateRegistry`).
  * @param opts - { mode, promptText, context, intentClass, stance, available,
- *   weights, totalBudgetTokens } — `available`: { contextPresent, notesOn,
- *   skillsOn, intentOn, narrative, recentEvents }; `weights`: gelernte Zähler
- *   ({ id: { up, down } }), wirken nur als Gleichstands-Brecher nach Treffern.
- * @returns { selected: [{ id, hits, reason, budgetTokens }],
- *   skipped: [{ id, reason }], totalTokens }
+ *   weights, totalBudgetTokens, includeIds } — `available`: { contextPresent,
+ *   notesOn, skillsOn, intentOn, narrative, recentEvents }; `weights`: gelernte
+ *   Zähler ({ id: { up, down } }), wirken nur als Gleichstands-Brecher nach
+ *   Treffern; `includeIds`: der Vorschlag des Selektionsagenten (nur IDs aus
+ *   `candidateBlocks`).
+ * @returns { selected: [{ id, quelle, hits, reason, budgetTokens }],
+ *   skipped: [{ id, quelle, reason }], totalTokens }
+ *
+ * Die Agentenwahl ist der EINE zweite Weg in die Auswahl, und sie ist kein
+ * Freifahrtschein: Pflicht steht immer, Modus und Quelle sperren weiter (der
+ * Agent sah nur Kandidaten), das Budget bleibt hart, und jede nicht gewählte
+ * Kandidatur wird mit `AGENT_ABGELEHNT` benannt statt still zu verschwinden.
+ * Ohne `includeIds` (leer, unbekannt, fehlend) gilt unverändert der rein
+ * deterministische Weg — der Rückfall ist kein Sonderfall, sondern derselbe
+ * Code.
  */
 export function selectBlocks(registry, opts = {}) {
   const blocks = Array.isArray(registry?.blocks) ? registry.blocks : [];
-  const words = new Set(tokens(buildHaystack(opts.promptText, opts.context ?? null).join(' ')));
+  const haystack = buildHaystack(opts.promptText, opts.context ?? null);
+  const words = new Set(tokens(haystack.join(' ')));
   const total = typeof opts.totalBudgetTokens === 'number' && opts.totalBudgetTokens > 0
     ? opts.totalBudgetTokens
     : DEFAULT_TOTAL_BUDGET;
+
+  const requested = Array.isArray(opts.includeIds)
+    ? new Set(opts.includeIds.filter((id) => typeof id === 'string' && id !== ''))
+    : null;
+  const agentDecides = requested !== null && requested.size > 0;
+  const candidates = agentDecides
+    ? new Set(candidateBlocks(registry, { mode: opts.mode, available: opts.available }).map((block) => block.id))
+    : null;
 
   const scored = [];
   const skipped = [];
@@ -289,24 +354,55 @@ export function selectBlocks(registry, opts = {}) {
     const match = matchBlock(block, {
       mode: opts.mode,
       promptText: opts.promptText,
-      haystack: buildHaystack(opts.promptText, opts.context ?? null),
+      haystack,
       words,
       intentClass: opts.intentClass,
       stance: opts.stance,
       available: opts.available,
     });
+    const base = { id: block?.id ?? null, quelle: block?.quelle ?? null };
     if (!match.selected) {
-      skipped.push({ id: block?.id ?? null, reason: match.reason });
+      // Der Agent darf einen NICHT ausgelösten Kandidaten wählen — das ist sein
+      // Beitrag. Eine fehlende Quelle oder ein fremder Modus bleibt gesperrt:
+      // beides stand nicht in seiner Kandidatenliste.
+      if (agentDecides && requested.has(block?.id) && candidates.has(block?.id)) {
+        scored.push({
+          ...base,
+          hits: match.hits,
+          reason: 'AGENT',
+          budgetTokens: block.budgetTokens,
+          must: false,
+          weight: weightScore(opts.weights, block.id),
+        });
+      } else {
+        skipped.push({ ...base, reason: match.reason });
+      }
+      continue;
+    }
+    if (agentDecides && match.reason !== 'PFLICHT' && !requested.has(block.id)) {
+      skipped.push({ ...base, reason: 'AGENT_ABGELEHNT' });
       continue;
     }
     scored.push({
       id: block.id,
+      quelle: block.quelle ?? null,
       hits: match.hits,
-      reason: match.reason,
+      reason: agentDecides && match.reason !== 'PFLICHT' ? 'AGENT' : match.reason,
       budgetTokens: block.budgetTokens,
       must: match.reason === 'PFLICHT',
       weight: weightScore(opts.weights, block.id),
     });
+  }
+
+  if (agentDecides) {
+    // Eine ID, die die Registry nicht kennt, ist keine Auswahl: sie wird
+    // benannt, nicht still fallen gelassen (dieselbe Fail-closed-Regel wie in
+    // `parseSelection`).
+    const known = new Set(blocks.map((block) => block?.id).filter((id) => typeof id === 'string'));
+    for (const id of requested) {
+      if (known.has(id)) continue;
+      skipped.push({ id, quelle: null, reason: 'AGENT_UNBEKANNT' });
+    }
   }
 
   // Reihung ist Vertrag: Pflicht zuerst, dann Treffer absteigend, dann das
@@ -321,13 +417,14 @@ export function selectBlocks(registry, opts = {}) {
   let totalTokens = 0;
   for (const entry of scored) {
     if (!entry.must && totalTokens + entry.budgetTokens > total) {
-      skipped.push({ id: entry.id, reason: 'BUDGET_ERSCHOEPFT' });
+      skipped.push({ id: entry.id, quelle: entry.quelle, reason: 'BUDGET_ERSCHOEPFT' });
       continue;
     }
-    selected.push({ id: entry.id, hits: entry.hits, reason: entry.reason, budgetTokens: entry.budgetTokens });
+    selected.push({ id: entry.id, quelle: entry.quelle, hits: entry.hits, reason: entry.reason, budgetTokens: entry.budgetTokens });
     totalTokens += entry.budgetTokens;
   }
-  skipped.sort((left, right) => String(left.id).localeCompare(String(right.id)));
+  skipped.sort((left, right) => String(left.id).localeCompare(String(right.id))
+    || String(left.reason).localeCompare(String(right.reason)));
 
   return { selected, skipped, totalTokens };
 }
@@ -336,11 +433,18 @@ export function selectBlocks(registry, opts = {}) {
  * Der Entscheidungsanteil: was gewählt wurde, ohne einen Zeichen Prompt-Text.
  * Baustein-Ids und Gründe sind Provenienz wie `context_source` — der Text des
  * Nutzers steht hier nie (dieselbe Regel wie im restlichen Datensatz).
+ *
+ * Die Quellen-Spalte (`blockSources`) läuft PARALLEL zu `blocks`: sie sagt je
+ * gewählter Id, woher der Baustein kommt (persona, scoring, narrative,
+ * prompter, project-index). `blocks` bleibt bewusst eine reine ID-Liste — der
+ * Scoring-Ledger lernt an Ids (`cleanBlockIds`), nicht an Objekten.
  */
 export function decisionBlocks(selection = null) {
   if (selection === null || typeof selection !== 'object') return null;
+  const selected = Array.isArray(selection.selected) ? selection.selected : [];
   return {
-    blocks: Array.isArray(selection.selected) ? selection.selected.map((entry) => entry.id) : [],
+    blocks: selected.map((entry) => entry.id),
+    blockSources: selected.map((entry) => `${entry.id}:${entry.quelle ?? 'unbekannt'}`),
     blockTokens: typeof selection.totalTokens === 'number' ? selection.totalTokens : 0,
     blocksSkipped: Array.isArray(selection.skipped)
       ? selection.skipped.map((entry) => `${entry.id}:${entry.reason}`)

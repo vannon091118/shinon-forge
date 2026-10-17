@@ -123,8 +123,18 @@ export const FORBIDDEN_RULE_KEYS = [
   'maxAgeSeconds',
 ];
 
-/** Lesbar zusätzlich: der reine Kern und die eingefrorene Replay-Fixture. */
-export const READABLE_ASSETS = [...WRITABLE_ASSETS, 'assets/scoring-core.js', 'assets/replay/scoring-demo.json'];
+/**
+ * Lesbar zusätzlich: die reinen Kerne und die eingefrorene Replay-Fixture.
+ * `block-weights.js` ist der Lern-Kern (Phase 3) — derselbe Host liest ihn,
+ * also gehört er in dieselbe Whitelist; ein fehlender Eintrag wäre kein
+ * Schreibverb, sondern eine falsch benannte Grenze.
+ */
+export const READABLE_ASSETS = [
+  ...WRITABLE_ASSETS,
+  'assets/scoring-core.js',
+  'assets/block-weights.js',
+  'assets/replay/scoring-demo.json',
+];
 
 /** Verbotene Module: Importnamen werden auch in Strings erkannt. */
 export const FORBIDDEN_MODULES = ['child_process'];
@@ -677,6 +687,26 @@ export function tendencyRuleIssues(tendency, rules, scoring, file) {
 }
 
 /**
+ * Ein Schreibverb zählen — lokale Map/Set-Aufräumarbeit ist KEIN Dienst-Ausgang.
+ *
+ * `sessionBlocks.delete(sessionId)` leert eine Map im Speicher, wenn eine
+ * Sitzung neu beginnt; das ist dieselbe Buchhaltung wie `splice`, kein zweiter
+ * Weg in die Ablage. Der Scan unterscheidet deshalb nach dem EMPFÄNGER: ein
+ * `delete` auf einer hier als `new Map(...)`/`new Set(...)` gebundenen Variablen
+ * zählt nicht, `store.delete('x')` schon. Die Zusage bleibt dieselbe — der eine
+ * Ausgang ist der Signal-Anhang, jedes andere Schreibverb auf einem Dienst ist
+ * ein Befund.
+ */
+function storeVerbHits(code, verb, localCollections) {
+  const receiver = new RegExp(`([A-Za-z_$][\\w$]*)\\.${verb}\\s*\\(`, 'g');
+  let hits = 0;
+  for (const match of code.matchAll(receiver)) {
+    if (!localCollections.has(match[1])) hits += 1;
+  }
+  return hits;
+}
+
+/**
  * Den EINEN Ausgang prüfen (Zusage aus dem Kopf dieser Datei).
  *
  * Der Host hängt ein Signal an: ein `save` auf dem Dienst der Ablage. Genau eines
@@ -690,13 +720,19 @@ export function outcomeIssues(sources) {
   for (const { file, source } of sources) {
     if (!file.endsWith('index.js')) continue;
     const code = codeOnly(source);
+    // Lokale Speicher-Aufräumer (Map/Set) sind keine Dienste. Sie werden aus
+    // DEMSELBEN Quelltext gelesen, damit die Ausnahme nicht geraten ist.
+    const localCollections = new Set();
+    for (const match of code.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+(?:Map|Set)\s*\(/g)) {
+      localCollections.add(match[1]);
+    }
     const count = (pattern) => (code.match(pattern) ?? []).length;
     const saves = count(/\.save\s*\(/g);
     if (saves !== 1) issues.push(`${file}: die Zusage ist EIN Ausgang — erwartet genau 1 \`save\`, gefunden ${saves}`);
     const loads = count(/\.load\s*\(/g);
     if (loads !== 1) issues.push(`${file}: erwartet genau 1 \`load\` beim Start, gefunden ${loads}`);
     for (const verb of STORE_VERBS) {
-      const hits = count(new RegExp(`\\.${verb}\\s*\\(`, 'g'));
+      const hits = storeVerbHits(code, verb, localCollections);
       if (hits > 0) {
         issues.push(`${file}: \`${verb}\` auf einem Dienst — der einzige Ausgang ist der Signal-Anhang (\`save\`)`);
       }

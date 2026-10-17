@@ -11,7 +11,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { join, isAbsolute } from 'node:path';
+import { join, isAbsolute, dirname } from 'node:path';
 
 /** Vertragsname des Runtime-Indexes. */
 export const RUNTIME_INDEX_CONTRACT = 'shinon.prompter/runtime-index/v1';
@@ -339,6 +339,26 @@ export function indexDirectory(index, dirPath, extensions = null, now = Date.now
 
   walk(dirPath);
   return { indexed, skipped, errors };
+}
+
+/**
+ * Eine JSON-Datei schreiben — der EINE Schreibweg des Pakets.
+ *
+ * Der Isolationstest verlangt, dass die Host-Komposition (`index.js`) und die
+ * One-Shot-Kerne kein Dateisystem öffnen; dieses Modul ist die benannte
+ * Ausnahme und schreibt bereits den Runtime-Index. Die gelernte Baustein-Ablage
+ * (Phase 4) nimmt denselben Weg statt einer zweiten Schreibstelle: ein Pfad,
+ * ein `mkdir`, ein `write` — und die Grenze bleibt an genau einer Stelle
+ * sichtbar, statt sie pro Aufrufer neu zu ziehen.
+ *
+ * Ein absoluter Pfad bleibt absolut (dieselbe Regel wie bei Zetteln/Skills).
+ */
+export function writeJsonFile(path, value) {
+  const full = isAbsolute(path) ? path : join(process.cwd(), path);
+  try {
+    mkdirSync(dirname(full), { recursive: true });
+  } catch { /* existiert bereits oder kein Zugriff — egal */ }
+  writeFileSync(full, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
 /**

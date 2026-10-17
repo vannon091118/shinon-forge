@@ -1199,6 +1199,11 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     mode: 'MIN',
     provider: '',
     model: '',
+    // Phase 5: eigener Schluesselname + Fallback-Route. NUR Namen, nie Werte;
+    // leer heisst: die Primaerroute traegt ihren Schluessel selbst.
+    providerKeyEnv: '',
+    providerFallback: '',
+    modelFallback: '',
     contextPath: '',
     // Neu mit der Naht zum Project Index: das Budget des MAX-Kontexts. Der
     // Vorgabewert ist DERSELBE wie der des Index (`DEFAULT_CONTEXT_BUDGET`),
@@ -1221,6 +1226,9 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     indexStoragePath: '',
     indexMaxFiles: 20,
     intentPatternsPath: './assets/intent-rules.json',
+    // Phase 4: die gelernte Baustein-Ablage gehoert dem PROJEKT. Der Vorgabewert
+    // ist die eine Konstante des Pakets, nicht ein zweites Literal.
+    blocksLearnedPath: bundle.LEARNED_DEFAULT_PATH,
   });
 });
 

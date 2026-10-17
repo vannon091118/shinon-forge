@@ -248,6 +248,12 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/prompt-files.js' },
       { kind: 'import', target: './assets/stand.js' },
       { kind: 'import', target: './assets/enhancer.js' },
+      // Die Injection-Runtime (Phase 1-4 + Selektionsvertrag): Registry-Auswahl,
+      // Vorschlags-Pruefung und der strenge Agenten-Vertrag sind eigene Kerne —
+      // der Selektor bleibt importfrei, der Host komponiert sie.
+      { kind: 'import', target: './assets/block-select.js' },
+      { kind: 'import', target: './assets/block-review.js' },
+      { kind: 'import', target: './assets/selection.js' },
     ].sort(byTarget),
     'Kanten sind Importe; externe Ziele bleiben drin, weil sie importiert werden',
   );
