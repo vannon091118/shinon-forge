@@ -118,7 +118,7 @@ Das Format stammt aus `@deepseek-ai/dsh-app-boot` (`loadProfile` /
   `profiles/shinon/package.json`.
 - Ein Bundle ist ein Paket mit `dsh.bundle.patch`; DSH löst es zuerst aus der
   Installation, dann aus dem Profil auf. Ein Paket ohne Profil-Eintrag ist gebaut,
-  aber nicht aktiv — heute sind das fünf, namentlich und gezählt in
+  aber nicht aktiv — heute sind das drei, namentlich und gezählt in
   `docs/ZAHLEN.md` §1 (`Pakete **nicht** im Profil`).
 
 ## 4. Validierungsregeln

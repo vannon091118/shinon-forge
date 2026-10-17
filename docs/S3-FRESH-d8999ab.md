@@ -1,6 +1,7 @@
 # S3 Frischklon @ d8999ab — Protokoll 2026-10-17
 
 > **Status:** Beleg — Release-Slice S3 (PLAN.md §9.1)
+> **Status:** current — Release-Beleg S3 am aktuellen Stand, eingefroren am Messzeitpunkt
 > **Stand:** 2026-10-17, 10:05–10:15 UTC, Commit `d8999ab`
 > Dritter Durchgang nach `docs/S3-FRESHCLONE-2026-10-17.md` (Boot-Beleg) und
 > `docs/S3-FRESH-2026-10-17.md` (HTTP-200-Beleg): fällig, weil `main` seither

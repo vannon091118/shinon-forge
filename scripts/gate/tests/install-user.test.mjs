@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -43,6 +43,7 @@ test('install-user: --help nennt alle vier Unterbefehle und endet mit 0', () => 
   for (const command of ['install', 'update', 'rollback', 'status']) assert.match(result.stdout, new RegExp(command));
   assert.match(result.stdout, /--prefix/);
   assert.match(result.stdout, /--no-rollback/);
+  assert.match(result.stdout, /selftest/);
 });
 
 test('install-user: ohne Unterbefehl und mit unbekanntem Unterbefehl Exit 2', () => {
@@ -110,6 +111,113 @@ test('install-user: history --json gibt die Rohzeilen aus, --limit begrenzt', ()
   const lines = limited.stdout.split('\n').filter((line) => line.startsWith('{'));
   assert.equal(lines.length, 2);
   assert.equal(JSON.parse(lines[1]).trigger, 'auto-rollback');
+});
+
+test('install-user: auto ohne Installat verweigert mit Exit 2, ohne zu klonen', () => {
+  const { dir, env } = sandbox();
+  const prefix = join(dir, 'nichts');
+  const result = run(['auto', '--prefix', prefix], env);
+  assert.equal(result.status, 2, result.stdout);
+  assert.match(result.stderr, /kein Installat/);
+  assert.equal(existsSync(prefix), false);
+});
+
+test('install-user: auto verweigert ein Staging, das das Installat selbst ist', () => {
+  const { dir, env } = sandbox();
+  const prefix = join(dir, 'nichts');
+  const result = run(['auto', '--prefix', prefix, '--staging', prefix], env);
+  assert.equal(result.status, 2, result.stdout);
+  assert.match(result.stderr, /--staging darf nicht das Installat selbst sein/);
+});
+
+test('install-user: units schreibt Dienst und Timer, ohne systemd anzufassen', () => {
+  const { dir, env } = sandbox();
+  const configHome = join(dir, 'config');
+  const result = run(['units', '--no-enable', '--no-systemd', '--interval', '6h'], { ...env, XDG_CONFIG_HOME: configHome });
+  assert.equal(result.status, 0, result.stderr);
+  const service = readFileSync(join(configHome, 'systemd', 'user', 'shinon-forge-update.service'), 'utf8');
+  const timer = readFileSync(join(configHome, 'systemd', 'user', 'shinon-forge-update.timer'), 'utf8');
+  assert.match(service, /install-user\.mjs auto --prefix /);
+  assert.match(service, /Type=oneshot/);
+  assert.match(timer, /OnActiveSec=10min/);
+  assert.match(timer, /OnUnitActiveSec=6h/);
+  assert.match(timer, /Persistent=true/);
+  assert.match(timer, /WantedBy=timers\.target/);
+});
+
+test('install-user: units --remove löscht beide Dateien wieder', () => {
+  const { dir, env } = sandbox();
+  const configHome = join(dir, 'config');
+  const scoped = { ...env, XDG_CONFIG_HOME: configHome };
+  assert.equal(run(['units', '--no-enable', '--no-systemd'], scoped).status, 0);
+  const removed = run(['units', '--remove', '--no-systemd'], scoped);
+  assert.equal(removed.status, 0, removed.stderr);
+  assert.equal(existsSync(join(configHome, 'systemd', 'user', 'shinon-forge-update.service')), false);
+  assert.equal(existsSync(join(configHome, 'systemd', 'user', 'shinon-forge-update.timer')), false);
+});
+
+/**
+ * Ein Installat, das genau so viel kann, wie der Selbsttest abfragt: `--check`
+ * antwortet mit Herkunft (der Pfad kommt aus dem Arbeitsverzeichnis, in dem
+ * `verify` den Kandidaten startet), `doctor` antwortet mit vorgegebenem Exit.
+ * Damit prüft der Test die Kette, ohne 621 Pakete und ohne Boot zu brauchen.
+ */
+function fakeInstall(dir, { doctorExit = 0 } = {}) {
+  mkdirSync(join(dir, 'bin'), { recursive: true });
+  writeFileSync(
+    join(dir, 'bin', 'shinon.mjs'),
+    `#!/usr/bin/env node
+const arg = process.argv[2];
+if (arg === '--check') {
+  console.log('✅ startfähig');
+  console.log('   dsh:       9.9.9-test');
+  console.log('   Herkunft:  Repo-Installat — ' + process.cwd() + '/node_modules/@deepseek-ai/dsh');
+  process.exit(0);
+}
+if (arg === 'doctor') { console.log('doctor'); process.exit(${doctorExit}); }
+process.exit(0);
+`,
+  );
+  return dir;
+}
+
+test('install-user: selftest verweigert ohne Installat mit Exit 2 und legt nichts an', () => {
+  const { dir, env } = sandbox();
+  const prefix = join(dir, 'nichts');
+  const result = run(['selftest', '--prefix', prefix], env);
+  assert.equal(result.status, 2, result.stdout);
+  assert.match(result.stderr, /kein Installat/);
+  assert.equal(existsSync(prefix), false);
+});
+
+test('install-user: selftest meldet Exit 1 und die Stufen, wenn die Kette reißt — ohne den Zustand anzufassen', () => {
+  const { dir, env } = sandbox();
+  const prefix = fakeInstall(join(dir, 'fake'), { doctorExit: 1 });
+  const result = run(['selftest', '--prefix', prefix], env);
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stdout, /✓ check/);
+  assert.match(result.stdout, /✗ doctor/);
+  // Die Bilanz eines roten Laufs geht nach stderr — sie ist ein Befund, keine Auskunft.
+  assert.match(result.stderr, /1\/4 Stufen/);
+  // READ-ONLY: kein Zustand geschrieben — der Lauf steht trotzdem im Protokoll.
+  assert.equal(existsSync(join(dir, 'state', 'install-state.json')), false);
+  assert.equal(existsSync(join(dir, 'state', 'logs', 'verify-log.jsonl')), true);
+});
+
+test('install-user: selftest --json beschreibt die vier Stufen maschinenlesbar', () => {
+  const { dir, env } = sandbox();
+  const prefix = fakeInstall(join(dir, 'fake'), { doctorExit: 1 });
+  const result = run(['selftest', '--prefix', prefix, '--json'], env);
+  assert.equal(result.status, 1, result.stderr);
+  const line = result.stdout.split('\n').find((entry) => entry.startsWith('{'));
+  const report = JSON.parse(line);
+  assert.deepEqual(Object.keys(report.stages).sort(), ['boot', 'check', 'doctor', 'http']);
+  assert.equal(report.stages.check, true);
+  assert.equal(report.stages.doctor, false);
+  assert.equal(report.ok, false);
+  assert.equal(report.of, 4);
+  assert.equal(report.passed, 1);
+  assert.ok(report.errors.length >= 1);
 });
 
 test('install-user: rollback ohne aufgezeichneten Stand verweigert mit Exit 2', () => {

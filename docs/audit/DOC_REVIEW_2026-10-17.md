@@ -231,3 +231,25 @@ und `Folgepaket` kennen, die **nicht** Teil der INDEX-Statusregel sind.
 *Dieser Review ist eine einmalige Messung, kein dauerhafter Nachweis. Er
 ersetzt keine Audit-Datei und wird nicht im INDEX-Verzeichnis aufgenommen,
 da er ein transientes Prüfungsergebnis ist, nicht kanonische Doku.*
+
+---
+
+## Nachtrag 2026-10-17 (nachmittags) — Korrekturen aus diesem Review
+
+1. **Befund A erledigt:** `docs/ARCHITECTURE.md` §3 zählte fünf inaktive Pakete —
+   korrigiert auf drei (`mobile`, `openapi`, `shinon-forge`); §8 war bereits korrekt.
+2. **Befund B gegenstandslos:** `docs/FEATURE_ANALYSIS.md` und
+   `docs/FEATURE_RANKING.md` sind per `.gitignore` bewusst untracked und kein Teil
+   des kanonischen Doku-Satzes — kein Statusblock nötig, kein INDEX-Eintrag.
+3. **Befund C/D erledigt:** der INDEX-Pfad-Check schließt `docs/audit/` aus
+   (transiente Reviews mit eingefrorenen Zitaten); `docs/handshakes/` existiert
+   nicht mehr — beendete Handshakes liegen im Archiv.
+4. **Zusätzlich berichtigt:** `README.md` nannte die alten Skriptnamen
+   (`dsh-test.mjs`, `dsh-profile-test.mjs`), unterschlug `scoring`/`traceability`/`mobile`
+   in der Pakettabelle und zählte nur zwei inaktive Pakete; dieselben alten Namen
+   standen in `.agents/skills/` (`dsh-dev-workflow`, `dsh-test-tempo`,
+   `dsh-bug-muster`, `cordis-architektur`). Die Release-Protokolle
+   (`docs/S3-*`, `S4-*`, `S5-*`, `S6-*`) tragen jetzt regelkonforme `current`-Blöcke
+   und stehen im INDEX-Verzeichnis; `docs/ROADMAP.md` §1.5 grenzt die neuen
+   Bediener-Werkzeuge (`install-user`, `verify:install`, `backup-retention`) vom
+   eingefrorenen v0.4.0-Abnahmeweg ab.

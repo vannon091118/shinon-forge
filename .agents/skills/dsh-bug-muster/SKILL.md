@@ -45,7 +45,7 @@ Rückgabe von `apply` — dann ist automatisches Teardown gratis.
 `profiles/<p>/cordis.patch.yml` `id`/`name`. **Workaround:** Ordner `packages/<dir>/`
 ist die Wahrheit, alles ableiten (`expected(dir)` in `scripts/lib/repo.mjs`); Rename =
 Ordner + Spiegel. Verträge nur in `scripts/lib/repo.mjs` ändern, nie in
-`dsh-test.mjs`/`build.mjs`.
+`shinon-test.mjs`/`build.mjs`.
 
 ## B6. Literal-Drift an der Client->Host-Naht
 **Symptom:** RPC-Richtung „schlägt fehl" ohne Log-Fehler / Drift-Test rot.
@@ -125,9 +125,9 @@ nur für echte Verzeichnisse.
 
 ## Erste Diagnoseschritte bei unklarem Fehler
 1. Fehlermeldung gegen B1–B4 (Cordis-Inject/Fiber) prüfen — das sind die häufigsten.
-2. `node scripts/dsh-test.mjs` — Vertrag/Struktur (B5, B14).
+2. `node scripts/shinon-test.mjs` — Vertrag/Struktur (B5, B14).
 3. `node --test packages/codingmon/test/uebergabe.test.mjs` — Naht (B6, B7).
-4. Verdacht auf Loader/Boot → realer Pfad: `node scripts/dsh-profile-test.mjs`,
+4. Verdacht auf Loader/Boot → realer Pfad: `node scripts/shinon-profile-test.mjs`,
    `node scripts/pack-test.mjs` (B1, B9, B10).
 5. Trace statt Theorie (Post-Mortem 0001): Fiber-Walk instrumentieren, echten
    Subprozess laufen lassen.

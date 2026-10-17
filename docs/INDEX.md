@@ -67,6 +67,12 @@ gilt nicht als Nachmessung.
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-17 | alle harten Zahlen + Befehle |
 | [`docs/INDEX.md`](INDEX.md) | current | 2026-10-17 | dieser Einstieg und die Statusregel |
 | [`docs/ROADMAP.md`](ROADMAP.md) | plan | 2026-10-17 | kanonische Roadmap: Versionsordnung, Historie, Release-Ziele `0.4.0`/`0.5.0`, `1.0.0`-Kriterien und der `0.1.0`-Pfad |
+| [`docs/S3-FRESHCLONE-2026-10-17.md`](S3-FRESHCLONE-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S3: Frischklon-Repro bis Boot |
+| [`docs/S3-FRESH-2026-10-17.md`](S3-FRESH-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S3: HTTP-200-Nachweis |
+| [`docs/S3-FRESH-d8999ab.md`](S3-FRESH-d8999ab.md) | current | 2026-10-17 | Release-Beleg S3 am aktuellen Stand |
+| [`docs/S4-DOCTOR-2026-10-17.md`](S4-DOCTOR-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S4: `doctor` als eigener Befehl |
+| [`docs/S5-RELEASE-2026-10-17.md`](S5-RELEASE-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S5 (teilweise): Schranke ohne Tag |
+| [`docs/S6-MODELLTURN-AUDIT-CI-2026-10-17.md`](S6-MODELLTURN-AUDIT-CI-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S6: zwei benannte Blocker, kein Go |
 | [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) | plan | 2026-10-08 | native App/Tauri: Stufe 1 scharf, 2–4 Konzept |
 | [`docs/MOBILE-PLAN.md`](MOBILE-PLAN.md) | plan | 2026-10-14 | Mobile-Profil, ballastarmes UI, CI-/Sicherheits-Gates und Android-Runtime-Spike |
 | [`docs/SCORING-KONZEPT.md`](SCORING-KONZEPT.md) | plan | 2026-10-11 | Scoring-Konzept: K1–K4 als Ist, K5–K8 als Ziel — implizite Signale, Dauerhaftigkeit über den Ledger, Vorlieben-Trennung, ohne Deckel |
@@ -87,9 +93,11 @@ gilt nicht als Nachmessung.
 Baum; die vollständige Liste und jede Umleitung steht in
 [`docs/archive/README.md`](archive/README.md).
 
-**Neue Nachweise** (noch nicht abgeschlossen) liegen unter `docs/audit/` bzw.
-`docs/handshakes/`; `docs/audit/` ist derzeit leer, weil alle Nachweise
-abgeschlossen und archiviert sind. Belege `docs/contracts/` und `docs/probes/`
+**Neue Nachweise** (noch nicht abgeschlossen) liegen unter `docs/audit/`;
+`docs/handshakes/` existiert derzeit nicht — beendete Handshakes liegen im Archiv.
+Derzeit liegt unter `docs/audit/` der transiente Review
+[`docs/audit/DOC_REVIEW_2026-10-17.md`](audit/DOC_REVIEW_2026-10-17.md); nach
+Einarbeitung seiner Korrekturen wandert er ins Archiv. Belege `docs/contracts/` und `docs/probes/`
 sind JSON-Dateien mit eigenem Statusfeld; sie sind Proben **mit Datum** und
 werden nicht nachträglich „aktuell“ gemacht, sondern neu gemessen.
 
@@ -109,6 +117,8 @@ Prüfbefehl (erwartet `defekt 0` im **kanonischen Satz**). Nicht geprüft werden
 
 - `docs/archive/` — dort stehen eingefrorene Nachweise (sie nennen absichtlich
   Pfade ihres Messzeitpunkts, z. B. das gelöschte Profil web);
+- `docs/audit/` — dort stehen transiente Reviews mit eingefrorenen Zitaten (sie
+  wandern nach Abschluss ins Archiv und werden nicht als live-Referenzen gelesen);
 - Verweise auf Verzeichnisse (mit `/` am Ende) — sie sind Konvention, keine Datei;
 - historische Namen, die in dieser Datei nur als Text stehen (dsh-test.mjs,
   dsh-profile-test.mjs, das pnpm-Verzeichnis) — eingefrorene Belege, keine
@@ -119,7 +129,7 @@ node --input-type=module -e '
 import fs from "node:fs"; import path from "node:path";
 const files = ["README.md","AGENTS.md","IDEA.md","shinon-forge-implementierungsplan.md","THIRD_PARTY_NOTICES.md"];
 const walk = d => fs.readdirSync(d,{withFileTypes:true}).flatMap(e => { const p = d+"/"+e.name; return e.isDirectory() ? walk(p) : (e.name.endsWith(".md") ? [p] : []); });
-const active = (d) => walk(d).filter((f) => !f.startsWith("docs/archive/"));
+const active = (d) => walk(d).filter((f) => !f.startsWith("docs/archive/") && !f.startsWith("docs/audit/"));
 files.push(...active("docs"), ...active("packages"), ...active("vendor"));
 const pat = /`((?:packages|profiles|scripts|docs|assets|vendor|starter)\/[A-Za-z0-9._\/-]+)`|\[[^\]]*\]\(((?:packages|profiles|scripts|docs|assets|vendor|starter)\/[^)\s]+)\)/g;
 let checked = 0, broken = 0;

@@ -13,11 +13,11 @@ falschen. Regeln aus DSHs Testing-Policy (`docs/testing.md`) und diesem Repo.
 | Signal braucht… | Aufruf | Dauer-Ordnung |
 |---|---|---|
 | Kernlogik/Formel | `node --test packages/codingmon/test/*.test.mjs` | Millisekunden |
-| Vertrag/Struktur | `node scripts/dsh-test.mjs` | Sekunden |
+| Vertrag/Struktur | `node scripts/shinon-test.mjs` | Sekunden |
 | Gate-Logik selbst | `node --test scripts/gate/tests/*.test.mjs` | Sekunden |
 | eine Regel beweisen | `node scripts/validate-test.mjs` | Sekunden |
 | eine Naht | `node --test packages/codingmon/test/uebergabe.test.mjs` | Sekunden |
-| Boot/Composition | `node scripts/dsh-profile-test.mjs` | teuer |
+| Boot/Composition | `node scripts/shinon-profile-test.mjs` | teuer |
 | Distribution | `node scripts/pack-test.mjs` | teuerste |
 | alles | `npm test` | nur am Ende |
 
@@ -57,10 +57,10 @@ falschen. Regeln aus DSHs Testing-Policy (`docs/testing.md`) und diesem Repo.
 | Kern-Mathematik/Regelwerk | `node --test packages/codingmon/test/*.test.mjs` |
 | Client→Host-Naht, Literal-Drift | `packages/codingmon/test/uebergabe.test.mjs` |
 | dauerhafter Store gegen echte DSH-Storage | `scripts/gate/tests/codingmon-store.test.mjs` |
-| Vertrag/Struktur/Namen | `node scripts/dsh-test.mjs` |
+| Vertrag/Struktur/Namen | `node scripts/shinon-test.mjs` |
 | Regel wird Gate+Build erzwingen | `scripts/validate-test.mjs` (Fixture) |
 | Paket lädt isoliert (Distribution) | `node scripts/pack-test.mjs` |
-| alle Bundle-Layer resolvieren | `node scripts/dsh-profile-test.mjs` |
+| alle Bundle-Layer resolvieren | `node scripts/shinon-profile-test.mjs` |
 | Regressions-Guard | Mutation → rot → revert (Probe!) |
 
 ## Stale-Artifact-Falle (kostet die meisten Wiederholungen)

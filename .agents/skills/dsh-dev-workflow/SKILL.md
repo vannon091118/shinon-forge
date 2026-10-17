@@ -13,13 +13,13 @@ Stelle. Reihenfolge spart Zeit: schnelle Checks zuerst, teure zuletzt.
 | Befehl | prüft | braucht |
 |---|---|---|
 | `node --test packages/codingmon/test/*.test.mjs` | Kern-Mathematik, Kompositor, E2E (vm, Fake-Clock) | nichts (nach `index.js`-Reexport) |
-| `node scripts/dsh-test.mjs` | Gate: Manifest, Ressourcen, Patch-Schema, Namensvertrag, Syntax, Legacy-Guard, Komposition | `dsh` im PATH (YAML-Parser) |
+| `node scripts/shinon-test.mjs` | Gate: Manifest, Ressourcen, Patch-Schema, Namensvertrag, Syntax, Legacy-Guard, Komposition | `dsh` im PATH (YAML-Parser) |
 | `node --test scripts/gate/tests/*.test.mjs` | Gate-Logik selbst | wenig |
 | `node scripts/validate-test.mjs` | je Regel: Gate **und** Build werden rot (Fixtures) | `dsh` |
 | `node --test scripts/gate/tests/codingmon-store.test.mjs` | Pet-Store gegen echte DSH-Storage-Familie | `dsh`, `node_modules` |
 | `node --test packages/codingmon/test/uebergabe.test.mjs` | Naht Client->Host, Literal-Drift, beide Cordis-Roots | `node_modules` |
 | `node scripts/pack-test.mjs` | Distribution je Paket: `npm pack` → isoliert installieren → laden | npm (netzgebunden, teuerster Lauf) |
-| `node scripts/dsh-profile-test.mjs` | `dsh --profile shinon --dump-config`, alle 8 Bundle-Layer | installiertes DSH |
+| `node scripts/shinon-profile-test.mjs` | `dsh --profile shinon --dump-config`, alle Bundle-Layer (Zahl: `docs/ZAHLEN.md` §2) | installiertes DSH |
 | `npm test` | alles oben in der Reihenfolge schnell → teuer | Gesamtstack |
 | `npm run gate` / `gate:local` / `gate:full` | modularer Gate-Engine, slice-selektiv | siehe `scripts/gate/engine.mjs` |
 | `npm run build` | validiert + generiert `dist/` komplett neu | Gesamtstack |
@@ -30,7 +30,7 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
 ## Womit man arbeitet
 
 - **Verträge ändern** → ausschließlich `scripts/lib/repo.mjs` (eine Quelle für Gate,
-  Build, validate-test). Nie `dsh-test.mjs` oder `build.mjs` direkt patchen.
+  Build, validate-test). Nie `shinon-test.mjs` oder `build.mjs` direkt patchen.
 - **Regel geändert?** → braucht ein neues Fixture in `scripts/validate-test.mjs`, das
   beweist: Gate **und** Build werden rot. Sonst ist die Regel wirkungslos.
 - **Gate-Plugin geändert?** → `scripts/gate/policy.json` synchron halten
@@ -51,7 +51,7 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
 
 1. Vertrag/Kern ändern (`scripts/lib/repo.mjs`, `assets/`), Tests mitziehen.
 2. Schnell laufen lassen: `node --test packages/codingmon/test/*.test.mjs`.
-3. `node scripts/dsh-test.mjs` — Namens-/Strukturfehler sofort.
+3. `node scripts/shinon-test.mjs` — Namens-/Strukturfehler sofort.
 4. Naht/Integration: uebergabe-Test, store-Test (falls relevant).
 5. Teure Runde: `npm test` (pack-test + Profiltest inklusive).
 6. `npm run build` nur wenn `dist/` gewünscht — es ist generiert, nie handeditiert.

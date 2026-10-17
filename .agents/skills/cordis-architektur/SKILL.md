@@ -133,8 +133,8 @@ Mechanismen nutzt. Regeln gelten für jedes `packages/<dir>/index.js`.
 
 ## Prüfpfad für Architektur-Änderungen
 
-1. `node scripts/dsh-test.mjs` (Gate) — Struktur/Namen bleiben konsistent.
+1. `node scripts/shinon-test.mjs` (Gate) — Struktur/Namen bleiben konsistent.
 2. `node --test packages/<dir>/test/*.test.mjs` — Kernlogik ohne DSH.
 3. `node --test packages/codingmon/test/uebergabe.test.mjs` — Naht-Drift
    (braucht `node_modules`).
-4. `node scripts/dsh-profile-test.mjs` — alle Layer resolvieren im echten Boot.
+4. `node scripts/shinon-profile-test.mjs` — alle Layer resolvieren im echten Boot.

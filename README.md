@@ -126,6 +126,11 @@ belegt (Test + Probelauf Exit 0); S5/S6 bleiben offen, also gilt v0.4.0 weiter a
 abgenommen. `npm run update` bleibt der **DSH-Upstream**-Updater und
 aktualisiert nicht Shinon Forge.
 
+Daneben enthält der Baum Bediener-Werkzeuge (`npm run install:user`,
+`npm run verify:install`, `npm run backup:retention`); der eingefrorene
+v0.4.0-Abnahmeweg bleibt der Quellklon, bis `PLAN.md` §9.1 einen weiteren
+Slice belegt.
+
 ---
 
 ## 🔌 Boot und Schlüssel
@@ -178,6 +183,7 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 | **[@shinon/prompter](packages/prompter)** | One-Shot Prompt-Enhancer am `agent/pre-step` (Route im Profil leer) | ✅ |
 | **[@shinon/task-router](packages/task-router)** | liest die validierte Klassifikation des Enhancers | ✅ |
 | **[@shinon/project-index](packages/project-index)** | persistenter Projektindex (files, symbols, edges, FTS) außerhalb des Repos | ✅ |
+| **[@shinon/scoring](packages/scoring)** | Scoring-Schicht: Scorecard lesen, nie schreiben (Decay, Relation, Signal-Ohren) | ✅ |
 | **[@shinon/codingmon](packages/codingmon)** | Pet-/Kampf-System mit dauerhaftem Zustand und Client→Host-Naht | ✅ |
 | **[@shinon/key-router](packages/key-router)** | Key-Pool mit 429-Rotation: Werkzeuge `key_router_status`/`key_router_rotate`/`key_router_probe`, Provider-Override für konfigurierte Credentials-Referenzen; echte Provider-Rotation mit realen Schlüsseln nicht live geprüft | ✅ |
 | **[@shinon/narrative](packages/narrative)** | Chronicle, Arcs, Relationships, Composite State (Zug 5 aktiviert) | ✅ |
@@ -185,12 +191,15 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 | **[@shinon/better-errors](packages/better-errors)** | Config-Ebene ohne Logik: `apply()` loggt nur | ✅ |
 | **[@shinon/token-usage](packages/token-usage)** | zeigt im Sidebar-Fuß die Token-Zahl des JÜNGSTEN Turns (aus dessen eigenen Ereignissen gefaltet, dieselbe Zahl wie DSHs Turn-Zeile) und im Titel daneben die Sitzungssumme (DSH-Sitzungs-Projektion `tokenUsage`, dieselbe Zahl wie DSHs Fußpille) | ✅ |
 | **[@shinon/openapi](packages/openapi)** | Vertrag (`openapi.yaml`) vorhanden, **kein** Server — bewusst nicht aktiviert | — |
+| **[@shinon/mobile](packages/mobile)** | minimale Viewport-Unterstützung für das erste Android-Runtime-Profil — Vorbereitung, bewusst nicht aktiviert | — |
 | **[@shinon/popup](packages/popup)** | Fortschritts-Overlay im `conversation.composer.dock`: faltet das Ereignisfenster der Sitzung (Schritt, offene Aufrufe, zuletzt benutztes Werkzeug) und übersetzt den Text aus `locale-de` | ✅ |
+| **[@shinon/traceability](packages/traceability)** | flüchtige Toasts im Chat: Tool-Calls mit Ergebnis, Schritte und Fehler als Benachrichtigung | ✅ |
 
 Die Spalte „Profil“ ist gemessen aus `profiles/shinon/package.json` (Zahl: `docs/ZAHLEN.md` §1).
-`openapi` und `shinon-forge` stehen nicht darin — bei `openapi` ist das eine
+`mobile`, `openapi` und `shinon-forge` stehen nicht darin — bei `openapi` ist das eine
 dokumentierte Entscheidung (`docs/ARCHITECTURE.md` §4), bei `shinon-forge` ein Verdikt
-(es startet fremde Engines; `PLAN.md` §3.12.1). Beide tragen selbst
+(es startet fremde Engines; `PLAN.md` §3.12.1), bei `mobile` Vorbereitung
+(`0.1.0`, Weg ins Mobile-Profil). Alle drei tragen selbst
 `"dsh": { "inactive": true }` im eigenen Manifest (`dead-package`-Gate).
 Alle Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
 allein `dsh.profile.bundles` im Profil (Bestandszahlen: `docs/ZAHLEN.md` §1).
@@ -224,18 +233,18 @@ daneben. Verbindlich: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## 📊 Projektstatus
 
-Statusklassen — und was sie hier bedeuten:
+Statusklassen — Befehle stehen hier, Belege in `docs/ZAHLEN.md`:
 
-- **Verified** — in **diesem** Durchlauf (2026-10-10) ausgeführt und **Exit 0 gesehen**.
+- **Verified** — in einem belegten Durchlauf ausgeführt und **Exit 0 gesehen** (Zeitpunkt und Zählung je Beleg: [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §2).
 - **Rot** — in diesem Durchlauf ausgeführt und **nicht** Exit 0; der Befund steht in
   [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §3.
 - **Nicht geprüft** — kein Exit-0-Beleg aus diesem Durchlauf (auch wenn es früher lief).
 
 | Bereich | Status 2026-10-10 | Beleg |
 |---|---|---|
-| Namensvertrag, Manifeste, Syntax, Legacy-Guard, Ressourcen, Komposition | **Verified** | `node scripts/dsh-test.mjs` → Exit 0 |
+| Namensvertrag, Manifeste, Syntax, Legacy-Guard, Ressourcen, Komposition | **Verified** | `node scripts/shinon-test.mjs` → Exit 0 |
 | Regel-Fixtures (Gate **und** Build müssen rot werden) | **Verified** | `node scripts/validate-test.mjs` → Exit 0 |
-| Profil `profiles/shinon` auflösbar (alle Layer, alle eigenen Bundles) | **Verified** | `node scripts/dsh-profile-test.mjs` → Exit 0 |
+| Profil `profiles/shinon` auflösbar (alle Layer, alle eigenen Bundles) | **Verified** | `node scripts/shinon-profile-test.mjs` → Exit 0 |
 | Marker-Regeln in Vertrag + Host + Client | **Verified** | `node --test scripts/gate/tests/markers.test.mjs` → Exit 0 |
 | Event-Spine gegen die eingefrorene Fixture | **Verified** | `node --test scripts/gate/tests/events-spine.test.mjs` → Exit 0 |
 | Codemon-Kernmathematik, Kompositor-Regel, Client-Durchstich im vm | **Verified** | `npm run test:codingmon` → Exit 0 (überspringt sichtbar, was DSH-Bausteine braucht) |
@@ -254,15 +263,15 @@ Zählungen, Exit-Codes und die Ursachen jedes roten Befunds stehen **nur** in
 
 ## ⚙ Build & Test
 
-Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man sie braucht:
+Die Befehle aus `package.json` (`scripts`), in der Reihenfolge, in der man sie braucht — Auswahl, vollständig ist die Datei selbst:
 
 | Befehl | Wirkung |
 |---|---|
 | `npm test` | Volle Kette: Codingmon-Tests → Gate → Fixtures → Distribution → Profil (stoppt beim ersten Fehler) |
-| `node scripts/dsh-test.mjs` | statisches Gate: Manifest, Namensvertrag, `index.js`, `client.js`, `cordis.patch.yml`, Legacy-Guard, Quell-Zwillings-Drift, Profil |
+| `node scripts/shinon-test.mjs` | statisches Gate: Manifest, Namensvertrag, `index.js`, `client.js`, `cordis.patch.yml`, Legacy-Guard, Quell-Zwillings-Drift, Profil |
 | `node scripts/validate-test.mjs` | Regel-Fixtures: jede Regel muss Gate **und** Build rot werden |
 | `node scripts/pack-test.mjs` | Distribution je Paket: `npm pack` → entpacken → isoliert installieren → laden |
-| `node scripts/dsh-profile-test.mjs` | Profiltest: `dsh --profile shinon --dump-config`, alle Layer |
+| `node scripts/shinon-profile-test.mjs` | Profiltest: `dsh --profile shinon --dump-config`, alle Layer |
 | `npm run gate` / `gate:local` / `gate:full` | modulare Gate-Engine (Slices / lokal / alle Gates) |
 | `npm run gate:test` | reine Gate-Logik (kein DSH nötig) |
 | `npm run test:codingmon` / `test:hook` | paketlokale Tests |
@@ -270,6 +279,10 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 | `npm run dev` / `dev:web` / `open` | DSH mit dem Profil starten (Web-UI) |
 | `npm start [-- …]` · `shinon [-- …]` | der Einstieg ([`bin/shinon.mjs`](bin/shinon.mjs), auch als `bin`-Feld im Manifest): heilt Node ≥ 22 selbst, findet `dsh` auch außerhalb des PATH und **nennt dessen Herkunft**, startet das Profil; `--check` prüft nur die Startfähigkeit. `scripts/start.mjs` bleibt als kompatibler Aufruf und importiert dieselbe Umsetzung |
 | `npm run verify:panel` | Panel-Beleg über `scripts/panel-check.mjs` (braucht jsdom) |
+| `npm run install:user` | Nutzer-Installat mit Abnahme: `install`/`update`/`rollback`/`status`/`history`/`auto`/`units`/`selftest` (`scripts/install-user.mjs`) |
+| `npm run verify:install` | read-only Selbsttest eines bestehenden Stands: Check, Doctor, Boot, HTTP-Nachweis (Exit 0 nur bei 4/4) |
+| `npm run backup:retention` | Aufbewahrung des Sicherungsordners (`--keep`, `--max-age`, `--dry-run`, `--json`; jede Anwendung protokolliert) |
+| `npm run profile:links` | Profil-Links setzen/prüfen (idempotent, Fremdpfade Exit 2) |
 | `npm run stages` | Startstufen/Ready-Zeile aus `scripts/open.mjs` nachvollziehen |
 | `npm run scale:check` | Skalierungsnachweis: Kopie des Baums + `--plugins N` neue Klon-Pakete durch Idiome, Gate, `gate:full`, Gate-Tests, Distribution und Build — braucht Node ≥ 22, nicht Teil von `npm test` (`N` und sein Standard: `scripts/scale-check.mjs`) |
 | `npm run commit:guard -- …` | Commit-Regeln prüfen (`--ci`, `--last n`, `--range`, `--all`) |
@@ -288,8 +301,8 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
 - **Versionsangleich der Pakete**: die Zeile folgt aus dem eigenen Manifest (`dsh.inactive`
   darf `0.1.0` führen, sonst `1.0.0`) — die gemessene Verteilung steht in
   `docs/ZAHLEN.md` §1; das statische Gate `doctor` ist grün, der gleichnamige Laufzeit-Unterbefehl ist seit 2026-10-17 implementiert und belegt (v0.4.0-S4).
-- **Nicht aktivierte Pakete** (`openapi`, `shinon-forge`): beide sind entschieden, nicht
-  vergessen — `openapi` hat einen Vertrag ohne Server, `shinon-forge` startet fremde Engines.
+- **Nicht aktivierte Pakete** (`mobile`, `openapi`, `shinon-forge`): alle drei sind entschieden, nicht
+  vergessen — `mobile` ist Vorbereitung für das Mobile-Profil, `openapi` hat einen Vertrag ohne Server, `shinon-forge` startet fremde Engines.
   `key-router` und `popup` sind am 2026-10-13 aktiviert worden (Overlay bzw. Pool-Werkzeuge).
   Offen bleibt nur die Live-Probe der 429-Rotation gegen den echten Anbieter mit
   echten Schlüsseln; die Pool-/Override-Kette bis zum Loopback-Draht ist getestet.
@@ -317,14 +330,15 @@ Shinon-forge/
 │   ├── ARCHITECTURE.md        # Namespace, Paketgrenzen, Profil-Vertrag
 │   ├── COMMIT-REGELN.md       # Commit-Regeln und Durchsetzung
 │   ├── STARTER-PLAN.md        # native App (plan)
-│   ├── PLAN.md · FOUNDATION-PLAN.md · REPO-ANALYSIS.md · SYSTEM-ANALYSIS.md   # historical
+│   ├── S*-Protokolle (S3/S4/S5/S6: Release-Belege 2026-10-17, current)
 │   ├── contracts/             # Verträge (JSON, mit Statusfeld)
 │   ├── probes/                # Falsifikations-Proben (JSON, mit Datum)
 │   ├── archive/               # archivierte Altfassungen (u. a. IDEA-raw-export.md)
-│   └── legacy-goose-prompts/  # importierte Fremdtexte
+│   ├── audit/                 # laufende Nachweise (transient, wandern nach Abschluss ins Archiv)
+│   └── archive/               # abgeschlossene Stände + importierte Fremdtexte (u. a. legacy-goose-prompts)
 ├── IDEA.md · shinon-forge-implementierungsplan.md   # current bzw. historical (Statusblock im Kopf)
 ├── scripts/                   # Gate-Engine, Build, Tests, Helfer (gate/, lib/, *.mjs)
-├── prompts/ · assets/banner.svg
+├── assets/banner.svg
 └── profiles/shinon/          # out-of-tree-Profil (package.json, cordis.patch.yml, cordis.yml)
 ```
 

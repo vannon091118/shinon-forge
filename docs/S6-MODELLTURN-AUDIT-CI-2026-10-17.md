@@ -1,6 +1,6 @@
 # S6 Modellturn + Audit + CI — Protokoll 2026-10-17
 
-> **Status:** teils belegt, mit zwei benannten Blockern — kein Go (PLAN.md §9.1)
+> **Status:** current — Release-Beleg S6: zwei benannte Blocker, kein Go (PLAN.md §9.1)
 > **Stand:** 2026-10-17, ~10:30 UTC, Commit `4db4006`, Node `v24.21.0`
 
 S6 verlangt drei Belege: echten Modellturn, Security-/Dependency-Audit und

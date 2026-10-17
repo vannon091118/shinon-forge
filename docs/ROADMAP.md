@@ -31,6 +31,16 @@ und S4 (`shinon doctor` als eigener Unterbefehl, Test 6/6, Hilfe + Fehlerpfade) 
 Bis auch S5/S6 erfüllt und ein grüner CI-Lauf des Bump-Commits belegt ist, ist
 `v0.4.0` nicht als Release abgenommen.
 
+**Werkzeuge im Baum, außerhalb des Urteils:** `scripts/install-user.mjs` (`npm run
+install:user`: `install`/`update`/`rollback`/`status`/`history`/`auto`/`units`/`selftest`),
+`npm run verify:install` (read-only Selbsttest eines bestehenden Stands) und
+`scripts/backup-retention.mjs` (`npm run backup:retention`) existieren als
+Bediener-Werkzeuge mit eigenen Gate-Tests — sie sind noch kein belegter
+Release-Installationsweg. Der v0.4.0-Abnahmeweg bleibt der Quellklon, bis
+`PLAN.md` §9.1 einen weiteren Slice führt. Namensgrenze: `npm run install:user
+update` pflegt ein Nutzer-Installat, `npm run update` prüft den DSH-Upstream —
+`shinon update` (Forge-Selbstupdate) bleibt Folgearbeit.
+
 **Außerhalb des Freeze (Ziel v0.5.0 oder später, nur als Folgearbeit
 dokumentiert):** `shinon update` (Forge-Selbstupdate), persistentes
 `shinon autoupdate`, `.deb`-Bau/Installation (`npm run deb` existiert nicht als

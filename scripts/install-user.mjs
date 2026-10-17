@@ -21,6 +21,22 @@
  *              wählbar) aus dem Lockfile — sparsam auf der Platte, braucht Netz.
  *   status     was läuft, welcher Stand davor liegt, was die letzte Abnahme sagte.
  *   history    das dauerhafte Protokoll aller Abnahmen als Tabelle (oder --json).
+ *   auto       der Timer-Lauf: neuen Stand in ein STAGING bauen, dort abnehmen
+ *              und das Live-Verzeichnis erst bei grünem Urteil umschalten.
+ *   units      den systemd-User-Timer schreiben/entfernen, der `auto` aufruft.
+ *   selftest   der Ein-Befehl-Selbsttest (auch `npm run verify:install`): check,
+ *              doctor, Boot und HTTP-Nachweis gegen einen bestehenden Stand.
+ *              READ-ONLY — kein Checkout, kein `npm ci`, keine Zustandsänderung,
+ *              kein Rückweg; Exit 0 nur bei vollständiger Kette (4/4), sonst 1.
+ *
+ * WARUM ES `auto` NEBEN `update` GIBT (gemessener Unterschied, keine Kosmetik):
+ * `update` installiert IN das laufende Verzeichnis und prüft danach — für die
+ * Dauer des `npm ci` steht dort ein ungeprüfter Stand, und ein rotes Urteil
+ * muss danach zurückgerollt werden. `auto` baut den Kandidaten daneben, nimmt
+ * IHN ab und benennt erst dann um (zwei `rename`s, kein Kopieren). Ein rotes
+ * Urteil kostet damit nichts: das Live-Installat hat den Kandidaten nie
+ * gesehen. Nach der Umschaltung wird der neue Ort erneut abgenommen; ist sie
+ * rot, tauschen dieselben zwei Umbenennungen zurück.
  *
  * Jede Abnahme wird in `<stateDir>/logs/verify-log.jsonl` geschrieben — eine
  * Zeile je Lauf, ohne Geheimnisse (kein Token, keine Schlüssel): Stand, Trigger,
@@ -56,13 +72,15 @@
  *   node scripts/install-user.mjs install  [--prefix DIR] [--ref R] [--source URL] [--no-verify]
  *   node scripts/install-user.mjs update   [--prefix DIR] [--ref R] [--no-verify] [--force]
  *   node scripts/install-user.mjs rollback [--prefix DIR] [--to SHA] [--no-verify] [--force] [--no-rollback]
- *   node scripts/install-user.mjs status   [--prefix DIR]
+ *   node scripts/install-user.mjs status   [--prefix DIR] [--quiet]
  *   node scripts/install-user.mjs history  [--limit N] [--json]
+ *   node scripts/install-user.mjs auto     [--prefix DIR] [--staging DIR] [--ref R] [--quiet]
+ *   node scripts/install-user.mjs units    [--interval ZEIT] [--no-enable] [--remove]
  *   Abnahme: [--port N] [--timeout S] [--no-rollback]
  * Exit: 0 = Stand installiert und abgenommen · 1 = Abnahme rot · 2 = Bedien- oder Umgebungsfehler
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createServer, connect } from 'node:net';
@@ -76,7 +94,10 @@ const STATE_VERSION = 1;
 const HISTORY_MAX = 20;
 const VERIFY_TIMEOUT_S = 120;
 
-const say = (line = '') => console.log(line);
+/** Fortschritt — mit `--quiet` still, weil der Timer das Journal nicht fluten soll. */
+const say = (line = '') => {
+  if (!QUIET) console.log(line);
+};
 const warn = (line) => console.warn(`   ⚠️  ${line}`);
 const die = (message, code = 2) => {
   console.error(`\n💥 install-user: ${message}`);
@@ -95,16 +116,26 @@ const flag = (name, fallback = null) => {
   return value;
 };
 const has = (name) => argv.includes(`--${name}`);
+// Muss vor jedem `say` stehen: `--help` druckt, bevor der Rest ausgewertet ist.
+const QUIET = has('quiet');
 
-const USAGE = `Aufruf: node scripts/install-user.mjs <install|update|rollback|status|history> [Optionen]
+const USAGE = `Aufruf: node scripts/install-user.mjs <install|update|rollback|status|history|auto|units|selftest> [Optionen]
   --prefix DIR     Installationsverzeichnis (Default ${DEFAULT_PREFIX})
-  --ref REF        Ziel-Ref für install/update (Default origin/main)
+  --staging DIR    Kandidaten-Verzeichnis für auto (Default <prefix>-staging)
+  --ref REF        Ziel-Ref für install/update/auto (Default origin/main)
   --to SHA         Ziel-SHA für rollback (Default: der vorherige Stand)
   --source URL     Klon-Quelle (Default: origin dieses Repos)
   --port N         Port für die Boot-Abnahme (Default: freier Port)
   --timeout S      Wartezeit auf "dsh web:" (Default ${VERIFY_TIMEOUT_S})
   --limit N        Anzahl der Zeilen für history (Default 20)
   --json           history als JSON-Zeilen statt Tabelle
+  --interval ZEIT  Rhythmus des Timers (units, Default 1d)
+  --first-delay ZEIT  erster Lauf nach Aktivierung (units, Default 10min)
+  --spread ZEIT    Streuung gegen Gleichzeitigkeit (units, Default 1h; 0 = keine)
+  --no-enable      units schreiben, Aktivierung von Hand
+  --no-systemd     units schreibt/löscht nur Dateien, ohne systemctl (Tests)
+  --remove         units entfernen (disable + löschen)
+  --quiet          nur die Ergebniszeile (für den Timer im Journal)
   --no-verify      Installation ohne Boot-Abnahme
   --no-rollback    bei roter Abnahme NICHT auf den letzten grünen Stand zurück
   --force          auch wenn eine Instanz aus dem Zielverzeichnis läuft`;
@@ -117,12 +148,15 @@ if (command === null) {
   console.error(USAGE);
   process.exit(2);
 }
-if (!['install', 'update', 'rollback', 'status', 'history'].includes(command)) die(`unbekannter Unterbefehl "${command}"\n${USAGE}`);
+if (!['install', 'update', 'rollback', 'status', 'history', 'auto', 'units', 'selftest'].includes(command)) die(`unbekannter Unterbefehl "${command}"\n${USAGE}`);
 
 const PREFIX = resolve(flag('prefix', DEFAULT_PREFIX));
 const NO_VERIFY = has('no-verify');
 const NO_ROLLBACK = has('no-rollback');
 const FORCE = has('force');
+/** Tests schreiben in ein anderes XDG_CONFIG_HOME: dann darf systemctl NICHT laufen —
+ *  `systemctl --user disable` würde sonst den echten Timer des Nutzers treffen. */
+const NO_SYSTEMD = has('no-systemd');
 const PORT = flag('port', null) === null ? null : Number(flag('port'));
 const TIMEOUT_S = Number(flag('timeout', String(VERIFY_TIMEOUT_S)));
 if (PORT !== null && (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535)) die('--port muss eine Portnummer sein');
@@ -236,74 +270,74 @@ function instancesUsing(prefix) {
  * laufende Instanz verliert dabei ihr node_modules unter den Füßen. Die reine
  * Abnahme startet ihren eigenen Prozess auf freiem Port und braucht keine Ruhe.
  */
-function guardInstances() {
-  const running = instancesUsing(PREFIX);
+function guardInstances(target = PREFIX) {
+  const running = instancesUsing(target);
   if (running.length === 0) return;
   if (FORCE) {
-    warn(`${running.length} Instanz(en) laufen aus ${PREFIX} — --force gesetzt, sie können brechen`);
+    warn(`${running.length} Instanz(en) laufen aus ${target} — --force gesetzt, sie können brechen`);
     return;
   }
   const list = running.map((hit) => `PID ${hit.pid}: ${hit.cmdline.slice(0, 120)}`).join('\n   ');
-  die(`aus ${PREFIX} laufen noch Instanzen — bitte beenden oder --force:\n   ${list}`);
+  die(`aus ${target} laufen noch Instanzen — bitte beenden oder --force:\n   ${list}`);
 }
 
 /** Steht der gepinnte dsh schon im Ziel? (Spart ein sinnloses npm ci.) */
-function dshInstalled() {
-  return existsSync(join(PREFIX, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'));
+function dshInstalled(dir = PREFIX) {
+  return existsSync(join(dir, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'));
 }
 
-function headSha() {
-  const head = git(['rev-parse', 'HEAD'], PREFIX, { allowFail: true });
+function headSha(dir = PREFIX) {
+  const head = git(['rev-parse', 'HEAD'], dir, { allowFail: true });
   return head.status === 0 ? head.stdout.trim() : null;
 }
 
 /** Ein Git-Klon im Ziel, oder ein klarer Fehler. */
-function ensureCheckout() {
-  if (!existsSync(join(PREFIX, 'package.json'))) {
-    say(`\n📦 Klon nach ${PREFIX}`);
-    mkdirSync(dirname(PREFIX), { recursive: true });
-    tool('git', ['clone', '--quiet', sourceUrl(), PREFIX], dirname(PREFIX), `git clone ${sourceUrl()}`);
+function ensureCheckout(dir = PREFIX, label = 'Installat') {
+  if (!existsSync(join(dir, 'package.json'))) {
+    say(`\n📦 ${label}: Klon nach ${dir}`);
+    mkdirSync(dirname(dir), { recursive: true });
+    tool('git', ['clone', '--quiet', sourceUrl(), dir], dirname(dir), `git clone ${sourceUrl()}`);
     return;
   }
-  const probe = git(['rev-parse', '--git-dir'], PREFIX, { allowFail: true });
+  const probe = git(['rev-parse', '--git-dir'], dir, { allowFail: true });
   if (probe.status !== 0) {
-    die(`${PREFIX} existiert, ist aber kein Git-Klon — bitte von Hand prüfen, dieses Werkzeug löscht nichts`);
+    die(`${dir} existiert, ist aber kein Git-Klon — bitte von Hand prüfen, dieses Werkzeug löscht nichts`);
   }
 }
 
-function fetchAndResolve(ref) {
-  say('   → git fetch origin');
-  const fetched = spawnSync('git', ['-C', PREFIX, 'fetch', '--prune', '--quiet', 'origin'], { encoding: 'utf8' });
+function fetchAndResolve(ref, dir = PREFIX) {
+  say(`   → git fetch origin (${dir})`);
+  const fetched = spawnSync('git', ['-C', dir, 'fetch', '--prune', '--quiet', 'origin'], { encoding: 'utf8' });
   if (fetched.status !== 0) {
     die(`git fetch scheiterte (Exit ${fetched.status}): ${(fetched.stderr ?? '').trim()} — offline?`);
   }
   const candidates = ref === null ? ['origin/main'] : [ref, `origin/${ref}`];
   for (const candidate of candidates) {
-    const resolved = git(['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`], PREFIX, { allowFail: true });
+    const resolved = git(['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`], dir, { allowFail: true });
     if (resolved.status === 0) return { sha: resolved.stdout.trim(), ref: candidate };
   }
   die(`Ref "${ref ?? 'origin/main'}" ist im Klon nicht auflösbar`);
 }
 
-function checkout(sha) {
-  say(`   → git checkout ${sha.slice(0, 12)}`);
-  git(['checkout', '--force', '--quiet', sha], PREFIX);
-  const head = git(['rev-parse', 'HEAD'], PREFIX).stdout.trim();
+function checkout(sha, dir = PREFIX) {
+  say(`   → git checkout ${sha.slice(0, 12)} (${dir})`);
+  git(['checkout', '--force', '--quiet', sha], dir);
+  const head = git(['rev-parse', 'HEAD'], dir).stdout.trim();
   if (head !== sha) die(`Checkout landete auf ${head}, erwartet war ${sha}`);
-  const dirty = git(['status', '--porcelain', '--untracked-files=no'], PREFIX).stdout.trim();
+  const dirty = git(['status', '--porcelain', '--untracked-files=no'], dir).stdout.trim();
   if (dirty !== '') die(`Arbeitsbaum nach dem Checkout nicht sauber:\n${dirty}`);
 }
 
-function installDependencies() {
+function installDependencies(dir = PREFIX) {
   const [cmd, prefixArgs] = npmCommand();
-  tool(cmd, [...prefixArgs, 'ci', '--no-audit', '--no-fund'], PREFIX, 'npm ci (Lockfile)');
-  linkProfiles();
+  tool(cmd, [...prefixArgs, 'ci', '--no-audit', '--no-fund'], dir, 'npm ci (Lockfile)');
+  linkProfiles(dir);
 }
 
-function linkProfiles({ write = true } = {}) {
+function linkProfiles(dir = PREFIX, { write = true } = {}) {
   const node = nodeBinary();
-  if (write) tool(node, [join(PREFIX, 'scripts', 'profile-links.mjs')], PREFIX, 'Profil-Links setzen');
-  tool(node, [join(PREFIX, 'scripts', 'profile-links.mjs'), '--check'], PREFIX, 'Profil-Links prüfen');
+  if (write) tool(node, [join(dir, 'scripts', 'profile-links.mjs')], dir, 'Profil-Links setzen');
+  tool(node, [join(dir, 'scripts', 'profile-links.mjs'), '--check'], dir, 'Profil-Links prüfen');
 }
 
 /* ------------------------------------------------------------------- Abnahme */
@@ -344,14 +378,37 @@ function errorLines(lines) {
   return lines.filter((line) => /\b(error|errors|exception|unhandled|failed|fehlgeschlagen|cannot)\b/i.test(line) && !NOISE.some((pattern) => pattern.test(line)));
 }
 
-async function verify() {
-  const report = { at: new Date().toISOString(), ok: false, dsh: null, herkunft: null, aktiviert: 0, errors: [], http: null, port: null, bootMs: 0, ms: 0 };
+/**
+ * Die Abnahme gegen ein BELIEBIGES Verzeichnis — live oder Staging. Genau
+ * diese Verallgemeinerung macht das Umschalten "nur bei grünem Urteil"
+ * möglich: geprüft wird der Kandidat, nicht das, was schon läuft.
+ */
+/** Die vier Stufen der Kette — einzeln als bestanden/gescheitert, nicht nur als Summe. */
+const STAGES = ['check', 'doctor', 'boot', 'http'];
+
+async function verify(prefix = PREFIX) {
+  const report = {
+    at: new Date().toISOString(),
+    installDir: prefix,
+    ok: false,
+    stages: { check: false, doctor: false, boot: false, http: false },
+    dsh: null,
+    herkunft: null,
+    aktiviert: 0,
+    errors: [],
+    http: null,
+    port: null,
+    bootMs: 0,
+    ms: 0,
+  };
   const started = Date.now();
   const node = nodeBinary();
-  const entry = join(PREFIX, 'bin', 'shinon.mjs');
+  const entry = join(prefix, 'bin', 'shinon.mjs');
 
-  say('\n🔎 Abnahme');
-  const check = spawnSync(node, [entry, '--check'], { cwd: PREFIX, encoding: 'utf8' });
+  say(`\n🔎 Abnahme — ${prefix}`);
+  // cwd MUSS das geprüfte Verzeichnis sein: der Selbsttest gegen ein Staging
+  // darf nicht im Live-Installat stehen, während er den Kandidaten befragt.
+  const check = spawnSync(node, [entry, '--check'], { cwd: prefix, encoding: 'utf8' });
   const checkText = `${check.stdout ?? ''}${check.stderr ?? ''}`;
   if (check.status !== 0) {
     report.errors.push(`shinon --check Exit ${check.status}`);
@@ -359,17 +416,19 @@ async function verify() {
   }
   report.dsh = /dsh:\s+(\S+)/.exec(checkText)?.[1] ?? null;
   report.herkunft = /Herkunft:\s+(.+)/.exec(checkText)?.[1]?.trim() ?? null;
-  if (report.herkunft === null || !report.herkunft.includes(PREFIX)) {
+  if (report.herkunft === null || !report.herkunft.includes(prefix)) {
     report.errors.push(`Herkunft zeigt nicht auf das Installat (${report.herkunft ?? 'fehlt'})`);
     return report;
   }
+  report.stages.check = true;
   say(`   ✓ --check: dsh ${report.dsh}, Herkunft ${report.herkunft}`);
 
-  const doctor = spawnSync(node, [entry, 'doctor'], { cwd: PREFIX, encoding: 'utf8' });
+  const doctor = spawnSync(node, [entry, 'doctor'], { cwd: prefix, encoding: 'utf8' });
   if (doctor.status !== 0) {
     report.errors.push(`shinon doctor Exit ${doctor.status}`);
     return report;
   }
+  report.stages.doctor = true;
   say('   ✓ doctor: gesund, keine Befunde');
 
   const port = PORT ?? (await freePort());
@@ -378,8 +437,8 @@ async function verify() {
   const lines = [];
   const bootStarted = Date.now();
   const child = spawn(node, [entry, '--no-open', '--trusted-host', '127.0.0.1', '--port', String(port)], {
-    cwd: PREFIX,
-    env: { ...process.env, DSH_HOME: PREFIX },
+    cwd: prefix,
+    env: { ...process.env, DSH_HOME: prefix },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let webUrl = null;
@@ -414,11 +473,13 @@ async function verify() {
     report.errors.push(...errorLines(lines).slice(0, 5));
     return report;
   }
+  report.stages.boot = true;
   report.bootMs = Date.now() - bootStarted;
   say(`   ✓ Boot: dsh web: ${url} (${(report.bootMs / 1000).toFixed(1)}s)`);
 
   report.aktiviert = lines.filter((line) => /Aktiviert/.test(line)).length;
 
+  const errorCountBefore = report.errors.length;
   try {
     const tokenUrl = webUrl;
     const tokenResponse = await fetch(tokenUrl, { redirect: 'manual' });
@@ -432,7 +493,8 @@ async function verify() {
     if (pageResponse.status !== 200) report.errors.push(`Seite lieferte HTTP ${pageResponse.status} statt 200`);
     if (!type.includes('text/html')) report.errors.push(`Inhaltstyp ${type || 'leer'} statt text/html`);
     if (report.http.bytes < 1000) report.errors.push(`Seite nur ${report.http.bytes} Bytes`);
-    say(`   ✓ HTTP: ${tokenResponse.status} → ${pageResponse.status} · ${report.http.bytes} Bytes · ${report.http.title ?? 'ohne Titel'}`);
+    report.stages.http = errorCountBefore === report.errors.length;
+    say(`   ${report.stages.http ? '✓' : '✗'} HTTP: ${tokenResponse.status} → ${pageResponse.status} · ${report.http.bytes} Bytes · ${report.http.title ?? 'ohne Titel'}`);
   } catch (error) {
     report.errors.push(`HTTP-Prüfung scheiterte: ${error.message}`);
   }
@@ -458,14 +520,14 @@ async function verify() {
  * die nicht schon im Zustand stehen. Anhängen statt überschreiben: nur so
  * lässt sich ein Stand über die Zeit mit seinen Vorgängern vergleichen.
  */
-function appendRunLog(report, trigger) {
+function appendRunLog(report, trigger, meta = {}) {
   const state = readState();
   const record = {
     schemaVersion: 1,
     at: report.at,
-    installDir: PREFIX,
-    sha: state?.current?.sha ?? null,
-    ref: state?.current?.ref ?? null,
+    installDir: report.installDir ?? PREFIX,
+    sha: meta.sha ?? state?.current?.sha ?? null,
+    ref: meta.ref ?? state?.current?.ref ?? null,
     trigger,
     ok: report.ok,
     dsh: report.dsh,
@@ -512,20 +574,26 @@ function recordStand(sha, ref, action) {
   return state;
 }
 
-async function verifyStand({ allowAuto = true, trigger = 'verify' } = {}) {
+async function verifyStand({ allowAuto = true, trigger = 'verify', prefix = PREFIX, record = true, sha = null, ref = null } = {}) {
   if (NO_VERIFY) {
     warn('Abnahme übersprungen (--no-verify) — dieser Stand ist NICHT als startfähig belegt');
     return 0;
   }
-  const state = readState() ?? emptyState();
-  const report = await verify();
-  state.lastVerify = report;
-  if (state.current !== null) state.current.verified = report.ok;
-  if (report.ok) noteGreen(state, state.current?.sha ?? null);
-  writeState(state);
-  const log = appendRunLog(report, trigger);
+  let state = null;
+  const report = await verify(prefix);
+  if (record) {
+    state = readState() ?? emptyState();
+    state.lastVerify = report;
+    if (state.current !== null) state.current.verified = report.ok;
+    if (report.ok) noteGreen(state, state.current?.sha ?? null);
+    writeState(state);
+  }
+  const log = appendRunLog(report, trigger, { sha, ref });
   printReport(report);
   say(`   Protokoll: ${log}`);
+  // Staging: geprüft wird ein Kandidat, kein Zustand wird verändert — das
+  // Urteil kehrt als Exit-Code zurück, mehr braucht der Aufrufer nicht.
+  if (!record) return report.ok ? 0 : 1;
   if (report.ok) return 0;
 
   const failedSha = state.current?.sha ?? null;
@@ -576,7 +644,7 @@ async function cmdInstall() {
   if (headSha() === target.sha && dshInstalled()) {
     say('   ↺ Stand und Abhängigkeiten liegen schon — nur Links prüfen und Abnahme');
     recordStand(target.sha, target.ref, 'install (bereits vorhanden)');
-    linkProfiles({ write: false });
+    linkProfiles(PREFIX, { write: false });
     return verifyStand({ trigger: 'install (bereits vorhanden)' });
   }
   guardInstances();
@@ -685,6 +753,270 @@ function readRunLog() {
 }
 
 /**
+ * `selftest` — der Ein-Befehl-Selbsttest: check, doctor, Boot und HTTP-Nachweis
+ * in einem Lauf, Exit 0 nur bei vollständiger Kette. Bewusst READ-ONLY: kein
+ * Checkout, kein `npm ci`, kein Zustandsschreiben, kein Rückweg. Wer einen
+ * laufenden Stand befragt, will ein Urteil — keine Reparatur.
+ */
+async function cmdSelftest() {
+  if (!existsSync(join(PREFIX, 'bin', 'shinon.mjs'))) {
+    die(`kein Installat unter ${PREFIX} — nichts zu prüfen (Erstinstallation: node scripts/install-user.mjs install)`);
+  }
+  const report = await verify(PREFIX);
+  const log = appendRunLog(report, 'selftest', { sha: headSha(), ref: 'HEAD' });
+  const passed = STAGES.filter((stage) => report.stages[stage]).length;
+  if (has('json')) {
+    console.log(JSON.stringify({
+      installDir: report.installDir,
+      at: report.at,
+      ok: report.ok,
+      stages: report.stages,
+      passed,
+      of: STAGES.length,
+      dsh: report.dsh,
+      bootMs: report.bootMs,
+      plugins: report.aktiviert,
+      http: report.http,
+      errors: report.errors,
+      log,
+    }));
+    return report.ok ? 0 : 1;
+  }
+  printSelftest(report);
+  say(`   Protokoll: ${log}`);
+  return report.ok ? 0 : 1;
+}
+
+/** Die vier Stufen untereinander — ein Blick, nicht vier Suchen im Log. */
+function printSelftest(report) {
+  const stages = report.stages;
+  const mark = (ok) => (ok ? '✓' : '✗');
+  const http = report.http;
+  say(`\n🩺 Selbsttest — ${report.installDir}`);
+  say(`   ${mark(stages.check)} check   ${stages.check ? `shinon --check Exit 0 · dsh ${report.dsh}` : 'shinon --check gescheitert'}`);
+  say(`   ${mark(stages.doctor)} doctor  ${stages.doctor ? 'Exit 0, keine Befunde' : 'Befunde oder gescheitert'}`);
+  say(`   ${mark(stages.boot)} boot    ${stages.boot ? `dsh web: in ${(report.bootMs / 1000).toFixed(1)}s · ${report.aktiviert} Plugins aktiv` : 'kein "dsh web:" erreicht'}`);
+  say(`   ${mark(stages.http)} http    ${stages.http ? `${http.token} → ${http.cookie} · ${http.bytes} Bytes · ${http.type}` : 'Nachweis fehlt'}`);
+  const passed = STAGES.filter((stage) => stages[stage]).length;
+  if (report.ok) {
+    say(`\n✅ Selbsttest grün — ${passed}/${STAGES.length} Stufen, Kette vollständig`);
+    return;
+  }
+  console.error(`\n❌ Selbsttest rot — ${passed}/${STAGES.length} Stufen`);
+  for (const error of report.errors) console.error(`   - ${error}`);
+}
+
+/** Das Staging-Verzeichnis: neben dem Installat, damit ein Umzug ein Umbenennen bleibt. */
+function stagingDir() {
+  return resolve(flag('staging', `${PREFIX}-staging`));
+}
+
+/**
+ * `auto` — der Lauf für den Timer: neuen Stand bauen, DORT abnehmen, und erst
+ * bei grünem Urteil umschalten. Der Unterschied zu `update` ist nicht Kosmetik:
+ * `update` installiert in das laufende Verzeichnis und prüft danach — für die
+ * Dauer des `npm ci` steht dort ein ungeprüfter Stand. Hier wird der Kandidat
+ * in einem eigenen Verzeichnis geprüft, und das Live-Verzeichnis wird erst
+ * angefasst, wenn das Urteil grün ist. Ein rotes Urteil kostet nichts: das
+ * Live-Installat hat den Kandidaten nie gesehen.
+ */
+async function cmdAuto() {
+  const staging = stagingDir();
+  if (staging === PREFIX) die('--staging darf nicht das Installat selbst sein');
+  // Erst prüfen, dann klonen: ein Tippfehler im Pfad soll nicht 600 MB anlegen.
+  const state = readState();
+  if (state === null || !existsSync(join(PREFIX, 'bin', 'shinon.mjs'))) {
+    die(`kein Installat unter ${PREFIX} — zuerst: node scripts/install-user.mjs install`);
+  }
+  ensureCheckout();
+  git(['remote', 'set-url', 'origin', sourceUrl()], PREFIX, { allowFail: true });
+  const target = fetchAndResolve(flag('ref', null), PREFIX);
+  if (target.sha === state.current?.sha) {
+    console.log(`auto: nichts zu tun — ${target.ref} @ ${target.sha.slice(0, 12)} ist schon der laufende Stand`);
+    return 0;
+  }
+  const running = instancesUsing(PREFIX);
+  if (running.length > 0) {
+    console.log(`auto: übersprungen — ${running.length} Instanz(en) laufen aus ${PREFIX} (${running.map((hit) => `PID ${hit.pid}`).join(', ')}); nächster Lauf schaltet um`);
+    return 0;
+  }
+
+  say(`\n🧪 Kandidat bauen: ${target.ref} @ ${target.sha.slice(0, 12)} → ${staging}`);
+  ensureCheckout(staging, 'Staging');
+  git(['remote', 'set-url', 'origin', sourceUrl()], staging, { allowFail: true });
+  fetchAndResolve(flag('ref', null), staging);
+  checkout(target.sha, staging);
+  installDependencies(staging);
+
+  const staged = await verify(staging);
+  appendRunLog(staged, 'stage', { sha: target.sha, ref: target.ref });
+  printReport(staged);
+  if (!staged.ok) {
+    console.error(`auto: Umschaltung unterlassen — ${PREFIX} hat den Kandidaten nicht gesehen; er liegt zur Untersuchung unter ${staging}`);
+    return 1;
+  }
+
+  return promote(staging, target);
+}
+
+/**
+ * Der Umschaltvorgang: Live wird zum Rückweg-Verzeichnis, der geprüfte Kandidat
+ * zieht an seinen Platz — zwei Umbenennungen, kein Kopieren. Danach wird der
+ * neue Ort erneut abgenommen; erst dieses Urteil gilt für den laufenden Baum.
+ * Geht sie schief, tauschen dieselben zwei Umbenennungen zurück.
+ */
+async function promote(staging, target) {
+  if (instancesUsing(PREFIX).length > 0) {
+    say('   übersprungen: zwischen Abnahme und Umschaltung ist eine Instanz gestartet');
+    return 0;
+  }
+  const previous = `${PREFIX}-previous`;
+  say(`\n🔀 Umschaltung: ${PREFIX} → ${previous}, ${staging} → ${PREFIX}`);
+  rmSync(previous, { recursive: true, force: true });
+  renameSync(PREFIX, previous);
+  renameSync(staging, PREFIX);
+  recordStand(target.sha, target.ref, 'auto (Umschaltung)');
+
+  const code = await verifyStand({ trigger: 'auto (nach Umschaltung)' });
+  if (code === 0) {
+    console.log(`auto: umgeschaltet und abgenommen — ${target.sha.slice(0, 12)} läuft, Rückweg liegt unter ${previous}`);
+    return 0;
+  }
+  console.error('   ↩︎ Der umgeschaltete Stand ist rot — Umschaltung wird zurückgenommen');
+  renameSync(PREFIX, staging);
+  renameSync(previous, PREFIX);
+  const back = await verifyStand({ trigger: 'auto (Umschaltung zurückgenommen)', allowAuto: false });
+  console.error(back === 0
+    ? `auto: Umschaltung zurückgenommen — ${liveHeadShort()} läuft wieder, der Kandidat liegt unter ${staging}`
+    : 'auto: ⚠️  auch der Rückweg ist rot — das Installat braucht Handarbeit');
+  return 1;
+}
+
+/** Der SHA, der gerade unter dem Live-Pfad liegt (für Meldungen). */
+function liveHeadShort() {
+  return headSha()?.slice(0, 12) ?? '—';
+}
+
+/**
+ * `units` — der systemd-User-Timer. Er ruft genau `auto` auf, damit der Timer
+ * nicht klüger ist als der Befehl, den ein Mensch von Hand startet.
+ */
+async function cmdUnits() {
+  const configHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
+  const dir = join(configHome, 'systemd', 'user');
+  const serviceFile = join(dir, 'shinon-forge-update.service');
+  const timerFile = join(dir, 'shinon-forge-update.timer');
+  const node = nodeBinary();
+  const script = join(paths.workspaceRoot(), 'scripts', 'install-user.mjs');
+
+  if (has('remove')) {
+    if (!NO_SYSTEMD) {
+      const stopped = systemctl(['disable', '--now', 'shinon-forge-update.timer']);
+      if (stopped.status !== 0) warn(`systemctl disable: ${(stopped.stderr ?? '').trim() || `Exit ${stopped.status}`}`);
+    } else {
+      say('   systemd unangetastet (--no-systemd)');
+    }
+    for (const file of [serviceFile, timerFile]) {
+      if (!existsSync(file)) continue;
+      rmSync(file, { force: true });
+      say(`   entfernt: ${file}`);
+    }
+    systemctl(['daemon-reload']);
+    say('✅ Timer entfernt (der Aufräumlauf bleibt: node scripts/install-user.mjs units --remove)');
+    return 0;
+  }
+
+  const interval = flag('interval', '1d');
+  const firstDelay = flag('first-delay', '10min');
+  const spread = flag('spread', '1h');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(serviceFile, `[Unit]
+Description=Shinon Forge: neuen Stand bauen, abnehmen, nur bei grünem Urteil umschalten
+Documentation=file:${join(paths.workspaceRoot(), 'scripts', 'install-user.mjs')}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=${paths.workspaceRoot()}
+ExecStart=${node} ${script} auto --prefix ${PREFIX} --quiet
+Nice=10
+
+# Kein Neustart bei rotem Urteil: der nächste Timer-Lauf ist der Wiederholungsversuch.
+TimeoutStartSec=900
+`);
+  // ZWEI Zeitgeber, und zwar aus einem gemessenen Grund: `OnUnitActiveSec`
+  // allein plant nichts ein, wenn der Dienst seit dem Aktivieren des Timers
+  // noch nicht gelaufen ist — `NextElapseUSecMonotonic` stand nach dem
+  // Neuladen auf `infinity`, der Timer wäre nie wieder gefeuert. `OnActiveSec`
+  // gibt jedem Aktivieren (und damit jedem Systemstart) einen ersten Termin,
+  // `OnUnitActiveSec` hält danach den Rhythmus.
+  writeFileSync(timerFile, `[Unit]
+Description=Shinon Forge: regelmäßig auf neue Stände prüfen (Umschaltung nur bei grüner Abnahme)
+
+[Timer]
+OnActiveSec=${firstDelay}
+OnUnitActiveSec=${interval}
+RandomizedDelaySec=${spread}
+Persistent=true
+Unit=shinon-forge-update.service
+
+[Install]
+WantedBy=timers.target
+`);
+  say(`\n✅ Units geschrieben:`);
+  say(`   ${serviceFile}`);
+  say(`   ${timerFile}`);
+  say(`   Rhythmus: erster Lauf ${firstDelay} nach Aktivierung bzw. Systemstart, danach alle ${interval}, Streuung bis ${spread} (Persistent=true holt Verpasstes nach)`);
+
+  if (has('no-enable') || NO_SYSTEMD) {
+    say(NO_SYSTEMD ? '   systemd unangetastet (--no-systemd)' : '   Aktivieren von Hand:');
+    say(`   systemctl --user daemon-reload && systemctl --user enable --now shinon-forge-update.timer`);
+    return 0;
+  }
+  const reload = systemctl(['daemon-reload']);
+  const enabled = systemctl(['enable', 'shinon-forge-update.timer']);
+  // `enable --now` lässt einen LAUFENDEN Timer mit alten Werten weiterlaufen —
+  // gemessen: nach dem Ändern der Unit stand `NextElapseUSecMonotonic` auf
+  // `infinity`, erst `restart` bewaffnet ihn mit den neuen Zeitgebern neu.
+  const restarted = systemctl(['restart', 'shinon-forge-update.timer']);
+  if (reload.status !== 0 || enabled.status !== 0) {
+    warn(`systemctl nicht verfügbar oder verweigert (reload ${reload.status}, enable ${enabled.status}) — Units liegen, Aktivierung von Hand:`);
+    if (restarted.status !== 0) warn(`systemctl restart: ${(restarted.stderr ?? '').trim() || `Exit ${restarted.status}`}`);
+    say('   systemctl --user daemon-reload && systemctl --user enable --now shinon-forge-update.timer');
+    return 0;
+  }
+  // Der Termin wird von systemd nicht im selben Augenblick gerechnet: nach dem
+  // `restart` stand er kurz leer, eine Sekunde später stand er. Deshalb fragen,
+  // nicht raten — und begrenzt nachfassen statt einmal und dann behaupten.
+  // Der Termin wird von systemd nicht im selben Augenblick gerechnet: nach dem
+  // `restart` stand er kurz leer, eine Sekunde später stand er. Und Achtung:
+  // `OnActiveSec`/`OnUnitActiveSec` sind MONOTONE Zeitgeber — `Next…Realtime`
+  // bleibt deshalb leer, der Termin steht in `Next…Monotonic`. Beide fragen,
+  // sonst meldet das Werkzeug „kein Termin", obwohl einer läuft.
+  let realtime = '';
+  let monotonic = '';
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    if (attempt > 0) await new Promise((done) => setTimeout(done, 250));
+    const show = systemctl(['show', 'shinon-forge-update.timer', '-p', 'NextElapseUSecRealtime', '-p', 'NextElapseUSecMonotonic', '--value']);
+    const [first = '', second = ''] = (show.stdout ?? '').split('\n');
+    realtime = first.trim();
+    monotonic = second.trim();
+    const hasNext = (realtime !== '' && realtime !== 'n/a') || (monotonic !== '' && monotonic !== 'infinity' && monotonic !== 'n/a');
+    if (hasNext) break;
+  }
+  const hasNext = (realtime !== '' && realtime !== 'n/a') || (monotonic !== '' && monotonic !== 'infinity' && monotonic !== 'n/a');
+  say(hasNext
+    ? `✅ Timer aktiv. Nächster Lauf: ${realtime !== '' && realtime !== 'n/a' ? realtime : `in ${monotonic}`}`
+    : '⚠️  Timer aktiv, aber ohne nächsten Termin — systemctl --user list-timers prüfen');
+  return 0;
+}
+
+function systemctl(args) {
+  return spawnSync('systemctl', ['--user', ...args], { encoding: 'utf8' });
+}
+
+/**
  * `history` — der Vergleich über Versionen: Boot-Dauer, Fehlerzeilen und
  * Ergebnis je Lauf, plus Kennzahlen, die man in Zahlen sehen will (Minimum,
  * Median, Maximum, Erfolgsquote). Ohne `--json` als Tabelle.
@@ -744,6 +1076,9 @@ if (command === 'install') code = await cmdInstall();
 else if (command === 'update') code = await cmdUpdate();
 else if (command === 'rollback') code = await cmdRollback();
 else if (command === 'history') code = cmdHistory();
+else if (command === 'auto') code = await cmdAuto();
+else if (command === 'units') code = await cmdUnits();
+else if (command === 'selftest') code = await cmdSelftest();
 else code = cmdStatus();
 
 process.exit(code);

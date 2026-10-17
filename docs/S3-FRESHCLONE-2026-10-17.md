@@ -1,6 +1,6 @@
 # S3 Frischklon-Repro — Protokoll 2026-10-17
 
-> **Status:** Beleg — Release-Slice S3 (PLAN.md §9.1)
+> **Status:** current — Release-Beleg S3 (PLAN.md §9.1), eingefroren am Messzeitpunkt
 > **Stand:** 2026-10-17, 09:38–09:55 UTC
 
 Der vorgeschriebene Ablauf aus einem frischen Klon ohne globales DSH, gemessen

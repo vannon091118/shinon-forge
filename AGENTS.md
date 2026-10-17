@@ -81,6 +81,15 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution (exit 0/1).
 - `node scripts/pack-test.mjs` → per-package distribution test: `npm pack` → unpack →
   isolated `npm install` → load. Optional `--keep` retains `/tmp` work dirs for debugging.
+- `npm run install:user` → user install tool (`scripts/install-user.mjs`):
+  `install`/`update`/`rollback`/`status`/`history`/`auto`/`units`/`selftest`,
+  each acceptance run logged to the state dir (no secrets). `auto` stages the
+  candidate beside the live install and only switches on a green verdict.
+- `npm run verify:install` → read-only selftest of an existing install:
+  check, doctor, boot, HTTP proof. Exit 0 only on 4/4; writes nothing but the log line.
+- `npm run backup:retention` → backup-folder retention (`scripts/backup-retention.mjs`):
+  `--keep`/`--max-age` upper bounds, newest backup never deleted, archives only,
+  `--dry-run` plans, every run logs one JSONL line and writes `KEEP.md`.
 - `node scripts/shinon-profile-test.mjs` → boots `dsh --profile shinon --dump-config` and
   asserts every bundle layer of the profile resolves (count: `docs/ZAHLEN.md` §2).
 - `npm run test:codingmon` → `node --test packages/codingmon/test/*.test.mjs`: isolated
