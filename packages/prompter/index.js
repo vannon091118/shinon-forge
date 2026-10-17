@@ -1,6 +1,6 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import z from '@deepseek-ai/schemastery';
-import { isAbsolute, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { parseNote, renderStand, reviewNotes, selectNotes, tokens } from './assets/note-core.js';
 import {
   createIndex,
@@ -23,6 +23,8 @@ import { renderContext, renderSkillsBlock } from './assets/render-context.js';
 import { loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
 import { readTone, standFor, standTrace } from './assets/stand.js';
 import { buildEnhancerRequest, collectStream, enhanceGuarded, replacePrompt } from './assets/enhancer.js';
+import { BLOCKS_CONTRACT, BLOCKS_PATH, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks, validateRegistry } from './assets/block-select.js';
+import { LEARNED_CONTRACT, PROPOSE_CONTRACT, PROPOSE_SERVICE, duplicateVsBlocks, mergeLearnedBlocks, validateBlockCore, validateLearnedFile, validateProposalShell } from './assets/block-review.js';
 
 /** Kanal und Vertragsname der Narrative Engine (Zug 6). Literale Spiegel von `@shinon/narrative` (Naht, drift-geprueft). */
 const NARRATIVE_CHANNEL = 'shinon/narrative/state';
@@ -315,6 +317,142 @@ function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contex
   };
 }
 
+/**
+ * Die gelernten Gewichte lesen — optional wie der Ton: kein `inject`, damit
+ * der Veredler auch ohne Scoring montiert. Fremd oder unlesbar heißt still
+ * null (fail-open); die Auswahl rechnet dann ohne Lernen weiter.
+ */
+function readBlockWeights(ctx) {
+  let service;
+  try {
+    service = typeof ctx?.get === 'function' ? ctx.get(WEIGHTS_SERVICE) : undefined;
+  } catch {
+    service = undefined;
+  }
+  if (service === undefined || service === null) return null;
+  if (service.contract !== WEIGHTS_CONTRACT || typeof service.read !== 'function') return null;
+  try {
+    const weights = service.read();
+    return weights ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Die WIRKSAME Route des One-Shots — einmal beim Mounten entschieden (Phase 5).
+ *
+ * Der eigene Schluessel (Namen-Feld `providerKeyEnv`, nie ein Wert) erlaubt dem
+ * One-Shot eine getrennte Route und Abrechnung. Fehlt die Variable, faellt die
+ * Route auf die konfigurierte Alternative zurueck — sonst waere der Enhancer
+ * tot, obwohl ein Schluessel fuer die Haupt-Route da ist. Fehlt BEIDES, giltt
+ * die Primärroute: dann meldet der Enhancer `NO_ROUTE` und der Roh-Prompt gilt
+ * (fail-open, unveraendert). Rein: config + Umgebung, kein Modell, kein Netz.
+ */
+export function effectiveRoute(config) {
+  const primary = { provider: config.provider, model: config.model };
+  if (typeof config.providerKeyEnv !== 'string' || config.providerKeyEnv === '') return primary;
+  const ownKey = process.env[config.providerKeyEnv];
+  if (typeof ownKey === 'string' && ownKey !== '') return primary;
+  if (typeof config.providerFallback !== 'string' || config.providerFallback === '') return primary;
+  return {
+    provider: config.providerFallback,
+    model: typeof config.modelFallback === 'string' && config.modelFallback !== '' ? config.modelFallback : config.model,
+  };
+}
+
+/**
+ * Die Baustein-Auswahl dieses Schritts — fail-open, ohne Modell, ohne Text.
+ *
+ * Haystack aus Prompttext plus aufgelöstem Kontext, Intent-Klasse aus der
+ * Expansion, Haltung aus dem Scoring-Ton, Gewichte aus dem Ledger. Fehlt die
+ * Registry oder wirft die Auswahl, gibt es keinen Anteil statt eines falschen —
+ * der Schritt läuft unverändert. Der Anteil nennt nur Baustein-Ids und Gründe.
+ */
+function blockSelection(ctx, config, runtime, contract, promptText, context, stance) {
+  if (runtime.blocks === null) return null;
+  try {
+    return selectBlocks(runtime.blocks, {
+      mode: contract.mode,
+      promptText,
+      context,
+      intentClass: runtime.intentMatchClass ?? null,
+      stance,
+      weights: readBlockWeights(ctx),
+      available: {
+        contextPresent: context !== null,
+        notesOn: runtime.noteRules !== null && config.notesPath !== '',
+        skillsOn: runtime.skillRules !== null && config.skillsPath !== '',
+        intentOn: runtime.intentRules !== null,
+        narrative: runtime.narrative !== null,
+        recentEvents: [],
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * EINEN Baustein vorschlagen, prüfen, aktivieren (Phase 4) — fail-closed.
+ *
+ * Der Agent schlägt aus Erfahrung vor (Zettel-Hülle + Block-Kern); der Host
+ * prüft die Hülle wie jeden Zettel (`parseNote` + `reviewNotes`: zu spitz mit
+ * Datum/Sitzung/Absolutpfad, zu breit, doppelt) und den Kern gegen aktive
+ * Bausteine (bekannte id, geteilte Begriffe plus Themenmarke). Nur was beides
+ * besteht, landet in der Projekt-Ablage und mischt sich neu ein. Jeder Fehler
+ * ist ein Befund, nie ein Wurf — die Aktivierung bleibt aus, statt zu raten.
+ */
+function proposeBlock(config, runtime, proposal) {
+  try {
+    const shell = validateProposalShell(proposal);
+    if (!shell.ok) return { ok: false, findings: [shell.reason] };
+    const core = validateBlockCore(proposal?.block);
+    if (!core.ok) return { ok: false, findings: [core.reason] };
+    const active = runtime.blocks?.blocks ?? [];
+    if (active.some((entry) => entry.id === core.block.id)) {
+      return { ok: false, findings: [`DOPPELT:bekannte-id:${core.block.id}`] };
+    }
+    if (runtime.noteRules === null) return { ok: false, findings: ['KEINE_REGELN'] };
+    const parsed = parseNote(
+      JSON.stringify({ contract: 'shinon.skill-note/v1', version: 1, ...shell.shell }),
+      runtime.noteRules.format,
+    );
+    if (!parsed.ok) return { ok: false, findings: [`FORM_FEHLER:${parsed.reason}`] };
+    const review = reviewNotes([{ file: `vorschlag:${core.block.id}`, note: parsed.note }], runtime.noteRules);
+    const findings = [
+      ...review.map((finding) => `${finding.finding}: ${finding.detail}`),
+      ...duplicateVsBlocks(shell.shell, active, runtime.noteRules.review?.duplicate ?? {}),
+    ];
+    if (findings.length > 0) return { ok: false, findings };
+    const path = runtime.learnedPath;
+    if (typeof path !== 'string' || path === '') {
+      return { ok: false, findings: ['KEINE_ABLAGE'] };
+    }
+    // Dieselbe Regel wie Zettel und Skills: ein absoluter Pfad bleibt absolut.
+    const file = isAbsolute(path) ? path : join(process.cwd(), path);
+    let current = [];
+    try {
+      current = validateLearnedFile(JSON.parse(readFileSync(file, 'utf8'))).blocks;
+    } catch {
+      current = [];
+    }
+    const next = [...current.filter((entry) => entry.id !== core.block.id), core.block];
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, `${JSON.stringify({ contract: LEARNED_CONTRACT, blocks: next }, null, 2)}\n`);
+    if (runtime.blocks !== null) {
+      const merged = mergeLearnedBlocks(runtime.blocks.blocks, next);
+      const check = validateRegistry({ contract: BLOCKS_CONTRACT, blocks: merged });
+      if (!check.ok) return { ok: false, findings: [`ZUSAMMENFUEHRUNG_UNGUELTIG:${check.reason}`] };
+      runtime.blocks = { ...runtime.blocks, blocks: merged };
+    }
+    console.log(`[shinon-prompter] Baustein gelernt: ${core.block.id}`);
+    return { ok: true, findings: [], block: core.block.id };
+  } catch (error) {
+    return { ok: false, findings: [`FEHLER:${error?.message ?? error}`] };
+  }
+}
+
 /** Der registrierte Listener. Genau ein `next()` — Durchreichen ist der Normalfall. */
 async function onPreStep(ctx, config, runtime, payload, next) {
   const prompt = readPrompt(payload);
@@ -335,7 +473,12 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     if (match !== null) {
       expandedText = `${prompt.text}\n\n# Aufgabe\n${match.expansion}`;
       runtime.intentMatch = match.patternId;
+      runtime.intentMatchClass = match.classification ?? null;
       console.log(`[shinon-prompter] Intent erkannt: ${match.label} (${match.classification}) — Expansion angewendet`);
+    } else {
+      // Kein Treffer heißt kein Treffer: die Klasse des VORIGEN Schritts darf
+      // nicht stehen bleiben (gemessen als stale intentMatchClass über Schritte).
+      runtime.intentMatchClass = null;
     }
   }
 
@@ -349,7 +492,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     // MAX ohne Kontext gibt es nicht: Code-Referenzen und Touches waeren
     // erfunden. Also wird der Modus abgelehnt, nicht weichgespuelt.
     const outcome = { outcome: 'unavailable', reasons: [supply.reason], result: null };
-    report(ctx, config, { ...decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId), stand: null });
+    report(ctx, config, { ...decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId), stand: null, blocks: decisionBlocks(blockSelection(ctx, config, runtime, contract, expandedText, null, null)) });
     return next();
   }
 
@@ -359,7 +502,10 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   // kein Zettel einen Anlass, und die Thema-Marke waere geraten). Der Ton kommt
   // aus der zweiten schmalen Faehigkeit (Scoring); fehlt sie, fehlt der Ton,
   // nicht der Stand.
-  const stand = contextUsed ? standFor(config, runtime, expandedText, supply.context, readTone(ctx, runtime)) : null;
+  const toneState = readTone(ctx, runtime);
+  const stance = toneState?.tone?.stance ?? null;
+  const selection = blockSelection(ctx, config, runtime, contract, expandedText, supply.context, stance);
+  const stand = contextUsed ? standFor(config, runtime, expandedText, supply.context, toneState) : null;
 
   // Skills werden IMMER gelesen (Zug 6): unabhaengig vom Modus, unabhaengig vom
   // Kontext. Sie geben dem Modell Zugriff auf projekspezifisches Wissen.
@@ -382,7 +528,9 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     }
   }
 
-  const outcome = await enhanceGuarded(ctx, contract, config, expandedText, supply.context, stand, skills, payload.signal);
+  // Die Route entscheidet der Mount (eigener Schluessel oder Fallback) — hier
+  // nur angewandt. `enhanceGuarded` baut die Anfrage aus diesem Config-Stueck.
+  const outcome = await enhanceGuarded(ctx, contract, { ...config, ...runtime.route }, expandedText, supply.context, stand, skills, payload.signal);
 
   // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
   // und darf nicht in einen zweiten next() umgedeutet werden.
@@ -404,7 +552,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   const recorded = effect.replacePrompt && messages === null
     ? { ...outcome, outcome: 'rejected', reasons: effect.missingMessage }
     : outcome;
-  report(ctx, config, { ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand) });
+  report(ctx, config, { ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection) });
 
   // Nur ein gefundenes akzeptiertes Ergebnis ersetzt die Nutzernachricht. In
   // JEDEM anderen Fall geht die Entscheidung unveraendert weiter — der Roh-Prompt
@@ -547,13 +695,74 @@ export function apply(ctx, config) {
   // Narrative-Lage (Zug 6): der Composite der Narrative Engine kommt auf einem
   // EIGENEN Kanal. Der Prompter hält den letzten und gibt ihn in den Stand;
   // ohne Composite kein <narrative>-Element. Er interpretiert ihn nicht um.
-  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules, narrative: null, narrativeContract: NARRATIVE_CONTRACT };
+  // Baustein-Registry (Phase 1/2): reine Daten, einmal beim Mounten geladen
+  // und geprüft. Fehlt sie, fehlt die Auswahl — nicht der Enhancer (fail-open).
+  let blocks = null;
+  try {
+    const loaded = loadJsonContract(BLOCKS_PATH, BLOCKS_CONTRACT, (parsed) => parsed);
+    const check = validateRegistry(loaded);
+    if (!check.ok) {
+      console.error(`[shinon-prompter] Baustein-Registry unbrauchbar (${check.reason}) — ohne Auswahl`);
+    } else {
+      blocks = loaded;
+      console.log(`[shinon-prompter] Baustein-Registry geladen (${blocks.blocks.length} Bausteine)`);
+    }
+  } catch (error) {
+    console.warn(`[shinon-prompter] Baustein-Registry nicht ladbar (${error?.message}) — ohne Auswahl`);
+  }
+
+  // Gelernte Bausteine (Phase 4): Projekt-Ablage über der Paket-Registry.
+  // Fehlt sie, steht die Registry wie ausgeliefert; ist sie kaputt, fällt sie
+  // mit Zählung weg statt zu raten (fail-closed, wie überall in dieser Schicht).
+  let learnedBlocks = [];
+  if (typeof config.blocksLearnedPath === 'string' && config.blocksLearnedPath !== '') {
+    try {
+      const learnedFile = isAbsolute(config.blocksLearnedPath)
+        ? config.blocksLearnedPath
+        : join(process.cwd(), config.blocksLearnedPath);
+      const raw = readFileSync(learnedFile, 'utf8');
+      const checked = validateLearnedFile(JSON.parse(raw));
+      if (checked.foreign) {
+        console.warn(`[shinon-prompter] Gelernte Bausteine fremd (${config.blocksLearnedPath}) — ohne Gelernte`);
+      } else {
+        learnedBlocks = checked.blocks;
+        if (checked.dropped > 0) {
+          console.warn(`[shinon-prompter] ${checked.dropped} unlesbare gelernte Bausteine uebergangen`);
+        }
+        if (learnedBlocks.length > 0) console.log(`[shinon-prompter] Gelernte Bausteine geladen (${learnedBlocks.length})`);
+      }
+    } catch (error) {
+      if (error?.code !== 'ENOENT') {
+        console.warn(`[shinon-prompter] Gelernte Bausteine nicht lesbar (${error?.message}) — ohne Gelernte`);
+      }
+    }
+  }
+  if (blocks !== null && learnedBlocks.length > 0) {
+    const merged = mergeLearnedBlocks(blocks.blocks, learnedBlocks);
+    const check = validateRegistry({ contract: BLOCKS_CONTRACT, blocks: merged });
+    if (!check.ok) {
+      console.error(`[shinon-prompter] Zusammenführung unbrauchbar (${check.reason}) — ohne Gelernte`);
+    } else {
+      blocks = { ...blocks, blocks: merged };
+    }
+  }
+
+  // Route (Phase 5): eigener Schluessel des One-Shots, sonst Fallback — EINMAL
+  // beim Mounten entschieden, nicht je Schritt (die Umgebung ist beim Start die
+  // Quelle, nicht waehrend des Laufs).
+  const route = effectiveRoute(config);
+  const ownKeyMissing = config.providerKeyEnv !== '' && process.env[config.providerKeyEnv] === undefined && route.provider !== config.provider;
+  if (ownKeyMissing) {
+    console.warn(`[shinon-prompter] Eigener Schluessel fehlt (${config.providerKeyEnv}) — One-Shot faellt auf ${route.provider}/${route.model} zurueck`);
+  }
+
+  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules, intentMatchClass: null, blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT };
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
   const disposeNarrative = ctx.on(NARRATIVE_CHANNEL, (composite) => {
     runtime.narrative = composite ?? null;
   });
 
-  const route = config.provider === '' || config.model === '' ? 'ohne Route (inaktiv)' : `${config.provider}/${config.model}`;
+  const routeLabel = route.provider === '' || route.model === '' ? 'ohne Route (inaktiv)' : `${route.provider}/${route.model}`;
   const mode = resolveMode(config.mode);
   const contextInfo = mode.needsContext ? `context=${contextState}` : `context=${contextState} (${mode.mode} nutzt ihn nicht)`;
   const notesInfo = config.notesPath === '' ? 'notes=off' : `notes=${notesDir(config)}${noteRules === null ? ' (ohne Regeln)' : ''}`;
@@ -563,11 +772,26 @@ export function apply(ctx, config) {
   const intentInfo = intentRules !== null
     ? `intent=${intentRules.patterns.length}Patterns`
     : 'intent=off';
-  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, ${route}, ${contextInfo}, ${notesInfo}, ${runtimeInfo}, ${intentInfo})`);
+  const blocksInfo = blocks !== null
+    ? `blocks=${blocks.blocks.length}Bausteine`
+    : 'blocks=off';
+  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, route=${routeLabel}, ${contextInfo}, ${notesInfo}, ${runtimeInfo}, ${intentInfo}, ${blocksInfo})`);
+
+  // Der fünfte Dienst (Phase 4): Vorschläge einreichen — prüfen und
+  // aktivieren in einem Aufruf, fail-closed mit Befundliste. Wie der Ton und
+  // die Gewichte: optionales Anbieten, gepruefter Vertragsname lesend, keine
+  // Injektionspflicht für den Veredler selbst.
+  const proposeService = {
+    contract: PROPOSE_CONTRACT,
+    propose: (proposal) => proposeBlock(config, runtime, proposal),
+  };
+  const canProvide = typeof ctx?.provide === 'function';
+  const releasePropose = canProvide ? ctx.provide(PROPOSE_SERVICE, proposeService) : null;
 
   return () => {
     if (typeof dispose === 'function') dispose();
     if (typeof disposeNarrative === 'function') disposeNarrative();
+    if (typeof releasePropose === 'function') releasePropose();
     console.log('[shinon-prompter] Deaktiviert — Listener abgemeldet');
   };
 }
@@ -580,3 +804,6 @@ export { renderContext, renderSkillsBlock };
 export { loadContext, loadNoteRules, loadSkillRules, readNotes, readSkills, selectSkills };
 export { standFor, standTrace };
 export { buildEnhancerRequest, collectStream, replacePrompt };
+export { BLOCKS_CONTRACT, BLOCKS_PATH, DEFAULT_TOTAL_BUDGET, SELF_QUESTION_MARKERS, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, buildHaystack, decisionBlocks, matchBlock, selectBlocks, validateRegistry, tokens as blockSelectTokens } from './assets/block-select.js';
+export { LEARNED_CONTRACT, LEARNED_DEFAULT_PATH, PROPOSE_CONTRACT, PROPOSE_SERVICE, duplicateVsBlocks, mergeLearnedBlocks, validateBlockCore, validateLearnedFile, validateProposalShell } from './assets/block-review.js';
+export { MAX_UNCERTAINTY, MIN_UNCERTAINTY, SELECTION_CONTRACT, parseSelection, renderCandidates, selectionSystemBrief } from './assets/selection.js';

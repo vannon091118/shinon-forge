@@ -48,7 +48,7 @@ function profileTargets(name) {
     if (typeof patch.id !== 'string' || patch.config === undefined) continue;
     targets.set(patch.id, patch.config);
   }
-  return { missing: null, targets, issues };
+  return { missing: null, targets, patches, issues };
 }
 
 /** Alle Paket-Patches mit ihrer Insert-Config, nach id. */
@@ -117,6 +117,41 @@ test('profile-config-override: das Paket traegt keine wirksame Config mehr', () 
   assert.equal(inserted.length, 1, 'genau EIN Insert-Eintrag');
   assert.equal(inserted[0].config, undefined, 'der Paket-Patch darf keine Config tragen — sie waere nicht wirksam und wuerde die Ersetzung verschleiern');
   assert.match(text, /id:\s*shinon-prompter/);
+});
+
+test('profile-config-override: die One-Shot-Route traegt einen eigenen Schlüssel mit Fallback (Phase 5)', () => {
+  const { targets, patches } = profileTargets(PROFILE);
+  const prompter = targets.get('shinon-prompter');
+  assert.ok(prompter, 'shinon-prompter wird vom Profil nicht mehr gezielt');
+
+  // Die Kette in Vierfach: Route-Provider existiert mit eigenem apiKeyEnv,
+  // der Prompter zeigt darauf, der Haupt-Turn nicht, und der Key-Router trägt
+  // denselben Umgebungsnamen. Ein Riss an JEDEM Glied waere sonst still —
+  // etwa eine Route ohne Provider oder ein Router-Platz ohne Route (der
+  // key-router-security-Test pinnt die baseUrl-Gegenseite).
+  const llm = patches.find((patch) => patch.id === 'llm-pi-ai');
+  assert.ok(llm !== undefined, 'das Profil hat keinen llm-pi-ai-Eintrag');
+  const own = llm.config?.providers?.prompter;
+  assert.ok(own !== undefined, 'llm-pi-ai kennt keinen Provider `prompter` — der One-Shot haengt auf agnes');
+  assert.equal(typeof own.apiKeyEnv, 'string', 'die Route braucht einen apiKeyEnv-NAMEN');
+  assert.match(own.apiKeyEnv, /^[A-Z][A-Z0-9_]*$/, `"${own.apiKeyEnv}" sieht nach einem Wert aus, nicht nach einem Umgebungsnamen`);
+  assert.equal(own.apiKeyEnv, 'PROMPTER_API_KEY', 'Slice 1 pinniert den Namen der Agentenroute (Vertrag im Plan)');
+  assert.notEqual(own.apiKeyEnv, llm.config?.providers?.agnes?.apiKeyEnv, 'prompter und agnes duerfen nicht denselben Schluessel teilen — dann waere Phase 5 Attrappe');
+
+  assert.equal(prompter.provider, 'prompter', 'der One-Shot faehrt die eigene Route');
+  assert.equal(prompter.providerKeyEnv, own.apiKeyEnv, 'Host und Route muessen denselben Umgebungsnamen nennen (Zwilling)');
+  assert.equal(prompter.providerFallback, 'agnes', 'ohne eigenen Schluessel faellt der One-Shot auf die Haupt-Route zurueck');
+  assert.notEqual(prompter.provider, prompter.providerFallback, 'Fallback muss von der Primärroute verschieden sein');
+
+  const turn = targets.get('agent-default-model');
+  assert.ok(turn !== undefined, 'der Haupt-Turn wird vom Profil nicht gezielt');
+  assert.notEqual(turn?.provider, 'prompter', 'der Haupt-Turn darf nicht auf der One-Shot-Route laufen');
+
+  const router = targets.get('shinon-key-router');
+  const slots = (router?.providers ?? []).map((entry) => entry.id);
+  assert.deepEqual(slots.sort(), ['agnes', 'prompter'], 'der Router traegt Plätze für BEIDE Routen');
+  const routerPrompter = (router?.providers ?? []).find((entry) => entry.id === 'prompter');
+  assert.deepEqual(routerPrompter?.envNames, [own.apiKeyEnv], 'Router und Route nennen denselben Umgebungsnamen');
 });
 
 test('profile-config-override: das aufgeloeste Profil traegt die Werte wirklich (dsh noetig)', (t) => {

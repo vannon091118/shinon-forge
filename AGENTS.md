@@ -1,6 +1,6 @@
 # Shinon Forge
 
-> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-09
+> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-17
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 An independent fork of the DeepSeek Harness (DSH). It ships the `@shinon/*` Cordis
@@ -146,6 +146,28 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   self-contained (it pulls React through `require`, not `import`). So the bundle carries the
   names as LITERALS and `packages/codingmon/test/uebergabe.test.mjs` compares both sides
   character by character. Never let a literal drift; extend that assertion instead.
+- Prompt building blocks are DATA (`packages/prompter/assets/blocks.json`, contract
+  `shinon.blocks/v1`): each block carries its trigger (haystack markers, intent class,
+  scoring stance, self-question markers), a token budget and a placement
+  (`system`/`user`/one-shot). Only `persona-identity-core` and `enhancer-system-policy`
+  are PFLICHT; everything else is situational and falls away empty. Selection is
+  deterministic and pure (`packages/prompter/assets/block-select.js`): haystack
+  relevance ranks first, the learned weight only breaks ties, budgets are hard,
+  `ctx.llm` never appears in the selector. Learning lives in the existing scoring
+  ledger (`shinon_block_weights`; snapshot fields `blockWeights`/`blockAttributions`,
+  retract symmetric). New blocks arrive ONLY through the propose seam
+  `shinon_block_propose` — checked like `reviewNotes` (too narrow, too broad,
+  duplicate via markers + shared terms), then stored in
+  `.shinon/blocks.learned.json` (project, not tarball). Seam names are pinned on
+  both sides by `scripts/gate/tests/context-wiring.test.mjs`; the one-shot runs on
+  a SEPARATE llm provider with its own key (`PROMPTER_API_KEY`, host-side
+  fallback to `agnes` — no `!!js` in this repo's profile file, the gate parser
+  does not know that tag). This route also serves the SELECTION agent of the
+  block-injection runtime: its strict answer contract is
+  `shinon.selection/v1` (`packages/prompter/assets/selection.js`) — unknown
+  IDs, disallowed blocks, out-of-range uncertainty and unparsable answers are
+  rejected fail-closed, and the deterministic selector stays the fallback; the
+  agent proposes, the runtime enforces budgets, modes and permissions.
 
 ## Pitfalls
 - Ein Profil-Bündel löst über `profiles/<name>/node_modules` auf — **vor** dem Root-`node_modules`.

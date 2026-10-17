@@ -187,6 +187,15 @@ test('Naht: Dienst- und Vertragsname stimmen in beiden Paketen ueberein', () => 
   // muessen auf beiden Seiten dieselben sein, sonst bleibt der Block stumm.
   assert.equal(prompter.SCORING_SERVICE, scoring.SCORING_SERVICE, 'derselbe Dienstname');
   assert.equal(prompter.SCORING_SERVICE_CONTRACT, scoring.SCORING_SERVICE_CONTRACT, 'derselbe Vertragsname');
+
+  // Die vierte Naht (Phase 3): die gelernten Gewichte. Der Veredler liest sie
+  // über dieselbe Bauform (optionales `get`, gepruefter Vertragsname) — die
+  // Namen müssen auf beiden Seiten dieselben sein, sonst rechnet die Auswahl
+  // ohne Lernen. Der Entscheidungskanal daneben ist die zweite Hälfte der
+  // Naht: dort nennt der Veredler je Schritt Sitzung + Baustein-Ids.
+  assert.equal(prompter.WEIGHTS_SERVICE, scoring.WEIGHTS_SERVICE, 'derselbe Dienstname');
+  assert.equal(prompter.WEIGHTS_CONTRACT, scoring.WEIGHTS_CONTRACT, 'derselbe Vertragsname');
+  assert.equal(scoring.BLOCKS_DECISION_CHANNEL, prompter.DECISION_CHANNEL, 'derselbe Entscheidungskanal');
 });
 
 // ── 3./4. Der echte Durchlauf und die Quelle im Datensatz ───────────────────

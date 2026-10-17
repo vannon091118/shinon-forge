@@ -109,6 +109,27 @@ export const Config = z.object({
   provider: z.string().default(''),
   /** Modell des One-Shot-Childs (leer = nicht konfiguriert). */
   model: z.string().default(''),
+  /**
+   * Name der Umgebungsvariable des EIGENEN One-Shot-Schluessels (Phase 5).
+   *
+   * Nur der NAME steht hier, nie ein Wert — eine Profildatei ist versioniert
+   * (dieselbe Regel wie beim Key-Router). Die Route (`provider`) zeigt auf einen
+   * eigenen llm-pi-ai-Eintrag mit diesem apiKeyEnv; der One-Shot laeuft damit
+   * ueber einen separaten Schluessel und eine eigene Abrechnung. Leer = der
+   * konfigurierte Provider traegt seinen Schluessel selbst (Zustand vor Phase 5).
+   */
+  providerKeyEnv: z.string().default(''),
+  /**
+   * Fallback-Route, wenn der eigene Schluessel fehlt (Phase 5).
+   *
+   * Ohne Schlüssel wäre der One-Shot tot (NO_ROUTE, Roh-Prompt) — obwohl ein
+   * benutzbarer Schlüssel fuer die Haupt-Route da ist. Der Host entscheidet das
+   * beim Mounten und NUR, wenn dieser Pfad gesetzt ist: ein leerer Wert laesst
+   * das Verhalten unveraendert (fail-open in beide Richtungen).
+   */
+  providerFallback: z.string().default(''),
+  /** Modell der Fallback-Route (leer = dasselbe Modell wie oben). */
+  modelFallback: z.string().default(''),
   /** Kontext-Quelle fuer MAX (leer = kein Kontext, MAX wird abgelehnt). */
   contextPath: z.string().default(''),
   /**
@@ -171,6 +192,14 @@ export const Config = z.object({
    * Leer = keine Intent-Erweiterung.
    */
   intentPatternsPath: z.string().default('./assets/intent-rules.json'),
+  /**
+   * Ablage gelernter Bausteine (Phase 4), relativ zum ARBEITSVERZEICHNIS.
+   *
+   * Dieselbe Regel wie Zettel und Skills: Gelerntes gehört dem PROJEKT, nicht
+   * dem Tarball. Leer = nicht lesen, nicht schreiben (dann bleibt die
+   * Registry, wie sie ausgeliefert wurde).
+   */
+  blocksLearnedPath: z.string().default('.shinon/blocks.learned.json'),
 });
 
 

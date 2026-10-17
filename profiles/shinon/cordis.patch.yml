@@ -135,6 +135,22 @@
             name: agnes-2.5-pro-beta
           - id: agnes-image-2.5-flash
             name: agnes-image-2.5-flash
+      # EIGENE Route für den Prompter-One-Shot (Phase 5): separater
+      # Schlüssel, getrennte Abrechnung, derselbe Host. Die models-Liste trägt
+      # bewusst nur das konfigurierte One-Shot-Modell — wer den Prompter auf ein
+      # anderes Modell stellt, erweitert DIESE Liste, nicht `agnes`. Der
+      # Schlüssel ist PROMPTER_API_KEY; fehlt er, faellt der Host auf
+      # `agnes` zurück (providerFallback in der Prompter-Config unten), statt
+      # den Enhancer totzustellen — das ist HOST-Logik, kein !!js in dieser
+      # Datei (der Gate-Parse läuft ueber js-yaml und kennt !!js nicht).
+      prompter:
+        displayName: Shinon Forge Prompter
+        apiKeyEnv: PROMPTER_API_KEY
+        api: openai-completions
+        baseURL: https://apihub.agnes-ai.com/v1
+        models:
+          - id: agnes-2.5-flash
+            name: Agnes 2.5 Flash
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
@@ -226,14 +242,24 @@
   config:
     observeEvents: [ 'agent/pre-step' ]
     mode: MAX
-    provider: agnes
+    # One-Shot-Route (Phase 5): EIGENER Provider mit eigenem Schlüssel
+    # (PROMPTER_API_KEY, `prompter`-Block in llm-pi-ai oben). Fehlt die
+    # Variable, faellt der Host beim Mounten auf `agnes` zurück — der Enhancer
+    # bleibt damit lauffähig, auch ohne eigenen Schlüssel. Die Haupt-Route
+    # (`agent-default-model`) bleibt unberührt bei agnes.
+    provider: prompter
     model: agnes-2.5-flash
+    providerKeyEnv: PROMPTER_API_KEY
+    providerFallback: agnes
+    modelFallback: agnes-2.5-flash
     skillsPath: .agents/skills
     indexBudgetTokens: 6000
     maxTokens: 0 # 0 = kein Limit (unbegrenzte Thinking-Tokens des One-Shots)
     temperature: 0.3
     timeoutMs: 15000
     trace: true
+    # Gelernte Bausteine (Phase 4): Projekt-Ablage über der Paket-Registry.
+    blocksLearnedPath: .shinon/blocks.learned.json
     # Runtime-Index (Zug 7): eigenhaend verwaltet, hash-basiert, JSON-persistiert.
     autoIndex: true
     indexSourcePath: .
@@ -306,6 +332,17 @@
     providers:
       - id: agnes
         envNames: [ 'AGNES_API_KEY' ]
+        baseUrl: https://apihub.agnes-ai.com/v1
+        protocol: openai-compatible
+        probePath: /models
+        initialDelayMs: 2000
+        maxDelayMs: 60000
+        maxRetries: 5
+      # Zweite Plätze für die One-Shot-Route (Phase 5): derselbe Host, eigener
+      # Umgebungsname. Der Router meldet Pool-Status für BEIDE Routen; baseUrl
+      # muss zur Route `prompter` passen (key-router-security pinnt das).
+      - id: prompter
+        envNames: [ 'PROMPTER_API_KEY' ]
         baseUrl: https://apihub.agnes-ai.com/v1
         protocol: openai-compatible
         probePath: /models

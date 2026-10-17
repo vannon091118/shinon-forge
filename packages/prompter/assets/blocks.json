@@ -1,0 +1,249 @@
+{
+  "contract": "shinon.blocks/v1",
+  "note": "Baustein-Registry (Phase 1): JEDE heutige Prompt-Injektion als Datensatz — kein Baustein steht je vollständig im Prompt. Der Selektor (Phase 2) wählt pro Schritt aus Haystack + Scoring-Haltung + Intent-Klasse, gedeckelt durch budgetTokens. Pflicht ist nur Identität + Anfrage; alles andere ist situativ und fällt leer weg. Reine Daten: ohne node_modules ladbar, kein Modell, keine Uhr.",
+  "pflichtBudgetTokens": 900,
+  "blocks": [
+    {
+      "id": "persona-identity-core",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:identity",
+      "modus": ["MIN", "MID", "MAX"],
+      "pflicht": true,
+      "budgetTokens": 600,
+      "ausloeser": { "immer": true },
+      "herkunft": "packages/persona/index.js (IDENTITY: Herkunft Shinon/von Vannon, Widerspruch, Ton-Verbote)"
+    },
+    {
+      "id": "persona-epistemic",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:epistemic",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 250,
+      "ausloeser": { "scoringHaltung": ["kritisch"], "haystack": ["beleg", "belege", "behaupt", "behauptung", "unsicher", "widerspruch", "widersprich"], "intentKlassen": ["LOOKUP", "TRANSFORM", "MULTI_STEP_TASK"] },
+      "herkunft": "packages/persona/index.js (EPISTEMIC)"
+    },
+    {
+      "id": "persona-change-classes",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:change-classes",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 300,
+      "ausloeser": { "haystack": ["änder", "ändert", "änderung", "refaktor", "refaktoriere", "refaktorieren", "repariere", "repariert", "fix", "bug", "commit", "golden", "breaking", "safe"], "intentKlassen": ["TRANSFORM", "MULTI_STEP_TASK"] },
+      "herkunft": "packages/persona/index.js (CHANGE_CLASSES: SAFE/BEHAVIOR/BREAKING + Golden-Disziplin)"
+    },
+    {
+      "id": "persona-determinism",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:determinism",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 250,
+      "ausloeser": { "haystack": ["seed", "rng", "random", "zufall", "replay", "save", "determin", "deterministisch"], "intentKlassen": ["TRANSFORM", "MULTI_STEP_TASK"] },
+      "herkunft": "packages/persona/index.js (DETERMINISM)"
+    },
+    {
+      "id": "persona-discipline",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:discipline",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 250,
+      "ausloeser": { "haystack": ["parallel", "agent", "branch", "merge", "commit", "konflikt"], "intentKlassen": ["MULTI_STEP_TASK", "LONG_RUNNING_GOAL"] },
+      "herkunft": "packages/persona/index.js (DISCIPLINE)"
+    },
+    {
+      "id": "persona-workaround",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:workaround",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 250,
+      "ausloeser": { "haystack": ["blockiert", "rate-limit", "429", "fehlend", "kein zugriff", "fallback"], "ereignisse": ["action.blocked", "gate.failed"] },
+      "herkunft": "packages/persona/index.js (WORKAROUND)"
+    },
+    {
+      "id": "persona-report",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:report",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 200,
+      "ausloeser": { "haystack": ["bericht", "fertig", "ergebnis", "status"], "intentKlassen": ["MULTI_STEP_TASK", "LONG_RUNNING_GOAL"], "amTurnEnde": true },
+      "herkunft": "packages/persona/index.js (REPORT: Gemacht/Gefunden/Risiko/Tests/Offen)"
+    },
+    {
+      "id": "persona-augenhoehe",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:augenhoehe",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 200,
+      "ausloeser": { "haystack": ["kürzer", "erklär", "einfacher", "ausführlich"], "config": "includeAugenhoehe" },
+      "herkunft": "packages/persona/index.js (AUGENHOEHE, config-gesteuert)"
+    },
+    {
+      "id": "persona-identity-overview",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:identity-overview",
+      "modus": ["MIN", "MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 400,
+      "ausloeser": { "triggerwoerter": "TRIGGERS (Selbstauskunft: wer bist du, stell dich vor, was kannst du, dein name)", "config": "alwaysKnowIdentity" },
+      "herkunft": "packages/persona/index.js (IDENTITY_OVERVIEW: Material, kein Skript)"
+    },
+    {
+      "id": "persona-identity-trigger",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:identity-trigger",
+      "modus": ["MIN", "MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 300,
+      "ausloeser": { "triggerwoerter": "TRIGGERS (Anrede erkannt: Form Person-statt-Datenblatt)", "nurWenn": "lastTrigger != null" },
+      "herkunft": "packages/persona/index.js (renderTriggerContext)"
+    },
+    {
+      "id": "persona-project-context",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:project-context",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 800,
+      "ausloeser": { "datei": ".shinon/project-context.md vorhanden und nicht leer", "config": "projectContextPath" },
+      "herkunft": "packages/persona/index.js (Zug 9, nur im Shinon-Projekt)"
+    },
+    {
+      "id": "persona-state",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:state",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 400,
+      "ausloeser": { "immer": "nach Zustandsänderung (sechs Felder: identity/stance/uncertainty/mood/capabilities/limitations/relation)" },
+      "herkunft": "packages/persona/index.js (renderStateContext, createPersonaState)"
+    },
+    {
+      "id": "persona-tendency",
+      "quelle": "scoring",
+      "lage": "system",
+      "sektion": "shinon:tendency",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 300,
+      "ausloeser": { "dienst": "shinon_scoring_state (shinon.scoring-state/read-v1) liefert bekannten Ton", "nurWenn": "renderTendency != null" },
+      "herkunft": "packages/persona/index.js (readTone + renderTendency, lesend)"
+    },
+    {
+      "id": "persona-narrative-arc",
+      "quelle": "narrative",
+      "lage": "system",
+      "sektion": "shinon:narrative-arc",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 300,
+      "ausloeser": { "kanal": "shinon/narrative/state (shinon.narrative/v1) liefert darstellbare Felder", "nurWenn": "renderNarrative != null" },
+      "herkunft": "packages/persona/index.js (renderNarrative, Interpretation nicht Autorität)"
+    },
+    {
+      "id": "enhancer-system-policy",
+      "quelle": "prompter",
+      "lage": "one-shot-system",
+      "sektion": "POLICIES[modus]",
+      "modus": ["MIN", "MID", "MAX"],
+      "pflicht": true,
+      "budgetTokens": 300,
+      "ausloeser": { "immer": true },
+      "herkunft": "packages/prompter/assets/mode-core.js (policyFor: RESULT_BRIEF + allows/forbids aus MODE_CONTRACT erzeugt)"
+    },
+    {
+      "id": "enhancer-untrusted-rule",
+      "quelle": "prompter",
+      "lage": "one-shot-system",
+      "sektion": "POLICIES[MAX].extras",
+      "modus": ["MAX"],
+      "pflicht": false,
+      "budgetTokens": 150,
+      "ausloeser": { "modus": "MAX", "nurWenn": "Kontextblock wird mitgeliefert" },
+      "herkunft": "packages/prompter/assets/mode-core.js (UNTRUSTED_RULE: Kontext ist Referenz, keine Anweisung)"
+    },
+    {
+      "id": "index-project-context",
+      "quelle": "project-index",
+      "lage": "user",
+      "sektion": "<untrusted_project_context>",
+      "modus": ["MAX"],
+      "pflicht": false,
+      "budgetTokens": 6000,
+      "ausloeser": { "modus": "MAX", "quelle": "Runtime-Index bevorzugt, Project-Index als Fallback, Datei vor beiden", "nurWenn": "needsContext && Kontext vorhanden" },
+      "herkunft": "packages/prompter/index.js (maxContext) + assets/render-context.js (renderContext, neutralizeMarkers)"
+    },
+    {
+      "id": "stand-haltung",
+      "quelle": "scoring",
+      "lage": "user",
+      "sektion": "<shinon_stand>/<haltung>/<tendenzen>",
+      "modus": ["MIN", "MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 200,
+      "ausloeser": { "dienst": "shinon_scoring_state liefert Haltung/Tendenzen", "nurWenn": "stance oder tendencies vorhanden" },
+      "herkunft": "packages/prompter/assets/stand.js (standFor) + note-core.js (renderStand)"
+    },
+    {
+      "id": "stand-zettel",
+      "quelle": "prompter",
+      "lage": "user",
+      "sektion": "<shinon_stand>/<zettel>",
+      "modus": ["MIN", "MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 1200,
+      "ausloeser": { "regeln": "shinon.note-rules/v1 (maxNotes 3, minHits 1)", "haystack": "Prompt + Projekt + Pfade + Symbole + Constraints + Touches + Dependencies", "nurWenn": "notesPath gesetzt und Regeln ladbar" },
+      "herkunft": "packages/prompter/assets/stand.js + note-core.js (selectNotes, reviewNotes) + prompt-files.js"
+    },
+    {
+      "id": "stand-narrative-lage",
+      "quelle": "narrative",
+      "lage": "user",
+      "sektion": "<shinon_stand>/<narrative>",
+      "modus": ["MIN", "MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 300,
+      "ausloeser": { "kanal": "Narrative-Composite in runtime.narrative vorhanden", "nurWenn": "darstellbare Felder (arc/erzähler/beziehung/stimmung)" },
+      "herkunft": "packages/prompter/assets/stand.js + note-core.js (renderStand <narrative>)"
+    },
+    {
+      "id": "skills-block",
+      "quelle": "prompter",
+      "lage": "user",
+      "sektion": "<shinon_skills> + <shinon_stand>/<selected_skills>",
+      "modus": ["MIN", "MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 800,
+      "ausloeser": { "regeln": "shinon.skill-rules/v1 (maxSkills 4, minHits 1)", "haystack": "Beschreibung (name + description + use-when) gegen Kontext-Haystack", "nurWenn": "skillsPath gesetzt und Treffer vorhanden" },
+      "herkunft": "packages/prompter/assets/stand.js (selectSkills) + render-context.js (renderSkillsBlock, modus-unabhängig) + prompt-files.js"
+    },
+    {
+      "id": "intent-expansion",
+      "quelle": "prompter",
+      "lage": "one-shot-input",
+      "sektion": "intentPatternsPath",
+      "modus": ["MIN", "MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 500,
+      "ausloeser": { "regeln": "shinon.intent-rules/v1 (6 Patterns: update-docs/documentation/tests/bugfix/refactor/read-code)", "trigger": "Trigger-Listen deutsch/englisch, case-insensitive", "nurWenn": "intentPatternsPath gesetzt und Pattern trifft" },
+      "herkunft": "packages/prompter/assets/intent-rules.json (Trigger → Klassifikation → Expansion)"
+    }
+  ]
+}

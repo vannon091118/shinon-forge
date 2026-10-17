@@ -46,7 +46,9 @@ export {
   deriveTendency,
   createSignalCollector,
 } from './assets/scoring-core.js';
+export { WEIGHTS_CONTRACT, WEIGHTS_SERVICE } from './assets/block-weights.js';
 import { canonicalize, initialState as coreInitialState, createSignalCollector, deriveTendency } from './assets/scoring-core.js';
+import { MAX_ATTRIBUTIONS, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, applyAttribution, cleanBlockIds, polarityOf, readWeights, reverseAttribution, validateAttribution, validateWeights } from './assets/block-weights.js';
 
 /**
  * Die Naht zur Ablage (Zug 2) — als Namen an EINER Stelle, weil kein Paket das
@@ -78,6 +80,17 @@ export const LEDGER_NAMESPACE = 'shinon.scoring/ledger-v1';
  */
 export const SCORING_SERVICE = 'shinon_scoring_state';
 export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
+
+/**
+ * Der Entscheidungskanal des Veredlers als LITERAL (vierte Naht, Phase 3).
+ *
+ * Warum als Literal und nicht als Import: Pakete lesen einander nicht (jedes
+ * Bundle reist eigenständig). Der Besitzer des Namens ist `@shinon/prompter`
+ * (`DECISION_CHANNEL` in dessen `mode-core.js`); Drift pinnt
+ * `scripts/gate/tests/context-wiring.test.mjs` auf beiden Seiten — dieselbe
+ * Bauform wie beim Ton und der Ablage.
+ */
+export const BLOCKS_DECISION_CHANNEL = 'shinon/prompter/decision';
 
 /** Leere Scorecard: der Stub läuft dann lesend, aber ohne Werte. */
 const EMPTY_SCORING = { contract: 'shinon.scoring-state/unloaded', dimensions: {}, events: {}, relation: { levels: [], initial: null } };
@@ -216,13 +229,30 @@ export function apply(ctx, config) {
     return store;
   };
 
+  // ── Das Lernen: Gewichte im selben Ledger, kein neues Backend ─────────────
+  //
+  // `blockWeights` ({ id: { up, down } }) und `blockAttributions` (Zuordnung
+  // Sitzung + Betreff → Bausteine + Polarität) reisen im SELBEN Snapshot wie
+  // das Protokoll — kein neuer Namensraum, keine neue Tabelle. Die Ablage
+  // braucht dafür KEINE neue Fassung: alte Stände ohne die Felder lesen sich
+  // als leere Gewichte, neue Stände in altem Code verlieren sie still (die
+  // Formprüfung dort lässt Unbekanntes fallen). Ein Versions-Bump würde das
+  // gesamte Gedächtnis verwerfen, um nichts zu schützen — deshalb keiner.
+  let blockWeights = {};
+  let blockAttributions = [];
+  const sessionBlocks = new Map();
+
   /** Den gemeldeten Stand in die Ablage schreiben — reine Weitergabe plus Spur. */
   const writeState = (snapshot) => {
     const target = resolveStore();
     if (target === null) return;
     let answer;
     try {
-      answer = target.save(LEDGER_NAMESPACE, snapshot);
+      answer = target.save(LEDGER_NAMESPACE, {
+        ...snapshot,
+        blockWeights: { ...blockWeights },
+        blockAttributions: blockAttributions.map((entry) => ({ ...entry, blocks: [...entry.blocks] })),
+      });
     } catch (error) {
       console.warn(`[shinon-scoring] Ablage nicht beschreibbar (${error?.message ?? error}) — der Stand bleibt im Speicher`);
       return;
@@ -264,6 +294,22 @@ export function apply(ctx, config) {
     const state = answer.state;
     if (state === null || state === undefined) return null;
     const adopted = collector.hydrate(state);
+    // Die Gewichte sind EVIDENZ wie das Protokoll: nur die Form wird geprüft,
+    // Unlesbares fällt mit Zählung weg statt zu raten.
+    const learned = validateWeights(state?.blockWeights);
+    blockWeights = learned.weights;
+    if (learned.dropped > 0) {
+      console.warn(`[shinon-scoring] ${learned.dropped} unlesbare Gewichtszeilen uebergangen`);
+    }
+    const rawAttributions = Array.isArray(state?.blockAttributions) ? state.blockAttributions : [];
+    blockAttributions = [];
+    for (const entry of rawAttributions) {
+      const valid = validateAttribution(entry);
+      if (valid !== null) blockAttributions.push(valid);
+    }
+    if (blockAttributions.length > MAX_ATTRIBUTIONS) {
+      blockAttributions.splice(0, blockAttributions.length - MAX_ATTRIBUTIONS);
+    }
     // Die gespeicherte Tafel ist EVIDENZ, nicht Wahrheit: sie muss mit der
     // Rechnung uebereinstimmen. Weicht sie ab, gilt das Protokoll — es ist die
     // Quelle — und die Abweichung steht im Protokoll, statt still zu bleiben.
@@ -277,6 +323,47 @@ export function apply(ctx, config) {
     return adopted;
   };
   loadState();
+
+  /**
+   * Aus einem Signalstand lernen: welche Bausteine standen, als das Signal kam.
+   *
+   * Die Zuordnung ist die Sitzung (der Veredler nennt je Schritt Sitzung +
+   * Baustein-Ids, das Signal nennt Sitzung + Betreff). Gewertet wird nur, was
+   * einen Pol hat (Urteil, Turn-Ende); die Bemerkung wird beobachtet, aber nie
+   * gewertet; Unbekanntes ändert nichts. Ein zweites Urteil zum SELBEN Betreff
+   * kehrt die alte Wertung erst um (Ersetzen statt Stapeln — wie im Protokoll).
+   * Jede Änderung wird gemeldet: die Ablage trägt sie wie jedes Signal.
+   */
+  const learn = (envelope, result) => {
+    const sessionId = typeof envelope?.session_id === 'string' ? envelope.session_id : '';
+    if (envelope?.event_type === 'session.created' && sessionId !== '') sessionBlocks.delete(sessionId);
+    const outcome = result?.outcome;
+    if (outcome?.kind === 'score' && typeof outcome.signal === 'string' && typeof outcome.subject === 'string' && outcome.subject !== '' && sessionId !== '') {
+      const polarity = polarityOf(outcome.signal);
+      const blocks = sessionBlocks.get(sessionId) ?? [];
+      if (polarity !== null && blocks.length > 0) {
+        // Ersetzen statt Stapeln (wie im Protokoll): die alte Wertung zum
+        // selben Betreff kehrt erst um, dann zählt die neue.
+        const prior = blockAttributions.find((entry) => entry.session_id === sessionId && entry.subject === outcome.subject);
+        if (prior !== undefined) blockWeights = reverseAttribution(blockWeights, prior);
+        blockAttributions = blockAttributions.filter((entry) => !(entry.session_id === sessionId && entry.subject === outcome.subject));
+        blockAttributions.push({ session_id: sessionId, subject: outcome.subject, blocks: [...blocks], polarity });
+        if (blockAttributions.length > MAX_ATTRIBUTIONS) {
+          blockAttributions.splice(0, blockAttributions.length - MAX_ATTRIBUTIONS);
+        }
+        blockWeights = applyAttribution(blockWeights, blocks, polarity);
+        writeState(collector.state());
+      }
+    } else if (outcome?.kind === 'retract' && typeof outcome.subject === 'string' && outcome.subject !== '' && sessionId !== '') {
+      const index = blockAttributions.findIndex((entry) => entry.session_id === sessionId && entry.subject === outcome.subject);
+      if (index !== -1) {
+        const [attribution] = blockAttributions.splice(index, 1);
+        blockWeights = reverseAttribution(blockWeights, attribution);
+        writeState(collector.state());
+      }
+    }
+    return result;
+  };
 
   /**
    * Die Ohren: der Spine emittiert `(envelope, payload)` auf dem Kanal. Zwei
@@ -296,7 +383,7 @@ export function apply(ctx, config) {
           // mountet das Profil den Index NACH dem Scoring, wird der Stand hier
           // nachgeholt. Danach ist die Frage entschieden (memoryLoaded).
           if (!memoryLoaded) loadState();
-          collector.observe(envelope, payload);
+          learn(envelope, collector.observe(envelope, payload));
         } catch (error) {
           console.warn(`[shinon-scoring] Signal verworfen (${error?.name ?? 'Error'}: ${error?.message ?? error})`);
         }
@@ -354,8 +441,49 @@ export function apply(ctx, config) {
     },
   };
   const releaseStand = canProvide ? ctx.provide(SCORING_SERVICE, standService) : null;
+
+  // ── Der vierte Dienst: die Gewichte als schmale Fähigkeit ───────────────────
+  //
+  // Der Veredler nennt seine Auswahl je Schritt auf dem Entscheidungskanal
+  // (nur Ids, nie Text); das Scoring merkt sie sich je Sitzung. Dieselbe
+  // Bauform wie der Ton: optionales Anbieten, gepruefter Vertragsname auf der
+  // lesenden Seite, `null` solange nichts zu sagen ist.
+  const stopBlocks = (() => {
+    if (typeof ctx?.on !== 'function') return null;
+    try {
+      const disposeBlocks = ctx.on(BLOCKS_DECISION_CHANNEL, (record) => {
+        try {
+          const sessionId = typeof record?.session_id === 'string' ? record.session_id : '';
+          const ids = cleanBlockIds(record?.blocks);
+          if (sessionId !== '' && ids.length > 0) {
+            // Deckel wie bei den Zuordnungen: die älteste Sitzung weicht, statt
+            // dass der Speicher mit jeder Sitzung wächst (Map in Einfügereihenfolge).
+            if (!sessionBlocks.has(sessionId) && sessionBlocks.size >= MAX_ATTRIBUTIONS) {
+              const oldest = sessionBlocks.keys().next();
+              if (!oldest.done) sessionBlocks.delete(oldest.value);
+            }
+            sessionBlocks.set(sessionId, ids);
+          }
+        } catch { /* Beiwerk: eine unlesbare Auswahl haelt nichts an */ }
+      });
+      return typeof disposeBlocks === 'function' ? disposeBlocks : () => {};
+    } catch {
+      return null;
+    }
+  })();
+  const weightsService = {
+    contract: WEIGHTS_CONTRACT,
+    read: () => {
+      if (!memoryLoaded) loadState();
+      return readWeights(blockWeights);
+    },
+  };
+  const releaseWeights = canProvide ? ctx.provide(WEIGHTS_SERVICE, weightsService) : null;
   console.log(
     `[shinon-scoring] Ton: ${SCORING_SERVICE} (${SCORING_SERVICE_CONTRACT}) ${canProvide ? 'angeboten' : 'NICHT angeboten (der Host hat kein ctx.provide)'}`,
+  );
+  console.log(
+    `[shinon-scoring] Gewichte: ${WEIGHTS_SERVICE} (${WEIGHTS_CONTRACT}) ${canProvide ? 'angeboten' : 'NICHT angeboten (der Host hat kein ctx.provide)'}`,
   );
 
   return {
@@ -364,10 +492,12 @@ export function apply(ctx, config) {
     collector,
     /** Der angebotene Ton — fuer Tests und den spaeten Mount. */
     standService,
+    /** Die angebotenen Gewichte — fuer Tests und den Veredler. */
+    weightsService,
     /** Ein Ereignis von Hand zufuehren (Tests, Replay, naechster Zug). */
     observe: (envelope, payload) => {
       if (!memoryLoaded) loadState();
-      return collector.observe(envelope, payload);
+      return learn(envelope, collector.observe(envelope, payload));
     },
     /** Den Stand aus der Ablage laden (fuer Tests und einen spaeten Mount). */
     loadState,
@@ -395,6 +525,9 @@ export function apply(ctx, config) {
     tendency: () => deriveTendency(tendency, collector.records()),
     dispose: () => {
       if (typeof releaseStand === 'function') releaseStand();
+      if (typeof releaseWeights === 'function') releaseWeights();
+      if (stopBlocks !== null) stopBlocks();
+      sessionBlocks.clear();
       if (listening !== null) listening();
       // Sitzungen enden mit dem Prozess: erst schliessen (die Ablage traegt den
       // Rest), dann den Speicher leeren. Umgekehrt waere der Merkzettel weg,

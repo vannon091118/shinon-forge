@@ -204,9 +204,11 @@ test('memory: die Ablage ist eine zweite, schmale Faehigkeit — die Abfrage ble
   const indexRoot = workDir('naht-index');
   const api = await mount({ root: project, indexRoot });
 
-  // Der Host hat GENAU drei Faehigkeiten, und jede ist schmal: die Abfrage und
-  // die Ablage kommen vom Index, der Ton vom Scoring (Zug 5).
-  assert.deepEqual([...api.host.services.keys()].sort(), ['shinon_index_query', 'shinon_index_store', 'shinon_scoring_state']);
+  // Der Host hat GENAU vier Faehigkeiten, und jede ist schmal: die Abfrage und
+  // die Ablage kommen vom Index, der Ton (Zug 5) und die Gewichte (Phase 3)
+  // vom Scoring. Die vierte ist angefragtes Verhalten (Gewichte für die
+  // Baustein-Auswahl), keine Beigabe — siehe context-wiring (vierte Naht).
+  assert.deepEqual([...api.host.services.keys()].sort(), ['shinon_block_weights', 'shinon_index_query', 'shinon_index_store', 'shinon_scoring_state']);
   const query = api.host.services.get(index.QUERY_SERVICE);
   assert.deepEqual(Object.keys(query).sort(), ['contract', 'resolveContext'], 'die Abfrage bleibt eine Operation');
   assert.equal(query.contract, index.QUERY_CONTRACT);
