@@ -316,6 +316,15 @@ test('narrative: der umgekehrte Weg — ein fremder Composite wird nicht erfunde
   const stand = prompter.standFor(config, { narrative: null }, 'text', null, null);
   assert.equal(stand.block, null);
   assert.equal(stand.narrative, null);
+
+  // Der Kanal steht jedem offen: ein Wert, der keine Lage IST — Text, Zahl,
+  // Array —, wird nicht zu einer Lage umgedeutet. Sonst widersprächen sich Block
+  // („keine Lage") und Datensatz („Lage ohne Felder") über denselben Stand.
+  for (const foreign of ['arc-7', 42, [], ['arc-7']]) {
+    const fremd = prompter.standFor(config, { narrative: foreign }, 'text', null, null);
+    assert.equal(fremd.narrative, null, `${JSON.stringify(foreign)} ist keine Lage`);
+    assert.equal(String(fremd.block ?? '').includes('<narrative'), false, `${JSON.stringify(foreign)} erfindet kein Element`);
+  }
 });
 
 // ── 3. Die reine Funktion ────────────────────────────────────────────────────
