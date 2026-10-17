@@ -87,7 +87,14 @@ npm run commit:guard -- --last 5          # die letzten 5 Commits
 npm run commit:guard -- --range <a>..<b>  # ein Bereich
 npm run commit:guard -- --ci              # genau das, was CI prüft
 npm run commit:guard -- --all             # Audit der ganzen Historie
+npm run commit:guard -- --stdin < datei   # Trockenlauf der eigenen Nachricht
+npm run commit:check-file -- datei        # derselbe Lauf über --file (ohne --fix)
 ```
+
+Der Trockenlauf ruft `checkMessage` auf — **denselben** Regelsatz wie der
+Commit-msg-Hook und CI, ohne Tausch und ohne Git-Zugriff. Er ist der billige
+Weg, die Checkliste vor dem ersten `git commit` abzuhaken, statt den Hook als
+Fehlermeldung zu benutzen.
 
 ## Eine Prüfung, zwei Werkzeuge — mit Invariante
 

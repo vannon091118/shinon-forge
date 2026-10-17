@@ -19,13 +19,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { delimiter, dirname, join } from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 import {
   SQLITE_SMOKE,
   engineRange,
   resetRuntimeCache,
   resolveRuntime,
+  runtimeCandidates,
   runtimeFailure,
   satisfiesRange,
   verifyRuntime,
@@ -77,6 +79,37 @@ test('runtime: der verifizierte Kandidat besteht Version UND node:sqlite-Rauchte
   const broken = verifyRuntime('/bin/true');
   assert.equal(broken.ok, false, '/bin/true führt den Rauchtest nicht aus');
   assert.ok(String(broken.reason).length > 0, 'ein Fehler ohne Text wäre ein Befund ohne Spur');
+});
+
+test('runtime: der Rückfall scannt die Versionsmanager, höchste Fassung zuerst', () => {
+  // Eine künstliche HOME: der Test hängt nicht an der Installation dieses Rechners.
+  // Geprüft wird die REIHENFOLGE (deterministisch, absteigend) und dass die drei
+  // dokumentierten Orte überhaupt gelesen werden — nicht, welche Fassung hier liegt.
+  const home = mkdtempSync(join(tmpdir(), 'shinon-node-'));
+  const binary = process.platform === 'win32' ? 'node.exe' : 'node';
+  const plant = (rel) => {
+    const dir = join(home, rel, 'bin');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, binary), '');
+  };
+  try {
+    plant('.local/opt/shinon-forge/node/current');
+    plant('.local/share/mise/installs/node/22.19.0');
+    plant('.local/share/mise/installs/node/24.1.0');
+    plant('.local/share/mise/installs/node/21.7.0');
+    plant('.nvm/versions/node/v22.23.3');
+    const found = runtimeCandidates({ HOME: home, PATH: '' })
+      .filter((entry) => entry.source === 'Versionsmanager')
+      .map((entry) => entry.binary);
+    assert.equal(found.length, 5, `alle fünf Binaries werden gelesen (${found.join(', ')})`);
+    assert.equal(found[0], join(home, '.local/opt/shinon-forge/node/current/bin', binary), 'der dokumentierte Opt-Pfad steht zuerst');
+    assert.equal(found[1], join(home, '.local/share/mise/installs/node/24.1.0/bin', binary), 'höchste Fassung vor 22.19');
+    assert.equal(found[2], join(home, '.local/share/mise/installs/node/22.19.0/bin', binary), '22.19 vor 21');
+    assert.equal(found[3], join(home, '.local/share/mise/installs/node/21.7.0/bin', binary), 'auch die zu alte Fassung wird geprüft — verworfen wird sie erst von den Proben');
+    assert.equal(found[4], join(home, '.nvm/versions/node/v22.23.3/bin', binary), 'nvm ist der letzte Rückfall');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test('runtime: SHINON_NODE auf ein untaugliches Binary ist ein Fehler mit Grund', () => {

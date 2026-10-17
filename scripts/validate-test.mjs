@@ -10,7 +10,7 @@
  * Eingebunden in `npm test`.
  */
 import { execFileSync } from 'child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { basename, join } from 'path';
 import * as repo from './lib/repo.mjs';
@@ -88,6 +88,13 @@ function fixtureRoot(name, mutate) {
   for (const entry of SOURCES) {
     cpSync(join(repo.ROOT, entry), join(root, entry), { recursive: true, filter: (src) => !SKIP.has(basename(src)) });
   }
+  // Die Fixtures sind ein Baum OHNE Installat — aber das statische Gate prüft
+  // den Cordis-Vertrag an den geladenen `Config`-Exporten. Ohne `schemastery`
+  // wäre diese Prüfung nicht ausführbar (und ein Skip wäre kein Grün). Der
+  // Symlink zeigt auf DASSELBE `node_modules` wie der Lauf, kopiert also
+  // nichts und kann den Baum nicht verändern.
+  const modules = join(repo.ROOT, 'node_modules');
+  if (existsSync(modules)) symlinkSync(modules, join(root, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
   if (mutate) mutate(root);
   return root;
 }

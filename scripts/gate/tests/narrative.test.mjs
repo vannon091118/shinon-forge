@@ -24,7 +24,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -272,6 +272,36 @@ test('narrative: der Veredler trägt Kanal und Vertragsname als Literal (Zwillin
   const twin = repo.SOURCE_TWINS.find((entry) => entry.mirror === 'packages/prompter/index.js' && entry.owner === 'packages/narrative/index.js');
   assert.ok(twin, 'der Veredler ist nicht als Zwilling der Narrative-Naht deklariert');
   assert.deepEqual(twin.values.map((value) => value.export).sort(), ['STATE_CHANNEL', 'STATE_CONTRACT']);
+});
+
+test('narrative: der Zwilling liest das ganze Prompter-Paket — ein Modulschnitt ist keine Drift', () => {
+  const twin = repo.SOURCE_TWINS.find((entry) => entry.owner === 'packages/narrative/index.js' && entry.mirror === 'packages/prompter/index.js');
+  assert.equal(twin?.mirrorScope, 'package', 'der Veredler ist modular — der Zwilling muss index.js UND assets/*.js lesen');
+
+  // Miniatur-Baum: der Besitzer liefert die Namen, der Spiegel trägt sie NICHT
+  // in seiner Komposition, sondern in einem `assets/`-Kern. Vorher war das rot,
+  // obwohl keine Drift existierte — genau die Falle, die dieser Test schließt.
+  const root = mkdtempSync(join(tmpdir(), 'shinon-twin-'));
+  try {
+    mkdirSync(join(root, 'packages', 'narrative'), { recursive: true });
+    mkdirSync(join(root, 'packages', 'prompter', 'assets'), { recursive: true });
+    writeFileSync(
+      join(root, 'packages', 'narrative', 'index.js'),
+      `export const STATE_CHANNEL = '${STATE_CHANNEL}';\nexport const STATE_CONTRACT = '${NARRATIVE_CONTRACT_ID}';\n`,
+    );
+    writeFileSync(join(root, 'packages', 'prompter', 'index.js'), 'export const composition = true;\n');
+    const asset = join(root, 'packages', 'prompter', 'assets', 'narrative-seam.js');
+    writeFileSync(asset, `const NARRATIVE_CHANNEL = '${STATE_CHANNEL}';\nconst NARRATIVE_CONTRACT = '${NARRATIVE_CONTRACT_ID}';\n`);
+    assert.deepEqual(repo.twinIssues(root, [twin]), [], 'die Literale im assets-Kern gelten');
+    assert.equal(repo.twinIssues(root, [{ ...twin, mirrorScope: 'file' }]).length, 2, 'ohne package-Scope bleibt die enge Prüfung');
+
+    writeFileSync(asset, 'export const moved = true;\n');
+    const issues = repo.twinIssues(root, [twin]);
+    assert.equal(issues.length, 2, issues.join('\n'));
+    assert.ok(issues.every((issue) => issue.includes('spiegelt')), issues.join('\n'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('narrative: renderStand macht aus dem Composite ein <narrative>-Element — aus nichts nichts', () => {

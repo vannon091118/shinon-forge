@@ -12,6 +12,22 @@ distribution tests below — the profile boot test also runs `dsh --profile shin
 are `origin` and `main`, both pointing at this repository — there is **no** `upstream`
 remote, so there is deliberately no sync script.
 
+## Zuerst lesen — drei Regeln vor jeder Änderung
+1. **Frage vs. Code:** Eine konzeptionelle, architektonische oder UX-Frage wird
+   in Textform beantwortet. Dateien ändert nur ein ausdrücklicher
+   Implementierungsauftrag („mach das", „implementiere", „fixe"); eine Frage
+   ist keine Erlaubnis.
+2. **Vertragsdateien schützen:** Bestehende JSON-Verträge
+   (`packages/*/assets/*.json`, `docs/contracts/*.json`, `profiles/*/package.json`)
+   werden nie mit einem erfundenen Schema überschrieben. Wer ein Feld braucht,
+   erweitert das vorhandene Dokument additiv und prüft es mit dem zuständigen
+   Test — „neu schreiben" ist kein Refactoring, sondern ein Vertragsbruch.
+3. **Commit-Gate beim ersten Versuch:** Vor `git commit` die Checkliste unter
+   „Commit rules" abhaken und die Nachricht trocken prüfen
+   (`npm run commit:check-file -- <datei>` oder `node scripts/commit-guard.mjs
+   --stdin`). Der lokale Hook tauscht nur Footer; die Wort-Regel repariert
+   niemand.
+
 ## Dev environment
 - Node and npm must be on PATH — **npm ist die einzige Paketquelle** (PLAN.md Schritt
   3.5/A1: `packageManager`, `pnpm-workspace.yaml` und die pnpm-Aufrufe sind raus). Die
@@ -49,10 +65,17 @@ Run from repo root:
 
 **Ist-Zustand:** Welche dieser Läufe Exit 0 liefern, mit welchen Zählungen, und warum
 welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wiederholen.
-- `npm test` → `node --test packages/codingmon/test/*.test.mjs && node --test
-  packages/scoring/test/*.test.mjs && dsh-test.mjs && validate-test.mjs && pack-test.mjs &&
-  dsh-profile-test.mjs` (die schnellen Einzeltests laufen zuerst, damit eine kaputte
-  Tabelle vor `pack-test` auffällt). Dieselben Tests laufen in
+- `npm test` → die Paket-Suiten (codingmon, scoring, token-usage, prompter,
+  narrative, popup, key-router, traceability) → statisches Gate
+  (`scripts/shinon-test.mjs`) → Fixtures (`scripts/validate-test.mjs`) →
+  Distribution (`scripts/pack-test.mjs`) → Profilboot
+  (`scripts/shinon-profile-test.mjs`). Die schnellen Einzeltests laufen zuerst,
+  damit eine kaputte Tabelle vor `pack-test` auffällt. Jeder Schritt läuft über
+  `scripts/run-with-node.mjs`: das setzt `node_modules/.bin` VOR den PATH und
+  re-exect unter einer verifizierten Node ≥ 22, wenn die Shell mit einer älteren
+  startet (Range aus `engines.node`, `node:sqlite`-Rauchtest). Ein nacktes
+  `node --test …` bleibt der ungeschützte Weg; `npm run gate:test` und alle
+  `test:*`-Skripte gehen durch den Wrapper. Dieselben Tests laufen in
   `.github/workflows/commit-guard.yml` auf jedem Push/PR.
 - `node scripts/shinon-test.mjs` → static gate: manifest, name contract, `index.js`,
   `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution (exit 0/1).
@@ -88,7 +111,14 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `npm run gate` / `gate:local` / `gate:full` → modular gate engine
   (`scripts/gate/engine.mjs`): slice-selected checks, one plugin per capability. Sits
   alongside `npm test`, does not replace it.
-- `npm run gate:test` → `node --test scripts/gate/tests/*.test.mjs` (pure gate logic).
+- `npm run gate:test` → `node scripts/run-with-node.mjs node --test
+  scripts/gate/tests/*.test.mjs` (pure gate logic; no DSH needed, DSH-dependent
+  tests skip visibly).
+- `npm run zahlen:sync` → `node scripts/sync-zahlen.mjs`: measures the inventory
+  (packages, profile layers, versions, idioms, dist) and writes **only** the marked
+  block `<!-- zahlen:bestand:start --> … <!-- zahlen:bestand:end -->` in
+  `docs/ZAHLEN.md`; `npm run zahlen:check` compares without writing (Exit 1 on drift).
+  Never hand-edit between those markers.
 - `npm run dev` → `dsh --profile shinon`.
 - `npm run update` → `node scripts/dsh-update.mjs` (upstream DSH refresh; see Pitfalls).
 
@@ -123,7 +153,7 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   (settings registration, locale fallback). The blocks in `packages/*/index.js` and
   `packages/*/client.js` are generated between `shinon:dsh-idiom` markers: write with
   `npm run idioms`, check with `npm run idioms:check` — `host-half`/`client-half`,
-  `dsh-test` and `build` check too. Never edit between the markers by hand; sharing by
+  the static gate and `build` check too. Never edit between the markers by hand; sharing by
   import is impossible here (one tarball per package, self-contained client bundle),
   which is exactly why the derivation is generated and drift-checked.
   **Each file declares its own values in the opening marker** (` params={…}`, JSON);
@@ -131,6 +161,13 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   an unknown block id, missing or unparseable params leave the file untouched and are
   reported (fail-closed). A new plugin writes its marker with its own table/key/label
   and runs `npm run idioms`.
+- Never invent a `shinon:dsh-idiom` marker. Only block ids from `TEMPLATES` in
+  `scripts/lib/plugin-idioms.mjs` are valid; an unknown id or unparseable params
+  leave the file untouched and are reported (fail-closed). Each file declares
+  its own values in the opening marker (` params={…}`, JSON) — there is no
+  central table. Write with `npm run idioms`, check with `npm run idioms:check`;
+  the block/file count is owned by `docs/ZAHLEN.md` §1 and must not be restated
+  here.
 - The gate carries **no per-package list**. A package that is deliberately not in the
   profile yet says so itself: `"dsh": { "inactive": true }` in its own manifest
   (`dead-package`); that is also what lets it skip the root inventory (`doctor`) and
@@ -141,7 +178,7 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - The declared Schemastery version (`docs/ZAHLEN.md` §1) has no `z.enum` — model enums as
   `z.union([z.const('a'), z.const('b')])`.
 - If a contract changes, edit it in `scripts/lib/repo.mjs` (the shared source) — never in
-  `dsh-test.mjs` or `build.mjs` directly.
+  `scripts/shinon-test.mjs` or `build.mjs` directly.
 - Client-internal slot ids follow `<name>-<purpose>` (e.g. `shinon-core-brand`,
   `shinon-info-banner`). Packages don't reference each other; shared logic goes in
   `scripts/lib/`.
@@ -217,7 +254,10 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - Documentation: every Markdown file carries a status block, and hard numbers (packages,
   layers, test counts, versions) have exactly **one** owner. Read `docs/INDEX.md` §2 and
   `docs/ZAHLEN.md` before writing a number into any document — nothing in the gate
-  checks documentation drift.
+  checks documentation drift. The inventory block in `docs/ZAHLEN.md` §1 is generated
+  (`npm run zahlen:sync`, checked with `npm run zahlen:check`); the run table in §2 is
+  measured per pass. History, causes and before/after numbers belong in the commit
+  message, `docs/audit/` or `docs/handshakes/` — not in a table cell.
 - A Client -> Host endpoint needs someone to SELECT it. Host-side `./typert` discovery exists
   (`dsh-typert-loader`), but the browser client mounts its Remote contributions from a
   hardcoded COMPILED list in `@deepseek-ai/dsh-api-remotes` (25 entries, `$mount`), so an
@@ -256,6 +296,23 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   `powered by …`, emoji signatures — and `co-authored-by:` at all.
 - Once per clone: `npm run hooks:install` (prepare-commit-msg swaps, commit-msg blocks).
   Check with `npm run commit:guard -- --ci | --last n | --range a..b | --all`.
+- **Checkliste VOR dem ersten `git commit`** (alle Punkte, sonst Exit 1):
+  1. Kein KI-Footer: kein `Generated with …`, kein `powered by …`, kein
+     `Co-Authored-By` (auch nicht für Menschen), keine Emoji-Signatur.
+  2. Mindestens **150 Wörter** Fließtext; Trailer-Zeilen und `#`-Zeilen zählen
+     nicht (`WORD_MIN` in `scripts/lib/commit-text.mjs`).
+  3. Mindestens **ein harter Datenbeleg** im Text: Pfad mit Endung
+     (`scripts/lib/dsh.mjs`), Commit-SHA, Messung (`430/430`), `Exit 0` oder
+     `Run`/`PR`/`Issue` mit Nummer.
+  4. Mindestens **ein Bildsprache-Marker** aus der festen Liste: `wie ein`, `wie
+     eine`, `wie einem`, `wie einer`, `wie eines`, `als wäre`, `als ob`, `als
+     sei`, `gleich einem`, `gleich einer`, `bildlich`, `metapher`, `szene:`,
+     `bild:`.
+  5. Exakter Trailer als letzte Zeile: `created by VANNON — Volatile Agent
+     Needing No Other Nonsense, Never Overly Nice, Never Average Vibe`.
+  6. Trocken prüfen: `npm run commit:check-file -- <datei>` oder
+     `node scripts/commit-guard.mjs --stdin < <datei>` — **derselbe**
+     `checkMessage` wie der Hook, kein zweiter Regelsatz.
 - CI (`.github/workflows/commit-guard.yml`) runs on every push/PR with no filter; an
   unresolvable range falls back to the **full** history, never to a narrower one.
   Rules, enforcement and commands: `docs/COMMIT-REGELN.md`. Single source of the

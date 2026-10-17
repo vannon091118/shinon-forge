@@ -10,6 +10,8 @@
  * Pro Paket: package.json + Ressourcen, Namensvertrag, index.js, client.js,
  * cordis.patch.yml (YAML-Schema). Dazu: Legacy-Guard und Profil-Komposition.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 
 let passed = 0;
@@ -68,6 +70,39 @@ check('keine "dsh-mod"-Referenzen in Runtime-Artefakten', () => {
 
 console.log('\n🚫 pnpm-Reste (Schritt 3.5/A1):');
 checkIssues('keine pnpm-Datei, kein pnpm-Aufruf', () => repo.pnpmIssues());
+
+console.log('\n🔗 Profil-Installation:');
+checkIssues('Links bleiben in packages/, keine pnpm-Reste', () => repo.profileInstallIssues());
+
+console.log('\n🧬 Config-Vertrag (Cordis/Schemastery):');
+// Der Cordis-Vertrag ist nicht „Config ist da", sondern `~standard.validate` ist
+// eine Funktion. Die Prüfung liegt in `repo.configShapeIssues`, damit sie
+// dieselbe Funktion ist, die ihre Mutationsprobe testet.
+//
+// Ein Baum ohne Installat kann die Host-Hälften nicht laden. Das ist FAIL-CLOSED:
+// die Prüfung zählt als Befund, nicht als Skip — ein Skip wäre Grün ohne Messung.
+// Die Fixture-Kopien in `scripts/validate-test.mjs` binden deshalb dasselbe
+// `node_modules` per Symlink ein; die CI installiert vor dem Gate (`npm ci`).
+let schemastery = true;
+try {
+  await import('@deepseek-ai/schemastery');
+} catch {
+  schemastery = false;
+}
+if (!schemastery) {
+  console.log('  ❌ Config-Vertrag: @deepseek-ai/schemastery fehlt — Prüfung nicht ausführbar (npm ci nötig)');
+  failed += 1;
+} else {
+  const configIssues = await repo.configShapeIssues(packages);
+  if (configIssues.length === 0) {
+    const checked = packages.filter((pkg) => /export const Config\b/.test(readFileSync(join(pkg.base, 'index.js'), 'utf8')));
+    console.log(`  ✅ ${checked.length} Configs sind Schemastery-Schemata`);
+    passed += 1;
+  } else {
+    for (const issue of configIssues) console.log(`  ❌ ${issue}`);
+    failed += configIssues.length;
+  }
+}
 
 console.log('\n🔗 Quell-Zwillinge:');
 checkIssues('eine Quelle, ein Spiegel — keine Drift', () => repo.twinIssues());

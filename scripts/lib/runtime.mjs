@@ -22,8 +22,9 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { delimiter, dirname, join } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
+import { homedir } from 'node:os';
 import { WORKSPACE_ROOT } from './paths.mjs';
 
 /** Der Rauchtest des SQLite-Builtins — als Quelltext, damit er im Kindprozess läuft. */
@@ -133,10 +134,46 @@ export function verifyRuntime(binary) {
 }
 
 /**
- * Kandidaten in fester Reihenfolge — kein fest verdrahteter Heimpfad mehr:
+ * Node-Binaries aus den üblichen Versionsmanagern — als RÜCKFALL, nicht als
+ * feste Wahrheit. Der PATH bleibt die erste Wahl (dort löst mise/nvm/volta
+ * bereits auf); diese Liste greift nur, wenn eine Shell mit nacktem `/usr/bin`
+ * startet und der PATH deshalb kein ≥ 22 kennt. Die Versionen werden ABSTEIGEND
+ * sortiert, damit „die höchste passende Fassung" deterministisch ist; was die
+ * Proben nicht besteht, fällt danach trotzdem raus (`verifyRuntime`).
+ */
+function managedNodeBinaries(env = process.env) {
+  const home = typeof env.HOME === 'string' && env.HOME !== '' ? env.HOME : homedir();
+  const binary = process.platform === 'win32' ? 'node.exe' : 'node';
+  const found = [];
+  const current = join(home, '.local', 'opt', 'shinon-forge', 'node', 'current', 'bin', binary);
+  if (existsSync(current)) found.push(current);
+  const versioned = (base) => {
+    if (!existsSync(base)) return [];
+    return readdirSync(base, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort((left, right) => {
+        const a = parseVersion(left);
+        const b = parseVersion(right);
+        if (a === null || b === null) return right.localeCompare(left);
+        return compare(b, a);
+      })
+      .map((name) => join(base, name, 'bin', binary))
+      .filter((path) => existsSync(path));
+  };
+  found.push(...versioned(join(home, '.local', 'share', 'mise', 'installs', 'node')));
+  found.push(...versioned(join(home, '.nvm', 'versions', 'node')));
+  return found;
+}
+
+/**
+ * Kandidaten in fester Reihenfolge — kein fest verdrahteter Heimpfad:
  *   1. `SHINON_NODE` (ausdrücklicher Wunsch, geprüft),
  *   2. der laufende Prozess (`process.execPath`) — meist das Richtige,
- *   3. `node` aus dem PATH (dort löst der Versionsmanager auf: mise, nvm, volta).
+ *   3. `node` aus dem PATH (dort löst der Versionsmanager auf: mise, nvm, volta),
+ *   4. die Versionsmanager-Verzeichnisse als Rückfall (mise, nvm, das
+ *      dokumentierte `~/.local/opt/shinon-forge/node/current`), höchste Fassung
+ *      zuerst.
  * Was nicht verifiziert, fällt raus; die Gründe bleiben erhalten.
  */
 export function runtimeCandidates(env = process.env) {
@@ -159,6 +196,7 @@ export function runtimeCandidates(env = process.env) {
     const binary = join(part, process.platform === 'win32' ? 'node.exe' : 'node');
     if (existsSync(binary)) add(binary, 'PATH');
   }
+  for (const binary of managedNodeBinaries(env)) add(binary, 'Versionsmanager');
   return candidates;
 }
 

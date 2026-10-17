@@ -5,6 +5,8 @@
  * Modi:
  *   --file <pfad> [--fix]   Hook-Modus: eine Nachricht prüfen (--fix tauscht
  *                           verbotene Footer gegen den Vannon-Trailer).
+ *   --stdin                 eine Nachricht von stdin prüfen (Agenten-Dry-Run,
+ *                           ohne temporäre Datei). Kein Tausch, nur Urteil.
  *   --ci                    CI-Modus: den Bereich aus der GitHub-Umgebung
  *                           ableiten und prüfen (scripts/lib/ci-range.mjs).
  *   --range <rev-range>     jeden Commit des Bereichs prüfen.
@@ -30,6 +32,7 @@ import { resolveCiRange } from './lib/ci-range.mjs';
 const USAGE = `Shinon Commit-Wächter
 
   node scripts/commit-guard.mjs --file <commit-msg-Datei> [--fix]
+  node scripts/commit-guard.mjs --stdin
   node scripts/commit-guard.mjs --ci
   node scripts/commit-guard.mjs --range <rev-range>
   node scripts/commit-guard.mjs --last <n>
@@ -138,6 +141,23 @@ if (has('--file')) {
     process.exit(1);
   }
   report([{ label: file, violations: result.violations }]);
+  process.exit(1);
+}
+
+/**
+ * Dry-Run für Agenten: die Nachricht kommt über stdin, das Urteil über stdout.
+ * Die Regeln sind DIESELBEN wie im Commit (checkMessage) — ein zweiter, laxerer
+ * Prüfpfad wäre eine Einladung, ihn zu benutzen. Ein Verstoß endet mit Exit 1
+ * und der vollständigen Liste, damit die Korrektur beim ersten Versuch sitzt.
+ */
+if (has('--stdin')) {
+  const raw = readFileSync(0, 'utf8');
+  const result = checkMessage(raw);
+  if (result.ok) {
+    console.log('✅ Commit-Wächter: Nachricht sauber (kein KI-Footer, Vannon-Trailer, Wort-Regel).');
+    process.exit(0);
+  }
+  report([{ label: 'stdin', violations: result.violations }]);
   process.exit(1);
 }
 

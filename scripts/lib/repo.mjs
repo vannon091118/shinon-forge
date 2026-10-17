@@ -29,7 +29,7 @@
 import { execFileSync } from 'child_process';
 import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, realpathSync, statSync } from 'fs';
 import { dirname, join, relative, resolve, sep } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { loadYaml } from './yaml.mjs';
 import { idiomIssues } from './plugin-idioms.mjs';
 import { PRUNE_DIRS, isPruned } from './scan.mjs';
@@ -519,6 +519,12 @@ export const SOURCE_TWINS = [
     kind: 'literals',
     owner: 'packages/narrative/index.js',
     mirror: 'packages/prompter/index.js',
+    // Das Paket ist modular: die Naht-Namen dürfen in `index.js` ODER in einem
+    // `assets/`-Kern stehen. Ein Zwilling, der nur die Komposition liest, würde
+    // bei einem sauberen Modulschnitt rot — und Rot ohne Drift ist eine Falle,
+    // kein Befund. Geprüft wird deshalb das ganze RUNTIME-Paket (index.js +
+    // assets/*.js), nie `test/` oder `fixtures/`.
+    mirrorScope: 'package',
     values: [
       { export: 'STATE_CHANNEL', literal: 'string' },
       { export: 'STATE_CONTRACT', literal: 'string' },
@@ -685,9 +691,38 @@ function dotPath(value, path) {
  * @param {string} root - Wurzel, in der die deklarierten Pfade gesucht werden.
  * @returns {string[]} Verstoesse (leer = alle Zwillinge stimmen).
  */
-export function twinIssues(root = ROOT) {
+/**
+ * Der Spiegeltext eines Zwillings. `mirrorScope: 'package'` liest das ganze
+ * Runtime-Paket (index.js + assets/*.js): ein Modulschnitt verschiebt einen
+ * Namen, er ändert die Zusage nicht. Ohne den Scope bleibt es bei der einen
+ * Datei — die enge Vorgabe gilt weiter, wo sie steht.
+ */
+function mirrorTextOf(twin, root) {
+  const file = join(root, twin.mirror);
+  if (twin.mirrorScope !== 'package') return read(file);
+  const texts = [read(file)];
+  const assets = join(dirname(file), 'assets');
+  if (existsSync(assets)) {
+    for (const entry of readdirSync(assets, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith('.js')) texts.push(read(join(assets, entry.name)));
+    }
+  }
+  return texts.join('\n');
+}
+
+/**
+ * Die Zwillings-Regeln prüfen. Ein fehlender Besitzer, ein fehlender Spiegel,
+ * eine fehlende oder abweichende Region und ein fehlendes Literal sind je ein
+ * Issue — Drift fällt damit im Gate (`scripts/shinon-test.mjs`) und im Build
+ * (`scripts/build.mjs`) auf, nicht erst im Betrieb.
+ * @param {string} root - Wurzel, in der die deklarierten Pfade gesucht werden.
+ * @param {Array} twins - die zu prüfenden Regeln (Default: `SOURCE_TWINS`);
+ *   der Parameter existiert für Mutationsproben an einem Miniatur-Baum.
+ * @returns {string[]} Verstoesse (leer = alle Zwillinge stimmen).
+ */
+export function twinIssues(root = ROOT, twins = SOURCE_TWINS) {
   const issues = [];
-  for (const twin of SOURCE_TWINS) {
+  for (const twin of twins) {
     const ownerFile = join(root, twin.owner);
     const mirrorFile = join(root, twin.mirror);
     if (!existsSync(ownerFile)) {
@@ -699,7 +734,7 @@ export function twinIssues(root = ROOT) {
       continue;
     }
     const ownerText = read(ownerFile);
-    const mirrorText = read(mirrorFile);
+    const mirrorText = mirrorTextOf(twin, root);
 
     if (twin.kind === 'region') {
       const ownerRegion = regionOf(ownerText, twin.marker);
@@ -993,6 +1028,90 @@ export function resolveProfile(profileName, packages, root = readRoot()) {
   if (entries.length === 0) issues.push('kein Paket-Bundle im Profil');
 
   return { dir, manifest, overlay: overlay.patches, bundles, entries, foreign, issues };
+}
+
+/**
+ * Der Cordis-Config-Vertrag: `Config` muss ein Schemastery-Schema sein, nicht
+ * nur ein Objekt. Geprüft wird die EIGENSCHAFT, die Cordis liest —
+ * `~standard.validate` als Funktion — am geladenen Modul, nicht am Quelltext.
+ *
+ * Genau diese Prüfung hätte den Fremd-Link vom 2026-10-17 abgefangen: dessen
+ * `Config = {}` fiel erst im Boot als `reading 'validate'` auf. Ohne
+ * installiertes Schemastery ist die Prüfung nicht durchführbar und meldet das
+ * (fail-closed) — ein stiller Skip wäre die Lücke wieder.
+ * @returns {Promise<string[]>} Befunde (leer = alle Configs sind Schemata).
+ */
+export async function configShapeIssues(packages) {
+  const issues = [];
+  for (const pkg of packages) {
+    const file = join(pkg.base, 'index.js');
+    if (!existsSync(file) || !/export const Config\b/.test(read(file))) continue;
+    let module;
+    try {
+      module = await import(pathToFileURL(file).href);
+    } catch (error) {
+      issues.push(`${pkg.dir}: index.js nicht ladbar (${error.code ?? error.message})`);
+      continue;
+    }
+    if (typeof module?.Config?.['~standard']?.validate !== 'function') {
+      issues.push(`${pkg.dir}: Config ist kein Schemastery-Schema (~standard.validate fehlt)`);
+    }
+  }
+  return issues;
+}
+
+/**
+ * Die INSTALLIERTE Profil-Ebene prüfen — die Naht, an der eine Beschattung
+ * entsteht, bevor irgendein Paketcode läuft.
+ *
+ * Zwei Befunde, beide gemessen bzw. benannt:
+ *   1. Ein `profiles/<name>/node_modules/@shinon/<pkg>`-Eintrag, dessen
+ *      `realpath` NICHT unter `<root>/packages/` liegt, beschattet das Repo-Paket.
+ *      Gemessen am 2026-10-17 zeigte `@shinon/traceability` auf einen externen
+ *      Prototyp; der Boot starb an `Config = {}` mit `reading 'validate'`. Ein
+ *      toter Link wird ebenfalls gemeldet, nicht still übersprungen.
+ *   2. pnpm-Reste (`.pnpm`, `.modules.yaml`, `.pnpm-workspace-state-v1.json`)
+ *      unter `profiles/<name>/node_modules`: dieses Repo installiert mit npm; ein
+ *      `dsh plugin add` (Upstream) darf sie anlegen, wir committen sie nie.
+ *
+ * Ein FEHLENDES `node_modules` ist kein Befund — ein frischer Klon hat keins.
+ * @returns {string[]} Befunde (leer = die installierte Ebene ist sauber).
+ */
+export function profileInstallIssues(root = ROOT, options = {}) {
+  const packagesDir = options.packagesDir ?? join(ROOT, 'packages');
+  const profilesDir = options.profilesDir ?? join(ROOT, 'profiles');
+  if (!existsSync(profilesDir)) return [];
+  const scope = String(root?.name ?? readRoot().name).split('/')[0];
+  const base = options.base ?? dirname(packagesDir);
+  const issues = [];
+  const label = (path) => relative(base, path);
+
+  for (const profile of readdirSync(profilesDir, { withFileTypes: true })) {
+    if (!profile.isDirectory()) continue;
+    const modules = join(profilesDir, profile.name, 'node_modules');
+    if (!existsSync(modules)) continue;
+    for (const remnant of ['.pnpm', '.modules.yaml', '.pnpm-workspace-state-v1.json']) {
+      if (existsSync(join(modules, remnant))) {
+        issues.push(`${label(join(modules, remnant))}: pnpm-Rest — dieses Repo installiert mit npm`);
+      }
+    }
+    const scopeDir = join(modules, scope);
+    if (!existsSync(scopeDir)) continue;
+    for (const entry of readdirSync(scopeDir)) {
+      const file = join(scopeDir, entry);
+      let real;
+      try {
+        real = realpathSync(file);
+      } catch {
+        issues.push(`${label(file)}: toter Link (${readlinkSync(file)})`);
+        continue;
+      }
+      if (!isInside(packagesDir, real)) {
+        issues.push(`${label(file)}: zeigt aus packages/ heraus (${real}) — Abhilfe: npm run profile:links`);
+      }
+    }
+  }
+  return issues;
 }
 
 /** Repository-weite Regeln (Paketgraph + Komposition) plus das aktive Profil. */
