@@ -28,6 +28,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeF
 import { availableParallelism, tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
+import { childEnv } from './lib/paths.mjs';
+import { resolveRuntime } from './lib/runtime.mjs';
 import * as repo from './lib/repo.mjs';
 
 const WORK = mkdtempSync(join(tmpdir(), 'shinon-pack-'));
@@ -48,9 +50,16 @@ let failed = 0;
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Ein Kindprozess mit AUSDRÜCKLICHEM PATH: das Verzeichnis des verifizierten
+ * Node und `node_modules/.bin` zuerst. Das war die Ursache von `spawn node
+ * ENOENT`: `npm pack` startet Kindprozesse, die `node` per Namen suchen — fehlte
+ * der PATH-Eintrag (Sandbox, gekürztes env, `env -i`), brach der Test ab und
+ * wurde als „Umgebungssache" abgetan. Der PATH wird hier gesetzt, nicht gehofft.
+ */
 async function run(cmd, args, cwd) {
   try {
-    const env = { ...process.env };
+    const env = childEnv(resolveRuntime(), { ...process.env });
     delete env.npm_config_allow_scripts;
     await execFileAsync(cmd, args, { cwd, env });
     return { ok: true };

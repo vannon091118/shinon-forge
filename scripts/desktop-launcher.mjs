@@ -14,15 +14,26 @@
  * Linux-Desktop-Icons brauchen ein trusted Markierung (freedesktop), damit
  * Cinnamon/GNOME sie ausführen — das passiert hier per .desktop: + chmod +x.
  *
- * Aufruf:  node scripts/desktop-launcher.mjs [--uninstall]
+ * Aufruf:  node scripts/desktop-launcher.mjs [--uninstall|--check]
  * npm-Entry: desktop:launcher / desktop:launcher:uninstall
- * Exit: 0 = ok, 1 = Befund (fehlt dsh/node/profil), 2 = Bedienfehler.
+ * Exit: 0 = ok, 1 = Befund (fehlt dsh/node/profil; bei --check: Eintrag veraltet),
+ *       2 = Bedienfehler.
+ *
+ * WAS HIER STEHEN MUSS: der ABSOLUTE Pfad der VERIFIZIERTEN Laufzeit (Version
+ * gegen `engines` + `node:sqlite`-Rauchtest). Die frühere Fassung schrieb
+ * `process.execPath` — den Interpreter, mit dem der Launcher zufällig gestartet
+ * wurde. Ein `.desktop`-Eintrag überlebt den Aufruf, der ihn geschrieben hat;
+ * zeigt er danach auf ein untaugliches Node, startet der Klick in einen Fehler,
+ * der nirgends sichtbar wird. Und der Eintrag wird bei jedem Lauf neu geprüft:
+ * ändert sich die Laufzeit (Upgrade), schreibt der nächste Lauf den Eintrag um.
  */
-import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { dshBinary, dshSource } from './lib/dsh.mjs';
+import { resolveRuntime, runtimeFailure } from './lib/runtime.mjs';
+import { describePaths } from './lib/paths.mjs';
 
 const ROOT = repo.ROOT;
 const HOME = homedir();
@@ -33,10 +44,14 @@ const APP_ID = 'shinon-forge';
 
 const args = process.argv.slice(2);
 const UNINSTALL = args.includes('--uninstall');
+const CHECK = args.includes('--check');
 const HELP = args.includes('--help') || args.includes('-h');
 
 if (HELP) {
-  console.log('node scripts/desktop-launcher.mjs [--uninstall]');
+  console.log('node scripts/desktop-launcher.mjs [--uninstall|--check]');
+  console.log('  (ohne Flag)  Einträge schreiben/aktualisieren');
+  console.log('  --check      prüfen, ob die Einträge auf die verifizierte Laufzeit zeigen (Exit 1 = veraltet)');
+  console.log('  --uninstall  Einträge entfernen');
   process.exit(0);
 }
 
@@ -53,9 +68,12 @@ const dsh = dshBinary();
 if (dsh === null) fail('kein Repo-/Vendor-DSH gefunden. Im Repo `npm install` ausführen; globale Nutzung nur mit SHINON_ALLOW_PATH_DSH=1.');
 const source = dshSource();
 
-// Node-Absolute-Pfad für Exec=: findOnPath sucht im PATH (dsh-Logik, nicht
-// node:logik), node ist im PATH (Repo-Voraussetzung), absolut aufgelöst.
-const node = process.execPath;
+// Die VERIFIZIERTE Laufzeit — nicht der Interpreter dieses Aufrufs.
+const runtime = resolveRuntime();
+if (runtime.binary === null) {
+  fail(`keine taugliche Node-Laufzeit für den Desktop-Eintrag —\n${runtimeFailure(runtime)}`);
+}
+const node = runtime.binary;
 if (!existsSync(node)) fail(`node-Exe nicht gefunden: ${node}`);
 
 const openScript = resolve(ROOT, 'scripts', 'open.mjs');
@@ -63,10 +81,11 @@ if (!existsSync(openScript)) fail(`open.mjs fehlt: ${openScript}`);
 
 // Icon: assets/banner.svg liegt im Repo — dort verankern (nicht im HOME).
 const iconPath = resolve(ROOT, 'assets', 'banner.svg');
-const iconRef = existsSync(iconPath) ? `SHINON_FORGE_ICON=${iconPath}` : null;
+const hasIcon = existsSync(iconPath);
 
-// Exec-Zeile: node open.mjs, Path=ROOT (DSH_HOME setzt open.mjs selbst).
-// Das Icon bekommt die Umgebung über die Path=-Variable des .desktop.
+// Exec-Zeile: die verifizierte Node absolut + open.mjs absolut. Path=ROOT ist
+// das Arbeitsverzeichnis; DSH_HOME setzt open.mjs selbst aus dem Pfaddienst.
+// Beide Pfade sind gequotet, damit ein Arbeitsbaum mit Leerzeichen trägt.
 const execLine = `"${node}" "${openScript}"`;
 
 function buildDesktopFile() {
@@ -81,7 +100,7 @@ function buildDesktopFile() {
     'Terminal=false',
     'StartupNotify=true',
   ];
-  if (iconRef) lines.push(`Icon=${iconPath}`);
+  if (hasIcon) lines.push(`Icon=${iconPath}`);
   lines.push(`Categories=Development;IDE;`);
   lines.push(`Keywords=shinon;dsh;ai;agent;`);
   lines.push(`X-Shinon-Profile=${profileName}`);
@@ -94,6 +113,28 @@ const targets = [
 ];
 for (const flavor of CANNED) {
   targets.push({ path: join(HOME, '.config', flavor, 'desktop', `${APP_ID}.desktop`), label: `${flavor}/Desktop` });
+}
+
+if (CHECK) {
+  // Ist der Eintrag noch gültig? Geprüft wird die Exec-Zeile gegen die JETZT
+  // verifizierte Laufzeit — ein Upgrade macht einen alten Eintrag sichtbar.
+  const content = buildDesktopFile();
+  let stale = 0;
+  for (const { path, label } of targets) {
+    if (!existsSync(path)) {
+      console.log(`  ⏭  ${label}: nicht installiert`);
+      continue;
+    }
+    const existing = readFileSync(path, 'utf8');
+    if (existing === content) {
+      console.log(`  ✅ ${label}: aktuell (${node})`);
+      continue;
+    }
+    stale += 1;
+    console.log(`  ⚠️  ${label}: veraltet — erwartet wird\n      ${execLine}`);
+  }
+  console.log(stale === 0 ? '\n✅ Desktop-Einträge aktuell.' : '\n💥 Desktop-Einträge veraltet — `npm run desktop:launcher` schreibt sie neu.');
+  process.exit(stale === 0 ? 0 : 1);
 }
 
 if (UNINSTALL) {
@@ -115,19 +156,29 @@ console.log('══════════════════════�
 console.log(`  Shinon Forge — Desktop-Icon für 1-Click-Start`);
 console.log(`  Profil: ${profileName}    dsh: ${source?.kind ?? 'unbekannt'} — ${dsh.slice(1).join(' ')}`);
 console.log(`  node:  ${node}`);
+console.log(`  DSH_HOME (beim Klick): ${describePaths().dshHome}`);
 console.log('═══════════════════════════════════\n');
 
 const content = buildDesktopFile();
 let created = 0;
+let updated = 0;
 for (const { path, label } of targets) {
   mkdirSync(dirname(path), { recursive: true });
+  const before = existsSync(path) ? readFileSync(path, 'utf8') : null;
+  if (before === content) {
+    console.log(`  = ${label}: unverändert (idempotent) — ${path}`);
+    continue;
+  }
   writeFileSync(path, content, 'utf8');
   chmodSync(path, 0o755); // .desktop muss ausführbar + trusted sein
-  console.log(`  ✅ ${label}: ${path}`);
-  created += 1;
+  const word = before === null ? 'angelegt' : 'aktualisiert';
+  console.log(`  ✅ ${label}: ${word} — ${path}`);
+  if (before === null) created += 1;
+  else updated += 1;
 }
 
-console.log(`\n${created} Einträge angelegt.\n`);
+console.log(`\n${created} Einträge angelegt, ${updated} aktualisiert.`);
+console.log(`   Laufzeit im Eintrag: ${runtime.version} — ${node}\n`);
 console.log('Nächster Schritt:');
 console.log('  • App-Menü/Dock: „Shinon Forge" suchen → Klick startet den 1-Click.');
 console.log('  • Desktop-Icon (Cinnamon): Desktop-Auswahl/Anpassen → Icon einfügen,');

@@ -112,7 +112,11 @@ in `docs/ZAHLEN.md` §4 unter „nicht geprüft“.
 
 ## 🔌 Boot und Schlüssel
 
-Das Repo-Root ist das `DSH_HOME`: dort liegt `profiles/shinon` als echtes DSH-Profil
+Das Repo-Root ist das `DSH_HOME`: dort liegt `profiles/shinon` als echtes DSH-Profil. Im
+Installat (`/opt/shinon-forge`, read-only) ist das anders: dort zeigt `DSH_HOME` auf den
+Zustandsordner des Nutzers, und der Starter seeded ihn aus dem Installat.
+
+**Wo was liegt** — eine Quelle ist `scripts/lib/paths.mjs` (Namen entstehen dort einmal):
 (`package.json` mit `dsh.profile.bundles` und `cordis.patch.yml` — ein
 `pnpm-workspace.yaml` führt dieses Repo nicht mehr, Schritt 3.5/A1).
 Der Schlüssel gehört **nie** ins Repo — im Profil steht nur der Referenzname

@@ -4,10 +4,11 @@
  *
  * Ein Aufruf, **keine** Voraussetzung im PATH. Was hier passiert:
  *
- *   1. Node-Heilung: verlangt wird Node ≥ 22 (`engines` im Root-Manifest;
- *      darunter sterben `node:sqlite` und `parseEnv` schon beim Import). Läuft
- *      die Datei unter einem älteren Node, startet sie sich mit dem ersten
- *      tauglichen Node aus `scripts/lib/dsh.mjs` (`goodNode()`) selbst neu.
+ *   1. Node-Heilung: verlangt wird die Range aus `engines` im Root-Manifest
+ *      (darunter sterben `node:sqlite` und `parseEnv` schon beim Import). Läuft
+ *      die Datei unter einem untauglichen Node, startet sie sich mit dem ersten
+ *      VERIFIZIERTEN Node aus `scripts/lib/runtime.mjs` selbst neu — geprüft
+ *      werden `--version` gegen die Range UND der `node:sqlite`-Rauchtest.
  *   2. dsh-Auflösung: genau EINE Quelle — `dshBinary()` aus `scripts/lib/dsh.mjs`
  *      (Repo-Installat, Vendor, PATH, bekannte Prefixe). Sie liefert ein
  *      `[node, bin.js]`-Paar: kein Shebang-Node und kein Shell-Quoting dazwischen.
@@ -37,7 +38,9 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { constants as osConstants } from 'node:os';
 import * as repo from '../scripts/lib/repo.mjs';
-import { dshBinary, dshSource, goodNode } from '../scripts/lib/dsh.mjs';
+import { dshBinary, dshSource } from '../scripts/lib/dsh.mjs';
+import { resolveRuntime, runtimeFailure } from '../scripts/lib/runtime.mjs';
+import { childEnv, describePaths } from '../scripts/lib/paths.mjs';
 
 const ROOT = repo.ROOT;
 const args = process.argv.slice(2);
@@ -49,19 +52,17 @@ const passthrough = args.filter((a) => a !== '--check');
  * Interpreter. `SHINON_START_REEXEC` verhindert die Endlosschleife, falls der
  * gefundene Node selbst zu alt wäre (dann greift der Fehler unten).
  */
-const runningMajor = Number((process.versions.node ?? '0').split('.')[0]);
-if (runningMajor < 22 && process.env.SHINON_START_REEXEC !== '1') {
-  const better = goodNode();
-  if (better === null) {
-    console.error(
-      `💥 shinon: Node ${process.versions.node} ist zu alt (verlangt: ≥ 22) und kein neuerer Node gefunden — ` +
-        'Node 22+ installieren (Fassung: docs/ZAHLEN.md §1)',
-    );
+const runtime = resolveRuntime();
+const running = runtime.binary !== null && runtime.binary === process.execPath;
+if (!running && process.env.SHINON_START_REEXEC !== '1') {
+  if (runtime.binary === null) {
+    console.error(`💥 shinon: keine taugliche Node-Laufzeit —\n${runtimeFailure(runtime)}`);
+    console.error('   Abhilfe: Node in der Range aus `engines` bereitstellen (Fassung: docs/ZAHLEN.md §1) oder SHINON_NODE auf das Binary zeigen lassen.');
     process.exit(2);
   }
-  const resumed = spawn(better, [process.argv[1], ...args], {
+  const resumed = spawn(runtime.binary, [process.argv[1], ...args], {
     stdio: 'inherit',
-    env: { ...process.env, SHINON_START_REEXEC: '1' },
+    env: { ...childEnv(runtime), SHINON_START_REEXEC: '1' },
   });
   forwardSignalsTo(resumed);
 } else {
@@ -128,7 +129,7 @@ function main() {
     process.exit(2);
   }
   const source = dshSource();
-  const probed = spawnSync(dsh[0], [...dsh.slice(1), '--version'], { encoding: 'utf8' });
+  const probed = spawnSync(dsh[0], [...dsh.slice(1), '--version'], { encoding: 'utf8', env: childEnv(resolveRuntime()) });
   if (probed.status !== 0) {
     console.error('💥 shinon: gefundenes dsh antwortet nicht auf --version — Installation prüfen');
     process.exit(2);
@@ -141,21 +142,27 @@ function main() {
     process.exit(2);
   }
 
+  const paths = describePaths();
   if (CHECK) {
     console.log('✅ startfähig');
     console.log(`   Einstieg:  ${process.argv[1]}`);
-    console.log(`   node:      ${process.versions.node} (ausgeführt mit ${dsh[0]})`);
+    console.log(`   node:      ${runtime.version ?? process.versions.node} — ${runtime.binary ?? dsh[0]}`);
+    console.log(`   sqlite:    ${runtime.sqlite ?? 'nicht gemeldet'} (node:sqlite-Rauchtest bestanden)`);
+    console.log(`   Range:     ${runtime.range}`);
     console.log(`   dsh:       ${dshVersion}`);
     console.log(`   Herkunft:  ${source.kind} — ${source.root}`);
     console.log(`   Profil:    ${profileName}`);
-    console.log(`   DSH_HOME:  ${ROOT}`);
+    console.log(`   DSH_HOME:  ${paths.dshHome}`);
+    console.log(`   Index:     ${paths.indexRoot}   (Cache — wiederherstellbar)`);
+    console.log(`   Ledger:    ${paths.ledgerFile}   (Daten — nicht wegwerfbar)`);
+    console.log(`   Installat: ${paths.installRoot}${paths.installed ? ' (read-only zur Laufzeit)' : ' (= Arbeitsbaum)'}`);
     process.exit(0);
   }
 
   const child = spawn(dsh[0], [...dsh.slice(1), '--profile', profileName, ...passthrough], {
     cwd: ROOT,
     stdio: 'inherit',
-    env: { ...process.env, DSH_HOME: ROOT },
+    env: childEnv(resolveRuntime()),
   });
   forwardSignalsTo(child);
 }

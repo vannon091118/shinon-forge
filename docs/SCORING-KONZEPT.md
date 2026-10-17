@@ -326,7 +326,13 @@ Absicht, die dieses Dokument in §2.3 selbst formuliert: „Dein Agent lernt, we
 bist." Ein Agent, der jede Sitzung bei `initial` beginnt, lernt nichts. Zug 2 legt
 den Stand deshalb dorthin, wo das Projekt ohnehin eine Datenbank hat.
 
-**Wo.** `~/.shinon/indexes/<projekt-hash>/index.sqlite`, Tabelle `memory`. Ein
+**Wo.** Eigene, dauerhafte Datei `ledger.sqlite` unter den Nutzerdaten
+(`$XDG_DATA_HOME/shinon/ledger.sqlite`, Default `~/.local/share/shinon/ledger.sqlite`),
+Tabelle `memory`. **Nicht** mehr im Index: der liegt seit 2026-10-17 im Cache
+(`$XDG_CACHE_HOME/shinon/indexes`) und ist wegwerfbar — ein `rm -rf` im Cache hätte den
+Ledger mitgenommen. Ein vorhandener Stand im Index wird beim ersten Lesen verlustfrei und
+idempotent herübergeholt (Quelle bleibt stehen), siehe
+`scripts/gate/tests/ledger-separation.test.mjs`. Ein
 Namensraum (`shinon.scoring/ledger-v1`) und drei Zeilenarten: `record` (eine
 Protokollzeile **mit Betreff**), `memo` (Zustand je Sitzung), `summary` (die
 gerechnete Tafel und die Zahl der Bemerkungen). Das Scoring schreibt **selbst
@@ -339,7 +345,11 @@ prüft es). Es liest den zweiten, schmalen Dienst des Index: `shinon_index_store
 erweitern hieße, jedem Leser des Kontexts ein Schreib-Modul in die Hand zu geben.
 Zwei Namen, zwei Verträge, zwei Berechtigungen.
 
-**Warum die Ablage einen Index-Neuaufbau überlebt.** Alles andere im Index ist
+**Warum die Ablage einen Index-Neuaufbau überlebt.** Sie liegt seit 2026-10-17 in einer
+eigenen Datei außerhalb des Index — ein Neuaufbau (oder eine geleerte Indexwurzel) berührt
+sie nicht mehr. Zuvor lag sie als Namensraum im Index und trug dafür eine eigene Fassung
+(`MEMORY_VERSION`), damit ein Schemawechsel des Index sie stehen ließ; die Trennung macht
+diese Vorsicht zur Sache des Ortes statt der Fassung. Alles andere im Index ist
 **Ableitung** — Dateien, Symbole, Kanten, Chunks entstehen aus dem Projekt, und
 ein `SCHEMA_VERSION`-Sprung verwirft sie bewusst (`1 → 2` in Zug 2, weil die
 Tabelle dazukam). Die Ablage ist das Gegenteil: ein Urteil lässt sich nirgends

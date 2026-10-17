@@ -170,15 +170,30 @@ unberührt: `@shinon/openapi` bleibt inaktiv.
 | Zahlen (Bestand, Prüfläufe) | `docs/ZAHLEN.md` | sonst nirgends |
 | Laufzeit-Index (Prompter MAX) | `@shinon/prompter` | `.shinon/prompter-index.json`, gitignoriert |
 | Projekt-Kontext (Persona) | der Nutzer | `.shinon/project-context.md`, getrackt wenn vorhanden |
-| Provenienz-Index (Project Index) | `@shinon/project-index` | `~/.shinon/indexes/<projekt-hash>/index.sqlite`, außerhalb des Repos |
+| Provenienz-Index (Project Index) | `@shinon/project-index` | **Wegwerfbar**: `$XDG_CACHE_HOME/shinon/indexes/<projekt-hash>/index.sqlite` (Default `~/.cache/shinon/indexes/…`) |
+| Dauerhafter Ledger des Scorings | `@shinon/scoring` schreibt, `@shinon/project-index` bietet den Dienst | **Daten**: `$XDG_DATA_HOME/shinon/ledger.sqlite` (Default `~/.local/share/shinon/ledger.sqlite`) |
+
+**Warum Cache und Daten getrennt sind (2026-10-17).** Der Index ist reine Ableitung — Dateien,
+Symbole, Kanten, Chunks entstehen aus dem Projekt und sind aus ihm wieder herstellbar. Der
+Ledger ist das Gegenteil: Urteile des Menschen, ihre Zuordnung und der daraus gerechnete Stand
+lassen sich nirgends nachlesen. Beides lag bis dahin in **derselben** Datei unter
+`~/.shinon/indexes`; ein `rm -rf` im Cache oder ein Cache-Aufräumer hätte den Ledger
+mitgenommen. Jetzt führt der Index in den Cache und der Ledger in die Daten — beide Pfade
+kommen aus **einer** Quelle (`scripts/lib/paths.mjs`: `indexRoot()`, `ledgerFile()`), die
+Pakete lesen sie über `SHINON_INDEX_ROOT`/`SHINON_LEDGER_FILE` bzw. ihre eigenen Defaults
+(`DEFAULT_INDEX_ROOT`, `DEFAULT_LEDGER_FILE` in `packages/project-index/assets/index-core.js`,
+von `scripts/gate/tests/scan-pruning.test.mjs` gegeneinander gepinnt). Ein vorhandener Stand
+im Index wird beim ersten Lesen **verlustfrei und idempotent** in den Ledger geholt; die
+Quelle bleibt dabei stehen. Beleg: `scripts/gate/tests/ledger-separation.test.mjs`.
 
 ### Der repo-lokale `.shinon/`-Ordner
 
 Zwei verschiedene Orte tragen denselben Namen, und das ist gewollt:
 
-- **`~/.shinon/`** (im HOME, **nicht** im Repo) gehört dem Project Index. Er ist
+- **`.shinon/`** unter den XDG-Basen (früher `~/.shinon/`) gehört dem Project Index. Er ist
   abgeleitet, projektübergreifend, pro Projekt gehasht und liegt bewusst außerhalb
-  des Baums — damit kein Index je mitcommittet wird. Beleg: `docs/probes/project-index.json`.
+  des Baums — damit kein Index je mitcommittet wird. Beleg: `docs/probes/project-index.json`
+  (dort steht noch der alte Ort `~/.shinon/indexes`; die Messung bleibt gültig, der Ort nicht).
 - **`.shinon/`** (im Arbeitsverzeichnis, **repo-relativ**) gehört dem Prompter und der
   Persona. Diesen Ort gibt es nur, wenn ein Paket ihn beim Lauf anlegt oder liest:
 

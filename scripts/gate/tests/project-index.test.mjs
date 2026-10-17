@@ -286,9 +286,18 @@ test('Extraktion: Chunks sind Zeilenfenster mit echten Zeilennummern', () => {
 
 test('Lage: der Index liegt außerhalb des Projekts und ist pro Projekt stabil', () => {
   const project = '/tief/im/projekt';
-  const indexRoot = join(homedir(), '.shinon', 'indexes');
+  // GEMESSEN 2026-10-17: die Wurzel kommt aus dem XDG-Cache, der Ledger aus den
+  // XDG-Daten — dieselbe Trennung, die `scripts/lib/paths.mjs` als Dienst führt
+  // (indexRoot()/ledgerFile()). Der Index ist reine Ableitung, der Ledger nicht.
+  const indexRoot = bundle.DEFAULT_INDEX_ROOT;
   const file = bundle.indexPath(indexRoot, project);
-  assert.equal(bundle.DEFAULT_INDEX_ROOT, indexRoot, 'Default-Wurzel ist ~/.shinon/indexes');
+  assert.equal(indexRoot, join(homedir(), '.cache', 'shinon', 'indexes'), 'Default-Wurzel ist der XDG-Cache');
+  assert.equal(indexRoot.includes('.shinon'), false, 'kein selbstgewählter Ort neben den XDG-Basen');
+  assert.equal(
+    bundle.DEFAULT_LEDGER_FILE,
+    join(homedir(), '.local', 'share', 'shinon', 'ledger.sqlite'),
+    'der dauerhafte Ledger liegt in den Daten, nicht im Cache',
+  );
   assert.ok(file.startsWith(indexRoot), 'der Index liegt unter der Indexwurzel');
   assert.ok(!file.startsWith(project), 'und nie im Projekt');
   assert.equal(file.endsWith(bundle.INDEX_FILE), true);
