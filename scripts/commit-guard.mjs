@@ -66,11 +66,11 @@ function report(entries) {
  * @param {{ fallbackRev?: string }} [options] Was geprüft wird, wenn `range`
  *        nicht auflösbar ist: immer die volle Historie dieser Revision.
  */
-function checkRange(range, { fallbackRev = 'HEAD' } = {}) {
+function checkRange(range, { fallbackRev = 'HEAD', firstParentOnly = false } = {}) {
   let raw;
   let audited = range;
   try {
-    raw = git(['log', '--no-merges', '--format=%H%x1f%B%x1e', range]);
+    raw = git(['log', '--no-merges', ...(firstParentOnly ? ['--first-parent'] : []), '--format=%H%x1f%B%x1e', range]);
   } catch {
     // Ein Bereich wie HEAD~1..HEAD existiert auf jungen Branches und in
     // flachen Klonen nicht. Wir prüfen dann die VOLLE Historie von
@@ -144,7 +144,10 @@ if (has('--file')) {
 if (has('--ci')) {
   const { range, why } = resolveCiRange(process.env, git);
   console.log(`   Prüfbereich: ${range} (${why})`);
-  process.exit(checkRange(range, { fallbackRev: process.env.GITHUB_SHA || 'HEAD' }));
+  // CI prüft den Branch-Diff auf der ersten Elternlinie. Merge-Seitenlinien
+  // importieren oft bereits geprüfte main-Commits; diese sind kein neuer Push-Inhalt.
+  // Kann der Bereich nicht aufgelöst werden, bleibt der Fallback absichtlich voll.
+  process.exit(checkRange(range, { fallbackRev: process.env.GITHUB_SHA || 'HEAD', firstParentOnly: true }));
 }
 
 if (has('--range')) {

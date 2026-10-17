@@ -1,7 +1,7 @@
 {
   "vendor": "dsh",
   "package": "@deepseek-ai/dsh",
-  "version": "0.2.1-alpha.2",
+  "version": "0.2.1-alpha.1",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -9,17 +9,17 @@
     "directory": "apps/cli"
   },
   "source": {
-    "tarball": "https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.2.1-alpha.2.tgz",
-    "integrity": "sha512-CkRE0uAOg2ldL2VpfF4cNRsl178CH5nM+8YklPrlMZl5ln0KhVfd42dJuRlgOXZmkpizCRvrVS8LAL+GKfgk0w==",
-    "shasum": "7acc898e09c4cd0678ab8bf5ee1029ee9c25a026",
-    "tarballSha256": "e4cad394413d6af93cc1fab8d198ef995e1ba7cbd7bc43386df5ed7ef4b692d0",
+    "tarball": "https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.2.1-alpha.1.tgz",
+    "integrity": "sha512-DJ8pwG/XqzwDrYQTgJXuIga6ku153Z4vJI/B3MzNtudVCkDaOf4O2pUQh1ToroLHPPe4mxhhFeNJ7ttNculqMw==",
+    "shasum": "4f0727d2b8b62d798cfbb5d5df0c797671a3a888",
+    "tarballSha256": "857f93aa6c85cbd92be3422380e5516f236dc5c49cda0405a958cbdf1865e8db",
     "fileCount": 20,
-    "unpackedSize": 74391
+    "unpackedSize": 73774
   },
   "gitHead": null,
-  "gitHeadNote": "Die Registry veroeffentlicht fuer 0.2.1-alpha.2 kein gitHead (npm view @deepseek-ai/dsh@0.2.1-alpha.2 gitHead --json -> leer). Ein Commit-Hash ist damit NICHT belegbar; belegbar sind Paketfassung, Tarball-Integritaet und der sha256 jeder vendorten Datei. Ein erfundener Hash waere schlimmer als ein ehrliches null.",
-  "vendoredAt": "2026-10-11",
-  "vendoredBy": "PLAN.md Schritt 3.2 (D2) — Vendoring des DSH-Subsets aus alpha.2",
+  "gitHeadNote": "Die Registry veroeffentlicht fuer 0.2.1-alpha.1 kein gitHead (npm view @deepseek-ai/dsh@0.2.1-alpha.1 gitHead --json -> leer). Ein Commit-Hash ist damit NICHT belegbar; belegbar sind Paketfassung, Tarball-Integritaet und der sha256 jeder vendorten Datei. Ein erfundener Hash waere schlimmer als ein ehrliches null.",
+  "vendoredAt": "2026-10-17",
+  "vendoredBy": "A4 der Release-Abnahme: dieselbe Fassung wie Root-Pin, Lock und installierte Binary (welcher Code vendor/ laedt: vendor/MODIFICATIONS.md)",
   "changes": "keine — jede Datei byte-identisch zum Tarball (sha256 je Datei unten, 20/20 verglichen, 0 Abweichungen)",
   "scope": {
     "enclosed": "das veroeffentlichte CLI-Paket @deepseek-ai/dsh (20 Dateien): lib/*.js, lib/types/*.d.ts, LICENSE, package.json, README*",
@@ -48,8 +48,8 @@
     },
     {
       "path": "lib/bin.js",
-      "sha256": "f9f0f13209aaeb586712b52c0f4b84072db9b21ccce77984a5e8fb52dd553362",
-      "bytes": 11761
+      "sha256": "1a03dee18683483ff6a1b27b2a1e650230da6bcca9a0f55f7d81b3308c3f307f",
+      "bytes": 11697
     },
     {
       "path": "lib/dump-config-BEDI-dNY.js",
@@ -123,8 +123,8 @@
     },
     {
       "path": "package.json",
-      "sha256": "f33d958d5b858747dd6c281ffecbf3b4b5cdee5b3ee02817e9339879a6d71b61",
-      "bytes": 8332
+      "sha256": "dbb4a7c1d88c412278fc8baccac7553f6d2310e85f5ffea1470a30106e99c688",
+      "bytes": 7779
     }
   ]
 }

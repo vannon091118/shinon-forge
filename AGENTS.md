@@ -1,6 +1,6 @@
 # Shinon Forge
 
-> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-09
+> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-17
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 An independent fork of the DeepSeek Harness (DSH). It ships the `@shinon/*` Cordis
@@ -20,11 +20,16 @@ remote, so there is deliberately no sync script.
   kennen muss, weil sie fremder Code sind: `dsh plugin add` (der Upstream-Plugin-Manager)
   spricht weiter pnpm und legt bei Bedarf selbst ein `pnpm-workspace.yaml` im Profil an
   (`initProfile` in `dsh-app-boot`); wir committen ein solches nie.
-- DSH is pinned in the root `package.json` (`dependencies`); the installed
-  `dsh --version` currently differs from that pin, and the drift is known — one gate test
-  refuses to assert against the unverified fassung. Both numbers: `docs/ZAHLEN.md` §1.
-  `npm run dev` and the profile test need `dsh` on PATH. Run with `DSH_HOME=$PWD`
-  (the `dev` script does this).
+- DSH is pinned in the root `package.json` (`dependencies`). Mit `node_modules/.bin`
+  **vor** dem PATH meldet `dsh --version` genau diesen Pin; eine **globale** Installation
+  daneben darf abweichen, und eine Zusage, die an der gemessenen Fassung hängt,
+  verweigert sich dann selbst (`scripts/gate/tests/message-ingress.test.mjs`). Beide
+  Zahlen: `docs/ZAHLEN.md` §1. Eine zweite Fassung liegt nicht mehr im Baum: `vendor/dsh`
+  trägt seit dem 2026-10-17 dieselbe Fassung wie Pin, Lock und Installat und wird von
+  **keinem** Laufzeitcode geladen — die drei Belege und die Kandidatenliste des Resolvers
+  stehen in `vendor/MODIFICATIONS.md`, geprüft von `scripts/gate/tests/dsh-pin.test.mjs`
+  (fail-closed). `npm run dev` and the profile test need `dsh` on PATH. Run with
+  `DSH_HOME=$PWD` (the `dev` script does this).
 - Der Arbeits-Schlüssel für echte Modell-Turns liegt in `.env` im Repo-Root (gitignoriert,
   `chmod 600`) — **nie committen, nie ausgeben, nie in eine Antwort kopieren.** `dsh` lädt
   die Datei beim Start selbst (Projekt-Ebene und Harness-Home; mit `DSH_HOME=$PWD` ist das

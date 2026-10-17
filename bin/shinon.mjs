@@ -28,9 +28,11 @@
  * `$DSH_HOME/profiles/<name>` auskommt (`resolvedProfile`, Schritt 3.3 ist dafür
  * belegt), wird hier erst eingehängt, wenn die Profilwerte aus Code kommen
  * (Schritt 3.6) — sonst gäbe es zwei Orte, an denen das Profil definiert ist.
- * Ebenso bleibt `vendor/dsh` (alpha.2) unverdrahtet: es läuft weiter das
- * Repo-Installat (alpha.1, der Pin), solange die Fassungsfrage aus 1.2 offen ist.
- * Zwei Fassungen gleichzeitig im Weg wären genau das, was 1.2 verbietet.
+ * Ebenso bleibt `vendor/dsh` unverdrahtet: es läuft das Repo-Installat, also der Pin
+ * aus `package.json`. Die vendorte Kopie trägt seit dem 2026-10-17 dieselbe Fassung
+ * wie Pin, Lock und Installat und hat **keinen** Laufzeitleser — welcher Code sie
+ * lädt (heute: keiner), welche Kandidaten `dshRoot()` kennt und was ein Umzug auf
+ * eine andere Fassung kostet, steht in `vendor/MODIFICATIONS.md`.
  *
  * Aufruf:  shinon [--check] [dsh-Argumente …]      (bzw. `npm start [-- …]`)
  * Exit:    0 = läuft bzw. geprüft · 2 = Umgebungsfehler (fail-closed)
