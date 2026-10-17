@@ -22,8 +22,9 @@
  *
  *   1. STATIK (ohne node_modules, immer): `repo.bundleResolutionIssues()` ist
  *      leer. Die Regel ist EINE Quelle (`scripts/lib/repo.mjs`) und wird vom
- *      Gate-Plugin `bundle-resolution` und von `shinon doctor` gelesen — ein
- *      Befund nennt Quelle, aufgelöstes Ziel und Abhilfe.
+ *      Gate-Plugin `bundle-resolution` und `scripts/profile-links.mjs --check`
+ *      gelesen; `shinon doctor` ist als Laufzeit-CLI noch offen (S4). Ein Befund
+ *      nennt Quelle, aufgelöstes Ziel und Abhilfe.
  *   2. AUFLÖSUNG (braucht eine Installation, sonst sichtbarer Skip): jedes
  *      Bündel des aktiven Profils löst aus dem PROFILVERZEICHNIS
  *      (`createRequire(profiles/<name>/package.json)`) in `packages/` auf — die

@@ -80,11 +80,14 @@ packages exist, which are active and how many profile layers there are is measur
 
 ## ▶ Quickstart
 
-> **Release-Freeze v0.4.0:** unterstützt wird **genau ein** Weg — der Quellklon
-> mit den Befehlen unten. `shinon update`, persistentes `shinon autoupdate` und
-> ein `.deb` sind **kein** v0.4.0-Umfang (Folgearbeit: `docs/ROADMAP.md` §1.5).
-> Ein global installiertes `dsh` ist nicht der getestete Weg: das Repo pinnt seine
-> DSH-Fassung selbst (`node_modules/.bin` vor dem PATH, Zahl: `docs/ZAHLEN.md` §1).
+> **Release-Ziel v0.4.0:** der eingefrorene Umfang sieht **einen** Installationsweg
+> vor — den Quellklon mit den Befehlen unten. Der Freeze ist keine Freigabe: die
+> Abnahme aus `PLAN.md` §9.1 ist noch nicht vollständig. Insbesondere ist
+> `shinon doctor` noch kein CLI-Unterbefehl (S4 offen). `shinon update`, persistentes
+> `shinon autoupdate` und ein `.deb` als unterstützter Release-Installationsweg sind
+> **nicht** v0.4.0-Umfang (Folgearbeit: `docs/ROADMAP.md` §1.5). Ein global
+> installiertes `dsh` ist nicht der getestete Weg: das Repo pinnt seine DSH-Fassung
+> selbst (`node_modules/.bin` vor dem PATH, Zahl: `docs/ZAHLEN.md` §1).
 
 ```bash
 # 1. Dieses Repo klonen
@@ -114,8 +117,12 @@ worden: für Schritte, die einen Modellschlüssel oder einen Browser brauchen, g
 keinen Beleg — sie stehen in `docs/ZAHLEN.md` §4 unter „nicht geprüft“. Ein frischer Klon
 wird für die Release-Abnahme (S3) mit Exit-Codes protokolliert, nicht behauptet.
 
-`shinon doctor` (read-only) folgt in v0.4.0 als Diagnose; `npm run update` bleibt der
-**DSH-Upstream**-Updater und aktualisiert nicht Shinon Forge.
+`shinon doctor` ist als read-only Diagnose für v0.4.0 vorgesehen, aber derzeit nicht
+implementiert: `bin/shinon.mjs` hat keinen solchen Unterbefehl und reicht Argumente an
+DSH weiter. Das statische Gate `doctor` (`scripts/gate/plugins/doctor.mjs`) ist kein
+Laufzeit-CLI. S4 bleibt damit offen; v0.4.0 darf erst nach Implementierung und Probe
+als abgenommen gelten. `npm run update` bleibt der **DSH-Upstream**-Updater und
+aktualisiert nicht Shinon Forge.
 
 ---
 
@@ -136,9 +143,16 @@ export SHINON_API_KEY="…"
 DSH_HOME=$PWD dsh --profile headless "Sag nur: OK"
 ```
 
-Ohne gesetzte Variable schlägt der Aufruf fail-closed fehl (beabsichtigt). Ob die
-konfigurierte Route in deiner Umgebung antwortet, hängt an deinem Schlüssel und ist
-deshalb **nicht** Teil der belegten Zusagen dieses Repos.
+Ohne gesetzte Variable schlägt der Aufruf fail-closed fehl (beabsichtigt). In der
+Web-UI bestimmt die bewusst gewählte Modellroute den benötigten Schlüssel: ein
+Schlüssel für die Profil-Standardroute Agnes ersetzt zum Beispiel
+`DEEPSEEK_API_KEY` nicht, wenn du gezielt eine DeepSeek-Route auswählst.
+`MISSING_CREDENTIAL` nennt die aktive Route und ihre fehlende Referenz. Wenn diese
+Auswahl beabsichtigt ist, konfiguriere genau dieses Credential über den
+Credentials-Dienst oder die passende Umgebungsvariable; war sie unbeabsichtigt,
+wähle das gewünschte Modell zurück. Gehe nicht von einem automatischen Wechsel zur
+Standardroute aus. Ob eine Route in deiner Umgebung antwortet, hängt an deinem
+Schlüssel und ist deshalb **nicht** Teil der belegten Zusagen dieses Repos.
 
 ---
 
@@ -163,7 +177,7 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 | **[@shinon/task-router](packages/task-router)** | liest die validierte Klassifikation des Enhancers | ✅ |
 | **[@shinon/project-index](packages/project-index)** | persistenter Projektindex (files, symbols, edges, FTS) außerhalb des Repos | ✅ |
 | **[@shinon/codingmon](packages/codingmon)** | Pet-/Kampf-System mit dauerhaftem Zustand und Client→Host-Naht | ✅ |
-| **[@shinon/key-router](packages/key-router)** | Key-Pool mit 429-Rotation: Werkzeuge `key_router_status`/`key_router_rotate`/`key_router_probe`, Schlüssel **nur** aus der Umgebung, nach außen nur der Poolplatz (`key#1`) — der Provider-Override fehlt noch | ✅ |
+| **[@shinon/key-router](packages/key-router)** | Key-Pool mit 429-Rotation: Werkzeuge `key_router_status`/`key_router_rotate`/`key_router_probe`, Provider-Override für konfigurierte Credentials-Referenzen; echte Provider-Rotation mit realen Schlüsseln nicht live geprüft | ✅ |
 | **[@shinon/narrative](packages/narrative)** | Chronicle, Arcs, Relationships, Composite State (Zug 5 aktiviert) | ✅ |
 | **[@shinon/shinon-forge](packages/shinon-forge)** | Memory Sync, Global Runner, Engine Adapters | — |
 | **[@shinon/better-errors](packages/better-errors)** | Config-Ebene ohne Logik: `apply()` loggt nur | ✅ |
@@ -271,12 +285,12 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
   (`message-ingress` verweigert die Zusage gegen eine ungeprüfte DSH-Fassung).
 - **Versionsangleich der Pakete**: die Zeile folgt aus dem eigenen Manifest (`dsh.inactive`
   darf `0.1.0` führen, sonst `1.0.0`) — die gemessene Verteilung steht in
-  `docs/ZAHLEN.md` §1, `doctor` ist grün.
+  `docs/ZAHLEN.md` §1; das statische Gate `doctor` ist grün, der gleichnamige Laufzeit-Unterbefehl bleibt v0.4.0-S4 offen.
 - **Nicht aktivierte Pakete** (`openapi`, `shinon-forge`): beide sind entschieden, nicht
   vergessen — `openapi` hat einen Vertrag ohne Server, `shinon-forge` startet fremde Engines.
   `key-router` und `popup` sind am 2026-10-13 aktiviert worden (Overlay bzw. Pool-Werkzeuge).
-  Offen bleibt am Key-Router der Provider-Override: er gibt DSH noch keinen rotierenden
-  Schlüssel an die Hand.
+  Offen bleibt nur die Live-Probe der 429-Rotation gegen den echten Anbieter mit
+  echten Schlüsseln; die Pool-/Override-Kette bis zum Loopback-Draht ist getestet.
 - **Native App** (Stufe 1 scharf, 2–4 Konzept): [`docs/STARTER-PLAN.md`](docs/STARTER-PLAN.md).
 - **Belege nachziehen**, wo nur ältere Messungen existieren: `docs/probes/` nennt je
   Probe sein Datum.

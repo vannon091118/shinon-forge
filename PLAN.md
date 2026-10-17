@@ -3,7 +3,7 @@
 > **Status:** plan — Umsetzungsplan für den Umbau zum eigenständigen Produkt. **Stand:** 2026-10-17
 > (Fortschritt: 1.3, 1.4, 2.1–2.6, 3.1, 3.11 und 3.12 sind im Arbeitsbaum erledigt — Nachweise je
 > Schritt bzw. `docs/archive/UMBAU_2026-10-11.md` §7 und `docs/archive/DSH_SUBSET_3-1.md`; §3.12 nennt
-> den EINEN offenen Faden des Key-Routers und den Nachtrag vom 2026-10-13)
+> die noch ungemessene Live-429-Rotation des Key-Routers; die Release-Abnahme v0.4.0 ist in §9.1 erfasst.)
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 **Stand:** 2026-10-10 · **Basis-Commit:** `91c7e4f` (`main`) · **Arbeitskopie:** `/home/vannon/Dokumente/Projekte/Shinon-forge` ·
@@ -604,9 +604,14 @@ hier. Code, der die Zusage erfüllt, aber keinen belegten Lauf hat, ist offen.
 | S1 Workspace | Prompter und Project Index beantworten dieselbe Workspace-Frage; fremde Root wird abgelehnt, `..`/Symlink-Ausbruch gestoppt, Veraltetes entfernt — und jede dieser Proben wird bei einer Mutation rot | `npm run test:prompter`, `npm run gate:test` (Mutationsprobe im Commit-Text) |
 | S2 Kontext | Eine Quelle je Schritt; Budget vor dem Modellaufruf; Provenienz (Workspace, Quelle, Pfade, Budget) im Entscheidungsdatensatz, ohne Prompt-Text und ohne Schlüsselwerte | `npm run test:prompter` + Gate-Tests |
 | S3 Quellklon | Frischer Klon ohne globales DSH: `npm ci` → `npm run profile:links` → Profil-Dump → UI-Start, nur mit den dokumentierten Befehlen | README-Quickstart + Laufprotokoll |
-| S4 Doctor | `shinon doctor` ist read-only (Filesystem-Snapshot vor/nach gleich), stabile Exitcodes, Presence-only für Schlüssel | Doctor-Test + Probelauf |
+| S4 Doctor | `shinon doctor` ist als Laufzeit-Unterbefehl implementiert und read-only (Filesystem-Snapshot vor/nach gleich), stabile Exitcodes, Presence-only für Schlüssel | **Offen:** `bin/shinon.mjs` reicht Argumente an DSH weiter und implementiert kein `doctor`; das Gate `scripts/gate/plugins/doctor.mjs` prüft nur statische Repo-Konsistenz. Erst Laufzeit-Test + Probelauf schließen S4. |
 | S5 Schranke | Alle Gates grün, Version/Tag/Lock konsistent, Quellarchiv + SHA-256, idempotent, minimale Publish-Rechte | Release-Workflow + Lauf |
 | S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel (3.9), Security-/Dependency-Audit, finale Doku, CI-Run-ID | `docs/probes/`, Release-Notes |
+
+**Ist-Stand:** S0–S2 sind durch die lokalen Gate-Tests belegt; S3 ist nur teilweise belegt
+und S4 ist offen (kein `shinon doctor`-Laufzeit-Unterbefehl). S5/S6 sind nicht als
+Release-Abnahme belegt. Der Paketwert `0.4.0` und ein Freeze-Dokument ersetzen diese
+Abnahme nicht.
 
 **Reihenfolge:** S0 → S1 → S2 → S3 → S4 → S5 → S6. Kein Slice zieht Arbeit aus
 v0.5.0 vor, auch nicht „schnell zwischendurch“.
@@ -622,7 +627,7 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 | alpha.2-Theme-Erweiterung bricht das Overlay | mittel | mittel | `UPSTREAM_DIFF` §2; am Quelltext lesen, nicht aus Bytes schließen |
 | Downgrade/Upgrade der DSH-Fassung (lokal alpha.1, Ziel alpha.2) | mittel | hoch | erst 3.2, dann Pin anpassen; keine Versionsmischung |
 | `popup` hat keinen Renderer | hoch | niedrig | **erledigt (2026-10-13):** echtes Overlay + Zwillings-Region + Gate-Test (§3.12) |
-| `key-router` hält Key-Material im Prozessspeicher | mittel | hoch | **erledigt (2026-10-13):** Vertrag steht — kein Schlüsselfeld im Schema, nur Poolplätze nach außen, jeder Log durch `redact`, Kanarienvogel-Test; OFFEN bleibt der Provider-Override (§3.12) |
+| `key-router` hält Key-Material im Prozessspeicher | mittel | hoch | **erledigt (2026-10-17):** Vertrag steht — kein Schlüsselfeld im Schema, nur Poolplätze nach außen, jeder Log durch `redact`, Kanarienvogel-Test; der Provider-Override ist bis zum Loopback-Draht belegt. Offen bleibt nur die Live-429-Rotation gegen den echten Anbieter mit echten Schlüsseln (`docs/ZAHLEN.md` §4). |
 | `shinon-forge` startet fremde Engines (Subprozesse) | mittel | hoch | vor Aktivierung bewerten; Defaults restriktiv |
 | Remote-Beitrag im Client nicht mountbar | mittel | mittel | `UPSTREAM_DIFF` §5.2 Punkt 3 vor 6.1 klären |
 | Kein `dsh` im PATH für Abnahmen | hoch | mittel | lokales `node_modules/@deepseek-ai/dsh` nutzen, Node ≥ 22 |

@@ -322,11 +322,12 @@
     # Fehlschlag wartet 2 s, jeder weitere verdoppelt, gedeckelt bei 60 s, mit
     # ±25 % Jitter (assets/pool-core.js; nachgerechnet in packages/key-router/test/).
     #
-    # OFFEN, ausdruecklich (nicht behauptet): der Provider-OVERRIDE fehlt — dieses
-    # Paket gibt DSH noch keinen rotierenden Schluessel an die Hand. Es verwaltet den
-    # Pool, beantwortet `key_router_status`, `key_router_rotate` und `key_router_probe`
-    # und deckelt Plaetze bei 429. Der Override braucht die LLM-Dienstflaeche; siehe
-    # PLAN.md.
+    # Der Provider-Override ist implementiert: fuer diese envNames klammert
+    # key-router credentials.resolve und bedient die Route aus dem Pool; nach
+    # RATE_LIMIT wird der verwendete Platz gedeckelt. Tests belegen die Kette bis
+    # zum Loopback-Draht. Nicht live belegt ist eine 429-Rotation beim echten
+    # Anbieter mit echten Schluesseln (docs/ZAHLEN.md §4).
+
 - id: shinon-key-router
   config:
     providers:

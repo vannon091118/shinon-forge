@@ -23,8 +23,9 @@
  *   - Ein bereits richtiger Link bleibt unangetastet (idempotent).
  *
  * Prüfen statt schreiben: `--check` schreibt nichts und unterscheidet zwei Grade,
- * dieselben, die das Gate-Plugin `bundle-resolution` und `shinon doctor` über
- * `repo.bundleResolutionIssues()` einnehmen:
+ * dieselben, die das Gate-Plugin `bundle-resolution` einnimmt. Das geplante
+ * Laufzeit-CLI `shinon doctor` soll dieselbe Funktion nutzen, ist aber noch nicht
+ * implementiert (Release-Slice S4):
  *
  *   💥 VERSTOSS  ein Link ist da, führt aber woandershin (oder ins Leere) → Exit 1
  *   –  HINWEIS  der Link fehlt noch (Normalzustand vor der Installation) → Exit 0

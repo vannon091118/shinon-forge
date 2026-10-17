@@ -9,7 +9,8 @@
  * Gates waren grün, weil keines den LINK ansah: sie prüfen `packages/` direkt.
  *
  * Die Regel ist EINE Quelle (`repo.bundleResolutionIssues`) — dasselbe Ergebnis
- * liest `shinon doctor` und `scripts/profile-links.mjs --check`. Ein Befund nennt
+ * lesen Gate und `scripts/profile-links.mjs --check`; das geplante Laufzeit-CLI
+ * `shinon doctor` ist noch nicht implementiert (Release-Slice S4). Ein Befund nennt
  * immer Quelle, aufgelöstes Ziel und Abhilfe; ein Gate, das nur „kaputt" sagt,
  * kostet die nächste Person dieselbe Suche noch einmal.
  *
