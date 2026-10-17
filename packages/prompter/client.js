@@ -2,9 +2,13 @@
  * @shinon/prompter — Client-Hälfte: Trace-Panel.
  *
  * Zeigt die letzten Prompter-Entscheidungen (Outcome, Modus, Gründe, Kontextquelle).
- * Host→Client über `window.__shinonPrompterTrace` (Fenster-Konvention, wie
- * `window.__codingmon` bei @shinon/codingmon). Das Host-Paket schreibt die
- * letzten Entscheidungen in dieses Fenster beim `DECISION_CHANNEL`-Emit.
+ * Host→Client läuft über den Kanal, nicht über das Fenster: der Host emittiert
+ * jeden Datensatz auf `DECISION_CHANNEL`, und diese Hälfte spiegelt ihn nach
+ * `window.__shinonPrompterTrace` (Fenster-Konvention, wie `window.__codingmon`
+ * bei @shinon/codingmon). Der Host schreibt NUR im In-Prozess-Fall selbst ins
+ * Fenster — in Produktion (Host in Node, Panel im Browser) käme sein `window`
+ * nie auf der Seite an, und das Panel bliebe ewig leer (gemessen 2026-10-17:
+ * `verworfen (NO_JSON)` im Terminal, „Keine Entscheidungen" im Panel).
  */
 window.__ModuleLoader__.load({
   id: '@shinon/prompter',
@@ -12,6 +16,28 @@ window.__ModuleLoader__.load({
     const React = require('react');
     const h = React.createElement;
     const PLUGIN = '@shinon/prompter';
+    /**
+     * Der Kanal, auf dem der Host seine Entscheidungen meldet. Als Literal
+     * dupliziert wie im Host (`packages/prompter/assets/mode-core.js`) —
+     * bewusst: der Client lädt das Host-Modul nicht, und ein gemeinsamer
+     * Import wäre eine Kopplung, die es sonst nirgends gibt (dieselbe Regel
+     * wie bei @shinon/task-router). Gepinnt vom Gate gegen den Host-Export.
+     */
+    const DECISION_CHANNEL = 'shinon/prompter/decision';
+    /** Die Form, die `TracePanel` unten liest — ein Schreiber mehr, keine zweite Form. */
+    const mirrorRecord = (record) => {
+      try {
+        const list = Array.isArray(window.__shinonPrompterTrace) ? window.__shinonPrompterTrace : [];
+        list.unshift({
+          outcome: record?.outcome ?? 'unbekannt',
+          mode: record?.mode ?? null,
+          reasons: Array.isArray(record?.reasons) ? record.reasons.slice(0, 5) : [],
+          context_source: record?.context_source ?? null,
+          at: typeof record?.session_id === 'string' && record.session_id !== '' ? Date.now() : null,
+        });
+        window.__shinonPrompterTrace = list.slice(0, 20);
+      } catch { /* die Anzeige ist Nebensache; sie darf das Panel nicht brechen */ }
+    };
 
     function insertStyles(tag, css) {
       if (document.querySelector(`style[data-plugin-css="${tag}"]`) !== null) return;
@@ -95,6 +121,15 @@ window.__ModuleLoader__.load({
         const registry = (window.__shinonPlugins ??= new Map());
         registry.set('@shinon/prompter', { label: 'Prompter', kind: 'client', panel: 'shinon-prompter' });
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/prompter' } }));
+        // Die Spur vom Kanal auf die Seite holen: ohne dieses Abo sieht das
+        // Panel nur, was der Host im In-Prozess-Fall selbst spiegelt — in
+        // Produktion also nichts. `ctx.on` ist Cordis-Fläche (events), kein
+        // Dienst, kein `inject` nötig (Präzedenz: @shinon/task-router).
+        if (typeof ctx?.on === 'function') {
+          ctx.on(DECISION_CHANNEL, (record) => {
+            mirrorRecord(record);
+          });
+        }
 
         ctx.slots.inject('main', () => ctx.slots.register({
           name: 'main',

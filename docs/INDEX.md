@@ -80,10 +80,16 @@ gilt nicht als Nachmessung.
 | [`vendor/MODIFICATIONS.md`](../vendor/MODIFICATIONS.md) | current | 2026-10-17 | Änderungslog des vendorten DSH-Anteils: welche Fassung hier liegt und welcher Code sie lädt (A4 der Release-Abnahme) |
 | [`vendor/dsh/`](../vendor/dsh/) (20 Dateien + `MANIFEST.json`) | imported | 2026-10-17 | unverändert übernommenes Fremdpaket `@deepseek-ai/dsh@0.2.1-alpha.1` — dieselbe Fassung wie Root-Pin, Lock und installierte Binary, kein Teil des kanonischen Satzes, Herkunft im Manifest |
 | [`docs/audit/`](audit/) | current | je Dokument (Statusblock) | Audit, Reparatur- und Umsetzungs-Nachweise; jeder nennt Messbefehl und Messzeitpunkt |
+| [`docs/FEATURE_ANALYSIS.md`](FEATURE_ANALYSIS.md) | plan | 2026-10-17 | Arbeitsmaterial: Fremd-Repo-Analyse (7 Repos), keine Aussage über diesen Baum |
+| [`docs/FEATURE_RANKING.md`](FEATURE_RANKING.md) | plan | 2026-10-17 | Arbeitsmaterial: Feature-Ranking aus Fremd-Repos, keine Aussage über diesen Baum |
 
 Nicht in dieser Tabelle: [`docs/archive/legacy-profiles/`](archive/legacy-profiles/) (archivierte
 Profil-Altdateien — kein Markdown, deshalb kein Statusblock) sowie `docs/contracts/` und
 `docs/probes/` (Belege mit eigenem Datenfeld, siehe unten).
+
+`docs/handshakes/` ist eine eigene Dokumentenart mit erweiterten Statuswerten:
+`implemented` und `Folgepaket` kommen dort vor und liegen bewusst außerhalb der
+§2-Liste — ein Handshake beschreibt eine Übergabe, keinen Dokumentenzustand.
 
 Belege: `docs/contracts/` (Verträge) und `docs/probes/` (Falsifikations-Proben).
 Beide sind JSON-Dateien mit eigenem Statusfeld; sie sind Proben **mit Datum** und
@@ -99,7 +105,12 @@ werden nicht nachträglich „aktuell“ gemacht, sondern neu gemessen.
 - Geplante, noch nicht existierende Dateien werden **nicht** als Pfad geschrieben,
   sondern als Text („geplant: …“) mit dem heutigen Ziel daneben.
 
-Prüfbefehl (erwartet `defekt 0`):
+Prüfbefehl (erwartet `defekt 0` im kanonischen Satz; ausgenommen sind Verweise
+in Audit-Dokumenten auf Umbenanntes — `scripts/dsh-test.mjs` (heute
+`scripts/shinon-test.mjs`), `scripts/dsh-profile-test.mjs` (heute
+`scripts/shinon-profile-test.mjs`) und das historische
+`profiles/shinon/node_modules/.pnpm`. Das sind eingefrorene Nachweise, keine
+live-Referenzen, und bleiben bewusst stehen — auch wo ein Review sie zitiert):
 
 ```bash
 node --input-type=module -e '

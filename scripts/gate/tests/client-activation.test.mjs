@@ -65,6 +65,7 @@ import vm from 'node:vm';
 import { codeOnly, stripComments } from '../../lib/source-scan.mjs';
 // Browser-Attrappe und Lader: EINE Quelle für beide vm-Tests (client-activation, markers).
 import { browserSandbox, loadClientBundle as loadBundle, node, requireStub } from './helpers/client-sandbox.mjs';
+import { DECISION_CHANNEL as HOST_PROMPTER_DECISION } from '../../../packages/prompter/assets/mode-core.js';
 
 const ROOT = new URL('../../../', import.meta.url);
 const PACKAGES = fileURLToPath(new URL('packages/', ROOT));
@@ -483,4 +484,41 @@ test('der Hintergrund haengt am frame-weiten Overlay und je Marken-Slot besetzt 
     assert.equal(svg.props.width, size, `${slot}: die Marke ignoriert die vorgegebene Kantenlaenge`);
     assert.equal(nodes.filter((element) => element.type === 'path').length, 4, `${slot}: das Zeichen ist unvollstaendig`);
   }
+});
+
+// ── Wache: die Prompter-Trace kommt vom Kanal auf die Seite ─────────────────
+// Gemessen 2026-10-17: `verworfen (NO_JSON)` im Terminal, „Keine Entscheidungen"
+// im Panel. Der Host schrieb die Spur in sein eigenes (in Produktion nicht
+// vorhandenes) `window`, statt sie über den Kanal zu schicken — der Client
+// hörte nie zu. Seit dem Fix abonniert die Client-Hälfte den Kanal wie
+// @shinon/task-router und spiegelt nach `window.__shinonPrompterTrace`.
+
+test('prompter-client: das Kanal-Literal ist der Host-Kanal (kein Drift)', () => {
+  const match = /const DECISION_CHANNEL = '([^']+)'/.exec(sourceOf('prompter'));
+  assert.ok(match !== null, 'client.js trägt kein DECISION_CHANNEL-Literal — ein Drift wäre still');
+  assert.equal(match[1], HOST_PROMPTER_DECISION, 'Client-Kanal ≠ Host-Kanal: das Abo liefe ins Leere');
+});
+
+test('prompter-client: eine Kanal-Entscheidung landet im Fenster-Spiegel', () => {
+  const { registration, sandbox } = loadBundle('prompter');
+  const seen = {};
+  const fake = {
+    slots: {
+      inject: (_key, callback) => { callback(); return () => {}; },
+      register: () => () => {},
+    },
+    effect: () => () => {},
+    on: (channel, handler) => { seen[channel] = handler; return () => {}; },
+  };
+  registration.factory(requireStub()).apply(fake);
+  const handler = seen[HOST_PROMPTER_DECISION];
+  assert.equal(typeof handler, 'function', 'kein Abo auf dem Host-Kanal — das Panel bliebe ewig leer');
+  handler({ outcome: 'rejected', mode: 'MAX', reasons: ['NO_JSON'], context_source: 'runtime', session_id: 's1' });
+  const trace = sandbox.sandbox.__shinonPrompterTrace;
+  assert.equal(Array.isArray(trace), true, 'kein Spiegel im Fenster');
+  assert.equal(trace.length, 1);
+  assert.equal(trace[0].outcome, 'rejected');
+  assert.equal(trace[0].mode, 'MAX');
+  assert.equal(trace[0].context_source, 'runtime');
+  assert.deepEqual([...trace[0].reasons], ['NO_JSON']);
 });

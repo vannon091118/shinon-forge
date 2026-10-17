@@ -271,9 +271,11 @@ Neue Features starten als *plan* und werden erst mit ausführbarem Nachweis *cur
   keine `pnpm-workspace.yaml` und kein `packageManager`-Feld mehr. Das Profil bringt
   ebenfalls keine mit; Upstreams `initProfile` kann bei `dsh plugin add` selbst eine
   anlegen — sie bleibt untracked.
-- Fünf Pakete (`key-router`, `narrative`, `openapi`, `popup`, `shinon-forge`) stehen
-  **nicht** im Profil und sind damit inaktiv; für `openapi` ist das eine dokumentierte
-  Entscheidung, für die übrigen ist kein Grund verzeichnet (`docs/ZAHLEN.md` §1/§3).
+- Drei Pakete (`mobile`, `openapi`, `shinon-forge`) stehen **nicht** im Profil und
+  sind damit inaktiv (`dsh.inactive` im eigenen Manifest; gemessen 2026-10-17:
+  `key-router`, `narrative` und `popup` sind seit 2026-10-13 aktiv im Profil).
+  Für `openapi` ist das eine dokumentierte Entscheidung, für die übrigen ist kein
+  Grund verzeichnet (`docs/ZAHLEN.md` §1/§3).
   `docs/archive/legacy-profiles/web/` ist der archivierte Altbestand ohne eigene Bundles.
 - Reload-Helfer sind entfallen (bis 2026-10-10 dreifach vorhanden, ohne Aufrufer und mit veraltetem `web`-Profil als Ziel): HMR läuft über den DSH-Prozess selbst, Locale steht in `packages/locale-de/`.
 - `better-errors` und `token-usage` sind Config-Ebenen ohne Logik (ihr `apply()`
