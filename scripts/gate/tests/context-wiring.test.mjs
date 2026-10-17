@@ -276,6 +276,34 @@ test('MAX: mit Index-Dienst kommt der Kontext aus dem INDEX und die Quelle steht
   dispose();
 });
 
+/**
+ * S1 — die Herkunft steht im Datensatz, nicht im Prompt.
+ *
+ * Ein Enhancer, der den falschen Workspace liest, ist keine Stilfrage. Der
+ * Datensatz nennt deshalb Root, Kurz-Identitaet und QUELLE (explizit, Env, cwd)
+ * je Schritt — und niemals den Prompt-Text: eine Spur, die den Inhalt kopiert,
+ * waere selbst ein Leck.
+ */
+test('S1: der Entscheidungsdatensatz nennt die Workspace-Identität und ihre Quelle', async () => {
+  const workspace = workDir('s1-workspace');
+  const llm = fakeLlm(result());
+  const { ctx, records, dispose } = connect({ llm, config: { mode: 'MIN', workspaceRoot: workspace } });
+  const prompt = 'Bitte pruefe src/a.mjs auf bThing.';
+  const claimed = [userMessage(prompt)];
+
+  await ctx.waterfall(prompter.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(records.length, 1, 'genau ein Datensatz je Schritt');
+  const record = records[0];
+  assert.equal(record.workspace.root, workspace, 'die ausdrueckliche Root gewinnt');
+  assert.equal(record.workspace.source, 'config');
+  assert.match(record.workspace.rootId, /^[0-9a-f]{16}$/);
+  assert.equal(record.workspace_contract, 'shinon.workspace/v1');
+  assert.equal(record.rawLength, prompt.length, 'nur die Laenge, nicht der Text');
+  assert.equal(JSON.stringify(record).includes(prompt), false, 'der Prompt-Text steht nicht in der Spur');
+  dispose();
+});
+
 test('MAX: eine Datei gewinnt gegen den Dienst, und ohne beides wird abgelehnt', async () => {
   // a) Datei konfiguriert -> Quelle file, der Dienst wird nicht einmal gefragt.
   const contextDir = workDir('datei');

@@ -584,6 +584,35 @@ Tests VOLLSTÄNDIG sind" ist damit erfüllt und keine Absichtserklärung mehr.
 
 ---
 
+## 9.1 Release-Freeze v0.4.0 — Slice-Abnahme (2026-10-17)
+
+**Die Entscheidung** steht in [docs/ROADMAP.md](docs/ROADMAP.md) §1.5 (kanonisch):
+v0.4.0 unterstützt genau den **Quellklon** (`git clone`, `npm ci`,
+`npm run profile:links`, Profil-Dump, UI-Start, `shinon doctor` read-only).
+`shinon update`, persistentes `shinon autoupdate`, `.deb`, Live-429-Rotation mit
+zwei echten Schlüsseln, Mobile/Android, Desktop-Shell, Rust-/Single-Binary-Port,
+Vollbenchmark und QoL Top 10 sind **kein** v0.4.0-Umfang; sie stehen als
+Folgearbeit in derselben Roadmap. Ein Feature-Wunsch erweitert den Freeze nicht.
+
+Ein Punkt zählt erst als erledigt, wenn **Befehl, Exit-Code und Ergebnis**
+dokumentiert sind; die gemessenen Zahlen stehen in `docs/ZAHLEN.md` §2, nicht
+hier. Code, der die Zusage erfüllt, aber keinen belegten Lauf hat, ist offen.
+
+| Slice | Pflicht (Abnahme) | Beleg |
+|---|---|---|
+| S0 Freeze | Freeze in Roadmap + dieser Tabelle; historische Arbeitsbaum-Regeln oben als HISTORISCH markiert; v0.5.0-Liste nennt Selbstupdate, Autoupdate, `.deb` | diese Datei + `docs/ROADMAP.md` §1.5/§3 |
+| S1 Workspace | Prompter und Project Index beantworten dieselbe Workspace-Frage; fremde Root wird abgelehnt, `..`/Symlink-Ausbruch gestoppt, Veraltetes entfernt — und jede dieser Proben wird bei einer Mutation rot | `npm run test:prompter`, `npm run gate:test` (Mutationsprobe im Commit-Text) |
+| S2 Kontext | Eine Quelle je Schritt; Budget vor dem Modellaufruf; Provenienz (Workspace, Quelle, Pfade, Budget) im Entscheidungsdatensatz, ohne Prompt-Text und ohne Schlüsselwerte | `npm run test:prompter` + Gate-Tests |
+| S3 Quellklon | Frischer Klon ohne globales DSH: `npm ci` → `npm run profile:links` → Profil-Dump → UI-Start, nur mit den dokumentierten Befehlen | README-Quickstart + Laufprotokoll |
+| S4 Doctor | `shinon doctor` ist read-only (Filesystem-Snapshot vor/nach gleich), stabile Exitcodes, Presence-only für Schlüssel | Doctor-Test + Probelauf |
+| S5 Schranke | Alle Gates grün, Version/Tag/Lock konsistent, Quellarchiv + SHA-256, idempotent, minimale Publish-Rechte | Release-Workflow + Lauf |
+| S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel (3.9), Security-/Dependency-Audit, finale Doku, CI-Run-ID | `docs/probes/`, Release-Notes |
+
+**Reihenfolge:** S0 → S1 → S2 → S3 → S4 → S5 → S6. Kein Slice zieht Arbeit aus
+v0.5.0 vor, auch nicht „schnell zwischendurch“.
+
+---
+
 ## Risiken gesamt
 
 | Risiko | W. | Wirkung | Umgang |

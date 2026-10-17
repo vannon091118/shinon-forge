@@ -60,6 +60,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { WORKSPACE_CONTRACT, fingerprintRoot } from './workspace.js';
 
 /** Vertragsname des Index. */
 export const CONTRACT = 'shinon.project-index/v1';
@@ -201,8 +202,13 @@ export const MEMORY_VERSION = 1;
  * `scripts/gate/tests/scan-pruning.test.mjs` beide Listen zeichengenau
  * gegeneinander. Wer hier etwas ergänzt, muss es dort auch tun (und umgekehrt),
  * sonst wird der Drift im Gate sichtbar statt still.
+ *
+ * `.agents` steht aus S1 darin: darunter liegen die Skills. Sie sind eine EIGENE
+ * Quelle (eigene Auswahl, eigenes Budget) und dürfen nicht zusätzlich als
+ * gewöhnlicher Projektquelltext im Kontext landen — sonst stünde derselbe Skill
+ * zweimal in der Nachricht, einmal als Datei und einmal als Skill-Block.
  */
-export const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', '.cache', '.turbo', '.nyc_output', 'coverage', 'storages', 'sessions', 'logs', 'vendor']);
+export const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', '.cache', '.turbo', '.nyc_output', 'coverage', 'storages', 'sessions', 'logs', 'vendor', '.agents']);
 
 /** Endungen, die als Text indexiert werden. */
 export const SOURCE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.json', '.md', '.yml', '.yaml'];
@@ -948,7 +954,7 @@ export function openLedger(file) {
  * Zeilen des Index bleiben stehen, sie sind die Sicherung (und der naechste
  * Index-Neuaufbau raeumt sie ohnehin selbst weg).
  */
-export function migrateMemory(db, { fromFile, namespace }) {
+export function migrateMemory(db, { fromFile, namespace, expectedRoot = '' }) {
   if (!existsSync(fromFile)) return { migrated: 0, reason: 'kein Index vorhanden' };
   if (readMemory(db, namespace) !== null) return { migrated: 0, reason: 'Ledger traegt den Stand bereits' };
   let source = null;
@@ -956,6 +962,25 @@ export function migrateMemory(db, { fromFile, namespace }) {
     source = new DatabaseSync(fromFile, { readOnly: true });
   } catch (error) {
     return { migrated: 0, reason: `Index nicht lesbar (${error?.message ?? error})`, error: 'INDEX_UNREADABLE' };
+  }
+  // S1: eine Migration darf keinen FREMDEN Workspace importieren. Der Ledger ist
+  // Nutzerzustand und fuer alle Projekte derselbe — ohne diese Pruefung koennte
+  // ein untergeschobener Index die Urteile eines anderen Projekts einschleusen.
+  if (typeof expectedRoot === 'string' && expectedRoot.trim() !== '') {
+    const want = fingerprintRoot(expectedRoot);
+    let storedRoot = null;
+    let storedId = null;
+    try {
+      storedRoot = source.prepare("select value from meta where key = 'root'").get()?.value ?? null;
+      storedId = source.prepare("select value from meta where key = 'root_id'").get()?.value ?? null;
+    } catch {
+      // Ein Index ohne meta-Tabelle macht keine Aussage ueber seine Root; dann
+      // gilt die alte Regel (kopieren), weil der Pfad pro Projekt gebildet wird.
+    }
+    const gotId = storedId ?? (typeof storedRoot === 'string' && storedRoot !== '' ? fingerprintRoot(storedRoot).rootId : null);
+    if (gotId !== null && gotId !== want.rootId) {
+      return { migrated: 0, reason: `Index von ${storedRoot ?? 'unbekannt'} gilt nicht fuer ${want.root}`, error: 'FOREIGN_ROOT' };
+    }
   }
   try {
     let rows;
@@ -1003,7 +1028,7 @@ export function migrateMemory(db, { fromFile, namespace }) {
  * verworfen und neu angelegt: ein stillschweigend weiterbenutzter Index mit
  * anderer Bedeutung waere schlimmer als ein Neuaufbau.
  */
-export function openIndex(file) {
+export function openIndex(file, options = {}) {
   const db = openDatabase(file);
 
   const stored = {
@@ -1014,11 +1039,26 @@ export function openIndex(file) {
   };
   // Ein LEERER Index ist kein fremder Index: geprueft wird nur, was schon gebaut war.
   const built = stored.contract !== null || stored.schema_version !== null;
+
+  // S1: Root-Bindung. Wer eine erwartete Root nennt, bekommt einen Index mit
+  // FREMDER Identitaet nicht zu sehen — er wird wie eine unpassende Fassung
+  // verworfen und leer neu angelegt. Die Identitaet ist der Fingerabdruck, nicht
+  // der Pfad-String: zwei Schreibweisen desselben Ordners sind derselbe
+  // Workspace, zwei Ordner mit gleichen relativen Pfaden sind es nicht.
+  // Alte Indexe tragen nur `root`; daraus wird dieselbe Identitaet gerechnet.
+  const expected = typeof options?.expectedRoot === 'string' && options.expectedRoot.trim() !== ''
+    ? fingerprintRoot(options.expectedRoot)
+    : null;
+  const storedRootPath = metaValue(db, 'root');
+  const storedRootId = metaValue(db, 'root_id') ?? (typeof storedRootPath === 'string' && storedRootPath !== '' ? fingerprintRoot(storedRootPath).rootId : null);
+  const foreignRoot = built && expected !== null && storedRootId !== null && storedRootId !== expected.rootId;
+
   const incompatible =
-    built &&
-    (stored.contract !== CONTRACT ||
-      stored.schema_version !== String(SCHEMA_VERSION) ||
-      stored.indexer_version !== String(INDEXER_VERSION));
+    foreignRoot ||
+    (built &&
+      (stored.contract !== CONTRACT ||
+        stored.schema_version !== String(SCHEMA_VERSION) ||
+        stored.indexer_version !== String(INDEXER_VERSION)));
   const rebuilt = incompatible;
   if (incompatible) {
     for (const table of [FTS_TABLE, SECRET_TABLE, ...PRIMARY_TABLES]) db.exec(`drop table if exists "${table}"`);
@@ -1038,6 +1078,13 @@ export function openIndex(file) {
   setMeta(db, 'indexer_version', String(INDEXER_VERSION));
   setMeta(db, 'memory_version', String(MEMORY_VERSION));
   setMeta(db, 'contract', CONTRACT);
+  // Eine genannte Root schlaegt sich auch im (leeren) Index nieder: der naechste
+  // Leser kann die Bindung pruefen, statt sie anzunehmen.
+  if (expected !== null) {
+    setMeta(db, 'root', expected.root);
+    setMeta(db, 'root_id', expected.rootId);
+    setMeta(db, 'workspace_contract', WORKSPACE_CONTRACT);
+  }
   return db;
 }
 
@@ -1049,6 +1096,8 @@ export function indexMeta(db) {
     indexer_version: metaValue(db, 'indexer_version'),
     memory_version: metaValue(db, 'memory_version'),
     root: metaValue(db, 'root'),
+    root_id: metaValue(db, 'root_id'),
+    workspace_contract: metaValue(db, 'workspace_contract'),
     symbols_digest: metaValue(db, 'symbols_digest'),
     updated_at_ms: metaValue(db, 'updated_at_ms'),
   };
@@ -1352,6 +1401,8 @@ export function updateIndex(db, root, options = {}) {
 
     setMeta(db, 'symbols_digest', digest);
     setMeta(db, 'root', resolve(root));
+    setMeta(db, 'root_id', fingerprintRoot(root).rootId);
+    setMeta(db, 'workspace_contract', WORKSPACE_CONTRACT);
     setMeta(db, 'updated_at_ms', String(Date.now()));
     db.exec('commit');
   } catch (error) {
@@ -1485,7 +1536,9 @@ export function writeMemory(db, namespace, state = {}) {
 export function runIndex(options) {
   const root = resolve(options.root);
   const indexRoot = resolve(options.indexRoot ?? DEFAULT_INDEX_ROOT);
-  const db = openIndex(indexPath(indexRoot, root));
+  // Die Root wird auch hier genannt: ein untergeschobener Index am richtigen
+  // Pfad wird verworfen, statt als Index dieses Projekts weiterzuleben.
+  const db = openIndex(indexPath(indexRoot, root), { expectedRoot: root });
   try {
     return updateIndex(db, root, { maxFileBytes: options.maxFileBytes, chunkLines: options.chunkLines, verify: options.verify });
   } finally {

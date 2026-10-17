@@ -32,7 +32,7 @@ function fixture() {
   writeFileSync(join(root, 'src', 'echt.mjs'), 'export const echt = 1;\n');
   writeFileSync(join(root, 'src', 'tief', 'noch-echter.mjs'), 'export const zwei = 2;\n');
   // Fremdcode und Ableitungen: dürfen nie betreten werden.
-  for (const dir of ['node_modules', '.git', 'dist', '.cache', 'coverage', 'storages', 'sessions', 'logs', 'vendor']) {
+  for (const dir of ['node_modules', '.git', 'dist', '.cache', 'coverage', 'storages', 'sessions', 'logs', 'vendor', '.agents/skills/s']) {
     mkdirSync(join(root, dir), { recursive: true });
     writeFileSync(join(root, dir, 'fremd.js'), 'export const fremd = 1;\n');
   }
@@ -47,6 +47,7 @@ test('prune: die gemeinsame Liste steht einmal, der Index-Kern hält dieselbe Me
   assert.equal(core.SKIP_DIRS.has('node_modules'), true);
   assert.equal(core.SKIP_DIRS.has('.git'), true);
   assert.equal(core.SKIP_DIRS.has('vendor'), true, 'der vendored DSH-Baum ist Fremdcode');
+  assert.equal(core.SKIP_DIRS.has('.agents'), true, 'Skills sind eine eigene Quelle, kein Projektquelltext (S1)');
 });
 
 test('prune: walkDir betritt Fremd- und Cacheordner nicht', () => {
@@ -56,7 +57,7 @@ test('prune: walkDir betritt Fremd- und Cacheordner nicht', () => {
     const rel = files.map((file) => relative(root, file));
     assert.deepEqual(rel, ['src/echt.mjs', 'src/tief/noch-echter.mjs'], 'nur der eigene Code wird gefunden');
     assert.equal(dirs, 3, 'betreten werden root, src und src/tief — sonst nichts');
-    for (const dir of ['node_modules', '.git', 'dist', '.cache', 'coverage', 'storages', 'sessions', 'logs', 'vendor']) {
+    for (const dir of ['node_modules', '.git', 'dist', '.cache', 'coverage', 'storages', 'sessions', 'logs', 'vendor', '.agents']) {
       assert.equal(rel.some((path) => path.startsWith(`${dir}/`)), false, `${dir} wurde betreten`);
       assert.equal(isPruned(dir), true, `${dir} muss gepruned sein`);
     }

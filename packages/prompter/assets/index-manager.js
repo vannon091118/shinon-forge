@@ -10,9 +10,9 @@
  * Persistenz: JSON-Datei auf Disk (load/save). Alle Operationen synchron.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, realpathSync } from 'node:fs';
 import { join, isAbsolute, dirname, resolve } from 'node:path';
-import { fingerprintRoot } from './workspace.js';
+import { checkRealpathInside, fingerprintRoot, isInsideRoot } from './workspace.js';
 
 /** Root-Fingerabdruck ohne zweite Wahrheit: die EINE Funktion steht in workspace.js. */
 function fingerprintOfRoot(root) {
@@ -246,8 +246,6 @@ export function getContext(index, promptText, options = {}) {
 export function createIndex(root = null) {
   let bound = null;
   if (typeof root === 'string' && root.trim() !== '') {
-    const { resolve: _resolve } = { resolve: (p) => p };
-    void _resolve;
     bound = fingerprintOfRoot(root);
   }
   return {
@@ -400,6 +398,13 @@ export function indexDirectory(index, dirPath, extensions = null, now = Date.now
         continue;
       }
       if (!exts.some((ext) => entry.name.endsWith(ext))) continue;
+      // S1: Symlink-Grenze VOR dem Lesen. `readFileSync` folgt jedem Link; ein
+      // Ziel außerhalb der Workspace-Root gehört nicht in den Index.
+      const real = checkRealpathInside(boundaryReal, full, realpathSync);
+      if (!real.ok) {
+        errors.push({ path: full, reason: real.reason.startsWith('SYMLINK_ESCAPE') ? 'SYMLINK_ESCAPE' : 'REALPATH_FAILED' });
+        continue;
+      }
       let content;
       try {
         content = readFileSync(full, 'utf8');
@@ -445,6 +450,17 @@ export function indexDirectory(index, dirPath, extensions = null, now = Date.now
     }
   }
 
+  // Die Grenze wird EINMAL aufgelöst (Realpath), nicht je Datei: sonst wäre auf
+  // Systemen mit symlinkter Temp-Wurzel (macOS: /var → /private/var) jede echte
+  // Datei ein „Ausbruch". Verglichen wird aufgelöst gegen aufgelöst.
+  const boundary = typeof options.root === 'string' && options.root.trim() !== ''
+    ? options.root
+    : (typeof index.root === 'string' && index.root !== '' ? index.root : dirPath);
+  let boundaryReal = boundary;
+  try {
+    boundaryReal = realpathSync(boundary);
+  } catch { /* fehlende Grenze meldet checkRealpathInside je Datei */ }
+
   walk(dirPath);
 
   // S1: Veraltetes entfernen — gelöschte, verschobene, umbenannte Dateien
@@ -452,7 +468,7 @@ export function indexDirectory(index, dirPath, extensions = null, now = Date.now
   // dem Speicher (und damit aus dem nächsten saveIndex).
   const removed = [];
   const tree = resolve(String(dirPath));
-  const inside = (p) => p === tree || p.startsWith(`${tree}/`);
+  const inside = (p) => isInsideRoot(tree, p);
   for (const key of [...index.entries.keys()]) {
     // Nur Einträge dieses Baums prüfen: was anderswoher kommt, gehört einem
     // anderen Lauf und wird hier nicht angefasst.

@@ -23,7 +23,7 @@
 
 ---
 
-> **Status:** current — Einstieg in das Repository. **Stand:** 2026-10-13
+> **Status:** current — Einstieg in das Repository. **Stand:** 2026-10-17
 > **Dokumentation:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 ---
@@ -80,33 +80,42 @@ packages exist, which are active and how many profile layers there are is measur
 
 ## ▶ Quickstart
 
-```bash
-# 1. DSH installieren (falls noch nicht da)
-npm install -g @deepseek-ai/dsh          # geprüfte Fassung + Pin: docs/ZAHLEN.md §1
+> **Release-Freeze v0.4.0:** unterstützt wird **genau ein** Weg — der Quellklon
+> mit den Befehlen unten. `shinon update`, persistentes `shinon autoupdate` und
+> ein `.deb` sind **kein** v0.4.0-Umfang (Folgearbeit: `docs/ROADMAP.md` §1.5).
+> Ein global installiertes `dsh` ist nicht der getestete Weg: das Repo pinnt seine
+> DSH-Fassung selbst (`node_modules/.bin` vor dem PATH, Zahl: `docs/ZAHLEN.md` §1).
 
-# 2. Dieses Repo klonen
+```bash
+# 1. Dieses Repo klonen
 git clone https://github.com/vannon091118/shinon-forge.git
 cd shinon-forge
 
-# 3. Wurzel-Abhängigkeiten (npm ist die einzige Paketquelle, Schritt 3.5/A1)
-npm install
-# 3b. Profil-Dependencies: `profiles/shinon` bindet seine Bundles mit `link:` —
-#     das lehnt npm ab (gemessen: EUNSUPPORTEDPROTOCOL). Bis die Bindungsfrage aus
-#     PLAN.md 3.5/3.6 entschieden ist, sind diese Links von Hand bereitzustellen;
-#     der Profiltest sagt es sichtbar, wenn sie fehlen.
+# 2. Wurzel-Abhängigkeiten aus dem Lockfile (npm ist die einzige Paketquelle)
+npm ci
+
+# 3. Profil-Links setzen: `profiles/shinon` bindet seine Bundles mit `link:` —
+#    npm lehnt das außerhalb des Root-Workspace-Modells ab (EUNSUPPORTEDPROTOCOL).
+#    Das Werkzeug ist idempotent und verweigert Fremdpfade mit Exit 2.
+npm run profile:links
+#    Prüfen ohne zu schreiben:  node scripts/profile-links.mjs --check
 
 # 4. Prüfen, ob das Profil auflöst   → in diesem Durchlauf ausgeführt: Exit 0
                                          (Layer und Bundles: docs/ZAHLEN.md §2)
-DSH_HOME=$PWD dsh --profile shinon --dump-config
+DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config
 
 # 5. Booten (Web-UI)   → in diesem Durchlauf NICHT gestartet, also hier auch nicht behauptet
-DSH_HOME=$PWD dsh --profile shinon
+DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon
 ```
 
-Schritt 4 ist belegt (`node scripts/dsh-profile-test.mjs`, Exit 0, Zahl: `docs/ZAHLEN.md` §2).
-Schritt 3 und 5 sind in diesem Durchlauf **nicht** ausgeführt worden: für Schritte, die
-einen Modellschlüssel oder einen Browser brauchen, gibt es hier keinen Beleg — sie stehen
-in `docs/ZAHLEN.md` §4 unter „nicht geprüft“.
+Schritt 4 ist belegt (`node scripts/shinon-profile-test.mjs`, Exit 0, Zahl: `docs/ZAHLEN.md` §2).
+Schritte 2, 3 und 5 sind in diesem Durchlauf **nicht** in einem frischen Klon wiederholt
+worden: für Schritte, die einen Modellschlüssel oder einen Browser brauchen, gibt es hier
+keinen Beleg — sie stehen in `docs/ZAHLEN.md` §4 unter „nicht geprüft“. Ein frischer Klon
+wird für die Release-Abnahme (S3) mit Exit-Codes protokolliert, nicht behauptet.
+
+`shinon doctor` (read-only) folgt in v0.4.0 als Diagnose; `npm run update` bleibt der
+**DSH-Upstream**-Updater und aktualisiert nicht Shinon Forge.
 
 ---
 

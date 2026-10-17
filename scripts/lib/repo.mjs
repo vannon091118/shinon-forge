@@ -489,6 +489,18 @@ export const SOURCE_TWINS = [
     mirror: 'packages/hook/index.js',
   },
   {
+    // S1: Prompter und Project Index muessen dieselbe Workspace-Identitaet
+    // beantworten (explizit > Env > cwd, Pfadgrenzen, Realpath, Fingerprint).
+    // Ein Paket darf das andere nicht importieren, also ist die Fassung im
+    // Index ein Spiegel — und ein Spiegel ohne Drift-Pruefung ist eine zweite
+    // Wahrheit. Die Region deckt Werte UND Funktionen ab (bytegleich).
+    rule: 'Workspace-Identitaet (S1) — Prompter und Project Index',
+    kind: 'region',
+    marker: 'zwilling:workspace-identitaet',
+    owner: 'packages/prompter/assets/workspace.js',
+    mirror: 'packages/project-index/assets/workspace.js',
+  },
+  {
     rule: 'letzte menschliche Nachricht mit Text',
     kind: 'region',
     marker: 'zwilling:letzte-menschliche-nachricht',

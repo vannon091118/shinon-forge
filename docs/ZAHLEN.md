@@ -34,7 +34,7 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Proben unter `docs/probes/` | 29 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 22 Pakete, 183 Dateien, 1500378 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 22 Pakete, 185 Dateien, 1527362 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -65,17 +65,17 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Profiltest | **3** bestanden, **0** fehlgeschlagen — **24** Layer, **19** Repo-Bundles | 0 | `node scripts/run-with-node.mjs scripts/shinon-profile-test.mjs` |
 | Profil-Dump im echten Boot | **60** Layer-Köpfe, **210** Einträge; `shinon-task-router.activate: false`, `permission.defaultPreset: workspace-write`, `agent-default-model: agnes/agnes-2.5-flash` | 0 | `DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config` |
 | Gate-Engine `--full` | **22** Gates gelaufen, **21** grün, **1** `NOT_APPLICABLE` (`typescript`: keine First-Party-TS-Datei), **0** fehlgeschlagen, **0** geskippt; Branding ohne Flag sichtbar übersprungen | 0 | `npm run gate:full` |
-| Gate-Tests | **532** Tests, **532** grün, **0** rot, **0** übersprungen — davon 2 für den Prompter-Trace-Kanal (Literal-Pin, Fenster-Spiegel) | 0 | `npm run gate:test` |
+| Gate-Tests | **536** Tests, **536** grün, **0** rot, **0** übersprungen — davon 2 für den Prompter-Trace-Kanal (Literal-Pin, Fenster-Spiegel) und 4 für die S1-Wurzelbindung (fremde Root wird verworfen, keine Migration aus fremdem Index, Prompter und Project Index antworten gleich, der Entscheidungsdatensatz nennt Identität und Quelle) | 0 | `npm run gate:test` |
 | Codingmon-Tests | **46** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:codingmon` |
 | Scoring-Tests (Kern, Signale, Ablage, Block-Gewichte) | **50** bestanden, **0** rot, **0** übersprungen — importfrei, läuft in CI ohne `npm ci`; die Host-Naht des Lernens fährt `scripts/gate/tests/scoring-block-learning.test.mjs` | 0 | `npm run test:scoring` |
 | Token-Usage-Tests | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:token` |
-| Prompter-Tests (Zettel, Laufzeit-Index, Skills, Selektor, Vorschlag, Selektionsvertrag, Workspace-Vertrag) | **113** bestanden, **0** rot, **0** übersprungen — davon 6 für das Index-Größenbudget (`ZU_GROSS`, `BUDGET_ERSCHOEPFT`, Determinismus, Doppelzählung) und 9 für den Workspace-Vertrag S1 (eine Quelle, Cross-Workspace, `FOREIGN_ROOT`, Pfadgrenzen, Symlink, stale, Skills-Entkopplung, Referenzen) | 0 | `npm run test:prompter` |
+| Prompter-Tests (Zettel, Laufzeit-Index, Skills, Selektor, Vorschlag, Selektionsvertrag, Workspace-Vertrag) | **115** bestanden, **0** rot, **0** übersprungen — davon 6 für das Index-Größenbudget (`ZU_GROSS`, `BUDGET_ERSCHOEPFT`, Determinismus, Doppelzählung) und 11 für den Workspace-Vertrag S1 (eine Quelle, Cross-Workspace, `FOREIGN_ROOT`, Pfadgrenzen, Symlink-Grenze beim Lesen mit interner Positivprobe, stale Entfernung, Skills-Entkopplung, Referenzen) | 0 | `npm run test:prompter` |
 | Narrative-Tests (Kern) | **9** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:narrative` |
 | Popup-Tests (Faltung des Sitzungsfensters) | **12** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:popup` |
 | Key-Router-Tests (Pool-Kern) | **17** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:key-router` |
 | Traceability-Tests | **12** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:traceability` |
 | Idiom-Blöcke | **16** Blöcke in **12** Dateien, deckungsgleich mit `scripts/lib/plugin-idioms.mjs` | 0 | `npm run idioms:check` |
-| Build (`dist/`) | **22** Pakete, **183** Dateien, **1 497 059** Bytes | 0 | `npm run build` |
+| Build (`dist/`) | **22** Pakete, **185** Dateien, **1 527 362** Bytes | 0 | `npm run build` |
 | Bestands-Block dieser Datei | deckungsgleich mit dem Baum | 0 | `npm run zahlen:check` |
 
 **Warum die Umgebung zählt:** `gate:test` und `npm test` brauchen Node ≥ 22 (`node:sqlite`)
@@ -97,9 +97,29 @@ Ein nacktes `node --test …` bleibt der ungeschützte Weg und ist kein Beleg.
 
 ## 3. Rote Befunde
 
-In diesem Durchgang: **keine**. `npm test`, `npm run gate:test`, `npm run gate:full` und
-`npm run build` enden mit Exit 0; es gibt keinen Skip und keinen `NOT_APPLICABLE`-Befund
-außer `typescript` (es existiert weiterhin keine First-Party-TypeScript-Datei).
+In diesem Durchgang: **keine** im abschließenden Lauf. `npm test`, `npm run gate:test`,
+`npm run gate:full` und `npm run build` enden mit Exit 0; es gibt keinen Skip und keinen
+`NOT_APPLICABLE`-Befund außer `typescript` (es existiert weiterhin keine
+First-Party-TypeScript-Datei).
+
+**Ein benannter Flake, behoben statt verdeckt:** der Gate-Test
+`Zeitstempel: verify=stamp schliesst die Luecke, ohne den Baum zu lesen` war in zwei von
+vier vollen `gate:test`-Läufen rot (`caught.suspicious` 0 statt 1), einzeln aber grün.
+Ursache ist die `ctime`-Auflösung dieser Umgebung: nach `writeFileSync` + zurückgesetzter
+`mtime` blieb `ctimeNs` in einer Kontrollprobe außerhalb des Repos **identisch** — eine
+Kontrollprobe mit 5 ms Pause und erneutem `utimes` zeigte den nächsten Tick (gemessen:
+4 ms Schrittweite). Der Test wartet jetzt (maximal 500 ms) auf den nächsten `ctime`-Tick,
+statt die Zusage zu senken: `suspicious === 1` und „ctime unterscheidet sich" stehen
+unverändert im Test. Zwei volle Läufe danach: **535/535**, `0` rot; mit dem zusätzlichen
+S1-Ablage-Test danach **536/536**, `0` rot.
+
+**Zweiter beobachteter Flake (nicht reproduziert):** im selben Durchgang war ein
+`npm test`-Lauf rot in `packages/codingmon/test/uebergabe.test.mjs`
+(`Zusage: nur turn/end mit reason=completed zaehlt XP-Completions in readActivity`,
+0 statt 4), also in der echten DSH-Storage-Familie. Einzeln (`npm run test:codingmon`)
+und in zwei folgenden `npm test`-Läufen war die Datei **46/46** grün; die Änderung dieses
+Durchgangs berührt `codingmon` nicht. Der Test ist damit lastempfindlich und bleibt als
+Beobachtung stehen — nicht als behoben behauptet.
 
 Offen **außerhalb** der Gates (kein Rot, nur ungemessen):
 

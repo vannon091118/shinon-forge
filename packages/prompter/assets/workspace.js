@@ -23,6 +23,7 @@
 import { createHash } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
+// #region zwilling:workspace-identitaet — Besitzer: packages/prompter/assets/workspace.js; Spiegel: packages/project-index/assets/workspace.js (bytegleich, scripts/lib/repo.mjs)
 /** Vertragsname der Workspace-Identität. */
 export const WORKSPACE_CONTRACT = 'shinon.workspace/v1';
 
@@ -147,3 +148,4 @@ export function toWorkspacePath(root, absolute) {
   const rel = relative(resolve(String(root ?? '')), resolve(String(absolute ?? '')));
   return sep === '/' ? rel : rel.split(sep).join('/');
 }
+// #endregion zwilling:workspace-identitaet

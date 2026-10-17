@@ -112,6 +112,11 @@ function fixtureProject(label) {
   mkdirSync(join(dir, 'src'), { recursive: true });
   mkdirSync(join(dir, 'docs'), { recursive: true });
   mkdirSync(join(dir, 'node_modules/fremd'), { recursive: true });
+  // S1: Skills liegen unter `.agents/` und sind eine EIGENE Quelle (eigene
+  // Auswahl, eigenes Budget). Als gewoehnlicher Quelltext indexiert, stuende
+  // derselbe Skill zweimal im Kontext — einmal als Datei, einmal als Block.
+  mkdirSync(join(dir, '.agents/skills/s'), { recursive: true });
+  writeFileSync(join(dir, '.agents/skills/s/SKILL.md'), '# skill\n');
   writeFileSync(
     join(dir, 'src/a.mjs'),
     [
@@ -417,6 +422,90 @@ test('Schema: ein Index mit fremdem Vertrag wird verworfen, nicht weitergenutzt'
   assert.equal(bundle.indexStats(second).files, 0, 'alte Zeilen sind weg');
   second.close();
   assert.equal(bundle.openIndex(file).close(), undefined);
+});
+
+/**
+ * S1 — der Index gehoert EINEM Workspace.
+ *
+ * Der Pfad allein bindet nicht (ein kopierter Index liegt am richtigen Pfad).
+ * Geprueft wird deshalb die IDENTITAET: ein Index unter fremder Root wird
+ * verworfen und leer neu angelegt — mit irgendeiner anderen Antwort wuerde ein
+ * Prompt den Kontext eines anderen Projekts lesen. Die Ablage (Nutzerurteile)
+ * ist kein abgeleiteter Index und ueberlebt den Neuaufbau.
+ */
+test('S1: fremde Root-Identität wird verworfen, die Ablage überlebt', () => {
+  const work = workDir('s1-root');
+  const a = fixtureProject('s1-a');
+  const b = fixtureProject('s1-b');
+  const file = join(work, 'index.sqlite');
+
+  const first = bundle.openIndex(file, { expectedRoot: a });
+  bundle.updateIndex(first, a, {});
+  assert.ok(bundle.indexStats(first).files > 0, 'der Index von A ist gefüllt');
+  const metaA = bundle.indexMeta(first);
+  assert.equal(metaA.root, a);
+  assert.equal(metaA.workspace_contract, 'shinon.workspace/v1');
+  assert.equal(typeof metaA.root_id, 'string', 'die Root-Identität ist prüfbar');
+  bundle.writeMemory(first, 'shinon.scoring', { records: [{ verdict: 'keep' }], memos: [], scorecard: null, notes: 1 });
+  first.close();
+
+  const foreign = bundle.openIndex(file, { expectedRoot: b });
+  assert.equal(bundle.indexStats(foreign).files, 0, 'fremder Workspace: der Index ist leer, nicht umgedeutet');
+  assert.equal(bundle.indexMeta(foreign).root, b);
+  assert.notEqual(bundle.indexMeta(foreign).root_id, metaA.root_id, 'zwei Ordner sind zwei Identitäten');
+  assert.ok(bundle.readMemory(foreign, 'shinon.scoring') !== null, 'die Ablage ist Nutzerzustand und überlebt den Neuaufbau');
+  foreign.close();
+
+  const back = bundle.openIndex(file, { expectedRoot: a });
+  assert.equal(bundle.indexStats(back).files, 0, 'auch der Rückweg baut neu, statt alte Zeilen zu übernehmen');
+  back.close();
+});
+
+/**
+ * S1 — auch die EINMALIGE Migration (Index-Ablage in den Ledger) darf keinen
+ * fremden Workspace importieren. Der Ledger ist fuer alle Projekte derselbe;
+ * ein untergeschobener Index waere sonst ein Weg, fremde Urteile einzuschleusen.
+ * Schreiben in den Ledger bleibt erlaubt: er ist die eigene Ablage.
+ */
+test('S1: die Ablage migriert nicht aus einem fremden Index', () => {
+  const work = workDir('s1-store');
+  const a = fixtureProject('s1-store-a');
+  const b = fixtureProject('s1-store-b');
+  const file = join(work, 'index.sqlite');
+  const db = bundle.openIndex(file, { expectedRoot: a });
+  bundle.updateIndex(db, a, {});
+  bundle.writeMemory(db, 'shinon.scoring', { records: [{ verdict: 'keep' }], memos: [], scorecard: null, notes: 1 });
+  db.close();
+
+  const foreign = bundle.createStoreService({ indexFile: file, ledgerFile: join(work, 'ledger.sqlite'), workspaceRoot: b });
+  const loaded = foreign.load('shinon.scoring');
+  assert.equal(loaded.ok, false, 'ein fremder Index ist keine Migrationsquelle');
+  assert.match(loaded.error, /^FOREIGN_ROOT/);
+  const saved = foreign.save('shinon.scoring', { records: [], memos: [], scorecard: null, notes: 0 });
+  assert.equal(saved.ok, true, 'der Ledger darf trotzdem schreiben');
+  assert.match(String(saved.migration_skipped), /gilt nicht/, 'und sagt, warum nichts migriert wurde');
+
+  const own = bundle.createStoreService({ indexFile: file, ledgerFile: join(work, 'own.sqlite'), workspaceRoot: a });
+  const migrated = own.load('shinon.scoring');
+  assert.equal(migrated.ok, true);
+  assert.equal(migrated.migrated, 2, 'der eigene Index wird migriert (ein Protokoll-Satz und die Zusammenfassung)');
+});
+
+test('S1: Prompter und Project Index beantworten die Workspace-Frage identisch', async () => {
+  const prompterWs = await import(new URL('../../../packages/prompter/assets/workspace.js', import.meta.url).href);
+  const indexWs = await import(new URL('../../../packages/project-index/assets/workspace.js', import.meta.url).href);
+  const env = { SHINON_WORKSPACE_ROOT: '/tmp/shinon-s1-env' };
+  for (const cwd of ['/', '/tmp/shinon-s1-cwd']) {
+    assert.deepEqual(indexWs.resolveWorkspaceRoot({ cwd, env }), prompterWs.resolveWorkspaceRoot({ cwd, env }), `Env > cwd (${cwd})`);
+    assert.deepEqual(
+      indexWs.resolveWorkspaceRoot({ cwd, env, configRoot: '/tmp/shinon-s1-explicit' }),
+      prompterWs.resolveWorkspaceRoot({ cwd, env, configRoot: '/tmp/shinon-s1-explicit' }),
+      `explizit > Env (${cwd})`,
+    );
+    assert.deepEqual(indexWs.resolveInRoot('/tmp/shinon-s1-root', '../etc'), prompterWs.resolveInRoot('/tmp/shinon-s1-root', '../etc'), 'Pfadgrenze');
+  }
+  assert.deepEqual(indexWs.fingerprintRoot('/tmp/shinon-s1-a'), prompterWs.fingerprintRoot('/tmp/shinon-s1-a'));
+  assert.equal(indexWs.WORKSPACE_CONTRACT, prompterWs.WORKSPACE_CONTRACT);
 });
 
 // ── Zusage: der Lauf indiziert und bleibt inkrementell (Plan §11) ────────────
@@ -828,6 +917,18 @@ test('Zeitstempel: verify=stamp schliesst die Luecke, ohne den Baum zu lesen', (
   writeFileSync(target, 'export const markerB = 1;\n');
   utimesSync(target, stamp, stamp);
   const storedRow = rows(db, 'select bytes, mtime_ms, stamp from files where path = ?', 'src/marker.mjs')[0];
+  // ctime hat auf manchen Dateisystemen eine grobe Auflösung (in dieser
+  // Umgebung gemessen: 4 ms). Fällt die Änderung in denselben Tick wie der
+  // vorige Lauf, sieht der Stempel sie nicht — der Test wäre dann zeitabhängig
+  // statt falsch (beobachtet: `suspicious` 0 statt 1 unter Volllast). Deshalb
+  // wird gewartet, bis der Tick weiter ist und die Metadaten-Aenderung ihn
+  // sichtbar macht. Die Pruefung selbst bleibt unveraendert streng.
+  const previousCtime = storedRow.stamp.split(':')[4];
+  const deadline = Date.now() + 500;
+  while (String(statSync(target, { bigint: true }).ctimeNs) === previousCtime && Date.now() < deadline) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2);
+    utimesSync(target, stamp, stamp);
+  }
   const nowInfo = statSync(target, { bigint: true });
   assert.equal(storedRow.bytes, Number(nowInfo.size), 'die Groesse ist gleich geblieben');
   assert.equal(storedRow.mtime_ms, Math.round(statSync(target).mtimeMs), 'und die mtime auf Millisekunden genau auch');

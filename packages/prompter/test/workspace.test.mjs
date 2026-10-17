@@ -139,6 +139,42 @@ test('workspace: Symlink-Ausbruch wird an der Realpath-Grenze gestoppt', () => {
   }
 });
 
+/**
+ * Der Symlink-Fall, der beim Indexieren zaehlt: ein Link INNERHALB der Root ist
+ * eine gewoehnliche Datei, ein Link AUS der Root heraus darf nie gelesen werden.
+ * Beides in einem Test, damit die Grenze nicht durch bloßes Verbieten "gruen"
+ * wird: ohne die Positivprobe wuerde ein pauschaler Symlink-Verzicht den Test
+ * genauso bestehen.
+ */
+test('workspace: beim Indexieren wird ein Symlink-Ausbruch nicht gelesen, ein interner Link schon', async () => {
+  const root = tmpRoot('indexlink');
+  const outside = tmpRoot('indexoutside');
+  try {
+    writeFileSync(join(outside, 'secret.js'), 'const geheim = 1;\n');
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'echt.js'), 'const echt = 1;\n');
+    try {
+      symlinkSync(join(outside, 'secret.js'), join(root, 'src', 'ausbruch.js'));
+      symlinkSync(join(root, 'src', 'echt.js'), join(root, 'src', 'intern.js'));
+    } catch {
+      return; // ohne Symlink-Recht keine Aussage — nicht grünlügen, sondern überspringen
+    }
+    const { createIndex, indexDirectory } = await import('../assets/index-manager.js');
+    const idx = createIndex(root);
+    const result = indexDirectory(idx, join(root, 'src'), null, Date.now(), { root });
+    const paths = [...idx.entries.keys()].join('\n');
+    assert.equal(paths.includes('ausbruch.js'), false, 'das Ziel liegt außerhalb des Workspace');
+    assert.equal(paths.includes('intern.js'), true, 'ein Link innerhalb der Root bleibt eine Quelle');
+    assert.ok(
+      result.errors.some((error) => error.reason === 'SYMLINK_ESCAPE' && String(error.path).includes('ausbruch.js')),
+      'der Ausschluss steht mit Grund und Pfad im Ergebnis',
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 // ── 4. Stale-Einträge ───────────────────────────────────────────────────────
 
 test('workspace: gelöschte Dateien kehren nicht aus dem Index zurück', () => {
@@ -152,6 +188,29 @@ test('workspace: gelöschte Dateien kehren nicht aus dem Index zurück', () => {
 });
 
 // ── 5. Quellen entkoppeln + Referenzen ───────────────────────────────────────
+
+test('workspace: gelöschte und umbenannte Dateien kehren nicht in den Index zurück', async () => {
+  const root = tmpRoot('stale');
+  try {
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'bleibt.js'), 'const a = 1;\n');
+    writeFileSync(join(root, 'src', 'weg.js'), 'const b = 2;\n');
+    const { createIndex, indexDirectory } = await import('../assets/index-manager.js');
+    const idx = createIndex(root);
+    indexDirectory(idx, join(root, 'src'), null, Date.now(), { root });
+    assert.ok([...idx.entries.keys()].some((path) => path.endsWith('weg.js')));
+
+    rmSync(join(root, 'src', 'weg.js'));
+    writeFileSync(join(root, 'src', 'neu.js'), 'const c = 3;\n');
+    const second = indexDirectory(idx, join(root, 'src'), null, Date.now(), { root });
+    const paths = [...idx.entries.keys()].join('\n');
+    assert.equal(paths.includes('weg.js'), false, 'die gelöschte Datei ist aus dem Index verschwunden');
+    assert.equal(paths.includes('neu.js'), true, 'die neue Datei ist aufgenommen');
+    assert.equal(second.removed.length, 1, 'der Lauf nennt, was er entfernt hat');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test('workspace: .agents/skills wird nicht als Quelltext indexiert', async () => {
   const root = tmpRoot('skills');

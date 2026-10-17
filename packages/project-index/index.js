@@ -1,6 +1,7 @@
 import z from '@deepseek-ai/schemastery';
 import { existsSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
+import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
 import {
   CONTRACT,
   DEFAULT_CONTEXT_BUDGET,
@@ -109,7 +110,7 @@ const validNamespace = (namespace) => typeof namespace === 'string' && namespace
  * dieselbe Regel wie bei der Abfrage. Ein Namensraum ist Pflicht: ohne ihn
  * waere die Ablage ein namenloser Haufen, und niemand koennte sie wiederfinden.
  */
-export function createStoreService({ indexFile, ledgerFile }) {
+export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }) {
   // Ohne eigenen Ledger-Pfad wird NICHT stillschweigend in die Indexdatei oder
   // in das echte Nutzerverzeichnis geschrieben: der Aufruf ist dann ein Fehler.
   // Eine Attrappe, die heimlich irgendwohin schreibt, waere schlimmer als eine
@@ -156,12 +157,15 @@ export function createStoreService({ indexFile, ledgerFile }) {
       const fresh = !existsSync(ledgerFile);
       return withLedger(namespace, (db) => {
         const migrated = fresh || readMemory(db, namespace) === null
-          ? migrateMemory(db, { fromFile: indexFile, namespace })
+          ? migrateMemory(db, { fromFile: indexFile, namespace, expectedRoot: workspaceRoot })
           : { migrated: 0, reason: 'nichts zu migrieren' };
         // Ein unlesbarer Index VOR der Migration ist ein Fehler, keine Leere:
         // ob dort ein Stand lag, wissen wir nicht — und das darf die Antwort
         // nicht verschweigen. Der Aufrufer startet dann leer MIT Grund.
         if (migrated.error === 'INDEX_UNREADABLE') return { ok: false, error: `INDEX_UNREADABLE: ${migrated.reason}` };
+        // S1: ein fremder Index ist als Migrationsquelle unbrauchbar — die
+        // Antwort sagt das, statt still leer zu starten.
+        if (migrated.error === 'FOREIGN_ROOT') return { ok: false, error: `FOREIGN_ROOT: ${migrated.reason}` };
         const state = readMemory(db, namespace);
         if (migrated.migrated > 0) return { ok: true, state, migrated: migrated.migrated, migration: migrated.reason };
         return { ok: true, state };
@@ -175,8 +179,17 @@ export function createStoreService({ indexFile, ledgerFile }) {
         // Auch beim Schreiben wird zuerst migriert: wer nur schreibt (ein Host
         // ohne vorherigen Lesevorgang), darf einen vorhandenen Stand nicht durch
         // die eigene Schreibung verdraengen, ohne ihn je gesehen zu haben.
-        const migrated = readMemory(db, namespace) === null ? migrateMemory(db, { fromFile: indexFile, namespace }) : { migrated: 0 };
-        return { ok: true, rows: writeMemory(db, namespace, state), migrated: migrated.migrated };
+        // Ein FREMDER Index ist kein Grund, das Schreiben zu verweigern (der
+        // Ledger ist die eigene Ablage) — er ist nur keine Migrationsquelle.
+        const migrated = readMemory(db, namespace) === null
+          ? migrateMemory(db, { fromFile: indexFile, namespace, expectedRoot: workspaceRoot })
+          : { migrated: 0 };
+        return {
+          ok: true,
+          rows: writeMemory(db, namespace, state),
+          migrated: migrated.migrated,
+          ...(migrated.error === 'FOREIGN_ROOT' ? { migration_skipped: migrated.reason } : {}),
+        };
       });
     },
   };
@@ -197,13 +210,17 @@ export function createStoreService({ indexFile, ledgerFile }) {
  * Die Abfrage ERZEUGT KEINEN Index: `openIndex` legt fehlende Dateien an, eine
  * Suche darf das nicht. Deshalb steht davor `existsSync`.
  */
-export function createQueryService({ indexFile, budgetTokens = DEFAULT_CONTEXT_BUDGET }) {
+export function createQueryService({ indexFile, budgetTokens = DEFAULT_CONTEXT_BUDGET, workspaceRoot = '' }) {
   return {
     contract: QUERY_CONTRACT,
     resolveContext(prompt, options = {}) {
       if (!existsSync(indexFile)) return null;
       const budget = Number.isFinite(options?.budgetTokens) ? options.budgetTokens : budgetTokens;
-      const db = openIndex(indexFile);
+      // S1: die Abfrage ist an DENSELBEN Workspace gebunden wie der Lauf. Ein
+      // untergeschobener Index (Kopie, falscher Pfad) hat eine fremde
+      // Root-Identität und wird von `openIndex` verworfen, statt Kontext aus
+      // einem anderen Projekt zu liefern.
+      const db = openIndex(indexFile, { expectedRoot: workspaceRoot });
       try {
         // Der Projektname kommt aus dem INDEX selbst (der Wurzelpfad, den der
         // Lauf eingetragen hat) — nicht aus einer Ableitung des Aufrufers. Eine
@@ -220,7 +237,11 @@ export function createQueryService({ indexFile, budgetTokens = DEFAULT_CONTEXT_B
 
 /** Die Konfiguration. Leere Pfade heissen: das laufende Projekt, der XDG-Cache und die XDG-Daten. */
 export const Config = z.object({
-  /** Projektwurzel; leer = Prozessverzeichnis. */
+  /**
+   * Projektwurzel; leer = Env `SHINON_WORKSPACE_ROOT`, sonst Prozessverzeichnis.
+   * Dieselbe Rangfolge wie im Prompter (`assets/workspace.js`, Zwilling):
+   * `process.cwd()` entscheidet nie still allein, und die Quelle steht im Log.
+   */
   root: z.string().default(''),
   /** Wurzel der Indizes (WEGWERFBAR); leer = $XDG_CACHE_HOME/shinon/indexes. */
   indexRoot: z.string().default(''),
@@ -323,8 +344,14 @@ function reportLine(report, stats, where) {
  * Kern — ein Detektor mit benannten Mustern ist kein Beweis.
  */
 export function apply(ctx, config) {
+  // S1: DIE EINE Workspace-Identität — explizite Config > Env > cwd. Der
+  // Prompter löst dieselbe Regel (Zwilling `workspace.js`); dieser Host
+  // protokolliert Quelle und Fingerabdruck, damit ein falscher Workspace im
+  // Log steht, statt sich als leerer Kontext zu tarnen.
+  const resolvedWorkspace = resolveWorkspaceRoot({ configRoot: config.root ?? '', env: process.env });
+  const workspace = { ...fingerprintRoot(resolvedWorkspace.root), source: resolvedWorkspace.source };
   const options = {
-    root: resolve(config.root === '' ? process.cwd() : config.root),
+    root: workspace.root,
     indexRoot: resolve(config.indexRoot === '' ? DEFAULT_INDEX_ROOT : config.indexRoot),
     ledgerFile: resolve(config.ledgerFile === '' || config.ledgerFile === undefined ? DEFAULT_LEDGER_FILE : config.ledgerFile),
     maxFileBytes: config.maxFileBytes,
@@ -339,10 +366,10 @@ export function apply(ctx, config) {
   // Zustand einmal, und ein Host ohne `provide` ist kein Fehler des Laufs.
   const canProvide = typeof ctx?.provide === 'function';
   const releaseQuery = canProvide
-    ? ctx.provide(QUERY_SERVICE, createQueryService({ indexFile: file }))
+    ? ctx.provide(QUERY_SERVICE, createQueryService({ indexFile: file, workspaceRoot: options.root }))
     : null;
   const releaseStore = canProvide
-    ? ctx.provide(STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile }))
+    ? ctx.provide(STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile, workspaceRoot: options.root }))
     : null;
   const queryState = canProvide
     ? `Abfrage ${QUERY_SERVICE} bereitgestellt (${QUERY_CONTRACT})`
@@ -358,7 +385,7 @@ export function apply(ctx, config) {
     if (!config.trace) return;
     let stats = null;
     try {
-      const db = openIndex(file);
+      const db = openIndex(file, { expectedRoot: options.root });
       stats = indexStats(db);
       db.close();
     } catch (error) {
@@ -388,6 +415,7 @@ export function apply(ctx, config) {
   });
 
   if (config.trace) {
+    console.log(`[shinon-project-index] Workspace: ${workspace.root} (id ${workspace.rootId}, quelle ${workspace.source})`);
     console.log(`[shinon-project-index] Aktiviert — ${CONTRACT}, ${file}, Lauf nach dem Start (${config.worker ? 'Worker' : 'Host'}), Schutz an (Plan §13)`);
     console.log(`[shinon-project-index] ${queryState}`);
     console.log(`[shinon-project-index] ${storeState}`);

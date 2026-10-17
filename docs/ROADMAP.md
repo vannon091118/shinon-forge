@@ -1,6 +1,6 @@
 # Roadmap — Versionen und Release-Ziele
 
-> **Status:** plan — wohin das Repo geht, was ein Release kostet, was 1.0 bedeutet. **Stand:** 2026-10-14
+> **Status:** plan — wohin das Repo geht, was ein Release kostet, was 1.0 bedeutet. **Stand:** 2026-10-17
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Eine Roadmap, die Bestands- und Testergebnisse wiederholt, veraltet bei der nächsten Messung.
@@ -35,9 +35,14 @@ QoL-Top-10. Die Liste steht hier, damit ein Implementierungsauftrag sie nicht
 versehentlich vorzieht.
 
 **Release-Checkliste (Abnahme je Pflicht):** Freeze-Dokumentation hier +
-`PLAN.md` §9, Workspace-Isolation (S1, rot-bei-Mutation), Quellklon-Repro
+`PLAN.md` §9.1, Workspace-Isolation (S1, rot-bei-Mutation), Quellklon-Repro
 (S3), read-only Doctor (S4), Gates + Version/Tag/Lock + Quellarchiv + SHA-256
 (S5), echter Modellturn + Audit + CI-Run-ID (S6). `UNGEPRÜFT` ist kein Pass.
+
+Die Abnahme je Pflicht steht als Tabelle in `PLAN.md` §9.1 (Punkt, Befehl,
+Exit, Ergebnis); die gemessenen Zahlen dazu stehen ausschließlich in
+`docs/ZAHLEN.md` §2. Ein Punkt ohne dort belegten Lauf ist offen — auch dann,
+wenn der Code dafür schon existiert.
 
 ## 2. Historie (gemessen, nicht erzählt)
 
@@ -58,7 +63,8 @@ Sieben-Lücken-Handshake (`docs/handshakes/2026-10-13-ci-lauf-gruen-verdict-schr
 §3). Hier steht nur die Liste, damit ein Blick genügt:
 
 - Live-429-Rotation mit zwei echten Schlüsseln (ZAHLEN §4: weiter offen)
-- Echter Modell-Turn 3.9 mit Protokoll (PLAN §3.9)
+- ~~Echter Modell-Turn 3.9~~ — **kein 0.5.0-Kandidat:** der Turn ist v0.4.0-Pflicht
+  (§1.5, PLAN §9.1); ein Release ohne ihn bleibt `UNGEPRÜFT` und damit kein Go.
 - Mobile-first-Prototyp: eigenes schlankes Profil, responsive Client-Schicht, profil-/UI-/Security-CI-Gates und validierte Android-Runtime-Strategie ([docs/MOBILE-PLAN.md](MOBILE-PLAN.md)); kein globaler Paket-Cut vor Messung.
 - §19 `LAST_VERIFIED_FACT`: Produzent und Gate-Abnahme stehen in `PLAN.md` §6.5; Implementierung bleibt v0.5.0-Ziel
 - `shinon-forge`-Aktivierungsschritt mit Sicherheitsvertrag (siehe §4)

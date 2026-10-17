@@ -43,6 +43,9 @@ export const PRUNE_DIRS = Object.freeze([
   'sessions',
   'logs',
   'vendor',
+  // S1: Skills laufen separat (eigene Auswahl, eigenes Budget) und sind kein
+  // gewoehnlicher Projektquelltext. Beide Walker halten dieselbe Menge.
+  '.agents',
 ]);
 
 const PRUNED = new Set(PRUNE_DIRS);
