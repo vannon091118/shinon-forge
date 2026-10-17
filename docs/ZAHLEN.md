@@ -69,7 +69,7 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Codingmon-Tests | **46** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:codingmon` |
 | Scoring-Tests (Kern, Signale, Ablage, Block-Gewichte) | **50** bestanden, **0** rot, **0** übersprungen — importfrei, läuft in CI ohne `npm ci`; die Host-Naht des Lernens fährt `scripts/gate/tests/scoring-block-learning.test.mjs` | 0 | `npm run test:scoring` |
 | Token-Usage-Tests | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:token` |
-| Prompter-Tests (Zettel, Laufzeit-Index, Skills, Selektor, Vorschlag, Selektionsvertrag) | **104** bestanden, **0** rot, **0** übersprungen — davon 6 für das Index-Größenbudget (`ZU_GROSS`, `BUDGET_ERSCHOEPFT`, Determinismus, Doppelzählung) | 0 | `npm run test:prompter` |
+| Prompter-Tests (Zettel, Laufzeit-Index, Skills, Selektor, Vorschlag, Selektionsvertrag, Workspace-Vertrag) | **113** bestanden, **0** rot, **0** übersprungen — davon 6 für das Index-Größenbudget (`ZU_GROSS`, `BUDGET_ERSCHOEPFT`, Determinismus, Doppelzählung) und 9 für den Workspace-Vertrag S1 (eine Quelle, Cross-Workspace, `FOREIGN_ROOT`, Pfadgrenzen, Symlink, stale, Skills-Entkopplung, Referenzen) | 0 | `npm run test:prompter` |
 | Narrative-Tests (Kern) | **9** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:narrative` |
 | Popup-Tests (Faltung des Sitzungsfensters) | **12** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:popup` |
 | Key-Router-Tests (Pool-Kern) | **17** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:key-router` |

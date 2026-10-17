@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import z from '@deepseek-ai/schemastery';
 import { isAbsolute, join } from 'node:path';
 import { parseNote, renderStand, reviewNotes, selectNotes, tokens } from './assets/note-core.js';
+import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
 import {
   createIndex,
   loadIndex as loadRuntimeIndex,
@@ -241,7 +242,12 @@ function indexContext(ctx, config, text, runtime) {
  */
 function maxContext(ctx, config, runtime, prompt) {
   if (runtime.contextState === 'invalid') return noContext('CONTEXT_INVALID');
-  if (runtime.contextState === 'loaded') return withContext(runtime.context, 'file');
+  if (runtime.contextState === 'loaded') {
+    runtime.lastBudgetTokens = config.indexBudgetTokens;
+    runtime.lastContextChars = (runtime.context?.files ?? []).reduce((s, f) => s + (f?.content?.length ?? 0), 0);
+    runtime.lastContextFiles = (runtime.context?.files ?? []).map((f) => f?.path);
+    return withContext(runtime.context, 'file');
+  }
 
   // Runtime-Index zuerst: der Prompter pflegt seinen eigenen Index, der
   // hash-basiert und session-lokal ist. Project-Index nur als Fallback,
@@ -263,6 +269,12 @@ function maxContext(ctx, config, runtime, prompt) {
         touches: [],
         dependencies: [],
       });
+      // S1: Budget-Provenienz am tatsächlichen Request — Zeichen-Näherung
+      // (Token ≈ Zeichen/4), Dateizahl, Quelle. Das Budget gilt VOR dem
+      // Modellaufruf; was es reißt, steht im Datensatz, nicht im Text.
+      runtime.lastBudgetTokens = config.indexBudgetTokens;
+      runtime.lastContextChars = ctxData.chars;
+      runtime.lastContextFiles = ctxData.files.map((f) => f.path);
       if (!runtime.runtimeIndexSeen) {
         runtime.runtimeIndexSeen = true;
         console.log(`[shinon-prompter] MAX-Kontext aus Runtime-Index (${ctxData.count}/${ctxData.totalEntries} Dateien, ${ctxData.chars} Zeichen, Budget ${config.indexBudgetTokens} Token)`);
@@ -298,6 +310,10 @@ function maxContext(ctx, config, runtime, prompt) {
  */
 function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contextSource = 'none', contextUsed = false) {
   const result = outcome.result;
+  // S1-Provenienz: Workspace-Identität, Quelle, Pfade, Budget, Gründe — aber
+  // nie der Prompt-Text (nur Längen) und nie Schlüsselwerte (die Route trägt
+  // nur Provider/Modell-Namen).
+  const ws = runtime?.workspace ?? null;
   return {
     contract: CONTRACT,
     session_id: typeof sessionId === 'string' ? sessionId : '',
@@ -306,6 +322,11 @@ function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contex
     reasons: outcome.reasons,
     context: contextLabel(contract.needsContext, runtime.contextState, contextUsed),
     context_source: contextSource,
+    workspace: ws === null ? null : { root: ws.root, rootId: ws.rootId, source: ws.source },
+    workspace_contract: ws === null ? null : ws.contract,
+    context_budget_tokens: runtime?.lastBudgetTokens ?? null,
+    context_chars: runtime?.lastContextChars ?? null,
+    context_files: runtime?.lastContextFiles ?? null,
     intentClassification: result?.intentClassification ?? null,
     uncertainties: result?.uncertainties ?? [],
     references: result?.references ?? [],
@@ -586,8 +607,11 @@ function report(ctx, config, record) {
     // ist gefallen, die Spur ist Nebensache — sie darf den Schritt nicht mitreissen.
     console.error(`[shinon-prompter] Spur nicht zustellbar (${error?.message}) — Entscheidung bleibt`);
   }
-  // Fenster-Konvention: die letzten Entscheidungen (max. 20) in `window.__shinonPrompterTrace`
-  // spiegeln, damit das Client-Panel sie ohne Host-Zugriff liest. Fail-open.
+  // Fenster-Konvention (NUR In-Prozess-Fall): die letzten Entscheidungen in
+  // `window.__shinonPrompterTrace` spiegeln. Das trägt genau dann, wenn Host
+  // und Panel dieselbe Realm teilen — in Produktion (Host in Node) ist hier
+  // kein `window`, und die Seite lebt vom `DECISION_CHANNEL`-Abo der
+  // Client-Hälfte (`packages/prompter/client.js`). Fail-open.
   try {
     const w = globalThis?.window;
     if (w !== undefined) {
@@ -662,26 +686,41 @@ export function apply(ctx, config) {
     }
   }
 
+  // S1: DIE EINE Workspace-Identität — explizite Config > Env > cwd.
+  // Prompter und Project Index hängen am selben aktiven Workspace; cwd allein
+  // bestimmt nie still die Projektidentität. Quelle, Pfad und Budget stehen im
+  // Mount-Log und in jedem Entscheidungsdatensatz (Provenienz ohne Inhalte).
+  const _ws = resolveWorkspaceRoot({ configRoot: config.workspaceRoot ?? '', env: process.env });
+  const _fp = fingerprintRoot(_ws.root);
+  const workspace = { ..._fp, source: _ws.source };
+  console.log(`[shinon-prompter] Workspace: ${workspace.root} (id ${workspace.rootId}, quelle ${workspace.source})`);
+
   // Runtime-Index (Zug 7): eigenhaend verwaltet, hash-basiert, JSON-persistiert.
   // Fehlt er, faellt MAX auf den Project Index zurueck (oder bleibt gesperrt).
+  // Rangfolge der MAX-Quellen (S1): konfigurierte Datei > root-gebundener
+  // Runtime-Index > Project Index. Eine Runtime-Datei mit Einträgen gewinnt
+  // NICHT allein durch Inhalt — erst die Root-Bindung macht sie zur Quelle.
   let runtimeIndex = null;
   if (config.indexStoragePath !== '') {
     try {
-      runtimeIndex = loadRuntimeIndex(config.indexStoragePath);
+      runtimeIndex = loadRuntimeIndex(config.indexStoragePath, { expectedRoot: workspace.root });
       if (runtimeIndex === null) {
-        runtimeIndex = createIndex();
+        runtimeIndex = createIndex(workspace.root);
         console.log(`[shinon-prompter] Runtime-Index erstellt (neu, ${config.indexStoragePath})`);
       } else {
         console.log(`[shinon-prompter] Runtime-Index geladen (${runtimeIndex.entries.size} Eintraege)`);
       }
     } catch (error) {
+      // FOREIGN_ROOT eingeschlossen: ein fremder Index wird abgelehnt und neu
+      // aufgebaut, nie als Kontext geliefert.
       console.error(`[shinon-prompter] Runtime-Index nicht ladbar (${error?.message}) — startet leer`);
-      runtimeIndex = createIndex();
+      runtimeIndex = createIndex(workspace.root);
     }
     // Auto-Index: beim Mount alle Dateien des Source-Verzeichnisses einlesen.
     if (config.autoIndex && config.indexSourcePath !== '') {
       try {
-        const result = autoIndexDirectory(runtimeIndex, config.indexSourcePath);
+        const source = isAbsolute(config.indexSourcePath) ? config.indexSourcePath : join(workspace.root, config.indexSourcePath);
+        const result = autoIndexDirectory(runtimeIndex, source, null, Date.now(), { root: workspace.root });
         // Ausgeschlossenes wird beim Namen genannt: ein Index, der Dateien
         // verschweigt, ohne es zu sagen, lügt über seine Abdeckung.
         const counts = new Map();
@@ -775,7 +814,7 @@ export function apply(ctx, config) {
     console.warn(`[shinon-prompter] Eigener Schluessel fehlt (${config.providerKeyEnv}) — One-Shot faellt auf ${route.provider}/${route.model} zurueck`);
   }
 
-  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules, intentMatchClass: null, blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT };
+  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules, intentMatchClass: null, blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null };
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
   const disposeNarrative = ctx.on(NARRATIVE_CHANNEL, (composite) => {
     runtime.narrative = composite ?? null;

@@ -131,6 +131,13 @@ export const Config = z.object({
   providerFallback: z.string().default(''),
   /** Modell der Fallback-Route (leer = dasselbe Modell wie oben). */
   modelFallback: z.string().default(''),
+  /**
+   * Aktiver Workspace (S1) — DIE EINE Quelle der Projektidentität.
+   * Leer = Env `SHINON_WORKSPACE_ROOT`, sonst `process.cwd()`. Wer hier einen
+   * Pfad nennt, bindet Prompter, Runtime-Index, Skills und Zettel an genau
+   * diesen Ordner; ein Index mit fremder Root-Bindung wird abgelehnt.
+   */
+  workspaceRoot: z.string().default(''),
   /** Kontext-Quelle fuer MAX (leer = kein Kontext, MAX wird abgelehnt). */
   contextPath: z.string().default(''),
   /**

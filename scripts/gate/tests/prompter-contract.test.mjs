@@ -1232,6 +1232,9 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     providerFallback: '',
     modelFallback: '',
     contextPath: '',
+    // S1: die EINE Workspace-Identität (explizit > Env > cwd). Leer heißt:
+    // kein expliziter Root, die Auflösung entscheidet — nie still das cwd.
+    workspaceRoot: '',
     // Neu mit der Naht zum Project Index: das Budget des MAX-Kontexts. Der
     // Vorgabewert ist DERSELBE wie der des Index (`DEFAULT_CONTEXT_BUDGET`),
     // deshalb ist er hier gepinnt und nicht nur behauptet.

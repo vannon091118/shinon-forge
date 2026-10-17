@@ -11,7 +11,13 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { join, isAbsolute, dirname } from 'node:path';
+import { join, isAbsolute, dirname, resolve } from 'node:path';
+import { fingerprintRoot } from './workspace.js';
+
+/** Root-Fingerabdruck ohne zweite Wahrheit: die EINE Funktion steht in workspace.js. */
+function fingerprintOfRoot(root) {
+  return fingerprintRoot(root);
+}
 
 /** Vertragsname des Runtime-Indexes. */
 export const RUNTIME_INDEX_CONTRACT = 'shinon.prompter/runtime-index/v1';
@@ -230,14 +236,28 @@ export function getContext(index, promptText, options = {}) {
 
 /**
  * Einen neuen, leeren Index erstellen.
+ *
+ * S1 (Workspace-Vertrag): `root` bindet den Index an genau einen Workspace.
+ * Wer eine Root angibt, bekommt `root` (aufgelöst) + `rootId` (prüfbar) in den
+ * Index geschrieben; `loadIndex` lehnt ihn unter einer fremden Root mit
+ * FOREIGN_ROOT ab, statt Projekt A als Kontext von Projekt B zu liefern.
+ * Ohne Root bleibt der Index ungebunden (Bestandstests, Altdaten).
  */
-export function createIndex() {
+export function createIndex(root = null) {
+  let bound = null;
+  if (typeof root === 'string' && root.trim() !== '') {
+    const { resolve: _resolve } = { resolve: (p) => p };
+    void _resolve;
+    bound = fingerprintOfRoot(root);
+  }
   return {
     contract: RUNTIME_INDEX_CONTRACT,
     version: 1,
     entries: new Map(),
     indexedAt: Date.now(),
     modifiedAt: null,
+    root: bound?.root ?? null,
+    rootId: bound?.rootId ?? null,
   };
 }
 
@@ -245,7 +265,7 @@ export function createIndex() {
  * Index aus einer JSON-Datei laden.
  * Wirft bei ungültigem Format.
  */
-export function loadIndex(path) {
+export function loadIndex(path, opts = {}) {
   if (!existsSync(path)) return null;
   const raw = readFileSync(path, 'utf8');
   let parsed;
@@ -267,12 +287,27 @@ export function loadIndex(path) {
       entries.set(e.path, e);
     }
   }
+  // S1: fremde Root-Identität ablehnen — ein Index aus Projekt A gilt in
+  // Projekt B nicht, auch wenn beide dieselben relativen Pfade tragen.
+  const expected = opts?.expectedRoot;
+  if (typeof expected === 'string' && expected.trim() !== '') {
+    const want = fingerprintOfRoot(expected);
+    const got = typeof parsed?.rootId === 'string' ? parsed.rootId : null;
+    if (got === null) {
+      throw new Error(`runtime-index: FOREIGN_ROOT:KEINE_IDENTITAET (Index ohne Root-Bindung gilt nicht für ${want.root})`);
+    }
+    if (got !== want.rootId) {
+      throw new Error(`runtime-index: FOREIGN_ROOT (Index von ${parsed?.root ?? 'unbekannt'} gilt nicht für ${want.root})`);
+    }
+  }
   return {
     contract: RUNTIME_INDEX_CONTRACT,
     version: 1,
     entries,
     indexedAt: parsed.indexedAt ?? Date.now(),
     modifiedAt: parsed.modifiedAt ?? null,
+    root: typeof parsed?.root === 'string' ? parsed.root : null,
+    rootId: typeof parsed?.rootId === 'string' ? parsed.rootId : null,
   };
 }
 
@@ -292,6 +327,8 @@ export function saveIndex(index, path) {
     entries: [...index.entries.values()],
     indexedAt: index.indexedAt,
     modifiedAt: index.modifiedAt,
+    root: index.root ?? null,
+    rootId: index.rootId ?? null,
   };
   writeFileSync(path, JSON.stringify(data, null, 2), 'utf8');
 }
@@ -331,7 +368,11 @@ export const MAX_INDEX_CHARS = 8388608;
 export function indexDirectory(index, dirPath, extensions = null, now = Date.now(), options = {}) {
   if (typeof dirPath !== 'string' || dirPath === '') return { indexed: 0, skipped: 0, errors: [], excluded: [] };
   const exts = extensions ?? ['.js', '.mjs', '.ts', '.json', '.yml', '.yaml', '.md', '.cjs'];
-  const skip = new Set(['node_modules', '.git', '.shinon', 'dist', 'build', 'coverage']);
+  // S1: `.agents` (darin `.agents/skills/`) wird NICHT als gewöhnlicher
+  // Quelltext indexiert — Skills laufen separat über die Skill-Selektion.
+  // Wer beides indexierte, injizierte denselben Skill doppelt: einmal als
+  // Datei, einmal als Skill-Block.
+  const skip = new Set(['node_modules', '.git', '.shinon', '.agents', '.freebuff', 'dist', 'build', 'coverage']);
   const maxFile = Number.isFinite(options.maxFileChars) ? options.maxFileChars : MAX_FILE_CHARS;
   const maxTotal = Number.isFinite(options.maxIndexChars) ? options.maxIndexChars : MAX_INDEX_CHARS;
   let total = 0;
@@ -366,7 +407,7 @@ export function indexDirectory(index, dirPath, extensions = null, now = Date.now
         errors.push({ path: full, reason: `NICHT_LESBAR:${err?.code ?? 'ERROR'}` });
         continue;
       }
-      const rel = join(process.cwd(), full);
+      const rel = isAbsolute(full) ? full : join(process.cwd(), full);
       // Bereits aktuell Indiziertes berührt kein Budget: es steht schon drin,
       // und ein zweiter Lauf darf es nicht plötzlich als „zu groß" melden.
       if (isIndexed(index, rel, content)) {
@@ -391,8 +432,44 @@ export function indexDirectory(index, dirPath, extensions = null, now = Date.now
     }
   }
 
+  // S1: Root-Bindung durchsetzen — ein Index mit fremder Root wird nicht
+  // still befüllt, sondern abgewiesen (der Aufrufer baut neu).
+  if (typeof options.root === 'string' && options.root.trim() !== '') {
+    const want = fingerprintOfRoot(options.root);
+    if (typeof index.rootId === 'string' && index.rootId !== want.rootId) {
+      throw new Error(`runtime-index: FOREIGN_ROOT (Index von ${index.root ?? 'unbekannt'} gilt nicht für ${want.root})`);
+    }
+    if (index.rootId == null) {
+      index.root = want.root;
+      index.rootId = want.rootId;
+    }
+  }
+
   walk(dirPath);
-  return { indexed, skipped, errors, excluded };
+
+  // S1: Veraltetes entfernen — gelöschte, verschobene, umbenannte Dateien
+  // kehren nicht aus dem Index zurück. Was auf der Platte fehlt, fliegt aus
+  // dem Speicher (und damit aus dem nächsten saveIndex).
+  const removed = [];
+  const tree = resolve(String(dirPath));
+  const inside = (p) => p === tree || p.startsWith(`${tree}/`);
+  for (const key of [...index.entries.keys()]) {
+    // Nur Einträge dieses Baums prüfen: was anderswoher kommt, gehört einem
+    // anderen Lauf und wird hier nicht angefasst.
+    if (!inside(String(key))) continue;
+    let alive = false;
+    try {
+      alive = existsSync(key);
+    } catch {
+      alive = false;
+    }
+    if (!alive) {
+      index.entries.delete(key);
+      removed.push(key);
+    }
+  }
+  if (removed.length > 0) index.modifiedAt = now;
+  return { indexed, skipped, errors, excluded, removed };
 }
 
 /**

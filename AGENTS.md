@@ -188,6 +188,14 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   self-contained (it pulls React through `require`, not `import`). So the bundle carries the
   names as LITERALS and `packages/codingmon/test/uebergabe.test.mjs` compares both sides
   character by character. Never let a literal drift; extend that assertion instead.
+- Workspace identity has ONE source (`packages/prompter/assets/workspace.js`, contract
+  `shinon.workspace/v1`): explicit `workspaceRoot` > `SHINON_WORKSPACE_ROOT` > `cwd`.
+  `process.cwd()` never silently decides the project. Persisted runtime indexes carry
+  `root`/`rootId`; a foreign root is rejected (`FOREIGN_ROOT`) and rebuilt, stale
+  entries are reconciled, `..`/absolute/separator escapes and symlink breakouts are
+  refused, and `.agents/` is never indexed as ordinary source (skills run separately).
+  Every decision record carries workspace, source, paths and budget — never prompt
+  text or key values. Tests: `packages/prompter/test/workspace.test.mjs`.
 - Prompt building blocks are DATA (`packages/prompter/assets/blocks.json`, contract
   `shinon.blocks/v1`): each block carries its trigger (haystack markers, intent class,
   scoring stance, self-question markers), a token budget and a placement

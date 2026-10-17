@@ -237,6 +237,9 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       // in `assets/`, weil er ohne node_modules testbar sein muss.
       { kind: 'import', target: './assets/note-core.js' },
       { kind: 'import', target: './assets/index-manager.js' },
+      // S1: DIE EINE Workspace-Identität — der Host löst sie einmal auf und
+      // bindet den Runtime-Index daran (kein stilles cwd).
+      { kind: 'import', target: './assets/workspace.js' },
       // Der Modulschnitt: je Verantwortung ein Modul (Seam-Namen und Modus-
       // Vertrag, Schemata, Ergebnisvertrag, XML-Marken, Dateien, Stand,
       // One-Shot). Die Liste steht hier vollstaendig, damit eine neue Kante
