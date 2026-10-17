@@ -82,8 +82,9 @@ packages exist, which are active and how many profile layers there are is measur
 
 > **Release-Ziel v0.4.0:** der eingefrorene Umfang sieht **einen** Installationsweg
 > vor — den Quellklon mit den Befehlen unten. Der Freeze ist keine Freigabe: die
-> Abnahme aus `PLAN.md` §9.1 ist noch nicht vollständig. Insbesondere ist
-> `shinon doctor` noch kein CLI-Unterbefehl (S4 offen). `shinon update`, persistentes
+> Abnahme aus `PLAN.md` §9.1 ist noch nicht vollständig. `shinon doctor` ist seit
+> 2026-10-17 ein eigener read-only CLI-Unterbefehl (S4 belegt: Test
+> `scripts/gate/tests/doctor-cli.test.mjs`, Probelauf Exit 0). `shinon update`, persistentes
 > `shinon autoupdate` und ein `.deb` als unterstützter Release-Installationsweg sind
 > **nicht** v0.4.0-Umfang (Folgearbeit: `docs/ROADMAP.md` §1.5). Ein global
 > installiertes `dsh` ist nicht der getestete Weg: das Repo pinnt seine DSH-Fassung
@@ -107,21 +108,22 @@ npm run profile:links
                                          (Layer und Bundles: docs/ZAHLEN.md §2)
 DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config
 
-# 5. Booten (Web-UI)   → in diesem Durchlauf NICHT gestartet, also hier auch nicht behauptet
+# 5. Booten (Web-UI)   → im Frischklon bis zur Web-Adresse belegt, siehe docs/S3-FRESHCLONE-2026-10-17.md
 DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon
 ```
 
 Schritt 4 ist belegt (`node scripts/shinon-profile-test.mjs`, Exit 0, Zahl: `docs/ZAHLEN.md` §2).
-Schritte 2, 3 und 5 sind in diesem Durchlauf **nicht** in einem frischen Klon wiederholt
-worden: für Schritte, die einen Modellschlüssel oder einen Browser brauchen, gibt es hier
-keinen Beleg — sie stehen in `docs/ZAHLEN.md` §4 unter „nicht geprüft“. Ein frischer Klon
-wird für die Release-Abnahme (S3) mit Exit-Codes protokolliert, nicht behauptet.
+Schritte 2, 3 und 5 sind am 2026-10-17 in einem frischen Klon mit Exit-Codes belegt:
+`docs/S3-FRESHCLONE-2026-10-17.md` (`npm ci` Exit 0, 29 Links Exit 0, UI-Start bis zur
+Web-Adresse). Für Schritte, die einen Modellschlüssel oder einen Browser brauchen, gibt
+es hier keinen Beleg — sie stehen in `docs/ZAHLEN.md` §4 unter „nicht geprüft“.
 
-`shinon doctor` ist als read-only Diagnose für v0.4.0 vorgesehen, aber derzeit nicht
-implementiert: `bin/shinon.mjs` hat keinen solchen Unterbefehl und reicht Argumente an
-DSH weiter. Das statische Gate `doctor` (`scripts/gate/plugins/doctor.mjs`) ist kein
-Laufzeit-CLI. S4 bleibt damit offen; v0.4.0 darf erst nach Implementierung und Probe
-als abgenommen gelten. `npm run update` bleibt der **DSH-Upstream**-Updater und
+`shinon doctor` ist seit 2026-10-17 die read-only Diagnose für v0.4.0: `bin/shinon.mjs`
+reicht `doctor` an `scripts/doctor.mjs` weiter (nie an DSH), mit stabilen Codes 0/1/2
+und Schlüsseln nur als Anwesenheit. Das statische Gate `doctor`
+(`scripts/gate/plugins/doctor.mjs`) prüft daneben weiter die Repo-Konsistenz. S4 ist
+belegt (Test + Probelauf Exit 0); S5/S6 bleiben offen, also gilt v0.4.0 weiter als nicht
+abgenommen. `npm run update` bleibt der **DSH-Upstream**-Updater und
 aktualisiert nicht Shinon Forge.
 
 ---
@@ -285,7 +287,7 @@ Alle Einträge aus `package.json` (`scripts`), in der Reihenfolge, in der man si
   (`message-ingress` verweigert die Zusage gegen eine ungeprüfte DSH-Fassung).
 - **Versionsangleich der Pakete**: die Zeile folgt aus dem eigenen Manifest (`dsh.inactive`
   darf `0.1.0` führen, sonst `1.0.0`) — die gemessene Verteilung steht in
-  `docs/ZAHLEN.md` §1; das statische Gate `doctor` ist grün, der gleichnamige Laufzeit-Unterbefehl bleibt v0.4.0-S4 offen.
+  `docs/ZAHLEN.md` §1; das statische Gate `doctor` ist grün, der gleichnamige Laufzeit-Unterbefehl ist seit 2026-10-17 implementiert und belegt (v0.4.0-S4).
 - **Nicht aktivierte Pakete** (`openapi`, `shinon-forge`): beide sind entschieden, nicht
   vergessen — `openapi` hat einen Vertrag ohne Server, `shinon-forge` startet fremde Engines.
   `key-router` und `popup` sind am 2026-10-13 aktiviert worden (Overlay bzw. Pool-Werkzeuge).

@@ -26,10 +26,10 @@ einen Installationsweg — den **Quellklon** (`git clone`, `npm ci`,
 `npm run profile:links`, Profil-Dump, UI-Start und `shinon doctor` read-only).
 Der Freeze ist eine Entscheidung, kein Messwert: **kein Feature-Wunsch wird
 nachträglich in v0.4.0 gezogen.** Er bedeutet nicht, dass die Abnahme schon
-abgeschlossen ist: S4 ist offen, weil `bin/shinon.mjs` keinen `doctor`-Unterbefehl
-implementiert; das statische Gate `doctor` ist nicht das Laufzeit-CLI. Bis S4 samt
-Probe erfüllt und ein grüner CI-Lauf des Bump-Commits belegt ist, ist `v0.4.0` nicht
-als Release abgenommen.
+abgeschlossen ist: S3 (Frischklon-Protokoll `docs/S3-FRESHCLONE-2026-10-17.md`) und S4
+(`shinon doctor` als eigener Unterbefehl, Test 4/4, Probelauf Exit 0) sind belegt.
+Bis auch S5/S6 erfüllt und ein grüner CI-Lauf des Bump-Commits belegt ist, ist
+`v0.4.0` nicht als Release abgenommen.
 
 **Außerhalb des Freeze (Ziel v0.5.0 oder später, nur als Folgearbeit
 dokumentiert):** `shinon update` (Forge-Selbstupdate), persistentes
@@ -55,13 +55,13 @@ wenn der Code dafür schon existiert.
 |---|---|---|
 | `0.2.0` | `ffbf721` | bootfähig, Brand-Overlay live, Gate-Engine, Verträge |
 | `0.3.0` | `3add487` | Skill-Selektion + Persona Du-Form + Profil-Update |
-| `0.4.0` (noch nicht abgenommen) | Release-Ziel dieses Durchgangs | Draht-E2E (`scripts/gate/tests/key-router-wire.test.mjs`), Audit Phase B (`docs/archive/AUDIT_2026-10-13.md`), Pfad-Heilung, CI-Verdict-Kette; S4 bleibt offen |
+| `0.4.0` (noch nicht abgenommen) | Release-Ziel dieses Durchgangs | Draht-E2E (`scripts/gate/tests/key-router-wire.test.mjs`), Audit Phase B (`docs/archive/AUDIT_2026-10-13.md`), Pfad-Heilung, CI-Verdict-Kette; S3+S4 belegt, S5/S6 offen |
 
 Abnahme von `0.4.0`: erst nach Erfüllung sämtlicher Slices in `PLAN.md` §9.1,
 einem grünen CI-Lauf des Bump-Commits (inkl. `Verdikt (fail-closed)`) und lokalem
-`gate:full` PASS. Derzeit fehlen die Laufzeitimplementierung und Probe für S4;
-ein passender CI-Run für den Release-Bump existiert noch nicht. Eine Run-ID wird
-hier erst nach dem tatsächlichen Lauf eingetragen.
+`gate:full` PASS. S3/S4 sind belegt; offen sind S5 (Workflow, Tag, Archiv) und S6
+(Modellturn, Audit). Ein passender CI-Run für den Release-Bump existiert noch
+nicht. Eine Run-ID wird hier erst nach dem tatsächlichen Lauf eingetragen.
 
 ## 3. Release-Ziele `0.5.0` (Kandidaten, keine Versprechen)
 
