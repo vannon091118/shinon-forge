@@ -49,6 +49,7 @@
     "hooks:install": "node scripts/install-hooks.mjs",
     "profile:links": "node scripts/profile-links.mjs",
     "install:user": "node scripts/install-user.mjs",
+    "uninstall:user": "node scripts/install-user.mjs uninstall",
     "backup:retention": "node scripts/backup-retention.mjs",
     "update": "node scripts/dsh-update.mjs",
     "stages": "node scripts/stages.mjs",

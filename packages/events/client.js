@@ -6,8 +6,7 @@
  * Bundle-Vertrag genau vier Dateien verlangt und der Client-Loader eine
  * Registrierung mit der Contract-id erwartet.
  *
- * Ein späteres @shinon/brand-state darf hier andocken (Persona-State →
- * Animation), aber erst, wenn es echte Events zu zeigen gibt.
+ * → Kanon: docs/COMMENT-KANON.md#k-7eff35fa4f9f
  */
 window.__ModuleLoader__.load({
   id: '@shinon/events',

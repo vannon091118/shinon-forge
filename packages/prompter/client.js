@@ -6,9 +6,7 @@
  * jeden Datensatz auf `DECISION_CHANNEL`, und diese Hälfte spiegelt ihn nach
  * `window.__shinonPrompterTrace` (Fenster-Konvention, wie `window.__codingmon`
  * bei @shinon/codingmon). Der Host schreibt NUR im In-Prozess-Fall selbst ins
- * Fenster — in Produktion (Host in Node, Panel im Browser) käme sein `window`
- * nie auf der Seite an, und das Panel bliebe ewig leer (gemessen 2026-10-17:
- * `verworfen (NO_JSON)` im Terminal, „Keine Entscheidungen" im Panel).
+ * → Kanon: docs/COMMENT-KANON.md#k-f618ee270fae
  */
 window.__ModuleLoader__.load({
   id: '@shinon/prompter',

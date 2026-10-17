@@ -7,22 +7,7 @@
  *                           verbotene Footer gegen den Vannon-Trailer).
  *   --stdin                 eine Nachricht von stdin prüfen (Agenten-Dry-Run,
  *                           ohne temporäre Datei). Kein Tausch, nur Urteil.
- *   --ci                    CI-Modus: den Bereich aus der GitHub-Umgebung
- *                           ableiten und prüfen (scripts/lib/ci-range.mjs).
- *   --range <rev-range>     jeden Commit des Bereichs prüfen.
- *   --last <n>              die letzten n Commits prüfen (Standard: 1).
- *   --all                   Audit der gesamten Historie.
- *
- * Fail-closed: ein verbotener Footer oder ein fehlender Vannon-Trailer ist
- * Exit 1. Es gibt keinen Schalter, der das abschaltet — nur --fix, und das
- * ersetzt die Signatur, statt sie durchzuwinken.
- *
- * Die entscheidende Eigenschaft: dieser Wächter wird NIE enger. Lässt sich ein
- * Bereich nicht auflösen (neuer Branch, Force-Push, flacher Klon, unbekanntes
- * Event), prüft er die volle Historie — nicht bloß den Kopf-Commit. Ein
- * Prüfwerkzeug, das im Zweifel weniger prüft, ist kein Prüfwerkzeug.
- *
- * Exit: 0 = sauber, 1 = Verstoß, 2 = Bedienfehler.
+ * → Kanon: docs/COMMENT-KANON.md#k-67fd024927e6
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

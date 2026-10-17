@@ -6,16 +6,7 @@
  * ergaenzt dabei den Zeitstempel des Schreibvorgangs; der REMOTE-DIENST
  * (`pet-remote.js`) nimmt ihn ueber die Leitung an und muss ihn pruefen, BEVOR
  * etwas auf ein Medium geht. Beide brauchen dieselben Felder mit denselben
- * Grenzen — zweimal getippt wuerden sie driften, und die Drift waere genau an
- * der Stelle, an der ein fremder Wert in die Ablage gelangt.
- *
- * `damageTotal` ist Dezimaltext (`'454'`): JSON kennt kein BigInt, der Client
- * fuehrt den Lebenslauf als BigInt, und eine Ziffernfolge ist im Speicher exakt
- * statt ab 2^53 gerundet.
- *
- * WAS HIER NICHT STEHT: keine Grenze nach zeitlicher Gueltigkeit, kein BigInt,
- * keine Deutung. Unbekannte Felder fallen weg (Zod-Objekt ohne `.passthrough`)
- * — wer mehr schickt als der Vertrag nennt, schickt es ins Leere.
+ * → Kanon: docs/COMMENT-KANON.md#k-7489450126b0
  */
 import { z } from 'zod';
 

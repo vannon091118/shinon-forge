@@ -7,21 +7,7 @@
  * (siehe SHARED_DEPS in scripts/lib/repo.mjs), grün, sobald alle Tarballs
  * im Isolat laden. Eingebunden in `npm test`.
  *
- * Eine Quelle: **npm**. Seit PLAN.md Schritt 3.5 ruft dieser Test kein pnpm
- * mehr auf (A1); der Tarball entsteht über `npm pack`, das Isolat über
- * `npm install`. Beide Wege sind gemessen gleichwertig: das Tarball heißt
- * `shinon-<dir>-<version>.tgz` und entpackt nach `package/`.
- *
- * Warum die Pakete PARALLEL laufen (und zwar in einem begrenzten Pool): der
- * Preis dieses Tests wächst linear mit der Zahl der Plugins — je Paket kostet
- * ein eigener `npm pack` plus ein netzgebundenes, isoliertes `npm install`
- * (gemessen 2026-10-11: 19 Pakete ≈ 22 s, also ≈ 1,2 s je Paket). Mit einem
- * `@shinon`-Plugin mehr wird der Lauf sonst zum Flaschenhals des gesamten
- * `npm test`. Jedes Paket arbeitet in einem eigenen Unterverzeichnis von WORK,
- * die Reihenfolge der Ausgabe hängt trotzdem nicht vom Pool ab: die Ergebnisse
- * werden gesammelt und danach in `repo.discover()`-Reihenfolge geschrieben.
- *
- * Option: --keep  Zwischenstände unter /tmp behalten (Debugging).
+ * → Kanon: docs/COMMENT-KANON.md#k-402f313d670a
  */
 import { execFile } from 'child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';

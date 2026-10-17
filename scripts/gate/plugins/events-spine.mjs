@@ -6,21 +6,7 @@
  * anderes tut.
  *
  * Geprüft wird:
- *   1. Vertrag (assets/event-spine.json): Envelope, neun Event-Typen, Quellen,
- *      Pflicht-Nutzlast, Signal-/Carrier-Abdeckung, authority NONE.
- *   2. Replay-Fixture: jeder Schritt zeigt auf ein bekanntes Signal, jede
- *      Erwartung trägt den vollständigen Envelope; Verwerfungsgründe sind
- *      bekannte Codes (fail-closed dokumentiert).
- *   3. Laufzeitgrenze (index.js): beobachtet (ctx.on), emittiert (ctx.emit),
- *      enthält die Envelope-Felder — und keinen einzigen Aktions-/Schreib-/
- *      Modell-/Netzaufruf (Nicht-Autonomie ist statisch geprüft, nicht nur
- *      behauptet).
- *   4. Aktivierung: das Profil muss das Bundle laden, sonst ist der Spine toter
- *      Text (dieselbe Regel wie beim Persona-Gate).
- *
- * Die reinen Funktionen sind ohne node_modules testbar; die Tests liegen in
- * scripts/gate/tests/events-spine.test.mjs und fahren zusätzlich das echte
- * Bundle gegen die Fixture.
+ * → Kanon: docs/COMMENT-KANON.md#k-b6d70b07c391
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -48,21 +34,7 @@ export const ENVELOPE_FIELDS = [
  * DSH-Fassung belegt ist — nie mit einem Alias. Vier Einträge der typeMap
  * (message.created, message.completed, tool.requested, tool.completed) standen in
  * keiner DSH-Fassung; sie sind entfernt, und der Abgleich unten fängt den
- * nächsten solchen Fall.
- *
- * `step.start`/`step.end` sind dabei eine Korrektur: sie hingen vorher an
- * tool.requested/tool.completed und hätten damit bei jedem Schritt einen
- * Tool-Aufruf behauptet, den es nicht gab.
- *
- * Dazu drei shinon-eigene Signaltypen für die Scoring-Schicht: `feedback.*`
- * (Korrektur/Zustimmung aus dem Verlauf) und `relation.updated` (Beziehungsstand).
- *
- * Und drei NATIVE Urteile des Menschen, die der Carrier liefert: `feedback.noted`
- * (Sitzungsbemerkung), `feedback.rated` (Urteil je Antwort mit messageId) und
- * `feedback.retracted` (Widerruf dieses Urteils). Sie waren bewusst ignoriert,
- * bis die Scoring-Schicht sie als Signale brauchte; jetzt sind sie abgebildet
- * und aus `ignoredTypes` entfernt (ein Typ ist entweder abgebildet oder
- * ignoriert — das Gate prüft genau das).
+ * → Kanon: docs/COMMENT-KANON.md#k-39e9824ae233
  */
 export const EVENT_TYPES = [
   'session.created',

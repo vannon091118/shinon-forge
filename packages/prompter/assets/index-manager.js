@@ -6,8 +6,7 @@
  *
  * Keine Abhängigkeit vom Project Index mehr — der Prompter bleibt funktionsfähig,
  * auch wenn project-index nicht verfügbar ist.
- *
- * Persistenz: JSON-Datei auf Disk (load/save). Alle Operationen synchron.
+ * → Kanon: docs/COMMENT-KANON.md#k-8a29e2b7759c
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, realpathSync } from 'node:fs';
@@ -150,21 +149,7 @@ function cutAtLine(text, room) {
  * beides zusammen, weil eins allein nicht reicht: `maxFiles` begrenzt die
  * Anzahl, nicht die Grösse, und 20 grosse Dateien sind mehr Inhalt als ein
  * Modellaufruf in seinem Zeitlimit verarbeiten kann.
- *
- * GEMESSEN 2026-10-16 (echter Profil-Lauf): ohne Budget baute der Prompter für
- * einen 132-Zeichen-Prompt eine Nutzer-Nachricht von 1 457 948 Zeichen
- * (package-lock.json 521 512, client.js 130 353, …). Der Aufruf lief in sein
- * eigenes 15-s-Limit, die Antwort kam leer zurück und jedes Verwerfen hiess
- * `NO_JSON` — der Enhancer kam in MAX nie an. Deshalb: harte Grenze wie §14.
- *
- * ZWEI REGELN, die zusammen die Ursache treffen:
- *   1. Ein Prompt-Wort zählt je Datei höchstens MAX_TOKEN_HITS-mal (nicht je
- *      Vorkommen im Tokenhaufen dieser Datei). Vorher gewann eine Datei durch
- *      Grösse: package-lock.json hatte zehntausende Tokens, die alle auf "js"
- *      oder "der" passten, und damit Rang 1 für einen Prompt über den Prompter.
- *   2. Das Budget wird nach Anteil verteilt (dieselbe Fairshare-Rechnung wie
- *      der Project Index), damit eine genannte grosse Datei die kleine
- *      genannte nicht verdrängt.
+ * → Kanon: docs/COMMENT-KANON.md#k-95fe4da8abd3
  */
 export function getContext(index, promptText, options = {}) {
   const maxFiles = typeof options.maxFiles === 'number' ? options.maxFiles : 20;
@@ -358,10 +343,7 @@ export const MAX_INDEX_CHARS = 8388608;
  * über MAX_INDEX_CHARS wird NICHT aufgenommen. Jeder Ausschluss steht mit
  * Grund in `excluded` — `[{ path, reason, detail }]`, reason ist `ZU_GROSS`
  * oder `BUDGET_ERSCHOEPFT`. Ein stiller Schnitt wäre ein Index, der behauptet,
- * das Projekt zu kennen, und dabei Dateien verschweigt.
- *
- * Die Reihenfolge ist sortiert, damit der Budget-Schnitt deterministisch ist:
- * derselbe Baum ergibt denselben Index, nicht Filesystem-Reihenfolge.
+ * → Kanon: docs/COMMENT-KANON.md#k-2664d6482bf0
  */
 export function indexDirectory(index, dirPath, extensions = null, now = Date.now(), options = {}) {
   if (typeof dirPath !== 'string' || dirPath === '') return { indexed: 0, skipped: 0, errors: [], excluded: [] };
@@ -496,9 +478,7 @@ export function indexDirectory(index, dirPath, extensions = null, now = Date.now
  * Ausnahme und schreibt bereits den Runtime-Index. Die gelernte Baustein-Ablage
  * (Phase 4) nimmt denselben Weg statt einer zweiten Schreibstelle: ein Pfad,
  * ein `mkdir`, ein `write` — und die Grenze bleibt an genau einer Stelle
- * sichtbar, statt sie pro Aufrufer neu zu ziehen.
- *
- * Ein absoluter Pfad bleibt absolut (dieselbe Regel wie bei Zetteln/Skills).
+ * → Kanon: docs/COMMENT-KANON.md#k-54687d80016d
  */
 export function writeJsonFile(path, value) {
   const full = isAbsolute(path) ? path : join(process.cwd(), path);
@@ -539,11 +519,7 @@ function hasPhrase(text, trigger) {
  *   1. Trigger sind Handlungsphrasen (Daten), keine Themenwörter — ein Satz
  *      über Tests ist kein Auftrag, Tests zu schreiben.
  *   2. Eine Frage wird höchstens KLASSIFIZIERT, nie erweitert: `expansion` ist
- *      dann leer, und der Aufrufer hängt keinen `# Aufgabe`-Block an. Sonst
- *      beantwortet der Agent die Frage nicht, sondern erfindet eine Aufgabe.
- *
- * Score-basiert: Patterns mit mehreren Phrasentreffern gewinnen vor solchen
- * mit nur einem.
+ * → Kanon: docs/COMMENT-KANON.md#k-bf50f2cfb46f
  */
 export function matchIntent(promptText, rules) {
   if (!rules || !Array.isArray(rules.patterns)) return null;

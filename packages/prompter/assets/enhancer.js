@@ -17,8 +17,7 @@ import { acceptance, parseResult } from './result-contract.js';
  * ungesetzt, weil DSH dort keine passende Klasse fuehrt.
  *
  * Der Kontextblock landet in der Nutzer-Nachricht, nicht im System-Prompt: er
- * ist Daten, und das Modell soll ihn als Daten lesen. MIN und MID bekommen ihn
- * gar nicht — ihr Modus kennt keine Projektkenntnis.
+ * → Kanon: docs/COMMENT-KANON.md#k-8e2d80ffff69
  */
 export function buildEnhancerRequest({ text, mode, contract, config, context = null, stand = null, skills = null, signal }) {
   // Beide Aufrufwege sind erlaubt: der Lauf uebergibt den bereits aufgeloesten
@@ -194,11 +193,7 @@ export function renderStreamEnd(finish, usage, request, elapsedMs) {
  * nannte den Grund (NO_JSON), aber nie, was das Modell tatsaechlich geantwortet
  * hatte — die Ursache blieb damit undiagnostizierbar (gemessen am Fehlerfall
  * 2026-10-16). Deshalb steht hier der volle Text auf stderr, NUR auf dem seltenen
- * Verwerfungsweg (kein Dauer-Log im Normalbetrieb). Kein Dateischreiben: der
- * Isolationstest verbietet writeFile im Laufzeitcode dieses Pakets, und die
- * Spur ueber DECISION_CHANNEL traegt bewusst keinen Prompt-Text.
- * Länge begrenzt (6000 Zeichen), damit eine unerwartet riesige Antwort den
- * Terminal-Log nicht sprengt — der Anfang ist immer vollstaendig sichtbar.
+ * → Kanon: docs/COMMENT-KANON.md#k-2866d84c7342
  */
 export function logRejectedAnswer(reasons, text, counts, finish, usage, request, elapsedMs) {
   const body = typeof text === 'string' ? text : '';
@@ -263,11 +258,7 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
  * Konfiguration (gemessen: `timeoutMs: -1` → RangeError ERR_OUT_OF_RANGE,
  * `NaN` → RangeError, ein fremdes Signal → TypeError) und liegt VOR dem try des
  * Modellaufrufs. Ein werfender Aufruf waere kein Fallback, sondern ein kaputter
- * Nutzer-Schritt: der Loop saehe den Enhancer, den es nicht geben darf. Deshalb
- * wird jeder solche Fall zu einem benannten Verwerfen — Roh-Prompt gilt, Grund steht.
- *
- * Die Grenze ist bewusst schmal: Fehler von `next()` sind NICHT unsere Fehler
- * und werden hier nicht gefangen (siehe onPreStep).
+ * → Kanon: docs/COMMENT-KANON.md#k-cec9fb972199
  */
 export async function enhanceGuarded(ctx, contract, config, prompt, context, stand, skills, signal) {
   try {

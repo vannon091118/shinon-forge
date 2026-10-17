@@ -7,15 +7,7 @@
  * DSH-Version: `ctx.storageDomain` aus @deepseek-ai/dsh-storage-domain ueber
  * dem JSON-Backend aus @deepseek-ai/dsh-storage-json, gemountet in einen echten
  * Cordis-Context — dieselbe Mechanik, die das Profil mountet.
- *
- * Die Zusage ist bewusst NICHT „es gibt eine Datei\": geprueft wird, dass ein
- * ZWEITER Prozess-Kontext (frisches `Context`, frisch geoeffnete Domain)
- * denselben Stand liest — genau das, was beim Absturz der Forge zaehlt.
- *
- * Lauf mit `node --test` (CI: .github/workflows/commit-guard.yml). Braucht die
- * installierte DSH-Version im PATH und die Schema-/Domain-Pakete aufloesbar;
- * fehlt eines davon, wird der Test SICHTBAR uebersprungen (Grund im Namen)
- * statt rot zu werden — CI hat kein node_modules.
+ * → Kanon: docs/COMMENT-KANON.md#k-9165167c107a
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

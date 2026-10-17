@@ -7,77 +7,7 @@
  * Hand). Handarbeit ist nicht wiederholbar: niemand weiß später, welcher Stand
  * läuft, ein misslungenes Update hinterlässt einen halbfertigen Baum, und ob
  * der neue Stand überhaupt startet, merkt man erst am Bildschirm. Dieses
- * Werkzeug macht aus der Kette einen Befehl und aus dem Start eine Abnahme.
- *
- * Vier Unterbefehle, ein Zustand:
- *
- *   install    Klon (falls nötig), Checkout des Ziels, `npm ci`, Profil-Links,
- *              Abnahme. Zieht standardmäßig `origin/main` (git fetch), nicht
- *              den lokalen Arbeitsbaum — ein Installat soll den veröffentlichten
- *              Stand tragen.
- *   update     derselbe Ablauf; ist der Stand schon aktuell, wird nur die
- *              Abnahme gefahren (kein sinnloses Neuinstallieren von 621 Paketen).
- *   rollback   Neuinstallation des vorherigen Standes (`--to <sha>` auch frei
- *              wählbar) aus dem Lockfile — sparsam auf der Platte, braucht Netz.
- *   status     was läuft, welcher Stand davor liegt, was die letzte Abnahme sagte.
- *   history    das dauerhafte Protokoll aller Abnahmen als Tabelle (oder --json).
- *   auto       der Timer-Lauf: neuen Stand in ein STAGING bauen, dort abnehmen
- *              und das Live-Verzeichnis erst bei grünem Urteil umschalten.
- *   units      den systemd-User-Timer schreiben/entfernen, der `auto` aufruft.
- *   selftest   der Ein-Befehl-Selbsttest (auch `npm run verify:install`): check,
- *              doctor, Boot und HTTP-Nachweis gegen einen bestehenden Stand.
- *              READ-ONLY — kein Checkout, kein `npm ci`, keine Zustandsänderung,
- *              kein Rückweg; Exit 0 nur bei vollständiger Kette (4/4), sonst 1.
- *
- * WARUM ES `auto` NEBEN `update` GIBT (gemessener Unterschied, keine Kosmetik):
- * `update` installiert IN das laufende Verzeichnis und prüft danach — für die
- * Dauer des `npm ci` steht dort ein ungeprüfter Stand, und ein rotes Urteil
- * muss danach zurückgerollt werden. `auto` baut den Kandidaten daneben, nimmt
- * IHN ab und benennt erst dann um (zwei `rename`s, kein Kopieren). Ein rotes
- * Urteil kostet damit nichts: das Live-Installat hat den Kandidaten nie
- * gesehen. Nach der Umschaltung wird der neue Ort erneut abgenommen; ist sie
- * rot, tauschen dieselben zwei Umbenennungen zurück.
- *
- * Jede Abnahme wird in `<stateDir>/logs/verify-log.jsonl` geschrieben — eine
- * Zeile je Lauf, ohne Geheimnisse (kein Token, keine Schlüssel): Stand, Trigger,
- * Boot-Dauer, Gesamtdauer, Plugins, Fehlerzahl, HTTP-Bytes, Ergebnis. Damit
- * lassen sich Boot-Zeiten und Fehlerzeilen über Versionen vergleichen, statt
- * sich auf die Erinnerung an den letzten Bildschirm zu verlassen.
- *
- * ROT HEISST NICHT STEHENBLEIBEN: besteht ein neu installierter Stand die
- * Abnahme nicht, kehrt der Befehl von selbst auf den letzten GRÜNEN Stand
- * zurück (der zuletzt abgenommene, nicht bloß der vorherige), installiert ihn
- * aus dessen Lockfile und prüft ihn erneut. Der Exit-Code bleibt 1 — das
- * Update ist gescheitert und soll nicht als Erfolg durchgehen —, aber das
- * Installat steht wieder auf einem belegten Stand. Der Rückweg wird in der
- * Historie als `auto-rollback` geführt. `--no-rollback` schaltet die
- * Selbstheilung aus, wenn jemand den roten Stand untersuchen will.
- *
- * Die Abnahme ist der Kern, nicht ein Anhängsel: `shinon --check`, `shinon
- * doctor`, dann ein echter Boot auf Loopback mit eigenem Port, Warten auf
- * `dsh web:`, HTTP-Nachweis (Token → Sitzung → Seite) und Zählung der
- * Fehlerzeilen. Exit 0 gibt es nur, wenn die ganze Kette steht. Der Server wird
- * danach über die PID aus dem Listener beendet, nicht über ein Muster.
- *
- * Grenzen, absichtlich:
- *   - Kein `git clean`: ein `--dry-run` gibt es nicht, aber auch kein Löschen
- *     unversionierter Dateien. Ein `.env` im Installat überlebt jedes Update.
- *   - Läuft eine Instanz aus dem Zielverzeichnis, verweigert der Befehl das
- *     Neuinstallieren (npm ci würde ihr node_modules unter den Füßen
- *     wegziehen) — `--force` ist die ausdrückliche Ausnahme.
- *   - Ein Rollback ist eine Neuinstallation, kein Symlinkwechsel: der Zustand
- *     (Sessions, Ledger, Index) liegt außerhalb und bleibt unberührt.
- *
- * Aufruf:
- *   node scripts/install-user.mjs install  [--prefix DIR] [--ref R] [--source URL] [--no-verify]
- *   node scripts/install-user.mjs update   [--prefix DIR] [--ref R] [--no-verify] [--force]
- *   node scripts/install-user.mjs rollback [--prefix DIR] [--to SHA] [--no-verify] [--force] [--no-rollback]
- *   node scripts/install-user.mjs status   [--prefix DIR] [--quiet]
- *   node scripts/install-user.mjs history  [--limit N] [--json]
- *   node scripts/install-user.mjs auto     [--prefix DIR] [--staging DIR] [--ref R] [--quiet]
- *   node scripts/install-user.mjs units    [--interval ZEIT] [--no-enable] [--remove]
- *   Abnahme: [--port N] [--timeout S] [--no-rollback]
- * Exit: 0 = Stand installiert und abgenommen · 1 = Abnahme rot · 2 = Bedien- oder Umgebungsfehler
+ * → Kanon: docs/COMMENT-KANON.md#k-edd9ef983fc6
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -86,6 +16,7 @@ import { dirname, join, resolve } from 'node:path';
 import { createServer, connect } from 'node:net';
 import * as paths from './lib/paths.mjs';
 import { resolveRuntime } from './lib/runtime.mjs';
+import { collectSecrets, describeSecrets, readVault, restoreSecrets, writeVault } from './lib/secrets.mjs';
 
 const DEFAULT_PREFIX = join(homedir(), '.local', 'opt', 'shinon-forge');
 const STATE_FILE = join(paths.stateDir(), 'install-state.json');
@@ -119,7 +50,7 @@ const has = (name) => argv.includes(`--${name}`);
 // Muss vor jedem `say` stehen: `--help` druckt, bevor der Rest ausgewertet ist.
 const QUIET = has('quiet');
 
-const USAGE = `Aufruf: node scripts/install-user.mjs <install|update|rollback|status|history|auto|units|selftest> [Optionen]
+const USAGE = `Aufruf: node scripts/install-user.mjs <install|update|rollback|status|history|auto|units|selftest|uninstall> [Optionen]
   --prefix DIR     Installationsverzeichnis (Default ${DEFAULT_PREFIX})
   --staging DIR    Kandidaten-Verzeichnis für auto (Default <prefix>-staging)
   --ref REF        Ziel-Ref für install/update/auto (Default origin/main)
@@ -135,6 +66,10 @@ const USAGE = `Aufruf: node scripts/install-user.mjs <install|update|rollback|st
   --no-enable      units schreiben, Aktivierung von Hand
   --no-systemd     units schreibt/löscht nur Dateien, ohne systemctl (Tests)
   --remove         units entfernen (disable + löschen)
+  --export-secrets DATEI  Tresor-Ziel bei uninstall (Default: <state>/secrets-backup.json)
+  --secrets-from DIR      zusätzliche Quelle für Zugangsdateien (z. B. der Arbeitsbaum)
+  --purge          uninstall OHNE Tresor — Zugangsdateien werden gelöscht
+  --keep-checkout  uninstall lässt das Installationsverzeichnis stehen
   --quiet          nur die Ergebniszeile (für den Timer im Journal)
   --no-verify      Installation ohne Boot-Abnahme
   --no-rollback    bei roter Abnahme NICHT auf den letzten grünen Stand zurück
@@ -148,7 +83,7 @@ if (command === null) {
   console.error(USAGE);
   process.exit(2);
 }
-if (!['install', 'update', 'rollback', 'status', 'history', 'auto', 'units', 'selftest'].includes(command)) die(`unbekannter Unterbefehl "${command}"\n${USAGE}`);
+if (!['install', 'update', 'rollback', 'status', 'history', 'auto', 'units', 'selftest', 'uninstall'].includes(command)) die(`unbekannter Unterbefehl "${command}"\n${USAGE}`);
 
 const PREFIX = resolve(flag('prefix', DEFAULT_PREFIX));
 const NO_VERIFY = has('no-verify');
@@ -636,6 +571,7 @@ async function restoreGreen(sha) {
 
 async function cmdInstall() {
   ensureCheckout();
+  restoreSecretsIfAvailable();
   git(['remote', 'set-url', 'origin', sourceUrl()], PREFIX, { allowFail: true });
   const target = fetchAndResolve(flag('ref', null));
   say(`\n🎯 Ziel: ${target.ref} @ ${target.sha.slice(0, 12)}`);
@@ -691,6 +627,91 @@ async function cmdRollback() {
   recordStand(targetSha, ref, explicit === null ? 'rollback' : `rollback --to ${targetSha.slice(0, 12)}`);
   installDependencies();
   return verifyStand({ trigger: explicit === null ? 'rollback' : `rollback --to ${targetSha.slice(0, 12)}` });
+}
+
+/* ------------------------------------------------------------------- Tresor */
+
+/** Ziel des Tresors: `--export-secrets`, sonst ein fester Ort im Zustand. */
+function vaultTarget() {
+  return resolve(flag('export-secrets', join(paths.stateDir(), 'secrets-backup.json')));
+}
+
+/**
+ * Setzt einen vorhandenen Tresor in das (neue) Installat zurück. Vorhandene
+ * Dateien bleiben unberührt — ein neuerer Schlüssel gewinnt gegen ein älteres
+ * Backup. Meldet nur Namen, nie Werte.
+ */
+function restoreSecretsIfAvailable() {
+  const state = readState();
+  const candidates = [state?.secretsVault, join(paths.stateDir(), 'secrets-backup.json')].filter(Boolean);
+  for (const file of candidates) {
+    if (!existsSync(file)) continue;
+    let vault;
+    try {
+      vault = readVault(file);
+    } catch (error) {
+      warn(`Tresor ${file} nicht lesbar: ${error.message}`);
+      return;
+    }
+    if (vault === null) return;
+    const { restored, skipped } = restoreSecrets(PREFIX, vault);
+    if (restored.length > 0) say(`   🔐 Zugangsdateien wiederhergestellt: ${restored.join(', ')}`);
+    if (skipped.length > 0) say(`   🔐 bereits vorhanden, unberührt: ${skipped.join(', ')}`);
+    return;
+  }
+}
+
+/**
+ * `uninstall` — der Rückweg. Ohne `--purge` wandern die Zugangsdateien in einen
+ * Tresor (Modus 0600); die nächste Installation setzt sie zurück. `--purge`
+ * löscht sie mit dem Verzeichnis, `--keep-checkout` lässt den Baum stehen.
+ */
+async function cmdUninstall() {
+  if (!existsSync(PREFIX)) {
+    say(`\nℹ️  Nichts zu entfernen: ${PREFIX} existiert nicht`);
+    return 0;
+  }
+  guardInstances();
+  const files = collectSecrets(PREFIX);
+  const extra = flag('secrets-from', null);
+  if (extra !== null) {
+    for (const [name, text] of Object.entries(collectSecrets(resolve(extra)))) {
+      if (!(name in files)) files[name] = text;
+    }
+  }
+  say(`\n🧹 Deinstallation: ${PREFIX}`);
+  removeUnits();
+  // Die Desktop-Verknüpfung kennt nur das Werkzeug, das sie schreibt.
+  const launcher = join(PREFIX, 'scripts', 'desktop-launcher.mjs');
+  if (existsSync(launcher)) {
+    const undone = spawnSync(nodeBinary(), [launcher, '--uninstall'], { encoding: 'utf8' });
+    if (undone.status === 0) say('   Desktop-Verknüpfung entfernt');
+    else warn(`Desktop-Verknüpfung: Exit ${undone.status}`);
+  }
+  const names = describeSecrets(files);
+  let vault = null;
+  if (has('purge')) {
+    say(`   🔐 --purge: ${names.length === 0 ? 'keine Zugangsdateien im Installat' : `${names.join(', ')} werden mit dem Verzeichnis gelöscht`}`);
+  } else if (names.length === 0) {
+    say('   🔐 keine Zugangsdateien im Installat — nichts zu sichern');
+  } else {
+    vault = writeVault(vaultTarget(), { source: PREFIX, files });
+    say(`   🔐 Tresor: ${vault}`);
+    say(`      gesichert: ${names.join(', ')} — Werte stehen nie im Protokoll`);
+    say('      die nächste Installation setzt sie zurück, ohne Vorhandenes zu überschreiben');
+  }
+  if (has('keep-checkout')) {
+    say(`   Verzeichnis bleibt (--keep-checkout): ${PREFIX}`);
+  } else {
+    rmSync(PREFIX, { recursive: true, force: true });
+    say(`   entfernt: ${PREFIX}`);
+  }
+  const state = readState() ?? emptyState();
+  state.uninstalledAt = new Date().toISOString();
+  if (vault !== null) state.secretsVault = vault;
+  writeState(state);
+  say(`\n✅ Deinstalliert. Zustand: ${STATE_FILE}`);
+  return 0;
 }
 
 function cmdStatus() {
@@ -901,6 +922,25 @@ function liveHeadShort() {
  * `units` — der systemd-User-Timer. Er ruft genau `auto` auf, damit der Timer
  * nicht klüger ist als der Befehl, den ein Mensch von Hand startet.
  */
+/** Der Timer, den `units` schreibt — Abbau geteilt mit `uninstall` (eine Quelle). */
+function removeUnits() {
+  const configHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
+  const dir = join(configHome, 'systemd', 'user');
+  if (!NO_SYSTEMD) {
+    const stopped = systemctl(['disable', '--now', 'shinon-forge-update.timer']);
+    if (stopped.status !== 0) warn(`systemctl disable: ${(stopped.stderr ?? '').trim() || `Exit ${stopped.status}`}`);
+  } else {
+    say('   systemd unangetastet (--no-systemd)');
+  }
+  for (const name of ['shinon-forge-update.service', 'shinon-forge-update.timer']) {
+    const file = join(dir, name);
+    if (!existsSync(file)) continue;
+    rmSync(file, { force: true });
+    say(`   entfernt: ${file}`);
+  }
+  if (!NO_SYSTEMD) systemctl(['daemon-reload']);
+}
+
 async function cmdUnits() {
   const configHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
   const dir = join(configHome, 'systemd', 'user');
@@ -910,18 +950,7 @@ async function cmdUnits() {
   const script = join(paths.workspaceRoot(), 'scripts', 'install-user.mjs');
 
   if (has('remove')) {
-    if (!NO_SYSTEMD) {
-      const stopped = systemctl(['disable', '--now', 'shinon-forge-update.timer']);
-      if (stopped.status !== 0) warn(`systemctl disable: ${(stopped.stderr ?? '').trim() || `Exit ${stopped.status}`}`);
-    } else {
-      say('   systemd unangetastet (--no-systemd)');
-    }
-    for (const file of [serviceFile, timerFile]) {
-      if (!existsSync(file)) continue;
-      rmSync(file, { force: true });
-      say(`   entfernt: ${file}`);
-    }
-    systemctl(['daemon-reload']);
+    removeUnits();
     say('✅ Timer entfernt (der Aufräumlauf bleibt: node scripts/install-user.mjs units --remove)');
     return 0;
   }
@@ -1079,6 +1108,7 @@ else if (command === 'history') code = cmdHistory();
 else if (command === 'auto') code = await cmdAuto();
 else if (command === 'units') code = await cmdUnits();
 else if (command === 'selftest') code = await cmdSelftest();
+else if (command === 'uninstall') code = await cmdUninstall();
 else code = cmdStatus();
 
 process.exit(code);

@@ -6,19 +6,7 @@
  * Bis hierher bestimmte `process.cwd()` stillschweigend die Projektidentität —
  * verstreut über `prompt-files.js`, `index.js` und `index-manager.js`. Wer aus
  * einem anderen Ordner startete, las einen anderen Index, andere Skills, andere
- * Zettel — ohne dass ein Test es merkte. Diese Datei benennt die Quelle EINMAL:
- *
- *   explizite Config `workspaceRoot` > Env `SHINON_WORKSPACE_ROOT` > `cwd`.
- *
- * Dazu die Grenzen: `resolveInRoot` lehnt `..`, absolute Pfade und
- * Separatorvarianten ab, die aus der Root ausbrechen; `checkRealpathInside`
- * stoppt Symlink-Ausbrüche an der Realpath-Grenze; `fingerprintRoot` gibt die
- * überprüfbare Root-Identität, an die persistierte Indexe gebunden werden;
- * `reconcileEntries` entfernt Veraltetes, statt es aus JSON zurückkehren zu
- * lassen.
- *
- * Nur Node-Builtins (`node:path`, `node:crypto`, `node:fs` für den Realpath) —
- * keine Bare-Imports, damit die Tests in CI ohne `node_modules` laufen.
+ * → Kanon: docs/COMMENT-KANON.md#k-8f36ddaa4a12
  */
 import { createHash } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';

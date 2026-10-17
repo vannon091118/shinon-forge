@@ -6,17 +6,7 @@
  * prüfte Symlinks. Auf schwacher Hardware kostet ein Lauf durch `node_modules`
  * Minuten, und ein Symlink-Ziel verlässt den Baum — eine Suche, die ihm folgt,
  * liest fremde Dateien, und ein Schreibzugriff darüber landet außerhalb.
- *
- * Gepinnt wird:
- *   1. die Liste steht EINMAL (`scan.mjs`), der Kern hält dieselbe Menge,
- *   2. `walkDir` betritt `node_modules`/`.git`/`dist`/Cache nicht,
- *   3. ein Symlink auf ein Verzeichnis und einer auf eine DATEI werden nie
- *      verfolgt — auch nicht als Fundstück,
- *   4. die Kosten wachsen NICHT mit der Zahl der Fremddateien (gezählt),
- *   5. das TypeScript-Gate nimmt dieselbe Regel.
- *
- * Gemessen wird an einem Fixture-Baum im Temp — nie am echten `node_modules`.
- * Läuft mit `node --test`; kein Netz, kein Modell, kein node_modules nötig.
+ * → Kanon: docs/COMMENT-KANON.md#k-07e3c3d9aab3
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

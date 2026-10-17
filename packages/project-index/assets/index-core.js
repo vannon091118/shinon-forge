@@ -6,52 +6,7 @@
  * ueber seine Datei-URL, waehrend er an einem Bare-Import des Host-Pakets
  * scheitern wuerde. Die Host-Haelfte (Config + apply) steht in index.js.
  *
- * VERIFIZIERTE RUNTIME (gemessen, nicht aus einer Doku abgeleitet):
- *
- *   node:sqlite    laedt OHNE Flag (nur `ExperimentalWarning: SQLite is an
- *                  experimental feature`). Exporte: DatabaseSync, StatementSync,
- *                  constants, backup. Form: new DatabaseSync(path); db.exec(sql)
- *                  fuer DDL; db.prepare(sql) -> run() = { lastInsertRowid,
- *                  changes }, all() = Zeilenarray, get() = eine Zeile.
- *   FTS5           `create virtual table ... using fts5(path, body, tokenize =
- *                  'porter')` wird akzeptiert, `match` liefert Treffer, und
- *                  `delete from <fts> where path = ?` entfernt die Indexzeilen
- *                  wirklich (gemessen: 2 Treffer vor, 0 danach). SQLite 3.51.3.
- *   `references`   ist ein SQLite-Schluesselwort: `create table references(...)`
- *                  ist ein Syntaxfehler, `create table "references"(...)` geht.
- *                  Deshalb traegt die Tabelle aus Plan §9 exakt ihren Namen, aber
- *                  ueberall gequotet.
- *   Parser         ES GIBT KEINEN. Weder acorn, espree, meriyah, typescript,
- *                  @babel/parser noch esprima sind aufloesbar; im Harness liegt
- *                  unter @babel nur code-frame/helper/runtime, global nur
- *                  cline/corepack/npm. Deshalb eine eigene, BEWUSST BEGRENZTE
- *                  Extraktion (siehe extractSymbols).
- *   Worker         ein Worker, der index.js laedt, scheitert im Host an
- *                  `Cannot find package '@deepseek-ai/schemastery'` — deshalb
- *                  dieser Kern ohne Bare-Importe.
- *
- * PRIMAERDATEN (Plan §9): files, symbols, edges, references, touches, chunks,
- * dazu die FTS5-Spiegelung der Chunks. Keine Vector-First-Architektur.
- *
- * SECRET PROTECTION (Plan §13) — zwei Schichten, beide VOR jedem Insert:
- *
- *   1. Pfad   Dateien, die Zugangsdaten SIND, werden nicht einmal geoeffnet: kein
- *             stat, kein Lesen, kein digest, keine Zeile. Hatten sie aus einer
- *             frueheren Fassung Zeilen, werden die entfernt (Remediation).
- *   2. Inhalt Ist ein eingegebener Wert schon ausgeschrieben, wird er ersetzt,
- *             bevor Text in die Datenbank geht — Symbole, Kanten, Referenzen,
- *             Chunks und FTS sehen nur den redigierten Text. Die Fundstelle
- *             (Pfad, Zeile, Art) wird festgehalten, der WERT NICHT.
- *
- * Gemessen vor dem Bau (docs/probes/secret-protection.json): die Musterliste aus
- * Plan §13 trifft die entscheidende Datei dieses Repos nicht — `credentials*`
- * scheitert an `.credentials.yaml`, weil dem Namen ein Punkt vorangeht. Beide
- * Schichten bauen deshalb auf ganzen Namen bzw. auf dem Inhalt, nicht auf Praefixen.
- *
- * GRENZE, die nicht verschwiegen wird: das ist ein Detektor mit benannten Mustern,
- * kein Beweis. Kodierte, geteilte oder unbekannte Formen werden nicht erkannt.
- * Die WIRKSAME Schutzmassnahme ist Schicht 1 plus eine Positivliste; Schicht 2
- * faengt den Rest der bekannten Muster.
+ * → Kanon: docs/COMMENT-KANON.md#k-3c6712e15061
  */
 
 import { DatabaseSync } from 'node:sqlite';
@@ -82,12 +37,7 @@ export const SCHEMA_VERSION = 2;
  * Ueberschriften, Abhaengigkeitskanten und Prosa-Ausschluss), dann bleiben die
  * Zeilen der unveraenderten Dateien auf dem alten Stand — gemessen im Live-Boot:
  * nach dem Parserwechsel standen 643 Symbole im Index statt der gemessenen rund
- * 1030, weil nur 12 Dateien neu geschrieben wurden. Ein Index, der seine eigene
- * Herkunft nicht kennt, ist damit still falsch. Also traegt er sie: eine andere
- * Fassung verwirft den Index und baut ihn neu auf.
- *
- * Erhoehen heisst: die Bedeutung des Inhalts hat sich geaendert, auch wenn die
- * Tabellen gleich geblieben sind.
+ * → Kanon: docs/COMMENT-KANON.md#k-17bb1310be3f
  */
 export const INDEXER_VERSION = 5;
 
@@ -99,12 +49,7 @@ export const INDEXER_VERSION = 5;
  * CACHE des Nutzers und nicht in die Daten: `SHINON_INDEX_ROOT`, sonst
  * `$XDG_CACHE_HOME/shinon/indexes`, sonst `~/.cache/shinon/indexes`.
  *
- * Die fruehere Fassung lag unter `~/.shinon/indexes` — einem eigenen Ort ohne
- * Konvention, der bei einem `rm -rf ~/.cache` ueberlebt haette, obwohl er nichts
- * Dauerhaftes traegt, und der beim Aufraeumen der Nutzerdaten niemandem auffiel.
- * Dieselbe Regel steht als Dienst in `scripts/lib/paths.mjs` (indexRoot());
- * `scripts/gate/tests/scan-pruning.test.mjs` pinnt beide Werte gegeneinander,
- * damit die zwei Orte nicht auseinanderlaufen.
+ * → Kanon: docs/COMMENT-KANON.md#k-b4f7bf978070
  */
 export const DEFAULT_INDEX_ROOT = indexRootDefault();
 
@@ -116,9 +61,7 @@ export const DEFAULT_INDEX_ROOT = indexRootDefault();
  *
  * Warum NICHT im Index (frueher: Namensraum in index.sqlite): der Index liegt im
  * Cache. Ein `rm -rf ~/.cache`, ein Projektrechtwechsel oder ein Cache-Aufraeumer
- * haette dort das Gedaechtnis des Nutzers mitgenommen. Ein Index-Neuaufbau war
- * schon vorher unschaedlich (eigene MEMORY_VERSION), die Cache-Bereinigung war
- * es nicht.
+ * → Kanon: docs/COMMENT-KANON.md#k-219af403ec19
  */
 export const DEFAULT_LEDGER_FILE = ledgerFileDefault();
 
@@ -168,21 +111,7 @@ export const FTS_TABLE = 'chunks_fts';
  * Projekt und sind aus ihm wieder herstellbar (SCHEMA_VERSION steigt, der
  * naechste Lauf baut sie neu). Was hier liegt, ist das Gegenteil: die
  * Bewertungen des Menschen, ihre Zuordnung und der daraus gerechnete Stand
- * lassen sich nirgends nachlesen. Ein Index-Neuaufbau darf sie deshalb NICHT
- * verwerfen — die Ablage traegt ihre eigene Fassung (MEMORY_VERSION), und nur
- * deren Wechsel wirft sie weg.
- *
- * Der Index kennt den INHALT nicht: eine Zeile ist ein Namensraum, eine Art,
- * ein Schluessel und ein JSON-Dokument. Was darin steht, ist Sache des Lesers
- * (der Scoring-Host legt dort Protokoll, Merkzettel und Tafel ab). Diese
- * Trennung ist der Grund, warum die Ablage kein zweites Scoring-Schema im
- * Index versteckt: der Index transportiert, der Leser versteht.
- *
- * GRENZE, benannt: je Signal wird der ganze Namensraum neu geschrieben. Die
- * Zeilenzahl ist die Zahl der Signale eines Projekts (gemessen: zweistellig je
- * Sitzung, nicht je Token) — der Aufwand waechst mit dem Protokoll und ist
- * damit bewusst nicht inkrementell. Ein inkrementelles Append braucht stabile
- * Zeilen-Identitaeten ueber Laeufe hinweg; die gibt es heute nicht.
+ * → Kanon: docs/COMMENT-KANON.md#k-3d3a8e86dcb1
  */
 export const MEMORY_TABLE = 'memory';
 
@@ -202,11 +131,7 @@ export const MEMORY_VERSION = 1;
  * `scripts/gate/tests/scan-pruning.test.mjs` beide Listen zeichengenau
  * gegeneinander. Wer hier etwas ergänzt, muss es dort auch tun (und umgekehrt),
  * sonst wird der Drift im Gate sichtbar statt still.
- *
- * `.agents` steht aus S1 darin: darunter liegen die Skills. Sie sind eine EIGENE
- * Quelle (eigene Auswahl, eigenes Budget) und dürfen nicht zusätzlich als
- * gewöhnlicher Projektquelltext im Kontext landen — sonst stünde derselbe Skill
- * zweimal in der Nachricht, einmal als Datei und einmal als Skill-Block.
+ * → Kanon: docs/COMMENT-KANON.md#k-217225e35edd
  */
 export const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', '.cache', '.turbo', '.nyc_output', 'coverage', 'storages', 'sessions', 'logs', 'vendor', '.agents']);
 
@@ -260,16 +185,7 @@ export const SECRET_TABLE = 'secret_findings';
  * Repos und traegt drei echte Schluessel — `credentials*` trifft sie NICHT, weil
  * ein Punkt vorangeht. (b) Ein Praefixmuster trifft auch Quelldateien, die
  * Zugangsdaten nur VERWALTEN; die gehoeren in den Index, sonst kann der Agent die
- * Stelle nicht finden, die einen Schluessel benutzt.
- *
- * Deshalb: ganze Namen statt Praefixe. Ein Name zaehlt als Zugangsdatentraeger,
- * wenn er genau `credentials`/`secrets` heisst (mit optionalem fuehrenden Punkt
- * und optional EINER Endung) oder wenn er eine Schluesselendung traegt. Damit
- * faellt `secrets.mjs` unter den Schutz — Plan §13 nennt `secrets*`, und eine
- * Datei mit diesem Namen ist ebenso wahrscheinlich ein Buendel ausgeschriebener
- * Werte wie ein Modul, das sie verwaltet. `credentials-handling.mjs` dagegen
- * bleibt indexiert: die Regel trifft Namen, nicht Praefixe, und eine Quelldatei
- * mit sprechendem Namen gehoert auffindbar. Ihr Inhalt wird von Schicht 2 geprueft.
+ * → Kanon: docs/COMMENT-KANON.md#k-abc7af297fd8
  */
 export const PROTECTED_PATH_RULES = [
   // §13 nennt `.env*` woertlich. `.envrc` (direnv) exportiert regelmaessig
@@ -319,10 +235,7 @@ export function protectedReason(path) {
  * der echten Datei. Zwei Entwurfsentscheidungen stammen aus dieser Messung:
  *
  *   - KEIN Lookbehind auf Bezeichnerzeichen. Die Fassung mit `(?<![A-Za-z0-9_])`
- *     lieferte 0 Treffer, weil in `SHINON_API_KEY` vor `API_KEY` ein Unterstrich
- *     steht — sie waere blind genau fuer die haeufigste Schreibweise.
- *   - `valueGroup` haelt den NAMEN und ersetzt nur den Wert. Der Name ist kein
- *     Geheimnis; ihn zu entfernen wuerde den Fund unbrauchbar machen.
+ * → Kanon: docs/COMMENT-KANON.md#k-965056f5e698
  */
 export const SECRET_PATTERNS = [
   { kind: 'private-key', pattern: /-----BEGIN[A-Z ]*PRIVATE KEY-----/g },
@@ -499,28 +412,7 @@ export function languageOf(file) {
  * Werkzeug nach einer Aenderung WIEDERHERSTELLEN; deshalb bleibt die Luecke aus
  * §11 (gleiche Groesse, zurueckgesetzte mtime) fuer den klassischen Vergleich
  * unsichtbar. Die ctime kann das nicht: sie ist die Zeit der letzten Aenderung
- * des INODES, jeder Schreibvorgang bewegt sie, und es gibt keinen Aufruf, der
- * sie setzt. Der Inode selbst deckt die zweite Form derselben Luecke: eine
- * ERSETZTE Datei hat eine neue Identitaet, auch bei gleicher Groesse und mtime.
- *
- * GEMESSEN auf diesem Rechner (ext4), nicht angenommen: writeFileSync mit
- * gleich langem Inhalt + utimesSync auf die alte mtime laesst Groesse und mtime
- * auf Millisekunden gleich und bewegt die ctime; ein chmod bewegt die ctime
- * OHNE Inhaltsaenderung (das ist der Fehlalarm, der im Bericht gezaehlt wird).
- *
- * UND EHRLICH ZUR ROLLE DES INODES: in den Proben dieses Repos traegt die ctime
- * die Erkennung — eine ersetzte Datei wird auch ohne die Inode-Nummer erkannt
- * (Mutationsprobe: Inode entfernt, das Ersetzungs-Szenario bleibt gruen, rot
- * werden nur die Format-Zusagen). Der Inode ist deshalb REDUNDANZ, kein eigener
- * Nachweis: er deckt Dateisysteme ab, deren ctime grob ist (Sekundengranularitaet
- * oder aus mtime abgeleitet), und genau dort ist er die zweite Chance.
- *
- * GRENZEN, benannt: (1) Das ist eine Eigenschaft des DATEISYSTEMS, keine Zusage.
- * Ein Dateisystem ohne brauchbare ctime — grob oder aus mtime abgeleitet — macht
- * dieses Signal schwaecher; `verify: 'all'` bleibt die Antwort, die nichts
- * annimmt. Faellt der Stempel ganz aus (null), wird gelesen, nie vertraut.
- * (2) Ein Stempel ist kein Inhaltsnachweis: er sagt "dieselbe Datei, seit dem
- * letzten Lauf nicht angefasst", nicht "derselbe Inhalt".
+ * → Kanon: docs/COMMENT-KANON.md#k-94f7076f39a8
  */
 export function inodeStamp(absolute, mtimeMs = null) {
   try {
@@ -619,24 +511,7 @@ const byPath = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
  *
  *   1. REIHENFOLGE: das Ergebnis ist aufsteigend nach Pfad sortiert. Der
  *      Durchlauf besucht die Eintraege je Ordner schon namenssortiert, aber erst
- *      diese Sortierung macht die Reihenfolge eine Funktion der DateiMENGE —
- *      unabhaengig davon, wie der Baum durchlaufen wurde, in welcher Reihenfolge
- *      `readdirSync` geantwortet hat und ob ein Ordner tiefer oder flacher lag.
- *      `localeCompare` waere hier falsch: es haengt von der Locale des Prozesses
- *      ab, und ein Bericht, der je Rechner anders sortiert, ist kein Nachweis.
- *   2. AUSSAHME: `onError` bekommt JEDEN ausgelassenen Ordner mit Pfad und Grund.
- *      Vorher kehrte der Durchlauf bei einem unlesbaren Ordner wortlos um, und
- *      sein ganzer Teilbaum fehlte im Index — der Bericht sah danach genauso aus
- *      wie ein Projekt ohne diesen Ordner. Ein stummer Ausfall, der wie ein
- *      Ergebnis aussieht, ist die teuerste Sorte Befund.
- *
- * Der Rueckgabewert bleibt ein Array (die Aufrufer im Repo und in den Proben
- * erwarten genau das); `onError` ist die optionale dritte Angabe, damit die
- * Erweiterung nichts bricht.
- *
- * @param root - Projektwurzel.
- * @param extensions - die aufgenommenen Endungen.
- * @param onError - optionale Senke `({ path, reason, detail })` fuer Auslassungen.
+ * → Kanon: docs/COMMENT-KANON.md#k-c45acf51b44e
  */
 export function listFiles(root, extensions = SOURCE_EXTENSIONS, onError = null) {
   const found = [];
@@ -674,8 +549,7 @@ export function listFiles(root, extensions = SOURCE_EXTENSIONS, onError = null) 
  * Blockkommentar stehen oder mit `//`, `/*` oder `*` beginnen, werden
  * uebersprungen; die Muster greifen nur am Zeilenanfang, ein Kommentar NACH
  * einem Ausdruck stoert also nicht. Ein Blockkommentar-Zustand wird ueber die
- * Zeilen mitgefuehrt, weil die Doc-Kommentare dieses Repos sonst als Code
- * gelesen wuerden.
+ * → Kanon: docs/COMMENT-KANON.md#k-087d1c4e7400
  */
 function codeSymbols(text) {
   const symbols = [];
@@ -789,18 +663,7 @@ const textOnly = { parser: 'keiner (nur Text)', symbols: () => [], edges: () => 
  *
  *   javascript/jsx/typescript/tsx  KEIN Parser. acorn, espree, meriyah,
  *       typescript, @babel/parser und esprima sind weder im Repo noch in der
- *       DSH-Installation aufloesbar. Also zeilenbasiert, best effort.
- *   json  `JSON.parse` — eingebaut, immer verfuegbar; traegt die Kanten.
- *   markdown  KEIN Parser (marked, gray-matter nicht aufloesbar); Ueberschriften
- *       sind die best-effort-Struktur.
- *   yaml  KEIN Parser, der aus DIESEM Paket erreichbar waere. `yaml`/`js-yaml`
- *       liegen in der DSH-Installation als internes Beiwerk einer Fassung; sie
- *       zu benutzen bindet das Paket an eine nicht deklarierte Abhaengigkeit und
- *       schliesst den Worker aus. Also Text, ohne Symbolbegriff.
- *
- * Diese Registry ist die Erweiterungsstelle fuer spaetere AST-Parser: ein echter
- * Parser wird hier eingetragen, der Lauf bleibt unveraendert. Heute traegt sie
- * keine AST-Zusage.
+ * → Kanon: docs/COMMENT-KANON.md#k-fa97efea8861
  */
 const codeParser = { parser: 'zeilenbasiert (kein Parser aufloesbar)', symbols: codeSymbols, edges: codeEdges };
 export const PARSERS = {
@@ -899,14 +762,7 @@ const setMeta = (db, key, value) => db.prepare('insert or replace into meta(key,
  *
  *   journal_mode = wal   ein Leser blockiert den Schreiber nicht (und umgekehrt)
  *   synchronous = full   die Haltbarkeit wird BENANNT, nicht geerbt — der
- *                        SQLite-Standard ist keine Zusage
- *   secure_delete = on   ein `delete` loescht Zeilen, nicht Bytes (gemessen: nach
- *                        dem Entfernen eines Werts stand er in den freigegebenen
- *                        Seiten der Datei weiterhin drin)
- *   busy_timeout         zwei Prozesse (Host + Worker) warten statt zu scheitern
- *   foreign_keys = on    die Kanten des Index sind Beziehungen, keine Zahlen
- *
- * Gepinnt von `scripts/gate/tests/project-index.test.mjs` gegen die echten Dateien.
+ * → Kanon: docs/COMMENT-KANON.md#k-b9057d4d6388
  */
 function openDatabase(file) {
   mkdirSync(dirname(file), { recursive: true });
@@ -949,10 +805,7 @@ export function openLedger(file) {
  * nicht anfassen). Kopiert wird in EINER Transaktion; faellt etwas um, bleibt
  * der Ledger leer statt halb gefuellt.
  *
- * Idempotent ist es, weil VOR dem Schreiben geprueft wird, ob der Ledger den
- * Namensraum schon hat: der zweite Aufruf tut nichts. Nichts wird geloescht — die
- * Zeilen des Index bleiben stehen, sie sind die Sicherung (und der naechste
- * Index-Neuaufbau raeumt sie ohnehin selbst weg).
+ * → Kanon: docs/COMMENT-KANON.md#k-596cc0a82f7b
  */
 export function migrateMemory(db, { fromFile, namespace, expectedRoot = '' }) {
   if (!existsSync(fromFile)) return { migrated: 0, reason: 'kein Index vorhanden' };
@@ -1123,12 +976,7 @@ function forgetFile(db, path) {
  * Der Text wird VOR der ersten Zeile redigiert (Plan §13: der Schutz greift vor
  * der persistierten Speicherung). Danach gibt es keinen Pfad mehr, auf dem
  * Rohinhalt in die Datenbank kommt: Symbole, Kanten, Chunks und FTS lesen den
- * redigierten Text.
- *
- * Der digest bleibt der Hash des ROHEN Inhalts: er entscheidet, ob sich eine
- * Datei geaendert hat, und ein Hash ist kein Geheimnis. Wuerde er aus dem
- * redigierten Text gebildet, saehe ein Lauf eine Aenderung nicht, die nur einen
- * bereits ersetzten Wert betrifft.
+ * → Kanon: docs/COMMENT-KANON.md#k-496de3328f9f
  */
 function indexFile(db, root, absolute, file, options) {
   const path = toProjectPath(root, absolute);
@@ -1191,35 +1039,7 @@ function resolveTouches(root, entry, known) {
  *        -> sonst lesen und sha256 vergleichen (hashed)
  *             gleicher Hash: nur die Dateizeile auffrischen (rehashed)
  *             neuer Hash:    neu parsen und die Primaerdaten ersetzen (written)
- *
- * Damit ist 'kein vollstaendiger Rebuild' ZAEHLBAR statt behauptet: der Bericht
- * nennt, wie viele Dateien gelesen (hashed) und wie viele neu geparst (written)
- * wurden, und wie viele BYTES dabei gelesen wurden (readBytes) — die Kosten
- * stehen im Bericht, nicht nur in einem Messskript. Ein zweiter Lauf ohne
- * Dateiaenderung hat hashed = 0, written = 0 und readBytes = 0.
- *
- * VERIFY (Umgang mit Zeitstempel-Problemen, §11) — drei Politiken, die sich in
- * dem unterscheiden, was sie ueber eine Datei ANNEHMEN:
- *
- *   'stamp'   (Standard) glaubt Groesse und mtime NICHT allein. Stimmen beide,
- *             wird zusaetzlich der Inode-Stempel verglichen (inodeStamp): ctime
- *             und Identitaet schliessen die Luecke, ohne dass eine unveraenderte
- *             Datei gelesen wird. Ein verdaechtiger Stempel kostet EINEN
- *             Lesevorgang; stellt sich der Inhalt als gleich heraus, ist das ein
- *             gezaehlter Fehlalarm (falseAlarms) und der Stempel wird mit
- *             aufgefrischt, damit er sich nicht wiederholt.
- *   'changed' vertraut mtime+size. Benannte Luecke: gleiche Groesse, geaenderter
- *             Inhalt, zurueckgesetzte mtime bleibt unentdeckt.
- *   'all'     liest und hasht jede Datei. Nimmt nichts an — und kostet ein
- *             vollstaendiges Lesen je Lauf.
- *
- * Alle drei sind FAIL-CLOSED in derselben Richtung: was nicht sicher gleich ist,
- * wird gelesen. 'stamp' ist strenger als 'changed' und billiger als 'all'.
- *
- * Der Lauf wirft nicht wegen einer einzelnen Datei; er gibt einen Bericht
- * zurueck. Der Referenzdurchgang laeuft nur, wenn sich die Menge der
- * Referenzziele geaendert hat (sonst nur fuer die neu geschriebenen Dateien), und
- * die Touch-Aufloesung raeumt Ziele weg, die es nicht mehr gibt.
+ * → Kanon: docs/COMMENT-KANON.md#k-03d8991ec153
  */
 export function updateIndex(db, root, options = {}) {
   const chunkLines = options.chunkLines ?? 40;
@@ -1446,15 +1266,7 @@ export function secretFindings(db, path) {
  *   keine Zeile   `null`. Kein erfundenes leeres Protokoll: "hier war noch
  *                 nichts" ist eine andere Aussage als "hier stand nichts mehr".
  *   kaputte Zeile GEZAEHLT und uebergangen (`broken`), nicht geworfen: ein
- *                 einzelner unlesbarer Eintrag darf die ganze Ablage nicht
- *                 unbrauchbar machen — und still verschwinden darf er auch
- *                 nicht. Der Aufrufer nennt die Zahl im Protokoll.
- *   Reihenfolge   folgt `ordinal`, nicht der Einfuegereihenfolge: dieselbe
- *                 Folge von Signalen ergibt dieselbe Tafel, auch ueber einen
- *                 Neustart hinweg.
- *
- * Was ein Dokument BEDEUTET, weiss diese Funktion nicht — sie liefert die drei
- * Arten getrennt zurueck und ueberlaesst das Lesen dem Aufrufer.
+ * → Kanon: docs/COMMENT-KANON.md#k-d351abac315d
  */
 export function readMemory(db, namespace) {
   const rows = db
@@ -1495,11 +1307,7 @@ export function readMemory(db, namespace) {
  * und niemand rechnet daneben ein Gegen-Delta. Faellt irgendetwas um, rollt die
  * Transaktion zurueck: ein halb geschriebener Stand waere schlimmer als der
  * alte, weil er wie ein ganzer aussieht.
- *
- * Die drei Arten sind bewusst die einzigen: `record` (eine Zeile des
- * Protokolls, mit `ordinal` in der Reihenfolge des Eingangs), `memo` (Zustand
- * je Sitzung, geschluesselt nach `ref`) und `summary` (der Stand, der aus dem
- * Protokoll folgt). Ein Dokument ohne Nummer ist hier nicht vorgesehen.
+ * → Kanon: docs/COMMENT-KANON.md#k-966d299ece78
  */
 export function writeMemory(db, namespace, state = {}) {
   const records = Array.isArray(state?.records) ? state.records : [];
@@ -1622,24 +1430,7 @@ export function searchChunks(db, query, limit = 10) {
 // Token bei 4 Zeichen je Token), das Budget aus §14 erlaubt 6000. Ein Resolver,
 // der nicht rangiert, kann das Budget nicht halten — er kann nur zufaellig
 // klein sein. Und die Volltextsuche allein ist nicht selektiv: das haeufigste
-// Symbol dieses Repos ('apply') liefert 10 Dateien mit 31 Treffern.
-//
-// DREI EIGENSCHAFTEN, die keine Geschmacksfrage sind:
-//
-//   1. NUR DER INDEX IST DIE QUELLE. Kein Dateisystemzugriff in dieser Sektion.
-//      Der Index traegt redigierten Text (Plan §13), die Platte den Rohinhalt —
-//      ein Resolver, der die Datei nachliest, umgeht den Secret-Schutz.
-//   2. DAS BUDGET IST HART. Was nicht hineinpasst, wird an der Zeilengrenze
-//      abgeschnitten; danach ist Schluss, statt die naechste Datei halb
-//      anzufangen. Ein halber Kontext verspricht mehr, als er traegt.
-//   3. DIE RANGFOLGE IST DATEN. `CONTEXT_PRIORITIES` haelt die Ordnung aus §14,
-//      und ein Gleichstand entscheidet der Pfad — zwei Laeufe liefern dieselbe
-//      Ausgabe, sonst waere der Kontext nicht nachpruefbar.
-//   4. DAS BUDGET FOLGT DEM RANG. Jeder Kandidat darf so viel nehmen, wie sein
-//      Rang am verbleibenden Gesamtrang ausmacht. Ohne diese Aufteilung frisst
-//      die erste grosse Datei das ganze Budget: live gemessen fiel bei einem
-//      Prompt, der ZWEI Pfade nennt, der zweite heraus — genau der Bezug, den
-//      der Nutzer ausdruecklich genannt hat.
+// → Kanon: docs/COMMENT-KANON.md#k-bd0e4151fdea
 
 /** Rangfolge aus Plan §14 — als Daten, damit die Ordnung pruefbar ist. */
 export const CONTEXT_PRIORITIES = {
@@ -1701,9 +1492,7 @@ export function promptTokens(prompt) {
  *   Paket/Modul     Kanten der Art 'dependency'
  *   Touch           Touches in beide Richtungen
  *   Volltext        FTS5 zuletzt und mit dem niedrigsten Rang
- *
- * Die Reihenfolge entsteht aus den RANGEN, nicht aus der Abfragereihenfolge:
- * eine spaetere Stufe kann einen frueheren Kandidaten nur bestaetigen.
+ * → Kanon: docs/COMMENT-KANON.md#k-502129437108
  */
 export function rankContextCandidates(db, prompt) {
   const tokens = promptTokens(prompt);

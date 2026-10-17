@@ -7,17 +7,7 @@
  *                       Gate + lokale Slices, Sekunden). Der volle Lauf gehört
  *                       in CI (`test:full`) — wer hier die Kette verlängert,
  *                       zahlt sie bei jedem Commit. Fail-closed: rot bleibt draußen.
- *   prepare-commit-msg  tauscht verbotene Footer gegen den Vannon-Trailer
- *                       (lokal ist Reparatur erlaubt — sonst wäre jeder
- *                       Agent-Commit Handarbeit).
- *   commit-msg          prüft fail-closed. Ohne Trailer kein Commit.
- *
- * Kein Husky, keine Dependency: die Hooks liegen in .githooks/ und werden über
- * `core.hooksPath` aktiviert. Das ist eine repo-lokale Einstellung — pro Klon
- * einmal `npm run hooks:install`.
- *
- * Idempotent: erneutes Ausführen überschreibt nur die eigenen Dateien.
- * Fremde Hook-Pfade werden nicht überschrieben, außer mit --force.
+ * → Kanon: docs/COMMENT-KANON.md#k-166493229b9e
  */
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

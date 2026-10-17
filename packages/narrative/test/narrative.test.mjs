@@ -7,11 +7,7 @@
  *     (Anti-Wiederholung als benannte Regel, nicht als Wuerfel).
  *   - Der Erzaehler kommt aus dem Ereignis-Praefix.
  *   - Gleicher Input + gleiche Historie = gleicher Composite (zweimal gefahren).
- *   - Die Chronik liest keine Uhr: ein fehlendes `timestamp` bleibt `null`.
- *   - Der Arc friert bei der Schwelle ein und ein neuer beginnt — der rote Faden
- *     reisst nicht, er wechselt benannt.
- *
- * Läuft mit `node --test` (`npm run test:narrative`) — kein DSH, kein Netz.
+ * → Kanon: docs/COMMENT-KANON.md#k-2d45581b039d
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -6,22 +6,7 @@
  *
  * KEINE Imports (weder Bare noch node:): nur dann läuft der Test in CI ohne
  * node_modules — dieselbe Regel wie `note-core.js`. Die `tokens`-Zerlegung ist
- * deshalb hier absichtlich dupliziert statt importiert (begrenzte, benannte
- * Duplikation wie bei den Zwillingen, kein heimliches Teilen).
- *
- * WAS HIER STEHT: Haystack bauen, Bausteine matchen, Budgets deckeln,
- * Entscheidungsanteil bauen. Alles rein: gleiche Eingabe, gleiche Auswahl.
- * WAS HIER NICHT STEHT: kein Modell (der Laufzeit-Dienst wird hier weder
- * gelesen noch aufgerufen — der Paket-Test pinnt das statisch), keine Uhr,
- * kein Dateisystem, kein Netz. Fehlt eine Quelle, fehlt der Baustein
- * (fail-open); der Schritt läuft immer weiter.
- *
- * Semantik eines Treffers (erste zutreffende Achse gewinnt, in dieser
- * Reihenfolge): PFLICHT > TRIGGER > INTENT > HALTUNG > EREIGNIS > HAYSTACK.
- * Die Reihung ist Teil des Vertrags: Pflicht zuerst (Registry-Reihenfolge),
- * dann Treffer absteigend, dann id aufsteigend. Budgets werden in genau dieser
- * Reihenfolge verbraucht; Pflicht sprengt das Gesamtbudget nie still — sie
- * steht immer, Situatives weicht mit BUDGET_ERSCHOEPFT.
+ * → Kanon: docs/COMMENT-KANON.md#k-f9dd0c524fdf
  */
 
 /** Vertragsname der Registry — dieselbe Zeichenkette wie in `blocks.json`. */
@@ -319,18 +304,7 @@ function weightScore(weights, id) {
  *   weights, totalBudgetTokens, includeIds } — `available`: { contextPresent,
  *   notesOn, skillsOn, intentOn, narrative, recentEvents }; `weights`: gelernte
  *   Zähler ({ id: { up, down } }), wirken nur als Gleichstands-Brecher nach
- *   Treffern; `includeIds`: der Vorschlag des Selektionsagenten (nur IDs aus
- *   `candidateBlocks`).
- * @returns { selected: [{ id, quelle, hits, reason, budgetTokens }],
- *   skipped: [{ id, quelle, reason }], totalTokens }
- *
- * Die Agentenwahl ist der EINE zweite Weg in die Auswahl, und sie ist kein
- * Freifahrtschein: Pflicht steht immer, Modus und Quelle sperren weiter (der
- * Agent sah nur Kandidaten), das Budget bleibt hart, und jede nicht gewählte
- * Kandidatur wird mit `AGENT_ABGELEHNT` benannt statt still zu verschwinden.
- * Ohne `includeIds` (leer, unbekannt, fehlend) gilt unverändert der rein
- * deterministische Weg — der Rückfall ist kein Sonderfall, sondern derselbe
- * Code.
+ * → Kanon: docs/COMMENT-KANON.md#k-e2e295eae3c5
  */
 export function selectBlocks(registry, opts = {}) {
   const blocks = Array.isArray(registry?.blocks) ? registry.blocks : [];

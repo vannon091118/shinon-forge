@@ -7,14 +7,7 @@
  *     Fassung ist KEIN Zettel (fail-closed) — es gibt keine Reparatur.
  *   - Geladen wird über die Thema-Marke im aufgelösten Kontext; ohne Treffer
  *     gibt es einen Grund, keine stille Lücke.
- *   - Die Auswahl ist deterministisch: gleicher Kontext, gleiche Reihenfolge.
- *   - Die drei Prüfungen treffen ihre Grenze genau: ein Dateiname zu viel ist
- *     zu spitz, ein Begriff zu wenig ist zu breit, gleicher Inhalt bei
- *     gleichem Thema ist doppelt.
- *   - Der gerenderte Stand ist Daten: kein Zettel kann die Markierung
- *     schließen, und ein leerer Stand wird gar nicht erst gebaut.
- *
- * Läuft mit `node --test` (`npm run test:prompter`) — kein DSH, kein Netz.
+ * → Kanon: docs/COMMENT-KANON.md#k-f49a33fc9647
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

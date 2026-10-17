@@ -6,29 +6,7 @@
  * bleiben referenzfrei) und schickt dazu ein `shinon:plugin`-Ereignis. Dieses
  * Panel liest die Liste und stellt sie gegen die ERWARTETEN Bundles: ein
  * erwartetes Plugin, das sich nicht meldet, steht als STILL da und nicht als
- * fehlende Zeile. Genau das ist der Unterschied zwischen „laeuft" und „sieht
- * so aus, als laufe es".
- *
- * `EXPECTED` spiegelt `profiles/shinon/package.json` (`dsh.profile.bundles`) —
- * die eine Quelle steht dort, der Browser kann sie nicht lesen. Deshalb ist
- * jede Abweichung hier sichtbar statt still: ein Bundle, das im Profil steht
- * und sich nicht meldet, faellt auf; ein Bundle, das sich meldet und nicht im
- * Profil steht (openapi), ist als inaktiv gekennzeichnet.
- *
- * WORKSPACES UND SITZUNGEN (gemessen, docs/probes/workspace-list.json): der
- * Host haelt die Liste in `ctx.workspaceRegistry` (dsh-workspace). In den
- * Browser kommt sie nicht ueber diesen Registry-Dienst, sondern ueber die
- * Client-Haelfte von dsh-api-workspace-controller: die registriert den Dienst
- * `workspaces` (WorkspaceController, `.list` ist der ClientWorkspaceModel) und
- * `sessions` ist der Sitzungskatalog (ClientSessions, `.list` mit `byId`).
- * Beide haben die ObservableSnapshot-Form der Client-Dienste - getSnapshot()
- * liefert den Wert, subscribe() meldet Aenderungen - und genau so werden sie
- * hier gelesen. Dieses Panel zeigt sie NUR: es legt keinen Workspace an,
- * benennt nichts um und heftet/archiviert nichts.
- *
- * 'main' ist ein keyed-Slot (options.key) und die Sidebar-Leiste
- * 'sidebar.panellist' eine list (options.id) - ohne diesen Eintrag wäre das
- * Panel nicht erreichbar.
+ * → Kanon: docs/COMMENT-KANON.md#k-2812e8832d65
  */
 window.__ModuleLoader__.load({
   id: '@shinon/dashboard',

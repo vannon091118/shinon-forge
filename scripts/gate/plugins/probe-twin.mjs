@@ -6,16 +6,7 @@
  *     sie Ziele, sind IDs eindeutig? Er urteilt NICHT über Wahrheit.
  *   - Der SEMANTIK-Executor (Twin) führt aus und liefert Evidenz.
  *   - Das Gate entscheidet aus tatsächlichen Ergebnissen, nie aus Prosa.
- *
- * Dieses Gate ist der Validator: es prüft die Probe-Definitionen in
- * docs/probes/*.json strukturell. Es führt nichts aus (kein Netz, kein
- * Modell) — Ausführung ist der Twin, und der gehört nicht in ein Gate.
- *
- * Vokabular (Falsify_Me): BESTAETIGT | WIDERSPRUCH | UNKLAR
- * Verdicts:                 PLAN | RESEARCH | ASK | WRITE
- *
- * Anti-Vakuum: eine Probe ohne Ziel oder ohne erwartetes Ergebnis ist keine
- * Probe. „Wiederholung ist kein Beweis" — eine leere Probe bestätigt nichts.
+ * → Kanon: docs/COMMENT-KANON.md#k-c577bc271c7d
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -33,9 +24,7 @@ export const VERDICTS = ['PLAN', 'RESEARCH', 'ASK', 'WRITE'];
  * eine spätere Messung teilweise überholt sein. Statt den Belegtext still zu
  * überschreiben, trägt die Probe einen Nachtrag mit DATUM und GELTUNGSBEREICH —
  * maschinenlesbar, damit er nicht zur Prosa wird, die niemand prüft.
- *
- * @param {unknown} nachtrag
- * @param {string} file
+ * → Kanon: docs/COMMENT-KANON.md#k-4a72578c6500
  */
 export function nachtragIssues(nachtrag, file) {
   const issues = [];

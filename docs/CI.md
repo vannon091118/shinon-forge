@@ -103,7 +103,7 @@ settings" in der Oberfläche; die API-Fassung davon ist `enforce_admins` (oben).
 |---|---|---|---|
 | Lokal, immer | `npm test` | statisches Gate (117 Prüfungen: Manifest, Namensvertrag, Ressourcen, Komposition) + lokale Engine-Slices (Bundle-Auflösung, Host-/Client-Hälften, Legacy-Guard, Profil) — Sekunden, ohne Netz, ohne Boot | Alltag, pre-commit-Hook |
 | Lokal, betroffen | `npm run gate` | `always`-Menge + nur die Slices, deren Pfade im Staged-Diff stehen (Paket-Drift, Dead-Package, Persona, Scoring, …) — der volle Katalog läuft nie lokal | vor dem Commit, auf gestagten Änderungen |
-| CI, vollständig | Workflow-Zweige + `Verdikt (fail-closed)` | `test:full`-Kette (alle Paket-Suiten, Fixtures, Distribution, Profilboot) + `gate:test` (568) + TypeScript — die zentrale Testlinie, parallel auf fremder Hardware | jeder Push/PR |
+| CI, vollständig | Workflow-Zweige + `Verdikt (fail-closed)` | `test:full`-Kette (alle Paket-Suiten, Fixtures, Distribution, Profilboot) + `gate:test` (583) + TypeScript — die zentrale Testlinie, parallel auf fremder Hardware | jeder Push/PR |
 | Explizit | `test:full`, `gate:full`, `scale:check`, `branding` | volle Läufe auf Zuruf, nie im Alltag und nie im Hook | Nacht, Release, Neugier |
 
 Jede lokale Prüfung ist eine echte Prüfung (kein Skip als Grün, kein

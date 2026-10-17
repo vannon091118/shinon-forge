@@ -6,28 +6,7 @@
  *
  * Zwei Genauigkeiten, die den Unterschied machen:
  *   - Kommentare zählen nicht. Ein Modul darf erklären, was es NICHT tut,
- *     ohne dass das Gate rot wird (deshalb wird der Kommentar entfernt, nicht
- *     der Kommentar verboten).
- *   - Strings zählen nur dort, wo sie Code sein können. Die Persona trägt
- *     Prompt-Texte, in denen „Math.random()" als Warnung für das Modell steht —
- *     das ist Dateninhalt, kein Aufruf. `Math.random()` im Code daneben bleibt
- *     ein Befund.
- * Modul-Importe (`require('child_process')`) werden weiterhin erkannt: für
- * solche Token liest der Scan die Strings mit (`mode: 'module'`).
- *
- * EIN Durchlauf statt zwei Schritten, und zwar aus gemessenem Grund: die fruehere
- * Fassung entfernte erst Kommentare und dann Strings, jeder Schritt mit einem
- * eigenen Muster. Sobald ein Template-Literal Quelltext als TEXT enthaelt (der
- * Worker-Quelltext des Project Index) oder ein Kommentar eine ungerade Zahl von
- * Anfuehrungszeichen mitbringt, verschiebt sich die Paarung: der String-Entferner
- * verschluckt dann echten Code, und ein Gate kann blind werden, ohne rot zu sein.
- * Gemessen war das genau so: `new DatabaseSync(file)` verschwand aus dem
- * 'codeOnly'-Ergebnis, waehrend die Kontrolle in tests/project-index.test.mjs
- * weiterhin gruen war. Deshalb erkennt `tokenize` Kommentar, String und Template
- * in einem Zug — und `${…}` in einem Template bleibt CODE, weil dort Code steht.
- *
- * Bewusst naiv gehalten: kein Parser, kein node_modules. Was der Scanner zusagt,
- * ist unten als Tabelle geprueft (scripts/gate/tests/source-scan.test.mjs).
+ * → Kanon: docs/COMMENT-KANON.md#k-4163d64fcf87
  */
 
 /**
@@ -38,13 +17,7 @@
  *   - Ein String endet am passenden Anfuehrungszeichen oder (einfache Quotes)
  *     am Zeilenende; ein Backslash schluckt das naechste Zeichen.
  *   - In einem Template-Block ist `${…}` CODE (verschachtelt, mit Zaehler).
- *   - Ein Regex-Literal wird als CODE gelesen, nicht als String: ein Muster kann
- *     Anfuehrungszeichen und Backticks enthalten (`/^\s*(```|~~~)/`), und ohne
- *     Regex-Zustand kippt der String-Zustand daran. Gemessen war genau das ein
- *     blinder Fleck: die Doc-Kommentare nach einem solchen Muster galten dann als
- *     String und der Code dahinter verschwand. Regex-Inhalt bleibt sichtbar —
- *     lieber ein sichtbarer Fehlalarm als eine stille Luecke.
- *   - Ein unfertiges Literal am Ende wird als solches gemeldet, nicht als Code.
+ * → Kanon: docs/COMMENT-KANON.md#k-23fa4b4e1e93
  */
 
 /** Nach diesen Zeichen kann ein `/` ein Regex-Literal beginnen (nicht Division). */

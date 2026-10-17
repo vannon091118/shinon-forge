@@ -7,13 +7,7 @@
  * erfüllt:
  *   - zwei Workspaces mit gleichen relativen Pfaden haben verschiedene Identitäten,
  *   - ein Index aus Projekt A wird in Projekt B abgelehnt (FOREIGN_ROOT),
- *   - `..`, absolute Pfade und Separatorvarianten brechen nicht aus der Root aus,
- *   - ein Symlink aus der Root heraus wird an der Realpath-Grenze gestoppt,
- *   - gelöschte/umbenannte Dateien kehren nicht aus dem JSON-Index zurück (stale),
- *   - `.agents/skills/` wird nicht als gewöhnlicher Quelltext indexiert (kein Doppel),
- *   - unbekannte Referenzen vernichten nicht den richtigen Kontext.
- *
- * Kein DSH, kein Netz, kein Modell — nur reine Funktionen + Temp-Verzeichnisse.
+ * → Kanon: docs/COMMENT-KANON.md#k-f51318a25fd4
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

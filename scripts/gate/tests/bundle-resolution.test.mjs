@@ -7,40 +7,7 @@
  * lag nicht im Paket, sondern in der AUFLÖSUNG: `profiles/shinon/node_modules/@shinon/traceability`
  * ist ein Link auf einen Prototyp AUSSERHALB dieses Repos
  * (`../../../../../Projekt Type/traceability-proto`). Node lädt für einen
- * Profil-Import zuerst `profiles/<name>/node_modules` — das Repo-Paket
- * `packages/traceability` wurde also nie geladen, sondorn beschattet. Der Prototyp
- * exportiert `Config = {}` (dokumentiert in seiner eigenen Zeile 78), Cordis liest
- * beim Mounten aber `Config['~standard'].validate` — und stirbt.
- *
- * Alle bisherigen Suiten waren grün, weil keine von ihnen den ECHTEN Ladepfad
- * ging: sie importierten `packages/<dir>/index.js` direkt (hook-pre-step,
- * prompter-contract, …) und sahen den Link nie. Ein frischer Klon hat umgekehrt
- * gar kein `profiles/<name>/node_modules` — deshalb war auch das Gate grün.
- *
- * Deshalb prüft diese Datei DREI Dinge am selben Gegenstand, und zwar in dieser
- * Reihenfolge der Härte:
- *
- *   1. STATIK (ohne node_modules, immer): `repo.bundleResolutionIssues()` ist
- *      leer. Die Regel ist EINE Quelle (`scripts/lib/repo.mjs`) und wird vom
- *      Gate-Plugin `bundle-resolution` und `scripts/profile-links.mjs --check`
- *      gelesen; `shinon doctor` ist als Laufzeit-CLI noch offen (S4). Ein Befund
- *      nennt Quelle, aufgelöstes Ziel und Abhilfe.
- *   2. AUFLÖSUNG (braucht eine Installation, sonst sichtbarer Skip): jedes
- *      Bündel des aktiven Profils löst aus dem PROFILVERZEICHNIS
- *      (`createRequire(profiles/<name>/package.json)`) in `packages/` auf — die
- *      Auflösung, die ein echter `shinon`-Start nimmt.
- *   3. MOUNT (braucht Installation und Cordis, sonst sichtbarer Skip): das
- *      aufgelöste Modul wird mit GENAU der installierten Profil-Config
- *      (`profiles/shinon/cordis.patch.yml`, Eintrag `shinon-traceability`) durch
- *      echtes Cordis validiert und aktiviert; die Auslieferung über
- *      `webserver/index-inject` trägt danach `{enabled: true, maxVisible: 3,
- *      duration: 4000}`. Eine Config OHNE Schema (`Config = {}`) durch DENSELBEN
- *      Weg muss genau den belegten Fehler werfen — der Fix darf den Fehler nicht
- *      verstecken, er muss ihn im Prototyp belassen und hier nachweisen.
- *
- * Was diese Datei NICHT beweist: kein `dsh --profile shinon` über die CLI, kein
- * Browser, kein Modellaufruf. Sie beantwortet genau eine Frage: löst ein
- * Profil-Start jedes Bündel in DIESES Repo auf, und trägt es die Profilwerte?
+ * → Kanon: docs/COMMENT-KANON.md#k-9a8f05cad762
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

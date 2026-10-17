@@ -6,17 +6,7 @@
  * heraus auf einen externen Prototyp; geladen wurde fremder Code, und der Boot
  * starb an `Config = {}` mit `Cannot read properties of undefined (reading
  * 'validate')`. Beide Zusagen werden hier an einem Miniatur-Baum geprüft —
- * nicht an der Installation dieses Rechners:
- *
- *   1. Jeder `@shinon/*`-Eintrag im Profil löst innerhalb von `packages/` auf;
- *      ein toter oder fremder Link ist ein benannter Befund, ein FEHLENDES
- *      `node_modules` dagegen nicht (ein frischer Klon hat keins).
- *   2. pnpm-Reste (`.pnpm`, `.modules.yaml`, `.pnpm-workspace-state-v1.json`)
- *      sind ein Befund — dieses Repo installiert mit npm.
- *   3. `Config` muss `~standard.validate` als Funktion tragen; ein blosses
- *      `Config = {}` wird abgelehnt, bevor es einen Boot erreicht.
- *
- * Läuft mit `node --test`; kein Netz, kein Modell, kein node_modules nötig.
+ * → Kanon: docs/COMMENT-KANON.md#k-73f2a9f6ec5a
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

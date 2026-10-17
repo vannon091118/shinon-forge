@@ -68,11 +68,7 @@ export function contextTokens(context) {
  * wie ein Mensch sie nennt (`packages/prompter/index.js`) — und die Referenz galt
  * als unbekannt, obwohl die Datei im Kontext stand. Das Protokoll meldete
  * "Unbekannte Referenzen ignoriert" für genau die Datei, ueber die der Prompt
- * ging.
- *
- * Verlangt wird ein Treffer an einer VERZEICHNISGRENZE: der gelieferte Pfad
- * endet auf `/<Referenz>`. Damit ist eine relative Schreibweise derselben Datei
- * aufloesbar, ein erfundener Pfad bleibt es nicht.
+ * → Kanon: docs/COMMENT-KANON.md#k-0be2944b10a1
  */
 export function isRelativeSpelling(reference, known) {
   if (typeof reference !== 'string' || reference === '' || reference.startsWith('/')) return false;
@@ -101,8 +97,7 @@ export const stringList = (value) => (Array.isArray(value) ? value : []);
  * ändern keine Anforderungen", und sie gilt auch für MAX: Kontext erweitert den
  * Blick, nicht den Auftrag. MAX kommt genau eine Regel hinzu: Referenzen muessen
  * im gelieferten Kontext aufloesbar sein — und nur MAX kennt das Feld ueberhaupt
- * als Pflicht (siehe resultSchema). Wo es fehlt, ist die Regel gegenstandslos,
- * nicht verletzt.
+ * → Kanon: docs/COMMENT-KANON.md#k-d0ccc39c6bab
  */
 export function acceptance(result, options = {}) {
   // Diese Funktion IST die Fail-Richtung des Vertrags — sie darf selbst nicht werfen.
@@ -140,11 +135,7 @@ export function acceptance(result, options = {}) {
  *
  *   replacePrompt   nur `accepted` ersetzt den Prompt-Text im Schritt
  *   missingMessage  der Grund, wenn die Nachricht nicht auffindbar war — der
- *                   Ausgang heisst dann `rejected`, weil der Roh-Prompt gilt
- *
- * Die Tabelle ist ein Vertrag: sie deckt jeden Ausgang ab, den enhance() und
- * enhanceGuarded() erzeugen (geprueft im Abnahmetest), und sie ist die einzige
- * Stelle, an der ein Ausgang eine Wirkung hat.
+ * → Kanon: docs/COMMENT-KANON.md#k-c9ae41353ef9
  */
 export const OUTCOME_EFFECTS = {
   accepted: { replacePrompt: true, missingMessage: ['MESSAGE_NOT_FOUND'] },

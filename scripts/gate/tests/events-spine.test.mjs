@@ -7,10 +7,7 @@
  *   2. Replay des ECHTEN Bundles: das Paket wird in ein temporäres Verzeichnis
  *      kopiert, mit einem Schemastery-Stub versehen (die einzige peer-Dependency,
  *      die hier nicht installiert ist) und über seine echte apply()-Schnittstelle
- *      gefahren. Die Fixture ist das Orakel: derselbe Event-Pfad muss dieselben
- *      Envelopes ergeben.
- *
- * Läuft mit `node --test` — kein node_modules, kein DSH, kein Netz.
+ * → Kanon: docs/COMMENT-KANON.md#k-42c3fadcad85
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -7,11 +7,7 @@
  *   DSH_HOME=<Repo-Root> dsh --profile <name> --dump-config
  *
  * Das Repo-Root ist ein gueltiges DSH_HOME, weil es profiles/ enthaelt; damit
- * ist der Lauf reproduzierbar, ohne etwas nach ~/.dsh zu installieren.
- *
- * Rot, solange profiles/<name> kein DSH-Profil ist (kein package.json ->
- * "profile does not exist"), gruen, sobald DSH das Profil aufloest und jeden
- * Bundle-Layer listet. Eingebunden in `npm test`.
+ * → Kanon: docs/COMMENT-KANON.md#k-049acec77c27
  */
 import { execFileSync } from 'child_process';
 import { existsSync } from 'fs';

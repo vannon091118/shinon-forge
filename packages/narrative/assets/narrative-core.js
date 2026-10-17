@@ -6,12 +6,7 @@
  * `@shinon/prompter` (note-core.js). `index.js` re-exportiert diesen Kern, die
  * Host-Anbindung (Events, Zustand, apply) bleibt dort.
  *
- * WAS ZUG 5 GEÄNDERT HAT: dieser Kern hatte eine eigene XorShift-PRNG und wuerfelte
- * Mood und Erzaehler aus. Ein Wuerfel ist auch dann ein Wuerfel, wenn er
- * deterministisch ist: niemand kann im Vertrag nachlesen, WARUM dieser Takt so
- * klingt. Jetzt entscheiden DATEN — die Mood-Tabelle je Ereignis (mit der
- * Anti-Wiederholung als benannte Regel) und der Erzaehler aus dem Ereignis-Praefix.
- * Kein `Math.random`, kein `Date.now`, kein Modell: gleiche Historie, gleicher Takt.
+ * → Kanon: docs/COMMENT-KANON.md#k-460edae63587
  */
 
 /** DJB2-Hash fuer String → Number (stabil, ohne Imports). */

@@ -6,25 +6,7 @@
  *     `SessionEventSource` („Observable contiguous Session event window") an der
  *     Sitzungs-Bindung. Aus den dauerhaften Ereignissen eines Turns
  *     (`turn/start` … `turn/end`) rechnet DSHs eigenes Chat-Bundle seine Zeile
- *     „Usage 18.5K tok" mit `deriveTurnTokenUsage`. Diese Hälfte liest DIESES
- *     Fenster (`ctx.get?.('sessions')` → `binding(id).eventSource`) und faltet
- *     die Turn-Ereignisse mit derselben Regel — sie erfindet kein Ereignis und
- *     keinen Projektionsschlüssel.
- *  2. **Je Sitzung** — die Sitzungs-Projektion `tokenUsage`
- *     (`@deepseek-ai/dsh-token-meter`), im Browser über
- *     `binding.session.projections.faceOf(key)` gelesen (der Weg, den
- *     `useProjection` nennt). Sie steht im Titel und ist der sichtbare Rückfall,
- *     wenn für keinen Turn eine Beweislage vorliegt.
- *  Welche Sitzung gezeigt wird, sagt die Vorgabe-Bindung des Renderers
- *  (`ctx.get?.('uiSession')` → `adapter.current`).
- *
- * Die Regel selbst (Faltung, Prozent, Form) steht NICHT hier als zweite Quelle:
- * sie ist eine **bytegleiche Region** mit `packages/token-usage/assets/token-core.js`.
- * Deshalb beginnen diese Zeilen in der Region ohne Einrückung — die
- * Zwillings-Regel in `scripts/lib/repo.mjs` (`SOURCE_TWINS`) vergleicht sie
- * zeichengenau, und `npm run idioms:check` / Gate / Build lassen Drift auffallen.
- *
- * 'sidebar.footer.action' ist eine list und verlangt daher options.id.
+ * → Kanon: docs/COMMENT-KANON.md#k-20c7dabbd1b8
  */
 window.__ModuleLoader__.load({
   id: '@shinon/token-usage',
@@ -173,8 +155,7 @@ function sameAttempt(state, turn, step) {
  * Lebenslauf-Grenze, ist eine Usage unvollständig oder widerspricht die exakte
  * Summe den Buckets, ist die ganze Offenlegung nicht verfügbar (`undefined`) —
  * die Anzeige fällt dann sichtbar auf ihren Stand zurück statt zu schätzen.
- * @param events - turn-lokale dauerhafte Ereignisse von `turn/start` bis `turn/end`.
- * @returns exakte Aggregat-Usage oder undefined, wenn sie nicht beweisbar ist.
+ * → Kanon: docs/COMMENT-KANON.md#k-35e5d3644878
  */
 function deriveTurnUsage(events) {
   let state = { kind: 'idle' };
@@ -325,9 +306,7 @@ function displayPercentUnits(units, decimalPlaces) {
  * (`99.5`, `99.99`, `99.9991`, …) — DSH verkauft einen verfehlten Treffer nie
  * als perfekten.
  * @param cacheReadTokens - exakte, aus dem Cache bediente Prompt-Token.
- * @param promptTokens - exakte Prompt-Token insgesamt.
- * @param decimalPlaces - 0 für die Sitzungs-Pille, 1 für die Turn-Offenlegung.
- * @returns Prozent-Text oder null, wenn es keinen Prompt-Token gab.
+ * → Kanon: docs/COMMENT-KANON.md#k-8c3450c1e801
  */
 function formatCacheHitPercent(cacheReadTokens, promptTokens, decimalPlaces = 0) {
   if (promptTokens === 0) return null;

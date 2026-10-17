@@ -6,10 +6,8 @@
  * ohne jede Abhaengigkeit, also auch in einer Umgebung ohne node_modules. Die
  * Einzeltests der Mathematik importieren deshalb DIESE Datei, und die CI faehrt
  * sie ohne Installation. `index.js` gibt alles hiervon weiter (`export *`) und
- * haelt nur, was den Host als Plugin ausmacht (`Config`, `apply`, der Spiegel).
- * Dieselbe Aufteilung wie beim Project Index: der Kern kennt keine
- * Host-Abhaengigkeit.
- *
+ * → Kanon: docs/COMMENT-KANON.md#k-3c3e561a6d25
+ */
 
 /**
  * @shinon/codingmon — die Codemon-Engine (Host-Hälfte).
@@ -19,42 +17,7 @@
  * Rundendauer sind reine Tabellen und reine Funktionen ohne Zeit und ohne
  * Zufallsquelle. Damit ist „was kostet Level 12, was trifft es und was faellt
  * dabei\" eine nachrechenbare Aussage und keine Behauptung aus einer Animation
- * — und sie ist ohne Browser pruefbar.
- *
- * VIER MECHANIKEN, EINE QUELLE JE MECHANIK.
- *   1. ESKALATION: jede Stufe multipliziert, nichts addiert. `ESCALATION.factor`
- *      ist die eine Zahl, aus der XP-Schwelle, Gegner-Lohn, Werte und Schaden
- *      folgen (Math.pow). Fuer den LEBENSLAUF (Summe allen Schadens) fuehrt der
- *      Client ein BigInt — dort sind Millionen exakt und nicht gerundet.
- *      `formatNumber` setzt Tausenderpunkte, `describeValue` nennt die
- *      Stellenzahl, damit der Sprung von zwei- auf fuenfstellig inszenierbar
- *      ist, ohne dass die Anzeige luegt. Die Leiter ist bei LEVEL_CAP gedeckelt
- *      (siehe dort), weil `Math.pow` sonst Infinity liefert und die Anzeige in
- *      Exponentialschreibweise ausbricht.
- *   2. REGELWERK: `ELEMENTS`/`ELEMENT_CHART` (Elementarkreis),
- *      `CATEGORY` (Verteidigungsdurchgriff), `SYNERGY` (Element mal Art),
- *      `BUFFS` (Zustandslagen) und `LINEAGE` (Vererbungsbaum der zehn Linien).
- *      Der Schaden ist BaseDamage * Element * Synergie * Buff - DEF * Durchgriff,
- *      also fuenf Nachschlagevorgaenge in festen Tabellen und KEINE Fallunter-
- *      scheidung ueber Zahlen. Das System rechnet nicht klug, es schlaegt nach;
- *      die Analyse muss der Spieler machen.
- *   3. PACING: `PACING.delayMs` ist die kuenstliche Rundendauer. Der Host nennt
- *      nur die Zahl und die Absage (LOCKED_TEXT); die Sperre selbst haelt der
- *      Client, weil dort der Zustand liegt.
- *   4. LOOT: `LOOT_TABLE` in Basispunkten (8500/1400/100 = 85/14/1 Prozent).
- *      `rollLoot(uniform)` ist eine reine Funktion eines Wertes aus [0,1) —
- *      derselbe Wurf ergibt immer dieselbe Beute, damit die Tabelle pruefbar
- *      ist und erst der Client echtes Math.random() einsetzt.
- *
- * Der Host entscheidet nichts und handelt nicht: er validiert die Parameter,
- * stellt die Vertragsfunktionen bereit und protokolliert die Aktivierung.
- * Alles Sichtbare — Pet, Arena, EXP — lebt im Client.
- *
- * ZEHN SPEZIES, ZWEI FAEIGKEITEN JE SPEZIES. `family` waehlt die Pixelart-Form
- * im Client (drei handgezeichnete Familien) und ist zugleich das ELEMENT der
- * Linie; die Spezies unterscheidet sich in Werten, Faehigkeiten und Vererbung.
- * Zehn eigene 16x16-Matrizen waeren 21 weitere handgezeichnete Sprites — die
- * gibt es nicht, und sie werden hier nicht erfunden.
+ * → Kanon: docs/COMMENT-KANON.md#k-12e039dfc775
  */
 
 /** Basis-Werte je Spezies. `family` = Pixelart-Form UND Element, `hue` = Farbe. */
@@ -434,8 +397,7 @@ export const LOOT_TOTAL = LOOT_TABLE.reduce((sum, entry) => sum + entry.weight, 
  *
  * FAIL-CLOSED: ein nicht endlicher Wert (NaN, Infinity, Text, undefined) wird
  * als 0 gelesen. Sonst liefe er durch jeden Vergleich und die Funktion gaebe
- * die SELTENSTE Stufe aus — ein kaputter Eingabewert duerfte nicht der Jackpot
- * sein. Der Client spiegelt diese Zeile (client.js, `rollLoot`).
+ * → Kanon: docs/COMMENT-KANON.md#k-2abda3500328
  */
 export function rollLoot(uniform) {
   const clamped = Number.isFinite(uniform) ? Math.min(1, Math.max(0, uniform)) : 0;

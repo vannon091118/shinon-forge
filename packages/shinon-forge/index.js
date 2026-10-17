@@ -6,11 +6,7 @@
  *                                        │
  *                                        ▼
  *                              Global Runner (Polling + Dispatch)
- *
- * Tools:
- *   - memory_sync: Trigger sync via notion-agent
- *   - runner_control: Start/Stop/Polling
- *   - engine_dispatch: Manueller Engine-Aufruf
+ * → Kanon: docs/COMMENT-KANON.md#k-25e8172398c2
  */
 
 import { execFile } from 'node:child_process';

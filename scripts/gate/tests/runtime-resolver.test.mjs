@@ -6,15 +6,7 @@
  * ausschließt, und Node 22.0–22.18 ebenso, obwohl `^22.19.0` erst ab 22.19 gilt.
  * Der Fehler fiel nicht hier auf, sondern tief im Index (`node:sqlite` fehlt).
  *
- * Gepinnt wird:
- *   1. die Range kommt aus dem Root-Manifest (eine Quelle, keine zweite Liste),
- *   2. `satisfiesRange` weist 21/22.18/23 ab und lässt 22.19+/24 zu,
- *   3. ein Kandidat gilt nur mit bestandenem `node:sqlite`-Rauchtest,
- *   4. `SHINON_NODE` auf ein untaugliches Binary ⇒ fail-closed mit Grund,
- *   5. der Kind-Umgebungsblock trägt den verifizierten Node VORN im PATH —
- *      das ist die Ursache des `spawn node ENOENT` (geprüft mit leerem PATH).
- *
- * Läuft mit `node --test`; kein Netz, kein Modell, kein node_modules nötig.
+ * → Kanon: docs/COMMENT-KANON.md#k-c2c0be6e9e5f
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

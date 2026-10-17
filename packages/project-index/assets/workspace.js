@@ -6,17 +6,7 @@
  * ist bytegleich zwischen den Markern `zwilling:workspace-identitaet` und wird
  * von `SOURCE_TWINS` in `scripts/lib/repo.mjs` (Gate + Build) geprüft.
  *
- * Warum eine Kopie und kein Import: Pakete dieses Repos referenzieren einander
- * nicht — jedes wird als eigenes Tarball gepackt und geladen. Ein Import über
- * die Paketgrenze wäre bequem und würde die Verteilung brechen.
- *
- * Warum die Werte übereinstimmen MÜSSEN: Prompter und Index beantworten
- * dieselbe Frage („welcher Workspace ist aktiv?"). Zwei verschiedene Antworten
- * hießen, dass ein Prompt den Index eines anderen Projekts liest — genau die
- * Verwechslung, die S1 ausschließt. `scripts/gate/tests/project-index.test.mjs`
- * vergleicht zusätzlich das Verhalten beider Fassungen.
- *
- * Nur Node-Builtins — keine Bare-Imports, damit der Kern workerfähig bleibt.
+ * → Kanon: docs/COMMENT-KANON.md#k-82440b0f6b33
  */
 import { createHash } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';

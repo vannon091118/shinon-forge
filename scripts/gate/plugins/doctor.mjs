@@ -6,9 +6,7 @@
  *   - Dependency-Drift: Workspace-Deps im Root vs. tatsächliche Pakete
  *   - Stale-Resource: in package.json referenzierte Datei fehlt (icon etc.)
  *   - Dead-Reference: package.json exports zeigt auf fehlende Datei
- *   - Profile-Drift: Profil-Bundles ↔ Paket-Registry
- *
- * Reine programmatische Gates statt Shell-Spaghetti. Kein Zustand, kein Netz.
+ * → Kanon: docs/COMMENT-KANON.md#k-3c4a20a765c9
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,11 +21,7 @@ export const id = 'doctor';
  * Paket führt, entscheidet das PAKET: ein aktives Paket führt `1.0.0`, ein im
  * eigenen Manifest als `dsh.inactive` deklariertes darf `0.1.0` führen.
  *
- * Warum nicht als Tabelle im Gate (bis 2026-10-11 `EXPECTED_VERSIONS`): die
- * Tabelle war eine zweite Quelle für dieselbe Zahl — jedes Vorbereitungs-Paket
- * musste sich hier eintragen, und ein neues Paket war bis dahin rot, obwohl sein
- * eigenes Manifest vollständig war. Dieselbe Begründung wie in `dead-package`:
- * die Erklärung gehört dem Paket, das Gate liest sie nur.
+ * → Kanon: docs/COMMENT-KANON.md#k-d74f36f7429b
  */
 export const SHIPPED_VERSION = '1.0.0';
 export const PREPARATION_VERSION = '0.1.0';

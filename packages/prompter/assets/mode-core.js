@@ -125,10 +125,7 @@ export const UNTRUSTED_RULE = [
  * sein System-Prompt zusaetzlich traegt (`extras`). `MODES`, `MODE_DELTAS`,
  * `MODE_CAPABILITIES` und `POLICIES` werden daraus ABGELEITET.
  *
- * Vorher lagen die Deltas in einer Tabelle und der Kontextbedarf als
- * `mode === 'MAX'` an fuenf Stellen im Code: ein vierter Modus haette fuenf
- * Aenderungen gebraucht, und eine vergessene Stelle haette still das Falsche
- * getan — MAX ohne Kontextregel, MIN mit Kontextblock.
+ * → Kanon: docs/COMMENT-KANON.md#k-dd7d8973d632
  */
 export const MODE_STEPS = [
   { mode: 'MIN', delta: MIN_OPS, needsContext: false, extras: [] },

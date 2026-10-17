@@ -63,6 +63,8 @@ gilt nicht als Nachmessung.
 | [`AGENTS.md`](../AGENTS.md) | current | 2026-10-17 | Arbeitsregeln für Agenten |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-17 | Namespace-, Paket- und Profilkonventionen; §5 führt den Lebenszyklus von `.shinon/` |
 | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) | current | 2026-10-08 | Commit-Regeln und ihre Durchsetzung |
+| [`docs/COMMENT-KANON.md`](COMMENT-KANON.md) | current | 2026-10-17 | Ablage aller Kommentar-Blöcke über 10 LOC, mit Zeiger-Anker je Fundstelle — Ziel der Kürzung, nie Handediting |
+| [`docs/audit/CLAIM_MATRIX_2026-10-17.md`](audit/CLAIM_MATRIX_2026-10-17.md) | current | 2026-10-17 | Claim-Matrix: 294 Kommentar-Blöcke und 39 Doku-Statusblöcke gesammelt, Überschneidungen/Dopplungen/Widersprüche geprüft, Kanonisierung belegt |
 | [`docs/CI.md`](CI.md) | current | 2026-10-14 | CI als Schranke: Zweige und verpflichtender Statuscheck für `main`, Setz- und Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-17 | alle harten Zahlen + Befehle |
 | [`docs/INDEX.md`](INDEX.md) | current | 2026-10-17 | dieser Einstieg und die Statusregel |

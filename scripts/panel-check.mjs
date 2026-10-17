@@ -7,22 +7,7 @@
  *   1. Auslieferung: gegen die laufende DSH-Web-UI (Token-Flow wie im Browser)
  *      wird die Seite geholt und geprüft, dass `@shinon/markers/client.js` in
  *      der Modul-Preload-Liste steht.
- *   2. Code im Bundle: das ausgelieferte Client-Bundle muss den Panel-Code
- *      enthalten (Panel-ID, Side-Panel-Slot, Panel-Klasse).
- *   3. Rendering: das gebaute Artefakt `dist/packages/markers/client.js` wird in
- *      einer DOM-Umgebung ausgeführt — Plugin laden, Slots einsammeln, Panel
- *      rendern, `m`-Modus schalten, Element anklicken und die Nutzlast prüfen.
- *      Dafür werden `jsdom`, `react` und `react-dom` gebraucht; ihr
- *      node_modules-Verzeichnis kommt über `--jsdom-root` (das Repo bleibt
- *      abhängigkeitsfrei). Ohne `--jsdom-root` laufen nur Stufe 1 und 2.
- *
- * Aufruf (DSH-Web-UI muss laufen, z. B. über `npm run dev` oder die Preview):
- *
- *   node scripts/panel-check.mjs --url http://127.0.0.1:5173 --token <token>
- *   node scripts/panel-check.mjs --url … --token … --jsdom-root /tmp/panelcheck/node_modules
- *
- * Exit 0 = alle ausgeführten Stufen grün, 1 = Befund, 2 = Bedienfehler.
- * Der Token steht in der Startzeile der UI: `dsh web: http://…/?token=…`.
+ * → Kanon: docs/COMMENT-KANON.md#k-de67cef1e90b
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

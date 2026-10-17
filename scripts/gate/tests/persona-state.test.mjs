@@ -7,12 +7,7 @@
  *   2. Der echte Bundle-Pfad: Event → Zustand → System-Context. Das Paket wird
  *      in ein temporäres Verzeichnis kopiert, mit einem Schemastery-Stub
  *      versehen und über seine echte apply()-Schnittstelle an einen Fake-Host
- *      gehängt, der nur `on` (Events) und `inject` (System-Prompt) kennt.
- *
- * Damit ist die Nicht-Aktions-Grenze nicht nur behauptet: der Host hat gar
- * keine andere API, und die Tests würden bei jedem Zugriff darauf werfen.
- *
- * Läuft mit `node --test` — kein node_modules, kein DSH, kein Netz.
+ * → Kanon: docs/COMMENT-KANON.md#k-6b5398366388
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -506,10 +501,7 @@ test('Tendenz: ein fremder Dienst unter dem Namen wird gemeldet, nicht gelesen',
  * verwandelt — die Persona startete also ohne Projekt-Kontext und sagte es nur
  * leise. Das Profil setzt `projectContextPath: .shinon/project-context.md`, der
  * RELATIVE Zweig ist damit der, der in jedem Lauf genommen wird.
- *
- * Der Prüfstand ist derselbe wie oben: echter Bundle-Pfad, Fake-Host, und die
- * registrierten Abschnitte sind von außen lesbar. Ein fehlender Import läßt den
- * Abschnitt verschwinden — dieser Test wird dann rot.
+ * → Kanon: docs/COMMENT-KANON.md#k-fb9ba8336530
  */
 const contextDir = mkdtempSync(join(tmpdir(), 'shinon-persona-ctx-'));
 const contextFixture = (name, value) => {

@@ -7,17 +7,7 @@
  * ein Gate still blind — es bleibt grün und beweist nichts. Genau das war
  * gemessen der Fall, als der Project Index seinen Worker-Quelltext als
  * Template-Literal mitbrachte: die alte Fassung entfernte erst Kommentare und
- * dann Strings, in zwei Durchläufen mit je einem eigenen Muster; ein Template,
- * das Quelltext als TEXT enthält, verschob die Paarung und verschluckte echten
- * Code (`new DatabaseSync(file)` war nicht mehr im 'codeOnly'-Ergebnis).
- *
- * Der Test pinnt deshalb die Zusagen des Scanners als Tabelle: Kommentare zählen
- * nicht, String-Inhalte zählen nicht, CODE IN `${…}` zählt, Escape und
- * Zeilenenden werden richtig gelesen, und nichts ausserhalb eines Literals
- * verschwindet.
- *
- * Läuft mit `node --test` (CI: .github/workflows/commit-guard.yml). Kein Netz,
- * kein Modell, kein node_modules.
+ * → Kanon: docs/COMMENT-KANON.md#k-6e2db373a8a8
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

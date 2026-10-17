@@ -65,11 +65,7 @@ export function notesDir(config) {
  * Aenderungszeit haengen, um eine geaenderte Datei zu bemerken — beides gibt es
  * hier nicht. Ein paar kleine Dateien je Schritt kosten weniger als ein
  * veralteter Stand.
- *
- * Was nicht gelesen werden kann, verschwindet nicht: es steht als Grund in
- * `skipped`. Eine stille Luecke waere hier die teure Variante — ein Modell, das
- * ohne seinen Zettel arbeitet und nicht weiss, warum.
- * @returns { notes, skipped, reason } — `notes` sind gepruefte Zettel mit Datei.
+ * → Kanon: docs/COMMENT-KANON.md#k-27780b8e524c
  */
 export function readNotes(config, rules) {
   const format = rules?.format ?? {};
@@ -174,9 +170,7 @@ export function readSkillDescription(text) {
  * (name + description + use-when) — nicht der Inhalt. Wie bei den Zetteln gilt:
  * nur was geladen wird, geht in den Block; was nicht passt, bleibt außen vor.
  *
- * Fail-Richtungen, wie beim Zettel: ein unlesbarer Ordner landet in `skipped`,
- * nicht in der Liste. Ein leerer Ordner ergibt `reason: SKILLS_EMPTY`, nicht
- * einen still leeren Block.
+ * → Kanon: docs/COMMENT-KANON.md#k-df74878c5180
  */
 export function readSkills(config, rules) {
   const reading = rules?.reading ?? {};

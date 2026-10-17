@@ -6,27 +6,7 @@
  * (trajectory-core.js) und `@shinon/prompter` (note-core.js). `index.js`
  * re-exportiert, was die Host-Hälfte braucht; die Namen bleiben dieselben.
  *
- * DIE SICHERHEITSREGEL IST HIER MECHANIK, NICHT EINE ZUSAGE IM KOMMENTAR:
- * Schlüsselmaterial verlässt diesen Kern nur auf ZWEI Wegen —
- *
- *   1. `buildProbeRequest()` legt es in den `Authorization`-Kopf. Das ist der
- *      einzige Ort, an dem es das darf: Kopfzeilen gehen an den Anbieter, nicht
- *      in eine Antwort.
- *   2. `redact()` entfernt es aus Text, der geloggt wird.
- *
- * Alles andere, was nach außen geht — `statusOf()`, die Werkzeug-Ergebnisse,
- * jeder Log-Eintrag — trägt die BESCHRIFTUNG des Poolplatzes (`key#1`, `key#2`)
- * und niemals den Schlüssel. Der Grund ist gemessen und nicht theoretisch: was
- * ein Werkzeug zurückgibt, landet im Kontext des Modells und damit in der
- * Transkription der Sitzung; ein „Key-Präfix zur Wiedererkennung" ist dort ein
- * Leck, kein Komfort. Die Reihenfolge des Pools ist der Ausweis (die Namen kommen
- * aus der Umgebung) — mehr braucht ein Mensch nicht, um einen Platz zu benennen.
- *
- * WARUM DAS ÜBERHAUPT EINE DATEI IST: die Backoff-Rechnung und die Auswahl waren
- * vorher mit einer echten Uhr (`Date.now()`) und echtem Zufall (`Math.random()`)
- * verwoben; damit war jeder Test eine Wahrscheinlichkeitsaussage über einen
- * Zeitpunkt. Hier kommen Uhr und Zufall als ARGUMENTE herein, und das Verhalten
- * ist nachrechenbar.
+ * → Kanon: docs/COMMENT-KANON.md#k-89d13e2c5858
  */
 
 /** Beschriftung eines Poolplatzes — die einzige Angabe, die nach außen darf. */
@@ -69,16 +49,7 @@ export function buildEntries(keys) {
 //     Aufruf über `ctx.get("credentials").resolve(ref)` auf; fehlt der Dienst,
 //     gilt die Startumgebung. Der Aufruf ist eine Funktion, kein Wert — jeder
 //     neue Aufruf sieht den aktuellen Poolstand.
-//   - Eine fehlgeschlagene Anfrage läuft als Middleware über
-//     `agent/request-error` (Nutzdaten: provider, failure mit stabilem
-//     `code`, z. B. `RATE_LIMIT` bei 429); wer dort nur beobachtet und `next()`
-//     weitergibt, ändert nichts am Wiederholungsverhalten — das gehört
-//     `llm-retry`.
-//
-// Der Override ist deshalb eine Klammer um genau EINE Methode (`resolve`), die
-// genau die Referenzen bedient, die das Profil nennt, und alles andere an das
-// Original weitergibt. Kein Schreiben in den Tresor (kein
-// Persistenz-Rauschen bei jeder Rotation), kein eigener Wiederholungs-Entscheid.
+// → Kanon: docs/COMMENT-KANON.md#k-10eea7afa416
 
 /**
  * Werte zu ausdrücklichen Namen aus der Startumgebung lesen.
@@ -88,8 +59,7 @@ export function buildEntries(keys) {
  * absichtlich schmal (`{ get(name) }`): was DSH dort liefert (`{ value, source }`)
  * und was ein Stub liefert, liest sich gleich.
  *
- * @param launch - die Startumgebung oder nichts.
- * @param names - die ausdrücklichen Namen, in Reihenfolge.
+ * → Kanon: docs/COMMENT-KANON.md#k-03e87e2a2faf
  */
 export function valuesFromLayers(launch, names) {
   const values = {};
@@ -123,14 +93,7 @@ export function refNameOf(ref) {
  * das Original unverändert — derselbe Aufruf, dasselbe Ergebnis. (2) Eine
  * verwaltete Referenz ohne Pool (leer, kein Eintrag wählbar) fällt auf das
  * Original zurück — der Router behauptet nie einen Schlüssel, den er nicht hat.
- * (3) `restore()` baut die Klammer ab; danach sieht der Dienst wieder genau so
- * aus wie vorher. Was `select` zurückgibt (`{ key }`), verlässt das Paket nur in
- * Richtung des fragenden Anbieters — derselbe einzige Ausgang wie die Kopfzeilen
- * des Verbindungstests.
- *
- * @param service - der `credentials`-Dienst (oder etwas, das so aussieht).
- * @param options - { managed: [Namen], select: (name) => Eintrag|null }.
- * @returns `{ restore, names }` oder null, wenn es nichts zu klammern gibt.
+ * → Kanon: docs/COMMENT-KANON.md#k-8e61ae3a6e32
  */
 export function createResolveOverlay(service, options = {}) {
   const original = service?.resolve;
@@ -164,10 +127,7 @@ export function createResolveOverlay(service, options = {}) {
  * `message`"), und nur für einen benannten Anbieter. Alles andere — Timeouts,
  * Abbrüche, Auth-Fehler, namenlose Nutzdaten — ist kein Grund zum Wechseln: ein
  * falscher Wechsel bei einem kaputten Schlüssel würde den gesunden Pool
- * für einen toten Anbieter leeren.
- *
- * @param payload - die Nutzdaten von `agent/request-error`.
- * @returns `{ provider }` oder null.
+ * → Kanon: docs/COMMENT-KANON.md#k-8eba23c96bba
  */
 export function observeRequestError(payload) {
   if (payload === null || typeof payload !== 'object') return null;
@@ -187,9 +147,7 @@ export function observeRequestError(payload) {
  * Eine Config kann KEINEN Schlüssel tragen: das Schema dieses Pakets hat kein
  * Feld dafür (`scripts/gate/tests/key-router-security.test.mjs` prüft das am
  * Schema, nicht an der Absicht) — eine Profildatei ist versioniert.
- *
- * @param env - die Umgebung (ein Objekt, damit der Test sie stellen kann).
- * @param options - { names, prefix }.
+ * → Kanon: docs/COMMENT-KANON.md#k-2ed2ae9919fc
  */
 export function keysFromEnv(env, options = {}) {
   const names = Array.isArray(options.names) ? options.names : [];
@@ -234,9 +192,7 @@ export function calcBackoff(failCount, initialDelayMs, maxDelayMs, random = Math
  * Rotation soll den Platz WECHSELN, sonst dreht sie sich im Kreis.
  *
  * @param entries - der Pool.
- * @param now - Zeitstempel in ms.
- * @param force - erzwingt einen anderen Platz, wenn es einen gibt.
- * @param activeLabel - der zuletzt benutzte Platz (für `force`).
+ * → Kanon: docs/COMMENT-KANON.md#k-b3798f386737
  */
 export function nextEntry(entries, now, force = false, activeLabel = null) {
   if (!Array.isArray(entries) || entries.length === 0) return null;
@@ -301,9 +257,7 @@ export function statusOf(entries, now, activeLabel = null) {
  * `sk-abc…` ist so brauchbar wie die mit dem ganzen Schlüssel. Gesucht wird auch
  * in zusammengesetzten Texten, weil ein Fehlerobjekt seinen Eingabe-Wert mit
  * sich führen kann.
- *
- * @param text - der Text (oder ein beliebiger Wert; er wird zu Text).
- * @param secrets - die Werte, die nicht erscheinen dürfen.
+ * → Kanon: docs/COMMENT-KANON.md#k-45cb09b9a337
  */
 export function redact(text, secrets) {
   let result = typeof text === 'string' ? text : String(text);
@@ -340,8 +294,7 @@ export function authHeaders(provider, key) {
  * `method` protokollieren und die Kopfzeilen nicht.
  *
  * @param provider - { baseUrl, probePath }.
- * @param key - der Schlüsselwert.
- * @param probePath - Rückfall, wenn der Anbieter keinen eigenen Pfad nennt.
+ * → Kanon: docs/COMMENT-KANON.md#k-3151d0b41c2a
  */
 export function buildProbeRequest(provider, key, probePath = '/models') {
   const base = typeof provider?.baseUrl === 'string' ? provider.baseUrl.replace(/\/+$/, '') : '';

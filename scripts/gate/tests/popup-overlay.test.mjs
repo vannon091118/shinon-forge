@@ -7,31 +7,7 @@
  * die Client-Haelfte sagte in ihrem eigenen Kopf, dass sie sie nicht rendert, und
  * das Paket erklaerte sich im Manifest als `inactive`. Genau dieser Zustand ist
  * von einem kaputten nicht zu unterscheiden — kein Fehler, keine Warnung, kein
- * roter Test, nur eine leere Flaeche.
- *
- * GEPRUEFT WIRD DAS AUSGELIEFERTE BUNDLE (`__ModuleLoader__` -> `apply`), nicht
- * eine Kopie der Logik:
- *
- *   1. NAHT — der Slot, den das PROFIL wirksam setzt, ist derselbe, in dem sich
- *      die Client-Haelfte anmeldet. Die Haelfte kann den Host nicht importieren;
- *      ein anderer Slot im Profil liesse das Overlay still ins Leere rendern.
- *   2. SPRACHE — der Text kommt aus dem Woerterbuch (`popup.running`), die ZAHLEN
- *      aus der Sitzung; ohne Locale-Dienst gilt der deutsche Fallback der
- *      generierten Tabelle. Beide Wege werden gerendert und verglichen.
- *   3. VERHALTEN — mit einem laufenden Turn erscheint der Fortschritt, ohne Turn
- *      erscheint NICHTS (ein leeres Overlay sagt nichts aus), und ein beendeter
- *      Turn ist kein Vorgang.
- *   4. ZERLEGUNG — das Fenster liefert `tool/call` und `tool/result`
- *      (geschlossen ueber `data.message.source.callId`); die Anzeige nennt
- *      Schritt, offene Aufrufe und das zuletzt benutzte Werkzeug.
- *
- * Was der Test NICHT beweist (ehrlich): dass der Browser das Overlay malt. Er
- * fuehrt die Komponente mit einer React-Attrappe aus und vergleicht den Baum; die
- * Aktivierung am ECHTEN Cordis-Proxy (mit `slots`/`locale` aus einer Fiber)
- * prueft `client-activation.test.mjs` fuer jede Client-Haelfte, auch diese.
- *
- * Laeuft mit `node --test` (CI: .github/workflows/commit-guard.yml), in der
- * Gate-Suite `npm run gate:test`. Kein Netz, kein node_modules.
+ * → Kanon: docs/COMMENT-KANON.md#k-219fd7ed5cf1
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,6 +19,26 @@ import { loadClientBundle, requireStub } from './helpers/client-sandbox.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
+
+/**
+ * Der Kopf einer Datei PLUS der Kanon, auf den sie zeigt. Seit dem Kanon
+ * (2026-10-17) sind Blöcke über 10 LOC in `docs/COMMENT-KANON.md` gewandert; eine
+ * Zusage über den DOKUMENTTEXT muss deshalb dort nachsehen, wo er steht — sonst
+ * prüft der Test eine Kürzung, nicht die Aussage.
+ */
+function docWithKanon(rel) {
+  const file = read(rel);
+  const kanon = read('docs/COMMENT-KANON.md');
+  const anchors = [...file.matchAll(/→ Kanon: docs\/COMMENT-KANON\.md#(k-[0-9a-f]{12})/g)].map((m) => m[1]);
+  assert.ok(anchors.length > 0, `${rel} trägt keinen Kanon-Zeiger`);
+  const sections = anchors.map((anchor) => {
+    const start = kanon.indexOf(`## Kanon ${anchor} `);
+    assert.notEqual(start, -1, `${rel} zeigt auf #${anchor}, der Kanon kennt den Anker nicht`);
+    const next = kanon.indexOf('\n## Kanon ', start + 1);
+    return kanon.slice(start, next === -1 ? undefined : next);
+  });
+  return [file, ...sections].join('\n');
+}
 
 /** Der wirksame Slot aus dem Profil (die ENTSCHEIDUNG, nicht der Schema-Default). */
 function profileSlot() {
@@ -203,7 +199,11 @@ test('trajectory: der Host-Kanal ist Probe-API, keine Ende-zu-Ende-Behauptung', 
   assert.match(host, /trajectoryChannel: z\.string\(\)\.default\('shinon\/trajectory'\)/, 'der Host hält den benannten Probe-Kanal');
   assert.match(host, /ctx\.emit\(config\.trajectoryChannel/, 'der Host emittiert die Probe, wenn ein Test sie beobachtet');
   assert.match(profile, /trajectoryChannel: 'shinon\/trajectory'/, 'die Profil-Config nennt denselben Probe-Kanal');
-  assert.match(client, /Probe-API ohne In-Tree-Konsument/, 'die Client-Doku stuft den Kanal als Probe-API ein');
+  assert.equal(
+    (docWithKanon('packages/popup/client.js').match(/Probe-API ohne In-Tree-Konsument/g) ?? []).length,
+    1,
+    'die Client-Doku stuft den Kanal als Probe-API ein — genau einmal, im Kopf oder in seinem Kanon',
+  );
   const clientRuntime = client.slice(client.indexOf('window.__ModuleLoader__.load'));
   assert.doesNotMatch(clientRuntime, /(?:\.on|\.subscribe)\s*\(\s*['\"]shinon\/trajectory/, 'der Client abonniert den Probe-Kanal nicht');
   assert.match(client, /readTrajectoryOf\(ctx\).*?eventSource/s, 'das Overlay liest stattdessen das Sitzungsfenster direkt');

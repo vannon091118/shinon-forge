@@ -7,8 +7,7 @@
  *      gegen gezielte Vertragsbrüche (jeder Bruch wird benannt).
  *   2. Die Laufzeitgrenze am echten Code (kein Schreiben/Handeln) plus
  *      Mutationsproben, die verbotene Aufrufe und fremde Pfade erkennen.
- *
- * Läuft mit `node --test` — kein node_modules, kein DSH, kein Netz.
+ * → Kanon: docs/COMMENT-KANON.md#k-d5ac5087f2be
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -6,10 +6,7 @@
  * Client spiegelt nur lesbar, damit im Browser nachvollziehbar ist, welche
  * Schwelle gilt und ob ein Goal entstand — eine Anzeige, die dieselben Zahlen
  * errät statt sie zu lesen, wäre eine zweite Wahrheit. Kein Goal-State hier:
- * den führt DSH, und ihn zu duplizieren hiesse, ihm zu widersprechen.
- *
- * Kein Config-Schema hier (die Konfiguration lebt im Host), kein Goal-State:
- * §16 endet bei goal/no goal; die Goal-Anzeige gehört zur Projektion (§22).
+ * → Kanon: docs/COMMENT-KANON.md#k-4935c8c78815
  */
 window.__ModuleLoader__.load({
   id: '@shinon/task-router',

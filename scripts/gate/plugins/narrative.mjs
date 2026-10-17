@@ -6,32 +6,7 @@
  * Composite (Arc, Erzähler, Beziehungsstufe, eigener Mood). Emittiert wurde er
  * auf `shinon/narrative/state` — und diesen Kanal hatte NIEMAND abonniert. Die
  * Engine war ein Radiosender ohne Empfänger: sie rechnete, und kein Gerät in der
- * Wohnung hatte ein Programm eingestellt. Das Paket hatte Unit-Tests für seine
- * Mathematik und kein Gate für seine VERDRAHTUNG — genau die Lücke, durch die
- * der Composite ins Leere gehen konnte.
- *
- * Fünf Zusagen, fünf Prüfungen:
- *   1. Der Vertrag (assets/narrative-state.json) trägt seinen Namen und ist
- *      vollständig: Mood-Tabelle, Erzähler-Regel, Arc-Themen, Beziehungsstufen.
- *      Jeder Ereignistyp der Mood-Tabelle ist ein Typ des Spines — eine Zeile
- *      auf ein Ereignis, das es nicht gibt, wäre ein Takt, der nie klingt.
- *   2. Die Ableitung ist deterministisch und uhrfrei: kein Zufall, keine Uhr,
- *      kein Modell, kein Tool, kein Schreiben — im Laufzeitcode UND im Kern.
- *   3. Der Ausgang ist genau EINER: der Composite geht als Ereignis
- *      (`STATE_CHANNEL`) hinaus. Es gibt keinen zweiten Weg — ein `ctx.provide`
- *      eines Zustands wäre der „tote Dienst" von vorher, und der ist entfernt.
- *   4. Der KANAL HAT ABNEHMER. Das ist die Zusage, die bis Zug 6 fehlte: die
- *      Persona trägt den Kanalnamen als Literal und registriert daraus einen
- *      Prompt-Abschnitt, der Veredler trägt ihn ebenso und baut daraus das
- *      Element `<narrative>` seines Stand-Blocks (der in den MAX-Aufruf geht).
- *      Ohne diese Prüfung darf das Gate nicht grün sein — ein Sender ohne
- *      Empfänger ist kein Feature.
- *   5. Das Profil aktiviert das Bundle, sonst läuft die Engine nie (dieselbe
- *      Regel wie beim Persona- und beim Scoring-Gate).
- *
- * Die reinen Funktionen des Pakets sind schon ohne node_modules getestet
- * (packages/narrative/test/narrative.test.mjs). Dieses Gate prüft die
- * VERDRAHTUNG, die ein Pakettest von innen nicht sehen kann.
+ * → Kanon: docs/COMMENT-KANON.md#k-b02775091853
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -57,14 +32,7 @@ export const COMPOSITE_FIELDS = ['seq', 'mood', 'narrator', 'arc_id', 'relations
  * `index.js` nicht importieren), den Kanal wirklich abonniert (`ctx.on` auf genau
  * diesen Namen) und aus dem Composite etwas SICHTBARES macht — ein Element, das
  * eine Prüfung finden kann. Es sind zwei, und sie lesen denselben Composite in
- * zwei verschiedene Ausgänge:
- *
- *   persona   den System-Prompt-Abschnitt `shinon:narrative-arc`
- *   prompter  das Element `<narrative>` im Stand-Block, den MAX als eigenen
- *             Block in den Modellaufruf hängt
- *
- * Beide Spiegel werden von `scripts/lib/repo.mjs` (SOURCE_TWINS) gegen den einen
- * Besitzer gepinnt; hier wird geprüft, dass daraus auch ein Abnehmer wird.
+ * → Kanon: docs/COMMENT-KANON.md#k-347ad0731e05
  */
 export const CONSUMERS = [
   {
@@ -226,13 +194,7 @@ export function staticIssues(sources) {
  * `@shinon/narrative` nicht importieren), ein `ctx.on` auf diesen Namen, und ein
  * Element, das aus dem Composite entsteht. Ein Abnehmer, der den Kanalnamen
  * falsch schreibt, sieht aus wie "es gibt keine Narrative" — deshalb ist die
- * Buchstabenfolge hier keine Stilfrage, sondern der Befund. Und es sind ZWEI
- * Abnehmer: die Prüfung läuft über die Liste CONSUMERS, an den Abnehmer selbst
- * werden die beiden Quelltexte gereicht.
- *
- * @param consumer - Eintrag aus CONSUMERS.
- * @param sources - `{ main, evidence }`; `null`, wo die Datei fehlt.
- * @param stateContract - geparster Zustandsvertrag des Abnehmers (nur Persona).
+ * → Kanon: docs/COMMENT-KANON.md#k-e11366863b90
  */
 export function consumerIssues(consumer, sources, stateContract) {
   const issues = [];

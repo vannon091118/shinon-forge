@@ -6,18 +6,7 @@
  *
  * WAS HIER STEHT: der SELEKTIONSVERTRAG (`shinon.selection/v1`). Ein kleiner
  * Selektionsagent bekommt pro Schritt nur KOMPAKTE Beschreibungen der
- * Bausteine (id, lage, budget, kanalischer Zusammус), niemals deren vollen
- * Text — Inhalt lädt die Runtime erst NACH der Auswahl. Die Antwort muss ein
- * strenges JSON sein; was den Vertrag verletzt, wird verworfen (fail-closed)
- * und die deterministische Auswahl bleibt der Rückfall.
- * WAS HIER NICHT STEHT: kein Modell, kein Netz, kein Dateisystem — nur Bauen,
- * Prüfen, Entscheiden-über-Form. Der Modellaufruf selbst bleibt im Host (so wie
- * beim Enhancer), die Antwortprüfung ist hier, damit sie ohne node_modules
- * testbar ist.
- *
- * DIE EINE REGEL: Der Agent schlägt vor, die Runtime setzt Verträge durch.
- * Unbekannte IDs verwirft die Runtime; Bausteine, die der aktuelle Modus
- * nicht erlaubt, verwirft sie; Grenzen (Budget, Unsicherheit) setzt sie selbst.
+ * → Kanon: docs/COMMENT-KANON.md#k-fd1f300dd9ba
  */
 
 /** Vertragsname der Agenten-Antwort — steht auch IN der Antwort drin. */
@@ -89,16 +78,7 @@ function summarizeTrigger(ausloeser) {
  *   VERTRAG_FREMD   falscher oder fehlender contract
  *   UNSICHERHEIT    kein Zahlwert 0..1 (Vektor der Unsicherheit)
  *   LEERE_AUSWAHL   selected nicht als Array (leer erlaubt — dann greift der Fallback)
- *   ID_UNBEKANNT    id nicht in der erlaubten Liste (der Kern des Vertrags)
- *   NICHT_ERLAUBT   der Kandidat ist für den gegebenen Modus NICHT freigegeben (id)
- *   PFLICHT_FEHLT   eine Pflicht-ID fehlt bei nicht-leerer Auswahl (id)
- *   BUDGET          Aufruftrag-Budgetverletzung (Kandidat > Gesamtbudget)
- *
- * @param text     - die Rohantwort (oder ein Objekt, schon geparst)
- * @param allowed - die erlaubten { id, budgetTokens, modus?, pflicht? } der Situation
- * @param opts    - { totalBudgetTokens, mode } — ohne `mode` wird die
- *                  Modus-Freigabe übersprungen (der Host schickt ihn immer)
- * @returns { ok: true, selected, uncertainty } | { ok: false, reason }
+ * → Kanon: docs/COMMENT-KANON.md#k-e366b30efdaa
  */
 export function parseSelection(text, allowed = [], opts = {}) {
   let parsed = text;

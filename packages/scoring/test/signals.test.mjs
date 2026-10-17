@@ -7,16 +7,7 @@
  * liefert) hinein, ein Scorecard-Wert heraus. Dazu die Zusagen, die die
  * Schicht von einer Vermutung unterscheiden:
  *
- *   - Nur was in der Signaltabelle steht, erzeugt ein Signal (fail-closed).
- *   - Menschen-Text zählt nur mit der Marke `data.source.kind === 'user'`;
- *     Harness-Text mit demselben Ereignistyp zählt nicht.
- *   - Wiederholung wird am INHALT gemessen, nicht an der Uhr.
- *   - Ein Widerruf rechnet exakt: die Zeile fällt weg, die Tafel wird aus dem
- *     Rest nachgerechnet — der Wert ist danach wieder der von vorher.
- *   - Kein Deckel, kein Zähler-Limit, keine Sekundenregel — auch nicht als
- *     vergessene Zahl in der Tabelle.
- *
- * Läuft mit `node --test` (`npm run test:scoring`) — kein DSH, kein Netz.
+ * → Kanon: docs/COMMENT-KANON.md#k-897a5dd7deb9
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

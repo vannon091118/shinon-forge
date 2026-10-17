@@ -6,29 +6,7 @@
  * Baum je `write` gerufen, und der Spiegel meldete folgerichtig „noch kein
  * Stand". Diese Datei ist der Empfaenger. Sie ist die Host-Seite des
  * Typert-RPC von DSH (api-gateway): ein Cordis-Dienst mit ZWEI als Remote
- * gekennzeichneten Methoden (`writeSnapshot` nimmt an, `readActivity` nennt den
- * Aktivitaetsstand), von denen der Client einen generierten Beitrag mountet
- * und sie ueber den gemeinsamen Carrier ruft.
- *
- * WARUM SRC UND NICHT EIN GENERIERTES HOST-MANIFEST: das Gateway loest einen
- * Endpunkt zuerst aus `ctx.typert.local` (strenge, GENERIERTE Definition) und
- * sonst aus dem Dienst selbst auf („SRC": Name, Parameterliste und
- * `typertRemote`-Bindung des Dienstes). Die zweite Form ist die ehrliche fuer
- * dieses Paket: die strict-Datei ist ein Erzeugnis von
- * `@deepseek-ai/dsh-typert-generator`, den dieses Paket nicht mitbringt, und
- * eine von Hand nachgebaute „generierte" Datei waere eine Fiktion mit
- * Dateinamen. SRC verlangt dafuer weniger: oeffentliche Methode mit einfachen
- * ParameterNamen (das Gateway liest sie aus der Signatur — deshalb steht
- * `writeSnapshot(snapshot)` genau so da und mit einem Parameter, nicht mit
- * einem Objekt), JSON-sichere Werte, und die Bindung aus `TypertRemoteService`.
- * Was SRC NICHT tut, ist den Inhalt pruefen — deshalb prueft der SPIEGEL
- * (`pet-store.js` parst, BEVOR er ein Medium anfasst). GENAU EINE Grenze: eine
- * zweite Pruefung desselben Schemas hier waere eine zweite Wahrheit, und im
- * Test nicht auseinanderzuhalten, weil beide dieselbe Meldung erzeugen.
- *
- * WAS HIER NICHT STEHT: kein Timer, kein Netz, kein Modell, und keine zweite
- * Ablage. Die Methode nimmt einen Stand an, prueft ihn, gibt ihn an den Spiegel
- * weiter und quittiert ihn.
+ * → Kanon: docs/COMMENT-KANON.md#k-6ba3af2466b5
  */
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { levelFor } from './mechanik.js';
@@ -46,14 +24,7 @@ import {
  * Standard-Methodendekoratoren: sie bekommt den Methodenwert und einen
  * Dekoratorkontext und traegt die Kennzeichnung ueber dessen `addInitializer`
  * in die Prototyp-Tabelle ein (die kompilierte DSH-Fassung desselben Aufrufs
- * steht in jedem `lib/types/index.js` der DSH-Pakete). Ein ESM-Modul ohne
- * Compiler hat keinen solchen Kontext — also stellt der Aufruf unten genau den
- * Vertrag her, den die Spezifikation vorsieht: ein Empfaengerobjekt, dessen
- * Prototyp die Klasse ist, an dem der Initialisierer laeuft. Mehr braucht die
- * Kennzeichnung nicht; sie ist idempotent und haengt am Prototyp, nicht an
- * einer Instanz.
- * @param {object} prototype - Prototyp der Dienstklasse.
- * @param {string} method - Name der oeffentlichen Methode.
+ * → Kanon: docs/COMMENT-KANON.md#k-2b8e8cc83d2f
  */
 function markRemote(prototype, method) {
   const receiver = Object.create(prototype);
@@ -144,8 +115,7 @@ export function mountPetRemote(ctx, store, activity) {
  * lehnt einen Beitrag mit einem Codec ohne strict VOR dem Mounten ab
  * („Client-supplied fields without strict generated codecs fail before methods
  * become callable"). Die Fabrik wird auf der Client-Seite nicht ausgefuehrt —
- * der Client schickt die Werte, der Host prueft sie.
- * @returns {object} Beitrag aus Paketname und einem Endpunkt.
+ * → Kanon: docs/COMMENT-KANON.md#k-4753c134ca3d
  */
 export function petRemoteContribution() {
   return {

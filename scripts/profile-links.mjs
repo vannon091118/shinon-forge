@@ -7,33 +7,7 @@
  * dieses Repos gesetzt — gemessen 2026-10-17: `@shinon/traceability` →
  * `../../../Projekt Type/traceability-proto` —, dann beschattet fremder Code das
  * Repo-Paket, ohne dass ein Gate es merkt: `packages/traceability` wird nie
- * geladen, der Prototyp exportiert `Config = {}`, und Cordis stirbt beim Mounten
- * mit `Cannot read properties of undefined (reading 'validate')`.
- *
- * Die einzige Wahrheit ist das Profil-Manifest: `dependencies["@shinon/<dir>"]`
- * deklariert `link:../../packages/<dir>`. Dieses Werkzeug liest genau diese
- * Zusagen und setzt die Links danach neu. Nichts anderes wird angefasst:
- *
- *   - Ein Ziel ausserhalb `packages/` wird VERWEIGERT (Exit 2, keine Änderung).
- *     Ein Werkzeug, das einen Fremdpfad durchreicht, wäre die Ursache statt der
- *     Reparatur.
- *   - Ein Ziel, das kein Paket mit DIESEM Namen ist, wird verweigert.
- *   - Ein echter Ordner im Weg wird NICHT gelöscht, sondern gemeldet: er ist
- *     fremde Handarbeit, und die zu überschreiben wäre Datenverlust.
- *   - Ein bereits richtiger Link bleibt unangetastet (idempotent).
- *
- * Prüfen statt schreiben: `--check` schreibt nichts und unterscheidet zwei Grade,
- * dieselben, die das Gate-Plugin `bundle-resolution` einnimmt. Das geplante
- * Laufzeit-CLI `shinon doctor` soll dieselbe Funktion nutzen, ist aber noch nicht
- * implementiert (Release-Slice S4):
- *
- *   💥 VERSTOSS  ein Link ist da, führt aber woandershin (oder ins Leere) → Exit 1
- *   –  HINWEIS  der Link fehlt noch (Normalzustand vor der Installation) → Exit 0
- *
- * Aufruf:  node scripts/profile-links.mjs [--check] [--profile <name>] [--quiet]
- * Exit:    0 = gesetzt bzw. geprüft und deckungsgleich · 1 = (--check) Abweichung
- *          · 2 = verweigert (Ziel ausserhalb packages/, fremder Name, echter
- *          Ordner im Weg) — in diesem Fall wurde NICHTS geschrieben.
+ * → Kanon: docs/COMMENT-KANON.md#k-c21108faa677
  */
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';

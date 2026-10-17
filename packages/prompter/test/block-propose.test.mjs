@@ -7,9 +7,7 @@
  * `reviewNotes`, aber Ende-zu-Ende: Ablehnung lässt die Registry unberührt,
  * Annahme landet in der Projekt-Ablage, wirkt in der Auswahl und überdauert
  * den Neustart.
- *
- * Läuft mit `node --test` (braucht node_modules für Schemastery, wie unter
- * `npm test` vorhanden); kein Netz, kein Modell, kein DSH.
+ * → Kanon: docs/COMMENT-KANON.md#k-7f580637ddfa
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

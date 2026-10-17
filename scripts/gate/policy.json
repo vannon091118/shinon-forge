@@ -10,7 +10,8 @@
       "client-half",
       "legacy-guard",
       "profile",
-      "typescript"
+      "typescript",
+      "comment-canon"
     ],
     "local": [
       "bundle-resolution",
@@ -21,7 +22,8 @@
       "client-half",
       "legacy-guard",
       "profile",
-      "typescript"
+      "typescript",
+      "comment-canon"
     ],
     "slices": {
       "package-drift": {

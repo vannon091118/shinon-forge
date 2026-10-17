@@ -7,8 +7,7 @@
  * AUSSCHLIESSLICH im Loot und ist als reine Funktion eines Wertes aus [0,1)
  * gebaut — hier wird die Tabelle deshalb ueber ALLE 10000 Basispunkte
  * abgezaehlt, nicht mit einer Stichprobe „ungefaehr" geprueft.
- *
- * Lauf: `npm run test:codingmon` bzw. `node --test packages/codingmon/test/*.test.mjs`.
+ * → Kanon: docs/COMMENT-KANON.md#k-abeeabc4d60e
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';

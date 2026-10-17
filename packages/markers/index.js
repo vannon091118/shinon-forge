@@ -9,25 +9,7 @@ import { readFileSync } from 'node:fs';
  * der Code: Feldmenge, id-Fortschreibung, Selektor-Ableitung, Nutzlast-Format,
  * Speicherschlüssel, Grenzen. Nicht gespiegelt: CDP-Verbindung, Chrome-Daemon,
  * Injektion in fremde Seiten.
- *
- * Rollenteilung:
- *   Host  (diese Datei)  — Vertrag als Daten + reine Prüfer/Ableiter. Kein Netz,
- *                          keine Datei-Schreibzugriffe, kein Modell, keine Aktion.
- *   Client (client.js)   — der Spiegel im nativen DSH-Side-Panel: markieren,
- *                          kommentieren, Nutzlast bauen, kopieren.
- *
- * DIE EINE NAHT ZUM BROWSER (INDEX_INJECT/LIMITS_GLOBAL): die WIRKSAMEN Grenzen
- * — Profilwerte, nicht Vertragsvorgaben — legt der Host beim Ausliefern der Seite
- * als `window.__DSH_MARKERS_CONFIG__` in den Index (dieselbe Naht, über die DSH
- * Theme, Dokument-Vorschau und Modell-Einstellungen ausliefert). Der Client liest
- * sie beim Mounten; er kann die Grenzen nicht erraten, weil er ein selbständiges
- * Bundle ist. Beide Seiten führen den Namen als Literal, der Test vergleicht sie.
- *
- * Fail-closed für die Marke: eine Marke ohne Selektor oder ohne ganzzahliges Rect
- * existiert nicht. Fail-open für den Host: die Beobachtung darf die Sitzung nie
- * mit einem Throw stören — Verstöße werden gezählt, nicht geworfen.
- *
- * Der Vertrag selbst liegt als Daten in ./assets/marker-model.json.
+ * → Kanon: docs/COMMENT-KANON.md#k-b323262b6700
  */
 
 /** Fallback, falls der Vertrag nicht lesbar ist; wird nie benutzt. */

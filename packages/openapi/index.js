@@ -18,20 +18,7 @@ export const Config = z.object({
  *   get:
  *     summary: Get system status
  *     responses:
- *       200:
- *         description: System is running
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   enum: [ok, error]
- *                 version:
- *                   type: string
- *                 uptime:
- *                   type: number
+ * → Kanon: docs/COMMENT-KANON.md#k-8cfad5dd55da
  */
 
 export function apply(ctx, config) {

@@ -7,17 +7,7 @@
  * wird mit DENSELBEN reinen Funktionen, die der Veredler benutzt
  * (`packages/prompter/assets/note-core.js`) — ein zweiter Prüfer wäre ein
  * zweiter Maßstab, und dann gäbe es keinen.
- *
- * WARUM EIN BEFEHL UND KEIN LISTENER: DSH kennt im Spine kein
- * Sitzungsende-Ereignis. Eine Prüfung, die an einem erfundenen Ereignis hängt,
- * wäre eine Behauptung; ein Befehl mit Exit-Code ist nachprüfbar. Dieselbe
- * benannte Lücke steht in `generated-skills/README.md`.
- *
- * Fail-closed in beide Richtungen: ein Befund ist Exit 1, und eine Datei, die
- * gar kein Zettel IST (fremder Vertrag, leeres Feld, unbekannte Fassung), ist
- * ebenfalls Exit 1 — sie würde sonst stillschweigend nie laden.
- *
- * Exit: 0 = kein Befund, 1 = Befund oder ungelesene Datei, 2 = Bedienfehler.
+ * → Kanon: docs/COMMENT-KANON.md#k-c669b42ee6d9
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';

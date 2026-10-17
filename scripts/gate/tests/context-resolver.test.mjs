@@ -7,26 +7,7 @@
  * traegt Symbole, Kanten, Touches und Chunks, der Enhancer kennt den
  * Kontextvertrag — aber niemand machte aus einem ROHTEXT relevanten Kontext.
  *
- * Fuenf Ebenen, bewusst getrennt:
- *   1. Die Rangfolge aus §14 an einem Fixture: exakter Pfad vor exaktem Symbol
- *      vor Paket/Modul vor Touches vor FTS — als Ausgabereihenfolge, nicht als
- *      Kommentar.
- *   2. Das harte Budget: die Ausgabe bleibt unter der Grenze, auch wenn eine
- *      Datei allein groesser ist als das Budget, und ein groesseres Budget
- *      liefert eine Obermenge.
- *   3. Die einzige Quelle ist der INDEX: eine nach dem Lauf geaenderte Datei
- *      liefert den indizierten Text, eine geloeschte liefert ueberhaupt noch
- *      Text, und ein ausgeschriebener Wert kommt redigiert an. Damit haengt der
- *      Resolver am Secret-Schutz aus Phase 8 statt an der Platte.
- *   4. Der Seam zum Enhancer: die Ausgabe besteht den Kontextvertrag des
- *      Prompt-Pakets (ContextSchema), ihre Pfade sind fuer Referenzen
- *      aufloesbar, und der Kontextblock aus §15 landet als DATEN in der
- *      Nutzer-Nachricht — der Aufruf traegt weiterhin keine Faehigkeit.
- *   5. Der Randfall: kein bekannter Bezug heisst leerer Kontext, nicht
- *      geworfener Fehler; zwei Laeufe liefern dasselbe.
- *
- * Kein Netz, kein Modell, kein node_modules im Repo — wie die uebrigen
- * Abnahmetests dieses Ordners.
+ * → Kanon: docs/COMMENT-KANON.md#k-e0470d3d54de
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

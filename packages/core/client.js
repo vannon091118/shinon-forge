@@ -6,14 +6,7 @@
  * `sidebar.brand.mark` / `sidebar.brand.name` / `conversation.hero.brand.mark`
  * Single-Slots sind: genau ein Besetzer.
  *
- * Abgeleitet aus @deepseek-ai/dsh-client-ui-brand-official (DSH-eigenes Muster):
- *   - factory(require) bekommt CommonJS-require; React aus 'react'.
- *   - ctx.slots.inject(<slot>, …) wartet auf den deklarierten Slot.
- *   - Styles als <style data-plugin-css>, kein 'styles'-Service.
- *   - Das Bundle ist SELF-CONTAINED: kein top-level `import`, denn der
- *     __ModuleLoader__ lädt klassische Scripts (kein ES-Modul).
- *
- * Die Marke ist ein eigener SVG-Pfad (weibliche Cyberpunk-Persona), kein Fremdlogo.
+ * → Kanon: docs/COMMENT-KANON.md#k-fab6cedebe07
  */
 window.__ModuleLoader__.load({
   id: '@shinon/core',

@@ -6,15 +6,7 @@
  * und der Projektindex lag mit dem dauerhaften Ledger in DERSELBEN Datei unter
  * `~/.shinon/indexes` (einem selbstgewählten Ort ohne Konvention). `.gitignore`
  * verhindert Commits — es isoliert keine Pfade.
- *
- * Gepinnt wird:
- *   1. XDG-Basen mit korrekten Defaults (Linux), Overrides nur absolut,
- *   2. workspaceRoot ≠ installRoot, und das Installat ist zur Laufzeit read-only,
- *   3. der Index liegt im CACHE, der Ledger in den DATEN — physisch getrennt,
- *   4. kein Laufzeitort liegt unter einem Installat,
- *   5. `runtimeEnv()` setzt genau die Variablen, die unsere Host-Hälften lesen.
- *
- * Läuft mit `node --test`; kein Netz, kein Modell, kein node_modules nötig.
+ * → Kanon: docs/COMMENT-KANON.md#k-47ea64290546
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

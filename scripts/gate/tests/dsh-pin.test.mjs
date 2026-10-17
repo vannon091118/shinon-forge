@@ -6,21 +6,7 @@
  * Laufzeit — und `vendor/dsh` stand mit `0.2.1-alpha.2` daneben. Vier Stellen, zwei
  * Meinungen: wer die Fassung ändert, musste sie an vier Orten ändern und erfuhr
  * nirgends, wenn er es an einem vergaß. Ein Beleg, der nicht stimmen *kann*, ist
- * schlimmer als keiner, weil er wie ein Nachweis aussieht.
- *
- * Gepinnt wird (fail-closed, ohne Netz, ohne `node_modules`):
- *   1. Root-Pin und Lock nennen dieselbe Fassung, und das Lock zeigt auf genau
- *      diesen Tarball — die Fassung ist damit an das ausgelieferte Artefakt gebunden,
- *   2. das Manifest und das vendorte `package.json` nennen sie ebenfalls,
- *   3. die `integrity` im Manifest ist die des Locks (derselbe Tarball, nicht ein
- *      zweiter),
- *   4. jede vendorte Datei trägt den `sha256` und die Größe aus dem Manifest —
- *      keine fehlt, keine ist übrig.
- *
- * Was hier NICHT geprüft wird: die **installierte** Binary. Sie ist nicht Teil des
- * Baums (CI hat kein `node_modules`), und ein Test, der dann sichtbar überspringt,
- * verletzt die Zusage „kein Skip“ aus B2. Die Gleichheit von Pin und Installation
- * prüft `scripts/gate/tests/message-ingress.test.mjs`, wo der Harness wirklich da ist.
+ * → Kanon: docs/COMMENT-KANON.md#k-c52bbfb3e3dc
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

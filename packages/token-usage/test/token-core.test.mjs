@@ -7,16 +7,7 @@
  * die Regel des Besitzers (`packages/token-usage/assets/token-core.js`):
  *
  *   1. FALTUNG eines Turns aus seinen eigenen dauerhaften Ereignissen
- *      (`turn/start` … `turn/end`) — dieselbe Regel, die DSHs Chat-Bundle
- *      anwendet; die Formen der Ereignisse und der Fenster-Einträge sind die
- *      des gelieferten Clients (`SessionEventLikeEntry`: `{ type: 'event',
- *      event }` bzw. `{ type: 'transient', event }`), nichts davon ist erfunden.
- *   2. PROZENT-REGEL: ein verfehlter Treffer wird nie als 100 verkauft.
- *   3. FORM: kompakte Zahl, deutsche Tausenderpunkte.
- *
- * Der Beweis GEGEN DSHs eigene Funktionen (Wertebereichs-Sweep, Faltung über
- * erzeugte Ereignisfolgen) steht in `scripts/gate/tests/token-usage-vendor.test.mjs`
- * — der braucht `node_modules` und überspringt ohne sie sichtbar.
+ * → Kanon: docs/COMMENT-KANON.md#k-b554efc2dd9a
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

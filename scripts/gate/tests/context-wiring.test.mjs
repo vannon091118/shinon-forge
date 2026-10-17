@@ -7,23 +7,7 @@
  * Prompt liefern — aber der Enhancer darf ihn nicht IMPORTIEREN: die Pakete
  * dieses Repos referenzieren einander nicht. Die Naht ist deshalb eine
  * Faehigkeit, die der Index ueber `ctx.provide` anbietet und der Enhancer
- * OPTIONAL ueber `ctx.get` liest (kein Injektionszwang — sonst waere der
- * Enhancer in einem Profil ohne Index gar nicht geladen).
- *
- * Vier Ebenen, bewusst getrennt:
- *   1. Die Faehigkeiten des Index: seit Zug 2 sind es ZWEI — die Abfrage
- *      (`resolveContext`, der Kontext fuer MAX) und die Ablage (`load`/`save`,
- *      das dauerhafte Gedaechtnis des Scorings). Jede ist schmal, jede hat
- *      ihren eigenen Vertragsnamen, und ohne Index gibt die Abfrage eine
- *      ehrliche Leere (null) statt eines leeren Index.
- *   2. Die Naht als Daten: Dienstname und Vertragsname stimmen in beiden Paketen
- *      ueberein — gepinnt von AUSSEN, weil kein Paket das andere liest.
- *   3. Der echte Durchlauf: beide Bundles an einem echten Cordis-Context, echter
- *      Waterfall agent/pre-step, echte Validierung des gelieferten Kontexts.
- *   4. Die Quelle im Datensatz: index | file | none — die Herkunft ist
- *      nachpruefbar, nicht geraten.
- *
- * Kein Netz, kein Modell, kein node_modules im Repo.
+ * → Kanon: docs/COMMENT-KANON.md#k-715a14a768e8
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

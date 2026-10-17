@@ -32,8 +32,7 @@ export const Config = z.object({
  * No-Op — eine Zeile in einem Profil, die nichts registriert und nichts meldet.
  *
  * 'user/message' hängt am kanonischen Spine-Signal `shinon/message/received`
- * (packages/events/assets/event-spine.json), nicht am Carrier `session/event`:
- * der Spine normalisiert bereits, ein zweiter Weg wäre eine zweite Wahrheit.
+ * → Kanon: docs/COMMENT-KANON.md#k-92f06b8275f8
  */
 export const TRIGGER_SIGNALS = {
   'user/message': 'shinon/message/received',

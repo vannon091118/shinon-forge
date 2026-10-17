@@ -6,12 +6,7 @@
  * mit Lücken ist eine Behauptung, kein Vertrag.
  *
  * Zustände (propsa): IMPLEMENTED | STUB | NOT_IMPLEMENTED | NOT_VERIFIED
- *   STUB          = die Entscheidung, es nicht zu bauen, ist getroffen.
- *   NOT_VERIFIED  = gebaut, aber niemand hat es geprüft.
- * Beides ist ehrlich, aber es führt zu verschiedenen Entscheidungen.
- *
- * Fehlt docs/contracts/ komplett, meldet das Gate das — nicht als Fehler,
- * sondern als offenen Posten (es gibt dann nichts zu prüfen).
+ * → Kanon: docs/COMMENT-KANON.md#k-e6425c89a590
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

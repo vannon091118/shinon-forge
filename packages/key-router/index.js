@@ -6,43 +6,7 @@
  *       (alle 3 Schichten)                             │
  *                                                      ├─▶ Verbindungstest (Kopfzeilen)
  *                                                      └─▶ OVERRIDE: `credentials.resolve(ref)`
- *                                                          bedient die verwalteten Referenzen
- *                                                          aus dem Pool
- *
- * Beim 429 wird ein Platz gedeckelt (`initialDelayMs` → `maxDelayMs`,
- * exponentiell); ein erfolgreicher Lauf baut die Schuld wieder ab. Die Rechnung
- * steht in `assets/pool-core.js` — importfrei und damit in CI testbar; `index.js`
- * ist die Naht zum Lauf (Umgebung, Werkzeuge, Override, Log).
- *
- * DER SICHERHEITSVERTRAG (drei Zusagen, jede an einer Stelle prüfbar):
- *
- *   1. DAS SCHEMA TRÄGT KEIN SCHLÜSSELFELD. Eine Profildatei ist versioniert;
- *      ein Schlüssel darin wäre ein Leck mit Ansage. Die Namen kommen aus der
- *      Umgebung (`envNames`, `envPrefix`) — nur die NAMEN stehen in der Config.
- *   2. NACH AUSSEN GEHT NUR DIE BESCHRIFTUNG DES PLATZES (`key#1`, `key#2`),
- *      niemals ein Präfix des Schlüssels. Der Grund ist gemessen: was ein
- *      Werkzeug zurückgibt, landet im Kontext des Modells und in der
- *      Sitzungstranskription. Ein „Präfix zur Wiedererkennung" ist dort ein
- *      Leck, kein Komfort — Schlüsselmaterial ist ganz oder gar nicht geheim.
- *      (Der Zustand VOR dieser Änderung gab `key.slice(0, 8) + '…'` aus drei
- *      Werkzeugen und in jede Log-Zeile.)
- *   3. JEDER LOG-EINTRAG GEHT DURCH `redact(...)`. Ein Fehlerobjekt kann den
- *      Eingabewert tragen; die Umgebungsvariable kann in einer Meldung stehen.
- *      Damit ist die Zusage eine Funktion und keine Absicht.
- *
- * DER OVERRIDE (PLAN.md §3.12): DSH einen rotierenden Schlüssel geben.
- *
- * Gemessen am installierten Harness, nicht geraten: die Route löst ihren Schlüssel
- * pro Aufruf über `ctx.get("credentials").resolve(ref)` auf (fehlt der Dienst, gilt
- * die Startumgebung), und eine fehlgeschlagene Anfrage läuft als Middleware über
- * `agent/request-error` (Nutzdaten: provider, failure mit stabilem `code`). Darauf
- * steht die Klammer: sie bedient genau die Referenzen, die das Profil als
- * `envNames` nennt, aus dem Pool — alles andere erreicht das Original unverändert
- * (`createResolveOverlay` in pool-core.js, drei Zusagen). Die 429-Beobachtung ruft
- * nur `next()` weiter und trifft keine Wiederholungs-Entscheidung — das gehört
- * `llm-retry`. Was dabei NICHT gemessen ist: eine echte 429-Rotation gegen die
- * laufende Route (dafür bräuchte es zwei echte Schlüssel und einen erzwungenen
- * 429 in dieser Umgebung). Benannt in docs/ZAHLEN.md §4, nicht behauptet.
+ * → Kanon: docs/COMMENT-KANON.md#k-726d03a69335
  */
 
 import z from '@deepseek-ai/schemastery';
@@ -136,10 +100,7 @@ function providerOf(config, providerId) {
  * Benutzer-`.env`). Wer nur `process.env` liest, findet den Schlüssel aus der
  * Datei nicht — genau so stand der Pool im echten Boot leer. Die ausdrücklichen
  * Namen kommen aus allen Schichten (fehlt die Naht, gilt `process.env`); der
- * Präfix-Scan kann nur den Prozess aufzählen (die Momentaufnahme zählt nicht auf)
- * und bleibt dort.
- *
- * Leer ist ein Befund, kein Fehler.
+ * → Kanon: docs/COMMENT-KANON.md#k-947b86581950
  */
 function loadPool(providerConfig, ctx) {
   const launch = typeof ctx?.get === 'function' ? ctx.get('launchEnvironment') : undefined;

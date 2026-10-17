@@ -6,25 +6,7 @@
  * duplizieren (wie Feed-the-Floors lib/commit-text.mjs, hier für Shinon).
  *
  * Drei Regeln, alle fail-closed:
- *   1. Kein KI-Footer. Nie — und in keiner Schreibweise: `with`/`by`, eine oder
- *      mehrere Leerzeichen, Tabs, optionaler Doppelpunkt.
- *   2. Der Vannon-Trailer ist Pflicht — er ersetzt jede Maschinen-Signatur.
- *   3. Die Wort-Regel: mindestens 150 Wörter (ohne Trailer und `#`-Zeilen),
- *      alle Daten namentlich genannt (Pfad, SHA, Messung, Exit oder Run/PR)
- *      und Bildsprache Pflicht (Vergleichs-/Bildmarker aus fester Liste).
- *
- * Der Trailer ist bewusst ein Datenwert an EINER Stelle: ändert sich die
- * Schreibweise, ändert sich hier etwas, und CI, Hook, Gate und Tests ziehen mit.
- *
- * Prüfen und Tauschen benutzen dasselbe zeilenweise Prädikat
- * (`forbiddenLabelsOf`). Daraus folgt die Invariante, die die Tests pinnen:
- *
- *     swapTrailer(n) !== n  ⇒  checkMessage(n).ok === false
- *     checkMessage(n).ok    ⇒  swapTrailer(n) entfernt keine Inhaltszeile
- *
- * Heißt: was der lokale Hook entfernt, muss CI auch ohne Hook ablehnen. Keine
- * Ebene repariert heimlich, was die andere durchwinkt. Signaturen sind
- * zeilenweise — geprüft wird die Zeile, nicht der Fließtext.
+ * → Kanon: docs/COMMENT-KANON.md#k-5c39318b2a8e
  */
 
 /** Der Trailer, der jeden Commit abschließt. */
@@ -103,12 +85,7 @@ export function forbiddenLabelsOf(line) {
  *   1. Umfang: mindestens WORD_MIN Wörter (Whitespace-getrennt; Zahlwörter und
  *      Code zählen mit — dokumentiert, nicht geraten).
  *   2. Daten namentlich: mindestens eine konkrete Referenz aus
- *      NAMED_DATA_PATTERNS (Pfad mit Endung, SHA, Messung `12/3`, Exit oder
- *      Run/PR/Issue). Eine Zahl ohne Herkunft ist kein Beleg.
- *   3. Bildsprache: mindestens ein Vergleichs-/Bildmarker aus
- *      BILDSPRACHE_MARKERS. Die Liste ist bewusst eng und fest: Der Wächter
- *      prüft einen Marker, kein Stilgefühl — was drinsteht, steht in
- *      `docs/COMMIT-REGELN.md`, und was nicht drinsteht, zählt nicht.
+ * → Kanon: docs/COMMENT-KANON.md#k-c2a86d55bdef
  */
 export const WORD_MIN = 150;
 

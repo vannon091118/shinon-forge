@@ -29,36 +29,7 @@ import {
  * Geschmack, sondern gemessen: ein Worker, der DIESE Datei importiert, scheitert
  * im echten Host an `Cannot find package '@deepseek-ai/schemastery'` — der
  * Worker hat die Modulaufloesung des Hosts nicht. Der Kern laedt deshalb ohne
- * Bare-Importe, und der Worker laedt den Kern.
- *
- * WAS DER INDEX IST: der persistente Projektindex aus Plan §9–§12 — files,
- * symbols, edges, references, touches, chunks + FTS5, ausserhalb des Repos unter
- * ~/.shinon/indexes/<project-hash>/index.sqlite.
- *
- * WAS ER ANBIETET: ZWEI Faehigkeiten, jede schmal und jede ueber `ctx.provide`.
- *
- *   1. `QUERY_SERVICE` (Plan §14/§17) — EIN Vertragsname und EINE Operation
- *      (`resolveContext`). Das ist die Naht zum Prompt-Enhancer. Kein
- *      Dateihandle, kein Schema, kein Lauf — wer mehr braucht, importiert den
- *      Kern; wer einen Kontext braucht, fragt hier.
- *   2. `STORE_SERVICE` (Zug 2) — zwei Operationen (`load`, `save`) auf einem
- *      Namensraum. Das ist die Naht zum Scoring, und sie ist die Antwort auf
- *      eine gemessene Luecke: der Index war reine Ableitung (Dateien, Symbole,
- *      Kanten — aus dem Projekt wieder herstellbar), dem Scoring fehlte jeder
- *      Ort fuer das, was NICHT herstellbar ist: Urteile, ihre Zuordnung und der
- *      daraus gerechnete Stand. Bis dahin lebte das im Arbeitsspeicher eines
- *      Hosts und war nach jedem Neustart weg.
- *
- * WARUM ALS DIENST UND NICHT ALS IMPORT: die Pakete dieses Repos referenzieren
- * einander nicht. Enhancer und Scoring lesen ihre Faehigkeit optional ueber
- * `ctx.get`; fehlt sie, ist MAX nur ueber eine Datei zu haben statt gar nicht —
- * und das Scoring rechnet im Speicher weiter, statt zu verschwinden.
- *
- * WARUM ZWEI DIENSTE UND NICHT EINER MIT VIER OPERATIONEN: die schmale Form der
- * Abfrage ist per Test festgenagelt (`contract` + `resolveContext`, genau diese
- * beiden Schluessel). Sie zu erweitern hiesse, jedem Leser des Kontexts ein
- * Schreib-Modul in die Hand zu geben. Zwei Namen, zwei Vertraege, zwei
- * Berechtigungen — dasselbe Prinzip wie bei den Marken-Slots.
+ * → Kanon: docs/COMMENT-KANON.md#k-04269fb71dcc
  */
 
 export * from './assets/index-core.js';
@@ -95,20 +66,7 @@ const validNamespace = (namespace) => typeof namespace === 'string' && namespace
  * „nichts da" und „nicht lesbar" die ganze Aussage ist:
  *
  *   load  { ok: true, state: null }   es gibt (noch) keinen Index — ehrliche
- *                                     Leere. Nichts ist verloren, nichts ist
- *                                     kaputt: hier war noch nie ein Stand.
- *   load  { ok: true, state: {…} }    der Stand (records, memos, scorecard,
- *                                     notes, broken).
- *   load  { ok: false, error }        die Datei ist da, aber unbrauchbar. Ein
- *                                     Fehler, kein stilles Nichts — der Aufrufer
- *                                     entscheidet, ob er leer startet.
- *   save  { ok: true, rows }          geschrieben (ein Aufruf, eine Transaktion).
- *   save  { ok: false, error }        nicht geschrieben; der alte Stand steht.
- *
- * `save` legt die Datei AN, `load` nicht: schreiben ist unsere eigene Ablage
- * (sie darf ihr Zuhause bauen), lesen waere sonst ein erfundener Index —
- * dieselbe Regel wie bei der Abfrage. Ein Namensraum ist Pflicht: ohne ihn
- * waere die Ablage ein namenloser Haufen, und niemand koennte sie wiederfinden.
+ * → Kanon: docs/COMMENT-KANON.md#k-c723d54e00a3
  */
 export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }) {
   // Ohne eigenen Ledger-Pfad wird NICHT stillschweigend in die Indexdatei oder
@@ -147,10 +105,8 @@ export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }
      * Fehler, und die ehrliche Leere („keine Ablage") darf ihn nicht verdecken.
      *
      * EINMALIGE MIGRATION: hat der Ledger den Stand nicht, der INDEX aber schon
-     * (so stand es bis zur Trennung), wird er hier heruebergeholt — verlustfrei
-     * und in einer Transaktion. Danach meldet `reason` nichts mehr. Das ist
-     * keine stille Datenbewegung: `save` schreibt weiterhin nur in den Ledger.
-     */
+ * → Kanon: docs/COMMENT-KANON.md#k-4ecd728f7f18
+ */
     load(namespace) {
       if (!validNamespace(namespace)) return { ok: false, error: 'MISSING_NAMESPACE' };
       if (!hasLedger) return { ok: false, error: 'MISSING_LEDGER_FILE' };
@@ -203,12 +159,7 @@ export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }
  *
  *   null      es gibt (noch) keinen Index — eine ehrliche Leere. Ein leerer
  *             Index waere eine Behauptung: "das Projekt hat keine Dateien".
- *   Kontext   der vertragsgemaesse Kontext; die Budgetgrenze ist hart (§14).
- *   wirft     der Index ist da, aber unbrauchbar (kaputte Datei). Ein Fehler,
- *             kein stilles Nichts — der Aufrufer entscheidet, was er daraus macht.
- *
- * Die Abfrage ERZEUGT KEINEN Index: `openIndex` legt fehlende Dateien an, eine
- * Suche darf das nicht. Deshalb steht davor `existsSync`.
+ * → Kanon: docs/COMMENT-KANON.md#k-460a91877e9e
  */
 export function createQueryService({ indexFile, budgetTokens = DEFAULT_CONTEXT_BUDGET, workspaceRoot = '' }) {
   return {
@@ -263,14 +214,8 @@ export const Config = z.object({
    *              beide, vergleicht er zusaetzlich den Inode-Stempel (Geraet,
    *              Inode, Groesse, mtime, ctime). Damit wird ein Inhalt, der bei
    *              GLEICHER Groesse geaendert und dessen mtime zurueckgesetzt wurde,
-   *              erkannt, ohne dass eine unveraenderte Datei gelesen wird. Der
-   *              Preis sind Lesevorgaenge fuer verdaechtige Dateien; ein Signal
-   *              ohne Inhaltsaenderung (chmod) ist ein gezaehlter Fehlalarm.
-   *   'changed'  vertraut mtime + size. Benannte Luecke: derselbe Inhalt bei
-   *              gleicher Groesse und zurueckgesetzter mtime bleibt unbemerkt.
-   *   'all'      jede Datei lesen und sha256 pruefen; nimmt nichts an und kostet
-   *              ein vollstaendiges Lesen je Lauf.
-   */
+ * → Kanon: docs/COMMENT-KANON.md#k-03e5d719ce37
+ */
   verify: z.union([z.const('stamp'), z.const('changed'), z.const('all')]).default('stamp'),
   /** Bericht nach dem Lauf. */
   trace: z.boolean().default(true),
@@ -333,15 +278,7 @@ function reportLine(report, stats, where) {
  * Deshalb laeuft er (a) nicht im Mount, sondern danach, und (b) im Worker statt
  * im Host. Ist der Worker nicht nutzbar, laeuft derselbe `runIndex` im Host und
  * die Ursache steht im Protokoll — ein stiller Wechsel waere ein Befund ohne Spur.
- *
- * Der Anlauf selbst laeuft NACH dem Mounten; die Abfrage-Faehigkeit wird aber
- * schon hier bereitgestellt. Das ist kein Widerspruch: sie antwortet `null`,
- * solange kein Index vorliegt, und benutzt denselben Dateipfad, den der Lauf
- * schreibt. Damit gibt es kein Fenster, in dem ein Aufrufer nichts bekaeme.
- *
- * Der Secret-Schutz (Plan §13) ist nicht konfigurierbar: er ist keine Option,
- * sondern eine Eigenschaft des Index. Was er nicht schuetzt, steht als Grenze im
- * Kern — ein Detektor mit benannten Mustern ist kein Beweis.
+ * → Kanon: docs/COMMENT-KANON.md#k-86bcb8c92b8a
  */
 export function apply(ctx, config) {
   // S1: DIE EINE Workspace-Identität — explizite Config > Env > cwd. Der

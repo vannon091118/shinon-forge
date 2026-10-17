@@ -280,7 +280,8 @@ Die Befehle aus `package.json` (`scripts`), in der Reihenfolge, in der man sie b
 | `npm run dev` / `dev:web` / `open` | DSH mit dem Profil starten (Web-UI) |
 | `npm start [-- …]` · `shinon [-- …]` | der Einstieg ([`bin/shinon.mjs`](bin/shinon.mjs), auch als `bin`-Feld im Manifest): heilt Node ≥ 22 selbst, findet `dsh` auch außerhalb des PATH und **nennt dessen Herkunft**, startet das Profil; `--check` prüft nur die Startfähigkeit. `scripts/start.mjs` bleibt als kompatibler Aufruf und importiert dieselbe Umsetzung |
 | `npm run verify:panel` | Panel-Beleg über `scripts/panel-check.mjs` (braucht jsdom) |
-| `npm run install:user` | Nutzer-Installat mit Abnahme: `install`/`update`/`rollback`/`status`/`history`/`auto`/`units`/`selftest` (`scripts/install-user.mjs`) |
+| `npm run install:user` | Nutzer-Installat mit Abnahme: `install`/`update`/`rollback`/`status`/`history`/`auto`/`units`/`selftest`/`uninstall` (`scripts/install-user.mjs`) |
+| `npm run uninstall:user` | Rückweg: Timer und Desktop-Verknüpfung weg, Zugangsdateien in einen Tresor (0600) — `--purge` löscht sie stattdessen, `--keep-checkout` lässt den Baum stehen. Die nächste Installation setzt den Tresor zurück und überschreibt nie einen neueren Stand (`scripts/lib/secrets.mjs`) |
 | `npm run verify:install` | read-only Selbsttest eines bestehenden Stands: Check, Doctor, Boot, HTTP-Nachweis (Exit 0 nur bei 4/4) |
 | `npm run backup:retention` | Aufbewahrung des Sicherungsordners (`--keep`, `--max-age`, `--dry-run`, `--json`; jede Anwendung protokolliert) |
 | `npm run profile:links` | Profil-Links setzen/prüfen (idempotent, Fremdpfade Exit 2) |

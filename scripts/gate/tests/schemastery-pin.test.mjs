@@ -6,27 +6,7 @@
  * Deklarationen `~3.18.5-alpha.1`. Die beiden Bereiche sind DISJUNKT — `~3.18.4`
  * akzeptiert keine Vorabfassung von 3.18.5, `~3.18.5-alpha.1` beginnt oberhalb von
  * 3.18.4 —, also durfte npm nicht hoisten: gemessen standen 1× `3.18.4` und 113×
- * `3.18.5-alpha.1` als eigene Verzeichnisse im Baum (114 Kopien, die jedes `npm ci`
- * erneut auspackt). Wer die Root-Range auf die des Harness zieht, bekommt eine
- * Fassung; das ist keine Installationskunst, sondern die Folge daraus, dass die
- * Bereiche sich dann decken.
- *
- * Gepinnt wird (fail-closed, ohne Netz, ohne `node_modules`):
- *   1. Root und JEDES Paket deklarieren dieselbe Range — in `peerDependencies`
- *      UND `devDependencies` (die Host-Shared-Regel aus `SHARED_DEPS`, hier auf
- *      die Fassung angewendet; `repo.mjs` prüft bisher nur die Anwesenheit),
- *   2. die Range ist die des gepinnten Harness (aus dem Lock, nicht aus dem
- *      installierten Verzeichnis),
- *   3. das Lock fordert diese Range überall und trägt GENAU EINEN Eintrag, auf
- *      oberster Ebene — keine verschachtelte Zweitfassung, die beim nächsten
- *      `npm ci` wieder entsteht,
- *   4. dieser Eintrag zeigt auf den Tarball seiner eigenen Fassung.
- *
- * Was hier NICHT geprüft wird: das installierte Verzeichnis. Es ist nicht Teil des
- * Baums (CI prüft ohne `node_modules`), und ein Test, der dann sichtbar
- * überspringt, verletzt die Zusage „kein Skip". Die installierte Seite ist eine
- * Messung, kein Test: `find node_modules -type d -name schemastery` nennt genau
- * einen Pfad, `npm ls @deepseek-ai/schemastery --all` sagt überall `deduped`.
+ * → Kanon: docs/COMMENT-KANON.md#k-8e620b2f3713
  */
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';

@@ -6,23 +6,7 @@
  * `packages/popup/assets/trajectory-core.js` — die Texte liegen in
  * `@shinon/locale-de`, dem Eigentuer, und der Client fuellt sie beim Rendern).
  *
- * WAS HIER ENTSCHIEDEN WIRD und sonst nirgends:
- *
- *   - Ein Eintrag ist nur ein Toat, wenn das Fenster `{ type: 'event', event }`
- *     liefert (gemessene Form `@deepseek-ai/dsh-session`, dieselbe wie popup).
- *   - `tool/call` oeffnet, `tool/result` schliesst ueber
- *     `data.message.source.callId` — OHNE callId wird NICHTS geschlossen.
- *   - `step/start` und `agent/error` sind eigene Toats; `agent/error` bekommt
- *     den Text, nichts anderes.
- *   - Deduplizierung ueber callId, dann Deckelung auf `maxVisible`; die
- *     juestigsten stehen oben.
- *
- * DIE REGION IST EIN ZWILLING: der Marker `zwilling:trace-toasts` steht
- * bytegleich in `packages/traceability/client.js` — ein Client-Bundle ist
- * eigenstaendig und darf diese Datei nicht importieren. Besitzer dieser Datei,
- * geprueft von `SOURCE_TWINS` in `scripts/lib/repo.mjs` (Region + Vertragsname).
- * Der Marker wird hier nicht ausgeschrieben: `regionOf()` sucht die erste
- * Vorkommen der Marke und faende sonst den Hinweis im Kopf statt der Region.
+ * → Kanon: docs/COMMENT-KANON.md#k-b1b7b4947e76
  */
 // #region zwilling:trace-toasts — Besitzer: packages/traceability/assets/trace-core.js
 /** Eintragsform des Fensters: `{ type: 'event', event }`. Chunks und Fremdes fallen weg. */

@@ -6,24 +6,7 @@
  * besetzt keinen Marken-Slot und gibt auch keine Marke heraus — die Figur
  * bleibt in ihren eigenen Flaechen (Panel, XP-Leiste, Arena). Nach aussen
  * lesbar ist allein der ZUSTAND, ueber eine Fenster-Konvention statt ueber
- * einen Import: `window.__codingmon` mit `state()` (dasselbe Muster wie
- * `window.__mk` bei @shinon/markers, damit Pakete referenzfrei bleiben).
- *
- * ZEHN CODEMONS: Werte, Faehigkeiten und Gegnerauswahl stehen in `SPECIES`,
- * `ABILITIES` und `arenaFor()` — gespiegelt aus der Host-Hälfte in index.js.
- * Der Client haelt keinen eigenen Vertrag: dieselbe Formel, dieselbe Tabelle,
- * dieselbe Reihenfolge. Was hier zusaetzlich lebt, ist ZUSTAND (XP, HP, Runde)
- * und Darstellung.
- *
- * KAMPF: rundenbasiert, ausgeloest durch Klick. Der Challenger waehlt eine
- * Faehigkeit, der Gegner antwortet sofort mit seiner eigenen — kein Timer,
- * kein Autoplay, keine Hintergrundschleife. Wer zuerst schlaegt, entscheidet
- * die AGI (Gleichstand an den Herausforderer). Jede Zahl im Log kommt aus
- * einer reinen Funktion (damage), nicht aus einer Animation.
- *
- * XP: Fortschritt kommt aus erfolgreichen Agent-Completions und Kampfsiegen.
- * Der Host zaehlt erfolgreiche `turn/end`-Ereignisse; der Client liest diesen
- * Zaehler und belohnt neue Completions. Tokenverbrauch hat keinen Einfluss auf XP.
+ * → Kanon: docs/COMMENT-KANON.md#k-a552c23582de
  */
 window.__ModuleLoader__.load({
   id: '@shinon/codingmon',
@@ -121,12 +104,8 @@ window.__ModuleLoader__.load({
      * Die zehn Spezies teilen sich DREI Familien — die Form kommt aus der
      * Familie, die Identitaet aus Werten, Faehigkeiten und Farbton. Zehn eigene
      * Matrizen waeren 21 weitere handgezeichnete Sprites; sie werden nicht
-     * erfunden, sondern benannt.
-     *
-     *   .  transparent        o  Outline
-     *   a  hell               b  Koerper      c  Schatten
-     *   w  Augenweiss         e  Pupille      y  Akzent (Blitz/Horn/Flamme)
-     */
+ * → Kanon: docs/COMMENT-KANON.md#k-10be308a1da3
+ */
     const SPRITES = {
       spark: [
         [
@@ -705,17 +684,8 @@ window.__ModuleLoader__.load({
      * sie schickt den Stand ueber den Typert-RPC von DSH an den Host, sofern
      * das Client-Bundle den Beitrag dieses Pakets gemountet hat.
      *
-     * Die Namen stehen hier als LITERAL und nicht als Import: dieses Bundle ist
-     * selbststaendig (es zieht React ueber `require`, nicht ueber `import`) und
-     * kann keine Datei aus `assets/` laden. Quelle ist `assets/uebergabe.js`;
-     * `test/uebergabe.test.mjs` vergleicht beide Seiten Zeichen fuer Zeichen,
-     * damit die Dopplung nicht STILL driftet.
-     *
-     * WAS DIESE FUNKTION NICHT TUT: sie wirft nie, sie wartet nie, und sie
-     * aendert nie den Spielstand. Ohne gemounteten Beitrag ist der Host schlicht
-     * nicht da — dann bleibt alles wie vorher (der Browser haelt den Stand
-     * allein), und der Zustand merkt sich die Absage, statt sie zu verschweigen.
-     */
+ * → Kanon: docs/COMMENT-KANON.md#k-8a3e82b5bc53
+ */
     const HOST_NAMESPACE = 'codingmon';
     const HOST_METHOD = 'writeSnapshot';
     /** Die Lese-Methode derselben Naht (Quelle: `assets/uebergabe.js`). */
@@ -1350,10 +1320,8 @@ window.__ModuleLoader__.load({
      * ESKALATION: was eine Stufe ausmacht. Die Zahlen stehen formatiert da,
      * weil die Aussage die Zahl ist: Schwelle, Werte und Lohn wachsen
      * multiplikativ (x1,35 je Stufe), und der Lebenslauf steht daneben als
-     * BigInt — in Millionenhöhe exakt und nicht gerundet. Der Stellensprung
-     * (zwei- auf fuenfstellig) ist damit der Beweis der investierten Zeit und
-     * keine Behauptung: er steht als Meilenstein mit Wert und Datum im Log.
-     */
+// → Kanon: docs/COMMENT-KANON.md#k-c83e791235d1
+ */
     function EscalationBlock({ s, lvl }) {
       const next = threshold(lvl + 1);
       const base = statsAtExact(s.species, 1);

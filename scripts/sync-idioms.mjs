@@ -7,14 +7,7 @@
  * den Marken nichts — wer den Baustein ändern will, ändert die Quelle und lässt
  * diesen Lauf darüber.
  *
- *   npm run idioms        schreibt alle Blöcke neu (idempotent; ohne Abweichung
- *                         wird keine Datei angefasst)
- *   npm run idioms:check  schreibt nichts, prüft nur
- *
- * Fehlende Marken werden NICHT geraten: die Datei bleibt stehen und das Skript
- * endet mit Exit 1 (fail-closed).
- *
- * Exit: 0 = geschrieben und deckungsgleich, 1 = Marker fehlen oder Drift bleibt.
+ * → Kanon: docs/COMMENT-KANON.md#k-55ab40e6406a
  */
 import * as repo from './lib/repo.mjs';
 import {

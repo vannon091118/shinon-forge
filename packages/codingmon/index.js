@@ -90,14 +90,7 @@ export function apply(ctx, config) {
   // `apply` bleibt SYNCHRON, obwohl das Oeffnen des Spiegels es nicht ist:
   // Cordis faesst den Rueckgabewert als Disposer, und der Vertrag des Gates
   // (`export function apply`) ist eine Zusage. Der Zustand des Spiegels steht
-  // deshalb in einer EIGENEN Zeile — er kann erst nach dem ersten `await`
-  // bekannt sein, und eine Aktivierungszeile, die ihn vorher behauptet, waere
-  // geraten.
-  // ── Aktivitaet: erfolgreiche Completions (J3) ────────────────────────────
-  //
-  // `agent/status` beschreibt nur, ob Arbeit laeuft; idle allein ist KEIN
-  // Erfolgsbeleg. XP und Fortschritt entstehen ausschliesslich aus einem
-  // erfolgreichen `turn/end` auf dem DSH-Carrier (`session/event`).
+// → Kanon: docs/COMMENT-KANON.md#k-b0f78dc914e1
   const activity = { completions: 0, running: false };
   /** Den Zaehler in den Spiegel heben (nur ergaenzen, nie erfinden). */
   const persistCompletions = () => {

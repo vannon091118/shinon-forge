@@ -7,16 +7,7 @@
  *
  *   - Das Fenster liefert `{ type: 'event', event }`; Chunks und Fremdes fallen weg.
  *   - `tool/call` oeffnet, `tool/result` schliesst ueber
- *     `data.message.source.callId` — OHNE callId wird NICHTS geschlossen.
- *   - Ein geschlossener Datensatz wird fertig, statt ein zweiter zu entstehen.
- *   - Deduplizierung ueber callId, Deckelung auf `maxVisible`, juengste zuerst.
- *   - Der Kern ist SPRACHFREI: er liefert Schluessel und Werte, keine Toatetexte.
- *
- * Laeuft mit `node --test` (`npm test`) — kein DSH, kein node_modules.
- *
- * Die BYTEGLEICHHEIT dieser Region zur Client-Haelfte traegt die Zwillings-Regel
- * `zwilling:trace-toasts` in `scripts/lib/repo.mjs` (geprueft von Gate und
- * Build) — hier steht nur die Rechnung, nicht noch einmal ihr Textabgleich.
+ * → Kanon: docs/COMMENT-KANON.md#k-18af7fbd74d2
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

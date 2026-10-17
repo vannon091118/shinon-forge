@@ -26,14 +26,7 @@ export const FILE_MARKER = /<\/?file(\s[^>]*)?>/g;
  * buildEnhancerRequest). Aber die Markierung ist die einzige Auskunft darueber,
  * was Daten sind, und ein Inhalt, der die Marken SELBST traegt, hebt genau diese
  * Auskunft auf: er schliesst den Block vorzeitig, und alles danach liest das
- * Modell als Anweisung ausserhalb des Datenblocks. Das ist kein konstruierter
- * Fall — gemessen am echten Index dieses Repos: der Prompt, der die Plan-Datei
- * nennt, erzeugte ZWEI Abschluesse und 10431 Zeichen ausserhalb der Markierung.
- *
- * Entschaerft werden NUR die Marken des Blocks, nicht der Code: aus `a < b`
- * wird nichts, und eine Datei, die diese Zeichenfolgen als TEXT beschreibt (wie
- * die Plan-Datei selbst), bleibt lesbar — sie steht dann als Text im
- * Datenblock, was sie auch ist.
+ * → Kanon: docs/COMMENT-KANON.md#k-fb13497c3c56
  */
 export function neutralizeMarkers(text) {
   return String(text)

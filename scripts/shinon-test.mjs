@@ -7,8 +7,7 @@
  * scripts/lib/repo.mjs - derselben Quelle, die auch scripts/build.mjs nutzt,
  * damit Gate und Build nicht auseinanderdriften.
  *
- * Pro Paket: package.json + Ressourcen, Namensvertrag, index.js, client.js,
- * cordis.patch.yml (YAML-Schema). Dazu: Legacy-Guard und Profil-Komposition.
+ * → Kanon: docs/COMMENT-KANON.md#k-6cd6adc0ab9c
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

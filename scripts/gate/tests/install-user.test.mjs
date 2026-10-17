@@ -7,14 +7,7 @@
  * Nutzer-Installat und trifft Entscheidungen, die man nicht am Bildschirm
  * erkennen kann — welchen Unterbefehl er kennt, wann er sich weigert und was
  * `status` über einen leeren Ort sagt. Ein Werkzeug, das bei einem falschen
- * Argument still das Falsche tut, wäre schlimmer als Handarbeit.
- *
- * Geprüft wird NUR die Oberfläche (kein Netz, kein npm ci, kein Boot): die
- * Abnahme selbst ist ein Laufzeitbeleg und steht im Protokoll der Sitzung,
- * nicht in einem Test, der ohne Registry und ohne 621 Pakete laufen muss.
- *
- * Die Zustandsdatei wird über `SHINON_STATE_DIR` in ein Temp-Verzeichnis
- * gelenkt — der Test liest und schreibt nie den echten Installationszustand.
+ * → Kanon: docs/COMMENT-KANON.md#k-9668127c3c07
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -232,4 +225,55 @@ test('install-user: update ohne Installat nennt den richtigen ersten Befehl', ()
   const result = run(['update', '--prefix', join(dir, 'nichts')], env);
   assert.equal(result.status, 2, result.stdout);
   assert.match(result.stderr, /install-user\.mjs install/);
+});
+
+test('install-user: uninstall sichert Zugangsdateien im Tresor und entfernt den Baum', () => {
+  const { dir, env } = sandbox();
+  const prefix = join(dir, 'installat');
+  mkdirSync(prefix, { recursive: true });
+  writeFileSync(join(prefix, '.env'), 'AGNES_API_KEY=sehr-geheim\n');
+  writeFileSync(join(prefix, '.credentials.yaml'), 'token: auch-geheim\n');
+  const vault = join(dir, 'vault.json');
+  const result = run(['uninstall', '--prefix', prefix, '--export-secrets', vault, '--no-systemd'], env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(prefix), false, 'das Installat ist weg');
+  assert.equal(existsSync(vault), true, 'der Tresor liegt da');
+  assert.equal(result.stdout.includes('sehr-geheim'), false, 'kein Wert im Protokoll');
+  assert.equal(result.stdout.includes('auch-geheim'), false, 'kein Wert im Protokoll');
+  assert.match(result.stdout, /\.env \(\d+ B\)/, 'die Sicherung nennt Name und Größe');
+  const saved = JSON.parse(readFileSync(vault, 'utf8'));
+  assert.equal(saved.files['.env'], 'AGNES_API_KEY=sehr-geheim\n');
+  assert.equal(saved.kind, 'shinon.secrets/v1');
+  const state = JSON.parse(readFileSync(join(dir, 'state', 'install-state.json'), 'utf8'));
+  assert.equal(state.secretsVault, vault, 'der Zustand merkt sich den Tresor für die nächste Installation');
+});
+
+test('install-user: uninstall --purge legt keinen Tresor an', () => {
+  const { dir, env } = sandbox();
+  const prefix = join(dir, 'installat');
+  mkdirSync(prefix, { recursive: true });
+  writeFileSync(join(prefix, '.env'), 'A=1\n');
+  const vault = join(dir, 'nie.json');
+  const result = run(['uninstall', '--prefix', prefix, '--purge', '--export-secrets', vault, '--no-systemd'], env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /--purge/);
+  assert.equal(existsSync(vault), false, 'purge schreibt nichts');
+  assert.equal(existsSync(prefix), false);
+});
+
+test('install-user: uninstall --keep-checkout lässt den Baum stehen', () => {
+  const { dir, env } = sandbox();
+  const prefix = join(dir, 'installat');
+  mkdirSync(prefix, { recursive: true });
+  writeFileSync(join(prefix, '.env'), 'A=1\n');
+  const result = run(['uninstall', '--prefix', prefix, '--keep-checkout', '--export-secrets', join(dir, 'v.json'), '--no-systemd'], env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(join(prefix, '.env')), true, 'der Baum und die Datei bleiben');
+});
+
+test('install-user: uninstall auf leerem Ort ist kein Fehler', () => {
+  const { dir, env } = sandbox();
+  const result = run(['uninstall', '--prefix', join(dir, 'nichts')], env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Nichts zu entfernen/);
 });

@@ -7,25 +7,7 @@
  * mit dem aktiven Profil und öffnet die tokenisierte UI im Systembrowser.
  * Terminal=false ist die Zusage — kein Fenster, kein Terminal.
  *
- * Ziele (werden bei Bedarf angelegt, nie überschrieben mit fremdem Inhalt):
- *   1. ~/.local/share/applications/shinon-forge.desktop  (App-Menü + Dock)
- *   2. ~/.config/cinnamon/desktop/  (+ Cinnamon-Spice-Varianz)  (Desktop-Icon)
- *
- * Linux-Desktop-Icons brauchen ein trusted Markierung (freedesktop), damit
- * Cinnamon/GNOME sie ausführen — das passiert hier per .desktop: + chmod +x.
- *
- * Aufruf:  node scripts/desktop-launcher.mjs [--uninstall|--check]
- * npm-Entry: desktop:launcher / desktop:launcher:uninstall
- * Exit: 0 = ok, 1 = Befund (fehlt dsh/node/profil; bei --check: Eintrag veraltet),
- *       2 = Bedienfehler.
- *
- * WAS HIER STEHEN MUSS: der ABSOLUTE Pfad der VERIFIZIERTEN Laufzeit (Version
- * gegen `engines` + `node:sqlite`-Rauchtest). Die frühere Fassung schrieb
- * `process.execPath` — den Interpreter, mit dem der Launcher zufällig gestartet
- * wurde. Ein `.desktop`-Eintrag überlebt den Aufruf, der ihn geschrieben hat;
- * zeigt er danach auf ein untaugliches Node, startet der Klick in einen Fehler,
- * der nirgends sichtbar wird. Und der Eintrag wird bei jedem Lauf neu geprüft:
- * ändert sich die Laufzeit (Upgrade), schreibt der nächste Lauf den Eintrag um.
+ * → Kanon: docs/COMMENT-KANON.md#k-a3a91e99873c
  */
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';

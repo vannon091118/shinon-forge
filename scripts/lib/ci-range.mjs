@@ -6,17 +6,7 @@
  * — also genau dort, wo sie niemand testen kann. Hier ist sie eine reine
  * Funktion: Umgebung rein, Bereich raus.
  *
- * Die eine Regel, die zählt: **dieser Resolver prüft nie weniger, als der Push
- * hinzufügt.** Kann der Bereich nicht bestimmt werden (Force-Push auf einen
- * verschwundenen Stand, flacher Klon ohne Hauptlinie, unbekanntes Event), ist
- * das Ergebnis die volle Historie der Spitze. Lieber zu viel geprüft als zu
- * wenig — ein Wächter, der im Zweifel weniger prüft, ist kein Wächter. Für
- * einen neuen Branch ist der Bereich dagegen bestimmbar (Spitze minus
- * Merge-Basis mit origin/main) — dort die volle Historie zu prüfen hieße, die
- * Hauptlinie bei jedem Branch erneut zu richten.
- *
- * `git` wird injiziert (Liste von Argumenten → stdout), damit die Funktion ohne
- * Repository testbar bleibt.
+ * → Kanon: docs/COMMENT-KANON.md#k-aefcb3a7af9b
  */
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -42,8 +32,7 @@ export function isResolvable(rev, git) {
  * mit `origin/main`. Der Klon in CI hat volle Historie (`fetch-depth: 0`),
  * also liegt sie vor. Fehlt sie (Fork ohne Hauptlinie, flacher Klon ohne
  * origin), gibt es keine Basis — dann gilt die volle Historie.
- *
- * @returns der Basis-SHA oder null.
+ * → Kanon: docs/COMMENT-KANON.md#k-f1100626103f
  */
 function branchBase(tip, git) {
   if (!isResolvable('origin/main', git)) return null;

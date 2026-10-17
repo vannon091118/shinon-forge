@@ -7,11 +7,7 @@
  *   2. Manifest-Validierung  Exports, DSH-Bundle-/Client-Metadaten
  *   3. Ressourcen            jede Manifest-/Config-Referenz existiert und parst
  *   4. Patch-Validierung     YAML-Schema der Loader-Patches (Felder, Typen, required)
- *   5. Namensvertrag         package.json ↔ Patch ↔ ModuleLoader-id
- *   6. Komposition           Profil-Bundles, doppelte ids, Paketgraph
- *   7. Artefakte             dist/ inkl. jeder referenzierten Ressource
- *
- * Läuft ohne node_modules - nur node:-Module und der YAML-Parser des DSH-Stacks.
+ * → Kanon: docs/COMMENT-KANON.md#k-fa327989c395
  */
 import { createHash } from 'crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';

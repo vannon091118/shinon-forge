@@ -6,17 +6,7 @@
  * `@shinon/events` und `@shinon/codingmon`. `index.js` re-exportiert diesen Kern,
  * die Host-Anbindung (Dateien lesen) bleibt dort.
  *
- * WAS HIER STEHT: das Lesen und Prüfen der Zettel — Thema-Marke gegen den
- * aufgelösten Kontext, dann die drei Prüfungen (zu spitz, zu breit, doppelt).
- * WAS HIER NICHT STEHT: das Schreiben. Zettel erzeugt das ARBEITENDE Modell mit
- * seinen eigenen Werkzeugen; der Veredler liest und prüft, er erzeugt nichts und
- * ändert nichts. Deshalb gibt es hier keinen Datei-, keinen Netz- und keinen
- * Modellzugriff — jede Funktion ist rein: gleiche Eingabe, gleiches Ergebnis.
- *
- * Kein `Math.random`, kein `Date.now`: Thema-Marke und Prüfung entscheiden nach
- * INHALT und Reihenfolge, nie nach Zeit. Eine Auswahl, die von der Uhr abhinge,
- * wäre nicht nachrechenbar — und ein Zettel, der zufällig lädt, ist ein Zettel,
- * dem niemand trauen kann.
+ * → Kanon: docs/COMMENT-KANON.md#k-13a3df667889
  */
 
 /** Ein Objekt, kein Array, kein null. */
@@ -100,15 +90,7 @@ export function parseNote(text, format = {}) {
  * vorkommen. Ohne Heuhaufen lädt keiner: wer nichts aufgelöst hat, hat auch
  * keinen Anlass.
  *
- * Die Reihenfolge ist Teil des Vertrags: mehr Treffer zuerst, bei Gleichstand
- * die alphabetische Marke. Ohne diese Regel hinge die Auswahl an der Reihenfolge
- * des Dateisystems, und zwei Läufe mit demselben Kontext könnten zwei
- * verschiedene Stände laden.
- * @param entries - `{ file, note }`, so wie der Host sie liest (EINE Huelle je Zettel).
- *                  Die Huelle ist Teil der Form: ohne Datei waere ein Befund nicht
- *                  zuzuordnen, und ein Befund ohne Ort ist keine Auskunft.
- * @returns { loaded, skipped } — `loaded` sind die Hüllen (mit Trefferzahl),
- *          `skipped` nennt je Datei den Grund.
+ * → Kanon: docs/COMMENT-KANON.md#k-38e83b11365d
  */
 export function selectNotes(entries = [], haystack = [], reading = {}) {
   const minLength = typeof reading.minTokenLength === 'number' ? reading.minTokenLength : 4;
@@ -238,14 +220,7 @@ function escapeText(text) {
  * `<haltung>` ohne Haltung wäre eine Behauptung. Ist nichts davon da, kommt
  * `null` zurück — der Aufrufer hängt dann keinen Block an (kein leerer Block im
  * Prompt).
- *
- * ZUG 6 — die Narrative-Lage: der Composite der Narrative Engine kommt als
- * EIGENES Element `<narrative contract="…">` in den Stand. Er trägt seinen
- * Vertragsnamen als Herkunft und ist damit als gelesen ausgewiesen; die Engine
- * sagt selbst `authority: NONE` (abgeleitet ist nicht autoritativ), und dieses
- * Element behauptet deshalb nichts über die Welt — es sagt, wie der Takt
- * gelesen wurde. Nur die FELDER, die der Composite wirklich trägt: ein Arc, den
- * es nicht gibt, wird nicht erfunden.
+ * → Kanon: docs/COMMENT-KANON.md#k-e0e8bc1c4076
  */
 export function renderStand(stand) {
   if (!isRecord(stand)) return null;

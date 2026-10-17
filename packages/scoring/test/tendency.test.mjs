@@ -7,16 +7,7 @@
  *   - GEWICHTUNG: die Stärke eines Signals (`high`/`medium`/`low`) wird über
  *     `limits.strengths` in einen Faktor übersetzt und skaliert das Basis-Delta
  *     des Vertrags. Keine zweite Delta-Tabelle, kein Laufzeit-Parameter.
- *   - WIDERRUF: eine zurückgenommene Zeile fällt aus dem Protokoll, und die
- *     Tafel wird aus dem Rest NACHGERECHNET — exakt der Wert von vorher.
- *   - BETREFF: jede Zeile trägt ihren Betreff (Sitzung + Kennung), deshalb
- *     trifft späte Kritik dieselbe Aufgabe und ein zweites Urteil ERSETZT die
- *     erste Zeile; `judgementOf` ist die Leseseite davon.
- *   - TENDENZ: aus dem Protokoll abgeleitet, datengetrieben (Klassen, Stufen,
- *     Haltungen aus `tendency-rules.json`), deterministisch — und unter
- *     `minSignals` wird NICHTS behauptet.
- *
- * Läuft mit `node --test` (`npm run test:scoring`) — kein DSH, kein Netz.
+ * → Kanon: docs/COMMENT-KANON.md#k-0127dedfbabd
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

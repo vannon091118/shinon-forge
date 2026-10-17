@@ -7,20 +7,7 @@
  * abonniert. Die Engine rechnete, der Composite ging ins Leere, und kein Test
  * konnte das sehen — die Paket-Tests prüfen die Mathematik, nicht die
  * Verdrahtung. Diese Datei prüft die Verdrahtung.
- *
- * Vier Ebenen:
- *   1. Der Vertrag: die Ableitung ist vollständig und jeder Mood-Ereignistyp
- *      existiert im Spine (ein Takt auf ein Ereignis, das es nicht gibt, klingt nie).
- *   2. Die Naht als DATEN: Kanalname und Vertragsname sind auf beiden Seiten
- *      LITERALE (kein Paket importiert das andere) — gepinnt über `twinIssues`
- *      und gegen das echte Bundle. Drift wäre hier STILL.
- *   3. `renderNarrative` ist rein: voller Composite → Abschnitt, fehlender → `null`.
- *      Kein leerer Abschnitt, keine Behauptung.
- *   4. Der echte Bundle-Pfad: das Persona-Bundle an einen Fake-Host gehängt, der
- *      nur `on`/`inject`/`get` kennt, ein Composite auf den Kanal geschickt — der
- *      Abschnitt erscheint, der Persona-Zustand bleibt unberührt (Vorrang!).
- *
- * Läuft mit `node --test` — kein DSH, kein node_modules (Schemastery-Stub).
+ * → Kanon: docs/COMMENT-KANON.md#k-8ac8d942847b
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

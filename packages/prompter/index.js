@@ -54,58 +54,7 @@ export const Config = _config_schema;
  *     → One-Shot-Child  (ctx.llm.stream, KEINE Tools)
  *     → strukturiertes Ergebnis
  *     → Host-Validierung (Schema + Policy)
- *     → übernommener oder verworfener Prompt
- *
- * Verifizierte Grundlage — installiertes DSH 0.2.0-rc.2, nichts davon geraten:
- *
- *   LLM           ctx.llm: LlmRuntime (@deepseek-ai/dsh-llm)
- *                 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
- *                 GenerateOptions: provider, model, messages: RequestMessage[],
- *                 system?, tools?, temperature?, maxTokens?, stop?, signal?,
- *                 sessionId?, purpose?: 'compaction' | 'session-title'
- *   One-Shot      RequestUserInput = { role: 'user', content, id?: never, source?: never }
- *                 Die Doku nennt den Fall ausdrücklich: „a hand-built one-shot may
- *                 include identity-free user inputs."
- *   Stream        StreamChunk u. a. { type: 'text-delta', index, text }
- *   Seam          agent/pre-step, @mode waterfall (siehe @shinon/hook für die
- *                 vollständige Signatur-Verifikation)
- *
- * ZWEI DINGE, DIE DSH NICHT HAT — und die deshalb hier liegen, statt erfunden
- * zu werden:
- *
- *   1. Kein Structured Output. Es gibt in der ganzen Installation kein
- *      `json_schema`, `response_format` oder `generateObject`. Die
- *      Schema-Durchsetzung ist damit zwangsläufig host-seitig: extrahieren,
- *      parsen, validieren, sonst verwerfen.
- *   2. Keine Modus-Semantik für Prompts. MIN/MID/MAX sind keine DSH-Konzepte,
- *      sondern unser Vertrag. Er steht deshalb als DATEN in MODE_CAPABILITIES,
- *      und die System-Prompts werden daraus ERZEUGT (policyFor). Ein separater
- *      Prompt-Text könnte von der Fähigkeitsliste abdriften; ein erzeugter
- *      nicht. Was dieser Vertrag NICHT behauptet: dass ein Modell sich daran
- *      hält. Prüfbar sind die Fähigkeitsliste, der erzeugte Text und die
- *      Annahme-Regeln — nicht der Gehorsam eines Modells.
- *
- * WER IST DER MENSCH? — der Seam liefert NICHT nur Nutzereingaben. Gemessen in
- * DSH 0.2.0-rc.2 reisen mindestens zwanzig Harness-Produzenten als
- * `role: 'user'`-Nachricht durch denselben Batch (`user-approval`,
- * `time-context`, `agent-instructions`, `repeat-tool-reminder`, `ptc-mode` …; die
- * Werkzeug-Kontexte kommen ueber `additionalContexts` der Werkzeuge). Die
- * Menschen erkennt man an `source.kind === 'user'` — genau diesen Test benutzt
- * DSH selbst (der API-Session-Controller raeumt Datei-Uploads damit auf, und der
- * UI-Weg setzt `{ kind: 'user', rpcId, clientTimeZone }`). Ohne die Pruefung
- * haelt der Enhancer Harness-Text fuer die Nutzereingabe und ersetzt ihn: eine
- * umformulierte Freigabe-Antwort („ja") ist eine geaenderte Entscheidung, keine
- * Stilfrage.
- *
- * CAPABILITY-ISOLATION (die eigentliche Sicherheitsgrenze): der One-Shot-Child
- * bekommt **kein `tools`-Feld**. Es gibt keinen Werkzeugkatalog, den man
- * einschränken könnte — die Liste ist leer, weil sie nicht existiert. Damit
- * fehlen Dateisystem, Shell, Subprozess, Terminal, Browser, beliebige Tools und
- * verschachtelte Agent-Steuerung nicht durch eine Policy, sondern durch
- * Abwesenheit. Ein XML-Tag wäre keine Grenze; das ist eine. Die
- * `<untrusted_project_context>`-Markierung aus Plan §15 ist ausdrücklich KEINE
- * Sicherheitsgrenze — sie sagt dem Modell, was Daten sind. Die Grenze bleibt die
- * fehlende Fähigkeit.
+ * → Kanon: docs/COMMENT-KANON.md#k-f4c0e94d7ce6
  */
 
 /**
@@ -116,9 +65,7 @@ export const Config = _config_schema;
  * hat nie etwas veredelt, und ohne sichtbaren Lauf waere das nicht aufgefallen.
  * Genau so deklarieren es die mitgelieferten Hostplugins (dsh-agent-instructions
  * exportiert `inject` neben `Config` und `apply`).
- *
- * Nebenwirkung, die dazugehoert: ohne `llm`-Dienst wird dieser Host gar nicht
- * erst montiert — er kann ohne ihn nichts tun. Der Hook bleibt unabhaengig davon.
+ * → Kanon: docs/COMMENT-KANON.md#k-914a925b339b
  */
 
 export const inject = ['llm'];
@@ -132,11 +79,7 @@ export const inject = ['llm'];
  * Terminal, Instruktionen, Erinnerungen, Werkzeug-Feedback). Ohne diesen Test
  * waere die jeweils letzte Nachricht irgendein Harness-Text — und der wuerde
  * veredelt und ersetzt (Enhancer) bzw. als Auftrag gelesen (Router). Fremde
- * Herkunft heisst deshalb: nicht anfassen.
- *
- * Die Nachricht kommt MIT zurueck, weil ein Aufrufer sie ueber ihre Identitaet
- * wiederfinden muss — ueber einen Index zu raten waere ein stiller Fehler. Der
- * Text ist UNGETRIMMT; was ein Aufrufer davon will, entscheidet er.
+ * → Kanon: docs/COMMENT-KANON.md#k-b7a8cb95e475
  */
 function lastHumanMessage(messages) {
   const list = Array.isArray(messages) ? messages : [];
@@ -184,14 +127,7 @@ function warnIndex(runtime, detail) {
  *
  *   kein Dienst        `MODE_NEEDS_CONTEXT` — es gibt keine Quelle. Das ist der
  *                      Normalfall in einem Profil ohne Project Index, kein Fehler.
- *   falscher Vertrag   `CONTEXT_INVALID` — wer unter diesem Namen etwas anderes
- *                      anbietet, liefert keine Projektkenntnis.
- *   `null`             `MODE_NEEDS_INDEX` — der Index ist noch nicht da. Eine
- *                      eigene Ursache, weil sie sich von selbst behebt: der
- *                      naechste Schritt hat ihn.
- *   unbrauchbar        `CONTEXT_INVALID` — Wurf oder Formverstoss. Geprueft wird
- *                      gegen DENSELBEN `ContextSchema` wie die Datei, damit es
- *                      fuer MAX genau eine gueltige Form gibt.
+ * → Kanon: docs/COMMENT-KANON.md#k-cf83279e4d43
  */
 function indexContext(ctx, config, text, runtime) {
   let service;
@@ -301,12 +237,7 @@ function maxContext(ctx, config, runtime, prompt) {
  * die Klassifikation einem LEBENDEN Agenten zuordnen, und `ctx.goals` akzeptiert
  * nur die exakte Instanz der Registry — ueber die Sitzung ist sie eindeutig.
  * Ohne dieses Feld waere die Zuordnung ein Raten nach Reihenfolge.
- *
- * `context_source` nennt die QUELLE, die den Kontext geliefert hat (`index` |
- * `file` | `none`), waehrend `context` sagt, wie es ihr erging. Zwei Felder, weil
- * es zwei Fragen sind: „hat MAX einen Kontext benutzt" und „woher kam er".
- * Ohne das zweite waere ein Indexkontext von einer Datei nicht zu unterscheiden,
- * und die Naht nicht nachpruefbar.
+ * → Kanon: docs/COMMENT-KANON.md#k-7bf397ab7eeb
  */
 function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contextSource = 'none', contextUsed = false) {
   const result = outcome.result;

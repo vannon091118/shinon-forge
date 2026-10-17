@@ -7,13 +7,7 @@
  *   - Hash-basierte Deduplikation: gleicher Inhalt = gleicher Hash = kein Double.
  *   - Token-Präfix-Matching: "test" trifft auf "tests", "testen", ...
  *   - Nur Treffer werden geliefert (score > 0).
- *   - Größenbudget: Datei über MAX_FILE_CHARS und Inhalt über MAX_INDEX_CHARS
- *     wird nicht aufgenommen — jeder Ausschluss trägt einen Grund (ZU_GROSS,
- *     BUDGET_ERSCHOEPFT), der Schnitt ist sortiert und damit deterministisch.
- *   - Intent-Matching: Handlungsphrase → Expansion; Themenwort und Frage → null
- *     bzw. Klassifikation ohne Expansion (der Agent antwortet, statt zu handeln).
- *
- * Läuft mit `node --test` — kein DSH, kein Netz.
+ * → Kanon: docs/COMMENT-KANON.md#k-7c72da4327b9
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

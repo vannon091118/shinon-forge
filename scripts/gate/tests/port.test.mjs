@@ -7,14 +7,7 @@
  * sah aus wie ein kaputtes Profil. Die Port-Wahl ist deshalb jetzt eine geprüfte
  * Zusage: eine ungültige Angabe wird gemeldet statt geraten, ein belegter Port
  * wird ÜBERSPRUNGEN, und ein volles Fenster endet in einem Abbruch statt in
- * einem stillen Rückfall auf einen belegten Port.
- *
- * Geprüft wird mit injizierter Probe (deterministisch, kein Socket) UND einmal
- * gegen einen echten Listener auf 127.0.0.1 — die Probe muss einen wirklich
- * belegten Port erkennen, sonst beweist sie nichts.
- *
- * Läuft mit `node --test` (CI: .github/workflows/commit-guard.yml). Kein Netz
- * nach außen, kein Modell, kein node_modules.
+ * → Kanon: docs/COMMENT-KANON.md#k-f09402fc7dad
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

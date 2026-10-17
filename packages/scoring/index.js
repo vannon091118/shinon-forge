@@ -9,23 +9,7 @@ import { readFileSync } from 'node:fs';
  * Signaltabelle (./assets/signal-rules.json) — reines Replay: Anfangszustand +
  * Signalstrom → Scorecard + Injektion + Digest. Deterministisch (kein
  * Math.random, kein Date.now, kein Modell), fail-closed bei Unbekanntem. Die
- * reine Mechanik liegt in ./assets/scoring-core.js (keine Imports, testbar ohne
- * node_modules); diese Datei lädt nur Verträge, haengt die Ohren an den
- * Ereigniskanal des Spines und re-exportiert den Kern.
- *
- * Kein Browser, keine Plattform-Abhaengigkeit: die Quellen sind Ereignisse, die
- * DSH selbst schreibt (Urteil je Antwort, Widerruf, Sitzungsbemerkung,
- * Menschen-Text, Turn-Ende). Was intern keine Quelle hat, steht in der Tabelle
- * als nicht beobachtbar — und wird nie geraten.
- *
- * DIE ABLAGE (Zug 2): dieser Host SCHREIBT SELBST NICHTS — kein Dateisystem,
- * keine Datenbank, kein `Date.now` (das Gate haelt das fest). Der Stand geht
- * ueber den zweiten, schmalen Dienst des Projekt-Index (`shinon_index_store`,
- * `shinon.project-index/store-v1`) in die SQLite, die der Index ohnehin fuer das
- * Projekt fuehrt — und wird beim Start von dort wieder gelesen. Fehlt der Dienst
- * (ein Profil ohne Project Index) oder ist er unbrauchbar, rechnet das Scoring
- * unveraendert im Speicher weiter: die Ablage ist eine Verstaerkung, keine
- * Bedingung.
+ * → Kanon: docs/COMMENT-KANON.md#k-3a0bdde97092
  */
 
 export {
@@ -75,8 +59,7 @@ export const LEDGER_NAMESPACE = 'shinon.scoring/ledger-v1';
  * HALTUNG und ihre Stufen. Deshalb genau ZWEI Felder — `contract` und EINE
  * Operation `read` — und `read` gibt `null` zurueck, solange nichts zu sagen
  * ist. Dieselbe Bauform wie die Abfrage des Index, aus demselben Grund: kein
- * Paket liest ein anderes, und der Vertragsname wird auf beiden Seiten geprueft.
- * Die Gleichheit der Namen pinnt `scripts/gate/tests/context-wiring.test.mjs`.
+ * → Kanon: docs/COMMENT-KANON.md#k-03cfefd4eb43
  */
 export const SCORING_SERVICE = 'shinon_scoring_state';
 export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
@@ -169,13 +152,7 @@ export function apply(ctx, config) {
   //   fremder Dienst    wer den Namen traegt, muss den Vertrag UND beide
   //                     Operationen tragen. Sonst wird er nicht benutzt.
   //   nicht lesbar      LEER starten (die Tafel steht bei initial) mit dem
-  //                     GRUND im Protokoll. Ein kaputter Index darf den Host
-  //                     nicht anhalten — und nicht so tun, als sei er heil.
-  //   nicht schreibbar  warnen und weiterrechnen: der laufende Prozess ist
-  //                     wichtiger als die Ablage.
-  // Einmal gefunden, bleibt gefunden. Ein NICHT gefundener Dienst wird dagegen
-  // erneut gefragt: die Mount-Reihenfolge eines Profils ist keine Zusage, und
-  // eine Abfrage ist ein Nachschlagen im Dienstverzeichnis — kein Aufwand.
+// → Kanon: docs/COMMENT-KANON.md#k-cc7e067c400e
   let store = null;
 
   /**
@@ -186,14 +163,8 @@ export function apply(ctx, config) {
    * … der Stand bleibt im Speicher", waehrend derselbe Lauf mit dem ersten
    * Signal in genau diese Ablage schrieb (belegt: `Stand geladen: 1 Signale`
    * im naechsten Boot). Ein Satz, der eine Frage beantwortet, die zu diesem
-   * Zeitpunkt noch offen ist, ist keine Auskunft.
-   *
-   * Deshalb jetzt: gefunden wird sofort genannt (das ist ein Fakt), NICHT
-   * gefunden erst beim ersten echten Gebrauch — dort liegt der Blick hinter
-   * allen Mounts, und dort ist „kein Gedaechtnis" eine Aussage statt einer
-   * Vermutung. Ein Boot ohne ein einziges Signal nennt die Ablage gar nicht:
-   * eine Zeile, die nichts weiss, ist besser als eine, die etwas behauptet.
-   */
+ * → Kanon: docs/COMMENT-KANON.md#k-d2a0f472685d
+ */
   let mountProbe = true;
   let decided = false;
   const announceStore = () => {

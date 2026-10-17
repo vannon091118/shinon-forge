@@ -7,9 +7,7 @@
  * BESCHREIBUNG (`generated-skills/README.md`, was ein Mensch liest). Dazu kommt
  * die echte Sammlung, die das arbeitende Modell schreibt. Diese Datei prueft
  * alle drei — und die Fail-Richtung des Befehls an einer Fixture.
- *
- * Kein DSH, kein Netz, kein Modell: nur die reinen Funktionen des Kerns, die
- * Dateien des Repos und der echte Befehl `npm run notes:check`.
+ * → Kanon: docs/COMMENT-KANON.md#k-1f95451a5235
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

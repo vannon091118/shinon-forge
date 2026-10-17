@@ -7,19 +7,7 @@
  * und die Ereignisse kommen in der Form, die DSH wirklich schreibt —
  * `session/event` mit `(session, event)` und `data`, wie im echten Log gemessen:
  *
- *   user/message   data.source.kind = 'user'  (Mensch)  |  'agent-instructions'
- *                                                    |  'runtime-context'  (Harness)
- *   turn/end       data.reason.kind = completed | aborted | error
- *   feedback/message-put     data.item = { messageId, rating }
- *   feedback/message-delete  data = { sessionId, messageId }
- *
- * Damit ist belegbar, was sonst nur behauptet waere: die Ohren haengen am echten
- * Kanal, Harness-Text zaehlt nicht, der Widerruf rechnet exakt zurueck, und ein
- * unbekanntes Ereignis aendert nichts. Kein Browser, kein DSH, kein Schluessel.
- *
- * Laeuft mit `node --test` — die Pakete werden in ein temporaeres Verzeichnis
- * kopiert und mit einem Schemastery-Stub versehen (die einzige peer-Dependency,
- * die hier nicht installiert ist).
+ * → Kanon: docs/COMMENT-KANON.md#k-b3aa670f5723
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

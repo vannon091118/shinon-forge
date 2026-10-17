@@ -6,18 +6,7 @@
  * Namespace, Methode, Dienstschluessel und die Feldliste des Vertrags. Diese
  * Namen standen sonst zweimal im Baum (Host in index.js, Client als Literal in
  * client.js), und zwei Wahrheiten driften — genau das, was der Rest dieses
- * Pakets vermeidet.
- *
- * WAS HIER BEWUSST NICHT STEHT: kein Import. Das Client-Bundle ist
- * selbststaendig (es zieht React ueber `require`, nicht ueber `import`) und kann
- * diese Datei deshalb nicht laden; client.js traegt die Namen als Literal und
- * `test/uebergabe.test.mjs` vergleicht beide Seiten Zeichen fuer Zeichen. Die
- * Dopplung bleibt so sichtbar und geprueft statt still.
- *
- * Die Naht selbst ist DSHs Typert-RPC (api-gateway): der Client holt sich den
- * generierten Beitrag ueber `ctx.remote.$mount(contribution)` und ruft die
- * Methode; der Host loest den Endpunkt in seiner Registry auf und ruft den
- * Dienst. Was hier steht, muss in BEIDEN Haelften passen.
+ * → Kanon: docs/COMMENT-KANON.md#k-ceb8420c5755
  */
 
 /** Das Paket, dem die Naht gehoert. Muss dem `name` in package.json entsprechen. */

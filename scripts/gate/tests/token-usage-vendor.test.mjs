@@ -7,21 +7,7 @@
  * die nur gegen die eigenen Erwartungen geprüft wird, ist eine Behauptung: die
  * frühere Fassung gab 136 von 45.531 Paaren als `100 %` aus, wo DSH `99.5`
  * schreibt, und ging mit ihrer eigenen Testtabelle grün durch. Dieser Test
- * vergleicht deshalb gegen den GELIEFERTEN Code selbst:
- *
- *   1. `formatCacheHitPercent` gegen die Funktion aus dem Bundle
- *      `@deepseek-ai/dsh-client-ui-chat` (Region
- *      `lib/types/client/chat/token-format.js`) — über den ganzen Wertebereich,
- *      beide Nachkommastellen. JEDE Abweichung ist rot.
- *   2. `deriveTurnUsage` gegen `deriveTurnTokenUsage` aus
- *      `@deepseek-ai/dsh-token-meter/client` — über vollständige, verstümmelte
- *      und zufällig erzeugte Ereignisfolgen (deterministisch, kein Zufall aus
- *      der Uhr).
- *   3. Die Client-Hälfte trägt DIESELBE Region (bytegleich): was hier für den
- *      Besitzer grün ist, gilt damit auch für das ausgelieferte Bundle.
- *
- * Braucht `node_modules` und überspringt ohne sie SICHTBAR (Grund im Testnamen) —
- * dieselbe Regel wie der Store- und der Übergabe-Test.
+ * → Kanon: docs/COMMENT-KANON.md#k-f7390febcb6c
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

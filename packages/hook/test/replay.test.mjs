@@ -7,16 +7,7 @@
  * dort gegen echtes Cordis gefahren. Hier bleibt nur, was dort nicht hingehört:
  *
  *   1. Die Replay-Fixture bleibt ein gültiges, in sich stimmiges Orakel des
- *      Wave-2-Event-Vokabulars — sie soll nicht still verrotten.
- *   2. Die Client-Hälfte ist ein LADBARES Cordis-Plugin. Das ist eine echte
- *      Bruchstelle: ein Datenobjekt ohne apply() reißt den GESAMTEN Client-Boot
- *      der Web-UI ab, weil der Loader alle Einträge in einem Promise.all mountet.
- *      Statisch prüft das bisher niemand (siehe Probe hook-client-plugin-shape).
- *
- * Was hier bewusst NICHT mehr steht: String-Inspektion von index.js. Sie war
- * implementierungsgekoppelt (sie prüfte z. B. das Vorhandensein von
- * `EventSchema.safeParse`, einer Schemastery-API, die es nicht gibt) und
- * bewies Verhalten nur scheinbar. Dieses Feld gehört dem ausführbaren Vertrag.
+ * → Kanon: docs/COMMENT-KANON.md#k-822a3b1508c4
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

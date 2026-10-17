@@ -7,27 +7,7 @@
  * den Lauf deshalb NACH den Mount und in einen Worker. Diese Entscheidung war im
  * Code als eine Zeile Kommentar belegt („gemessen: 817 ms") — eine Zahl ohne
  * Befehl. Dieses Skript ist der Befehl.
- *
- * WARUM DREI ZAHLEN UND NICHT EINE: „der Scan dauert X" verschmilzt drei
- * verschiedene Kosten, und aus der Summe lässt sich die Anordnung nicht mehr
- * begründen:
- *
- *   1. MOUNT    — was `apply()` den Aufrufer kostet (Fähigkeiten bereitstellen,
- *                 Lauf einplanen). Wäre sie groß, wäre „nach dem Mount" wirkungslos.
- *   2. LAUF     — was ein vollständiger Lauf im Worker kostet (kalt: alles lesen).
- *   3. WIEDERHOLUNG — was der nächste unveränderte Lauf kostet. Ist sie fast null,
- *                 ist der Preis des Starts einmalig und nicht pro Start.
- *
- * WAS HIER ECHT IST: der Kern (`runIndex`, `listFiles`, `indexPath`), die
- * Host-Hälfte (`apply`, `Config`) und der Worker (`runIndexInWorker`) — dieselben
- * Funktionen, die der Host benutzt. Was NICHT echt ist: die Uhr (drei Läufe,
- * keine Statistik), die Maschine (diese VM) und das Indexverzeichnis (temporär
- * statt `~/.shinon/indexes/<hash>`; der Ort ändert die Zeit nicht, die Menge
- * schon). Die Zahlen gehen nach docs/probes/project-index-startscan.json.
- *
- * Aufruf: `node scripts/index-scan-cost.mjs` (braucht `dsh` bzw. node_modules im
- * PATH, weil die Host-Hälfte `@deepseek-ai/schemastery` auflöst), dann
- * `node scripts/index-scan-cost.mjs --json` für die Rohform.
+ * → Kanon: docs/COMMENT-KANON.md#k-1f83cd1fe67b
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
