@@ -11,10 +11,10 @@
     "./assets/narrative-state.json": "./assets/narrative-state.json"
   },
   "peerDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.4"
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.4"
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "dsh": {
     "bundle": {

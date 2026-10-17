@@ -92,12 +92,12 @@ gestoppt und gemeldet, nicht repariert.
 
 ### 1.2 (B4) `schemastery` auflösbar, keine Versionsmischung
 - **Ziel:** eine Fassung für Root und Build verwenden.
-- **Schritte:** Root-Pin `~3.18.4` gegen den später zu vendorenden Stand `3.18.0` abgleichen; Entscheidung erst mit 3.2, dann ggf. Pin anpassen.
-- **Abnahme:** `npm run gate:test` läuft ohne Umgebungsfehler durch.
-- **Nachweis:** Exit-Code und Zählung von `npm run gate:test`.
+- **Schritte:** Der Root-Pin folgt der Range des gepinnten Harness (`~3.18.5-alpha.1`, heute auf `3.18.5` aufgelöst) — das ist keine freie Wahl: `~3.18.4` und `~3.18.5-alpha.1` sind disjunkt, also darf npm nicht hoisten und legt jeder Direktabhängigkeit eine eigene Kopie bei (gemessen 2026-10-17: 1× `3.18.4` + 113× `3.18.5-alpha.1`, 114 Kopien). Der Abgleich mit dem zu vendorenden Stand bleibt bei 1.5.
+- **Abnahme:** `npm run gate:test` läuft ohne Umgebungsfehler durch, und `scripts/gate/tests/schemastery-pin.test.mjs` belegt die eine Fassung (Manifest-Gleichheit, Range des Harness, genau ein Lock-Eintrag).
+- **Nachweis:** Exit-Code und Zählung von `npm run gate:test`; `npm ls @deepseek-ai/schemastery --all` sagt überall `deduped`, `find node_modules -type d -name schemastery` nennt genau einen Pfad.
 - **Risiko:** mittel / hoch (Versionsmischung bricht zur Laufzeit, nicht im Test).
 - **Abhängig von:** 3.2 (Vendor-Stand)
-- **Status:** offen — Auflösbarkeit im Root ist bereits belegt (`STAND` §4)
+- **Status:** erledigt für „eine Fassung im Baum" (2026-10-17); der Vendor-Abgleich (3.18.0) bleibt offen und hängt an 1.5.
 
 ### 1.3 (B1) `Docs/` nach `docs/` migrieren
 - **Ziel:** ein Dokumentationsordner; Case-Fold-Kollision beseitigen.
