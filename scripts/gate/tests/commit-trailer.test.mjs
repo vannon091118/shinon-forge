@@ -509,6 +509,26 @@ test('commit-guard --ci: Push mit auflösbarem before prüft nur die Spanne', ()
   assert.match(result.stdout, /1 Commit/);
 });
 
+test('commit-guard --ci: Merge prüft keine importierten Commits der zweiten Elternlinie', () => {
+  const repo = tempRepo();
+  repo.commit(VALID_SAMPLE, 'base.txt');
+  repo.git(['branch', '-M', 'main']);
+  repo.git(['checkout', '-q', '-b', 'feature']);
+  repo.commit(VALID_SAMPLE, 'feature.txt');
+  const before = repo.rev('HEAD');
+
+  // main bekommt nach dem Abzweig einen historisch ungültigen Commit. Ein
+  // Merge in feature darf ihn beim Push nicht erneut als Branch-Änderung werten.
+  repo.git(['checkout', '-q', 'main']);
+  repo.commit(FORBIDDEN_SAMPLE, 'upstream.txt');
+  repo.git(['checkout', '-q', 'feature']);
+  repo.git(['merge', '--no-edit', 'main']);
+
+  const result = run([GUARD, '--ci'], repo.dir, pushEnv(repo, { before }));
+  assert.equal(result.status, 0, 'der zweite Elternzweig gehört nicht zum neuen Push-Diff');
+  assert.match(result.stdout, /keine Commits/, 'der Merge selbst wird nicht wie ein Inhalts-Commit geprüft');
+});
+
 test('commit-guard --ci: Footer im neuen Commit ⇒ Exit 1', () => {
   const repo = tempRepo();
   repo.commit(VALID_SAMPLE, 'a.txt');
