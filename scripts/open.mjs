@@ -26,6 +26,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { dshBinary, dshSource } from './lib/dsh.mjs';
+import { childEnv, describePaths } from './lib/paths.mjs';
+import { resolveRuntime, runtimeFailure } from './lib/runtime.mjs';
 import { DEFAULT_PORT_BASE, parsePort, pickFreePort } from './lib/port.mjs';
 import * as os from 'node:os';
 
@@ -49,6 +51,15 @@ if (dsh === null) {
   process.exit(2);
 }
 const source = dshSource();
+
+// Die Laufzeit wird VERIFIZIERT (Version gegen `engines` + node:sqlite-Rauchtest).
+// Ein untaugliches Node ist hier ein Umgebungsfehler mit Begründung — kein
+// stiller Start, der erst im Index an `node:sqlite` stirbt.
+const runtime = resolveRuntime();
+if (runtime.binary === null) {
+  console.error(`💥 open: keine taugliche Node-Laufzeit —\n${runtimeFailure(runtime)}`);
+  process.exit(2);
+}
 
 /** Öffner je Plattform — Tabelle statt verschachtelter Ternaere. */
 const PLATFORM_OPENERS = {
@@ -105,9 +116,12 @@ try {
   process.exit(2);
 }
 
+const paths = describePaths();
 console.log('═══════════════════════════════════');
 console.log('  Shinon Forge — 1-Click-Start');
 console.log(`  Profil: ${profileName}    dsh: ${source?.kind ?? 'unbekannt'} — ${dsh.slice(1).join(' ')}`);
+console.log(`  node:   ${runtime.version} — ${runtime.binary}`);
+console.log(`  DSH_HOME: ${paths.dshHome}`);
 console.log(`  Port: ${PORT === 0 ? '0 (vom Betriebssystem gewählt)' : PORT}${PORT === 0 || PORT === requested.port ? '' : ` (erster freier ab ${DEFAULT_PORT_BASE})`}`);
 if (ephemeral && ARGS_NETWORK) console.log(`  Hinweis: --network braucht eine bekannte Nummer, --port 0 wurde zu ${PORT} aufgelöst`);
 if (ARGS_NETWORK) console.log('  Netzwerk-Modus aktiv (--network: SSH-Tunnel für externen Zugriff)');
@@ -130,7 +144,9 @@ if (ARGS_NETWORK) {
 
 const child = spawn(dsh[0], [...dsh.slice(1), ...args], {
   cwd: root,
-  env: { ...process.env, DSH_HOME: root },
+  // EIN Umgebungsblock: DSHs Home und unsere Orte aus dem Pfaddienst, dazu der
+  // PATH mit dem verifizierten Node.
+  env: childEnv(runtime),
   stdio: ['inherit', 'pipe', 'inherit'],
 });
 

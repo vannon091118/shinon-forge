@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { extname, join, relative, resolve, sep } from 'node:path';
+import { PRUNE_DIRS } from '../../lib/scan.mjs';
 
 export const id = 'typescript';
 export const REQUIRED_INCLUDE = ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'];
@@ -19,8 +20,14 @@ export const REQUIRED_OPTIONS = {
   skipLibCheck: true,
 };
 
+/**
+ * Gesperrte Ordner beim Scannen. `REQUIRED_EXCLUDE` bleibt der VERTRAG für die
+ * tsconfig (`validateTypeScriptConfig` prüft ihn dort); der Baumlauf selbst nimmt
+ * die gemeinsame Regel aus `scan.mjs` — sie ist eine Obermenge und enthält die
+ * Werkzeug-/Laufzeitordner, die der Vertrag nicht aufzählt.
+ */
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
-const IGNORED_DIRS = new Set(REQUIRED_EXCLUDE);
+const IGNORED_DIRS = new Set([...REQUIRED_EXCLUDE, ...PRUNE_DIRS]);
 
 /** Return first-party TypeScript paths, relative to root and normalized to '/'. */
 export function discoverTypeScriptFiles(root) {

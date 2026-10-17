@@ -20,6 +20,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { dshBinary } from './lib/dsh.mjs';
+import { childEnv } from './lib/paths.mjs';
+import { resolveRuntime } from './lib/runtime.mjs';
 import * as repo from './lib/repo.mjs';
 
 /**
@@ -89,6 +91,10 @@ export function checkForUpdates() {
       execFileSync('npm', ['view', '@deepseek-ai/dsh', 'versions', '--json'], {
         encoding: 'utf8',
         timeout: 45000,
+        // EIN Kind-Umgebungsblock: der verifizierte Node steht VORN im PATH.
+        // Ohne das scheitert `npm` in einer Umgebung mit gekürztem PATH an
+        // ENOENT — und der Lauf meldete „keine Updates" statt „ungeprüft".
+        env: childEnv(resolveRuntime()),
       }),
     );
   } catch (error) {
@@ -193,7 +199,7 @@ function run() {
 
     // 3. Update DSH (Installationsmodell: globales Update, wie bisher)
     console.log('📦 Aktualisiere DSH...');
-    execFileSync('npm', ['update', '-g', '@deepseek-ai/dsh'], { stdio: 'inherit' });
+    execFileSync('npm', ['update', '-g', '@deepseek-ai/dsh'], { stdio: 'inherit', env: childEnv(resolveRuntime()) });
 
     // 4. Installiere Bundles (kanonisches Profil, aufgelöstes Binary)
     installBundles(profile);
