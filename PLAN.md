@@ -603,13 +603,12 @@ hier. Code, der die Zusage erfüllt, aber keinen belegten Lauf hat, ist offen.
 | S0 Freeze | Freeze in Roadmap + dieser Tabelle; historische Arbeitsbaum-Regeln oben als HISTORISCH markiert; v0.5.0-Liste nennt Selbstupdate, Autoupdate, `.deb` | diese Datei + `docs/ROADMAP.md` §1.5/§3 |
 | S1 Workspace | Prompter und Project Index beantworten dieselbe Workspace-Frage; fremde Root wird abgelehnt, `..`/Symlink-Ausbruch gestoppt, Veraltetes entfernt — und jede dieser Proben wird bei einer Mutation rot | `npm run test:prompter`, `npm run gate:test` (Mutationsprobe im Commit-Text) |
 | S2 Kontext | Eine Quelle je Schritt; Budget vor dem Modellaufruf; Provenienz (Workspace, Quelle, Pfade, Budget) im Entscheidungsdatensatz, ohne Prompt-Text und ohne Schlüsselwerte | `npm run test:prompter` + Gate-Tests |
-| S3 Quellklon | Frischer Klon ohne globales DSH: `npm ci` → `npm run profile:links` → Profil-Dump → UI-Start, nur mit den dokumentierten Befehlen | README-Quickstart + Laufprotokoll |
+| S3 Quellklon | Frischer Klon ohne globales DSH: `npm ci` → `npm run profile:links` → Profil-Dump → UI-Start, nur mit den dokumentierten Befehlen | **Belegt 2026-10-17:** Klon von Branch `freebuff/f12cb7d008d4b72f5ee5f65c` @ `dd18824` nach `/tmp`: `npm ci` Exit 0, 29 Links Exit 0, Dump 60/210 Exit 0, UI-Start bis `dsh web:` (Exit 124 = Timeout nach Boot), doctor ok Exit 0, gate 544/544, statisch 117/117 — siehe `docs/S3-FRESHCLONE-2026-10-17.md`. |
 | S4 Doctor | `shinon doctor` ist als Laufzeit-Unterbefehl implementiert und read-only (Filesystem-Snapshot vor/nach gleich), stabile Exitcodes, Presence-only für Schlüssel | **Belegt 2026-10-17:** eigener Unterbefehl in `bin/shinon.mjs` (Route auf `scripts/doctor.mjs`, nie an DSH durchgereicht); read-only bezeugt (`git status --porcelain` vorher/nachher gleich, kein Schreibaufruf in der Quelle); Exit 0/1/2 stabil; Schlüssel presence-only. Test `scripts/gate/tests/doctor-cli.test.mjs` 4/4, `npm run gate:test` 544/544, Probelauf `node bin/shinon.mjs doctor` Exit 0/status ok. |
 | S5 Schranke | Alle Gates grün, Version/Tag/Lock konsistent, Quellarchiv + SHA-256, idempotent, minimale Publish-Rechte | Release-Workflow + Lauf |
 | S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel (3.9), Security-/Dependency-Audit, finale Doku, CI-Run-ID | `docs/probes/`, Release-Notes |
 
-**Ist-Stand:** S0–S2 sind durch die lokalen Gate-Tests belegt; S3 ist nur teilweise belegt
-und S4 ist offen (kein `shinon doctor`-Laufzeit-Unterbefehl). S5/S6 sind nicht als
+**Ist-Stand:** S0–S3 sind belegt (S3: Frischklon-Protokoll `docs/S3-FRESHCLONE-2026-10-17.md`); S4 ist belegt (`shinon doctor`-Laufzeit-Unterbefehl, Test 4/4, Probelauf Exit 0). S5/S6 sind nicht als
 Release-Abnahme belegt. Der Paketwert `0.4.0` und ein Freeze-Dokument ersetzen diese
 Abnahme nicht.
 
