@@ -12,8 +12,8 @@ sowie auf Zuruf (`workflow_dispatch`) — ohne `paths`-Filter, ohne
 | Job (id) | Anzeigename | Was er tut |
 |---|---|---|
 | `commit-guard` | Commit-Wächter (Footer + Trailer) | Der Bereichs-Wächter: kein KI-Footer, Vannon-Trailer (Regeln: `docs/COMMIT-REGELN.md`) |
-| `unit` | (Matrix) | Die Paket-Tests (fünf Suiten aus der `test:full`-Kette, ohne die Regel-Läufe) |
-| `gate-rules` | Gate-Tests (Regeln, Verträge, Nähte) | `npm run gate:test` |
+| `unit` | (Matrix) | Die Paket-Tests (acht Suiten aus der `test:full`-Kette, ohne die Regel-Läufe: codingmon, hook, narrative, scoring, token-usage, popup, key-router, traceability) |
+| `gate-rules` | Gate-Tests (Regeln, Verträge, Nähte) | `npm run gate:test` + `packages/codingmon/test/uebergabe.test.mjs` in voller Naht (mit Install; in der Unit-Matrix ohne Install nur sichtbarer Skip) |
 | `static-gate` | Statisches Gate (manifest, name contract, Profile) | `node scripts/shinon-test.mjs` |
 | `fixtures` | Fixtures (Validierung gegen den echten Bau) | `node scripts/validate-test.mjs` |
 | `distribution` | Distribution (npm pack → Isolat → Laden) | `node scripts/pack-test.mjs` |
@@ -112,6 +112,45 @@ käufliches Urteil): was sie nicht abdeckt — isolierte Installation
 (`gate:test`) — deckt CI ab. Wer lokal grün ist und nur betroffene Slices
 anfasst, geht im Regelfall grün durch den Push-Verdict; der Rest ist Sache der
 fremden Hardware, nicht dieser CPU.
+
+### 3.1 Audit der lokalen Tests (2026-10-17): was wirklich geprüft wird
+
+Alle 75 Testdateien (26 Paket-Suiten, 49 Gate-Tests) wurden auf Aussagewert
+geprüft — Verhalten gegen Existenz, gemessen an Einbruchstellen statt an
+Zählungen. Ergebnis: keine taube Prüfung; drei Formen brauchen einen
+Satz Erklärung, weil sie sonst wie Schwäche aussehen:
+
+- `packages/hook/test/replay.test.mjs` und
+  `packages/codingmon/test/durchstich.test.mjs` fahren einen eigenen Runner
+  statt `node:test` (0 bzw. 1 gezählte Zusagen bei 9 bzw. ~60 echten Checks) —
+  der Vertrag ist der Exit-Code, nicht die Zählung.
+- `packages/codingmon/test/animation.test.mjs` prüft die Compositor-Regel am
+  Quelltext (kein Browser vorhanden); die Messung im echten Chromium bleibt
+  Sache von `npm run branding`, nicht dieses Tests.
+- Dünn besetzte Dateien (`skill-selection`, `skill-injection`, `client-locale`)
+  prüfen reine Funktionen bzw. je eine Einbruchstelle pro Zusage — wenig
+  Text, aber jede Zeile bindet einen echten Fehler (falsche Auswahl,
+  `ctx.locale` ohne `inject`, Fallback ohne Wörterbuch).
+
+### 3.2 Abdeckung: jede Suite hat ihren CI-Zweig
+
+| Suite / Kette | CI-Zweig | Lokal |
+|---|---|---|
+| codingmon (Mathematik, Beute, Keyframes, E2E-Durchstich) | `unit` | `npm run test:codingmon` |
+| codingmon/uebergabe (volle Client→Host-Naht) | `gate-rules` (mit Install; in `unit` nur sichtbarer Skip) | `test:full` |
+| scoring, token-usage, narrative, hook | `unit` | `test:<name>` |
+| popup, key-router, traceability | `unit` | `test:<name>` |
+| prompter (braucht `../index.js`) | `prompter` (eigener Zweig mit Install) | `npm run test:prompter` |
+| statisches Gate | `static-gate` | `npm test` |
+| Fixtures, Distribution, Profilboot | `fixtures`, `distribution`, `profile` | nur `test:full` (explizit) |
+| Gate-Logik (alle `scripts/gate/tests/`) | `gate-rules` | `npm run gate` (betroffene Slices) |
+| schneller Pfad | `quick` (`npm test`) | pre-commit-Hook, Alltag |
+
+Regel für neue Suiten: Wer eine Paket-Suite hinzufügt, trägt sie in die
+`unit`-Matrix ein — oder in einen Install-Zweig, sobald sie `../index.js`
+oder `dsh` braucht. Eine Suite, die nur in `test:full` steht, ist auf der
+zentralen Testlinie unsichtbar; genau diese Lücke (popup, key-router,
+traceability, uebergabe-voll) hat dieses Audit geschlossen.
 
 ## 4. Was hier gemessen ist und was nicht
 
