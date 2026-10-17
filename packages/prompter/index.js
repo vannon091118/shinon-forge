@@ -682,7 +682,16 @@ export function apply(ctx, config) {
     if (config.autoIndex && config.indexSourcePath !== '') {
       try {
         const result = autoIndexDirectory(runtimeIndex, config.indexSourcePath);
-        console.log(`[shinon-prompter] Auto-Index: ${result.indexed} neu, ${result.skipped} uebersprungen, ${result.errors.length} Fehler`);
+        // Ausgeschlossenes wird beim Namen genannt: ein Index, der Dateien
+        // verschweigt, ohne es zu sagen, lügt über seine Abdeckung.
+        const counts = new Map();
+        for (const item of result.excluded ?? []) counts.set(item.reason, (counts.get(item.reason) ?? 0) + 1);
+        const summary = [...counts.entries()].map(([reason, n]) => `${n}× ${reason}`).join(', ');
+        const sample = (result.excluded ?? []).slice(0, 5).map((item) => `${item.path} (${item.reason})`).join('; ');
+        const rest = (result.excluded ?? []).length > 5 ? ` (+${(result.excluded ?? []).length - 5} weitere)` : '';
+        console.log(
+          `[shinon-prompter] Auto-Index: ${result.indexed} neu, ${result.skipped} uebersprungen, ${result.errors.length} Fehler${summary === '' ? '' : `, ausgeschlossen: ${summary}`}${sample === '' ? '' : ` — ${sample}${rest}`}`,
+        );
         if (config.indexStoragePath !== '') saveRuntimeIndex(runtimeIndex, config.indexStoragePath);
       } catch (error) {
         console.error(`[shinon-prompter] Auto-Index fehlgeschlagen (${error?.message})`);

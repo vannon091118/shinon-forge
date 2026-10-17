@@ -29,12 +29,12 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Schemastery (deklariert) | `~3.18.4` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
 | Node (`engines.node`) | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
 | pnpm-Artefakte (getrackt) | 0 | `git ls-files '*pnpm-workspace.yaml' '*pnpm-lock.yaml' \| wc -l` (Aufrufe: Gate-Prüfung „pnpm-Reste“) | 0 |
-| Markdown-Dokumente (getrackt) | 75 | `git ls-files '*.md' \| wc -l` | 0 |
+| Markdown-Dokumente (getrackt) | 70 | `git ls-files '*.md' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | 6 | `ls docs/contracts/*.json \| wc -l` | 0 |
 | Proben unter `docs/probes/` | 29 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 22 Pakete, 183 Dateien, 1497059 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 22 Pakete, 183 Dateien, 1500378 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -69,7 +69,7 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Codingmon-Tests | **46** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:codingmon` |
 | Scoring-Tests (Kern, Signale, Ablage, Block-Gewichte) | **50** bestanden, **0** rot, **0** übersprungen — importfrei, läuft in CI ohne `npm ci`; die Host-Naht des Lernens fährt `scripts/gate/tests/scoring-block-learning.test.mjs` | 0 | `npm run test:scoring` |
 | Token-Usage-Tests | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:token` |
-| Prompter-Tests (Zettel, Laufzeit-Index, Skills, Selektor, Vorschlag, Selektionsvertrag) | **98** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:prompter` |
+| Prompter-Tests (Zettel, Laufzeit-Index, Skills, Selektor, Vorschlag, Selektionsvertrag) | **104** bestanden, **0** rot, **0** übersprungen — davon 6 für das Index-Größenbudget (`ZU_GROSS`, `BUDGET_ERSCHOEPFT`, Determinismus, Doppelzählung) | 0 | `npm run test:prompter` |
 | Narrative-Tests (Kern) | **9** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:narrative` |
 | Popup-Tests (Faltung des Sitzungsfensters) | **12** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:popup` |
 | Key-Router-Tests (Pool-Kern) | **17** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:key-router` |

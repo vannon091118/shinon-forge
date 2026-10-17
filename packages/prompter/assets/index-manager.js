@@ -297,16 +297,51 @@ export function saveIndex(index, path) {
 }
 
 /**
+ * Obergrenze je Datei (Zeichen) — derselbe Zahlenwert wie die Byte-Grenze des
+ * Project Index (262 144), damit beide Indexe dieselbe Datei gleich behandeln:
+ * package-lock.json (521 512 Zeichen, gemessen 2026-10-16/17) fällt auf beiden
+ * Seiten als ZU_GROSS heraus, statt als Rauschdatei Rang 1 zu belegen.
+ */
+export const MAX_FILE_CHARS = 262144;
+
+/**
+ * Obergrenze des GESAMTEN Index-Inhalts (Zeichen über alle Einträge).
+ *
+ * Der Index speichert Volltext plus Tokens — die gespeicherte JSON-Datei ist
+ * ein Mehrfaches des Quelltexts (gemessen 2026-10-17: 37 MB Ablage). Ohne
+ * Deckel wächst sie mit jedem Lauf unbemerkt weiter. 8 MiB fassen dieses Repo
+ * (gemessen ~5,4 MB indizierbarer Text) mit Luft, und alles darüber wird mit
+ * benanntem Grund abgelehnt statt still mitgeschleppt.
+ */
+export const MAX_INDEX_CHARS = 8388608;
+
+/**
  * Alle .js/.mjs/.ts/.json/.yml/.yaml/.md-Dateien in einem Verzeichnis
  * rekursiv einlesen und in den Index aufnehmen.
+ *
+ * Zwei Budgets, beide hart: eine Datei über MAX_FILE_CHARS und jeder Inhalt
+ * über MAX_INDEX_CHARS wird NICHT aufgenommen. Jeder Ausschluss steht mit
+ * Grund in `excluded` — `[{ path, reason, detail }]`, reason ist `ZU_GROSS`
+ * oder `BUDGET_ERSCHOEPFT`. Ein stiller Schnitt wäre ein Index, der behauptet,
+ * das Projekt zu kennen, und dabei Dateien verschweigt.
+ *
+ * Die Reihenfolge ist sortiert, damit der Budget-Schnitt deterministisch ist:
+ * derselbe Baum ergibt denselben Index, nicht Filesystem-Reihenfolge.
  */
-export function indexDirectory(index, dirPath, extensions = null, now = Date.now()) {
-  if (typeof dirPath !== 'string' || dirPath === '') return { indexed: 0, skipped: 0, errors: [] };
+export function indexDirectory(index, dirPath, extensions = null, now = Date.now(), options = {}) {
+  if (typeof dirPath !== 'string' || dirPath === '') return { indexed: 0, skipped: 0, errors: [], excluded: [] };
   const exts = extensions ?? ['.js', '.mjs', '.ts', '.json', '.yml', '.yaml', '.md', '.cjs'];
   const skip = new Set(['node_modules', '.git', '.shinon', 'dist', 'build', 'coverage']);
+  const maxFile = Number.isFinite(options.maxFileChars) ? options.maxFileChars : MAX_FILE_CHARS;
+  const maxTotal = Number.isFinite(options.maxIndexChars) ? options.maxIndexChars : MAX_INDEX_CHARS;
+  let total = 0;
+  for (const entry of index.entries.values()) {
+    if (typeof entry?.content === 'string') total += entry.content.length;
+  }
   let indexed = 0;
   let skipped = 0;
   const errors = [];
+  const excluded = [];
 
   function walk(currentDir) {
     let entries;
@@ -315,7 +350,8 @@ export function indexDirectory(index, dirPath, extensions = null, now = Date.now
     } catch {
       return;
     }
-    for (const entry of entries) {
+    const ordered = [...entries].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    for (const entry of ordered) {
       if (skip.has(entry.name)) continue;
       const full = join(currentDir, entry.name);
       if (entry.isDirectory()) {
@@ -331,14 +367,32 @@ export function indexDirectory(index, dirPath, extensions = null, now = Date.now
         continue;
       }
       const rel = join(process.cwd(), full);
+      // Bereits aktuell Indiziertes berührt kein Budget: es steht schon drin,
+      // und ein zweiter Lauf darf es nicht plötzlich als „zu groß" melden.
+      if (isIndexed(index, rel, content)) {
+        skipped++;
+        continue;
+      }
+      if (content.length > maxFile) {
+        excluded.push({ path: full, reason: 'ZU_GROSS', detail: `${content.length}>${maxFile}` });
+        skipped++;
+        continue;
+      }
+      if (total + content.length > maxTotal) {
+        excluded.push({ path: full, reason: 'BUDGET_ERSCHOEPFT', detail: `${total}+${content.length}>${maxTotal}` });
+        skipped++;
+        continue;
+      }
       const result = indexFile(index, rel, content, now);
-      if (result) indexed++;
-      else skipped++;
+      if (result) {
+        indexed++;
+        total += content.length;
+      } else skipped++;
     }
   }
 
   walk(dirPath);
-  return { indexed, skipped, errors };
+  return { indexed, skipped, errors, excluded };
 }
 
 /**

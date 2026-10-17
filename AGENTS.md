@@ -215,6 +215,12 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   classified but **never** expanded — otherwise the agent answers its own invented
   task instead of the question. `matchIntent` matches whole phrases (Unicode word
   boundaries) and returns an empty `expansion` for every question.
+  The runtime index (`packages/prompter/assets/index-manager.js`) has TWO hard
+  budgets, both DATA (`MAX_FILE_CHARS = 262144` — the twin of the project
+  index byte limit — and `MAX_INDEX_CHARS = 8388608`): anything over them is
+  NOT indexed, and every exclusion stands in the result with a reason
+  (`ZU_GROSS` or `BUDGET_ERSCHOEPFT`) that the mount log names file by file —
+  a silent cut would be an index lying about its coverage.
 
 ## Pitfalls
 - Ein Profil-Bündel löst über `profiles/<name>/node_modules` auf — **vor** dem Root-`node_modules`.

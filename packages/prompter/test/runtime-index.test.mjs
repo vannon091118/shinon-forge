@@ -7,6 +7,9 @@
  *   - Hash-basierte Deduplikation: gleicher Inhalt = gleicher Hash = kein Double.
  *   - Token-Präfix-Matching: "test" trifft auf "tests", "testen", ...
  *   - Nur Treffer werden geliefert (score > 0).
+ *   - Größenbudget: Datei über MAX_FILE_CHARS und Inhalt über MAX_INDEX_CHARS
+ *     wird nicht aufgenommen — jeder Ausschluss trägt einen Grund (ZU_GROSS,
+ *     BUDGET_ERSCHOEPFT), der Schnitt ist sortiert und damit deterministisch.
  *   - Intent-Matching: Handlungsphrase → Expansion; Themenwort und Frage → null
  *     bzw. Klassifikation ohne Expansion (der Agent antwortet, statt zu handeln).
  *
@@ -14,8 +17,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, readdirSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   createIndex,
@@ -30,6 +34,8 @@ import {
   simpleHash,
   tokenize,
   RUNTIME_INDEX_CONTRACT,
+  MAX_FILE_CHARS,
+  MAX_INDEX_CHARS,
 } from '../assets/index-manager.js';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
@@ -358,5 +364,96 @@ test('matchIntent: kein Trigger ist ein nacktes Themenwort', () => {
     for (const trigger of pattern.trigger) {
       assert.ok(!bare.includes(trigger.toLocaleLowerCase()), `${pattern.id}: "${trigger}" ist ein Themenwort, keine Handlungsphrase`);
     }
+  }
+});
+
+// ── 8. Größenbudget ──────────────────────────────────────────────────────────
+
+/** Fixture-Verzeichnis mit benannten Dateien — wird vom Aufrufer aufgeräumt. */
+function fixtureDir(files) {
+  const dir = mkdtempSync(join(tmpdir(), 'shinon-index-budget-'));
+  for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
+  return dir;
+}
+
+test('indexDirectory: die Dateigrenze ist der Zwillingswert des Project Index', () => {
+  assert.equal(MAX_FILE_CHARS, 262144, 'beide Indexe behandeln dieselbe Datei gleich');
+  assert.ok(Number.isInteger(MAX_INDEX_CHARS) && MAX_INDEX_CHARS > 0, 'das Gesamtbudget ist eine Zahl, kein Wunsch');
+});
+
+test('indexDirectory: Datei über der Grenze wird mit ZU_GROSS ausgeschlossen', () => {
+  const dir = fixtureDir({ 'klein.js': 'const a = 1;\n', 'gross.js': `// ${'x'.repeat(200)}\n` });
+  try {
+    const index = createIndex();
+    const result = indexDirectory(index, dir, ['.js'], 1, { maxFileChars: 100 });
+    assert.equal(result.indexed, 1);
+    assert.equal(result.excluded.length, 1);
+    assert.equal(result.excluded[0].reason, 'ZU_GROSS');
+    assert.ok(result.excluded[0].path.endsWith('gross.js'));
+    assert.ok(result.excluded[0].detail.includes('>100'), 'der Grund nennt die gemessene Zahl');
+    assert.equal(index.entries.size, 1, 'die grosse Datei steht nicht im Index');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('indexDirectory: genau an der Grenze wird noch aufgenommen', () => {
+  const dir = fixtureDir({ 'rand.js': 'x'.repeat(100) });
+  try {
+    const result = indexDirectory(createIndex(), dir, ['.js'], 1, { maxFileChars: 100 });
+    assert.equal(result.indexed, 1);
+    assert.deepEqual(result.excluded, []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('indexDirectory: BUDGET_ERSCHOEPFT ist deterministisch und benannt', () => {
+  const files = { 'a.js': 'a'.repeat(40), 'b.js': 'b'.repeat(40), 'c.js': 'c'.repeat(40) };
+  const once = () => {
+    const dir = fixtureDir(files);
+    try {
+      return indexDirectory(createIndex(), dir, ['.js'], 1, { maxIndexChars: 100 });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  const first = once();
+  const second = once();
+  assert.equal(first.indexed, 2, 'zwei Dateien passen in 100 Zeichen');
+  assert.equal(first.excluded.length, 1);
+  assert.equal(first.excluded[0].reason, 'BUDGET_ERSCHOEPFT');
+  assert.ok(first.excluded[0].path.endsWith('c.js'), 'der Schnitt faellt sortiert auf die letzte Datei');
+  const names = (result) => result.excluded.map((item) => item.path.split('/').pop());
+  assert.deepEqual(names(second), names(first), 'derselbe Baum, derselbe Schnitt — keine Filesystem-Wuerfel');
+  assert.deepEqual(names(first), ['c.js']);
+});
+
+test('indexDirectory: ein zweiter Lauf zaehlt unveraenderte Dateien nicht doppelt', () => {
+  const dir = fixtureDir({ 'a.js': 'a'.repeat(40), 'b.js': 'b'.repeat(40) });
+  try {
+    const index = createIndex();
+    const first = indexDirectory(index, dir, ['.js'], 1, { maxIndexChars: 100 });
+    assert.equal(first.indexed, 2);
+    const second = indexDirectory(index, dir, ['.js'], 2, { maxIndexChars: 100 });
+    assert.equal(second.indexed, 0, 'nichts Neues, nichts gezaehlt');
+    assert.deepEqual(second.excluded, [], 'bekannte Dateien fallen nicht ploetzlich aus dem Budget');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('indexDirectory: ausgeschlossene Dateien stehen mit Grund im Ergebnis', () => {
+  const dir = fixtureDir({ 'gross.js': 'x'.repeat(200) });
+  try {
+    const result = indexDirectory(createIndex(), dir, ['.js'], 1, { maxFileChars: 100 });
+    for (const item of result.excluded) {
+      assert.ok(['ZU_GROSS', 'BUDGET_ERSCHOEPFT'].includes(item.reason), `unbekannter Grund: ${item.reason}`);
+      assert.ok(typeof item.path === 'string' && item.path !== '', 'jeder Ausschluss nennt die Datei');
+      assert.ok(typeof item.detail === 'string' && item.detail !== '', 'jeder Ausschluss nennt die Zahl');
+    }
+    assert.equal(result.skipped, 1, 'ausgeschlossen zaehlt weiter als uebersprungen');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
