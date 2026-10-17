@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 /**
- * block-learning.test.mjs — das Lernen im Ledger (Phase 3) als Weg.
+ * scoring-block-learning.test.mjs — das Lernen im Ledger (Phase 3) als Weg.
  *
  * Signal → Gewicht → Neustart → Retraction, nach dem Muster von
- * `scripts/gate/tests/scoring-memory.test.mjs`, aber als Paket-Test mit
- * gefälschter Ablage (kein DSH nötig — nur node_modules für Schemastery,
- * wie unter `npm test` vorhanden).
+ * `scripts/gate/tests/scoring-memory.test.mjs`, aber mit gefälschter Ablage
+ * statt der echten SQLite (kein DSH nötig).
+ *
+ * WARUM HIER und nicht in `packages/scoring/test/`: dieser Weg fährt die
+ * HOST-Hälfte (`packages/scoring/index.js`) und damit `@deepseek-ai/schemastery`.
+ * Die Paket-Suiten laufen in CI in einem Zweig OHNE `npm ci` — genau wie bei
+ * `prompter` würde ein `../index.js`-Import diesen Zweig rot machen, ohne dass
+ * eine Zusage bricht (gemessen 2026-10-17: Job 117312423811, 50/51, `ERR_MODULE_NOT_FOUND`).
+ * Die reinen Kerne bleiben in `packages/scoring/test/`; die Naht läuft hier,
+ * wo `npm ci` gelaufen ist.
  *
  * Gepinnt wird: die Auswahl des Veredlers (nur Ids, Sitzung) wird mit dem
  * nächsten Signal gewertet; die Gewichte überdauern den Neustart im selben
@@ -24,7 +31,7 @@ import {
   WEIGHTS_CONTRACT,
   WEIGHTS_SERVICE,
   apply,
-} from '../index.js';
+} from '../../../packages/scoring/index.js';
 
 /** Die Ausgabe der Pakete auffangen — der Grund steht in den Asserts. */
 const noise = [];

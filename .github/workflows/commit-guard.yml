@@ -67,6 +67,10 @@ jobs:
   # während die Install-Zweige noch ihren Baum aufbauen.
   # `prompter` steht hier bewusst NICHT: sein Test importiert ../index.js und
   # damit @deepseek-ai/schemastery; er läuft im eigenen Zweig mit node_modules.
+  # Dasselbe gilt für JEDE Host-Naht: ein `../index.js`-Import in einer
+  # Paket-Suite macht diesen Zweig rot (gemessen 2026-10-17, Job 117312423811,
+  # `ERR_MODULE_NOT_FOUND: @deepseek-ai/schemastery`) — solche Tests gehören
+  # nach `scripts/gate/tests/`, wo `npm ci` gelaufen ist.
   unit:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
