@@ -108,14 +108,14 @@ npm run profile:links
                                          (Layer und Bundles: docs/ZAHLEN.md §2)
 DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config
 
-# 5. Booten (Web-UI)   → im Frischklon bis zur Web-Adresse belegt, siehe docs/S3-FRESHCLONE-2026-10-17.md
+# 5. Booten (Web-UI)   → im Frischklon mit HTTP 200 belegt, siehe docs/S3-FRESH-d8999ab.md
 DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon
 ```
 
 Schritt 4 ist belegt (`node scripts/shinon-profile-test.mjs`, Exit 0, Zahl: `docs/ZAHLEN.md` §2).
 Schritte 2, 3 und 5 sind am 2026-10-17 in einem frischen Klon mit Exit-Codes belegt:
-`docs/S3-FRESHCLONE-2026-10-17.md` (`npm ci` Exit 0, 29 Links Exit 0, UI-Start bis zur
-Web-Adresse). Für Schritte, die einen Modellschlüssel oder einen Browser brauchen, gibt
+`docs/S3-FRESH-d8999ab.md` (`npm ci` Exit 0, 29 Links Exit 0, UI HTTP 200 mit 41 314 Bytes
+HTML). Für Schritte, die einen Modellschlüssel oder einen Browser brauchen, gibt
 es hier keinen Beleg — sie stehen in `docs/ZAHLEN.md` §4 unter „nicht geprüft“.
 
 `shinon doctor` ist seit 2026-10-17 die read-only Diagnose für v0.4.0: `bin/shinon.mjs`

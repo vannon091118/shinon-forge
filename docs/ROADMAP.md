@@ -26,8 +26,8 @@ einen Installationsweg — den **Quellklon** (`git clone`, `npm ci`,
 `npm run profile:links`, Profil-Dump, UI-Start und `shinon doctor` read-only).
 Der Freeze ist eine Entscheidung, kein Messwert: **kein Feature-Wunsch wird
 nachträglich in v0.4.0 gezogen.** Er bedeutet nicht, dass die Abnahme schon
-abgeschlossen ist: S3 (Frischklon-Protokoll `docs/S3-FRESHCLONE-2026-10-17.md`) und S4
-(`shinon doctor` als eigener Unterbefehl, Test 4/4, Probelauf Exit 0) sind belegt.
+abgeschlossen ist: S3 (Frischklon @ `d8999ab` mit HTTP-200-Beleg, `docs/S3-FRESH-d8999ab.md`)
+und S4 (`shinon doctor` als eigener Unterbefehl, Test 6/6, Hilfe + Fehlerpfade) sind belegt.
 Bis auch S5/S6 erfüllt und ein grüner CI-Lauf des Bump-Commits belegt ist, ist
 `v0.4.0` nicht als Release abgenommen.
 

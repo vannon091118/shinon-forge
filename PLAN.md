@@ -608,7 +608,7 @@ hier. Code, der die Zusage erfüllt, aber keinen belegten Lauf hat, ist offen.
 | S5 Schranke | Alle Gates grün, Version/Tag/Lock konsistent, Quellarchiv + SHA-256, idempotent, minimale Publish-Rechte | **Teils belegt 2026-10-17:** Workflow `.github/workflows/release.yml` (Tag `v*`, nur `contents: read`, kein Publish), Lockfile konsistent, Archiv 2× byte-identisch (SHA-256 `e6cb6e0c…`, 572 Dateien) — siehe `docs/S5-RELEASE-2026-10-17.md`. Offen: Tag `v0.4.0` + Schranken-Lauf darauf (Release-Akt, S6-Freigabe). |
 | S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel (3.9), Security-/Dependency-Audit, finale Doku, CI-Run-ID | `docs/probes/`, Release-Notes |
 
-**Ist-Stand:** S0–S3 sind belegt (S3: Frischklon-Protokoll `docs/S3-FRESHCLONE-2026-10-17.md`); S4 ist belegt (`shinon doctor`-Laufzeit-Unterbefehl, Test 4/4, Probelauf Exit 0). S5/S6 sind nicht als
+**Ist-Stand:** S0–S3 sind belegt (S3: Frischklon @ `d8999ab` mit HTTP-200-Beleg, `docs/S3-FRESH-d8999ab.md`); S4 ist belegt (`shinon doctor`-Laufzeit-Unterbefehl, Test 6/6, Probelauf Exit 0, Hilfe + Fehlerpfade). S5/S6 sind nicht als
 Release-Abnahme belegt. Der Paketwert `0.4.0` und ein Freeze-Dokument ersetzen diese
 Abnahme nicht.
 
