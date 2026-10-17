@@ -12,10 +12,15 @@
 **Abweichung zum Briefing:** Das Briefing nennt `c0e274f` als Basis. Gemessen ist der
 Stand `91c7e4f` (drei Commits weiter). Nachweis: `docs/audit/STAND_2026-10-10.md` §1.
 
-**Harte Regeln während der Umsetzung:** keine Commits, keine Pushes, keine
-Branch-Löschung; `main` wird nicht beschrieben; Arbeit auf `umbau/<schritt>`;
-Änderungen nur in dieser Arbeitskopie; Secrets nur über Umgebungsvariablen; keine
-Erfolgsmeldung ohne Exit-Code und Zählung.
+**Harte Regeln während der Umsetzung (HISTORISCH, Stand 2026-10-10 — keine aktive Release-Regel):**
+> Historisch: „keine Commits, keine Pushes, keine Branch-Löschung; `main` wird
+> nicht beschrieben; Arbeit auf `umbau/<schritt>`" galt nur für die Umbau-Phase
+> ab Basis `91c7e4f`. Für den v0.4.0-Freeze gilt das Gegenteil: dokumentierte
+> Commits mit Trailer + Wächter + grünem CI auf `main` sind der Release-Weg
+> (`docs/ROADMAP.md` §1.5, `docs/COMMIT-REGELN.md`). Wer diese Zeile als
+> aktuelle Regel liest, blockiert den Release mit einer veralteten Anweisung.
+> Zeitlos gültig bleibt: Secrets nur über Umgebungsvariablen; keine
+> Erfolgsmeldung ohne Exit-Code und Zählung.
 
 ---
 

@@ -19,6 +19,26 @@ stehen in `PLAN.md` §9. Diese Datei benennt nur Release-Ziele und Versionsbedeu
   Vorbereitung (`dsh.inactive` im eigenen Manifest) — entschieden vom Paket
   selbst, geprüft vom `doctor` (`scripts/gate/plugins/doctor.mjs`).
 
+## 1.5 Release-Freeze v0.4.0 (kanonische Entscheidung, 2026-10-17)
+
+**Eingefroren:** `v0.4.0` unterstützt genau einen Installationsweg — den
+**Quellklon** (`git clone`, `npm ci`, `npm run profile:links`, Profil-Dump,
+UI-Start, `shinon doctor` read-only). Der Freeze ist eine Entscheidung, kein
+Messwert: **kein Feature-Wunsch wird nachträglich in v0.4.0 gezogen.**
+
+**Außerhalb des Freeze (Ziel v0.5.0 oder später, nur als Folgearbeit
+dokumentiert):** `shinon update` (Forge-Selbstupdate), persistentes
+`shinon autoupdate`, `.deb`-Bau/Installation (`npm run deb` existiert nicht als
+Script-Eintrag), Live-429-Rotation mit zwei echten Schlüsseln,
+Mobile/Android, Desktop-Shell, Rust-/Single-Binary-Port, Vollbenchmark und
+QoL-Top-10. Die Liste steht hier, damit ein Implementierungsauftrag sie nicht
+versehentlich vorzieht.
+
+**Release-Checkliste (Abnahme je Pflicht):** Freeze-Dokumentation hier +
+`PLAN.md` §9, Workspace-Isolation (S1, rot-bei-Mutation), Quellklon-Repro
+(S3), read-only Doctor (S4), Gates + Version/Tag/Lock + Quellarchiv + SHA-256
+(S5), echter Modellturn + Audit + CI-Run-ID (S6). `UNGEPRÜFT` ist kein Pass.
+
 ## 2. Historie (gemessen, nicht erzählt)
 
 | Fassung | Commit | Inhalt |
@@ -42,6 +62,8 @@ Sieben-Lücken-Handshake (`docs/handshakes/2026-10-13-ci-lauf-gruen-verdict-schr
 - Mobile-first-Prototyp: eigenes schlankes Profil, responsive Client-Schicht, profil-/UI-/Security-CI-Gates und validierte Android-Runtime-Strategie ([docs/MOBILE-PLAN.md](MOBILE-PLAN.md)); kein globaler Paket-Cut vor Messung.
 - §19 `LAST_VERIFIED_FACT`: Produzent und Gate-Abnahme stehen in `PLAN.md` §6.5; Implementierung bleibt v0.5.0-Ziel
 - `shinon-forge`-Aktivierungsschritt mit Sicherheitsvertrag (siehe §4)
+- Shinon-Selbstupdate (`shinon update`, Release-Abfrage, Prüfsumme), persistentes Autoupdate, transaktionales Update/Rollback — v0.5.0-Arbeit, kein v0.4.0-Punkt
+- `.deb`-Distribution (`npm run deb`, Paket-Metadaten, Installations-/Upgrade-/Entfernungsproben) — v0.5.0-Arbeit, kein v0.4.0-Artefakt
 
 Was aus der Liste in `0.5.0` landet, entscheidet der Betreiber — die Liste
 selbst ist vollständig, wenn jeder offene Punkt aus PLAN §9 hier oder in §4
