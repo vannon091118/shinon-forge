@@ -26,6 +26,8 @@ import {
 } from '../plugins/persona.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/persona/', import.meta.url));
+/** Die Wurzel des Repos, in dem dieses Paket liegt — der EINE erlaubte Persona-Scope. */
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const ASSET_FILE = join(PACKAGE_DIR, 'assets/persona-state.json');
 
 const contract = JSON.parse(readFileSync(ASSET_FILE, 'utf8'));
@@ -65,7 +67,9 @@ function createHost(services = {}) {
       },
       section({ name, order, text }) {
         calls.push(`section:${name}`);
-        const entry = { name, order, text };
+        // Der echte Dienst löst `text` zur Assembly-Zeit auf; hier gibt es keine
+        // Sitzung, also ist das die Identität — der Fake bleibt ein Host.
+        const entry = { name, order, text: typeof text === 'function' ? text({}) : text };
         sections.push(entry);
         return () => {
           const at = sections.indexOf(entry);
@@ -126,6 +130,8 @@ const baseConfig = {
   determinism: 'DET',
   discipline: 'DISC',
   report: 'REP',
+  // Scope ausdrücklich benannt: die Tests laufen IM Shinon-Repo, nicht „irgendwo“.
+  workspaceRoot: REPO_ROOT,
 };
 
 const connect = (services = {}, overrides = {}) =>
@@ -513,7 +519,7 @@ const projectSection = (host) => host.sections.find((entry) => entry.name === 's
 
 test('Projekt-Kontext: ein RELATIVER Pfad wird geladen und steht als Abschnitt im Prompt', () => {
   const file = contextFixture('relativ.md', 'PROJEKT-KONTEXT-RELATIV gilt nur hier\n');
-  const host = connect({}, { projectContextPath: relative(process.cwd(), file) });
+  const host = connect({}, { projectContextPath: relative(REPO_ROOT, file) });
 
   const section = projectSection(host);
   assert.ok(section, `Abschnitt fehlt (${host.sections.map((entry) => entry.name).join(', ')})`);
@@ -536,7 +542,7 @@ test('Projekt-Kontext: auch ein ABSOLUTER Pfad wird geladen', () => {
 
 test('Projekt-Kontext: fehlende oder leere Datei erzeugt keinen Abschnitt — und keinen leeren', () => {
   const cases = [
-    ['fehlend', relative(process.cwd(), join(contextDir, 'gibt-es-nicht.md'))],
+    ['fehlend', relative(REPO_ROOT, join(contextDir, 'gibt-es-nicht.md'))],
     ['leer', relative(process.cwd(), contextFixture('leer.md', '   \n\n'))],
   ];
   for (const [name, path] of cases) {
@@ -551,5 +557,72 @@ test('Projekt-Kontext: ein leerer Pfad in der Config heisst nicht laden', () => 
   const host = connect({}, { projectContextPath: '' });
   assert.equal(projectSection(host), undefined);
   assert.ok(host.sections.some((entry) => entry.name === 'shinon:identity'));
+  host.dispose();
+});
+
+// ── 7. Der Projektscope (P0, gemessen 2026-10-17) ───────────────────────────
+//
+// Der Fehler war der BESITZER der Identität: `isShinonProject()` las
+// `process.cwd()/package.json`. Bei `DSH_HOME=$PWD` ist der CWD der HOST (dieses
+// Repo), nicht der Workspace der Session — ein fremdes Projekt bekam damit die
+// Shinon-Persona. Der Scope kommt jetzt aus einer ausdrücklichen Angabe.
+
+/** Ein frisches Fremdprojekt mit eigenem Manifest. */
+function foreignProject(name = 'fremdes-projekt') {
+  const dir = mkdtempSync(join(tmpdir(), 'shinon-fremd-'));
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name, version: '1.0.0' }));
+  return dir;
+}
+
+/** Ohne Env-Variable messen, was die Config allein sagt — und den Zustand zurückgeben. */
+function withoutEnv(name, fn) {
+  const saved = process.env[name];
+  delete process.env[name];
+  try {
+    return fn();
+  } finally {
+    if (saved === undefined) delete process.env[name];
+    else process.env[name] = saved;
+  }
+}
+
+test('Projektscope: fremder Session-Workspace bekommt keine Persona, auch wenn der Host-CWD Shinon ist', () => {
+  const foreign = foreignProject();
+  const host = withoutEnv('SHINON_WORKSPACE_ROOT', () =>
+    connect({}, { workspaceRoot: foreign, projectContextPath: '.shinon/project-context.md' }));
+
+  assert.deepEqual(host.sections, [], `kein Abschnitt im Fremdprojekt (${host.sections.map((e) => e.name).join(', ')})`);
+  assert.equal(host.handlers.size, 0, 'auch kein Event-Handler wird registriert');
+});
+
+test('Projektscope: unklarer Workspace (weder Config noch Env) schaltet die Persona AUS', () => {
+  const host = withoutEnv('SHINON_WORKSPACE_ROOT', () => connect({}, { workspaceRoot: '' }));
+
+  assert.deepEqual(host.sections, [], 'kein Abschnitt ohne benannten Scope');
+  assert.equal(host.handlers.size, 0, 'kein Handler ohne benannten Scope');
+});
+
+test('Projektscope: SHINON_WORKSPACE_ROOT allein entscheidet — fremd bleibt stumm, Repo spricht', () => {
+  const saved = process.env.SHINON_WORKSPACE_ROOT;
+  try {
+    process.env.SHINON_WORKSPACE_ROOT = foreignProject();
+    const fremd = connect({}, { workspaceRoot: '' });
+    assert.deepEqual(fremd.sections, [], 'Env zeigt auf ein Fremdprojekt → keine Persona');
+
+    process.env.SHINON_WORKSPACE_ROOT = REPO_ROOT;
+    const eigen = connect({}, { workspaceRoot: '' });
+    assert.ok(eigen.sections.some((entry) => entry.name === 'shinon:identity'), 'Env zeigt auf dieses Repo → Identity da');
+    eigen.dispose();
+  } finally {
+    if (saved === undefined) delete process.env.SHINON_WORKSPACE_ROOT;
+    else process.env.SHINON_WORKSPACE_ROOT = saved;
+  }
+});
+
+test('Projektscope: das Shinon-Repo bekommt seine Persona weiterhin (Gegenprobe)', () => {
+  const host = connect({}, { workspaceRoot: REPO_ROOT });
+
+  assert.ok(host.sections.some((entry) => entry.name === 'shinon:identity'), 'Identity im eigenen Repo');
+  assert.ok(host.handlers.size > 0, 'Events werden im eigenen Repo beobachtet');
   host.dispose();
 });

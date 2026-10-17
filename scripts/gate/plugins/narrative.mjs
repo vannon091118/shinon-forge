@@ -24,6 +24,9 @@ export const STATE_CHANNEL = 'shinon/narrative/state';
 /** Die Felder, die der Composite nach außen trägt (aus dem Vertrag). */
 export const COMPOSITE_FIELDS = ['seq', 'mood', 'narrator', 'arc_id', 'relationship_state'];
 
+/** Die Evidenzlevel, die ein Übergang nennen darf (Spiegel des Kerns). */
+export const EVIDENCE_LEVELS = ['EVENT_TYPE', 'EXPLICIT_PAYLOAD', 'NONE'];
+
 /**
  * Die ABNEHMER. Bis Zug 6 war diese Liste leer — und das Gate hätte die Lücke
  * benannt, statt sie zu überspringen.
@@ -70,6 +73,7 @@ export const FORBIDDEN_MODULES = ['child_process'];
  * wieder eingeführte Uhr wäre still nicht reproduzierbar.
  */
 export const FORBIDDEN_TOKENS = [
+  'djb2',
   'Math.random',
   'Date.now',
   'new Date(',
@@ -135,39 +139,110 @@ export function contractIssues(contract, file) {
     }
   }
 
-  // Mood: Pool + Ereignistabelle, jeder Typ ein Typ des Spines.
-  const mood = derivation.mood ?? {};
-  const pool = mood.pool;
-  if (!isList(pool, isText)) {
-    issues.push(at('derivation.mood.pool fehlt oder ist leer (die Anti-Wiederholung braucht eine Liste)'));
+  // Die Regeln: explizit, versioniert und vollständig — sonst rät der Kern.
+  const rules = contract.rules;
+  if (typeof rules !== 'object' || rules === null) {
+    return [...issues, at('rules fehlt — ohne explizite Regeln gibt es keine Ableitung')];
   }
-  const byEvent = mood.by_event;
-  if (typeof byEvent !== 'object' || byEvent === null || Object.keys(byEvent).length === 0) {
-    issues.push(at('derivation.mood.by_event fehlt oder ist leer — dann wird der Mood geraten'));
+  if (!Number.isInteger(rules.version) || rules.version < 2) {
+    issues.push(at('rules.version muss eine ganze Zahl ≥ 2 sein (v2 = explizite Regeln statt Hash)'));
+  }
+  const pool = rules.moodPool;
+  if (!isList(pool, isText)) issues.push(at('rules.moodPool fehlt oder ist leer'));
+  const themes = rules.arcThemes;
+  if (!isList(themes, isText)) issues.push(at('rules.arcThemes fehlt oder ist leer'));
+
+  const moodByEvidence = rules.moodByEvidence;
+  if (typeof moodByEvidence !== 'object' || moodByEvidence === null || Object.keys(moodByEvidence).length === 0) {
+    issues.push(at('rules.moodByEvidence fehlt oder ist leer — dann wird der Mood geraten'));
   } else {
-    for (const [type, value] of Object.entries(byEvent)) {
+    for (const [type, entry] of Object.entries(moodByEvidence)) {
       if (!SPINE_EVENT_TYPES.includes(type)) {
-        issues.push(at(`derivation.mood.by_event nennt ${type} — den Typ kennt der Spine nicht, der Takt klingt nie`));
+        issues.push(at(`rules.moodByEvidence nennt ${type} — den Typ kennt der Spine nicht, der Takt klingt nie`));
       }
-      if (!isText(value)) issues.push(at(`derivation.mood.by_event.${type} ist kein Mood`));
-      else if (Array.isArray(pool) && !pool.includes(value)) {
-        issues.push(at(`derivation.mood.by_event.${type} = ${JSON.stringify(value)} steht nicht in mood.pool`));
+      if (typeof entry !== 'object' || entry === null) {
+        issues.push(at(`rules.moodByEvidence.${type} ist kein Objekt (mood, reason, evidence)`));
+        continue;
+      }
+      if (!isText(entry.mood)) issues.push(at(`rules.moodByEvidence.${type}.mood fehlt`));
+      else if (Array.isArray(pool) && !pool.includes(entry.mood)) {
+        issues.push(at(`rules.moodByEvidence.${type}.mood = ${JSON.stringify(entry.mood)} steht nicht in moodPool`));
+      }
+      if (!isText(entry.reason)) issues.push(at(`rules.moodByEvidence.${type}.reason fehlt — jeder Übergang braucht einen Grund`));
+      if (!EVIDENCE_LEVELS.includes(entry.evidence) || entry.evidence === 'NONE') {
+        issues.push(at(`rules.moodByEvidence.${type}.evidence muss EVENT_TYPE oder EXPLICIT_PAYLOAD sein`));
       }
     }
   }
 
-  // Erzähler: Rückfall benannt.
-  const narrator = derivation.narrator ?? {};
-  if (!isText(narrator.default)) issues.push(at('derivation.narrator.default fehlt (wer erzählt, wenn nichts passt)'));
-
-  // Arc: Themenliste, sonst hat der Arc kein Thema.
-  if (!isList(derivation.arc?.themes, isText)) {
-    issues.push(at('derivation.arc.themes fehlt oder ist leer'));
+  const themeByEvent = rules.themeByEvent;
+  if (typeof themeByEvent !== 'object' || themeByEvent === null || Object.keys(themeByEvent).length === 0) {
+    issues.push(at('rules.themeByEvent fehlt oder ist leer — dann hat der Arc kein Thema'));
+  } else {
+    for (const [type, theme] of Object.entries(themeByEvent)) {
+      if (!SPINE_EVENT_TYPES.includes(type)) issues.push(at(`rules.themeByEvent nennt ${type} — den Typ kennt der Spine nicht`));
+      if (!isText(theme)) issues.push(at(`rules.themeByEvent.${type} ist kein Thema`));
+      else if (Array.isArray(themes) && !themes.includes(theme)) {
+        issues.push(at(`rules.themeByEvent.${type} = ${JSON.stringify(theme)} steht nicht in arcThemes`));
+      }
+    }
+    for (const type of Object.keys(moodByEvidence ?? {})) {
+      if (!Object.hasOwn(themeByEvent, type)) {
+        issues.push(at(`rules.themeByEvent fehlt für ${type} — ein semantischer Takt ohne Arc-Thema`));
+      }
+    }
   }
 
-  // Beziehung: Stufen von oben nach unten — die Schwellenrechnung braucht sie.
-  if (!isList(derivation.relationship?.states, isText)) {
-    issues.push(at('derivation.relationship.states fehlt oder ist leer'));
+  // Erzähler: Rückfall benannt, Zuordnung ausdrücklich.
+  const narrator = rules.narrator ?? {};
+  if (!isText(narrator.default)) issues.push(at('rules.narrator.default fehlt (wer erzählt, wenn nichts passt)'));
+  if (narrator.byEvent !== undefined) {
+    if (typeof narrator.byEvent !== 'object' || narrator.byEvent === null) {
+      issues.push(at('rules.narrator.byEvent muss ein Objekt sein'));
+    } else {
+      for (const [type, who] of Object.entries(narrator.byEvent)) {
+        if (!SPINE_EVENT_TYPES.includes(type)) issues.push(at(`rules.narrator.byEvent nennt ${type} — unbekannter Typ`));
+        if (!isText(who)) issues.push(at(`rules.narrator.byEvent.${type} ist kein Erzähler`));
+      }
+    }
+  }
+
+  const states = rules.relationshipStates;
+  if (!isList(states, isText)) issues.push(at('rules.relationshipStates fehlt oder ist leer'));
+  const transitions = rules.relationshipTransitions;
+  if (transitions !== undefined && !Array.isArray(transitions)) {
+    issues.push(at('rules.relationshipTransitions muss eine Liste sein'));
+  } else {
+    const seen = new Set();
+    for (const [index, transition] of (transitions ?? []).entries()) {
+      const where = `rules.relationshipTransitions[${index}]`;
+      if (typeof transition !== 'object' || transition === null) {
+        issues.push(at(`${where} ist kein Objekt`));
+        continue;
+      }
+      if (!SPINE_EVENT_TYPES.includes(transition.event)) {
+        issues.push(at(`${where}.event ${JSON.stringify(transition.event)} kennt der Spine nicht`));
+      }
+      if (!isText(transition.reason)) issues.push(at(`${where}.reason fehlt`));
+      if (!EVIDENCE_LEVELS.includes(transition.evidence) || transition.evidence === 'NONE') {
+        issues.push(at(`${where}.evidence muss EVENT_TYPE oder EXPLICIT_PAYLOAD sein`));
+      }
+      if (Array.isArray(states) && (!states.includes(transition.from) || !states.includes(transition.to))) {
+        issues.push(at(`${where}: from/to müssen Zustände aus relationshipStates sein`));
+      }
+      if (transition.from === transition.to) issues.push(at(`${where}: from und to sind gleich`));
+      if (transition.field !== undefined) {
+        if (!isText(transition.field) || !isList(transition.when, isText)) {
+          issues.push(at(`${where}: field braucht when (Liste von Werten)`));
+        }
+        if (transition.evidence !== 'EXPLICIT_PAYLOAD') {
+          issues.push(at(`${where}: ein Payload-Feld ist EXPLICIT_PAYLOAD, nicht ${JSON.stringify(transition.evidence)}`));
+        }
+      }
+      const key = `${transition.event}|${transition.from}`;
+      if (seen.has(key)) issues.push(at(`${where}: zweite Transition für ${key} — welcher gilt, wäre nicht entscheidbar`));
+      seen.add(key);
+    }
   }
   return issues;
 }

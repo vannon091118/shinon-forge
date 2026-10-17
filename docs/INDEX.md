@@ -64,7 +64,14 @@ gilt nicht als Nachmessung.
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-17 | Namespace-, Paket- und Profilkonventionen; §5 führt den Lebenszyklus von `.shinon/` |
 | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) | current | 2026-10-08 | Commit-Regeln und ihre Durchsetzung |
 | [`docs/COMMENT-KANON.md`](COMMENT-KANON.md) | current | 2026-10-17 | Ablage aller Kommentar-Blöcke über 10 LOC, mit Zeiger-Anker je Fundstelle — Ziel der Kürzung, nie Handediting |
+| [`docs/audit/BATCH0-SCOPE-2026-10-17.md`](audit/BATCH0-SCOPE-2026-10-17.md) | current | 2026-10-17 | Batch 0: Scope-Isolation von Persona und globaler `AGENTS.md`, getrenntes DSH-Home, gemessene Runtime-Baseline |
+| [`docs/audit/BATCH0-ABNAHME-2026-10-17.md`](audit/BATCH0-ABNAHME-2026-10-17.md) | current | 2026-10-17 | Abnahme Batch 0 (00G): Gate-Tabelle der Kriterien 1–6, **NO-GO** wegen Sitzungs-Scope der Persona, kleinster offener Fix |
+| [`docs/audit/NARRATIVE-C3-2026-10-17.md`](audit/NARRATIVE-C3-2026-10-17.md) | current | 2026-10-17 | Narrative/Relationship: Hash-Ableitungen entfernt, explizite Regeln (`rules` v2) mit Evidenzlevel — Vorher/Nachher und Regressionstests |
+| [`docs/audit/PERF-BASELINE-2026-10-17.md`](audit/PERF-BASELINE-2026-10-17.md) | current | 2026-10-17 | Performance-Baseline und drei abgeleitete Umbauten je unabhängiger Messmethode: Meta-Batch beim Öffnen (F1), `forgetFile`-Skip (F2), Referenz-Matcher — je mit Vorher/Nachher, TDD und Zerlegung des Kaltlaufs; Rohdaten in `docs/probes/perf-baseline.json` und `docs/probes/index-cold-breakdown.json` |
+| [`docs/audit/G1-ORCHESTRIERUNG-2026-10-17.md`](audit/G1-ORCHESTRIERUNG-2026-10-17.md) | current | 2026-10-17 | G1: Orchestrierungsentscheidung am echten Boot — Capability-Gap-Tabelle gegen den geladenen Profil-Dump, **NO SCHEDULER**, `shinon-task-router.activate` bleibt `false` bis zum echten Goal-Runden-Test |
+| [`docs/audit/G2-NOGO-2026-10-17.md`](audit/G2-NOGO-2026-10-17.md) | current | 2026-10-17 | G2: Gate-DAG **NO-GO** — beide Bedingungen (Gate als Engpass, fehlende Orchestrierung) scheitern gemessen; keine Codeänderung |
 | [`docs/audit/CLAIM_MATRIX_2026-10-17.md`](audit/CLAIM_MATRIX_2026-10-17.md) | current | 2026-10-17 | Claim-Matrix: 294 Kommentar-Blöcke und 39 Doku-Statusblöcke gesammelt, Überschneidungen/Dopplungen/Widersprüche geprüft, Kanonisierung belegt |
+| [`docs/PR-PROMOTION.md`](PR-PROMOTION.md) | current | 2026-10-17 | PR-Promotion: Zustandsautomat, Evidenzregeln (Status zählt nur am genannten SHA) und die Adapter-Grenze — Schreibaktion bewusst außerhalb |
 | [`docs/CI.md`](CI.md) | current | 2026-10-14 | CI als Schranke: Zweige und verpflichtender Statuscheck für `main`, Setz- und Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-17 | alle harten Zahlen + Befehle |
 | [`docs/INDEX.md`](INDEX.md) | current | 2026-10-17 | dieser Einstieg und die Statusregel |
@@ -97,9 +104,11 @@ Baum; die vollständige Liste und jede Umleitung steht in
 
 **Neue Nachweise** (noch nicht abgeschlossen) liegen unter `docs/audit/`;
 `docs/handshakes/` existiert derzeit nicht — beendete Handshakes liegen im Archiv.
-Derzeit liegt unter `docs/audit/` der transiente Review
-[`docs/audit/DOC_REVIEW_2026-10-17.md`](audit/DOC_REVIEW_2026-10-17.md); nach
-Einarbeitung seiner Korrekturen wandert er ins Archiv. Belege `docs/contracts/` und `docs/probes/`
+Derzeit liegen unter `docs/audit/` der transiente Review
+[`docs/audit/DOC_REVIEW_2026-10-17.md`](audit/DOC_REVIEW_2026-10-17.md), der
+Batch-0-Nachweis [`docs/audit/BATCH0-SCOPE-2026-10-17.md`](audit/BATCH0-SCOPE-2026-10-17.md)
+und die Performance-Baseline [`docs/audit/PERF-BASELINE-2026-10-17.md`](audit/PERF-BASELINE-2026-10-17.md);
+nach Abschluss wandern sie ins Archiv. Belege `docs/contracts/` und `docs/probes/`
 sind JSON-Dateien mit eigenem Statusfeld; sie sind Proben **mit Datum** und
 werden nicht nachträglich „aktuell“ gemacht, sondern neu gemessen.
 

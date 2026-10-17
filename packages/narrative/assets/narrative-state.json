@@ -12,44 +12,88 @@
   "derivation": {
     "composite": {
       "input": ["prevComposite", "event"],
-      "method": "deterministic_hash",
-      "output": ["seq", "mood", "narrator", "arc_id", "relationship_state"]
+      "method": "explicit_rules",
+      "output": [
+        "seq",
+        "mood",
+        "mood_evidence",
+        "mood_event",
+        "narrator",
+        "arc_id",
+        "relationship_state",
+        "relationship_reason",
+        "relationship_evidence",
+        "relationship_event"
+      ]
     },
-    "mood": {
-      "anti_repeat": true,
-      "pool": ["idle", "curious", "focused", "working", "concerned", "blocked"],
-      "by_event": {
-        "session.created": "curious",
-        "message.received": "curious",
-        "message.completed": "focused",
-        "claim.created": "focused",
-        "tool.requested": "working",
-        "tool.completed": "focused",
-        "gate.passed": "focused",
-        "gate.failed": "concerned",
-        "action.blocked": "blocked",
-        "relation.updated": "focused"
-      },
-      "fallback": "der naechste Mood der Liste",
-      "note": "Zug 5: der Mood kommt aus `by_event` — die Zuordnung ist DATEN, kein Zufall. Ist der zugeordnete Mood derselbe wie der vorige, nimmt die Regel den naechsten der Liste (anti_repeat), ebenfalls deterministisch: gleiche Historie, gleicher Mood."
+    "rules": "siehe `rules` — ein Übergang braucht Event, Grund und Evidenzlevel",
+    "note": "Seit 2026-10-17 gibt es keine Hash-Ableitung mehr: kein djb2(pair) % 100, kein Präfix-Hash als Thema, keine Anti-Wiederholung. Mood, Thema und Beziehungsstufe stehen als benannte Regeln in `rules` (Version 2)."
+  },
+  "rules": {
+    "version": 2,
+    "moodPool": ["idle", "curious", "focused", "working", "concerned", "blocked"],
+    "moodByEvidence": {
+      "session.created": { "mood": "curious", "reason": "Sitzung beginnt", "evidence": "EVENT_TYPE" },
+      "message.received": { "mood": "curious", "reason": "neue Nachricht", "evidence": "EVENT_TYPE" },
+      "message.completed": { "mood": "focused", "reason": "Antwort abgeschlossen", "evidence": "EVENT_TYPE" },
+      "claim.created": { "mood": "focused", "reason": "Behauptung erhoben", "evidence": "EVENT_TYPE" },
+      "tool.requested": { "mood": "working", "reason": "Werkzeug angefordert", "evidence": "EVENT_TYPE" },
+      "tool.completed": { "mood": "focused", "reason": "Werkzeug abgeschlossen", "evidence": "EVENT_TYPE" },
+      "gate.passed": { "mood": "focused", "reason": "Prüfung bestanden", "evidence": "EVENT_TYPE" },
+      "gate.failed": { "mood": "concerned", "reason": "Prüfung fehlgeschlagen", "evidence": "EVENT_TYPE" },
+      "action.blocked": { "mood": "blocked", "reason": "Aktion blockiert", "evidence": "EVENT_TYPE" },
+      "relation.updated": { "mood": "focused", "reason": "Beziehungsstufe gemeldet", "evidence": "EVENT_TYPE" }
     },
+    "themeByEvent": {
+      "session.created": "identity",
+      "message.received": "exploration",
+      "message.completed": "creation",
+      "claim.created": "verification",
+      "tool.requested": "creation",
+      "tool.completed": "verification",
+      "gate.passed": "verification",
+      "gate.failed": "conflict",
+      "action.blocked": "conflict",
+      "relation.updated": "resolution"
+    },
+    "arcThemes": ["identity", "verification", "creation", "conflict", "resolution", "exploration"],
     "narrator": {
       "default": "shinon",
-      "by_event_prefix": { "message": "user", "gate": "system", "tool": "shinon" },
-      "note": "Zug 5: wer diesen Takt erzaehlt, entscheidet das Ereignis (Praefix vor dem Punkt), nicht ein Wuerfel."
+      "byEvent": {
+        "session.created": "shinon",
+        "message.received": "user",
+        "message.completed": "shinon",
+        "claim.created": "shinon",
+        "tool.requested": "shinon",
+        "tool.completed": "shinon",
+        "gate.passed": "system",
+        "gate.failed": "system",
+        "action.blocked": "system",
+        "relation.updated": "shinon"
+      }
     },
-    "arc": {
-      "create": "first_event",
-      "freeze": "after N events or explicit",
-      "status": ["active", "archived"],
-      "themes": ["identity", "verification", "creation", "conflict", "resolution", "exploration"],
-      "note": "Zug 5: die Themen stehen hier (vorher im Code). Der Themen-Index kommt aus dem Ereignis-Praefix, nicht aus einem Zufall."
-    },
-    "relationship": {
-      "compute": "co-occurrence + history",
-      "states": ["fresh_pair", "established_duo", "trusted_team"],
-      "fields": ["trust", "respect", "patterns", "conflicts", "open_threads"]
-    }
+    "relationshipStates": ["fresh_pair", "established_duo", "trusted_team"],
+    "relationshipTransitions": [
+      {
+        "event": "relation.updated",
+        "field": "relation",
+        "when": ["known", "trusted", "anchor"],
+        "from": "fresh_pair",
+        "to": "established_duo",
+        "reason": "explizite Stufe im Ereignis",
+        "evidence": "EXPLICIT_PAYLOAD"
+      },
+      {
+        "event": "relation.updated",
+        "field": "relation",
+        "when": ["trusted", "anchor"],
+        "from": "established_duo",
+        "to": "trusted_team",
+        "reason": "explizite Stufe trusted/anchor im Ereignis",
+        "evidence": "EXPLICIT_PAYLOAD"
+      }
+    ],
+    "note": "Nur benannte Events ändern semantische Felder. `relation.updated` hebt die Stufe ausschließlich bei den Stufen known/trusted/anchor (Payload-Feld `relation`); `stranger` erzeugt keine Transition, weil die drei Zustände keine Aussage über Distanz treffen. Es gibt keinen Abstieg und keine Aufstufung durch Historie — beides wäre eine Behauptung ohne Evidenz."
   },
   "forbidden": [
     "autonomous_action",
@@ -60,9 +104,11 @@
   ],
   "invariants": [
     "Ein Composite wird nur aus Vorgänger + Event abgeleitet, nie aus Modell oder Zeit.",
-    "Keine Zufallsquelle und keine Uhr: der Mood kommt aus der Tabelle, der Erzaehler aus dem Ereignis.",
+    "Keine Zufallsquelle, keine Uhr und kein Hash: Mood, Thema und Beziehungsstufe kommen aus `rules`.",
+    "Derselbe Ereignistyp ergibt denselben Mood — keine Anti-Wiederholung.",
+    "Unbekannte Events ändern kein semantisches Feld; sie stehen in der Chronik.",
     "Die Sequenz wächst monoton: jede(seq) > jede(seq-1).",
     "Arc-Freeze ist deterministisch: gleiche Historie = gleicher Snapshot.",
-    "Relationship-State ist abgeleitet, nicht behauptet."
+    "Relationship-State ist abgeleitet oder NONE, nie behauptet."
   ]
 }

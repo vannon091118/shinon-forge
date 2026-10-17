@@ -709,20 +709,63 @@ export const REFERENCABLE_KINDS = new Set(['function', 'class', 'const', 'export
  * MAX_REFERENCE_NAMES, damit der Ausdruck endlich bleibt.
  */
 export function findReferences(text, names) {
-  const list = [...names].slice(0, MAX_REFERENCE_NAMES).filter((name) => !RESERVED_WORDS.has(name));
+  const list = referenceNames(names);
   if (list.length === 0) return [];
-  const pattern = new RegExp(`\\b(${list.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'g');
+  return scanLines(text, referencePattern(list), null, (match) => match[1]);
+}
+
+/** Die Vorbehandlung einer Referenzsuche — in Legacy-Suche und Matcher identisch. */
+export function referenceNames(names) {
+  return [...names].slice(0, MAX_REFERENCE_NAMES).filter((name) => !RESERVED_WORDS.has(name));
+}
+
+/** Der einmal gebaute Legacy-Ausdruck über die gefilterten Namen. */
+function referencePattern(list) {
+  return new RegExp(`\\b(${list.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'g');
+}
+
+/**
+ * Zeilenweiser Scan mit Ergebnis in `line`-Nummern.
+ *
+ * `wanted === null` akzeptiert jeden Treffer (Legacy-Semantik); sonst zählt
+ * nur, was in der Token- Menge liegt — Treffer außerhalb sind keine.
+ */
+function scanLines(text, pattern, wanted, nameOf) {
   const found = [];
   text.split('\n').forEach((line, index) => {
     const seen = new Set();
     for (const match of line.matchAll(pattern)) {
-      if (seen.has(match[1])) continue;
-      seen.add(match[1]);
-      found.push({ name: match[1], line: index + 1 });
+      const name = nameOf(match);
+      if ((wanted !== null && !wanted.has(name)) || seen.has(name)) continue;
+      seen.add(name);
+      found.push({ name, line: index + 1 });
     }
   });
   return found;
 }
+
+/**
+ * Der Referenz-Matcher — einmal je Lauf gebaut, nicht je Datei.
+ *
+ * F-Messung (PERF-BASELINE §5): je Datei der Alternations-Regex kostete
+ * 400,8 ms Kompilierung neben 4876,1 ms Scan. Für reine Wort-Namen
+ * (/[A-Za-z0-9_]+/) ist ein \b-anchored Treffer exakt der Tokenausdruck,
+ * also liefert scan dieselben Paare in derselben Reihenfolge. Namen mit
+ * `$`, Unicode oder Regex-Sonderzeichen kriegen den einmal kompilierten
+ * Legacy-Ausdruck — die Grundbedeutung zählt, nie die Geschwindigkeit.
+ */
+export function createReferenceMatcher(names) {
+  const list = referenceNames(names);
+  if (list.length === 0) return { scan: () => [] };
+  const tokens = /[A-Za-z0-9_]+/g;
+  if (list.every((name) => /^[A-Za-z0-9_]+$/.test(name))) {
+    const wanted = new Set(list);
+    return { scan: (text) => scanLines(text, tokens, wanted, (match) => match[0]) };
+  }
+  const pattern = referencePattern(list);
+  return { scan: (text) => scanLines(text, pattern, null, (match) => match[1]) };
+}
+
 
 /** Text in Fenster schneiden — Grundlage der FTS5-Suche. */
 export function chunkText(text, chunkLines) {
@@ -746,6 +789,26 @@ function metaValue(db, key) {
 }
 
 const setMeta = (db, key, value) => db.prepare('insert or replace into meta(key, value) values (?, ?)').run(key, value);
+
+/**
+ * Mehrere meta-Werte in EINER Transaktion.
+ *
+ * Jede Transaktion ist ein fsync: das Oeffnen schrieb sieben einzelne und zahlte
+ * den Festpreis siebenmal (Messung: docs/audit/PERF-BASELINE-2026-10-17.md).
+ * Nur ausserhalb einer laufenden Transaktion aufrufen — SQLite verschachtelt nicht.
+ */
+function setMetaMany(db, entries) {
+  if (entries.length === 0) return;
+  const statement = db.prepare('insert or replace into meta(key, value) values (?, ?)');
+  db.exec('begin');
+  try {
+    for (const [key, value] of entries) statement.run(key, value);
+    db.exec('commit');
+  } catch (error) {
+    db.exec('rollback');
+    throw error;
+  }
+}
 
 /**
  * Den Index oeffnen, das Schema anlegen und die Fassung festhalten.
@@ -927,17 +990,18 @@ export function openIndex(file, options = {}) {
   // Eine Datei, die gerade Tabellen verloren hat, traegt deren Bytes noch. Der
   // Index ist abgeleitete Kopie — ein Neuzusammenzug kostet hier nur Zeit.
   if (rebuilt) db.exec('vacuum');
-  setMeta(db, 'schema_version', String(SCHEMA_VERSION));
-  setMeta(db, 'indexer_version', String(INDEXER_VERSION));
-  setMeta(db, 'memory_version', String(MEMORY_VERSION));
-  setMeta(db, 'contract', CONTRACT);
+  const metas = [
+    ['schema_version', String(SCHEMA_VERSION)],
+    ['indexer_version', String(INDEXER_VERSION)],
+    ['memory_version', String(MEMORY_VERSION)],
+    ['contract', CONTRACT],
+  ];
   // Eine genannte Root schlaegt sich auch im (leeren) Index nieder: der naechste
   // Leser kann die Bindung pruefen, statt sie anzunehmen.
   if (expected !== null) {
-    setMeta(db, 'root', expected.root);
-    setMeta(db, 'root_id', expected.rootId);
-    setMeta(db, 'workspace_contract', WORKSPACE_CONTRACT);
+    metas.push(['root', expected.root], ['root_id', expected.rootId], ['workspace_contract', WORKSPACE_CONTRACT]);
   }
+  setMetaMany(db, metas);
   return db;
 }
 
@@ -983,7 +1047,10 @@ function indexFile(db, root, absolute, file, options) {
   const language = languageOf(path) ?? 'text';
   const digest = createHash('sha256').update(file.text).digest('hex');
   const safe = redactSecrets(file.text);
-  forgetFile(db, path);
+  // Nur eine Datei mit Vorzeilen kann gelöschte Zeilen haben; auf einer frischen
+  // Datei sind neun Deletes gegen eine wachsende FTS-Tabelle Wegwerfzeit
+  // (gemessen ~1,0 s je Kaltlauf, docs/audit/PERF-BASELINE-2026-10-17.md §5).
+  if (options.known !== false) forgetFile(db, path);
 
   db.prepare('insert or replace into files(path, language, bytes, mtime_ms, digest, indexed_at_ms, stamp) values (?, ?, ?, ?, ?, ?, ?)')
     .run(path, language, file.bytes, file.mtimeMs, digest, Date.now(), options.stamp ?? null);
@@ -1173,7 +1240,9 @@ export function updateIndex(db, root, options = {}) {
         if (suspicious) report.falseAlarms += 1;
         continue;
       }
-      written.push(indexFile(db, root, absolute, file, { chunkLines, stamp }));
+      // Der Durchgang weiß, ob die Datei Zeilen hatte: nur dann kann forgetFile
+      // etwas finden. Auf der geänderten Datei bleibt das Leeren unangetastet.
+      written.push(indexFile(db, root, absolute, file, { chunkLines, stamp, known: before !== undefined }));
       report.written += 1;
     }
 
@@ -1195,6 +1264,9 @@ export function updateIndex(db, root, options = {}) {
     ].sort();
     const digest = createHash('sha256').update(names.join('\n')).digest('hex').slice(0, 16);
     report.symbolsChanged = metaValue(db, 'symbols_digest') !== digest;
+    // EIN Matcher je Lauf, nicht je Datei (PERF-BASELINE §5: Kompilierung war
+    // je Datei 400 ms; Semantik bleibt die der Legacy-Suche).
+    const matcher = createReferenceMatcher(names);
     const rescanned = report.symbolsChanged ? db.prepare('select path from files order by path').all().map((row) => row.path) : written.map((entry) => entry.path);
     for (const path of rescanned) {
       db.prepare('delete from "references" where path = ?').run(path);
@@ -1204,7 +1276,7 @@ export function updateIndex(db, root, options = {}) {
       // traegt Namen und Zeile, nie einen Wert — und der Wert soll auch nicht
       // auf einem Umweg ueber diese Schleife in die Datenbank kommen.
       const insert = db.prepare('insert or ignore into "references"(path, name, line) values (?, ?, ?)');
-      for (const reference of findReferences(redactSecrets(file.text).text, names)) {
+      for (const reference of matcher.scan(redactSecrets(file.text).text)) {
         report.references += insert.run(path, reference.name, reference.line).changes;
       }
     }

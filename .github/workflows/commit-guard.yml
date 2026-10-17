@@ -15,8 +15,8 @@ name: Shinon Forge Gate
 # ZWEI GESCHWINDIGKEITEN, gemessen (leerer Baum aus `git archive`, kein node_modules,
 # kein `dsh` im PATH — genau die Bedingung eines frischen Läufers):
 #   * OHNE Install: `commit-guard` und die `unit`-Matrix. 8 Suiten in Sekunden
-#     zusammen, jede Exit 0 — Zusagen: codingmon 42, hook 2, narrative 9,
-#     scoring 42, token-usage 13, popup 13, key-router 17, traceability 12.
+#     zusammen, jede Exit 0 — Zusagen (Stand 2026-10-17): codingmon 46, hook 1,
+#     narrative 13, scoring 50, token-usage 13, popup 12, key-router 17, traceability 12.
 #     Der Verzicht spart je Zweig einen Baum von 726 Paketen (467 MB,
 #     16 s) — und der Hook-Zweig ist als fail-closed nachgewiesen: Fixture auf zwei
 #     Events gekürzt ⇒ Exit 1.

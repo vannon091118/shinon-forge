@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { dshBinary, dshSource } from './lib/dsh.mjs';
 import { childEnv, describePaths } from './lib/paths.mjs';
+import { seedDshHome } from './lib/dsh-home.mjs';
 import { resolveRuntime, runtimeFailure } from './lib/runtime.mjs';
 import { DEFAULT_PORT_BASE, parsePort, pickFreePort } from './lib/port.mjs';
 import * as os from 'node:os';
@@ -105,6 +106,13 @@ try {
 }
 
 const paths = describePaths();
+// Das Home wird aus dem Baum gefüllt (Profil, Sitzungen, Schlüssel) — aber ohne
+// dessen AGENTS.md: die wäre sonst die globale Anweisung fremder Sitzungen.
+const seeded = seedDshHome(paths.dshHome, root);
+if (seeded.issues.length > 0) {
+  console.error(`💥 open: DSH-Home nicht benutzbar —\n   ${seeded.issues.join('\n   ')}`);
+  process.exit(2);
+}
 console.log('═══════════════════════════════════');
 console.log('  Shinon Forge — 1-Click-Start');
 console.log(`  Profil: ${profileName}    dsh: ${source?.kind ?? 'unbekannt'} — ${dsh.slice(1).join(' ')}`);

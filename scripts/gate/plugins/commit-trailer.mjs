@@ -11,6 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkMessage, swapTrailer, VANNON_TRAILER, FORBIDDEN_LINES } from '../../lib/commit-text.mjs';
+import { policyIssues, resolvePreset } from '../../lib/commit-policy.mjs';
 
 export const id = 'commit-trailer';
 
@@ -56,6 +57,9 @@ export const VALID_SAMPLE = ['Etwas ändern', '', LONG_BODY, '', VANNON_TRAILER]
 
 const REQUIRED_FILES = [
   'scripts/lib/commit-text.mjs',
+  'scripts/lib/commit-policy.mjs',
+  'scripts/lib/commit-policy-file.mjs',
+  'docs/contracts/commit-policy.json',
   'scripts/lib/ci-range.mjs',
   'scripts/commit-guard.mjs',
   'scripts/install-hooks.mjs',
@@ -93,6 +97,35 @@ export function ruleIssues({ forbiddenSample = FORBIDDEN_SAMPLE, validSample = V
   }
 
   if (FORBIDDEN_LINES.length === 0) issues.push('keine verbotenen Footer definiert');
+  return issues;
+}
+
+/**
+ * Der Policy-Vertrag selbst: gültig, jedes Preset auflösbar, und die drei
+ * Zusagen, die kein Datenfeld still umdrehen darf.
+ */
+export function policyRuleIssues(contract) {
+  const issues = policyIssues(contract);
+  if (issues.length > 0) return issues;
+  for (const name of Object.keys(contract.presets)) {
+    try {
+      resolvePreset(contract, name);
+    } catch (error) {
+      issues.push(`Preset „${name}" löst nicht auf: ${error.message}`);
+    }
+  }
+  const maintainer = resolvePreset(contract, 'shinon-maintainer');
+  if (!maintainer.trailerRequired || maintainer.minWords === 0) {
+    issues.push('shinon-maintainer: Trailer und Wort-Regel sind das heutige Verhalten und dürfen nicht fehlen');
+  }
+  const strict = resolvePreset(contract, 'strict-evidence');
+  if (strict.repairSwapTrailer) issues.push('strict-evidence: darf lokal nicht reparieren (fail-closed)');
+  for (const name of ['minimal', 'conventional']) {
+    if (!Object.hasOwn(contract.presets, name)) continue;
+    if (resolvePreset(contract, name).trailerRequired) {
+      issues.push(`${name}: erzwingt den Vannon-Trailer ohne Auswahl`);
+    }
+  }
   return issues;
 }
 
@@ -170,6 +203,14 @@ export function check(ctx) {
   const guard = readFileSync(join(root, 'scripts/commit-guard.mjs'), 'utf8');
   if (!guard.includes("--ci")) issues.push('scripts/commit-guard.mjs: --ci fehlt (der CI-Weg muss im Wächter liegen)');
   if (!guard.includes("./lib/ci-range.mjs")) issues.push('scripts/commit-guard.mjs: nutzt den Bereichs-Resolver nicht');
+  if (!guard.includes('commit-policy-file.mjs')) issues.push('scripts/commit-guard.mjs: nutzt die Policy-Auswahl nicht (Presets wären tote Daten)');
+
+  try {
+    const contract = JSON.parse(readFileSync(join(root, 'docs/contracts/commit-policy.json'), 'utf8'));
+    issues.push(...policyRuleIssues(contract));
+  } catch (error) {
+    issues.push(`docs/contracts/commit-policy.json: nicht lesbar (${error.message})`);
+  }
   // Ein einzelner Kopf-Commit als Rückfall wäre eine Verengung der Prüfung.
   if (/git',\s*\['log',\s*'--no-merges',\s*'-1'/.test(guard) || /'-1',\s*'--format/.test(guard)) {
     issues.push('scripts/commit-guard.mjs: Rückfall prüft nur einen Commit — der Wächter darf nie enger werden');

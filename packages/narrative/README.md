@@ -1,10 +1,10 @@
 # @shinon/narrative — Narrative Engine
 
-> **Status:** current — Paket-Doku Narrative Engine. **Stand:** 2026-10-10
+> **Status:** current — Paket-Doku Narrative Engine. **Stand:** 2026-10-17
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
-**Stand der Umsetzung:** WIP (Wave 3). Das Paket ist gebaut und lädt im
-Distributionstest, ist aber **nicht** in `dsh.profile.bundles` aktiviert.
+**Stand der Umsetzung:** aktiv im Profil (`shinon-narrative`); der Composite geht
+auf `shinon/narrative/state` hinaus und wird von Persona und Veredler gelesen.
 
 **Rolle:** Deterministische Ableitung von Composite, Mood, Arc, Relationship aus Event-Historie  
 **Abhängigkeit:** `@shinon/events` (Spine als Event-Quelle)
@@ -61,8 +61,10 @@ REAL EVENT ──▶ @shinon/events ──▶ shinon/event ──▶ Chronicle
 {
   pair: ['shinon', 'user'],
   history: [{ event: 'evt-001', type: 'conflict' }, ...],
-  trust: 0.7,        // 0..1
-  respect: 0.9,
+  state: 'established_duo',        // nur aus expliziter Transition
+  state_evidence: 'EXPLICIT_PAYLOAD',
+  trust: null,       // kein Wert ohne Beleg (nie aus Historie oder Hash)
+  respect: null,
   patterns: ['direct', 'challenges-assumptions'],
   commitments: ['verify-before-write'],
   conflicts: [],
@@ -74,7 +76,9 @@ REAL EVENT ──▶ @shinon/events ──▶ shinon/event ──▶ Chronicle
 ```javascript
 {
   seq: 294,                    // monotone Sequenz
-  mood: 'focused',            // Anti-Wiederholung
+  mood: 'focused',            // aus rules.moodByEvidence
+  mood_evidence: 'EVENT_TYPE',
+  mood_event: 'evt-294',
   narrator: 'shinon',         // wer erzählt
   arc_id: 'arc-001',
   arc_events: 15,
@@ -92,23 +96,20 @@ REAL EVENT ──▶ @shinon/events ──▶ shinon/event ──▶ Chronicle
 
 ## Ableitung (Deterministisch)
 
-### Seed-Berechnung
+### Explizite Regeln (`rules` v2)
 ```javascript
-// Input: Vorgänger-Composite + aktuelles Event
-const seed = djb2(`${prevComposite.seq}|${event.id}|${event.timestamp}`);
-const rng = new XorShift(seed);
+// Mood: Ereignis → Mood, Grund und Evidenzlevel. Kein Hash, kein Wurf.
+const { mood, reason, evidence } = deriveMood(rules.moodByEvidence, prevMood, event.type);
+
+// Thema: Ereignis → Thema. Ein unbekanntes Ereignis trägt kein Thema.
+const theme = rules.themeByEvent[event.type]; // undefined ⇒ kein Arc
 ```
 
 ### Mood-Auswahl
 ```javascript
-// Wähle aus Pool, nie gleich wie vorher
-function selectMood(prevMood, rng) {
-  let next;
-  do {
-    next = MOODS[rng.next() % MOODS.length];
-  } while (next === prevMood);
-  return next;
-}
+// Derselbe Ereignistyp ergibt IMMER denselben Mood.
+// Die frühere Anti-Wiederholung („nie zweimal derselbe") ist entfernt:
+// Abwechslung war keine Evidenz.
 ```
 
 ### Arc-Freeze
@@ -122,13 +123,10 @@ if (composite.arc_events >= freezeThreshold) {
 
 ### Relationship-State
 ```javascript
-// Aus Historie abgeleitet, nie behauptet
-function calculateRelationshipState(pair, historyLength) {
-  const score = hash(pair) + (historyLength * 2);
-  if (score >= 70) return 'trusted_team';
-  if (score >= 40) return 'established_duo';
-  return 'fresh_pair';
-}
+// Nur eine ausdrückliche Transition hebt die Stufe — sonst KEINE_EVIDENZ.
+// `djb2(pair) % 100` und `historyLength * 2` sind entfernt: beides war
+// eine Trust-Aussage aus dem Fehlen von Gegenbelegen.
+const { state, evidence } = relationshipState(rules, current, event.type, event.context);
 ```
 
 ---
@@ -191,7 +189,8 @@ Codingmon kann Narrative-Events nutzen, um XP/Battles basierend auf tatsächlich
 | Regel | Status |
 |-------|--------|
 | Deterministische Ableitung | ✅ |
-| Anti-Wiederholung (Mood) | ✅ |
+| Explizite Regeln (`rules` v2, Evidenzlevel) | ✅ |
+| Unbekannte Events ändern kein semantisches Feld | ✅ |
 | Monotone Sequenz | ✅ |
 | Authority NONE | ✅ |
 | Keine autonomen Aktionen | ✅ |

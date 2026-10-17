@@ -89,6 +89,23 @@ export function forbiddenLabelsOf(line) {
  */
 export const WORD_MIN = 150;
 
+/**
+ * Die Voreinstellung ist das heutige Repo-Verhalten (Preset `shinon-maintainer`).
+ * Jede Regel ist ein Feld, damit ein Preset sie setzen kann — der Fußboden
+ * (Signatur-Footer, co-authored-by) steht dagegen NICHT hier und ist nicht abwählbar.
+ */
+export const DEFAULT_RULES = Object.freeze({
+  name: 'shinon-maintainer',
+  subjectPattern: null,
+  subjectHint: '',
+  trailerRequired: true,
+  trailerText: VANNON_TRAILER,
+  minWords: WORD_MIN,
+  requireNamedData: true,
+  requireImagery: true,
+  repairSwapTrailer: true,
+});
+
 /** Konkrete Referenzen: je ein Muster, je ein Name für die Meldung. */
 export const NAMED_DATA_PATTERNS = [
   { re: /[\w.~\-]+\/[\w.~\/-]+\.\w{1,8}\b/, label: 'Pfad mit Endung (z. B. scripts/lib/commit-text.mjs)' },
@@ -143,22 +160,27 @@ export function countWords(raw) {
 /**
  * Verstöße gegen die Wort-Regel (leer ⇒ Umfang, Daten und Bildsprache stehen).
  */
-export function wordViolations(raw) {
+export function wordViolations(raw, rules = DEFAULT_RULES) {
   const content = contentText(raw);
   const violations = [];
   const words = countWords(raw);
-  if (words < WORD_MIN) {
-    violations.push(`Wort-Regel: Nachricht zu kurz — ${words} Wörter, mindestens ${WORD_MIN} verlangt (Trailer und #-Zeilen zählen nicht)`);
+  if (rules.minWords > 0 && words < rules.minWords) {
+    violations.push(
+      `Wort-Regel: Nachricht zu kurz — ${words} Wörter, mindestens ${rules.minWords} verlangt (Trailer und #-Zeilen zählen nicht)`,
+    );
   }
-  if (!NAMED_DATA_PATTERNS.some(({ re }) => re.test(content))) {
+  if (rules.requireNamedData && !NAMED_DATA_PATTERNS.some(({ re }) => re.test(content))) {
     violations.push(
       `Wort-Regel: keine Daten namentlich genannt — verlangt ist mindestens eines: ${NAMED_DATA_PATTERNS.map(({ label }) => label).join('; ')}`,
     );
   }
   const lowered = `\n${content.toLowerCase()}\n`;
-  if (!BILDSPRACHE_MARKERS.some((marker) => lowered.includes(marker))) {
-    violations.push(`Wort-Regel: keine Bildsprache — verlangt ist ein Vergleichs-/Bildmarker: ${BILDSPRACHE_MARKERS.join(', ')}`);
-  }  return violations;
+  if (rules.requireImagery && !BILDSPRACHE_MARKERS.some((marker) => lowered.includes(marker))) {
+    violations.push(
+      `Wort-Regel: keine Bildsprache — verlangt ist ein Vergleichs-/Bildmarker: ${BILDSPRACHE_MARKERS.join(', ')}`,
+    );
+  }
+  return violations;
 }
 
 /** Ist diese Zeile ein verbotener Footer? */
@@ -166,20 +188,35 @@ export function isForbiddenFooterLine(line) {
   return forbiddenLabelsOf(line).length > 0;
 }
 
-/** Trägt die Nachricht den Vannon-Trailer (in den letzten drei inhaltlichen Zeilen)? */
-export function hasVannonTrailer(raw) {
+/** Trägt die Nachricht den Trailer des Presets (in den letzten drei inhaltlichen Zeilen)? */
+export function carriesTrailer(raw, rules = DEFAULT_RULES) {
+  const wanted = fold(rules.trailerText ?? VANNON_TRAILER);
   const lines = String(raw ?? '')
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line !== '' && !line.startsWith('#'));
-  return lines.slice(-3).some((line) => fold(line).includes(TRAILER_FOLDED));
+  return lines.slice(-3).some((line) => fold(line).includes(wanted));
+}
+
+/** Trägt die Nachricht den Vannon-Trailer (in den letzten drei inhaltlichen Zeilen)? */
+export function hasVannonTrailer(raw) {
+  return carriesTrailer(raw, DEFAULT_RULES);
+}
+
+/** Die erste inhaltliche Zeile — der Betreff, gegen den ein Preset prüfen kann. */
+function firstContentLine(raw) {
+  const line = String(raw ?? '')
+    .split('\n')
+    .map((candidate) => candidate.trim())
+    .find((candidate) => candidate !== '' && !candidate.startsWith('#'));
+  return line ?? '';
 }
 
 /**
  * Nachricht prüfen — zeilenweise, mit demselben Prädikat wie der Tausch.
  * @returns {{ ok: boolean, violations: string[], hasTrailer: boolean }}
  */
-export function checkMessage(raw) {
+export function checkMessage(raw, rules = DEFAULT_RULES) {
   const text = String(raw ?? '');
   const violations = [];
   const seen = new Set();
@@ -192,11 +229,20 @@ export function checkMessage(raw) {
     }
   }
 
-  const hasTrailer = hasVannonTrailer(text);
-  if (!hasTrailer) {
-    violations.push(`Vannon-Trailer fehlt — erwartet als letzte Zeile: ${VANNON_TRAILER}`);
+  if (rules.subjectPattern) {
+    const subject = firstContentLine(text);
+    if (!new RegExp(rules.subjectPattern).test(subject)) {
+      const shown = subject.length > 72 ? `${subject.slice(0, 72)}…` : subject;
+      const hint = rules.subjectHint || rules.subjectPattern;
+      violations.push(`Format: Betreff passt nicht zum Preset „${rules.name}" — ${hint} (Betreff: ${JSON.stringify(shown)})`);
+    }
   }
-  for (const violation of wordViolations(text)) violations.push(violation);
+
+  const hasTrailer = carriesTrailer(text, rules);
+  if (rules.trailerRequired && !hasTrailer) {
+    violations.push(`Vannon-Trailer fehlt — erwartet als letzte Zeile: ${rules.trailerText}`);
+  }
+  for (const violation of wordViolations(text, rules)) violations.push(violation);
   return { ok: violations.length === 0, violations, hasTrailer };
 }
 
@@ -205,11 +251,14 @@ export function checkMessage(raw) {
  * Das ist der „eintauschen"-Schritt: lokal ersetzt der Hook die Signatur,
  * in CI gibt es keinen Tausch — dort gilt fail-closed.
  */
-export function swapTrailer(raw) {
+export function swapTrailer(raw, rules = DEFAULT_RULES) {
+  // Ein Preset ohne Reparatur (strict-evidence) schreibt nichts: der Tausch ist
+  // eine definierte, begrenzte Handlung, keine allgemeine Lizenz zum Umschreiben.
+  if (rules.repairSwapTrailer === false) return String(raw ?? '');
   const lines = String(raw ?? '').replace(/\r\n/g, '\n').split('\n');
   const kept = lines.filter((line) => !isForbiddenFooterLine(line));
   while (kept.length > 0 && kept[kept.length - 1].trim() === '') kept.pop();
   const body = kept.join('\n');
-  if (hasVannonTrailer(body)) return `${body}\n`;
+  if (carriesTrailer(body, rules)) return `${body}\n`;
   return `${body}\n\n${VANNON_TRAILER}\n`;
 }

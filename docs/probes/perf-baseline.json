@@ -1,0 +1,448 @@
+[
+  {
+    "id": "perf-baseline-lokal-2026-10-17",
+    "claim": "Der lokale Anteil eines Laufs ist millisekundengroß, außer dem Indexweg: Dateiscan, Scoring, Workspace-Auflösung, One-Shot und agent/pre-step liegen unter 4 ms, der Index kalt bei Sekunden.",
+    "targets": [
+      "scripts/perf-baseline.mjs",
+      "scripts/lib/perf-stats.mjs",
+      "docs/audit/PERF-BASELINE-2026-10-17.md"
+    ],
+    "expect": "Je Fall dieselbe Operation auf identischer Fixture, P50/P95 über ≥ 25 Läufe (index-cold 7, weil jeder Lauf ~20 MB schreibt), und ein Fingerabdruck je Stichprobe, der beweist, dass alle Läufe dasselbe Ergebnis hatten.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, 1fd90f9c85b247d41e6299ca3c9f251a759e556f (main, schmutzig), Node 22.23.3, 6× AMD FX(tm)-6300 Six-Core Processor, Last 3.47 / 3.96 / 4.19. Einheit ms je Operation; jede Stichprobe trug denselben Fingerabdruck. workspace-resolve P50 0.006 ms / P95 0.007 ms (n=25, min 0.006, max 0.007, sd 0); file-scan P50 3.372 ms / P95 4.667 ms (n=25, min 2.562, max 6.829, sd 0.881); index-open P50 167.243 ms / P95 182.487 ms (n=25, min 158.241, max 208.558, sd 9.493); index-cold P50 3095.705 ms / P95 3637.303 ms (n=7, min 2949.826, max 3796.128, sd 262.141); index-warm P50 283.716 ms / P95 313.825 ms (n=25, min 250.879, max 359.194, sd 20.491); scoring-replay P50 0.14 ms / P95 0.241 ms (n=25, min 0.099, max 0.246, sd 0.041); one-shot-local P50 0.107 ms / P95 0.136 ms (n=25, min 0.094, max 0.15, sd 0.013); one-shot-fallback P50 0.037 ms / P95 0.05 ms (n=25, min 0.029, max 0.054, sd 0.006); agent-pre-step P50 0.269 ms / P95 0.325 ms (n=25, min 0.239, max 0.34, sd 0.026). NICHT GEMESSEN: Modellantwort, DSH-Host-Turn, Browser — Turn-Latenz ist nicht Teil dieser Baseline.",
+    "evidence_note": "Ausgegeben werden Pfade, Zählungen, Bytegrößen und Digests; kein Prompttext, kein Dateiinhalt, kein Schlüsselwert.",
+    "measurements": {
+      "schema": "shinon.perf-baseline/v1",
+      "measuredAt": "2026-10-17T22:09:49.594Z",
+      "invocation": "node scripts/perf-baseline.mjs --runs 25 --cold-runs 7 --warmup 2",
+      "runtime": {
+        "node": "22.23.3",
+        "v8": "12.4.254.21-node.57",
+        "platform": "linux x64",
+        "cpus": 6,
+        "cpu": "AMD FX(tm)-6300 Six-Core Processor",
+        "loadavg": [
+          3.47,
+          3.96,
+          4.19
+        ],
+        "dshPin": "0.2.1-alpha.1",
+        "commit": "1fd90f9c85b247d41e6299ca3c9f251a759e556f",
+        "branch": "main",
+        "dirty": true
+      },
+      "method": {
+        "runs": 25,
+        "warmup": 2,
+        "runsByCase": {
+          "index-cold": 7
+        },
+        "note": "index-cold läuft seltener: jeder Lauf schreibt eine neue ~20-MB-SQLite-Datei",
+        "unit": "ms je Operation",
+        "percentile": "lineare Interpolation zwischen den Nachbar-Rängen",
+        "repetition": "je Stichprobe `reps` Operationen, Zeit durch `reps` geteilt",
+        "excluded": [
+          "Modellantwort und Netz",
+          "DSH-Host-Turn",
+          "Browser/UI",
+          "parallele Fremdlast"
+        ]
+      },
+      "cases": [
+        {
+          "id": "workspace-resolve",
+          "what": "resolveWorkspaceRoot + fingerprintRoot (Config > ENV > cwd)",
+          "kind": "pure",
+          "blocking": false,
+          "reps": 2000,
+          "runs": 25,
+          "input": {
+            "root": "/home/vannon/Dokumente/Source_repos/Shinon-forge"
+          },
+          "result": "83563c491a42aa45",
+          "ms": {
+            "n": 25,
+            "min": 0.006,
+            "p50": 0.006,
+            "p95": 0.007,
+            "max": 0.007,
+            "mean": 0.006,
+            "sd": 0
+          },
+          "stability": {
+            "stable": true,
+            "distinct": 1,
+            "samples": 25,
+            "values": [
+              "c80dc78160f7"
+            ]
+          },
+          "notes": ""
+        },
+        {
+          "id": "file-scan",
+          "what": "listFiles über den Baum (Quell-Endungen, SKIP_DIRS)",
+          "kind": "sync-io",
+          "blocking": true,
+          "reps": 1,
+          "runs": 25,
+          "input": {
+            "files": 434
+          },
+          "result": 434,
+          "ms": {
+            "n": 25,
+            "min": 2.562,
+            "p50": 3.372,
+            "p95": 4.667,
+            "max": 6.829,
+            "mean": 3.54,
+            "sd": 0.881
+          },
+          "stability": {
+            "stable": true,
+            "distinct": 1,
+            "samples": 25,
+            "values": [
+              "ea415bf50eb6"
+            ]
+          },
+          "notes": ""
+        },
+        {
+          "id": "index-open",
+          "what": "openIndex + close auf vorhandener Datei (der Preis des Öffnens allein)",
+          "kind": "sqlite-write",
+          "blocking": true,
+          "reps": 1,
+          "runs": 25,
+          "input": {
+            "root": "/home/vannon/Dokumente/Source_repos/Shinon-forge",
+            "files": 434
+          },
+          "result": [
+            "shinon.project-index/v1",
+            "83563c491a42aa45",
+            "2"
+          ],
+          "ms": {
+            "n": 25,
+            "min": 158.241,
+            "p50": 167.243,
+            "p95": 182.487,
+            "max": 208.558,
+            "mean": 171.055,
+            "sd": 9.493
+          },
+          "stability": {
+            "stable": true,
+            "distinct": 1,
+            "samples": 25,
+            "values": [
+              "a64be62b213a"
+            ]
+          },
+          "notes": ""
+        },
+        {
+          "id": "index-cold",
+          "what": "openIndex + updateIndex auf leerer Datei (der Startscan)",
+          "kind": "sqlite-write",
+          "blocking": true,
+          "reps": 1,
+          "runs": 7,
+          "input": {
+            "root": "/home/vannon/Dokumente/Source_repos/Shinon-forge",
+            "files": 434
+          },
+          "result": {
+            "files": 434,
+            "written": 428,
+            "readBytes": 4036207,
+            "references": 64689,
+            "touches": 248,
+            "findings": 15,
+            "dbBytes": 21319680
+          },
+          "ms": {
+            "n": 7,
+            "min": 2949.826,
+            "p50": 3095.705,
+            "p95": 3637.303,
+            "max": 3796.128,
+            "mean": 3190.1,
+            "sd": 262.141
+          },
+          "stability": {
+            "stable": true,
+            "distinct": 1,
+            "samples": 7,
+            "values": [
+              "c58e3043f971"
+            ]
+          },
+          "notes": ""
+        },
+        {
+          "id": "index-warm",
+          "what": "openIndex + updateIndex auf vorhandener Datei, nichts verändert",
+          "kind": "sqlite-write",
+          "blocking": true,
+          "reps": 1,
+          "runs": 25,
+          "input": {
+            "root": "/home/vannon/Dokumente/Source_repos/Shinon-forge",
+            "files": 434
+          },
+          "result": {
+            "files": 434,
+            "written": 0,
+            "readBytes": 0,
+            "references": 0,
+            "touches": 0,
+            "findings": 0,
+            "dbBytes": 21319680
+          },
+          "ms": {
+            "n": 25,
+            "min": 250.879,
+            "p50": 283.716,
+            "p95": 313.825,
+            "max": 359.194,
+            "mean": 283.877,
+            "sd": 20.491
+          },
+          "stability": {
+            "stable": true,
+            "distinct": 1,
+            "samples": 25,
+            "values": [
+              "5aaec3af8151"
+            ]
+          },
+          "notes": ""
+        },
+        {
+          "id": "scoring-replay",
+          "what": "replay: ganzer Signalstrom → Scorecard + Injektion + Digest",
+          "kind": "pure",
+          "blocking": false,
+          "reps": 20,
+          "runs": 25,
+          "input": {
+            "records": 7
+          },
+          "result": "sc_d6b3d4377a06e5e9",
+          "ms": {
+            "n": 25,
+            "min": 0.099,
+            "p50": 0.14,
+            "p95": 0.241,
+            "max": 0.246,
+            "mean": 0.149,
+            "sd": 0.041
+          },
+          "stability": {
+            "stable": true,
+            "distinct": 1,
+            "samples": 25,
+            "values": [
+              "a413af945be7"
+            ]
+          },
+          "notes": ""
+        },
+        {
+          "id": "one-shot-local",
+          "what": "enhanceGuarded gegen einen lokalen Fake-Strom: Request, Chunks, Parse, Annahme",
+          "kind": "async-host",
+          "blocking": false,
+          "reps": 200,
+          "runs": 25,
+          "input": {
+            "bytes": 1282,
+            "tokensEstimated": 320
+          },
+          "result": {
+            "outcome": "accepted",
+            "reasons": "",
+            "hasResult": true
+          },
+          "ms": {
+            "n": 25,
+            "min": 0.094,
+            "p50": 0.107,
+            "p95": 0.136,
+            "max": 0.15,
+            "mean": 0.11,
+            "sd": 0.013
+          },
+          "stability": {
+            "stable": true,
+            "distinct": 1,
+            "samples": 25,
+            "values": [
+              "869ba976290e"
+            ]
+          },
+          "notes": ""
+        },
+        {
+          "id": "one-shot-fallback",
+          "what": "enhanceGuarded gegen einen werfenden Provider: LLM_FAILED, genau ein Aufruf",
+          "kind": "async-host",
+          "blocking": false,
+          "reps": 200,
+          "runs": 25,
+          "input": {
+            "bytes": 67
+          },
+          "result": {
+            "outcome": "rejected",
+            "reasons": "LLM_FAILED:ProviderError",
+            "hasResult": false
+          },
+          "ms": {
+            "n": 25,
+            "min": 0.029,
+            "p50": 0.037,
+            "p95": 0.05,
+            "max": 0.054,
+            "mean": 0.038,
+            "sd": 0.006
+          },
+          "stability": {
+            "stable": true,
+            "distinct": 1,
+            "samples": 25,
+            "values": [
+              "d4d35deecd10"
+            ]
+          },
+          "notes": ""
+        },
+        {
+          "id": "agent-pre-step",
+          "what": "readStep + stepIssues + buildStepEnvelope + Konformitätsprüfung",
+          "kind": "pure",
+          "blocking": true,
+          "reps": 500,
+          "runs": 25,
+          "input": {
+            "records": 20
+          },
+          "result": [
+            0,
+            "evt-35d58e88be50",
+            "tr-415dd6e40bb6"
+          ],
+          "ms": {
+            "n": 25,
+            "min": 0.239,
+            "p50": 0.269,
+            "p95": 0.325,
+            "max": 0.34,
+            "mean": 0.277,
+            "sd": 0.026
+          },
+          "stability": {
+            "stable": true,
+            "distinct": 1,
+            "samples": 25,
+            "values": [
+              "1feebf7a2a02"
+            ]
+          },
+          "notes": ""
+        }
+      ],
+      "diagnostics": [
+        {
+          "id": "sqlite-meta-batch",
+          "what": "sieben Meta-Zeilen einzeln committet gegen sieben in EINER Transaktion (dieselben Pragmas wie openDatabase)",
+          "ms": {
+            "n": 5,
+            "min": 359.48,
+            "p50": 409.57,
+            "p95": 621.895,
+            "max": 668.983,
+            "mean": 456.213,
+            "sd": 109.088
+          },
+          "compare": {
+            "id": "sieben in einer Transaktion",
+            "ms": {
+              "n": 5,
+              "min": 50.097,
+              "p50": 58.468,
+              "p95": 58.557,
+              "max": 58.572,
+              "mean": 56.801,
+              "sd": 3.353
+            }
+          },
+          "note": "Diagnose, kein Produktschritt: openIndex zahlt heute sieben einzelne setMeta-Commits je Öffnen"
+        }
+      ],
+      "blockers": [
+        {
+          "case": "model-turn",
+          "reason": "nicht gemessen: echte Modellantwort braucht den DSH-Host; dieser Lauf erzeugt keine Prompt-Inhalte und keine Kosten",
+          "detail": "NOT_VERIFIED — Turn-Latenz ist nicht Teil der Baseline"
+        }
+      ],
+      "candidate": {
+        "metric": "index-open p50",
+        "reason": "openIndex setzt sieben Meta-Zeilen (4× Fassung, 3× Root) in sieben eigenen Transaktionen — jede ist ein fsync, der Öffnen-Preis hängt nicht am Inhalt",
+        "change": "die sieben setMeta-Aufrufe in openIndex in EINE Transaktion legen (und den Lauf danach neu messen)",
+        "measured": {
+          "separateCommitsMs": 409.57,
+          "oneTransactionMs": 58.468
+        },
+        "notImplemented": "F1 liefert die Baseline; die Produktionsänderung gehört in einen eigenen Slice"
+      }
+    }
+  },
+  {
+    "id": "index-open-sieben-commits-2026-10-17",
+    "claim": "Das Öffnen des Projektindex zahlt einen inhaltsunabhängigen Festpreis: sieben Meta-Zeilen (4× Fassung, 3× Root) in sieben eigenen Transaktionen, jede ein fsync. Gebündelt in EINER Transaktion fällt genau dieser Anteil weg.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "scripts/gate/tests/project-index.test.mjs",
+      "docs/audit/PERF-BASELINE-2026-10-17.md"
+    ],
+    "expect": "Wenn die sieben Commits den Preis tragen, muss dieselbe Arbeit in EINER Transaktion deutlich billiger sein — gleiche Zeilenzahl, dieselben Pragmas, abwechselnd in derselben Schleife gemessen —, und der Öffnen-Preis muss danach fallen.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, 1fd90f9c85b247d41e6299ca3c9f251a759e556f (main, schmutzig), Node 22.23.3, 6× AMD FX(tm)-6300 Six-Core Processor, Last 3.47 / 3.96 / 4.19. index-open P50 167.243 ms auf vorhandener Datei; sieben Meta-Zeilen einzeln P50 409.57 ms (min 359.48, max 668.983, n=5) gegen 58.468 ms in einer Transaktion (n=5), also ~351 ms Unterschied je Öffnen. Der Vorher-Lauf derselben Fixture (index-open P50 912,2 ms) steht in docs/audit/PERF-BASELINE-2026-10-17.md; Last und Maschine sind zwischen beiden Läufen nicht gleich, der kontrollierte Teil ist die gepaarte Diagnose.",
+    "evidence_note": "Nur Dauern und Zeilenzahlen; kein Tabelleninhalt, kein Schlüssel.",
+    "change": "UMGESETZT: openIndex schreibt seine sieben Meta-Zeilen über setMetaMany in EINER Transaktion (packages/project-index/assets/index-core.js); gepinnt von scripts/gate/tests/project-index.test.mjs (alle sieben Schlüssel da, kein einzelner setMeta-Commit im Öffnen).",
+    "measurements": {
+      "id": "sqlite-meta-batch",
+      "what": "sieben Meta-Zeilen einzeln committet gegen sieben in EINER Transaktion (dieselben Pragmas wie openDatabase)",
+      "ms": {
+        "n": 5,
+        "min": 359.48,
+        "p50": 409.57,
+        "p95": 621.895,
+        "max": 668.983,
+        "mean": 456.213,
+        "sd": 109.088
+      },
+      "compare": {
+        "id": "sieben in einer Transaktion",
+        "ms": {
+          "n": 5,
+          "min": 50.097,
+          "p50": 58.468,
+          "p95": 58.557,
+          "max": 58.572,
+          "mean": 56.801,
+          "sd": 3.353
+        }
+      },
+      "note": "Diagnose, kein Produktschritt: openIndex zahlt heute sieben einzelne setMeta-Commits je Öffnen"
+    }
+  }
+]

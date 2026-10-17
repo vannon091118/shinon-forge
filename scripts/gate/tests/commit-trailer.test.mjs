@@ -242,7 +242,9 @@ test('commit: jede Schreibweise wird abgelehnt — with/by, Tabs, Doppel-Leerzei
     assert.equal(isForbiddenFooterLine(line), true, `nicht erkannt: ${JSON.stringify(line)}`);
     assert.equal(checkMessage(withBody(line)).ok, false, `akzeptiert: ${JSON.stringify(line)}`);
   }
-  assert.ok(SIGNATURE_VARIANTS.length >= 300, 'die Variantenmenge ist geschrumpft');
+  // Die Zahl ist gemessen (5 Verben × 2 Präpositionen × 3 Abstände × 11 Namen)
+  // und wird hier gepinnt, weil die Doku sie nennt: 330, nicht „mindestens 300".
+  assert.equal(SIGNATURE_VARIANTS.length, 330, 'die Variantenmenge ist geschrumpft oder gewachsen');
 });
 
 test('commit: Signaturen zählen auch mitten im Body (P3)', () => {

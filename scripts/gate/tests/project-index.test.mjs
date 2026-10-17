@@ -1118,6 +1118,65 @@ test('Grenze: der Lauf schreibt nichts ins Projekt', () => {
   assert.ok(bundle.SKIP_DIRS.has('node_modules') && bundle.SKIP_DIRS.has('.git'), 'Fremdcode und Historie werden nie betreten');
 });
 
+// ── Zusage: das Öffnen zahlt EINEN Commit, nicht sieben (F1-Baseline) ────────
+
+test('Öffnen: die sieben Meta-Zeilen gehen in einer Transaktion raus', () => {
+  const project = fixtureProject('meta-batch');
+  const { file } = fixtureIndex(project, 'meta-batch');
+  const db = bundle.openIndex(file, { expectedRoot: project });
+  const keys = db.prepare('select key from meta order by key').all().map((row) => row.key);
+  db.close();
+
+  assert.deepEqual(keys, [
+    'contract', 'indexer_version', 'memory_version', 'root', 'root_id', 'schema_version', 'workspace_contract',
+  ], 'alle sieben Kopffelder sind da — gebündelt heißt nicht weniger');
+
+  // Der Grund ist der Preis: sieben Commits waren sieben fsyncs. Gepinnt wird
+  // die Form, nicht die Dauer — die hängt an Maschine und Last.
+  const source = codeOnly(readFileSync(CORE_FILE, 'utf8'));
+  const start = source.indexOf('export function openIndex');
+  const body = source.slice(start, source.indexOf('export function indexMeta', start));
+  assert.ok(start !== -1 && body.length > 0, 'openIndex ist auffindbar');
+  assert.match(body, /setMetaMany\(/, 'das Öffnen bündelt seine Meta-Schreibvorgänge');
+  assert.equal(/setMeta\(/.test(body), false, 'kein einzelner Meta-Commit mehr im Öffnen');
+});
+
+// ── Zusage: eine neue Datei wird nicht vorher geleert; eine bekannte schon ───
+
+test('Update: eine bekannte Datei wird vor dem Neuschreiben geleert — keine Doppelzeilen', () => {
+  const project = fixtureProject('forget-bekannt');
+  const { file } = fixtureIndex(project, 'forget-bekannt');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, {});
+  const symbolsBefore = one(db, `select count(*) as n from symbols where path = 'src/b.mjs'`).n;
+  assert.ok(symbolsBefore > 1, 'b.mjs trägt vor dem Umbau mehrere Symbolzeilen');
+
+  // Dieselbe Datei, weniger Symbole: die alten Zeilen dürfen nicht liegen bleiben.
+  writeFileSync(join(project, 'src/b.mjs'), 'export function bThing(value) {\n  return value;\n}\n');
+  const second = bundle.updateIndex(db, project, {});
+  const symbolsAfter = one(db, `select count(*) as n from symbols where path = 'src/b.mjs'`).n;
+  db.close();
+
+  assert.equal(second.written, 1, 'genau die geänderte Datei wird neu geschrieben');
+  assert.equal(second.rehashed, 0, 'der Inhalt ist geändert, kein Rehash-Idlefall');
+  assert.equal(symbolsAfter, 1, 'nur der neue Stand steht in symbols — forgetFile läuft für bekannte Dateien');
+});
+
+test('Kaltlauf: eine neue Datei braucht kein Leeren — forgetFile läuft nur für bekannte Pfade', () => {
+  const source = codeOnly(readFileSync(CORE_FILE, 'utf8'));
+  // Der Durchgang weiß, ob die Datei Zeilen hatte: dieses Wissen geht mit hinein.
+  assert.match(source, /indexFile\(db, root, absolute, file, \{ chunkLines, stamp, known: before !== undefined \}\)/, 'der Aufruf übergibt das Wissen über Vorzeilen');
+  // indexFile leert nur dann — auf einer frischen Datei kann nichts liegen.
+  const start = source.indexOf('function indexFile');
+  const body = source.slice(start, source.indexOf('\n}', start));
+  assert.ok(start !== -1 && body.length > 0, 'indexFile ist auffindbar');
+  assert.match(body, /options\.known !== false\) forgetFile\(db, path\)/, 'unbekannte Pfade werden nicht vorher geleert');
+  for (const table of [bundle.FTS_TABLE, ...bundle.PRIMARY_TABLES]) {
+    assert.ok(source.includes(`forgetFile`), 'forgetFile bleibt der eine Besitzer des Löschens');
+    break;
+  }
+});
+
 // ── Zusage: der Lauf steht im Worker, der Mount blockiert nicht (Plan §12) ───
 
 test('Host und Worker: derselbe Lauf, derselbe Index', async () => {
@@ -1956,4 +2015,53 @@ test('Mount: die Berichtszeile nennt jeden Ausschluss mit Grund und Pfad', async
   } finally {
     quiet.restore();
   }
+});
+
+// ── Zusage: der Referenz-Matcher ist einmal je Lauf wortgleich mit findReferences ──
+//
+// F-Messung (PERF-BASELINE §5): findReferences baute je DATEI einen
+// Alternations-Regex ueber bis zu 1757 Namen (Kompilierung 403 ms, Scan 4,9 s).
+// Der Matcher wird je UPDATE-Lauf EINMAL gebaut und muss dieselben
+// {name, line}-Eintraege liefern wie die Legacy-Funktion — in derselben
+// Reihenfolge, mit derselben Vorbehandlung (Slice auf MAX_REFERENCE_NAMES,
+// RESERVED_WORDS raus) — die Tabelle "references" darf sich um nichts aendern.
+
+test('Referenz-Matcher: wortidentische Eintraege zur Legacy-Suche (Token-Strategie)', () => {
+  assert.ok(typeof bundle.createReferenceMatcher === 'function', 'createReferenceMatcher existiert');
+  const legacy = (text, names) => bundle.findReferences(text, names);
+  const probe = (text, names) => {
+    const m = bundle.createReferenceMatcher(names);
+    assert.deepEqual(m.scan(text), legacy(text, names), `Scan an ${JSON.stringify(text.slice(0, 40))}…`);
+  };
+  const names = ['alpha', 'beta', 'foo', 'fooBar', 'x2', '42'];
+  probe('const a = alpha + beta; fooBar(1);', names);
+  // Wortgrenze: Teilwort zaehlt nicht, bei getrennten Zeichen zaehlt es.
+  probe('alphaBeta alpha.beta alpha_beta alpha;beta', names.slice(0, 2));
+  probe('x2 + 42 = 42x2', names.slice(4));
+  // zwei Treffer derselben Zeile — nur der erste je Name, Reihenfolge wie im Text.
+  probe('beta; alpha; beta, alpha', names.slice(0, 2));
+  probe('', names);
+  probe('irgendwas ganz anderes', names);
+  // Vorbehandlung identisch: RESERVED_WORDS sind außendienst, die ersten
+  // MAX_REFERENCE_NAMES sind die Grenze.
+  probe('if (alpha) { }', ['if', 'alpha']);
+  const many = Array.from({ length: bundle.MAX_REFERENCE_NAMES + 5 }, (_v, i) => `sym${i}`);
+  probe(`sym0 sym2010 sym${bundle.MAX_REFERENCE_NAMES}`, many);
+});
+
+test('Referenz-Matcher: Namen jenseits der Tokenmenge fallen auf die Legacy-Semantik zurueck', () => {
+  const legacy = (text, names) => bundle.findReferences(text, names);
+  const probe = (text, names) => {
+    const m = bundle.createReferenceMatcher(names);
+    assert.deepEqual(m.scan(text), legacy(text, names), `Fallback an ${JSON.stringify(text.slice(0, 40))}…`);
+  };
+  // $-Namen: die Legacy-Wortgrenze um $ ist anders als eine Tokenmenge —
+  // genau dafuer gibt es den Rueckweg (einmal kompiliert, je Datei gescannt).
+  probe('foo.$scope und foo$scope', ['$scope']);
+  // Unicode-Namen: \b ist ASCII-basiert, die Tokenmenge hier anders.
+  probe('das f\u00fcr hier', ['f\u00fcr']);
+  // Regex-Sonderzeichen im Namen.
+  probe('a.a und aa und a.a.a', ['a.a']);
+  // gemischte Folge bleibt korrekt.
+  probe('alpha beta. $scope a.a', ['alpha', 'beta', '$scope', 'a.a']);
 });

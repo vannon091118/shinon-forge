@@ -14,8 +14,8 @@
     "shinon": "bin/shinon.mjs"
   },
   "scripts": {
-    "dev": "DSH_HOME=$PWD dsh --profile shinon",
-    "dev:web": "DSH_HOME=$PWD dsh --profile shinon --no-open --trusted-host localhost --trusted-host 127.0.0.1 --port 3085",
+    "dev": "SHINON_WORKSPACE_ROOT=$PWD node bin/shinon.mjs --profile shinon",
+    "dev:web": "SHINON_WORKSPACE_ROOT=$PWD node bin/shinon.mjs --profile shinon --no-open --trusted-host localhost --trusted-host 127.0.0.1 --port 3085",
     "open": "node scripts/open.mjs",
     "start": "node bin/shinon.mjs",
     "desktop:launcher": "node scripts/desktop-launcher.mjs",
@@ -54,8 +54,14 @@
     "update": "node scripts/dsh-update.mjs",
     "stages": "node scripts/stages.mjs",
     "scale:check": "node scripts/scale-check.mjs",
+    "perf:baseline": "node scripts/run-with-node.mjs scripts/perf-baseline.mjs",
+    "index:cold-cost": "node scripts/run-with-node.mjs scripts/index-cold-cost.mjs",
+    "index:match-eq": "node scripts/run-with-node.mjs scripts/index-match-eq.mjs",
+    "s6:check": "node scripts/run-with-node.mjs scripts/s6-turn.mjs check",
+    "s6:boot": "node scripts/run-with-node.mjs scripts/s6-turn.mjs boot",
+    "s6:stop": "node scripts/run-with-node.mjs scripts/s6-turn.mjs stop",
     "typecheck": "node scripts/run-with-node.mjs scripts/gate/engine.mjs --only typescript",
-    "dev:mobile": "DSH_HOME=$PWD node scripts/open.mjs --profile mobile --print-url",
+    "dev:mobile": "SHINON_WORKSPACE_ROOT=$PWD node scripts/open.mjs --profile mobile --print-url",
     "test:mobile-profile": "node scripts/run-with-node.mjs scripts/mobile-profile-contract-test.mjs && node scripts/run-with-node.mjs scripts/shinon-profile-test.mjs --profile mobile"
   },
   "dependencies": {

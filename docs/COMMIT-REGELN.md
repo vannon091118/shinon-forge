@@ -138,6 +138,44 @@ Fehlt die Basis, gilt weiter die volle Historie (fail-closed). Die Regel oben
 bleibt: unbestimmt ⇒ volle Historie. Neu ist nur, dass ein neuer Branch mit
 bestimmbarer Basis nicht mehr „unbestimmt" heißt.
 
+## Presets — eine Policy, drei Pfade
+
+Die Regeln sind Daten: `docs/contracts/commit-policy.json` (Vertrag
+`shinon.commit-policy/v1`). `scripts/lib/commit-policy.mjs` validiert sie,
+`scripts/lib/commit-policy-file.mjs` wählt sie aus; Hook, CLI und CI lesen
+dieselbe Datei über `scripts/commit-guard.mjs`.
+
+| Preset | Trailer | Wort-Regel | Betreff | Reparatur |
+|---|---|---|---|---|
+| `shinon-maintainer` (Voreinstellung) | Pflicht | 150 Wörter, Daten, Bild | frei | `--fix` tauscht Footer |
+| `minimal` | keine | keine | frei | `--fix` tauscht Footer |
+| `conventional` | keine | keine | `typ(scope)!: …` | `--fix` tauscht Footer |
+| `strict-evidence` | Pflicht | 150 Wörter, Daten, Bild | frei | keine — fail-closed |
+
+**Fußboden, von keinem Preset abwählbar:** Signatur-Footer und `co-authored-by`
+bleiben verboten. Die Prüfung ist kein Preset-Feld; der Vertrag hat dafür
+`floor` (beide `true`), und ein Preset kann die Felder gar nicht ausdrücken —
+unbekannte Schlüssel lehnt der Validator ab.
+
+**Auswahl**, Vorrang von oben nach unten:
+
+1. `--policy-file <datei>` (ein vollständiger Vertrag)
+2. `--policy <preset>`
+3. `SHINON_COMMIT_POLICY=<preset>`
+4. `.shinon/gate-profile.json` → `{ "commitPolicy": { "preset": "conventional" } }`
+5. Voreinstellung `shinon-maintainer` (das unveränderte Repo-Verhalten)
+
+Ein defekter Input — kaputtes JSON, unbekanntes Preset, unbekannter Schlüssel,
+abgeschwächter Fußboden — endet mit **Exit 2**. Es gibt keinen Rückfall auf
+Ersatzregeln, in keinem der drei Pfade.
+
+Die Reparatur bleibt begrenzt: `prepare-commit-msg` entfernt nur Zeilen, die die
+Footer-Prüfung ablehnt, und hängt den Trailer an; Body und Prosa bleiben
+bytegleich. Unter `strict-evidence` schreibt auch der prepare-Hook nichts.
+
+Tests: `scripts/gate/tests/commit-policy.test.mjs` (Vertrag, Preset-Matrix,
+Auswahl, Parität Hook/CLI/CI, Reparaturgrenze).
+
 ## Warum Tausch UND Fail-Closed
 
 Lokal ist Reparatur erlaubt: Agenten produzieren Signatur-Footer aus Gewohnheit,

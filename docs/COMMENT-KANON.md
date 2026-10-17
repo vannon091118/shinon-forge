@@ -8455,3 +8455,94 @@ Volltext des gekürzten Blocks (Stand 2026-10-17):
  * Tresor ist damit teilbar; der Inhalt ist es nicht.
  */
 ```
+
+## Kanon k-987f6fcf8e49 {#k-987f6fcf8e49}
+
+Fundstellen: scripts/gate/tests/commit-policy.test.mjs:2–14
+
+Volltext des gekürzten Blocks (Stand 2026-10-17):
+
+```
+/**
+ * Tests der Committext-Policy (Presets als Daten, ein Urteil in drei Pfaden).
+ *
+ * Ebenen:
+ *   1. Vertrag: Validierung fail-closed — unbekannte Version, Schlüssel, Presets,
+ *      abgeschwächter Fußboden.
+ *   2. Preset-Matrix: je Preset positive und negative Nachrichten.
+ *   3. Auswahl und Parität: Projektdatei/Env/Flag, und dass Hook (--file),
+ *      CLI (--stdin) und CI (--ci) für dieselbe Nachricht dasselbe Urteil und
+ *      denselben Exitcode liefern.
+ *   4. Reparatur-Grenze: --fix entfernt nur Footer-Zeilen; ein Preset ohne
+ *      Reparatur schreibt nichts.
+ */
+```
+
+## Kanon k-2d8c5ca52d5c {#k-2d8c5ca52d5c}
+
+Fundstellen: scripts/lib/commit-policy.mjs:1–12
+
+Volltext des gekürzten Blocks (Stand 2026-10-17):
+
+```
+/**
+ * commit-policy.mjs — die Presets der Committext-Regeln, validiert statt geraten.
+ *
+ * Reine Funktionen, kein Dateisystem: die Vertragsdatei kommt herein, die
+ * effektiven Regeln oder die Liste der Fehler kommen heraus. IO und Auswahl
+ * stehen in commit-policy-file.mjs.
+ *
+ * Fail-closed in drei Richtungen: ein unbekannter Schlüssel, eine unbekannte
+ * Version oder ein unbekanntes Preset ergibt Fehler — nie einen stillen Rückfall
+ * auf schwächere Regeln. Die Fußboden-Regeln (Signatur-Footer, co-authored-by)
+ * sind kein Preset-Feld und damit nicht abwählbar.
+ */
+```
+
+## Kanon k-a26b3e47ea18 {#k-a26b3e47ea18}
+
+Fundstellen: packages/narrative/assets/narrative-core.js:1–11
+
+Volltext des gekürzten Blocks (Stand 2026-10-17):
+
+```
+/**
+ * @shinon/narrative — reiner Kern (assets/narrative-core.js).
+ *
+ * KEINE Imports (weder Bare noch node:): nur dann laeuft der Test in CI ohne
+ * node_modules — dieselbe Regel wie bei `@shinon/scoring` (scoring-core.js).
+ *
+ * Seit 2026-10-17 leitet der Kern NICHTS aus einem Hash ab: Mood, Thema und
+ * Beziehungsstufe kommen aus benannten Regeln (`rules` im Vertrag), jeder
+ * Übergang trägt Event-ID, Grund und Evidenzlevel. Unbekannte Events ändern
+ * kein semantisches Feld — sie stehen in der Chronik, sonst nichts.
+ */
+```
+
+## Kanon k-1a92de5cb5a8 {#k-1a92de5cb5a8}
+
+Fundstellen: scripts/s6-turn.mjs:2–20
+
+Volltext des gekürzten Blocks (Stand 2026-10-17):
+
+```
+/**
+ * S6-Runner für den echten Modellturn — Bereitschafts- und Startsteuerung.
+ *
+ * Drei Unterbefehle, fail-closed:
+ *   check  Preflight: Node ≥ 22, echtes dsh-Binary, Schlüssel presence-only,
+ *          `.env`-Chmod, Route aus dem effektiven Profil-Dump.
+ *   boot   Startet den Host im Hintergrund (Port 3099, --no-open), Protokoll
+ *          unter logDir()/s6/, Prozessdaten als JSON daneben.
+ *   stop   SIGTERM an den gelogten Host — das Host-Ende des Protokolls.
+ *
+ * Der Turn selbst (Urteil, Widerruf) geht über die echtes UI — der Weg aus
+ * docs/probes/store-cost.json (#4): 'Good response' → 'Task result' →
+ * 'Submit', Widerruf 'Remove rating'. Das Runbook führt ihn.
+ *
+ * Der Schlüssel: `.env` im Repo-Root, chmod 600 — nie committen, nie ausgeben,
+ * nie in eine Antwort kopieren. Hier wird nur der NAME geprüft; der Wert
+ * verlässt diese Maschine nicht.
+ * → Kanon: docs/COMMENT-KANON.md
+ */
+```
