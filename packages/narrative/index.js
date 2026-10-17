@@ -14,10 +14,10 @@ import { advance, initialState } from './assets/narrative-core.js';
  */
 
 export {
+  EVIDENCE_LEVELS,
   advance,
   appendChronicle,
   createArc,
-  djb2,
   deriveComposite,
   deriveMood,
   deriveNarrator,

@@ -2,17 +2,18 @@
 /**
  * shinon-profile-test.mjs - Exit Gate fuer das bootfaehige Profil (Block 2)
  *
- * Laedt das aktive Profil genau so, wie DSH es laedt:
- *
- *   DSH_HOME=<Repo-Root> dsh --profile <name> --dump-config
- *
- * Das Repo-Root ist ein gueltiges DSH_HOME, weil es profiles/ enthaelt; damit
+ * Laedt das aktive Profil wie DSH: `DSH_HOME=<geseedetes Home> dsh --profile
+ * <name> --dump-config`. Das Home ist TEMPORAER und aus dem Baum geseedet —
+ * dieselbe Form, die der Starter anlegt (`scripts/lib/dsh-home.mjs`).
  * → Kanon: docs/COMMENT-KANON.md#k-049acec77c27
  */
 import { execFileSync } from 'child_process';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import * as repo from './lib/repo.mjs';
+import { seedDshHome } from './lib/dsh-home.mjs';
 
 const root = repo.readRoot();
 const profileArg = process.argv.indexOf('--profile');
@@ -48,7 +49,13 @@ if (!profileName) {
   process.exit(1);
 }
 
-console.log(`  Profil: ${profileName}    DSH_HOME: ${repo.ROOT}`);
+const seededHome = mkdtempSync(join(tmpdir(), 'shinon-profile-home-'));
+const seeded = seedDshHome(seededHome, repo.ROOT);
+if (seeded.issues.length > 0) {
+  console.error(`❌ DSH-Home nicht seedbar: ${seeded.issues.join(' | ')}`);
+  process.exit(1);
+}
+console.log(`  Profil: ${profileName}    DSH_HOME: ${seededHome} (aus ${repo.ROOT} geseedet)`);
 console.log(`  Bundles: ${profile.bundles.length} (${profile.entries.length} aus diesem Repo)\n`);
 
 let dump = null;
@@ -57,7 +64,7 @@ check(`dsh --profile ${profileName} --dump-config`, () => {
   try {
     dump = execFileSync('dsh', ['--profile', profileName, '--dump-config'], {
       cwd: repo.ROOT,
-      env: { ...process.env, DSH_HOME: repo.ROOT },
+      env: { ...process.env, DSH_HOME: seededHome },
       encoding: 'utf8',
       timeout: 120000,
     });
@@ -81,6 +88,8 @@ if (dump !== null) {
     assert(missing.length === 0, `fehlende Eintraege: ${missing.map((entry) => entry.id).join(', ')}`);
   });
 }
+
+rmSync(seededHome, { recursive: true, force: true });
 
 console.log('\n═══════════════════════════════════════');
 console.log(`  Ergebnisse: ${passed} bestanden, ${failed} fehlgeschlagen`);

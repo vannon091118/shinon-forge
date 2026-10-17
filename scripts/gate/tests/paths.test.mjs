@@ -82,8 +82,10 @@ test('paths: der Arbeitsbaum ist vom Installat getrennt und das Installat ist re
 test('paths: das DSH-Home folgt DSH, nicht unserer Erfindung', () => {
   // DSH kennt genau einen Knopf (gemessen an dsh-home-paths): DSH_HOME.
   assert.equal(dshHome({ ...CLEAN, DSH_HOME: '/dsh/home' }), '/dsh/home');
-  // Im Entwicklerlauf (kein Installat) MUSS es der Baum sein: dort liegt profiles/.
-  assert.equal(dshHome(CLEAN), workspaceRoot());
+  // Der Entwicklerlauf hat sein EIGENES Home: waere er der Baum, liefe dessen
+  // AGENTS.md als benutzerglobale Anweisung in jeder fremden Sitzung mit.
+  assert.equal(dshHome(CLEAN), join(HOME, '.local', 'state', 'shinon', 'dev-dsh-home'));
+  assert.notEqual(dshHome(CLEAN), workspaceRoot(), 'der Baum ist nie das Home');
   // Als Installat ist der Baum gesperrt — dann der Zustandsordner.
   assert.equal(
     dshHome({ ...CLEAN, SHINON_INSTALL_ROOT: '/opt/shinon-forge' }),
@@ -107,7 +109,9 @@ test('paths: Index (Cache) und Ledger (Daten) sind physisch getrennt', () => {
 
 test('paths: runtimeEnv setzt genau die Variablen, die unsere Host-Hälften lesen', () => {
   const env = runtimeEnv(CLEAN);
-  assert.equal(env.DSH_HOME, workspaceRoot(), 'Entwicklerlauf: DSH findet profiles/');
+  // Das Home ist getrennt; `profiles/` erreicht es ueber die Verknuepfung, die der
+  // Starter seeded (`scripts/lib/dsh-home.mjs`), nicht ueber den Baum selbst.
+  assert.equal(env.DSH_HOME, join(HOME, '.local', 'state', 'shinon', 'dev-dsh-home'));
   assert.equal(env.SHINON_INDEX_ROOT, indexRoot(CLEAN));
   assert.equal(env.SHINON_LEDGER_FILE, ledgerFile(CLEAN));
   assert.equal(env.PATH, CLEAN.PATH, 'runtimeEnv rührt den PATH nicht an');

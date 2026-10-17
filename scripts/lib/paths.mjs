@@ -119,23 +119,23 @@ export function logDir(env = process.env) {
 }
 
 /**
- * Das DSH-Home: `DSH_HOME` (DSHs eigener, gemessener Knopf), sonst der
- * Arbeitsbaum, wenn er `profiles/` trägt (Entwicklerlauf — dort MUSS das Home
- * der Baum sein, sonst findet DSH das Profil nicht), sonst der Zustandsordner
- * des Installats.
+ * Das DSH-Home: `DSH_HOME` (DSHs eigener, gemessener Knopf), sonst ein
+ * Zustandsordner — NIE der Arbeitsbaum.
  *
- * Für ein Installat seeded der Starter das Home einmalig aus dem Installat
- * (`seedInstalledHome()`), weil DSH `$DSH_HOME/profiles/<name>` liest und
- * `/opt` read-only ist.
+ * Warum nicht der Baum, obwohl er `profiles/` trägt: DSH liest `$DSH_HOME/AGENTS.md`
+ * als benutzerglobale Anweisung in JEDER Session. Mit dem Repo als Home wurde
+ * dessen `AGENTS.md` zur globalen Anweisung fremder Projekte (gemessen
+ * 2026-10-17). Profil, Sitzungen und Schlüssel erreichen das Home über
+ * Verknüpfungen (`scripts/lib/dsh-home.mjs`), die Anweisungsdatei nicht.
  */
 export function dshHome(env = process.env) {
   const explicit = absoluteOverride('DSH_HOME', env);
   if (explicit !== null) return explicit;
-  // Entwicklerlauf: das Home MUSS der Baum sein, sonst findet DSH `profiles/`
-  // nicht. Ein INSTALLAT ist read-only und darf kein Home sein — dort zeigt
-  // DSH_HOME auf den Zustandsordner, den der Starter aus dem Installat seeded.
-  if (!isInstalled(env) && existsSync(join(WORKSPACE_ROOT, 'profiles'))) return WORKSPACE_ROOT;
-  return join(stateDir(env), 'dsh-home');
+  // Zwei Bäume, zwei Homes: der Entwicklerbaum hat `.git`, ein Installat nicht.
+  // Ohne diese Trennung würden Repo und Installat dasselbe Home seeden — und der
+  // zweite Start fände die Verknüpfungen des ersten (die niemand überschreibt).
+  const devTree = !isInstalled(env) && existsSync(join(WORKSPACE_ROOT, '.git'));
+  return join(stateDir(env), devTree ? 'dev-dsh-home' : 'dsh-home');
 }
 
 /** Wegwerfbarer Projektindex (jederzeit neu baubar). */

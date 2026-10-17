@@ -44,13 +44,24 @@ remote, so there is deliberately no sync script.
   trägt seit dem 2026-10-17 dieselbe Fassung wie Pin, Lock und Installat und wird von
   **keinem** Laufzeitcode geladen — die drei Belege und die Kandidatenliste des Resolvers
   stehen in `vendor/MODIFICATIONS.md`, geprüft von `scripts/gate/tests/dsh-pin.test.mjs`
-  (fail-closed). `npm run dev` and the profile test need `dsh` on PATH. Run with
-  `DSH_HOME=$PWD` (the `dev` script does this).
+  (fail-closed). `npm run dev` startet über `bin/shinon.mjs`; ein `dsh` im PATH braucht
+  nur, wer den Profiltest direkt aufruft.
+- **Das Repo-Root ist NICHT mehr `DSH_HOME`.** Grund (gemessen 2026-10-17):
+  `$DSH_HOME/AGENTS.md` ist bei DSH die benutzerglobale Anweisungsdatei und lief damit in
+  JEDER Sitzung mit — auch in fremden Projekten. Das Home liegt jetzt unter dem
+  Zustandsordner (`dev-dsh-home`) und wird beim Start aus dem Baum gefüllt
+  (`scripts/lib/dsh-home.mjs`: `profiles`, `sessions`, `logs`, `.env`,
+  `.credentials.yaml` als Verknüpfungen) — die Anweisungsdatei wird bewusst nicht
+  verlinkt. Profilauflösung ist dabei bytegleich: `--dump-config` über das geseedete Home
+  liefert denselben Baum wie über das Repo. Prüfung:
+  `scripts/gate/tests/dsh-home.test.mjs` (echter Instruction-Loader des gepinnten DSH).
+  Ein fremder Link im Home wird gemeldet und nie überschrieben, wie bei `profile:links`.
 - Der Arbeits-Schlüssel für echte Modell-Turns liegt in `.env` im Repo-Root (gitignoriert,
   `chmod 600`) — **nie committen, nie ausgeben, nie in eine Antwort kopieren.** `dsh` lädt
-  die Datei beim Start selbst (Projekt-Ebene und Harness-Home; mit `DSH_HOME=$PWD` ist das
-  dieselbe Datei), die Route ist `agnes/agnes-3.0-flash` (`apiKeyEnv: AGNES_API_KEY` im
-  Profil). Wer einen e2e-Lauf braucht, nimmt sie; **„kein Schlüssel" ist kein Grund mehr,
+  die Datei beim Start selbst; das geseedete Home verlinkt sie, es ist dieselbe Datei. Die
+  **konfigurierte** Route ist `agnes/agnes-2.5-flash` (`apiKeyEnv: AGNES_API_KEY` im Profil)
+  — gemessen mit `node_modules/.bin/dsh --profile shinon --dump-config`; welche Route ein
+  konkreter Lauf hatte, steht im Messheader des Laufs, nicht hier. Wer einen e2e-Lauf braucht, nimmt sie; **„kein Schlüssel" ist kein Grund mehr,
   eine Messung zu verschieben** — der erste Durchlauf (echter Boot, echtes Urteil, Widerruf,
   Host-Ende, Neustart) steht in `docs/ZAHLEN.md` §2, die Belege in
   `docs/probes/store-cost.json`.
@@ -351,6 +362,10 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   6. Trocken prüfen: `npm run commit:check-file -- <datei>` oder
      `node scripts/commit-guard.mjs --stdin < <datei>` — **derselbe**
      `checkMessage` wie der Hook, kein zweiter Regelsatz.
+- Presets: die Regeln sind Daten (`docs/contracts/commit-policy.json`), Voreinstellung
+  `shinon-maintainer` = das hier beschriebene Verhalten. Auswahl über
+  `.shinon/gate-profile.json` (`commitPolicy.preset`) oder `--policy`; ein defekter
+  Input endet mit Exit 2, nie mit einem Rückfall auf schwächere Regeln.
 - CI (`.github/workflows/commit-guard.yml`) runs on every push/PR with no filter; an
   unresolvable range falls back to the **full** history, never to a narrower one.
   Rules, enforcement and commands: `docs/COMMIT-REGELN.md`. Single source of the

@@ -20,11 +20,13 @@ import { EVENT_TYPES as SPINE_EVENTS } from '../plugins/events-spine.mjs';
 import {
   COMPOSITE_FIELDS,
   CONSUMERS,
+  EVIDENCE_LEVELS,
   NARRATIVE_CONTRACT_ID,
   STATE_CHANNEL,
   check,
   consumerIssues,
   contractIssues,
+  staticIssues,
 } from '../plugins/narrative.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -86,7 +88,9 @@ function createHost() {
         return name === 'DEPLOYMENT_PERSONA_PREFIX' ? 10 : 9000;
       },
       section({ name, order, text }) {
-        const entry = { name, order, text };
+        // Der echte Dienst löst `text` zur Assembly-Zeit auf; hier gibt es keine
+        // Sitzung, also ist das die Identität — der Fake bleibt ein Host.
+        const entry = { name, order, text: typeof text === 'function' ? text({}) : text };
         sections.push(entry);
         return () => {
           const at = sections.indexOf(entry);
@@ -138,6 +142,8 @@ const connect = () =>
       statePath: './assets/persona-state.json',
       eventsChannel: 'shinon/event',
       projectContextPath: '',
+      // Die Persona spricht nur für einen AUSDRÜCKLICH benannten Workspace.
+      workspaceRoot: ROOT,
       includeAugenhoehe: true,
       identity: 'IDENT',
       epistemic: 'EPI',
@@ -169,10 +175,23 @@ test('narrative: der echte Vertrag ist fehlerfrei', () => {
 });
 
 test('narrative: jeder Mood-Ereignistyp ist ein Typ des Spines', () => {
-  const byEvent = Object.keys(narrativeContract.derivation.mood.by_event);
+  const byEvent = Object.keys(narrativeContract.rules.moodByEvidence);
   assert.ok(byEvent.length > 0);
   for (const type of byEvent) {
     assert.ok(SPINE_EVENTS.includes(type), `${type} ist kein Event-Typ des Spines`);
+  }
+});
+
+test('narrative: jede Mood-Regel traegt Grund und Evidenz, jeder Takt ein Thema', () => {
+  for (const [type, entry] of Object.entries(narrativeContract.rules.moodByEvidence)) {
+    assert.ok(entry.reason.length > 0, `${type}: Grund fehlt`);
+    assert.ok(['EVENT_TYPE', 'EXPLICIT_PAYLOAD'].includes(entry.evidence), `${type}: Evidenzlevel fehlt`);
+    assert.ok(narrativeContract.rules.themeByEvent[type], `${type}: kein Thema`);
+  }
+  for (const transition of narrativeContract.rules.relationshipTransitions) {
+    assert.ok(transition.reason.length > 0, 'Transition ohne Grund');
+    assert.equal(transition.evidence, 'EXPLICIT_PAYLOAD', 'eine Payload-Regel ist EXPLICIT_PAYLOAD');
+    assert.notEqual(transition.from, transition.to);
   }
 });
 
@@ -185,10 +204,34 @@ test('narrative: der Composite trägt genau die Felder, die das Gate als Ausgang
 
 test('narrative: ein erfundener Mood-Ereignistyp wird gemeldet (Mutationsprobe)', () => {
   const broken = JSON.parse(JSON.stringify(narrativeContract));
-  broken.derivation.mood.by_event['gibt.es.nicht'] = 'curious';
+  broken.rules.moodByEvidence['gibt.es.nicht'] = { mood: 'curious', reason: 'erfunden', evidence: 'EVENT_TYPE' };
   const issues = contractIssues(broken, 'narrative-state.json');
-  assert.equal(issues.length, 1);
-  assert.match(issues[0], /gibt\.es\.nicht/);
+  assert.ok(issues.some((issue) => issue.includes('gibt.es.nicht')), issues.join('\n'));
+});
+
+test('narrative: eine Transition ohne Grund, Evidenz oder Zustand wird gemeldet', () => {
+  const withoutReason = JSON.parse(JSON.stringify(narrativeContract));
+  delete withoutReason.rules.relationshipTransitions[0].reason;
+  assert.match(contractIssues(withoutReason, 'x.json').join('\n'), /reason fehlt/);
+
+  const wrongEvidence = JSON.parse(JSON.stringify(narrativeContract));
+  wrongEvidence.rules.relationshipTransitions[0].evidence = 'NONE';
+  assert.match(contractIssues(wrongEvidence, 'x.json').join('\n'), /evidence muss/);
+
+  const unknownState = JSON.parse(JSON.stringify(narrativeContract));
+  unknownState.rules.relationshipTransitions[0].to = 'beste_freunde';
+  assert.match(contractIssues(unknownState, 'x.json').join('\n'), /from\/to/);
+
+  const duplicate = JSON.parse(JSON.stringify(narrativeContract));
+  duplicate.rules.relationshipTransitions.push({ ...duplicate.rules.relationshipTransitions[0] });
+  assert.match(contractIssues(duplicate, 'x.json').join('\n'), /nicht entscheidbar/);
+});
+
+test('narrative: ein Hash als Bedeutungsquelle wird im Kern gemeldet (Mutationsprobe)', () => {
+  const source = readFileSync(join(ROOT, 'packages/narrative/assets/narrative-core.js'), 'utf8');
+  assert.deepEqual(staticIssues([{ file: 'core.js', source }]), [], 'der echte Kern ist sauber');
+  const withHash = `${source}\nexport const score = (pair) => djb2(pair) % 100;\n`;
+  assert.ok(staticIssues([{ file: 'core.js', source: withHash }]).some((issue) => issue.includes('djb2')));
 });
 
 test('narrative: eine fehlende Autoritäts-Aussage wird gemeldet', () => {
@@ -202,6 +245,10 @@ test('narrative: eine fehlende Autoritäts-Aussage wird gemeldet', () => {
 test('narrative: der Kanalname des Gates ist der des Pakets', () => {
   assert.equal(narrative.STATE_CHANNEL, STATE_CHANNEL);
   assert.equal(narrative.STATE_CONTRACT, NARRATIVE_CONTRACT_ID);
+});
+
+test('narrative: die Evidenzlevel des Gates sind die des Kerns', () => {
+  assert.deepEqual([...narrative.EVIDENCE_LEVELS], EVIDENCE_LEVELS);
 });
 
 test('narrative: Kanal und Vertragsname stehen als Literal im Abnehmer (kein Import über Paketgrenzen)', () => {

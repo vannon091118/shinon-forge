@@ -373,7 +373,10 @@ async function verify(prefix = PREFIX) {
   const bootStarted = Date.now();
   const child = spawn(node, [entry, '--no-open', '--trusted-host', '127.0.0.1', '--port', String(port)], {
     cwd: prefix,
-    env: { ...process.env, DSH_HOME: prefix },
+    // NICHT DSH_HOME=prefix: dann wäre die AGENTS.md des Installats die globale
+    // Anweisung jeder Sitzung. Der Einstieg leitet sein Home selbst ab und seedet
+    // es aus dem Installat; hier wird nur gesagt, WELCHES Installat gemeint ist.
+    env: { ...process.env, SHINON_INSTALL_ROOT: prefix },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let webUrl = null;

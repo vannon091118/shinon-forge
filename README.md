@@ -135,9 +135,16 @@ Slice belegt.
 
 ## 🔌 Boot und Schlüssel
 
-Das Repo-Root ist das `DSH_HOME`: dort liegt `profiles/shinon` als echtes DSH-Profil. Im
-Installat (`/opt/shinon-forge`, read-only) ist das anders: dort zeigt `DSH_HOME` auf den
-Zustandsordner des Nutzers, und der Starter seeded ihn aus dem Installat.
+`DSH_HOME` ist **nicht** das Repo-Root. Der Grund ist gemessen: DSH liest
+`$DSH_HOME/AGENTS.md` als benutzerglobale Anweisung in jeder Sitzung — mit dem Baum als
+Home wurde dessen `AGENTS.md` zur globalen Anweisung fremder Projekte. Der Starter legt
+das Home deshalb im Zustandsordner an (`dev-dsh-home`, im Installat `dsh-home`) und
+verlinkt hinein, was zusammengehört: `profiles/`, `sessions/`, `logs/`, `.env` und
+`.credentials.yaml`. Die Anweisungsdatei bleibt draußen; sie wird als Projektanweisung
+geladen, wenn die Sitzung in diesem Repo läuft, und sonst gar nicht.
+
+Wer das Home selbst setzt, setzt es absolut (`DSH_HOME=/pfad`); ein relativer Wert wird
+abgelehnt. Ein fremder Link im Home wird gemeldet, nie überschrieben.
 
 **Wo was liegt** — eine Quelle ist `scripts/lib/paths.mjs` (Namen entstehen dort einmal):
 (`package.json` mit `dsh.profile.bundles` und `cordis.patch.yml` — ein
@@ -147,7 +154,7 @@ Der Schlüssel gehört **nie** ins Repo — im Profil steht nur der Referenzname
 
 ```bash
 export SHINON_API_KEY="…"
-DSH_HOME=$PWD dsh --profile headless "Sag nur: OK"
+node bin/shinon.mjs --profile headless "Sag nur: OK"
 ```
 
 Ohne gesetzte Variable schlägt der Aufruf fail-closed fehl (beabsichtigt). In der

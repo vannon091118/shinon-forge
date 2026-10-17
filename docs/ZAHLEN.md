@@ -29,12 +29,12 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Schemastery (deklariert) | `~3.18.5-alpha.1` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
 | Node (`engines.node`) | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
 | pnpm-Artefakte (getrackt) | 0 | `git ls-files '*pnpm-workspace.yaml' '*pnpm-lock.yaml' \| wc -l` (Aufrufe: Gate-Prüfung „pnpm-Reste“) | 0 |
-| Markdown-Dokumente (getrackt) | 78 | `git ls-files '*.md' \| wc -l` | 0 |
-| Verträge unter `docs/contracts/` | 6 | `ls docs/contracts/*.json \| wc -l` | 0 |
-| Proben unter `docs/probes/` | 29 | `ls docs/probes/*.json \| wc -l` | 0 |
+| Markdown-Dokumente (getrackt) | 81 | `git ls-files '*.md' \| wc -l` | 0 |
+| Verträge unter `docs/contracts/` | 7 | `ls docs/contracts/*.json \| wc -l` | 0 |
+| Proben unter `docs/probes/` | 31 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 22 Pakete, 183 Dateien, 1500378 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 22 Pakete, 185 Dateien, 1449724 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,

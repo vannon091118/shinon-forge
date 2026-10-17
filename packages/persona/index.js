@@ -1,18 +1,48 @@
 import z from '@deepseek-ai/schemastery';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname, isAbsolute } from 'node:path';
+import { join, dirname, isAbsolute, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Prüfen, ob wir uns im Shinon-Projekt befinden.
+ * Der Workspace, den die LAUFENDE Sitzung beansprucht — pro Turn, nicht pro Prozess.
  *
- * Der Projektname wird aus der package.json im Arbeitsverzeichnis gelesen.
- * Nur im Shinon-Projekt sollen die Persona-Abschnitte injiziert werden —
- * in anderen Projekten würde das Shinon-interne Daten ungewollt exponieren.
+ * `SHINON_WORKSPACE_ROOT` gilt für den ganzen Boot; ein Host, der in Shinon startet,
+ * bedient damit auch fremde Sitzungen. Der Instruktions-Loader liest stattdessen
+ * `agent.session.header.cwd` (`dsh-agent-instructions/lib/index.js:912`). Derselbe
+ * Wert entscheidet hier, im Kontext des Schritts (AsyncLocalStorage statt globalem
+ * Schalter — zwei Sitzungen im selben Prozess überschreiben sich nicht).
  */
-function isShinonProject() {
+const sessionRoot = new AsyncLocalStorage();
+
+/** Liegt `dir` innerhalb von `root`? Präfixvergleich reicht hier nicht. */
+function isInside(root, dir) {
+  const rel = relative(resolve(root), resolve(dir));
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
+/**
+ * Der Workspace, für den die Persona spricht — AUSDRÜCKLICH benannt, nie geraten.
+ *
+ * Gemessen 2026-10-17: `process.cwd()` ist der HOST (bei `DSH_HOME=$PWD` also das
+ * Shinon-Repo), nicht der Workspace der Session. Wer daraus den Projektscope
+ * ableitet, injiziert Shinon-Persona in fremde Projekte. Deshalb: explizite Config
+ * (`workspaceRoot`) oder `SHINON_WORKSPACE_ROOT`; fehlt beides, ist der Scope
+ * UNKLAR und die Persona bleibt aus (fail-closed, nicht fail-open).
+ */
+function resolveWorkspaceRoot(config) {
+  const declared = typeof config.workspaceRoot === 'string' ? config.workspaceRoot.trim() : '';
+  if (declared !== '') return isAbsolute(declared) ? declared : join(process.cwd(), declared);
+  const fromEnv = (process.env.SHINON_WORKSPACE_ROOT ?? '').trim();
+  if (fromEnv !== '') return isAbsolute(fromEnv) ? fromEnv : null;
+  return null;
+}
+
+/** Trägt genau dieses Verzeichnis das Shinon-Manifest? */
+function isShinonProjectAt(dir) {
+  if (dir === null) return false;
   try {
-    const pkgPath = join(process.cwd(), 'package.json');
+    const pkgPath = join(dir, 'package.json');
     if (!existsSync(pkgPath)) return false;
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
     return pkg.name === '@shinon/forge';
@@ -559,14 +589,23 @@ export const Config = z.object({
    * — ähnlich wie agents.md, aber projektspezifisch. Leer = nicht laden.
    */
   projectContextPath: z.string().default(''),
+  /**
+   * Der Workspace, in dessen Namen die Persona spricht (absolut oder relativ zu
+   * `process.cwd()`). Leer = aus `SHINON_WORKSPACE_ROOT`, sonst unklar = keine Persona.
+   */
+  workspaceRoot: z.string().default(''),
 });
 
 export function apply(ctx, config) {
-  // Projektscope: Persona nur im Shinon-Projekt registrieren.
-  // In anderen Projekten würden Shinon-interne Daten ungewollt exponiert.
-  const inShinonProject = isShinonProject();
-  if (!inShinonProject) {
-    console.log(`[shinon-persona] Nicht im Shinon-Projekt — Persona-Abschnitte werden NICHT registriert`);
+  // Projektscope: Persona nur für den AUSDRÜCKLICH benannten Shinon-Workspace.
+  // In fremden oder unklaren Workspaces würden interne Daten exponiert.
+  const workspaceRoot = resolveWorkspaceRoot(config);
+  if (workspaceRoot === null) {
+    console.log('[shinon-persona] Workspace unklar (weder workspaceRoot noch SHINON_WORKSPACE_ROOT) — Persona-Abschnitte werden NICHT registriert');
+    return () => {};
+  }
+  if (!isShinonProjectAt(workspaceRoot)) {
+    console.log(`[shinon-persona] ${workspaceRoot} ist nicht das Shinon-Projekt — Persona-Abschnitte werden NICHT registriert`);
     return () => {};
   }
 
@@ -576,6 +615,18 @@ export function apply(ctx, config) {
   } catch (error) {
     console.warn(`[shinon-persona] Zustandsvertrag nicht lesbar (${config.statePath}): ${error.message}`);
   }
+
+  /**
+   * Spricht die Persona für die Sitzung dieses Schritts? Ohne Sitzungsangabe
+   * (Tests, direkte Assembly) gilt die Freigabe des Boots; mit Sitzung entscheidet
+   * deren CWD — liegt er außerhalb der Wurzel, bleibt jeder Abschnitt leer.
+   */
+  const speaksForSession = () => {
+    const root = sessionRoot.getStore()?.root;
+    if (typeof root !== 'string' || root === '') return true;
+    return isInside(workspaceRoot, root);
+  };
+  const gated = (text) => () => (speaksForSession() ? text : '');
 
   // Der Prompt-Abschnitt wird bei jeder Zustandsänderung neu gesetzt. Vor dem
   // inject ist das ein No-op — der Zustand selbst ist immer schon da.
@@ -642,7 +693,7 @@ export function apply(ctx, config) {
       try {
         const path = isAbsolute(config.projectContextPath)
           ? config.projectContextPath
-          : join(process.cwd(), config.projectContextPath);
+          : join(workspaceRoot, config.projectContextPath);
         if (existsSync(path)) {
           projectContextText = readFileSync(path, 'utf8').trim();
           if (projectContextText !== '') {
@@ -659,13 +710,13 @@ export function apply(ctx, config) {
       const disposers = [];
       for (const [name, order, text] of sections) {
         if (typeof text !== 'string' || text.trim() === '') continue;
-        disposers.push(sp.section({ name, order, text }));
+        disposers.push(sp.section({ name, order, text: gated(text) }));
       }
       let stateDisposer = null;
       let tendencyDisposer = null;
       renderPrompt = () => {
         if (typeof stateDisposer === 'function') stateDisposer();
-        stateDisposer = sp.section({ name: 'shinon:state', order: atSuffix - 2, text: renderStateContext(contract, persona.snapshot()) });
+        stateDisposer = sp.section({ name: 'shinon:state', order: atSuffix - 2, text: gated(renderStateContext(contract, persona.snapshot())) });
         // Die Tendenz wird bei jedem Neu-Setzen gelesen: die Haltung aendert sich
         // mit den Signalen des Scorings, nicht mit einem Ereignis der Persona —
         // deshalb kein zweiter Listener, sondern dieselbe Stelle, an der die
@@ -675,7 +726,7 @@ export function apply(ctx, config) {
         tendencyDisposer = null;
         const tendencyText = renderTendency(contract, readTone(ctx, warnedTone));
         if (tendencyText !== null) {
-          tendencyDisposer = sp.section({ name: 'shinon:tendency', order: atSuffix - 3, text: tendencyText });
+          tendencyDisposer = sp.section({ name: 'shinon:tendency', order: atSuffix - 3, text: gated(tendencyText) });
         }
       };
       let triggerDisposer = null;
@@ -683,7 +734,7 @@ export function apply(ctx, config) {
         if (typeof triggerDisposer === 'function') triggerDisposer();
         triggerDisposer = lastTrigger === null
           ? null
-          : sp.section({ name: 'shinon:identity-trigger', order: atPrefix + 4, text: renderTriggerContext(lastTrigger) });
+          : sp.section({ name: 'shinon:identity-trigger', order: atPrefix + 4, text: gated(renderTriggerContext(lastTrigger)) });
       };
       // Der narrative Abschnitt wird bei jedem gelesenen Composite neu gesetzt —
       // nicht bei jeder Zustandsaenderung der Persona: die beiden Quellen sind
@@ -694,7 +745,7 @@ export function apply(ctx, config) {
         narrativeSectionDisposer = null;
         const narrativeText = renderNarrative(contract, lastNarrative);
         if (narrativeText !== null) {
-          narrativeSectionDisposer = sp.section({ name: 'shinon:narrative-arc', order: atSuffix - 4, text: narrativeText });
+          narrativeSectionDisposer = sp.section({ name: 'shinon:narrative-arc', order: atSuffix - 4, text: gated(narrativeText) });
         }
       };
       renderPrompt();
@@ -736,6 +787,18 @@ export function apply(ctx, config) {
   };
   const disposer = typeof ctx?.on === 'function' ? ctx.on(config.eventsChannel, handler) : () => {};
 
+  // Der Sitzungs-Scope: `agent/pre-step` umschließt den ganzen Schritt, also auch
+  // die Assembly des System-Prompts. Was hier gesetzt wird, gilt nur für diesen
+  // Schritt und nur in diesem Async-Kontext.
+  const sessionDisposer = typeof ctx?.on === 'function'
+    ? ctx.on('agent/pre-step', (payload, next) => {
+        const cwd = payload?.agent?.session?.header?.cwd;
+        return sessionRoot.run({ root: typeof cwd === 'string' ? cwd : '' }, () =>
+          typeof next === 'function' ? next() : undefined,
+        );
+      })
+    : () => {};
+
   // ── Die Narrative Engine (Zug 6) ──────────────────────────────────────────
   //
   // Sie liest DIESELBEN Spines-Ereignisse und meldet ihren Composite auf einem
@@ -753,6 +816,7 @@ export function apply(ctx, config) {
   return () => {
     if (typeof disposer === 'function') disposer();
     if (typeof narrativeDisposer === 'function') narrativeDisposer();
+    if (typeof sessionDisposer === 'function') sessionDisposer();
     console.log('[shinon-persona] Deaktiviert');
   };
 }

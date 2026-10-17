@@ -15,6 +15,7 @@ import * as repo from '../scripts/lib/repo.mjs';
 import { dshBinary, dshSource } from '../scripts/lib/dsh.mjs';
 import { resolveRuntime, runtimeFailure } from '../scripts/lib/runtime.mjs';
 import { childEnv, describePaths } from '../scripts/lib/paths.mjs';
+import { seedDshHome } from '../scripts/lib/dsh-home.mjs';
 
 const ROOT = repo.ROOT;
 const args = process.argv.slice(2);
@@ -92,6 +93,17 @@ export function signalExitCode(signal) {
 }
 
 async function main() {
+  // Das Home liegt getrennt vom Baum (sonst wäre dessen AGENTS.md global) und wird
+  // hier einmalig aus dem Baum gefüllt: Profil, Sitzungen, Schlüssel.
+  const seeded = seedDshHome(describePaths().dshHome, ROOT);
+  if (seeded.issues.length > 0) {
+    console.error(`💥 shinon: DSH-Home nicht benutzbar —\n   ${seeded.issues.join('\n   ')}`);
+    process.exit(2);
+  }
+  // Status auf stderr: `doctor --json` (und jeder andere JSON-Verbraucher) liest
+  // stdout als Maschinenausgabe — eine Seed-Zeile davor machte sie unparsebar.
+  if (seeded.created.length > 0) console.error(`   DSH-Home geseedet: ${seeded.created.join(', ')}`);
+
   // S4: `shinon doctor` ist ein EIGENER Unterbefehl (scripts/doctor.mjs) —
   // read-only Diagnose mit stabilen Codes 0/1/2. Er wird hier abgefangen und
   // NIEMALS an DSH durchgereicht (ein `doctor` bei DSH wäre ein fremder
@@ -151,7 +163,10 @@ async function main() {
     process.exit(0);
   }
 
-  const child = spawn(dsh[0], [...dsh.slice(1), '--profile', profileName, ...passthrough], {
+  // Ein `--profile` aus der Kommandozeile gilt (der `dev`-Eintrag ist die eine
+  // Quelle des aktiven Profils); sonst setzt der Starter es aus dem Manifest.
+  const named = passthrough.some((arg) => arg === '--profile' || arg.startsWith('--profile='));
+  const child = spawn(dsh[0], [...dsh.slice(1), ...(named ? [] : ['--profile', profileName]), ...passthrough], {
     cwd: ROOT,
     stdio: 'inherit',
     env: childEnv(resolveRuntime()),

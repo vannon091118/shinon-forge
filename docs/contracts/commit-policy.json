@@ -1,0 +1,85 @@
+{
+  "contract": "shinon.commit-policy/v1",
+  "version": 1,
+  "default": "shinon-maintainer",
+  "floor": {
+    "forbiddenFooters": true,
+    "coAuthorBan": true
+  },
+  "note": "Die Presets sind DATEN. scripts/lib/commit-policy.mjs validiert sie fail-closed (unbekannter Schlüssel, unbekannte Version, falscher Typ, unbekanntes Preset ⇒ Ablehnung, nie ein Rückfall auf schwächere Regeln); Hook, CLI und CI lesen dieselbe Datei über scripts/commit-guard.mjs. Die Fußboden-Regeln (Signatur-Footer und co-authored-by bleiben verboten) sind kein Preset-Feld und damit nicht abwählbar. Das aktuelle Repo-Verhalten ist unverändert das Preset 'shinon-maintainer'; die Auswahl steht in .shinon/gate-profile.json (Projektzustand, kein Paketdefault).",
+  "presets": {
+    "minimal": {
+      "basis": "Regel 1 aus docs/COMMIT-REGELN.md vor dem 2026-10-08: nur die Signaturfreiheit, ohne Trailer und ohne Wort-Regel.",
+      "subject": {
+        "pattern": null
+      },
+      "trailer": {
+        "required": false,
+        "id": "vannon"
+      },
+      "words": {
+        "min": 0,
+        "requireNamedData": false,
+        "requireImagery": false
+      },
+      "repair": {
+        "swapTrailer": true
+      }
+    },
+    "conventional": {
+      "basis": "Conventional Commits v1.0.0 (https://www.conventionalcommits.org/en/v1.0.0/): Betreff in der Form typ(scope)!: Beschreibung, Typ aus der dort genannten Liste; kein Trailer, keine Wort-Regel.",
+      "subject": {
+        "pattern": "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\([a-z0-9._/-]+\\))?!?: \\S.*$",
+        "hint": "typ(scope)!: Beschreibung — Typ aus feat/fix/docs/style/refactor/perf/test/build/ci/chore/revert"
+      },
+      "trailer": {
+        "required": false,
+        "id": "vannon"
+      },
+      "words": {
+        "min": 0,
+        "requireNamedData": false,
+        "requireImagery": false
+      },
+      "repair": {
+        "swapTrailer": true
+      }
+    },
+    "shinon-maintainer": {
+      "basis": "AGENTS.md „Commit rules\" und docs/COMMIT-REGELN.md §1–§3, Stand 2026-10-08 — das heutige Repo-Verhalten, unverändert.",
+      "subject": {
+        "pattern": null
+      },
+      "trailer": {
+        "required": true,
+        "id": "vannon"
+      },
+      "words": {
+        "min": 150,
+        "requireNamedData": true,
+        "requireImagery": true
+      },
+      "repair": {
+        "swapTrailer": true
+      }
+    },
+    "strict-evidence": {
+      "basis": "shinon-maintainer ohne lokalen Tausch — genau der Zustand, den CI ohnehin prüft (docs/COMMIT-REGELN.md, „Warum Tausch UND Fail-Closed\"): kein Reparaturschritt, jede Abweichung ist ein Fehler.",
+      "subject": {
+        "pattern": null
+      },
+      "trailer": {
+        "required": true,
+        "id": "vannon"
+      },
+      "words": {
+        "min": 150,
+        "requireNamedData": true,
+        "requireImagery": true
+      },
+      "repair": {
+        "swapTrailer": false
+      }
+    }
+  }
+}

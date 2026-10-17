@@ -120,6 +120,7 @@
           "package.json",
           "docs/COMMIT-REGELN.md",
           "docs/contracts/commit-trailer.json",
+          "docs/contracts/commit-policy.json",
           "AGENTS.md"
         ]
       }

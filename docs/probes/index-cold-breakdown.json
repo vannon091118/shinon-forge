@@ -1,0 +1,534 @@
+[
+  {
+    "id": "index-cold-zerlegung-2026-10-17",
+    "claim": "Der Kaltlauf des Projektindex ist nicht I/O-gebunden: Lesen und Hashen sind zusammen ein Bruchteil, der Referenzdurchgang ist der größte Einzelposten und SQLite der zweite.",
+    "targets": [
+      "scripts/index-cold-cost.mjs",
+      "packages/project-index/assets/index-core.js",
+      "docs/audit/PERF-BASELINE-2026-10-17.md"
+    ],
+    "expect": "Jede Phase wird auf derselben Fixture gemessen; die Summe der Phasen muss den echten Lauf innerhalb der Streuung erklären, sonst ist die Zerlegung falsch.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, Node 22.23.3, 428 Dateien, 4035492 gelesene Bytes, 1764 Referenznamen, 2 Läufe. Gesamt P50 3159.2 ms (open 900.9, update 2250.5, close 7.9). Index anlegen (Schema + Meta, erster Lauf) 900.9 ms (28.5 %); SQLite im Update (Inserts, Deletes, Commit) 1292.1 ms (40.9 %); Lesen (beide Durchgänge) 62.6 ms (2 %); SHA-256 (beide Hashes je Datei) 52.2 ms (1.7 %); Redigieren / Secret-Scan (beide Runden) 365.7 ms (11.6 %); Extrahieren (Symbole, Kanten, Chunks) 85.1 ms (2.7 %); Regex je Lauf kompilieren (Matcher gebaut) 0.4 ms (0 %); Referenzen scannen (Matcher je Datei) 231.4 ms (7.3 %); stat je Datei 6.4 ms (0.2 %); nicht zugeordnet 162.5 ms (5.1 %). SQLite im Einzelnen: begin 0.1 ms, commit 603.2 ms, delete:references 2 ms, delete:touches 0.2 ms, insert:chunks 44.3 ms, insert:chunks_fts 174.9 ms, insert:edges 7.3 ms, insert:files 5.8 ms, insert:meta 0 ms, insert:references 371.3 ms, insert:secret_findings 0.2 ms, insert:symbols 24.9 ms, insert:touches 1.7 ms, prepare 48.7 ms, select:files 0.6 ms, select:meta 0 ms, select:symbols 6.9 ms. Diagnose Schema: 9 Statements einzeln 476.2 ms gegen 83.4 ms in einer Transaktion.",
+    "evidence_note": "Nur Dauern, Zählungen und Tabellennamen; kein Dateiinhalt, kein Schlüsselwert.",
+    "measurements": {
+      "schema": "shinon.index-cold-cost/v1",
+      "measuredAt": "2026-10-17T22:08:41.366Z",
+      "runtime": {
+        "node": "22.23.3",
+        "platform": "linux x64",
+        "commit": "1fd90f9c85b247d41e6299ca3c9f251a759e556f"
+      },
+      "method": {
+        "runs": 2,
+        "unit": "ms je Kaltlauf",
+        "fixture": {
+          "root": "/home/vannon/Dokumente/Source_repos/Shinon-forge",
+          "files": 428,
+          "bytes": 4035492,
+          "references": 1764
+        },
+        "note": "SQLite-Zeit über einen Proxy um die echte Verbindung; JS-Phasen einzeln mit den exportierten Funktionen in der Reihenfolge von indexFile"
+      },
+      "total": 3159.2266375,
+      "split": {
+        "open": 900.8634860000002,
+        "update": 2250.4667885,
+        "close": 7.896363000000065
+      },
+      "groups": [
+        {
+          "id": "open",
+          "label": "Index anlegen (Schema + Meta, erster Lauf)",
+          "ms": 900.8634860000002,
+          "share": 28.5
+        },
+        {
+          "id": "sqlite",
+          "label": "SQLite im Update (Inserts, Deletes, Commit)",
+          "ms": 1292.091646499961,
+          "share": 40.9
+        },
+        {
+          "id": "read",
+          "label": "Lesen (beide Durchgänge)",
+          "ms": 62.55689849999999,
+          "share": 2
+        },
+        {
+          "id": "hash",
+          "label": "SHA-256 (beide Hashes je Datei)",
+          "ms": 52.157178999999815,
+          "share": 1.7
+        },
+        {
+          "id": "redact",
+          "label": "Redigieren / Secret-Scan (beide Runden)",
+          "ms": 365.74853300000086,
+          "share": 11.6
+        },
+        {
+          "id": "extract",
+          "label": "Extrahieren (Symbole, Kanten, Chunks)",
+          "ms": 85.14797199999975,
+          "share": 2.7
+        },
+        {
+          "id": "compile",
+          "label": "Regex je Lauf kompilieren (Matcher gebaut)",
+          "ms": 0.3994620000003124,
+          "share": 0
+        },
+        {
+          "id": "references",
+          "label": "Referenzen scannen (Matcher je Datei)",
+          "ms": 231.3761519999989,
+          "share": 7.3
+        },
+        {
+          "id": "stat",
+          "label": "stat je Datei",
+          "ms": 6.357235500000115,
+          "share": 0.2
+        }
+      ],
+      "sqlite": [
+        {
+          "label": "begin",
+          "ms": 0.06535549999989598,
+          "share": 0
+        },
+        {
+          "label": "commit",
+          "ms": 603.2393239999997,
+          "share": 19.1
+        },
+        {
+          "label": "delete:references",
+          "ms": 2.0386610000024348,
+          "share": 0.1
+        },
+        {
+          "label": "delete:touches",
+          "ms": 0.15241299999979674,
+          "share": 0
+        },
+        {
+          "label": "insert:chunks",
+          "ms": 44.33399200000645,
+          "share": 1.4
+        },
+        {
+          "label": "insert:chunks_fts",
+          "ms": 174.87201200000464,
+          "share": 5.5
+        },
+        {
+          "label": "insert:edges",
+          "ms": 7.346415000000604,
+          "share": 0.2
+        },
+        {
+          "label": "insert:files",
+          "ms": 5.774568499994189,
+          "share": 0.2
+        },
+        {
+          "label": "insert:meta",
+          "ms": 0.03888349999942875,
+          "share": 0
+        },
+        {
+          "label": "insert:references",
+          "ms": 371.291897499945,
+          "share": 11.8
+        },
+        {
+          "label": "insert:secret_findings",
+          "ms": 0.1839669999999387,
+          "share": 0
+        },
+        {
+          "label": "insert:symbols",
+          "ms": 24.862100000000396,
+          "share": 0.8
+        },
+        {
+          "label": "insert:touches",
+          "ms": 1.682879500002855,
+          "share": 0.1
+        },
+        {
+          "label": "prepare",
+          "ms": 48.71719300000609,
+          "share": 1.5
+        },
+        {
+          "label": "select:files",
+          "ms": 0.5751534999997716,
+          "share": 0
+        },
+        {
+          "label": "select:meta",
+          "ms": 0.018868999999881453,
+          "share": 0
+        },
+        {
+          "label": "select:symbols",
+          "ms": 6.897962499999835,
+          "share": 0.2
+        }
+      ],
+      "diagnostics": [
+        {
+          "id": "schema-commits",
+          "statements": 9,
+          "separateMs": 476.1635129999995,
+          "batchedMs": 83.43999500000064
+        }
+      ],
+      "js": [
+        {
+          "label": "stat",
+          "ms": 6.357235500000115,
+          "share": 0.2
+        },
+        {
+          "label": "lesen:1",
+          "ms": 32.656128000000535,
+          "share": 1
+        },
+        {
+          "label": "sha256:1",
+          "ms": 27.92726249999987,
+          "share": 0.9
+        },
+        {
+          "label": "redigieren:1",
+          "ms": 191.33487650000097,
+          "share": 6.1
+        },
+        {
+          "label": "sha256:2",
+          "ms": 24.229916499999945,
+          "share": 0.8
+        },
+        {
+          "label": "symbole",
+          "ms": 37.08753849999994,
+          "share": 1.2
+        },
+        {
+          "label": "kanten",
+          "ms": 26.3892294999996,
+          "share": 0.8
+        },
+        {
+          "label": "chunks",
+          "ms": 21.671204000000216,
+          "share": 0.7
+        },
+        {
+          "label": "lesen:2",
+          "ms": 29.900770499999453,
+          "share": 0.9
+        },
+        {
+          "label": "redigieren:2",
+          "ms": 174.4136564999999,
+          "share": 5.5
+        },
+        {
+          "label": "referenzen:legacy:kompilieren",
+          "ms": 401.8987065000001,
+          "share": 12.7
+        },
+        {
+          "label": "referenzen:legacy",
+          "ms": 6045.710760999999,
+          "share": 191.4
+        },
+        {
+          "label": "matcher:bauen",
+          "ms": 0.3994620000003124,
+          "share": 0
+        },
+        {
+          "label": "referenzen",
+          "ms": 231.3761519999989,
+          "share": 7.3
+        }
+      ],
+      "rest": {
+        "ms": 162.5,
+        "share": 5.1
+      },
+      "report": {
+        "root": "/home/vannon/Dokumente/Source_repos/Shinon-forge",
+        "verify": "stamp",
+        "files": 434,
+        "unchanged": 0,
+        "stamped": 0,
+        "suspicious": 0,
+        "falseAlarms": 0,
+        "readBytes": 4035492,
+        "hashed": 428,
+        "rehashed": 0,
+        "written": 428,
+        "skipped": 3,
+        "scanErrors": [
+          {
+            "path": ".shinon/prompter-index.json",
+            "reason": "ZU_GROSS",
+            "detail": "12427991>262144"
+          },
+          {
+            "path": "docs/COMMENT-KANON.md",
+            "reason": "ZU_GROSS",
+            "detail": "379871>262144"
+          },
+          {
+            "path": "package-lock.json",
+            "reason": "ZU_GROSS",
+            "detail": "464568>262144"
+          }
+        ],
+        "removed": 0,
+        "protected": 3,
+        "protectedKinds": {
+          "credential-datei": 1,
+          "secret-datei": 2
+        },
+        "purged": 0,
+        "findings": 15,
+        "references": 64681,
+        "touches": 248,
+        "symbolsChanged": true
+      },
+      "counts": {
+        "symbols": 3464
+      }
+    }
+  },
+  {
+    "id": "index-cold-fts-loeschen-2026-10-17",
+    "claim": "Auf einem LEEREN Index löscht forgetFile je Datei neun Zeilengruppen, die es nicht gibt; das FTS-Löschen ist darunter der teuerste Posten und teurer als Lesen, Hashen, Redigieren und Extrahieren zusammen.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "docs/audit/PERF-BASELINE-2026-10-17.md"
+    ],
+    "expect": "Wenn das Löschen nichts findet, darf es nichts kosten. Kostet es messbar, ist es auf dem Kaltlauf Arbeit ohne Wirkung — ein Kandidat, kein Beweis für einen Umbau.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, Node 22.23.3, 428 Dateien, 4035492 gelesene Bytes, 1764 Referenznamen, 2 Läufe. delete:chunks_fts 0 ms (0 % des Laufs) für 428 Deletes, also ~0 ms je Datei; die übrigen acht Deletes zusammen 2.2 ms. Zum Vergleich: Lesen 62.6 ms, Hashen 52.2 ms, Redigieren 365.7 ms, Extrahieren 85.1 ms.",
+    "evidence_note": "Nur Dauern und Zählungen; kein Tabelleninhalt.",
+    "measurements": {
+      "sqlite": [
+        {
+          "label": "begin",
+          "ms": 0.06535549999989598
+        },
+        {
+          "label": "commit",
+          "ms": 603.2393239999997
+        },
+        {
+          "label": "delete:references",
+          "ms": 2.0386610000024348
+        },
+        {
+          "label": "delete:touches",
+          "ms": 0.15241299999979674
+        },
+        {
+          "label": "insert:chunks",
+          "ms": 44.33399200000645
+        },
+        {
+          "label": "insert:chunks_fts",
+          "ms": 174.87201200000464
+        },
+        {
+          "label": "insert:edges",
+          "ms": 7.346415000000604
+        },
+        {
+          "label": "insert:files",
+          "ms": 5.774568499994189
+        },
+        {
+          "label": "insert:meta",
+          "ms": 0.03888349999942875
+        },
+        {
+          "label": "insert:references",
+          "ms": 371.291897499945
+        },
+        {
+          "label": "insert:secret_findings",
+          "ms": 0.1839669999999387
+        },
+        {
+          "label": "insert:symbols",
+          "ms": 24.862100000000396
+        },
+        {
+          "label": "insert:touches",
+          "ms": 1.682879500002855
+        },
+        {
+          "label": "prepare",
+          "ms": 48.71719300000609
+        },
+        {
+          "label": "select:files",
+          "ms": 0.5751534999997716
+        },
+        {
+          "label": "select:meta",
+          "ms": 0.018868999999881453
+        },
+        {
+          "label": "select:symbols",
+          "ms": 6.897962499999835
+        }
+      ],
+      "js": [
+        {
+          "label": "stat",
+          "ms": 6.357235500000115
+        },
+        {
+          "label": "lesen:1",
+          "ms": 32.656128000000535
+        },
+        {
+          "label": "sha256:1",
+          "ms": 27.92726249999987
+        },
+        {
+          "label": "redigieren:1",
+          "ms": 191.33487650000097
+        },
+        {
+          "label": "sha256:2",
+          "ms": 24.229916499999945
+        },
+        {
+          "label": "symbole",
+          "ms": 37.08753849999994
+        },
+        {
+          "label": "kanten",
+          "ms": 26.3892294999996
+        },
+        {
+          "label": "chunks",
+          "ms": 21.671204000000216
+        },
+        {
+          "label": "lesen:2",
+          "ms": 29.900770499999453
+        },
+        {
+          "label": "redigieren:2",
+          "ms": 174.4136564999999
+        },
+        {
+          "label": "referenzen:legacy:kompilieren",
+          "ms": 401.8987065000001
+        },
+        {
+          "label": "referenzen:legacy",
+          "ms": 6045.710760999999
+        },
+        {
+          "label": "matcher:bauen",
+          "ms": 0.3994620000003124
+        },
+        {
+          "label": "referenzen",
+          "ms": 231.3761519999989
+        }
+      ],
+      "files": 428
+    }
+  },
+  {
+    "id": "index-cold-doppelarbeit-2026-10-17",
+    "claim": "Der Kaltlauf liest jede Datei zweimal und hasht sie zweimal — der zweite Lesevorgang ist der Referenzdurchgang, der zweite Hash steht in indexFile.",
+    "targets": [
+      "packages/project-index/assets/index-core.js",
+      "docs/audit/PERF-BASELINE-2026-10-17.md"
+    ],
+    "expect": "Die Doppelarbeit ist nur ein Kandidat, wenn sie messbar teuer ist; ist sie billig, bleibt sie stehen.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, Node 22.23.3, 428 Dateien, 4035492 gelesene Bytes, 1764 Referenznamen, 2 Läufe. Lesen 1 32.7 ms gegen Lesen 2 29.9 ms; SHA-256 1 27.9 ms gegen SHA-256 2 24.2 ms; Redigieren 1 191.3 ms gegen Redigieren 2 174.4 ms. Zusammen 114.7 ms = 3.6 % — gemessen billig, also KEIN Optimierungskandidat.",
+    "evidence_note": "Nur Dauern; kein Dateiinhalt.",
+    "measurements": {
+      "js": [
+        {
+          "label": "stat",
+          "ms": 6.357235500000115
+        },
+        {
+          "label": "lesen:1",
+          "ms": 32.656128000000535
+        },
+        {
+          "label": "sha256:1",
+          "ms": 27.92726249999987
+        },
+        {
+          "label": "redigieren:1",
+          "ms": 191.33487650000097
+        },
+        {
+          "label": "sha256:2",
+          "ms": 24.229916499999945
+        },
+        {
+          "label": "symbole",
+          "ms": 37.08753849999994
+        },
+        {
+          "label": "kanten",
+          "ms": 26.3892294999996
+        },
+        {
+          "label": "chunks",
+          "ms": 21.671204000000216
+        },
+        {
+          "label": "lesen:2",
+          "ms": 29.900770499999453
+        },
+        {
+          "label": "redigieren:2",
+          "ms": 174.4136564999999
+        },
+        {
+          "label": "referenzen:legacy:kompilieren",
+          "ms": 401.8987065000001
+        },
+        {
+          "label": "referenzen:legacy",
+          "ms": 6045.710760999999
+        },
+        {
+          "label": "matcher:bauen",
+          "ms": 0.3994620000003124
+        },
+        {
+          "label": "referenzen",
+          "ms": 231.3761519999989
+        }
+      ],
+      "counts": {
+        "symbols": 3464
+      }
+    }
+  }
+]
