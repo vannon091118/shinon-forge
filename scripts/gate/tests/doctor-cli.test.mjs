@@ -24,8 +24,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -85,4 +86,33 @@ test('doctor: presence-only — ein Fake-Schlüssel wird nie ausgegeben, nur gem
   const report = JSON.parse(run.stdout);
   assert.equal(report.keys.AGNES_API_KEY, true, 'gesetzter Schlüssel wird nicht als gesetzt gemeldet');
   assert.equal(typeof report.keys.PROMPTER_API_KEY, 'boolean');
+});
+
+test('doctor: --help nennt Usage und endet mit Exit 0, ohne Diagnose', () => {
+  const before = execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' });
+  const run = runDoctor(['--help']);
+  assert.equal(run.status, 0, `help-Exit ${run.status}: ${run.stderr}`);
+  assert.match(run.stdout, /Usage: node scripts\/doctor\.mjs/);
+  assert.match(run.stdout, /Exit: 0 gesund/);
+  assert.equal(run.stdout.includes('shinon doctor —'), false, '--help stellt keine Diagnose');
+  const after = execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(after, before, '--help hat den Arbeitsbaum verändert');
+});
+
+test('doctor: defekte Wurzel meldet Exit 2 fail-closed (lesbar, ohne Stack)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shinon-doctor-'));
+  writeFileSync(join(dir, 'package.json'), '{"name":"kaputt","version":"0.0.0"}');
+  const before = execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' });
+  const broken = runDoctor(['--root', dir, '--json']);
+  assert.equal(broken.status, 2, `defekte Wurzel meldet ${broken.status} statt 2`);
+  const report = JSON.parse(broken.stdout);
+  assert.equal(report.status, 'error');
+  assert.equal(report.exitCode, 2);
+  assert.match(report.environmentError ?? '', /--profile/);
+  const missing = runDoctor(['--root', join(dir, 'gibt-es-nicht')]);
+  assert.equal(missing.status, 2, `fehlende Wurzel meldet ${missing.status} statt 2`);
+  assert.match(missing.stderr, /nicht lesbar/);
+  assert.equal(missing.stderr.includes('at '), false, 'kein Stack-Trace auf stderr');
+  const after = execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(after, before, 'Fehlerpfad hat den Arbeitsbaum verändert');
 });

@@ -29,7 +29,7 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Schemastery (deklariert) | `~3.18.5-alpha.1` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
 | Node (`engines.node`) | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
 | pnpm-Artefakte (getrackt) | 0 | `git ls-files '*pnpm-workspace.yaml' '*pnpm-lock.yaml' \| wc -l` (Aufrufe: Gate-Prüfung „pnpm-Reste“) | 0 |
-| Markdown-Dokumente (getrackt) | 73 | `git ls-files '*.md' \| wc -l` | 0 |
+| Markdown-Dokumente (getrackt) | 74 | `git ls-files '*.md' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | 6 | `ls docs/contracts/*.json \| wc -l` | 0 |
 | Proben unter `docs/probes/` | 29 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
@@ -66,7 +66,7 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Profil-Dump im echten Boot | **60** Layer-Köpfe, **210** Einträge; `shinon-task-router.activate: false`, `permission.defaultPreset: workspace-write`, `agent-default-model: agnes/agnes-2.5-flash` | 0 | `DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config` |
 | Frischklon-Repro S3 | Klon @ `dd18824` Exit 0, `npm ci` Exit 0, 29 Links Exit 0, Dump 60/210 Exit 0, UI-Start bis `dsh web:` (Exit 124 = Timeout nach Boot, 0 Fehler), doctor ok Exit 0, gate 544/544, statisch 117/117 | 0 | `docs/S3-FRESHCLONE-2026-10-17.md` |
 | Gate-Engine `--full` | **22** Gates gelaufen, **21** grün, **1** `NOT_APPLICABLE` (`typescript`: keine First-Party-TS-Datei), **0** fehlgeschlagen, **0** geskippt; Branding ohne Flag sichtbar übersprungen | 0 | `npm run gate:full` |
-| Gate-Tests | **544** Tests, **544** grün, **0** rot, **0** übersprungen — davon 2 für den Prompter-Trace-Kanal (Literal-Pin, Fenster-Spiegel), 4 für die S1-Wurzelbindung (fremde Root wird verworfen, keine Migration aus fremdem Index, Prompter und Project Index antworten gleich, der Entscheidungsdatensatz nennt Identität und Quelle), 3 für die eine schemastery-Fassung (Manifest-Gleichheit, Harness-Range, genau ein Lock-Eintrag), 1 dafür, dass nur der Nutzertext einen Skill ausdrücklich nennt — die Intent-Expansion nicht — und 4 für `shinon doctor` S4 (eigener Unterbefehl, stabile Codes, read-only, presence-only) | 0 | `npm run gate:test` |
+| Gate-Tests | **546** Tests, **546** grün, **0** rot, **0** übersprungen — davon 2 für den Prompter-Trace-Kanal (Literal-Pin, Fenster-Spiegel), 4 für die S1-Wurzelbindung (fremde Root wird verworfen, keine Migration aus fremdem Index, Prompter und Project Index antworten gleich, der Entscheidungsdatensatz nennt Identität und Quelle), 3 für die eine schemastery-Fassung (Manifest-Gleichheit, Harness-Range, genau ein Lock-Eintrag), 1 dafür, dass nur der Nutzertext einen Skill ausdrücklich nennt — die Intent-Expansion nicht — und 6 für `shinon doctor` S4 (eigener Unterbefehl, stabile Codes, read-only, presence-only, Hilfe, Fehlerpfade) | 0 | `npm run gate:test` |
 | Codingmon-Tests | **46** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:codingmon` |
 | Scoring-Tests (Kern, Signale, Ablage, Block-Gewichte) | **50** bestanden, **0** rot, **0** übersprungen — importfrei, läuft in CI ohne `npm ci`; die Host-Naht des Lernens fährt `scripts/gate/tests/scoring-block-learning.test.mjs` | 0 | `npm run test:scoring` |
 | Token-Usage-Tests | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:token` |

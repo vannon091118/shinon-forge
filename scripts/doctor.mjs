@@ -23,7 +23,7 @@
  *           shinon doctor [--json]
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { dshBinary, dshSource } from './lib/dsh.mjs';
@@ -79,7 +79,22 @@ export function diagnose({ root = repo.ROOT, env = process.env } = {}) {
   if (!dsh.ok) environmentError ??= 'kein lauffähiges dsh gefunden (Repo-Installat, Vendor, bekannte Prefixe)';
 
   // 3. Profil + Bündel-Auflösung (EINE Regel: repo.bundleResolutionIssues).
-  const manifest = repo.readRoot();
+  //    `--root` verlegt nur das gelesene Manifest (fail-closed bei unlesbarem
+  //    oder ungültigem JSON) — der Rest bleibt an diesem Repo verankert.
+  let manifest;
+  if (root === repo.ROOT) {
+    manifest = repo.readRoot();
+  } else {
+    const file = join(root, 'package.json');
+    try {
+      manifest = JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+      throw new Error(`--root ${root}: ${file} ist nicht lesbar oder kein gültiges JSON`);
+    }
+    if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
+      throw new Error(`--root ${root}: ${file} enthält kein Manifest-Objekt`);
+    }
+  }
   const profileName = repo.activeProfile(manifest);
   if (profileName === null) {
     environmentError ??= 'kein --profile im dev-Skript (package.json) gefunden';
@@ -128,16 +143,29 @@ function renderHuman(report) {
   return `${lines.join('\n')}\n`;
 }
 
+const USAGE = 'Usage: node scripts/doctor.mjs [--json] [--root <pfad>]\n       shinon doctor [--json]\nExit: 0 gesund · 1 Befunde · 2 Umgebung (fail-closed, schreibt nichts)';
+
 const args = process.argv.slice(2);
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(USAGE);
+  process.exit(0);
+}
 const asJson = args.includes('--json');
 const rootIndex = args.indexOf('--root');
 const overrideRoot = rootIndex === -1 ? undefined : args[rootIndex + 1];
 if (rootIndex !== -1 && (overrideRoot === undefined || overrideRoot.startsWith('--'))) {
-  console.error('Usage: node scripts/doctor.mjs [--json] [--root <pfad>]');
+  console.error(USAGE);
   process.exit(2);
 }
 
-const report = diagnose(overrideRoot === undefined ? {} : { root: overrideRoot });
+let report;
+try {
+  report = diagnose(overrideRoot === undefined ? {} : { root: overrideRoot });
+} catch (error) {
+  console.error(`💥 shinon doctor: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(2);
+}
+
 if (asJson) {
   console.log(JSON.stringify(report, null, 2));
 } else {
