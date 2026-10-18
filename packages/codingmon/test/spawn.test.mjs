@@ -68,6 +68,6 @@ test('unbekannte Elemente fallen auf die spark-Zeile zurueck (wie resolveAttack)
   assert.deepEqual(effectiveness('spark', 'yyy'), { factor: 1, symbol: '●' });
 });
 
-test('zehn Spezies im Vertrag (die Sprites zaehlen mit)', () => {
-  assert.equal(SPECIES_IDS.length, 10);
+test('50 Spezies im kanonischen Vertrag', () => {
+  assert.equal(SPECIES_IDS.length, 50);
 });

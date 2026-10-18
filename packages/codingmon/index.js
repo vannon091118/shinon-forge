@@ -21,7 +21,7 @@ export * from './assets/mechanik.js';
 export * from './assets/uebergabe.js';
 
 export const Config = z.object({
-  /** XP-Basis der ersten Stufe (kumulativ und multiplikativ). */
+  /** XP-Basis der ersten Stufe (kumulativ und quadratisch). */
   xpPerLevel: z.number().description('XP-Basis der ersten Stufe').min(1).default(XP_BASE),
   /**
    * Kuenstliche Rundendauer in Millisekunden. Kein Zeitdruck, nur Verzoegerung.
@@ -66,7 +66,7 @@ export function apply(ctx, config) {
     version: 'shinon.codingmon/v2',
     xpPerLevel: config.xpPerLevel,
     roundDelayMs: config.roundDelayMs,
-    escalation: { factor: ESCALATION.factor, xpBase: XP_BASE, levelCap: LEVEL_CAP, milestones: MILESTONES.slice() },
+    escalation: { growthBps: ESCALATION.growthBps, perLevel: ESCALATION.perLevel, xpBase: XP_BASE, levelCap: LEVEL_CAP, milestones: MILESTONES.slice() },
     species: config.species,
     speciesCount: SPECIES_IDS.length,
     abilities: ABILITIES.map((ability) => ({ ...ability })),
@@ -78,7 +78,7 @@ export function apply(ctx, config) {
   console.log(
     `[shinon-codingmon] Aktiviert — ${ABILITIES.length} Faehigkeiten, ${SPECIES_IDS.length} Spezies, `
     + `${contract.elements.length} Elemente, ${contract.loot.length} Loot-Stufen `
-    + `(${contract.version}, Faktor ${ESCALATION.factor}, Runde ${config.roundDelayMs} ms, authority NONE)`,
+    + `(${contract.version}, Wachstum ${ESCALATION.perLevel}, Runde ${config.roundDelayMs} ms, authority NONE)`,
   );
 
   // Fuer die Leiter und das Regelwerk gilt weiter: wer sie braucht, importiert

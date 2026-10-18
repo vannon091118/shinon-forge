@@ -19,73 +19,19 @@ window.__ModuleLoader__.load({
     const STORAGE_KEY = 'shinon.codingmon/v1';
     /** Stand der Ablage. v2 = Eskalation, Regelwerk, Loot, Sperre. */
     const STORE_VERSION = 2;
-    /** XP-Basis der ersten Stufe (kumulativ, exponentiell). */
+    /** XP-Basis der ersten Stufe, kumulativ und quadratisch. */
     const XP_BASE = 250;
 
     // ── Vertrag (Spiegel der Host-Hälfte in index.js) ───────────────────────
     // Bewusst dupliziert: Client- und Host-Bundle teilen keinen Code, und ein
     // Import quer ueber Pakete ist in diesem Repo nicht erlaubt.
-    const SPECIES = {
-      nullpointer: { label: 'NullPointer', family: 'spark', hue: 268, hp: 44, atk: 10, def: 6, agi: 9, int: 8 },
-      stackoverflow: { label: 'StackOverflow', family: 'byte', hue: 10, hp: 40, atk: 8, def: 7, agi: 7, int: 12 },
-      memoryleak: { label: 'MemoryLeak', family: 'feral', hue: 96, hp: 58, atk: 9, def: 5, agi: 5, int: 9 },
-      racecondition: { label: 'RaceCondition', family: 'spark', hue: 190, hp: 36, atk: 8, def: 6, agi: 14, int: 7 },
-      deadlock: { label: 'Deadlock', family: 'byte', hue: 264, hp: 62, atk: 8, def: 12, agi: 3, int: 6 },
-      segfault: { label: 'SegFault', family: 'feral', hue: 0, hp: 46, atk: 13, def: 6, agi: 8, int: 4 },
-      offbyone: { label: 'OffByOne', family: 'spark', hue: 40, hp: 38, atk: 9, def: 7, agi: 11, int: 8 },
-      bufferoverflow: { label: 'BufferOverflow', family: 'feral', hue: 320, hp: 54, atk: 12, def: 8, agi: 5, int: 5 },
-      heisenbug: { label: 'Heisenbug', family: 'byte', hue: 285, hp: 42, atk: 7, def: 6, agi: 10, int: 13 },
-      recursion: { label: 'Recursion', family: 'spark', hue: 150, hp: 50, atk: 10, def: 9, agi: 6, int: 9 },
-    };
+    // >>> generated-codingmon-catalog — source: assets/data/codingmon-50.json
+    const SPECIES = {"nullpointer":{"id":"nullpointer","label":"NullPointer","name":"NullPointer","family":"spark","hue":268,"hp":44,"atk":10,"def":6,"agi":9,"int":8,"ancestor":null,"lineageDepth":1,"depth":1,"abilityIds":["deref","null-access"],"inheritedAbilityIds":[],"traits":["Leere Referenz","Präzisionsangriff"],"role":"void-sprite","rarity":"original","description":"Ein kleiner Geist aus ungültigen Speicheradressen.","children":["racecondition","nullprism"],"unlock":{"type":"starter","requirement":"Startkonfiguration"},"lineageBranch":null},"stackoverflow":{"id":"stackoverflow","label":"StackOverflow","name":"StackOverflow","family":"byte","hue":10,"hp":40,"atk":8,"def":7,"agi":7,"int":12,"ancestor":null,"lineageDepth":1,"depth":1,"abilityIds":["recursion-dive","trace-back"],"inheritedAbilityIds":[],"traits":["Gedächtnis","Arkan"],"role":"stack-golem","rarity":"original","description":"Ein stapelnder Wächter, der Wissen Schicht um Schicht aufbaut.","children":["deadlock","stackwisp"],"unlock":{"type":"starter","requirement":"Startkonfiguration"},"lineageBranch":null},"memoryleak":{"id":"memoryleak","label":"MemoryLeak","name":"MemoryLeak","family":"feral","hue":96,"hp":58,"atk":9,"def":5,"agi":5,"int":9,"ancestor":null,"lineageDepth":1,"depth":1,"abilityIds":["page-fault","heap-flood"],"inheritedAbilityIds":[],"traits":["Ausdauer","Regeneration"],"role":"moss-beast","rarity":"original","description":"Ein moosiger Datenfresser, der Energie hortet.","children":["segfault","cachewraith"],"unlock":{"type":"starter","requirement":"Startkonfiguration"},"lineageBranch":null},"racecondition":{"id":"racecondition","label":"RaceCondition","name":"RaceCondition","family":"spark","hue":190,"hp":36,"atk":8,"def":6,"agi":14,"int":7,"ancestor":"nullpointer","lineageDepth":2,"depth":2,"abilityIds":["interleave","torn-read"],"inheritedAbilityIds":["null-access"],"traits":["Tempo","Doppeltakt"],"role":"speed-wisp","rarity":"original","description":"Ein flinker Funkenläufer, der vor dem eigenen Schatten angreift.","children":["offbyone","threadlet"],"unlock":{"type":"lineage","requirement":"Abstammung / Freischaltung"},"lineageBranch":null},"deadlock":{"id":"deadlock","label":"Deadlock","name":"Deadlock","family":"byte","hue":264,"hp":62,"atk":8,"def":12,"agi":3,"int":6,"ancestor":"stackoverflow","lineageDepth":2,"depth":2,"abilityIds":["barrier","starve"],"inheritedAbilityIds":["trace-back"],"traits":["Panzerung","Kontrolle"],"role":"iron-golem","rarity":"original","description":"Ein starrer Blockadegolem, der Gegner in Stellungskämpfe zwingt.","children":["heisenbug","mutexling"],"unlock":{"type":"lineage","requirement":"Abstammung / Freischaltung"},"lineageBranch":null},"segfault":{"id":"segfault","label":"SegFault","name":"SegFault","family":"feral","hue":0,"hp":46,"atk":13,"def":6,"agi":8,"int":4,"ancestor":"memoryleak","lineageDepth":2,"depth":2,"abilityIds":["dangling-pointer","core-dump"],"inheritedAbilityIds":["heap-flood"],"traits":["Durchbruch","Nahkampf"],"role":"claw-beast","rarity":"original","description":"Ein Krallenjäger, dessen Treffer jede Struktur aufreißen.","children":["bufferoverflow","faultling"],"unlock":{"type":"lineage","requirement":"Abstammung / Freischaltung"},"lineageBranch":null},"offbyone":{"id":"offbyone","label":"OffByOne","name":"OffByOne","family":"spark","hue":40,"hp":38,"atk":9,"def":7,"agi":11,"int":8,"ancestor":"racecondition","lineageDepth":3,"depth":3,"abilityIds":["nudge","boundary-slip"],"inheritedAbilityIds":["torn-read"],"traits":["Ausweichen","Grenztrick"],"role":"boundary-fox","rarity":"original","description":"Ein Grenzgänger, der jede Lücke um genau einen Schritt findet.","children":["recursion","indeximp"],"unlock":{"type":"lineage","requirement":"Abstammung / Freischaltung"},"lineageBranch":null},"bufferoverflow":{"id":"bufferoverflow","label":"BufferOverflow","name":"BufferOverflow","family":"feral","hue":320,"hp":54,"atk":12,"def":8,"agi":5,"int":5,"ancestor":"segfault","lineageDepth":3,"depth":3,"abilityIds":["smash","stack-smash"],"inheritedAbilityIds":["core-dump"],"traits":["Wucht","Überladung"],"role":"overflow-brute","rarity":"original","description":"Ein wuchtiger Brecher, dessen Kraft den eigenen Rahmen sprengt.","children":["bufferbug"],"unlock":{"type":"lineage","requirement":"Abstammung / Freischaltung"},"lineageBranch":null},"heisenbug":{"id":"heisenbug","label":"Heisenbug","name":"Heisenbug","family":"byte","hue":285,"hp":42,"atk":7,"def":6,"agi":10,"int":13,"ancestor":"deadlock","lineageDepth":3,"depth":3,"abilityIds":["obfuscate","observation-collapse"],"inheritedAbilityIds":["starve"],"traits":["Täuschung","Analyse"],"role":"phase-phantom","rarity":"original","description":"Ein Beobachtungsphantom, dessen Muster sich kaum festhalten lassen.","children":["phantomtrace"],"unlock":{"type":"lineage","requirement":"Abstammung / Freischaltung"},"lineageBranch":null},"recursion":{"id":"recursion","label":"Recursion","name":"Recursion","family":"spark","hue":150,"hp":50,"atk":10,"def":9,"agi":6,"int":9,"ancestor":"offbyone","lineageDepth":4,"depth":4,"abilityIds":["base-case","infinite-descent"],"inheritedAbilityIds":["boundary-slip"],"traits":["Kettenangriff","Zyklus"],"role":"loop-drake","rarity":"original","description":"Ein Schleifendrache, der aus jedem Ende einen neuen Anfang macht.","children":["basecase"],"unlock":{"type":"lineage","requirement":"Abstammung / Freischaltung"},"lineageBranch":null},"nullprism":{"id":"nullprism","label":"NullPrism","name":"NullPrism","family":"spark","hue":178,"hp":46,"atk":11,"def":6,"agi":10,"int":10,"ancestor":"nullpointer","lineageDepth":2,"depth":2,"abilityIds":["nullprism-pulse","nullprism-surge"],"inheritedAbilityIds":["null-access"],"traits":["Crystal Wisp","Erblinie NullPointer"],"role":"crystal-wisp","rarity":"lineage-2","description":"Ein Prismengeist, der ungültige Zeiger in klares Licht bricht.","children":["derefang"],"unlock":{"type":"lineage","requirement":"Abstammung von NullPointer"},"lineageBranch":"nullpointer"},"derefang":{"id":"derefang","label":"DereFang","name":"DereFang","family":"byte","hue":288,"hp":49,"atk":14,"def":6,"agi":11,"int":10,"ancestor":"nullprism","lineageDepth":3,"depth":3,"abilityIds":["derefang-pulse","derefang-surge"],"inheritedAbilityIds":["nullprism-surge"],"traits":["Void Wolf","Erblinie NullPrism"],"role":"void-wolf","rarity":"lineage-3","description":"Ein leiser Jäger, der Referenzen mit einem einzigen Biss auftrennt.","children":["voidseraph"],"unlock":{"type":"lineage","requirement":"Abstammung von NullPrism"},"lineageBranch":"nullpointer"},"voidseraph":{"id":"voidseraph","label":"VoidSeraph","name":"VoidSeraph","family":"spark","hue":168,"hp":50,"atk":14,"def":8,"agi":12,"int":13,"ancestor":"derefang","lineageDepth":4,"depth":4,"abilityIds":["voidseraph-pulse","voidseraph-surge"],"inheritedAbilityIds":["derefang-surge"],"traits":["Winged Void","Erblinie DereFang"],"role":"winged-void","rarity":"lineage-4","description":"Ein schwebender Wächter der Leere mit gefalteten Lichtflügeln.","children":["zerooracle"],"unlock":{"type":"lineage","requirement":"Abstammung von DereFang"},"lineageBranch":"nullpointer"},"zerooracle":{"id":"zerooracle","label":"ZeroOracle","name":"ZeroOracle","family":"feral","hue":104,"hp":54,"atk":15,"def":10,"agi":11,"int":17,"ancestor":"voidseraph","lineageDepth":5,"depth":5,"abilityIds":["zerooracle-pulse","zerooracle-surge"],"inheritedAbilityIds":["voidseraph-surge"],"traits":["Oracle Beast","Erblinie VoidSeraph"],"role":"oracle-beast","rarity":"lineage-5","description":"Ein Orakelwesen, das im Nichts verborgene Pfade erkennt.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von VoidSeraph"},"lineageBranch":"nullpointer"},"stackwisp":{"id":"stackwisp","label":"StackWisp","name":"StackWisp","family":"byte","hue":286,"hp":42,"atk":8,"def":8,"agi":9,"int":14,"ancestor":"stackoverflow","lineageDepth":2,"depth":2,"abilityIds":["stackwisp-pulse","stackwisp-surge"],"inheritedAbilityIds":["trace-back"],"traits":["Layer Ghost","Erblinie StackOverflow"],"role":"layer-ghost","rarity":"lineage-2","description":"Ein mehrschichtiger Funke, dessen Gedächtnis nie den Faden verliert.","children":["callstacker"],"unlock":{"type":"lineage","requirement":"Abstammung von StackOverflow"},"lineageBranch":"stackoverflow"},"callstacker":{"id":"callstacker","label":"CallStacker","name":"CallStacker","family":"spark","hue":166,"hp":46,"atk":10,"def":10,"agi":9,"int":15,"ancestor":"stackwisp","lineageDepth":3,"depth":3,"abilityIds":["callstacker-pulse","callstacker-surge"],"inheritedAbilityIds":["stackwisp-surge"],"traits":["Callstack Knight","Erblinie StackWisp"],"role":"callstack-knight","rarity":"lineage-3","description":"Ein Ritter, der jeden Aufruf in einer schwebenden Rune ablegt.","children":["overflowarchon"],"unlock":{"type":"lineage","requirement":"Abstammung von StackWisp"},"lineageBranch":"stackoverflow"},"overflowarchon":{"id":"overflowarchon","label":"OverflowArchon","name":"OverflowArchon","family":"byte","hue":276,"hp":49,"atk":11,"def":13,"agi":8,"int":19,"ancestor":"callstacker","lineageDepth":4,"depth":4,"abilityIds":["overflowarchon-pulse","overflowarchon-surge"],"inheritedAbilityIds":["callstacker-surge"],"traits":["Arcane Construct","Erblinie CallStacker"],"role":"arcane-construct","rarity":"lineage-4","description":"Ein arkaner Archon, der unendlich viele Schichten ordnet.","children":["stacktitan"],"unlock":{"type":"lineage","requirement":"Abstammung von CallStacker"},"lineageBranch":"stackoverflow"},"stacktitan":{"id":"stacktitan","label":"StackTitan","name":"StackTitan","family":"feral","hue":62,"hp":57,"atk":15,"def":17,"agi":6,"int":21,"ancestor":"overflowarchon","lineageDepth":5,"depth":5,"abilityIds":["stacktitan-pulse","stacktitan-surge"],"inheritedAbilityIds":["overflowarchon-surge"],"traits":["Tower Giant","Erblinie OverflowArchon"],"role":"tower-giant","rarity":"lineage-5","description":"Ein riesiger Stapeltitan mit steinernen Ebenen und glühendem Kern.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von OverflowArchon"},"lineageBranch":"stackoverflow"},"cachewraith":{"id":"cachewraith","label":"CacheWraith","name":"CacheWraith","family":"feral","hue":70,"hp":62,"atk":9,"def":5,"agi":5,"int":11,"ancestor":"memoryleak","lineageDepth":2,"depth":2,"abilityIds":["cachewraith-pulse","cachewraith-surge"],"inheritedAbilityIds":["heap-flood"],"traits":["Moss Ghost","Erblinie MemoryLeak"],"role":"moss-ghost","rarity":"lineage-2","description":"Ein gespeicherter Schatten, der Wärme und Erinnerungen sammelt.","children":["heapgolem"],"unlock":{"type":"lineage","requirement":"Abstammung von MemoryLeak"},"lineageBranch":"memoryleak"},"heapgolem":{"id":"heapgolem","label":"HeapGolem","name":"HeapGolem","family":"byte","hue":274,"hp":70,"atk":11,"def":9,"agi":3,"int":11,"ancestor":"cachewraith","lineageDepth":3,"depth":3,"abilityIds":["heapgolem-pulse","heapgolem-surge"],"inheritedAbilityIds":["cachewraith-surge"],"traits":["Heap Construct","Erblinie CacheWraith"],"role":"heap-construct","rarity":"lineage-3","description":"Ein schwerer Golem aus versiegelten Speicherblöcken.","children":["leakhydra"],"unlock":{"type":"lineage","requirement":"Abstammung von CacheWraith"},"lineageBranch":"memoryleak"},"leakhydra":{"id":"leakhydra","label":"LeakHydra","name":"LeakHydra","family":"feral","hue":130,"hp":76,"atk":15,"def":10,"agi":3,"int":12,"ancestor":"heapgolem","lineageDepth":4,"depth":4,"abilityIds":["leakhydra-pulse","leakhydra-surge"],"inheritedAbilityIds":["heapgolem-surge"],"traits":["Many Headed Beast","Erblinie HeapGolem"],"role":"many-headed-beast","rarity":"lineage-4","description":"Eine Hydra, bei der jeder verlorene Tropfen einen neuen Kopf formt.","children":["memoryphoenix"],"unlock":{"type":"lineage","requirement":"Abstammung von HeapGolem"},"lineageBranch":"memoryleak"},"memoryphoenix":{"id":"memoryphoenix","label":"MemoryPhoenix","name":"MemoryPhoenix","family":"spark","hue":184,"hp":79,"atk":18,"def":10,"agi":6,"int":17,"ancestor":"leakhydra","lineageDepth":5,"depth":5,"abilityIds":["memoryphoenix-pulse","memoryphoenix-surge"],"inheritedAbilityIds":["leakhydra-surge"],"traits":["Memory Bird","Erblinie LeakHydra"],"role":"memory-bird","rarity":"lineage-5","description":"Ein Phönix, der verlorene Erinnerungen aus glühender Asche zurückholt.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von LeakHydra"},"lineageBranch":"memoryleak"},"threadlet":{"id":"threadlet","label":"Threadlet","name":"Threadlet","family":"spark","hue":192,"hp":36,"atk":9,"def":6,"agi":17,"int":7,"ancestor":"racecondition","lineageDepth":3,"depth":3,"abilityIds":["threadlet-pulse","threadlet-surge"],"inheritedAbilityIds":["torn-read"],"traits":["Thread Sprite","Erblinie RaceCondition"],"role":"thread-sprite","rarity":"lineage-2","description":"Ein winziger Prozessgeist, der zwei Wege gleichzeitig einschlägt.","children":["raceweaver"],"unlock":{"type":"lineage","requirement":"Abstammung von RaceCondition"},"lineageBranch":"racecondition"},"raceweaver":{"id":"raceweaver","label":"RaceWeaver","name":"RaceWeaver","family":"feral","hue":128,"hp":38,"atk":11,"def":7,"agi":19,"int":8,"ancestor":"threadlet","lineageDepth":4,"depth":4,"abilityIds":["raceweaver-pulse","raceweaver-surge"],"inheritedAbilityIds":["threadlet-surge"],"traits":["Web Runner","Erblinie Threadlet"],"role":"web-runner","rarity":"lineage-3","description":"Ein schneller Weber, der Zeitlinien zu einem Netz verknüpft.","children":["temporlock"],"unlock":{"type":"lineage","requirement":"Abstammung von Threadlet"},"lineageBranch":"racecondition"},"temporlock":{"id":"temporlock","label":"TemporLock","name":"TemporLock","family":"spark","hue":182,"hp":42,"atk":12,"def":9,"agi":21,"int":11,"ancestor":"raceweaver","lineageDepth":5,"depth":5,"abilityIds":["temporlock-pulse","temporlock-surge"],"inheritedAbilityIds":["raceweaver-surge"],"traits":["Time Lock","Erblinie RaceWeaver"],"role":"time-lock","rarity":"lineage-4","description":"Ein zeitversetzter Läufer, der Momente wie Scharniere verriegelt.","children":["quantumracer"],"unlock":{"type":"lineage","requirement":"Abstammung von RaceWeaver"},"lineageBranch":"racecondition"},"quantumracer":{"id":"quantumracer","label":"QuantumRacer","name":"QuantumRacer","family":"byte","hue":292,"hp":44,"atk":16,"def":10,"agi":21,"int":15,"ancestor":"temporlock","lineageDepth":6,"depth":6,"abilityIds":["quantumracer-pulse","quantumracer-surge"],"inheritedAbilityIds":["temporlock-surge"],"traits":["Quantum Beast","Erblinie TemporLock"],"role":"quantum-beast","rarity":"lineage-5","description":"Ein Quantenrenner, der vor seiner eigenen Bewegung ankommt.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von TemporLock"},"lineageBranch":"racecondition"},"mutexling":{"id":"mutexling","label":"Mutexling","name":"Mutexling","family":"byte","hue":300,"hp":65,"atk":9,"def":14,"agi":3,"int":8,"ancestor":"deadlock","lineageDepth":3,"depth":3,"abilityIds":["mutexling-pulse","mutexling-surge"],"inheritedAbilityIds":["starve"],"traits":["Lockling","Erblinie Deadlock"],"role":"lockling","rarity":"lineage-2","description":"Ein kleiner Schlossgeist, der den Zugang zu jeder Tür bewacht.","children":["lockwarden"],"unlock":{"type":"lineage","requirement":"Abstammung von Deadlock"},"lineageBranch":"deadlock"},"lockwarden":{"id":"lockwarden","label":"LockWarden","name":"LockWarden","family":"feral","hue":86,"hp":70,"atk":11,"def":18,"agi":3,"int":10,"ancestor":"mutexling","lineageDepth":4,"depth":4,"abilityIds":["lockwarden-pulse","lockwarden-surge"],"inheritedAbilityIds":["mutexling-surge"],"traits":["Armored Warden","Erblinie Mutexling"],"role":"armored-warden","rarity":"lineage-3","description":"Ein gepanzerter Wächter, der gegnerische Züge einfriert.","children":["stalemateon"],"unlock":{"type":"lineage","requirement":"Abstammung von Mutexling"},"lineageBranch":"deadlock"},"stalemateon":{"id":"stalemateon","label":"Stalemateon","name":"Stalemateon","family":"byte","hue":290,"hp":74,"atk":14,"def":21,"agi":4,"int":13,"ancestor":"lockwarden","lineageDepth":5,"depth":5,"abilityIds":["stalemateon-pulse","stalemateon-surge"],"inheritedAbilityIds":["lockwarden-surge"],"traits":["Stalemate Knight","Erblinie LockWarden"],"role":"stalemate-knight","rarity":"lineage-4","description":"Ein Duellant, der jede Schlacht in ein Patt verwandelt.","children":["foreverwait"],"unlock":{"type":"lineage","requirement":"Abstammung von LockWarden"},"lineageBranch":"deadlock"},"foreverwait":{"id":"foreverwait","label":"ForeverWait","name":"ForeverWait","family":"spark","hue":170,"hp":77,"atk":15,"def":22,"agi":7,"int":18,"ancestor":"stalemateon","lineageDepth":6,"depth":6,"abilityIds":["foreverwait-pulse","foreverwait-surge"],"inheritedAbilityIds":["stalemateon-surge"],"traits":["Waiting Phantom","Erblinie Stalemateon"],"role":"waiting-phantom","rarity":"lineage-5","description":"Ein gespenstischer Zeitwächter, der Geduld zur Waffe macht.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von Stalemateon"},"lineageBranch":"deadlock"},"faultling":{"id":"faultling","label":"Faultling","name":"Faultling","family":"feral","hue":84,"hp":47,"atk":15,"def":6,"agi":9,"int":5,"ancestor":"segfault","lineageDepth":3,"depth":3,"abilityIds":["faultling-pulse","faultling-surge"],"inheritedAbilityIds":["core-dump"],"traits":["Fault Imp","Erblinie SegFault"],"role":"fault-imp","rarity":"lineage-2","description":"Ein scharfkantiger Imp, der Fehlerlinien erschnuppert.","children":["coremaw"],"unlock":{"type":"lineage","requirement":"Abstammung von SegFault"},"lineageBranch":"segfault"},"coremaw":{"id":"coremaw","label":"CoreMaw","name":"CoreMaw","family":"spark","hue":208,"hp":51,"atk":20,"def":8,"agi":9,"int":5,"ancestor":"faultling","lineageDepth":4,"depth":4,"abilityIds":["coremaw-pulse","coremaw-surge"],"inheritedAbilityIds":["faultling-surge"],"traits":["Core Beast","Erblinie Faultling"],"role":"core-beast","rarity":"lineage-3","description":"Ein Kernfresser mit leuchtendem Rachen und gesplitterten Schuppen.","children":["coredrake"],"unlock":{"type":"lineage","requirement":"Abstammung von Faultling"},"lineageBranch":"segfault"},"coredrake":{"id":"coredrake","label":"CoreDrake","name":"CoreDrake","family":"feral","hue":74,"hp":56,"atk":23,"def":10,"agi":10,"int":7,"ancestor":"coremaw","lineageDepth":5,"depth":5,"abilityIds":["coredrake-pulse","coredrake-surge"],"inheritedAbilityIds":["coremaw-surge"],"traits":["Core Dragon","Erblinie CoreMaw"],"role":"core-dragon","rarity":"lineage-4","description":"Ein Kerndrache, dessen Atem wie ein abstürzender Prozess lodert.","children":["crashcolossus"],"unlock":{"type":"lineage","requirement":"Abstammung von CoreMaw"},"lineageBranch":"segfault"},"crashcolossus":{"id":"crashcolossus","label":"CrashColossus","name":"CrashColossus","family":"byte","hue":278,"hp":66,"atk":23,"def":15,"agi":7,"int":9,"ancestor":"coredrake","lineageDepth":6,"depth":6,"abilityIds":["crashcolossus-pulse","crashcolossus-surge"],"inheritedAbilityIds":["coredrake-surge"],"traits":["Colossus","Erblinie CoreDrake"],"role":"colossus","rarity":"lineage-5","description":"Ein kolossaler Codewächter, der mit jedem Schritt den Boden erschüttert.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von CoreDrake"},"lineageBranch":"segfault"},"indeximp":{"id":"indeximp","label":"IndexImp","name":"IndexImp","family":"spark","hue":206,"hp":38,"atk":10,"def":7,"agi":14,"int":9,"ancestor":"offbyone","lineageDepth":4,"depth":4,"abilityIds":["indeximp-pulse","indeximp-surge"],"inheritedAbilityIds":["boundary-slip"],"traits":["Index Imp","Erblinie OffByOne"],"role":"index-imp","rarity":"lineage-2","description":"Ein kleiner Grenzimp, der immer genau einen Schritt zu weit springt.","children":["boundarybeast"],"unlock":{"type":"lineage","requirement":"Abstammung von OffByOne"},"lineageBranch":"offbyone"},"boundarybeast":{"id":"boundarybeast","label":"BoundaryBeast","name":"BoundaryBeast","family":"byte","hue":246,"hp":43,"atk":12,"def":10,"agi":14,"int":10,"ancestor":"indeximp","lineageDepth":5,"depth":5,"abilityIds":["boundarybeast-pulse","boundarybeast-surge"],"inheritedAbilityIds":["indeximp-surge"],"traits":["Boundary Bear","Erblinie IndexImp"],"role":"boundary-bear","rarity":"lineage-3","description":"Ein kräftiger Grenzbär mit einem Panzer aus geschlossenen Klammern.","children":["indexeater"],"unlock":{"type":"lineage","requirement":"Abstammung von IndexImp"},"lineageBranch":"offbyone"},"indexeater":{"id":"indexeater","label":"IndexEater","name":"IndexEater","family":"feral","hue":102,"hp":46,"atk":16,"def":11,"agi":16,"int":11,"ancestor":"boundarybeast","lineageDepth":6,"depth":6,"abilityIds":["indexeater-pulse","indexeater-surge"],"inheritedAbilityIds":["boundarybeast-surge"],"traits":["Index Eater","Erblinie BoundaryBeast"],"role":"index-eater","rarity":"lineage-4","description":"Ein gefräßiger Vierbeiner, der vergessene Indizes verschlingt.","children":["zerowyrm"],"unlock":{"type":"lineage","requirement":"Abstammung von BoundaryBeast"},"lineageBranch":"offbyone"},"zerowyrm":{"id":"zerowyrm","label":"ZeroWyrm","name":"ZeroWyrm","family":"spark","hue":156,"hp":48,"atk":18,"def":13,"agi":20,"int":15,"ancestor":"indexeater","lineageDepth":7,"depth":7,"abilityIds":["zerowyrm-pulse","zerowyrm-surge"],"inheritedAbilityIds":["indexeater-surge"],"traits":["Zero Wyrm","Erblinie IndexEater"],"role":"zero-wyrm","rarity":"lineage-5","description":"Ein Wyrm, der jedes Zählwerk zu seinem Anfang zurückführt.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von IndexEater"},"lineageBranch":"offbyone"},"bufferbug":{"id":"bufferbug","label":"BufferBug","name":"BufferBug","family":"feral","hue":70,"hp":57,"atk":13,"def":10,"agi":5,"int":6,"ancestor":"bufferoverflow","lineageDepth":4,"depth":4,"abilityIds":["bufferbug-pulse","bufferbug-surge"],"inheritedAbilityIds":["stack-smash"],"traits":["Buffer Beetle","Erblinie BufferOverflow"],"role":"buffer-beetle","rarity":"lineage-2","description":"Ein gedrungener Käfer mit einem Rückenpanzer aus Speicherzellen.","children":["overflowhorn"],"unlock":{"type":"lineage","requirement":"Abstammung von BufferOverflow"},"lineageBranch":"bufferoverflow"},"overflowhorn":{"id":"overflowhorn","label":"OverflowHorn","name":"OverflowHorn","family":"byte","hue":274,"hp":61,"atk":17,"def":11,"agi":6,"int":6,"ancestor":"bufferbug","lineageDepth":5,"depth":5,"abilityIds":["overflowhorn-pulse","overflowhorn-surge"],"inheritedAbilityIds":["bufferbug-surge"],"traits":["Horned Brute","Erblinie BufferBug"],"role":"horned-brute","rarity":"lineage-3","description":"Ein gehörntes Kraftpaket, das seine eigene Kapazität sprengt.","children":["stackravager"],"unlock":{"type":"lineage","requirement":"Abstammung von BufferBug"},"lineageBranch":"bufferoverflow"},"stackravager":{"id":"stackravager","label":"StackRavager","name":"StackRavager","family":"spark","hue":224,"hp":64,"atk":21,"def":13,"agi":8,"int":8,"ancestor":"overflowhorn","lineageDepth":6,"depth":6,"abilityIds":["stackravager-pulse","stackravager-surge"],"inheritedAbilityIds":["overflowhorn-surge"],"traits":["Stack Raider","Erblinie OverflowHorn"],"role":"stack-raider","rarity":"lineage-4","description":"Ein flinker Räuber, der fremde Stapel zu seiner Rüstung macht.","children":["bufferbehemoth"],"unlock":{"type":"lineage","requirement":"Abstammung von OverflowHorn"},"lineageBranch":"bufferoverflow"},"bufferbehemoth":{"id":"bufferbehemoth","label":"BufferBehemoth","name":"BufferBehemoth","family":"feral","hue":90,"hp":76,"atk":23,"def":18,"agi":6,"int":10,"ancestor":"stackravager","lineageDepth":7,"depth":7,"abilityIds":["bufferbehemoth-pulse","bufferbehemoth-surge"],"inheritedAbilityIds":["stackravager-surge"],"traits":["Behemoth","Erblinie StackRavager"],"role":"behemoth","rarity":"lineage-5","description":"Ein uralter Speicherbehemoth mit einem Herz aus verdichtetem Code.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von StackRavager"},"lineageBranch":"bufferoverflow"},"phantomtrace":{"id":"phantomtrace","label":"PhantomTrace","name":"PhantomTrace","family":"byte","hue":272,"hp":43,"atk":7,"def":7,"agi":13,"int":16,"ancestor":"heisenbug","lineageDepth":4,"depth":4,"abilityIds":["phantomtrace-pulse","phantomtrace-surge"],"inheritedAbilityIds":["observation-collapse"],"traits":["Trace Phantom","Erblinie Heisenbug"],"role":"trace-phantom","rarity":"lineage-2","description":"Ein kaum sichtbarer Spurenleser aus wechselnden Datenmustern.","children":["observoid"],"unlock":{"type":"lineage","requirement":"Abstammung von Heisenbug"},"lineageBranch":"heisenbug"},"observoid":{"id":"observoid","label":"ObserVoid","name":"ObserVoid","family":"spark","hue":222,"hp":45,"atk":9,"def":8,"agi":15,"int":20,"ancestor":"phantomtrace","lineageDepth":5,"depth":5,"abilityIds":["observoid-pulse","observoid-surge"],"inheritedAbilityIds":["phantomtrace-surge"],"traits":["Void Observer","Erblinie PhantomTrace"],"role":"void-observer","rarity":"lineage-3","description":"Ein Auge aus Licht, das erst durch Beobachtung Gestalt annimmt.","children":["heisenwisp"],"unlock":{"type":"lineage","requirement":"Abstammung von PhantomTrace"},"lineageBranch":"heisenbug"},"heisenwisp":{"id":"heisenwisp","label":"HeisenWisp","name":"HeisenWisp","family":"feral","hue":88,"hp":48,"atk":10,"def":10,"agi":18,"int":23,"ancestor":"observoid","lineageDepth":6,"depth":6,"abilityIds":["heisenwisp-pulse","heisenwisp-surge"],"inheritedAbilityIds":["observoid-surge"],"traits":["Uncertain Wisp","Erblinie ObserVoid"],"role":"uncertain-wisp","rarity":"lineage-4","description":"Ein unbeständiger Irrwisch, der zwischen mehreren Formen flackert.","children":["quantumdebug"],"unlock":{"type":"lineage","requirement":"Abstammung von ObserVoid"},"lineageBranch":"heisenbug"},"quantumdebug":{"id":"quantumdebug","label":"QuantumDebug","name":"QuantumDebug","family":"byte","hue":292,"hp":51,"atk":12,"def":12,"agi":19,"int":23,"ancestor":"heisenwisp","lineageDepth":7,"depth":7,"abilityIds":["quantumdebug-pulse","quantumdebug-surge"],"inheritedAbilityIds":["heisenwisp-surge"],"traits":["Quantum Owl","Erblinie HeisenWisp"],"role":"quantum-owl","rarity":"lineage-5","description":"Ein Quantenkundiger, der Fehlerzustände wie Sterne liest.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von HeisenWisp"},"lineageBranch":"heisenbug"},"basecase":{"id":"basecase","label":"BaseCase","name":"BaseCase","family":"spark","hue":220,"hp":54,"atk":10,"def":12,"agi":6,"int":12,"ancestor":"recursion","lineageDepth":5,"depth":5,"abilityIds":["basecase-pulse","basecase-surge"],"inheritedAbilityIds":["infinite-descent"],"traits":["Basecase Turtle","Erblinie Recursion"],"role":"basecase-turtle","rarity":"lineage-2","description":"Ein Schildkrötengeist, der jede Schleife mit dem richtigen Ende versieht.","children":["callwyrm"],"unlock":{"type":"lineage","requirement":"Abstammung von Recursion"},"lineageBranch":"recursion"},"callwyrm":{"id":"callwyrm","label":"CallWyrm","name":"CallWyrm","family":"byte","hue":260,"hp":58,"atk":13,"def":13,"agi":7,"int":16,"ancestor":"basecase","lineageDepth":6,"depth":6,"abilityIds":["callwyrm-pulse","callwyrm-surge"],"inheritedAbilityIds":["basecase-surge"],"traits":["Call Wyrm","Erblinie BaseCase"],"role":"call-wyrm","rarity":"lineage-3","description":"Ein langer Wyrm, dessen Schuppen verschachtelte Funktionsrufe tragen.","children":["recursaur"],"unlock":{"type":"lineage","requirement":"Abstammung von BaseCase"},"lineageBranch":"recursion"},"recursaur":{"id":"recursaur","label":"Recursaur","name":"Recursaur","family":"spark","hue":210,"hp":65,"atk":17,"def":16,"agi":8,"int":19,"ancestor":"callwyrm","lineageDepth":7,"depth":7,"abilityIds":["recursaur-pulse","recursaur-surge"],"inheritedAbilityIds":["callwyrm-surge"],"traits":["Recursive Saur","Erblinie CallWyrm"],"role":"recursive-saur","rarity":"lineage-4","description":"Ein Echsenkoloss, der aus jedem Angriff eine neue Runde erzeugt.","children":["infiniteancestor"],"unlock":{"type":"lineage","requirement":"Abstammung von CallWyrm"},"lineageBranch":"recursion"},"infiniteancestor":{"id":"infiniteancestor","label":"InfiniteAncestor","name":"InfiniteAncestor","family":"feral","hue":76,"hp":74,"atk":21,"def":20,"agi":8,"int":23,"ancestor":"recursaur","lineageDepth":8,"depth":8,"abilityIds":["infiniteancestor-pulse","infiniteancestor-surge"],"inheritedAbilityIds":["recursaur-surge"],"traits":["Infinite Elder","Erblinie Recursaur"],"role":"infinite-elder","rarity":"lineage-5","description":"Ein uralter Urahn, der Anfang und Ende seiner Linie zugleich kennt.","children":[],"unlock":{"type":"lineage","requirement":"Abstammung von Recursaur"},"lineageBranch":"recursion"}};
     const SPECIES_IDS = Object.keys(SPECIES);
+    const ABILITIES = [{"id":"tackle","label":"Tackle","stat":"atk","power":12,"minLevel":1,"kind":"physisch","species":null},{"id":"deref","label":"Deref","stat":"atk","power":15,"minLevel":1,"kind":"physisch","species":"nullpointer"},{"id":"null-access","label":"Nullzugriff","stat":"int","power":18,"minLevel":4,"kind":"speziell","species":"nullpointer"},{"id":"recursion-dive","label":"Recursion Dive","stat":"int","power":16,"minLevel":1,"kind":"speziell","species":"stackoverflow"},{"id":"trace-back","label":"Trace Back","stat":"int","power":20,"minLevel":4,"kind":"speziell","species":"stackoverflow"},{"id":"page-fault","label":"Page Fault","stat":"atk","power":14,"minLevel":1,"kind":"physisch","species":"memoryleak"},{"id":"heap-flood","label":"Heap Flood","stat":"int","power":20,"minLevel":4,"kind":"speziell","species":"memoryleak"},{"id":"interleave","label":"Interleave","stat":"agi","power":16,"minLevel":1,"kind":"physisch","species":"racecondition"},{"id":"torn-read","label":"Torn Read","stat":"agi","power":20,"minLevel":4,"kind":"physisch","species":"racecondition"},{"id":"barrier","label":"Barriere","stat":"def","power":18,"minLevel":1,"kind":"physisch","species":"deadlock"},{"id":"starve","label":"Starve","stat":"int","power":16,"minLevel":4,"kind":"speziell","species":"deadlock"},{"id":"dangling-pointer","label":"Dangling Pointer","stat":"atk","power":17,"minLevel":1,"kind":"physisch","species":"segfault"},{"id":"core-dump","label":"Core Dump","stat":"atk","power":22,"minLevel":4,"kind":"physisch","species":"segfault"},{"id":"nudge","label":"Nudge","stat":"agi","power":14,"minLevel":1,"kind":"physisch","species":"offbyone"},{"id":"boundary-slip","label":"Boundary Slip","stat":"agi","power":18,"minLevel":4,"kind":"physisch","species":"offbyone"},{"id":"smash","label":"Smash","stat":"atk","power":18,"minLevel":1,"kind":"physisch","species":"bufferoverflow"},{"id":"stack-smash","label":"Stack Smash","stat":"atk","power":23,"minLevel":4,"kind":"physisch","species":"bufferoverflow"},{"id":"obfuscate","label":"Obfuscate","stat":"int","power":15,"minLevel":1,"kind":"speziell","species":"heisenbug"},{"id":"observation-collapse","label":"Observation Collapse","stat":"int","power":21,"minLevel":4,"kind":"speziell","species":"heisenbug"},{"id":"base-case","label":"Base Case","stat":"def","power":16,"minLevel":1,"kind":"physisch","species":"recursion"},{"id":"infinite-descent","label":"Infinite Descent","stat":"atk","power":21,"minLevel":4,"kind":"physisch","species":"recursion"},{"id":"nullprism-pulse","label":"Resonanzimpuls","stat":"agi","power":13,"minLevel":1,"kind":"physisch","species":"nullprism"},{"id":"nullprism-surge","label":"Endlosschlag","stat":"agi","power":18,"minLevel":4,"kind":"physisch","species":"nullprism"},{"id":"derefang-pulse","label":"Schattenstich","stat":"atk","power":14,"minLevel":1,"kind":"physisch","species":"derefang"},{"id":"derefang-surge","label":"Quantensturm","stat":"int","power":20,"minLevel":4,"kind":"speziell","species":"derefang"},{"id":"voidseraph-pulse","label":"Runenstoß","stat":"int","power":15,"minLevel":1,"kind":"speziell","species":"voidseraph"},{"id":"voidseraph-surge","label":"Grenzsprung","stat":"def","power":22,"minLevel":4,"kind":"physisch","species":"voidseraph"},{"id":"zerooracle-pulse","label":"Klammerwurf","stat":"atk","power":16,"minLevel":1,"kind":"physisch","species":"zerooracle"},{"id":"zerooracle-surge","label":"Ursprungsruf","stat":"atk","power":19,"minLevel":4,"kind":"physisch","species":"zerooracle"},{"id":"stackwisp-pulse","label":"Speicherzahn","stat":"agi","power":17,"minLevel":1,"kind":"physisch","species":"stackwisp"},{"id":"stackwisp-surge","label":"Endlosschlag","stat":"agi","power":22,"minLevel":4,"kind":"physisch","species":"stackwisp"},{"id":"callstacker-pulse","label":"Nullfunke","stat":"def","power":13,"minLevel":1,"kind":"physisch","species":"callstacker"},{"id":"callstacker-surge","label":"Quantensturm","stat":"int","power":21,"minLevel":4,"kind":"speziell","species":"callstacker"},{"id":"overflowarchon-pulse","label":"Resonanzimpuls","stat":"agi","power":14,"minLevel":1,"kind":"physisch","species":"overflowarchon"},{"id":"overflowarchon-surge","label":"Grenzsprung","stat":"agi","power":18,"minLevel":4,"kind":"physisch","species":"overflowarchon"},{"id":"stacktitan-pulse","label":"Kernhieb","stat":"int","power":15,"minLevel":1,"kind":"speziell","species":"stacktitan"},{"id":"stacktitan-surge","label":"Ursprungsruf","stat":"int","power":22,"minLevel":4,"kind":"speziell","species":"stacktitan"},{"id":"cachewraith-pulse","label":"Schattenstich","stat":"atk","power":16,"minLevel":1,"kind":"physisch","species":"cachewraith"},{"id":"cachewraith-surge","label":"Quantensturm","stat":"int","power":19,"minLevel":4,"kind":"speziell","species":"cachewraith"},{"id":"heapgolem-pulse","label":"Runenstoß","stat":"int","power":17,"minLevel":1,"kind":"speziell","species":"heapgolem"},{"id":"heapgolem-surge","label":"Endlosschlag","stat":"int","power":23,"minLevel":4,"kind":"speziell","species":"heapgolem"},{"id":"leakhydra-pulse","label":"Klammerwurf","stat":"atk","power":13,"minLevel":1,"kind":"physisch","species":"leakhydra"},{"id":"leakhydra-surge","label":"Ursprungsruf","stat":"atk","power":20,"minLevel":4,"kind":"physisch","species":"leakhydra"},{"id":"memoryphoenix-pulse","label":"Taktbruch","stat":"def","power":14,"minLevel":1,"kind":"physisch","species":"memoryphoenix"},{"id":"memoryphoenix-surge","label":"Ursprungsruf","stat":"def","power":23,"minLevel":4,"kind":"physisch","species":"memoryphoenix"},{"id":"threadlet-pulse","label":"Runenstoß","stat":"int","power":15,"minLevel":1,"kind":"speziell","species":"threadlet"},{"id":"threadlet-surge","label":"Grenzsprung","stat":"int","power":18,"minLevel":4,"kind":"speziell","species":"threadlet"},{"id":"raceweaver-pulse","label":"Klammerwurf","stat":"atk","power":16,"minLevel":1,"kind":"physisch","species":"raceweaver"},{"id":"raceweaver-surge","label":"Ursprungsruf","stat":"atk","power":19,"minLevel":4,"kind":"physisch","species":"raceweaver"},{"id":"temporlock-pulse","label":"Speicherzahn","stat":"agi","power":17,"minLevel":1,"kind":"physisch","species":"temporlock"},{"id":"temporlock-surge","label":"Endlosschlag","stat":"agi","power":20,"minLevel":4,"kind":"physisch","species":"temporlock"},{"id":"quantumracer-pulse","label":"Nullfunke","stat":"def","power":13,"minLevel":1,"kind":"physisch","species":"quantumracer"},{"id":"quantumracer-surge","label":"Quantensturm","stat":"int","power":21,"minLevel":4,"kind":"speziell","species":"quantumracer"},{"id":"mutexling-pulse","label":"Resonanzimpuls","stat":"agi","power":14,"minLevel":1,"kind":"physisch","species":"mutexling"},{"id":"mutexling-surge","label":"Endlosschlag","stat":"agi","power":22,"minLevel":4,"kind":"physisch","species":"mutexling"},{"id":"lockwarden-pulse","label":"Kernhieb","stat":"int","power":15,"minLevel":1,"kind":"speziell","species":"lockwarden"},{"id":"lockwarden-surge","label":"Quantensturm","stat":"int","power":23,"minLevel":4,"kind":"speziell","species":"lockwarden"},{"id":"stalemateon-pulse","label":"Schattenstich","stat":"atk","power":16,"minLevel":1,"kind":"physisch","species":"stalemateon"},{"id":"stalemateon-surge","label":"Grenzsprung","stat":"int","power":18,"minLevel":4,"kind":"speziell","species":"stalemateon"},{"id":"foreverwait-pulse","label":"Taktbruch","stat":"def","power":17,"minLevel":1,"kind":"physisch","species":"foreverwait"},{"id":"foreverwait-surge","label":"Ursprungsruf","stat":"def","power":19,"minLevel":4,"kind":"physisch","species":"foreverwait"},{"id":"faultling-pulse","label":"Runenstoß","stat":"int","power":13,"minLevel":1,"kind":"speziell","species":"faultling"},{"id":"faultling-surge","label":"Grenzsprung","stat":"def","power":20,"minLevel":4,"kind":"physisch","species":"faultling"},{"id":"coremaw-pulse","label":"Klammerwurf","stat":"atk","power":14,"minLevel":1,"kind":"physisch","species":"coremaw"},{"id":"coremaw-surge","label":"Ursprungsruf","stat":"int","power":21,"minLevel":4,"kind":"speziell","species":"coremaw"},{"id":"coredrake-pulse","label":"Speicherzahn","stat":"agi","power":15,"minLevel":1,"kind":"physisch","species":"coredrake"},{"id":"coredrake-surge","label":"Endlosschlag","stat":"agi","power":22,"minLevel":4,"kind":"physisch","species":"coredrake"},{"id":"crashcolossus-pulse","label":"Nullfunke","stat":"def","power":16,"minLevel":1,"kind":"physisch","species":"crashcolossus"},{"id":"crashcolossus-surge","label":"Quantensturm","stat":"def","power":23,"minLevel":4,"kind":"physisch","species":"crashcolossus"},{"id":"indeximp-pulse","label":"Resonanzimpuls","stat":"agi","power":17,"minLevel":1,"kind":"physisch","species":"indeximp"},{"id":"indeximp-surge","label":"Endlosschlag","stat":"int","power":18,"minLevel":4,"kind":"speziell","species":"indeximp"},{"id":"boundarybeast-pulse","label":"Kernhieb","stat":"int","power":13,"minLevel":1,"kind":"speziell","species":"boundarybeast"},{"id":"boundarybeast-surge","label":"Quantensturm","stat":"def","power":19,"minLevel":4,"kind":"physisch","species":"boundarybeast"},{"id":"indexeater-pulse","label":"Schattenstich","stat":"atk","power":14,"minLevel":1,"kind":"physisch","species":"indexeater"},{"id":"indexeater-surge","label":"Grenzsprung","stat":"atk","power":20,"minLevel":4,"kind":"physisch","species":"indexeater"},{"id":"zerowyrm-pulse","label":"Taktbruch","stat":"def","power":15,"minLevel":1,"kind":"physisch","species":"zerowyrm"},{"id":"zerowyrm-surge","label":"Ursprungsruf","stat":"int","power":21,"minLevel":4,"kind":"speziell","species":"zerowyrm"},{"id":"bufferbug-pulse","label":"Runenstoß","stat":"int","power":16,"minLevel":1,"kind":"speziell","species":"bufferbug"},{"id":"bufferbug-surge","label":"Grenzsprung","stat":"int","power":22,"minLevel":4,"kind":"speziell","species":"bufferbug"},{"id":"overflowhorn-pulse","label":"Klammerwurf","stat":"atk","power":17,"minLevel":1,"kind":"physisch","species":"overflowhorn"},{"id":"overflowhorn-surge","label":"Ursprungsruf","stat":"atk","power":23,"minLevel":4,"kind":"physisch","species":"overflowhorn"},{"id":"stackravager-pulse","label":"Speicherzahn","stat":"agi","power":13,"minLevel":1,"kind":"physisch","species":"stackravager"},{"id":"stackravager-surge","label":"Endlosschlag","stat":"int","power":18,"minLevel":4,"kind":"speziell","species":"stackravager"},{"id":"bufferbehemoth-pulse","label":"Nullfunke","stat":"def","power":14,"minLevel":1,"kind":"physisch","species":"bufferbehemoth"},{"id":"bufferbehemoth-surge","label":"Quantensturm","stat":"def","power":19,"minLevel":4,"kind":"physisch","species":"bufferbehemoth"},{"id":"phantomtrace-pulse","label":"Resonanzimpuls","stat":"agi","power":15,"minLevel":1,"kind":"physisch","species":"phantomtrace"},{"id":"phantomtrace-surge","label":"Endlosschlag","stat":"agi","power":20,"minLevel":4,"kind":"physisch","species":"phantomtrace"},{"id":"observoid-pulse","label":"Kernhieb","stat":"int","power":16,"minLevel":1,"kind":"speziell","species":"observoid"},{"id":"observoid-surge","label":"Quantensturm","stat":"int","power":21,"minLevel":4,"kind":"speziell","species":"observoid"},{"id":"heisenwisp-pulse","label":"Schattenstich","stat":"atk","power":17,"minLevel":1,"kind":"physisch","species":"heisenwisp"},{"id":"heisenwisp-surge","label":"Grenzsprung","stat":"atk","power":22,"minLevel":4,"kind":"physisch","species":"heisenwisp"},{"id":"quantumdebug-pulse","label":"Taktbruch","stat":"def","power":13,"minLevel":1,"kind":"physisch","species":"quantumdebug"},{"id":"quantumdebug-surge","label":"Ursprungsruf","stat":"def","power":23,"minLevel":4,"kind":"physisch","species":"quantumdebug"},{"id":"basecase-pulse","label":"Runenstoß","stat":"int","power":14,"minLevel":1,"kind":"speziell","species":"basecase"},{"id":"basecase-surge","label":"Grenzsprung","stat":"int","power":18,"minLevel":4,"kind":"speziell","species":"basecase"},{"id":"callwyrm-pulse","label":"Klammerwurf","stat":"atk","power":15,"minLevel":1,"kind":"physisch","species":"callwyrm"},{"id":"callwyrm-surge","label":"Ursprungsruf","stat":"atk","power":19,"minLevel":4,"kind":"physisch","species":"callwyrm"},{"id":"recursaur-pulse","label":"Speicherzahn","stat":"agi","power":16,"minLevel":1,"kind":"physisch","species":"recursaur"},{"id":"recursaur-surge","label":"Endlosschlag","stat":"agi","power":20,"minLevel":4,"kind":"physisch","species":"recursaur"},{"id":"infiniteancestor-pulse","label":"Nullfunke","stat":"def","power":17,"minLevel":1,"kind":"physisch","species":"infiniteancestor"},{"id":"infiniteancestor-surge","label":"Quantensturm","stat":"int","power":21,"minLevel":4,"kind":"speziell","species":"infiniteancestor"}];
+    // <<< generated-codingmon-catalog
 
-
-    /**
-     * Faehigkeiten. `species === null` = von jedem Codemon nutzbar; sonst eine
-     * der ZWEI Spezies-Faehigkeiten (Stufe 1 und Stufe 4). `stat` bestimmt, ob
-     * die Faehigkeit ueber Kraft (ATK), Tempo (AGI), Verstand (INT) oder
-     * Verteidigung (DEF) rechnet — dadurch spielen sich die zehn Linien
-     * wirklich unterschiedlich und nicht nur in der Farbe.
-     */
-    const ABILITIES = [
-      { id: 'tackle', label: 'Tackle', stat: 'atk', power: 12, minLevel: 1, kind: 'physisch', species: null },
-
-      { id: 'deref', label: 'Deref', stat: 'atk', power: 15, minLevel: 1, kind: 'physisch', species: 'nullpointer' },
-      { id: 'null-access', label: 'Nullzugriff', stat: 'int', power: 18, minLevel: 4, kind: 'speziell', species: 'nullpointer' },
-
-      { id: 'recursion-dive', label: 'Recursion Dive', stat: 'int', power: 16, minLevel: 1, kind: 'speziell', species: 'stackoverflow' },
-      { id: 'trace-back', label: 'Trace Back', stat: 'int', power: 20, minLevel: 4, kind: 'speziell', species: 'stackoverflow' },
-
-      { id: 'page-fault', label: 'Page Fault', stat: 'atk', power: 14, minLevel: 1, kind: 'physisch', species: 'memoryleak' },
-      { id: 'heap-flood', label: 'Heap Flood', stat: 'int', power: 20, minLevel: 4, kind: 'speziell', species: 'memoryleak' },
-
-      { id: 'interleave', label: 'Interleave', stat: 'agi', power: 16, minLevel: 1, kind: 'physisch', species: 'racecondition' },
-      { id: 'torn-read', label: 'Torn Read', stat: 'agi', power: 20, minLevel: 4, kind: 'physisch', species: 'racecondition' },
-
-      { id: 'barrier', label: 'Barriere', stat: 'def', power: 18, minLevel: 1, kind: 'physisch', species: 'deadlock' },
-      { id: 'starve', label: 'Starve', stat: 'int', power: 16, minLevel: 4, kind: 'speziell', species: 'deadlock' },
-
-      { id: 'dangling-pointer', label: 'Dangling Pointer', stat: 'atk', power: 17, minLevel: 1, kind: 'physisch', species: 'segfault' },
-      { id: 'core-dump', label: 'Core Dump', stat: 'atk', power: 22, minLevel: 4, kind: 'physisch', species: 'segfault' },
-
-      { id: 'nudge', label: 'Nudge', stat: 'agi', power: 14, minLevel: 1, kind: 'physisch', species: 'offbyone' },
-      { id: 'boundary-slip', label: 'Boundary Slip', stat: 'agi', power: 18, minLevel: 4, kind: 'physisch', species: 'offbyone' },
-
-      { id: 'smash', label: 'Smash', stat: 'atk', power: 18, minLevel: 1, kind: 'physisch', species: 'bufferoverflow' },
-      { id: 'stack-smash', label: 'Stack Smash', stat: 'atk', power: 23, minLevel: 4, kind: 'physisch', species: 'bufferoverflow' },
-
-      { id: 'obfuscate', label: 'Obfuscate', stat: 'int', power: 15, minLevel: 1, kind: 'speziell', species: 'heisenbug' },
-      { id: 'observation-collapse', label: 'Observation Collapse', stat: 'int', power: 21, minLevel: 4, kind: 'speziell', species: 'heisenbug' },
-
-      { id: 'base-case', label: 'Base Case', stat: 'def', power: 16, minLevel: 1, kind: 'physisch', species: 'recursion' },
-      { id: 'infinite-descent', label: 'Infinite Descent', stat: 'atk', power: 21, minLevel: 4, kind: 'physisch', species: 'recursion' },
-    ];
-
-    /**
-     * Entwicklungsstufen. Jede Familie hat genau drei Formen; die Stufe haengt
-     * am Level, nicht am Zufall. Reihenfolge = Index in SPRITES.
-     */
-    const STAGES = [
+        const STAGES = [
       { at: 1, label: 'Basis', from: 1 },
       { at: 5, label: 'Entwickelt', from: 5 },
       { at: 10, label: 'Final', from: 10 },
@@ -228,111 +174,61 @@ window.__ModuleLoader__.load({
     // Import quer ueber Pakete ist in diesem Repo nicht erlaubt. Die Probe
     // /tmp/codemon-sim.mjs vergleicht beide Seiten Zahl fuer Zahl, damit die
     // Dopplung nicht auseinanderlaeuft.
-    const ESCALATION = { factor: 1.35, perLevel: 'x1,35', label: 'multiplikativ je Stufe' };
+    const ESCALATION = { growthBps: 1200, perLevel: '+12 % der Basiswerte', label: 'linear je Stufe' };
     const POWER_UNIT = 10;
-    /**
-     * Die Decke der Leiter, Spiegel des Host-Vertrags (index.js, LEVEL_CAP).
-     * Ohne sie laeuft `Math.pow` ab Stufe ~2363 in Infinity und die Anzeige in
-     * Exponentialschreibweise — „HP 4.72e+298" ist keine Aussage. 1,35^1999 ist
-     * rund 1e260 und damit noch eine endliche Number.
-     */
-    const LEVEL_CAP = 2000;
-    /** Die Stufe, wie die Leiter sie zaehlt: ganzzahlig, mindestens 1, hoechstens LEVEL_CAP. */
-    const cappedLevel = (level) => Math.min(LEVEL_CAP, Math.max(1, Math.floor(level)));
-
-    /** Die Leiter als Zahl: `base * factor^(level-1)`, gedeckelt. */
-    const powerAt = (base, level) => Math.round(base * Math.pow(ESCALATION.factor, cappedLevel(level) - 1));
-
-    /** Dieselbe Leiter EXAKT in BigInt (Basis 135/100). Fuer den Lebenslauf. */
-    const powerAtExact = (base, level) => {
-      const steps = BigInt(cappedLevel(level) - 1);
-      return BigInt(Math.round(base)) * (135n ** steps) / (100n ** steps);
+    const LEVEL_CAP = 50;
+    const cappedLevel = (level) => {
+      if (!Number.isFinite(level)) throw new TypeError('level muss endlich sein');
+      return Math.min(LEVEL_CAP, Math.max(1, Math.floor(level)));
     };
-
+    const powerAt = (base, level) => Math.floor((base * (10000 + ESCALATION.growthBps * (cappedLevel(level) - 1))) / 10000);
+    const powerAtExact = (base, level) => BigInt(powerAt(base, level));
     const group = (digits) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-    /**
-     * Tausenderpunkte — und KEIN Ausbruch in Exponentialschreibweise: was ueber
-     * 2^53 liegt, wird ueber seinen Ganzzahlwert (BigInt) gedruckt. Der Wert
-     * einer Number oberhalb von 2^53 ist der Wert DIESER Number; die Ziffern
-     * werden also nicht erfunden, sie sind nur nicht mehr die ganze Wahrheit —
-     * die steht in der exakten BigInt-Leiter.
-     */
     const formatNumber = (value) => {
       if (typeof value === 'bigint') return group(value.toString());
-      // Ein reiner Dezimaltext (so liegt der Lebenslauf in JSON) wird gruppiert,
-      // alles andere unveraendert durchgereicht — „1e+300" sind keine Ziffern.
-      if (typeof value === 'string') return /^-?\d+$/.test(value) ? group(value) : value;
+      if (typeof value === 'string') {
+        if (/^-?\d+$/.test(value)) return group(value);
+        if (/^-?\d+(?:\.\d+)?e[+-]?\d+$/i.test(value) && Number.isFinite(Number(value))) {
+          return group(BigInt(Math.round(Number(value))).toString());
+        }
+        return value;
+      }
       if (typeof value !== 'number' || !Number.isFinite(value)) return String(value);
-      if (!Number.isSafeInteger(Math.round(value))) return group(BigInt(Math.round(value)).toString());
-      return group(String(Math.round(value)));
+      const rounded = Math.round(value);
+      return Number.isSafeInteger(rounded) ? group(String(rounded)) : group(BigInt(rounded).toString());
     };
-
-    /**
-     * Ein Wert als reiner Ganzzahltext fuer Protokoll und Ablage. `String(1e300)`
-     * ergibt „1e+300" — im Meilenstein-Log stand damit „Level 2000 -> 1e+300",
-     * eine Zahl, die niemand zaehlen kann. Hier steht sie in Ziffern.
-     */
     const exactText = (value) => {
       if (typeof value === 'bigint') return value.toString();
-      if (typeof value !== 'number' || !Number.isFinite(value)) return String(value);
-      return BigInt(Math.round(value)).toString();
+      if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.round(value)).toString();
+      return String(value);
     };
-
-    /**
-     * Die Stellenzahl — und zwar die des GANZZAHLWERTS, nicht die Laenge von
-     * „4.721837931227852e+298" (die waere 21 und damit Unsinn).
-     */
     const digitsOf = (value) => {
       if (typeof value === 'bigint') return String(value < 0n ? -value : value).length;
       if (!Number.isFinite(value)) return String(value).length;
       const whole = BigInt(Math.round(value));
       return String(whole < 0n ? -whole : whole).length;
     };
-
-    /** Ein Wert samt Inszenierung: exakter Betrag, Text, Stellenzahl. */
     const describeValue = (base, level) => {
       const exact = powerAtExact(base, level);
       return { exact, text: formatNumber(exact), digits: digitsOf(exact), safe: exact <= BigInt(Number.MAX_SAFE_INTEGER) };
     };
-
-    /** Kumulative XP-Schwelle (multiplikativ, nicht quadratisch). */
-    const threshold = (level) => {
-      const steps = cappedLevel(level) - 1;
-      return Math.round((XP_BASE * (Math.pow(ESCALATION.factor, steps) - 1)) / (ESCALATION.factor - 1));
+    const threshold = (level, xpBase = XP_BASE) => {
+      if (!Number.isSafeInteger(xpBase) || xpBase < 1) throw new RangeError('xpBase muss positiv sein');
+      const current = cappedLevel(level);
+      return (xpBase * (current - 1) * current) / 2;
     };
-    const levelFor = (xp) => {
+    const levelFor = (xp, xpBase = XP_BASE) => {
+      if (!Number.isFinite(xp) || xp < 0) throw new RangeError('XP muss endlich und nicht negativ sein');
       let level = 1;
-      while (level < LEVEL_CAP && threshold(level + 1) <= xp) level += 1;
+      while (level < LEVEL_CAP && threshold(level + 1, xpBase) <= xp) level += 1;
       return level;
     };
     const statsAt = (speciesId, level) => {
       const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
-      const scale = Math.pow(ESCALATION.factor, cappedLevel(level) - 1);
-      return {
-        hp: Math.round(base.hp * scale),
-        atk: Math.round(base.atk * scale),
-        def: Math.round(base.def * scale),
-        agi: Math.round(base.agi * scale),
-        int: Math.round(base.int * scale),
-      };
+      const capped = cappedLevel(level);
+      return Object.fromEntries(['hp','atk','def','agi','int'].map((key) => [key, Math.floor((base[key] * (10000 + ESCALATION.growthBps * (capped - 1))) / 10000)]));
     };
-    /**
-     * Dieselben Werte EXAKT (BigInt, dieselbe 135/100-Leiter). Gerechnet wird
-     * mit der schnellen Number-Fassung, ANGEZEIGT mit dieser: eine Zahl mit 260
-     * Stellen ist in Number nicht darstellbar, und `Math.pow` liefert dort
-     * „4.7e+298" statt Ziffern.
-     */
-    const statsAtExact = (speciesId, level) => {
-      const base = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
-      return {
-        hp: powerAtExact(base.hp, level),
-        atk: powerAtExact(base.atk, level),
-        def: powerAtExact(base.def, level),
-        agi: powerAtExact(base.agi, level),
-        int: powerAtExact(base.int, level),
-      };
-    };
+    const statsAtExact = (speciesId, level) => Object.fromEntries(Object.entries(statsAt(speciesId, level)).map(([key, value]) => [key, BigInt(value)]));
 
     /** Meilensteine der Inszenierung: zweistellig bis Millionen. */
     const MILESTONES = [10, 100, 1000, 10000, 1000000];
@@ -343,21 +239,13 @@ window.__ModuleLoader__.load({
     };
 
     // ── 2. REGELWERK (feste Tabellen, je Faktor ein Nachschlagen) ─────────
-    const ELEMENTS = {
-      spark: { label: 'Spark', beats: 'byte', losesTo: 'feral' },
-      byte: { label: 'Byte', beats: 'feral', losesTo: 'spark' },
-      feral: { label: 'Feral', beats: 'spark', losesTo: 'byte' },
-    };
+    // >>> generated-codingmon-elements — source: assets/data/codingmon-50.json
+    const ELEMENTS = {"spark":{"label":"Spark","beats":"byte","losesTo":"feral"},"byte":{"label":"Byte","beats":"feral","losesTo":"spark"},"feral":{"label":"Feral","beats":"spark","losesTo":"byte"}};
     const ELEMENT_WIN = 1.5;
     const ELEMENT_LOSS = 0.75;
-    const ELEMENT_CHART = Object.fromEntries(Object.entries(ELEMENTS).map(([attacker, entry]) => [
-      attacker,
-      Object.fromEntries(Object.keys(ELEMENTS).map((defender) => [
-        defender,
-        defender === entry.beats ? ELEMENT_WIN : defender === entry.losesTo ? ELEMENT_LOSS : 1,
-      ])),
-    ]));
-    const CATEGORY = {
+    const ELEMENT_CHART = {"spark":{"spark":1,"byte":1.5,"feral":0.75},"byte":{"spark":0.75,"byte":1,"feral":1.5},"feral":{"spark":1.5,"byte":0.75,"feral":1}};
+    // <<< generated-codingmon-elements
+        const CATEGORY = {
       physisch: { label: 'physisch', defFactor: 0.8 },
       speziell: { label: 'speziell', defFactor: 0.35 },
     };
@@ -370,25 +258,14 @@ window.__ModuleLoader__.load({
       'feral:speziell': 1.25,
     };
     /** Vererbungsbaum: Ahn, Generation und die geerbte Faehigkeit je Linie. */
-    const LINEAGE = {
-      nullpointer: { ancestor: null, generation: 1, inherits: [] },
-      stackoverflow: { ancestor: null, generation: 1, inherits: [] },
-      memoryleak: { ancestor: null, generation: 1, inherits: [] },
-      racecondition: { ancestor: 'nullpointer', generation: 2, inherits: ['null-access'] },
-      deadlock: { ancestor: 'stackoverflow', generation: 2, inherits: ['trace-back'] },
-      segfault: { ancestor: 'memoryleak', generation: 2, inherits: ['heap-flood'] },
-      offbyone: { ancestor: 'racecondition', generation: 3, inherits: ['torn-read'] },
-      heisenbug: { ancestor: 'deadlock', generation: 3, inherits: ['starve'] },
-      bufferoverflow: { ancestor: 'segfault', generation: 3, inherits: ['core-dump'] },
-      recursion: { ancestor: 'offbyone', generation: 4, inherits: ['boundary-slip'] },
-    };
-    const NEUTRAL_BUFF = { id: 'neutral', label: 'kein Buff', factor: 1 };
-    const BUFFS = [
-      { id: 'linie', label: 'Reine Linie', factor: 1.1, test: 'inherited' },
-      { id: 'nichts-zu-verlieren', label: 'Nichts zu verlieren', factor: 1.5, test: 'low-hp' },
-      { id: 'uebertaktet', label: 'Uebertaktet', factor: 1.15, test: 'full-hp' },
-    ];
-    const BUFF_TESTS = {
+    // >>> generated-codingmon-lineage — source: assets/data/codingmon-50.json
+    const LINEAGE = {"nullpointer":{"ancestor":null,"depth":1,"generation":1,"inherits":[]},"stackoverflow":{"ancestor":null,"depth":1,"generation":1,"inherits":[]},"memoryleak":{"ancestor":null,"depth":1,"generation":1,"inherits":[]},"racecondition":{"ancestor":"nullpointer","depth":2,"generation":2,"inherits":["null-access"]},"deadlock":{"ancestor":"stackoverflow","depth":2,"generation":2,"inherits":["trace-back"]},"segfault":{"ancestor":"memoryleak","depth":2,"generation":2,"inherits":["heap-flood"]},"offbyone":{"ancestor":"racecondition","depth":3,"generation":3,"inherits":["torn-read"]},"bufferoverflow":{"ancestor":"segfault","depth":3,"generation":3,"inherits":["core-dump"]},"heisenbug":{"ancestor":"deadlock","depth":3,"generation":3,"inherits":["starve"]},"recursion":{"ancestor":"offbyone","depth":4,"generation":4,"inherits":["boundary-slip"]},"nullprism":{"ancestor":"nullpointer","depth":2,"generation":2,"inherits":["null-access"]},"derefang":{"ancestor":"nullprism","depth":3,"generation":3,"inherits":["nullprism-surge"]},"voidseraph":{"ancestor":"derefang","depth":4,"generation":4,"inherits":["derefang-surge"]},"zerooracle":{"ancestor":"voidseraph","depth":5,"generation":5,"inherits":["voidseraph-surge"]},"stackwisp":{"ancestor":"stackoverflow","depth":2,"generation":2,"inherits":["trace-back"]},"callstacker":{"ancestor":"stackwisp","depth":3,"generation":3,"inherits":["stackwisp-surge"]},"overflowarchon":{"ancestor":"callstacker","depth":4,"generation":4,"inherits":["callstacker-surge"]},"stacktitan":{"ancestor":"overflowarchon","depth":5,"generation":5,"inherits":["overflowarchon-surge"]},"cachewraith":{"ancestor":"memoryleak","depth":2,"generation":2,"inherits":["heap-flood"]},"heapgolem":{"ancestor":"cachewraith","depth":3,"generation":3,"inherits":["cachewraith-surge"]},"leakhydra":{"ancestor":"heapgolem","depth":4,"generation":4,"inherits":["heapgolem-surge"]},"memoryphoenix":{"ancestor":"leakhydra","depth":5,"generation":5,"inherits":["leakhydra-surge"]},"threadlet":{"ancestor":"racecondition","depth":3,"generation":3,"inherits":["torn-read"]},"raceweaver":{"ancestor":"threadlet","depth":4,"generation":4,"inherits":["threadlet-surge"]},"temporlock":{"ancestor":"raceweaver","depth":5,"generation":5,"inherits":["raceweaver-surge"]},"quantumracer":{"ancestor":"temporlock","depth":6,"generation":6,"inherits":["temporlock-surge"]},"mutexling":{"ancestor":"deadlock","depth":3,"generation":3,"inherits":["starve"]},"lockwarden":{"ancestor":"mutexling","depth":4,"generation":4,"inherits":["mutexling-surge"]},"stalemateon":{"ancestor":"lockwarden","depth":5,"generation":5,"inherits":["lockwarden-surge"]},"foreverwait":{"ancestor":"stalemateon","depth":6,"generation":6,"inherits":["stalemateon-surge"]},"faultling":{"ancestor":"segfault","depth":3,"generation":3,"inherits":["core-dump"]},"coremaw":{"ancestor":"faultling","depth":4,"generation":4,"inherits":["faultling-surge"]},"coredrake":{"ancestor":"coremaw","depth":5,"generation":5,"inherits":["coremaw-surge"]},"crashcolossus":{"ancestor":"coredrake","depth":6,"generation":6,"inherits":["coredrake-surge"]},"indeximp":{"ancestor":"offbyone","depth":4,"generation":4,"inherits":["boundary-slip"]},"boundarybeast":{"ancestor":"indeximp","depth":5,"generation":5,"inherits":["indeximp-surge"]},"indexeater":{"ancestor":"boundarybeast","depth":6,"generation":6,"inherits":["boundarybeast-surge"]},"zerowyrm":{"ancestor":"indexeater","depth":7,"generation":7,"inherits":["indexeater-surge"]},"bufferbug":{"ancestor":"bufferoverflow","depth":4,"generation":4,"inherits":["stack-smash"]},"overflowhorn":{"ancestor":"bufferbug","depth":5,"generation":5,"inherits":["bufferbug-surge"]},"stackravager":{"ancestor":"overflowhorn","depth":6,"generation":6,"inherits":["overflowhorn-surge"]},"bufferbehemoth":{"ancestor":"stackravager","depth":7,"generation":7,"inherits":["stackravager-surge"]},"phantomtrace":{"ancestor":"heisenbug","depth":4,"generation":4,"inherits":["observation-collapse"]},"observoid":{"ancestor":"phantomtrace","depth":5,"generation":5,"inherits":["phantomtrace-surge"]},"heisenwisp":{"ancestor":"observoid","depth":6,"generation":6,"inherits":["observoid-surge"]},"quantumdebug":{"ancestor":"heisenwisp","depth":7,"generation":7,"inherits":["heisenwisp-surge"]},"basecase":{"ancestor":"recursion","depth":5,"generation":5,"inherits":["infinite-descent"]},"callwyrm":{"ancestor":"basecase","depth":6,"generation":6,"inherits":["basecase-surge"]},"recursaur":{"ancestor":"callwyrm","depth":7,"generation":7,"inherits":["callwyrm-surge"]},"infiniteancestor":{"ancestor":"recursaur","depth":8,"generation":8,"inherits":["recursaur-surge"]}};
+    // <<< generated-codingmon-lineage
+        const NEUTRAL_BUFF = { id: 'neutral', label: 'kein Buff', factor: 1 };
+    // >>> generated-codingmon-buffs — source: assets/data/codingmon-50.json
+    const BUFFS = [{"id":"linie","label":"Reine Linie","factor":1.1,"test":"inherited"},{"id":"nichts-zu-verlieren","label":"Nichts zu verlieren","factor":1.5,"test":"low-hp"},{"id":"uebertaktet","label":"Uebertaktet","factor":1.15,"test":"full-hp"}];
+    // <<< generated-codingmon-buffs
+        const BUFF_TESTS = {
       inherited: (ability, attacker) => attacker.inherited.includes(ability.id),
       'low-hp': (ability, attacker) => attacker.hp / Math.max(1, attacker.maxHp) < 0.25,
       'full-hp': (ability, attacker) => attacker.hp / Math.max(1, attacker.maxHp) >= 0.9,
@@ -427,20 +304,14 @@ window.__ModuleLoader__.load({
     /** Kurzform: nur der Betrag. */
     const damageOf = (ability, attacker, defender) => resolveAttack(ability, attacker, defender).dealt;
     /** XP fuer einen Sieg. Waechst mit dem Level des Gegners — multiplikativ. */
-    const rewardFor = (level) => powerAt(20, Math.max(1, Math.floor(level)) + 1);
+    const rewardFor = (level) => powerAt(20, Math.min(LEVEL_CAP, Math.max(1, Math.floor(level) + 1)));
     const firstStrike = (challengerStats, enemyStats) => (challengerStats.agi >= enemyStats.agi ? 'challenger' : 'enemy');
     const arenaFor = (level, round) => {
       const lvl = Math.max(1, Math.floor(level));
       const rnd = Math.max(0, Math.floor(round));
       const speciesId = SPECIES_IDS[(lvl * 3 + rnd * 7) % SPECIES_IDS.length];
-      const enemyLevel = Math.max(1, lvl + ((rnd % 3) - 1));
-      return {
-        speciesId,
-        element: SPECIES[speciesId].family,
-        level: enemyLevel,
-        stats: statsAt(speciesId, enemyLevel),
-        reward: rewardFor(enemyLevel),
-      };
+      const enemyLevel = Math.min(LEVEL_CAP, Math.max(1, lvl + ((rnd % 3) - 1)));
+      return { speciesId, element: SPECIES[speciesId].family, level: enemyLevel, stats: statsAt(speciesId, enemyLevel), reward: rewardFor(enemyLevel) };
     };
     /** Die staerkste Faehigkeit eines Gegners. Determinismus statt Wuerfel. */
     const bestMove = (level, speciesId) =>
@@ -459,11 +330,7 @@ window.__ModuleLoader__.load({
       if (done <= 0 || done % SPAWN_EVERY !== 0) return null;
       const lvl = Math.max(1, Math.floor(level ?? 1));
       const speciesId = SPECIES_IDS[(done * 7 + 3) % SPECIES_IDS.length];
-      return {
-        speciesId,
-        element: SPECIES[speciesId].family,
-        level: Math.max(1, lvl + ((done % 3) - 1)),
-      };
+      return { speciesId, element: SPECIES[speciesId].family, level: Math.min(LEVEL_CAP, Math.max(1, lvl + ((done % 3) - 1))) };
     };
     /**
      * Die Typwirkung als Zeichen statt Tabelle: dieselbe Zahl wie
@@ -486,13 +353,11 @@ window.__ModuleLoader__.load({
     const roundDelayMs = PACING.delayMs;
 
     // ── 4. LOOT (gewichteter Wurf in Basispunkten) ──────────────────────────
-    const LOOT_TABLE = [
-      { id: 'schrott', label: 'Schrott', weight: 8500, xp: 0 },
-      { id: 'brauchbar', label: 'Brauchbares Teil', weight: 1400, xp: 25 },
-      { id: 'shiny', label: 'Shiny God-Tier', weight: 100, xp: 2500 },
-    ];
+    // >>> generated-codingmon-loot — source: assets/data/codingmon-50.json
+    const LOOT_TABLE = [{"id":"schrott","label":"Schrott","weight":8500,"xp":0},{"id":"brauchbar","label":"Brauchbares Teil","weight":1400,"xp":25},{"id":"shiny","label":"Shiny God-Tier","weight":100,"xp":2500}];
     const LOOT_TOTAL = LOOT_TABLE.reduce((sum, entry) => sum + entry.weight, 0);
-    /**
+    // <<< generated-codingmon-loot
+        /**
      * Der Wurf: `uniform` aus [0,1) gegen die kumulierten Gewichte. Rein.
      * Dieselbe Sperrklinke wie in index.js: ein nicht endlicher Wert wird als 0
      * gelesen, damit ein kaputter Eingabewert nicht die seltenste Stufe gewinnt.
@@ -1145,7 +1010,7 @@ window.__ModuleLoader__.load({
       store.species = speciesId;
       store.battle = null;
       store.hp = statsAt(speciesId, level()).hp;
-      note(`Gewechselt zu ${SPECIES[speciesId].label} (Generation ${(LINEAGE[speciesId] ?? {}).generation ?? 1})`);
+      note(`Gewechselt zu ${SPECIES[speciesId].label} (Abstammungstiefe ${(LINEAGE[speciesId] ?? {}).depth ?? 1})`);
       persist();
       emit();
       return { species: speciesId };
@@ -1280,9 +1145,9 @@ window.__ModuleLoader__.load({
         h('div', { className: '__cm_panel-id' },
           h('h2', null, `${s.name} — ${SPECIES[s.species].label}`),
           h('p', { className: '__cm_sub' },
-            `Level ${lvl} · ${s.wins} Siege / ${s.losses} K.o. · Runde ${s.round} · ${ELEMENTS[SPECIES[s.species].family].label} · Generation ${lineage.generation ?? 1}`),
+            `Level ${lvl} · ${s.wins} Siege / ${s.losses} K.o. · Runde ${s.round} · ${ELEMENTS[SPECIES[s.species].family].label} · Abstammungstiefe ${lineage.depth ?? 1}`),
           h('p', { className: '__cm_xp' },
-            `${formatNumber(s.xp)} XP (${digitsOf(s.xp)} Stellen) · ${formatNumber(Math.max(0, next - s.xp))} XP bis Level ${lvl + 1}`),
+            `${formatNumber(s.xp)} XP (${digitsOf(s.xp)} Stellen) · ${lvl >= LEVEL_CAP ? 'Level-Cap erreicht' : `${formatNumber(Math.max(0, next - s.xp))} XP bis Level ${lvl + 1}`}`),
           h(Bar, { value: s.xp - prev, max: Math.max(1, next - prev), tone: 'xp' }),
           h('label', { className: '__cm_pick' },
             h('span', null, 'Codemon'),
@@ -1329,14 +1194,14 @@ window.__ModuleLoader__.load({
       const peak = Math.max(0, Math.round(s.peakHit));
       const upcoming = MILESTONES.find((mark) => BigInt(mark) > s.damageTotal) ?? null;
       return h('div', { className: '__cm_block' },
-        h('h3', null, `Eskalation — Faktor ${ESCALATION.factor} je Stufe`),
+        h('h3', null, `Eskalation — ${ESCALATION.perLevel} je Stufe`),
         h('ul', { className: '__cm_facts' },
           h('li', { key: 'threshold' },
             `Schwelle L${lvl + 1}: ${formatNumber(next)} XP (L1 ${formatNumber(threshold(1))}, L20 ${formatNumber(threshold(20))}, L50 ${formatNumber(threshold(50))})`),
           h('li', { key: 'stats' },
             `Werte L${lvl}: HP ${formatNumber(ladder.hp)} · ATK ${formatNumber(ladder.atk)} — auf L1: HP ${formatNumber(base.hp)} · ATK ${formatNumber(base.atk)} (exakte BigInt-Leiter)`),
           h('li', { key: 'cap' },
-            `Decke: Level ${formatNumber(LEVEL_CAP)} — bis dahin bleibt Math.pow endlich, ab darueber rechnet nur die BigInt-Leiter`),
+            `Decke: Level ${formatNumber(LEVEL_CAP)} — die Werte skalieren linear; darüber bleibt das Level auf der Decke`),
           h('li', { key: 'hit' }, `Groesster Treffer: ${formatNumber(peak)} (${digitsOf(peak)} Stellen)`),
           h('li', { key: 'total' }, `Lebenslauf: ${formatNumber(s.damageTotal)} Schaden in ${formatNumber(s.hits)} Treffern (BigInt, exakt)`),
           h('li', { key: 'digits' }, `Stellen: ${digitsOf(s.damageTotal)}`
@@ -1379,7 +1244,7 @@ window.__ModuleLoader__.load({
             `Durchgriff: physisch ${CATEGORY.physisch.defFactor} · speziell ${CATEGORY.speziell.defFactor}`),
           h('li', { key: 'buff' }, `Buffs: ${BUFFS.map((buff) => `${buff.label} ${buff.factor}x`).join(' · ')}`),
           h('li', { key: 'line' },
-            `Linie: ${chain.map((id) => SPECIES[id].label).join(' → ')} (Generation ${lineage.generation ?? 1})`),
+            `Linie: ${chain.map((id) => SPECIES[id].label).join(' → ')} (Abstammungstiefe ${lineage.depth ?? 1})`),
           h('li', { key: 'inherits' },
             `Erbfaehigkeiten: ${(lineage.inherits ?? []).map(abilityLabel).join(', ') || 'keine'}`)),
         h('p', { className: '__cm_sub' },

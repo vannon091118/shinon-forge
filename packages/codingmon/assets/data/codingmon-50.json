@@ -1,0 +1,3728 @@
+{
+  "metadata": {
+    "title": "CodingMon · 50-Creature Asset Pack",
+    "version": "1.2.0",
+    "generated": "2026-10-18",
+    "description": "10 vorhandene Shinon Forge CodingMon plus 40 neue Abstammungsformen, Daten, Moves, SVG/PNG-Assets und eine interaktive Katalog-Galerie.",
+    "canonicalSource": {
+      "archive": "CodingMon_50_Cyberpunk_Nerd_Animation_ArtPack.zip",
+      "file": "CodingMon_50_Cyberpunk_Nerd_ArtPack/data/codingmon-50.json",
+      "originalSha256": "5d4c0aee8ce847b1df0e48733310324f16d8eea2225fd9cc52387fe8ffc2d72d",
+      "normalization": "normalized during integration from the supplied ArtPack and checked-in data shards; the SHA-256 identifies the original ArtPack JSON, not this normalized file",
+      "license": "MIT"
+    },
+    "expansionNotice": "Die zehn vorhandenen Arten-IDs, Basiswerte, Elemente und bestehenden Abstammungsverknüpfungen sind aus dem Repository übernommen. Die 40 Ergänzungen, ihre Werte, Moves und Illustrationen sind neu für dieses Paket entworfen.",
+    "count": {
+      "total": 50,
+      "canonicalExisting": 10,
+      "newExpansion": 40,
+      "abilities": 101,
+      "svgCreatureAssets": 50,
+      "pngCreatureAssets": 50,
+      "svgElementAssets": 3,
+      "svgEffectAssets": 5,
+      "svgUiAssets": 17
+    },
+    "elements": {
+      "spark": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "byte": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "feral": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      }
+    },
+    "combatAssumptions": {
+      "stats": [
+        "hp",
+        "atk",
+        "def",
+        "agi",
+        "int"
+      ],
+      "existingElementMultipliers": {
+        "win": 1.5,
+        "loss": 0.75,
+        "neutral": 1
+      },
+      "physicalDefFactor": 0.8,
+      "specialDefFactor": 0.35,
+      "growthCurve": "Not defined here; apply the active game contract. These are base values."
+    },
+    "lineageSemantics": "lineageDepth is static species ancestry depth, matching the planned rename from LINEAGE.generation to LINEAGE.depth; it is not a creature breeding generation stored in a save.",
+    "artwork": "Fresh generated vector artwork; not copies of the repository’s original .grid/.svg sprites.",
+    "animationViews": {
+      "species": 50,
+      "states": [
+        "idle",
+        "combat",
+        "action",
+        "hit",
+        "victory"
+      ],
+      "kind": "CSS motion plus SVG overlays; static source art preserved"
+    },
+    "integration": {
+      "canonicalFile": "packages/codingmon/assets/data/codingmon-50.json",
+      "sourceOfTruth": true,
+      "clientDataGeneratedBy": "scripts/assets/build-codingmon.mjs"
+    }
+  },
+  "species": [
+    {
+      "id": "nullpointer",
+      "name": "NullPointer",
+      "family": "spark",
+      "hue": 268,
+      "stats": {
+        "hp": 44,
+        "atk": 10,
+        "def": 6,
+        "agi": 9,
+        "int": 8
+      },
+      "role": "void-sprite",
+      "description": "Ein kleiner Geist aus ungültigen Speicheradressen.",
+      "traits": [
+        "Leere Referenz",
+        "Präzisionsangriff"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 1,
+      "ancestor": null,
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "deref",
+        "null-access"
+      ],
+      "inheritedAbilityIds": [],
+      "rarity": "original",
+      "unlock": {
+        "type": "starter",
+        "requirement": "Startkonfiguration"
+      },
+      "children": [
+        "racecondition",
+        "nullprism"
+      ]
+    },
+    {
+      "id": "stackoverflow",
+      "name": "StackOverflow",
+      "family": "byte",
+      "hue": 10,
+      "stats": {
+        "hp": 40,
+        "atk": 8,
+        "def": 7,
+        "agi": 7,
+        "int": 12
+      },
+      "role": "stack-golem",
+      "description": "Ein stapelnder Wächter, der Wissen Schicht um Schicht aufbaut.",
+      "traits": [
+        "Gedächtnis",
+        "Arkan"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 1,
+      "ancestor": null,
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "recursion-dive",
+        "trace-back"
+      ],
+      "inheritedAbilityIds": [],
+      "rarity": "original",
+      "unlock": {
+        "type": "starter",
+        "requirement": "Startkonfiguration"
+      },
+      "children": [
+        "deadlock",
+        "stackwisp"
+      ]
+    },
+    {
+      "id": "memoryleak",
+      "name": "MemoryLeak",
+      "family": "feral",
+      "hue": 96,
+      "stats": {
+        "hp": 58,
+        "atk": 9,
+        "def": 5,
+        "agi": 5,
+        "int": 9
+      },
+      "role": "moss-beast",
+      "description": "Ein moosiger Datenfresser, der Energie hortet.",
+      "traits": [
+        "Ausdauer",
+        "Regeneration"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 1,
+      "ancestor": null,
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "page-fault",
+        "heap-flood"
+      ],
+      "inheritedAbilityIds": [],
+      "rarity": "original",
+      "unlock": {
+        "type": "starter",
+        "requirement": "Startkonfiguration"
+      },
+      "children": [
+        "segfault",
+        "cachewraith"
+      ]
+    },
+    {
+      "id": "racecondition",
+      "name": "RaceCondition",
+      "family": "spark",
+      "hue": 190,
+      "stats": {
+        "hp": 36,
+        "atk": 8,
+        "def": 6,
+        "agi": 14,
+        "int": 7
+      },
+      "role": "speed-wisp",
+      "description": "Ein flinker Funkenläufer, der vor dem eigenen Schatten angreift.",
+      "traits": [
+        "Tempo",
+        "Doppeltakt"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 2,
+      "ancestor": "nullpointer",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "interleave",
+        "torn-read"
+      ],
+      "inheritedAbilityIds": [
+        "null-access"
+      ],
+      "rarity": "original",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung / Freischaltung"
+      },
+      "children": [
+        "offbyone",
+        "threadlet"
+      ]
+    },
+    {
+      "id": "deadlock",
+      "name": "Deadlock",
+      "family": "byte",
+      "hue": 264,
+      "stats": {
+        "hp": 62,
+        "atk": 8,
+        "def": 12,
+        "agi": 3,
+        "int": 6
+      },
+      "role": "iron-golem",
+      "description": "Ein starrer Blockadegolem, der Gegner in Stellungskämpfe zwingt.",
+      "traits": [
+        "Panzerung",
+        "Kontrolle"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 2,
+      "ancestor": "stackoverflow",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "barrier",
+        "starve"
+      ],
+      "inheritedAbilityIds": [
+        "trace-back"
+      ],
+      "rarity": "original",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung / Freischaltung"
+      },
+      "children": [
+        "heisenbug",
+        "mutexling"
+      ]
+    },
+    {
+      "id": "segfault",
+      "name": "SegFault",
+      "family": "feral",
+      "hue": 0,
+      "stats": {
+        "hp": 46,
+        "atk": 13,
+        "def": 6,
+        "agi": 8,
+        "int": 4
+      },
+      "role": "claw-beast",
+      "description": "Ein Krallenjäger, dessen Treffer jede Struktur aufreißen.",
+      "traits": [
+        "Durchbruch",
+        "Nahkampf"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 2,
+      "ancestor": "memoryleak",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "dangling-pointer",
+        "core-dump"
+      ],
+      "inheritedAbilityIds": [
+        "heap-flood"
+      ],
+      "rarity": "original",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung / Freischaltung"
+      },
+      "children": [
+        "bufferoverflow",
+        "faultling"
+      ]
+    },
+    {
+      "id": "offbyone",
+      "name": "OffByOne",
+      "family": "spark",
+      "hue": 40,
+      "stats": {
+        "hp": 38,
+        "atk": 9,
+        "def": 7,
+        "agi": 11,
+        "int": 8
+      },
+      "role": "boundary-fox",
+      "description": "Ein Grenzgänger, der jede Lücke um genau einen Schritt findet.",
+      "traits": [
+        "Ausweichen",
+        "Grenztrick"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 3,
+      "ancestor": "racecondition",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "nudge",
+        "boundary-slip"
+      ],
+      "inheritedAbilityIds": [
+        "torn-read"
+      ],
+      "rarity": "original",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung / Freischaltung"
+      },
+      "children": [
+        "recursion",
+        "indeximp"
+      ]
+    },
+    {
+      "id": "bufferoverflow",
+      "name": "BufferOverflow",
+      "family": "feral",
+      "hue": 320,
+      "stats": {
+        "hp": 54,
+        "atk": 12,
+        "def": 8,
+        "agi": 5,
+        "int": 5
+      },
+      "role": "overflow-brute",
+      "description": "Ein wuchtiger Brecher, dessen Kraft den eigenen Rahmen sprengt.",
+      "traits": [
+        "Wucht",
+        "Überladung"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 3,
+      "ancestor": "segfault",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "smash",
+        "stack-smash"
+      ],
+      "inheritedAbilityIds": [
+        "core-dump"
+      ],
+      "rarity": "original",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung / Freischaltung"
+      },
+      "children": [
+        "bufferbug"
+      ]
+    },
+    {
+      "id": "heisenbug",
+      "name": "Heisenbug",
+      "family": "byte",
+      "hue": 285,
+      "stats": {
+        "hp": 42,
+        "atk": 7,
+        "def": 6,
+        "agi": 10,
+        "int": 13
+      },
+      "role": "phase-phantom",
+      "description": "Ein Beobachtungsphantom, dessen Muster sich kaum festhalten lassen.",
+      "traits": [
+        "Täuschung",
+        "Analyse"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 3,
+      "ancestor": "deadlock",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "obfuscate",
+        "observation-collapse"
+      ],
+      "inheritedAbilityIds": [
+        "starve"
+      ],
+      "rarity": "original",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung / Freischaltung"
+      },
+      "children": [
+        "phantomtrace"
+      ]
+    },
+    {
+      "id": "recursion",
+      "name": "Recursion",
+      "family": "spark",
+      "hue": 150,
+      "stats": {
+        "hp": 50,
+        "atk": 10,
+        "def": 9,
+        "agi": 6,
+        "int": 9
+      },
+      "role": "loop-drake",
+      "description": "Ein Schleifendrache, der aus jedem Ende einen neuen Anfang macht.",
+      "traits": [
+        "Kettenangriff",
+        "Zyklus"
+      ],
+      "source": "canonical-existing",
+      "lineageDepth": 4,
+      "ancestor": "offbyone",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "base-case",
+        "infinite-descent"
+      ],
+      "inheritedAbilityIds": [
+        "boundary-slip"
+      ],
+      "rarity": "original",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung / Freischaltung"
+      },
+      "children": [
+        "basecase"
+      ]
+    },
+    {
+      "id": "nullprism",
+      "name": "NullPrism",
+      "family": "spark",
+      "hue": 178,
+      "stats": {
+        "hp": 46,
+        "atk": 11,
+        "def": 6,
+        "agi": 10,
+        "int": 10
+      },
+      "ancestor": "nullpointer",
+      "lineageDepth": 2,
+      "role": "crystal-wisp",
+      "description": "Ein Prismengeist, der ungültige Zeiger in klares Licht bricht.",
+      "traits": [
+        "Crystal Wisp",
+        "Erblinie NullPointer"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "nullprism-pulse",
+        "nullprism-surge"
+      ],
+      "inheritedAbilityIds": [
+        "null-access"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von NullPointer"
+      },
+      "lineageBranch": "nullpointer",
+      "children": [
+        "derefang"
+      ]
+    },
+    {
+      "id": "derefang",
+      "name": "DereFang",
+      "family": "byte",
+      "hue": 288,
+      "stats": {
+        "hp": 49,
+        "atk": 14,
+        "def": 6,
+        "agi": 11,
+        "int": 10
+      },
+      "ancestor": "nullprism",
+      "lineageDepth": 3,
+      "role": "void-wolf",
+      "description": "Ein leiser Jäger, der Referenzen mit einem einzigen Biss auftrennt.",
+      "traits": [
+        "Void Wolf",
+        "Erblinie NullPrism"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "derefang-pulse",
+        "derefang-surge"
+      ],
+      "inheritedAbilityIds": [
+        "nullprism-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von NullPrism"
+      },
+      "lineageBranch": "nullpointer",
+      "children": [
+        "voidseraph"
+      ]
+    },
+    {
+      "id": "voidseraph",
+      "name": "VoidSeraph",
+      "family": "spark",
+      "hue": 168,
+      "stats": {
+        "hp": 50,
+        "atk": 14,
+        "def": 8,
+        "agi": 12,
+        "int": 13
+      },
+      "ancestor": "derefang",
+      "lineageDepth": 4,
+      "role": "winged-void",
+      "description": "Ein schwebender Wächter der Leere mit gefalteten Lichtflügeln.",
+      "traits": [
+        "Winged Void",
+        "Erblinie DereFang"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "voidseraph-pulse",
+        "voidseraph-surge"
+      ],
+      "inheritedAbilityIds": [
+        "derefang-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von DereFang"
+      },
+      "lineageBranch": "nullpointer",
+      "children": [
+        "zerooracle"
+      ]
+    },
+    {
+      "id": "zerooracle",
+      "name": "ZeroOracle",
+      "family": "feral",
+      "hue": 104,
+      "stats": {
+        "hp": 54,
+        "atk": 15,
+        "def": 10,
+        "agi": 11,
+        "int": 17
+      },
+      "ancestor": "voidseraph",
+      "lineageDepth": 5,
+      "role": "oracle-beast",
+      "description": "Ein Orakelwesen, das im Nichts verborgene Pfade erkennt.",
+      "traits": [
+        "Oracle Beast",
+        "Erblinie VoidSeraph"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "zerooracle-pulse",
+        "zerooracle-surge"
+      ],
+      "inheritedAbilityIds": [
+        "voidseraph-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von VoidSeraph"
+      },
+      "lineageBranch": "nullpointer",
+      "children": []
+    },
+    {
+      "id": "stackwisp",
+      "name": "StackWisp",
+      "family": "byte",
+      "hue": 286,
+      "stats": {
+        "hp": 42,
+        "atk": 8,
+        "def": 8,
+        "agi": 9,
+        "int": 14
+      },
+      "ancestor": "stackoverflow",
+      "lineageDepth": 2,
+      "role": "layer-ghost",
+      "description": "Ein mehrschichtiger Funke, dessen Gedächtnis nie den Faden verliert.",
+      "traits": [
+        "Layer Ghost",
+        "Erblinie StackOverflow"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "stackwisp-pulse",
+        "stackwisp-surge"
+      ],
+      "inheritedAbilityIds": [
+        "trace-back"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von StackOverflow"
+      },
+      "lineageBranch": "stackoverflow",
+      "children": [
+        "callstacker"
+      ]
+    },
+    {
+      "id": "callstacker",
+      "name": "CallStacker",
+      "family": "spark",
+      "hue": 166,
+      "stats": {
+        "hp": 46,
+        "atk": 10,
+        "def": 10,
+        "agi": 9,
+        "int": 15
+      },
+      "ancestor": "stackwisp",
+      "lineageDepth": 3,
+      "role": "callstack-knight",
+      "description": "Ein Ritter, der jeden Aufruf in einer schwebenden Rune ablegt.",
+      "traits": [
+        "Callstack Knight",
+        "Erblinie StackWisp"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "callstacker-pulse",
+        "callstacker-surge"
+      ],
+      "inheritedAbilityIds": [
+        "stackwisp-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von StackWisp"
+      },
+      "lineageBranch": "stackoverflow",
+      "children": [
+        "overflowarchon"
+      ]
+    },
+    {
+      "id": "overflowarchon",
+      "name": "OverflowArchon",
+      "family": "byte",
+      "hue": 276,
+      "stats": {
+        "hp": 49,
+        "atk": 11,
+        "def": 13,
+        "agi": 8,
+        "int": 19
+      },
+      "ancestor": "callstacker",
+      "lineageDepth": 4,
+      "role": "arcane-construct",
+      "description": "Ein arkaner Archon, der unendlich viele Schichten ordnet.",
+      "traits": [
+        "Arcane Construct",
+        "Erblinie CallStacker"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "overflowarchon-pulse",
+        "overflowarchon-surge"
+      ],
+      "inheritedAbilityIds": [
+        "callstacker-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von CallStacker"
+      },
+      "lineageBranch": "stackoverflow",
+      "children": [
+        "stacktitan"
+      ]
+    },
+    {
+      "id": "stacktitan",
+      "name": "StackTitan",
+      "family": "feral",
+      "hue": 62,
+      "stats": {
+        "hp": 57,
+        "atk": 15,
+        "def": 17,
+        "agi": 6,
+        "int": 21
+      },
+      "ancestor": "overflowarchon",
+      "lineageDepth": 5,
+      "role": "tower-giant",
+      "description": "Ein riesiger Stapeltitan mit steinernen Ebenen und glühendem Kern.",
+      "traits": [
+        "Tower Giant",
+        "Erblinie OverflowArchon"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "stacktitan-pulse",
+        "stacktitan-surge"
+      ],
+      "inheritedAbilityIds": [
+        "overflowarchon-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von OverflowArchon"
+      },
+      "lineageBranch": "stackoverflow",
+      "children": []
+    },
+    {
+      "id": "cachewraith",
+      "name": "CacheWraith",
+      "family": "feral",
+      "hue": 70,
+      "stats": {
+        "hp": 62,
+        "atk": 9,
+        "def": 5,
+        "agi": 5,
+        "int": 11
+      },
+      "ancestor": "memoryleak",
+      "lineageDepth": 2,
+      "role": "moss-ghost",
+      "description": "Ein gespeicherter Schatten, der Wärme und Erinnerungen sammelt.",
+      "traits": [
+        "Moss Ghost",
+        "Erblinie MemoryLeak"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "cachewraith-pulse",
+        "cachewraith-surge"
+      ],
+      "inheritedAbilityIds": [
+        "heap-flood"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von MemoryLeak"
+      },
+      "lineageBranch": "memoryleak",
+      "children": [
+        "heapgolem"
+      ]
+    },
+    {
+      "id": "heapgolem",
+      "name": "HeapGolem",
+      "family": "byte",
+      "hue": 274,
+      "stats": {
+        "hp": 70,
+        "atk": 11,
+        "def": 9,
+        "agi": 3,
+        "int": 11
+      },
+      "ancestor": "cachewraith",
+      "lineageDepth": 3,
+      "role": "heap-construct",
+      "description": "Ein schwerer Golem aus versiegelten Speicherblöcken.",
+      "traits": [
+        "Heap Construct",
+        "Erblinie CacheWraith"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "heapgolem-pulse",
+        "heapgolem-surge"
+      ],
+      "inheritedAbilityIds": [
+        "cachewraith-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von CacheWraith"
+      },
+      "lineageBranch": "memoryleak",
+      "children": [
+        "leakhydra"
+      ]
+    },
+    {
+      "id": "leakhydra",
+      "name": "LeakHydra",
+      "family": "feral",
+      "hue": 130,
+      "stats": {
+        "hp": 76,
+        "atk": 15,
+        "def": 10,
+        "agi": 3,
+        "int": 12
+      },
+      "ancestor": "heapgolem",
+      "lineageDepth": 4,
+      "role": "many-headed-beast",
+      "description": "Eine Hydra, bei der jeder verlorene Tropfen einen neuen Kopf formt.",
+      "traits": [
+        "Many Headed Beast",
+        "Erblinie HeapGolem"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "leakhydra-pulse",
+        "leakhydra-surge"
+      ],
+      "inheritedAbilityIds": [
+        "heapgolem-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von HeapGolem"
+      },
+      "lineageBranch": "memoryleak",
+      "children": [
+        "memoryphoenix"
+      ]
+    },
+    {
+      "id": "memoryphoenix",
+      "name": "MemoryPhoenix",
+      "family": "spark",
+      "hue": 184,
+      "stats": {
+        "hp": 79,
+        "atk": 18,
+        "def": 10,
+        "agi": 6,
+        "int": 17
+      },
+      "ancestor": "leakhydra",
+      "lineageDepth": 5,
+      "role": "memory-bird",
+      "description": "Ein Phönix, der verlorene Erinnerungen aus glühender Asche zurückholt.",
+      "traits": [
+        "Memory Bird",
+        "Erblinie LeakHydra"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "memoryphoenix-pulse",
+        "memoryphoenix-surge"
+      ],
+      "inheritedAbilityIds": [
+        "leakhydra-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von LeakHydra"
+      },
+      "lineageBranch": "memoryleak",
+      "children": []
+    },
+    {
+      "id": "threadlet",
+      "name": "Threadlet",
+      "family": "spark",
+      "hue": 192,
+      "stats": {
+        "hp": 36,
+        "atk": 9,
+        "def": 6,
+        "agi": 17,
+        "int": 7
+      },
+      "ancestor": "racecondition",
+      "lineageDepth": 3,
+      "role": "thread-sprite",
+      "description": "Ein winziger Prozessgeist, der zwei Wege gleichzeitig einschlägt.",
+      "traits": [
+        "Thread Sprite",
+        "Erblinie RaceCondition"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "threadlet-pulse",
+        "threadlet-surge"
+      ],
+      "inheritedAbilityIds": [
+        "torn-read"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von RaceCondition"
+      },
+      "lineageBranch": "racecondition",
+      "children": [
+        "raceweaver"
+      ]
+    },
+    {
+      "id": "raceweaver",
+      "name": "RaceWeaver",
+      "family": "feral",
+      "hue": 128,
+      "stats": {
+        "hp": 38,
+        "atk": 11,
+        "def": 7,
+        "agi": 19,
+        "int": 8
+      },
+      "ancestor": "threadlet",
+      "lineageDepth": 4,
+      "role": "web-runner",
+      "description": "Ein schneller Weber, der Zeitlinien zu einem Netz verknüpft.",
+      "traits": [
+        "Web Runner",
+        "Erblinie Threadlet"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "raceweaver-pulse",
+        "raceweaver-surge"
+      ],
+      "inheritedAbilityIds": [
+        "threadlet-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von Threadlet"
+      },
+      "lineageBranch": "racecondition",
+      "children": [
+        "temporlock"
+      ]
+    },
+    {
+      "id": "temporlock",
+      "name": "TemporLock",
+      "family": "spark",
+      "hue": 182,
+      "stats": {
+        "hp": 42,
+        "atk": 12,
+        "def": 9,
+        "agi": 21,
+        "int": 11
+      },
+      "ancestor": "raceweaver",
+      "lineageDepth": 5,
+      "role": "time-lock",
+      "description": "Ein zeitversetzter Läufer, der Momente wie Scharniere verriegelt.",
+      "traits": [
+        "Time Lock",
+        "Erblinie RaceWeaver"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "temporlock-pulse",
+        "temporlock-surge"
+      ],
+      "inheritedAbilityIds": [
+        "raceweaver-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von RaceWeaver"
+      },
+      "lineageBranch": "racecondition",
+      "children": [
+        "quantumracer"
+      ]
+    },
+    {
+      "id": "quantumracer",
+      "name": "QuantumRacer",
+      "family": "byte",
+      "hue": 292,
+      "stats": {
+        "hp": 44,
+        "atk": 16,
+        "def": 10,
+        "agi": 21,
+        "int": 15
+      },
+      "ancestor": "temporlock",
+      "lineageDepth": 6,
+      "role": "quantum-beast",
+      "description": "Ein Quantenrenner, der vor seiner eigenen Bewegung ankommt.",
+      "traits": [
+        "Quantum Beast",
+        "Erblinie TemporLock"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "quantumracer-pulse",
+        "quantumracer-surge"
+      ],
+      "inheritedAbilityIds": [
+        "temporlock-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von TemporLock"
+      },
+      "lineageBranch": "racecondition",
+      "children": []
+    },
+    {
+      "id": "mutexling",
+      "name": "Mutexling",
+      "family": "byte",
+      "hue": 300,
+      "stats": {
+        "hp": 65,
+        "atk": 9,
+        "def": 14,
+        "agi": 3,
+        "int": 8
+      },
+      "ancestor": "deadlock",
+      "lineageDepth": 3,
+      "role": "lockling",
+      "description": "Ein kleiner Schlossgeist, der den Zugang zu jeder Tür bewacht.",
+      "traits": [
+        "Lockling",
+        "Erblinie Deadlock"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "mutexling-pulse",
+        "mutexling-surge"
+      ],
+      "inheritedAbilityIds": [
+        "starve"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von Deadlock"
+      },
+      "lineageBranch": "deadlock",
+      "children": [
+        "lockwarden"
+      ]
+    },
+    {
+      "id": "lockwarden",
+      "name": "LockWarden",
+      "family": "feral",
+      "hue": 86,
+      "stats": {
+        "hp": 70,
+        "atk": 11,
+        "def": 18,
+        "agi": 3,
+        "int": 10
+      },
+      "ancestor": "mutexling",
+      "lineageDepth": 4,
+      "role": "armored-warden",
+      "description": "Ein gepanzerter Wächter, der gegnerische Züge einfriert.",
+      "traits": [
+        "Armored Warden",
+        "Erblinie Mutexling"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "lockwarden-pulse",
+        "lockwarden-surge"
+      ],
+      "inheritedAbilityIds": [
+        "mutexling-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von Mutexling"
+      },
+      "lineageBranch": "deadlock",
+      "children": [
+        "stalemateon"
+      ]
+    },
+    {
+      "id": "stalemateon",
+      "name": "Stalemateon",
+      "family": "byte",
+      "hue": 290,
+      "stats": {
+        "hp": 74,
+        "atk": 14,
+        "def": 21,
+        "agi": 4,
+        "int": 13
+      },
+      "ancestor": "lockwarden",
+      "lineageDepth": 5,
+      "role": "stalemate-knight",
+      "description": "Ein Duellant, der jede Schlacht in ein Patt verwandelt.",
+      "traits": [
+        "Stalemate Knight",
+        "Erblinie LockWarden"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "stalemateon-pulse",
+        "stalemateon-surge"
+      ],
+      "inheritedAbilityIds": [
+        "lockwarden-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von LockWarden"
+      },
+      "lineageBranch": "deadlock",
+      "children": [
+        "foreverwait"
+      ]
+    },
+    {
+      "id": "foreverwait",
+      "name": "ForeverWait",
+      "family": "spark",
+      "hue": 170,
+      "stats": {
+        "hp": 77,
+        "atk": 15,
+        "def": 22,
+        "agi": 7,
+        "int": 18
+      },
+      "ancestor": "stalemateon",
+      "lineageDepth": 6,
+      "role": "waiting-phantom",
+      "description": "Ein gespenstischer Zeitwächter, der Geduld zur Waffe macht.",
+      "traits": [
+        "Waiting Phantom",
+        "Erblinie Stalemateon"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "foreverwait-pulse",
+        "foreverwait-surge"
+      ],
+      "inheritedAbilityIds": [
+        "stalemateon-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von Stalemateon"
+      },
+      "lineageBranch": "deadlock",
+      "children": []
+    },
+    {
+      "id": "faultling",
+      "name": "Faultling",
+      "family": "feral",
+      "hue": 84,
+      "stats": {
+        "hp": 47,
+        "atk": 15,
+        "def": 6,
+        "agi": 9,
+        "int": 5
+      },
+      "ancestor": "segfault",
+      "lineageDepth": 3,
+      "role": "fault-imp",
+      "description": "Ein scharfkantiger Imp, der Fehlerlinien erschnuppert.",
+      "traits": [
+        "Fault Imp",
+        "Erblinie SegFault"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "faultling-pulse",
+        "faultling-surge"
+      ],
+      "inheritedAbilityIds": [
+        "core-dump"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von SegFault"
+      },
+      "lineageBranch": "segfault",
+      "children": [
+        "coremaw"
+      ]
+    },
+    {
+      "id": "coremaw",
+      "name": "CoreMaw",
+      "family": "spark",
+      "hue": 208,
+      "stats": {
+        "hp": 51,
+        "atk": 20,
+        "def": 8,
+        "agi": 9,
+        "int": 5
+      },
+      "ancestor": "faultling",
+      "lineageDepth": 4,
+      "role": "core-beast",
+      "description": "Ein Kernfresser mit leuchtendem Rachen und gesplitterten Schuppen.",
+      "traits": [
+        "Core Beast",
+        "Erblinie Faultling"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "coremaw-pulse",
+        "coremaw-surge"
+      ],
+      "inheritedAbilityIds": [
+        "faultling-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von Faultling"
+      },
+      "lineageBranch": "segfault",
+      "children": [
+        "coredrake"
+      ]
+    },
+    {
+      "id": "coredrake",
+      "name": "CoreDrake",
+      "family": "feral",
+      "hue": 74,
+      "stats": {
+        "hp": 56,
+        "atk": 23,
+        "def": 10,
+        "agi": 10,
+        "int": 7
+      },
+      "ancestor": "coremaw",
+      "lineageDepth": 5,
+      "role": "core-dragon",
+      "description": "Ein Kerndrache, dessen Atem wie ein abstürzender Prozess lodert.",
+      "traits": [
+        "Core Dragon",
+        "Erblinie CoreMaw"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "coredrake-pulse",
+        "coredrake-surge"
+      ],
+      "inheritedAbilityIds": [
+        "coremaw-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von CoreMaw"
+      },
+      "lineageBranch": "segfault",
+      "children": [
+        "crashcolossus"
+      ]
+    },
+    {
+      "id": "crashcolossus",
+      "name": "CrashColossus",
+      "family": "byte",
+      "hue": 278,
+      "stats": {
+        "hp": 66,
+        "atk": 23,
+        "def": 15,
+        "agi": 7,
+        "int": 9
+      },
+      "ancestor": "coredrake",
+      "lineageDepth": 6,
+      "role": "colossus",
+      "description": "Ein kolossaler Codewächter, der mit jedem Schritt den Boden erschüttert.",
+      "traits": [
+        "Colossus",
+        "Erblinie CoreDrake"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "crashcolossus-pulse",
+        "crashcolossus-surge"
+      ],
+      "inheritedAbilityIds": [
+        "coredrake-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von CoreDrake"
+      },
+      "lineageBranch": "segfault",
+      "children": []
+    },
+    {
+      "id": "indeximp",
+      "name": "IndexImp",
+      "family": "spark",
+      "hue": 206,
+      "stats": {
+        "hp": 38,
+        "atk": 10,
+        "def": 7,
+        "agi": 14,
+        "int": 9
+      },
+      "ancestor": "offbyone",
+      "lineageDepth": 4,
+      "role": "index-imp",
+      "description": "Ein kleiner Grenzimp, der immer genau einen Schritt zu weit springt.",
+      "traits": [
+        "Index Imp",
+        "Erblinie OffByOne"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "indeximp-pulse",
+        "indeximp-surge"
+      ],
+      "inheritedAbilityIds": [
+        "boundary-slip"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von OffByOne"
+      },
+      "lineageBranch": "offbyone",
+      "children": [
+        "boundarybeast"
+      ]
+    },
+    {
+      "id": "boundarybeast",
+      "name": "BoundaryBeast",
+      "family": "byte",
+      "hue": 246,
+      "stats": {
+        "hp": 43,
+        "atk": 12,
+        "def": 10,
+        "agi": 14,
+        "int": 10
+      },
+      "ancestor": "indeximp",
+      "lineageDepth": 5,
+      "role": "boundary-bear",
+      "description": "Ein kräftiger Grenzbär mit einem Panzer aus geschlossenen Klammern.",
+      "traits": [
+        "Boundary Bear",
+        "Erblinie IndexImp"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "boundarybeast-pulse",
+        "boundarybeast-surge"
+      ],
+      "inheritedAbilityIds": [
+        "indeximp-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von IndexImp"
+      },
+      "lineageBranch": "offbyone",
+      "children": [
+        "indexeater"
+      ]
+    },
+    {
+      "id": "indexeater",
+      "name": "IndexEater",
+      "family": "feral",
+      "hue": 102,
+      "stats": {
+        "hp": 46,
+        "atk": 16,
+        "def": 11,
+        "agi": 16,
+        "int": 11
+      },
+      "ancestor": "boundarybeast",
+      "lineageDepth": 6,
+      "role": "index-eater",
+      "description": "Ein gefräßiger Vierbeiner, der vergessene Indizes verschlingt.",
+      "traits": [
+        "Index Eater",
+        "Erblinie BoundaryBeast"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "indexeater-pulse",
+        "indexeater-surge"
+      ],
+      "inheritedAbilityIds": [
+        "boundarybeast-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von BoundaryBeast"
+      },
+      "lineageBranch": "offbyone",
+      "children": [
+        "zerowyrm"
+      ]
+    },
+    {
+      "id": "zerowyrm",
+      "name": "ZeroWyrm",
+      "family": "spark",
+      "hue": 156,
+      "stats": {
+        "hp": 48,
+        "atk": 18,
+        "def": 13,
+        "agi": 20,
+        "int": 15
+      },
+      "ancestor": "indexeater",
+      "lineageDepth": 7,
+      "role": "zero-wyrm",
+      "description": "Ein Wyrm, der jedes Zählwerk zu seinem Anfang zurückführt.",
+      "traits": [
+        "Zero Wyrm",
+        "Erblinie IndexEater"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "zerowyrm-pulse",
+        "zerowyrm-surge"
+      ],
+      "inheritedAbilityIds": [
+        "indexeater-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von IndexEater"
+      },
+      "lineageBranch": "offbyone",
+      "children": []
+    },
+    {
+      "id": "bufferbug",
+      "name": "BufferBug",
+      "family": "feral",
+      "hue": 70,
+      "stats": {
+        "hp": 57,
+        "atk": 13,
+        "def": 10,
+        "agi": 5,
+        "int": 6
+      },
+      "ancestor": "bufferoverflow",
+      "lineageDepth": 4,
+      "role": "buffer-beetle",
+      "description": "Ein gedrungener Käfer mit einem Rückenpanzer aus Speicherzellen.",
+      "traits": [
+        "Buffer Beetle",
+        "Erblinie BufferOverflow"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "bufferbug-pulse",
+        "bufferbug-surge"
+      ],
+      "inheritedAbilityIds": [
+        "stack-smash"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von BufferOverflow"
+      },
+      "lineageBranch": "bufferoverflow",
+      "children": [
+        "overflowhorn"
+      ]
+    },
+    {
+      "id": "overflowhorn",
+      "name": "OverflowHorn",
+      "family": "byte",
+      "hue": 274,
+      "stats": {
+        "hp": 61,
+        "atk": 17,
+        "def": 11,
+        "agi": 6,
+        "int": 6
+      },
+      "ancestor": "bufferbug",
+      "lineageDepth": 5,
+      "role": "horned-brute",
+      "description": "Ein gehörntes Kraftpaket, das seine eigene Kapazität sprengt.",
+      "traits": [
+        "Horned Brute",
+        "Erblinie BufferBug"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "overflowhorn-pulse",
+        "overflowhorn-surge"
+      ],
+      "inheritedAbilityIds": [
+        "bufferbug-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von BufferBug"
+      },
+      "lineageBranch": "bufferoverflow",
+      "children": [
+        "stackravager"
+      ]
+    },
+    {
+      "id": "stackravager",
+      "name": "StackRavager",
+      "family": "spark",
+      "hue": 224,
+      "stats": {
+        "hp": 64,
+        "atk": 21,
+        "def": 13,
+        "agi": 8,
+        "int": 8
+      },
+      "ancestor": "overflowhorn",
+      "lineageDepth": 6,
+      "role": "stack-raider",
+      "description": "Ein flinker Räuber, der fremde Stapel zu seiner Rüstung macht.",
+      "traits": [
+        "Stack Raider",
+        "Erblinie OverflowHorn"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "stackravager-pulse",
+        "stackravager-surge"
+      ],
+      "inheritedAbilityIds": [
+        "overflowhorn-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von OverflowHorn"
+      },
+      "lineageBranch": "bufferoverflow",
+      "children": [
+        "bufferbehemoth"
+      ]
+    },
+    {
+      "id": "bufferbehemoth",
+      "name": "BufferBehemoth",
+      "family": "feral",
+      "hue": 90,
+      "stats": {
+        "hp": 76,
+        "atk": 23,
+        "def": 18,
+        "agi": 6,
+        "int": 10
+      },
+      "ancestor": "stackravager",
+      "lineageDepth": 7,
+      "role": "behemoth",
+      "description": "Ein uralter Speicherbehemoth mit einem Herz aus verdichtetem Code.",
+      "traits": [
+        "Behemoth",
+        "Erblinie StackRavager"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "bufferbehemoth-pulse",
+        "bufferbehemoth-surge"
+      ],
+      "inheritedAbilityIds": [
+        "stackravager-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von StackRavager"
+      },
+      "lineageBranch": "bufferoverflow",
+      "children": []
+    },
+    {
+      "id": "phantomtrace",
+      "name": "PhantomTrace",
+      "family": "byte",
+      "hue": 272,
+      "stats": {
+        "hp": 43,
+        "atk": 7,
+        "def": 7,
+        "agi": 13,
+        "int": 16
+      },
+      "ancestor": "heisenbug",
+      "lineageDepth": 4,
+      "role": "trace-phantom",
+      "description": "Ein kaum sichtbarer Spurenleser aus wechselnden Datenmustern.",
+      "traits": [
+        "Trace Phantom",
+        "Erblinie Heisenbug"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "phantomtrace-pulse",
+        "phantomtrace-surge"
+      ],
+      "inheritedAbilityIds": [
+        "observation-collapse"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von Heisenbug"
+      },
+      "lineageBranch": "heisenbug",
+      "children": [
+        "observoid"
+      ]
+    },
+    {
+      "id": "observoid",
+      "name": "ObserVoid",
+      "family": "spark",
+      "hue": 222,
+      "stats": {
+        "hp": 45,
+        "atk": 9,
+        "def": 8,
+        "agi": 15,
+        "int": 20
+      },
+      "ancestor": "phantomtrace",
+      "lineageDepth": 5,
+      "role": "void-observer",
+      "description": "Ein Auge aus Licht, das erst durch Beobachtung Gestalt annimmt.",
+      "traits": [
+        "Void Observer",
+        "Erblinie PhantomTrace"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "observoid-pulse",
+        "observoid-surge"
+      ],
+      "inheritedAbilityIds": [
+        "phantomtrace-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von PhantomTrace"
+      },
+      "lineageBranch": "heisenbug",
+      "children": [
+        "heisenwisp"
+      ]
+    },
+    {
+      "id": "heisenwisp",
+      "name": "HeisenWisp",
+      "family": "feral",
+      "hue": 88,
+      "stats": {
+        "hp": 48,
+        "atk": 10,
+        "def": 10,
+        "agi": 18,
+        "int": 23
+      },
+      "ancestor": "observoid",
+      "lineageDepth": 6,
+      "role": "uncertain-wisp",
+      "description": "Ein unbeständiger Irrwisch, der zwischen mehreren Formen flackert.",
+      "traits": [
+        "Uncertain Wisp",
+        "Erblinie ObserVoid"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "heisenwisp-pulse",
+        "heisenwisp-surge"
+      ],
+      "inheritedAbilityIds": [
+        "observoid-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von ObserVoid"
+      },
+      "lineageBranch": "heisenbug",
+      "children": [
+        "quantumdebug"
+      ]
+    },
+    {
+      "id": "quantumdebug",
+      "name": "QuantumDebug",
+      "family": "byte",
+      "hue": 292,
+      "stats": {
+        "hp": 51,
+        "atk": 12,
+        "def": 12,
+        "agi": 19,
+        "int": 23
+      },
+      "ancestor": "heisenwisp",
+      "lineageDepth": 7,
+      "role": "quantum-owl",
+      "description": "Ein Quantenkundiger, der Fehlerzustände wie Sterne liest.",
+      "traits": [
+        "Quantum Owl",
+        "Erblinie HeisenWisp"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "quantumdebug-pulse",
+        "quantumdebug-surge"
+      ],
+      "inheritedAbilityIds": [
+        "heisenwisp-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von HeisenWisp"
+      },
+      "lineageBranch": "heisenbug",
+      "children": []
+    },
+    {
+      "id": "basecase",
+      "name": "BaseCase",
+      "family": "spark",
+      "hue": 220,
+      "stats": {
+        "hp": 54,
+        "atk": 10,
+        "def": 12,
+        "agi": 6,
+        "int": 12
+      },
+      "ancestor": "recursion",
+      "lineageDepth": 5,
+      "role": "basecase-turtle",
+      "description": "Ein Schildkrötengeist, der jede Schleife mit dem richtigen Ende versieht.",
+      "traits": [
+        "Basecase Turtle",
+        "Erblinie Recursion"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "basecase-pulse",
+        "basecase-surge"
+      ],
+      "inheritedAbilityIds": [
+        "infinite-descent"
+      ],
+      "rarity": "lineage-2",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von Recursion"
+      },
+      "lineageBranch": "recursion",
+      "children": [
+        "callwyrm"
+      ]
+    },
+    {
+      "id": "callwyrm",
+      "name": "CallWyrm",
+      "family": "byte",
+      "hue": 260,
+      "stats": {
+        "hp": 58,
+        "atk": 13,
+        "def": 13,
+        "agi": 7,
+        "int": 16
+      },
+      "ancestor": "basecase",
+      "lineageDepth": 6,
+      "role": "call-wyrm",
+      "description": "Ein langer Wyrm, dessen Schuppen verschachtelte Funktionsrufe tragen.",
+      "traits": [
+        "Call Wyrm",
+        "Erblinie BaseCase"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Byte",
+        "element": "Byte",
+        "color": "#b99aff",
+        "dark": "#422779",
+        "accent": "#e9dbff",
+        "matchup_beats": "feral",
+        "loses_to": "spark"
+      },
+      "abilityIds": [
+        "callwyrm-pulse",
+        "callwyrm-surge"
+      ],
+      "inheritedAbilityIds": [
+        "basecase-surge"
+      ],
+      "rarity": "lineage-3",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von BaseCase"
+      },
+      "lineageBranch": "recursion",
+      "children": [
+        "recursaur"
+      ]
+    },
+    {
+      "id": "recursaur",
+      "name": "Recursaur",
+      "family": "spark",
+      "hue": 210,
+      "stats": {
+        "hp": 65,
+        "atk": 17,
+        "def": 16,
+        "agi": 8,
+        "int": 19
+      },
+      "ancestor": "callwyrm",
+      "lineageDepth": 7,
+      "role": "recursive-saur",
+      "description": "Ein Echsenkoloss, der aus jedem Angriff eine neue Runde erzeugt.",
+      "traits": [
+        "Recursive Saur",
+        "Erblinie CallWyrm"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Spark",
+        "element": "Funken",
+        "color": "#65dfff",
+        "dark": "#12548a",
+        "accent": "#fff1a6",
+        "matchup_beats": "byte",
+        "loses_to": "feral"
+      },
+      "abilityIds": [
+        "recursaur-pulse",
+        "recursaur-surge"
+      ],
+      "inheritedAbilityIds": [
+        "callwyrm-surge"
+      ],
+      "rarity": "lineage-4",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von CallWyrm"
+      },
+      "lineageBranch": "recursion",
+      "children": [
+        "infiniteancestor"
+      ]
+    },
+    {
+      "id": "infiniteancestor",
+      "name": "InfiniteAncestor",
+      "family": "feral",
+      "hue": 76,
+      "stats": {
+        "hp": 74,
+        "atk": 21,
+        "def": 20,
+        "agi": 8,
+        "int": 23
+      },
+      "ancestor": "recursaur",
+      "lineageDepth": 8,
+      "role": "infinite-elder",
+      "description": "Ein uralter Urahn, der Anfang und Ende seiner Linie zugleich kennt.",
+      "traits": [
+        "Infinite Elder",
+        "Erblinie Recursaur"
+      ],
+      "source": "new-expansion",
+      "familyMeta": {
+        "label": "Feral",
+        "element": "Feral",
+        "color": "#a7e36e",
+        "dark": "#2c653f",
+        "accent": "#ffe0a4",
+        "matchup_beats": "spark",
+        "loses_to": "byte"
+      },
+      "abilityIds": [
+        "infiniteancestor-pulse",
+        "infiniteancestor-surge"
+      ],
+      "inheritedAbilityIds": [
+        "recursaur-surge"
+      ],
+      "rarity": "lineage-5",
+      "unlock": {
+        "type": "lineage",
+        "requirement": "Abstammung von Recursaur"
+      },
+      "lineageBranch": "recursion",
+      "children": []
+    }
+  ],
+  "lineage": {
+    "nullpointer": {
+      "ancestor": null,
+      "depth": 1,
+      "inherits": []
+    },
+    "stackoverflow": {
+      "ancestor": null,
+      "depth": 1,
+      "inherits": []
+    },
+    "memoryleak": {
+      "ancestor": null,
+      "depth": 1,
+      "inherits": []
+    },
+    "racecondition": {
+      "ancestor": "nullpointer",
+      "depth": 2,
+      "inherits": [
+        "null-access"
+      ]
+    },
+    "deadlock": {
+      "ancestor": "stackoverflow",
+      "depth": 2,
+      "inherits": [
+        "trace-back"
+      ]
+    },
+    "segfault": {
+      "ancestor": "memoryleak",
+      "depth": 2,
+      "inherits": [
+        "heap-flood"
+      ]
+    },
+    "offbyone": {
+      "ancestor": "racecondition",
+      "depth": 3,
+      "inherits": [
+        "torn-read"
+      ]
+    },
+    "bufferoverflow": {
+      "ancestor": "segfault",
+      "depth": 3,
+      "inherits": [
+        "core-dump"
+      ]
+    },
+    "heisenbug": {
+      "ancestor": "deadlock",
+      "depth": 3,
+      "inherits": [
+        "starve"
+      ]
+    },
+    "recursion": {
+      "ancestor": "offbyone",
+      "depth": 4,
+      "inherits": [
+        "boundary-slip"
+      ]
+    },
+    "nullprism": {
+      "ancestor": "nullpointer",
+      "depth": 2,
+      "inherits": [
+        "null-access"
+      ]
+    },
+    "derefang": {
+      "ancestor": "nullprism",
+      "depth": 3,
+      "inherits": [
+        "nullprism-surge"
+      ]
+    },
+    "voidseraph": {
+      "ancestor": "derefang",
+      "depth": 4,
+      "inherits": [
+        "derefang-surge"
+      ]
+    },
+    "zerooracle": {
+      "ancestor": "voidseraph",
+      "depth": 5,
+      "inherits": [
+        "voidseraph-surge"
+      ]
+    },
+    "stackwisp": {
+      "ancestor": "stackoverflow",
+      "depth": 2,
+      "inherits": [
+        "trace-back"
+      ]
+    },
+    "callstacker": {
+      "ancestor": "stackwisp",
+      "depth": 3,
+      "inherits": [
+        "stackwisp-surge"
+      ]
+    },
+    "overflowarchon": {
+      "ancestor": "callstacker",
+      "depth": 4,
+      "inherits": [
+        "callstacker-surge"
+      ]
+    },
+    "stacktitan": {
+      "ancestor": "overflowarchon",
+      "depth": 5,
+      "inherits": [
+        "overflowarchon-surge"
+      ]
+    },
+    "cachewraith": {
+      "ancestor": "memoryleak",
+      "depth": 2,
+      "inherits": [
+        "heap-flood"
+      ]
+    },
+    "heapgolem": {
+      "ancestor": "cachewraith",
+      "depth": 3,
+      "inherits": [
+        "cachewraith-surge"
+      ]
+    },
+    "leakhydra": {
+      "ancestor": "heapgolem",
+      "depth": 4,
+      "inherits": [
+        "heapgolem-surge"
+      ]
+    },
+    "memoryphoenix": {
+      "ancestor": "leakhydra",
+      "depth": 5,
+      "inherits": [
+        "leakhydra-surge"
+      ]
+    },
+    "threadlet": {
+      "ancestor": "racecondition",
+      "depth": 3,
+      "inherits": [
+        "torn-read"
+      ]
+    },
+    "raceweaver": {
+      "ancestor": "threadlet",
+      "depth": 4,
+      "inherits": [
+        "threadlet-surge"
+      ]
+    },
+    "temporlock": {
+      "ancestor": "raceweaver",
+      "depth": 5,
+      "inherits": [
+        "raceweaver-surge"
+      ]
+    },
+    "quantumracer": {
+      "ancestor": "temporlock",
+      "depth": 6,
+      "inherits": [
+        "temporlock-surge"
+      ]
+    },
+    "mutexling": {
+      "ancestor": "deadlock",
+      "depth": 3,
+      "inherits": [
+        "starve"
+      ]
+    },
+    "lockwarden": {
+      "ancestor": "mutexling",
+      "depth": 4,
+      "inherits": [
+        "mutexling-surge"
+      ]
+    },
+    "stalemateon": {
+      "ancestor": "lockwarden",
+      "depth": 5,
+      "inherits": [
+        "lockwarden-surge"
+      ]
+    },
+    "foreverwait": {
+      "ancestor": "stalemateon",
+      "depth": 6,
+      "inherits": [
+        "stalemateon-surge"
+      ]
+    },
+    "faultling": {
+      "ancestor": "segfault",
+      "depth": 3,
+      "inherits": [
+        "core-dump"
+      ]
+    },
+    "coremaw": {
+      "ancestor": "faultling",
+      "depth": 4,
+      "inherits": [
+        "faultling-surge"
+      ]
+    },
+    "coredrake": {
+      "ancestor": "coremaw",
+      "depth": 5,
+      "inherits": [
+        "coremaw-surge"
+      ]
+    },
+    "crashcolossus": {
+      "ancestor": "coredrake",
+      "depth": 6,
+      "inherits": [
+        "coredrake-surge"
+      ]
+    },
+    "indeximp": {
+      "ancestor": "offbyone",
+      "depth": 4,
+      "inherits": [
+        "boundary-slip"
+      ]
+    },
+    "boundarybeast": {
+      "ancestor": "indeximp",
+      "depth": 5,
+      "inherits": [
+        "indeximp-surge"
+      ]
+    },
+    "indexeater": {
+      "ancestor": "boundarybeast",
+      "depth": 6,
+      "inherits": [
+        "boundarybeast-surge"
+      ]
+    },
+    "zerowyrm": {
+      "ancestor": "indexeater",
+      "depth": 7,
+      "inherits": [
+        "indexeater-surge"
+      ]
+    },
+    "bufferbug": {
+      "ancestor": "bufferoverflow",
+      "depth": 4,
+      "inherits": [
+        "stack-smash"
+      ]
+    },
+    "overflowhorn": {
+      "ancestor": "bufferbug",
+      "depth": 5,
+      "inherits": [
+        "bufferbug-surge"
+      ]
+    },
+    "stackravager": {
+      "ancestor": "overflowhorn",
+      "depth": 6,
+      "inherits": [
+        "overflowhorn-surge"
+      ]
+    },
+    "bufferbehemoth": {
+      "ancestor": "stackravager",
+      "depth": 7,
+      "inherits": [
+        "stackravager-surge"
+      ]
+    },
+    "phantomtrace": {
+      "ancestor": "heisenbug",
+      "depth": 4,
+      "inherits": [
+        "observation-collapse"
+      ]
+    },
+    "observoid": {
+      "ancestor": "phantomtrace",
+      "depth": 5,
+      "inherits": [
+        "phantomtrace-surge"
+      ]
+    },
+    "heisenwisp": {
+      "ancestor": "observoid",
+      "depth": 6,
+      "inherits": [
+        "observoid-surge"
+      ]
+    },
+    "quantumdebug": {
+      "ancestor": "heisenwisp",
+      "depth": 7,
+      "inherits": [
+        "heisenwisp-surge"
+      ]
+    },
+    "basecase": {
+      "ancestor": "recursion",
+      "depth": 5,
+      "inherits": [
+        "infinite-descent"
+      ]
+    },
+    "callwyrm": {
+      "ancestor": "basecase",
+      "depth": 6,
+      "inherits": [
+        "basecase-surge"
+      ]
+    },
+    "recursaur": {
+      "ancestor": "callwyrm",
+      "depth": 7,
+      "inherits": [
+        "callwyrm-surge"
+      ]
+    },
+    "infiniteancestor": {
+      "ancestor": "recursaur",
+      "depth": 8,
+      "inherits": [
+        "recursaur-surge"
+      ]
+    }
+  },
+  "abilities": [
+    {
+      "id": "tackle",
+      "label": "Tackle",
+      "stat": "atk",
+      "power": 12,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": null
+    },
+    {
+      "id": "deref",
+      "label": "Deref",
+      "stat": "atk",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "nullpointer"
+    },
+    {
+      "id": "null-access",
+      "label": "Nullzugriff",
+      "stat": "int",
+      "power": 18,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "nullpointer"
+    },
+    {
+      "id": "recursion-dive",
+      "label": "Recursion Dive",
+      "stat": "int",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "stackoverflow"
+    },
+    {
+      "id": "trace-back",
+      "label": "Trace Back",
+      "stat": "int",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "stackoverflow"
+    },
+    {
+      "id": "page-fault",
+      "label": "Page Fault",
+      "stat": "atk",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "memoryleak"
+    },
+    {
+      "id": "heap-flood",
+      "label": "Heap Flood",
+      "stat": "int",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "memoryleak"
+    },
+    {
+      "id": "interleave",
+      "label": "Interleave",
+      "stat": "agi",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "racecondition"
+    },
+    {
+      "id": "torn-read",
+      "label": "Torn Read",
+      "stat": "agi",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "racecondition"
+    },
+    {
+      "id": "barrier",
+      "label": "Barriere",
+      "stat": "def",
+      "power": 18,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "deadlock"
+    },
+    {
+      "id": "starve",
+      "label": "Starve",
+      "stat": "int",
+      "power": 16,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "deadlock"
+    },
+    {
+      "id": "dangling-pointer",
+      "label": "Dangling Pointer",
+      "stat": "atk",
+      "power": 17,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "segfault"
+    },
+    {
+      "id": "core-dump",
+      "label": "Core Dump",
+      "stat": "atk",
+      "power": 22,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "segfault"
+    },
+    {
+      "id": "nudge",
+      "label": "Nudge",
+      "stat": "agi",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "offbyone"
+    },
+    {
+      "id": "boundary-slip",
+      "label": "Boundary Slip",
+      "stat": "agi",
+      "power": 18,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "offbyone"
+    },
+    {
+      "id": "smash",
+      "label": "Smash",
+      "stat": "atk",
+      "power": 18,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "bufferoverflow"
+    },
+    {
+      "id": "stack-smash",
+      "label": "Stack Smash",
+      "stat": "atk",
+      "power": 23,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "bufferoverflow"
+    },
+    {
+      "id": "obfuscate",
+      "label": "Obfuscate",
+      "stat": "int",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "heisenbug"
+    },
+    {
+      "id": "observation-collapse",
+      "label": "Observation Collapse",
+      "stat": "int",
+      "power": 21,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "heisenbug"
+    },
+    {
+      "id": "base-case",
+      "label": "Base Case",
+      "stat": "def",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "recursion"
+    },
+    {
+      "id": "infinite-descent",
+      "label": "Infinite Descent",
+      "stat": "atk",
+      "power": 21,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "recursion"
+    },
+    {
+      "id": "nullprism-pulse",
+      "label": "Resonanzimpuls",
+      "stat": "agi",
+      "power": 13,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "nullprism"
+    },
+    {
+      "id": "nullprism-surge",
+      "label": "Endlosschlag",
+      "stat": "agi",
+      "power": 18,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "nullprism"
+    },
+    {
+      "id": "derefang-pulse",
+      "label": "Schattenstich",
+      "stat": "atk",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "derefang"
+    },
+    {
+      "id": "derefang-surge",
+      "label": "Quantensturm",
+      "stat": "int",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "derefang"
+    },
+    {
+      "id": "voidseraph-pulse",
+      "label": "Runenstoß",
+      "stat": "int",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "voidseraph"
+    },
+    {
+      "id": "voidseraph-surge",
+      "label": "Grenzsprung",
+      "stat": "def",
+      "power": 22,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "voidseraph"
+    },
+    {
+      "id": "zerooracle-pulse",
+      "label": "Klammerwurf",
+      "stat": "atk",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "zerooracle"
+    },
+    {
+      "id": "zerooracle-surge",
+      "label": "Ursprungsruf",
+      "stat": "atk",
+      "power": 19,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "zerooracle"
+    },
+    {
+      "id": "stackwisp-pulse",
+      "label": "Speicherzahn",
+      "stat": "agi",
+      "power": 17,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "stackwisp"
+    },
+    {
+      "id": "stackwisp-surge",
+      "label": "Endlosschlag",
+      "stat": "agi",
+      "power": 22,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "stackwisp"
+    },
+    {
+      "id": "callstacker-pulse",
+      "label": "Nullfunke",
+      "stat": "def",
+      "power": 13,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "callstacker"
+    },
+    {
+      "id": "callstacker-surge",
+      "label": "Quantensturm",
+      "stat": "int",
+      "power": 21,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "callstacker"
+    },
+    {
+      "id": "overflowarchon-pulse",
+      "label": "Resonanzimpuls",
+      "stat": "agi",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "overflowarchon"
+    },
+    {
+      "id": "overflowarchon-surge",
+      "label": "Grenzsprung",
+      "stat": "agi",
+      "power": 18,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "overflowarchon"
+    },
+    {
+      "id": "stacktitan-pulse",
+      "label": "Kernhieb",
+      "stat": "int",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "stacktitan"
+    },
+    {
+      "id": "stacktitan-surge",
+      "label": "Ursprungsruf",
+      "stat": "int",
+      "power": 22,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "stacktitan"
+    },
+    {
+      "id": "cachewraith-pulse",
+      "label": "Schattenstich",
+      "stat": "atk",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "cachewraith"
+    },
+    {
+      "id": "cachewraith-surge",
+      "label": "Quantensturm",
+      "stat": "int",
+      "power": 19,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "cachewraith"
+    },
+    {
+      "id": "heapgolem-pulse",
+      "label": "Runenstoß",
+      "stat": "int",
+      "power": 17,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "heapgolem"
+    },
+    {
+      "id": "heapgolem-surge",
+      "label": "Endlosschlag",
+      "stat": "int",
+      "power": 23,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "heapgolem"
+    },
+    {
+      "id": "leakhydra-pulse",
+      "label": "Klammerwurf",
+      "stat": "atk",
+      "power": 13,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "leakhydra"
+    },
+    {
+      "id": "leakhydra-surge",
+      "label": "Ursprungsruf",
+      "stat": "atk",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "leakhydra"
+    },
+    {
+      "id": "memoryphoenix-pulse",
+      "label": "Taktbruch",
+      "stat": "def",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "memoryphoenix"
+    },
+    {
+      "id": "memoryphoenix-surge",
+      "label": "Ursprungsruf",
+      "stat": "def",
+      "power": 23,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "memoryphoenix"
+    },
+    {
+      "id": "threadlet-pulse",
+      "label": "Runenstoß",
+      "stat": "int",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "threadlet"
+    },
+    {
+      "id": "threadlet-surge",
+      "label": "Grenzsprung",
+      "stat": "int",
+      "power": 18,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "threadlet"
+    },
+    {
+      "id": "raceweaver-pulse",
+      "label": "Klammerwurf",
+      "stat": "atk",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "raceweaver"
+    },
+    {
+      "id": "raceweaver-surge",
+      "label": "Ursprungsruf",
+      "stat": "atk",
+      "power": 19,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "raceweaver"
+    },
+    {
+      "id": "temporlock-pulse",
+      "label": "Speicherzahn",
+      "stat": "agi",
+      "power": 17,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "temporlock"
+    },
+    {
+      "id": "temporlock-surge",
+      "label": "Endlosschlag",
+      "stat": "agi",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "temporlock"
+    },
+    {
+      "id": "quantumracer-pulse",
+      "label": "Nullfunke",
+      "stat": "def",
+      "power": 13,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "quantumracer"
+    },
+    {
+      "id": "quantumracer-surge",
+      "label": "Quantensturm",
+      "stat": "int",
+      "power": 21,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "quantumracer"
+    },
+    {
+      "id": "mutexling-pulse",
+      "label": "Resonanzimpuls",
+      "stat": "agi",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "mutexling"
+    },
+    {
+      "id": "mutexling-surge",
+      "label": "Endlosschlag",
+      "stat": "agi",
+      "power": 22,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "mutexling"
+    },
+    {
+      "id": "lockwarden-pulse",
+      "label": "Kernhieb",
+      "stat": "int",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "lockwarden"
+    },
+    {
+      "id": "lockwarden-surge",
+      "label": "Quantensturm",
+      "stat": "int",
+      "power": 23,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "lockwarden"
+    },
+    {
+      "id": "stalemateon-pulse",
+      "label": "Schattenstich",
+      "stat": "atk",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "stalemateon"
+    },
+    {
+      "id": "stalemateon-surge",
+      "label": "Grenzsprung",
+      "stat": "int",
+      "power": 18,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "stalemateon"
+    },
+    {
+      "id": "foreverwait-pulse",
+      "label": "Taktbruch",
+      "stat": "def",
+      "power": 17,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "foreverwait"
+    },
+    {
+      "id": "foreverwait-surge",
+      "label": "Ursprungsruf",
+      "stat": "def",
+      "power": 19,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "foreverwait"
+    },
+    {
+      "id": "faultling-pulse",
+      "label": "Runenstoß",
+      "stat": "int",
+      "power": 13,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "faultling"
+    },
+    {
+      "id": "faultling-surge",
+      "label": "Grenzsprung",
+      "stat": "def",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "faultling"
+    },
+    {
+      "id": "coremaw-pulse",
+      "label": "Klammerwurf",
+      "stat": "atk",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "coremaw"
+    },
+    {
+      "id": "coremaw-surge",
+      "label": "Ursprungsruf",
+      "stat": "int",
+      "power": 21,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "coremaw"
+    },
+    {
+      "id": "coredrake-pulse",
+      "label": "Speicherzahn",
+      "stat": "agi",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "coredrake"
+    },
+    {
+      "id": "coredrake-surge",
+      "label": "Endlosschlag",
+      "stat": "agi",
+      "power": 22,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "coredrake"
+    },
+    {
+      "id": "crashcolossus-pulse",
+      "label": "Nullfunke",
+      "stat": "def",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "crashcolossus"
+    },
+    {
+      "id": "crashcolossus-surge",
+      "label": "Quantensturm",
+      "stat": "def",
+      "power": 23,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "crashcolossus"
+    },
+    {
+      "id": "indeximp-pulse",
+      "label": "Resonanzimpuls",
+      "stat": "agi",
+      "power": 17,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "indeximp"
+    },
+    {
+      "id": "indeximp-surge",
+      "label": "Endlosschlag",
+      "stat": "int",
+      "power": 18,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "indeximp"
+    },
+    {
+      "id": "boundarybeast-pulse",
+      "label": "Kernhieb",
+      "stat": "int",
+      "power": 13,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "boundarybeast"
+    },
+    {
+      "id": "boundarybeast-surge",
+      "label": "Quantensturm",
+      "stat": "def",
+      "power": 19,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "boundarybeast"
+    },
+    {
+      "id": "indexeater-pulse",
+      "label": "Schattenstich",
+      "stat": "atk",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "indexeater"
+    },
+    {
+      "id": "indexeater-surge",
+      "label": "Grenzsprung",
+      "stat": "atk",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "indexeater"
+    },
+    {
+      "id": "zerowyrm-pulse",
+      "label": "Taktbruch",
+      "stat": "def",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "zerowyrm"
+    },
+    {
+      "id": "zerowyrm-surge",
+      "label": "Ursprungsruf",
+      "stat": "int",
+      "power": 21,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "zerowyrm"
+    },
+    {
+      "id": "bufferbug-pulse",
+      "label": "Runenstoß",
+      "stat": "int",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "bufferbug"
+    },
+    {
+      "id": "bufferbug-surge",
+      "label": "Grenzsprung",
+      "stat": "int",
+      "power": 22,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "bufferbug"
+    },
+    {
+      "id": "overflowhorn-pulse",
+      "label": "Klammerwurf",
+      "stat": "atk",
+      "power": 17,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "overflowhorn"
+    },
+    {
+      "id": "overflowhorn-surge",
+      "label": "Ursprungsruf",
+      "stat": "atk",
+      "power": 23,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "overflowhorn"
+    },
+    {
+      "id": "stackravager-pulse",
+      "label": "Speicherzahn",
+      "stat": "agi",
+      "power": 13,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "stackravager"
+    },
+    {
+      "id": "stackravager-surge",
+      "label": "Endlosschlag",
+      "stat": "int",
+      "power": 18,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "stackravager"
+    },
+    {
+      "id": "bufferbehemoth-pulse",
+      "label": "Nullfunke",
+      "stat": "def",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "bufferbehemoth"
+    },
+    {
+      "id": "bufferbehemoth-surge",
+      "label": "Quantensturm",
+      "stat": "def",
+      "power": 19,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "bufferbehemoth"
+    },
+    {
+      "id": "phantomtrace-pulse",
+      "label": "Resonanzimpuls",
+      "stat": "agi",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "phantomtrace"
+    },
+    {
+      "id": "phantomtrace-surge",
+      "label": "Endlosschlag",
+      "stat": "agi",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "phantomtrace"
+    },
+    {
+      "id": "observoid-pulse",
+      "label": "Kernhieb",
+      "stat": "int",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "observoid"
+    },
+    {
+      "id": "observoid-surge",
+      "label": "Quantensturm",
+      "stat": "int",
+      "power": 21,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "observoid"
+    },
+    {
+      "id": "heisenwisp-pulse",
+      "label": "Schattenstich",
+      "stat": "atk",
+      "power": 17,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "heisenwisp"
+    },
+    {
+      "id": "heisenwisp-surge",
+      "label": "Grenzsprung",
+      "stat": "atk",
+      "power": 22,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "heisenwisp"
+    },
+    {
+      "id": "quantumdebug-pulse",
+      "label": "Taktbruch",
+      "stat": "def",
+      "power": 13,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "quantumdebug"
+    },
+    {
+      "id": "quantumdebug-surge",
+      "label": "Ursprungsruf",
+      "stat": "def",
+      "power": 23,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "quantumdebug"
+    },
+    {
+      "id": "basecase-pulse",
+      "label": "Runenstoß",
+      "stat": "int",
+      "power": 14,
+      "minLevel": 1,
+      "kind": "speziell",
+      "species": "basecase"
+    },
+    {
+      "id": "basecase-surge",
+      "label": "Grenzsprung",
+      "stat": "int",
+      "power": 18,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "basecase"
+    },
+    {
+      "id": "callwyrm-pulse",
+      "label": "Klammerwurf",
+      "stat": "atk",
+      "power": 15,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "callwyrm"
+    },
+    {
+      "id": "callwyrm-surge",
+      "label": "Ursprungsruf",
+      "stat": "atk",
+      "power": 19,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "callwyrm"
+    },
+    {
+      "id": "recursaur-pulse",
+      "label": "Speicherzahn",
+      "stat": "agi",
+      "power": 16,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "recursaur"
+    },
+    {
+      "id": "recursaur-surge",
+      "label": "Endlosschlag",
+      "stat": "agi",
+      "power": 20,
+      "minLevel": 4,
+      "kind": "physisch",
+      "species": "recursaur"
+    },
+    {
+      "id": "infiniteancestor-pulse",
+      "label": "Nullfunke",
+      "stat": "def",
+      "power": 17,
+      "minLevel": 1,
+      "kind": "physisch",
+      "species": "infiniteancestor"
+    },
+    {
+      "id": "infiniteancestor-surge",
+      "label": "Quantensturm",
+      "stat": "int",
+      "power": 21,
+      "minLevel": 4,
+      "kind": "speziell",
+      "species": "infiniteancestor"
+    }
+  ],
+  "elementChart": {
+    "spark": {
+      "spark": 1,
+      "byte": 1.5,
+      "feral": 0.75
+    },
+    "byte": {
+      "spark": 0.75,
+      "byte": 1,
+      "feral": 1.5
+    },
+    "feral": {
+      "spark": 1.5,
+      "byte": 0.75,
+      "feral": 1
+    }
+  },
+  "buffs": [
+    {
+      "id": "linie",
+      "label": "Reine Linie",
+      "factor": 1.1,
+      "trigger": "inherited"
+    },
+    {
+      "id": "nichts-zu-verlieren",
+      "label": "Nichts zu verlieren",
+      "factor": 1.5,
+      "trigger": "hp < 25%"
+    },
+    {
+      "id": "uebertaktet",
+      "label": "Uebertaktet",
+      "factor": 1.15,
+      "trigger": "hp >= 90%"
+    }
+  ],
+  "lootTable": [
+    {
+      "id": "schrott",
+      "label": "Schrott",
+      "weight": 8500,
+      "xp": 0
+    },
+    {
+      "id": "brauchbar",
+      "label": "Brauchbares Teil",
+      "weight": 1400,
+      "xp": 25
+    },
+    {
+      "id": "shiny",
+      "label": "Shiny God-Tier",
+      "weight": 100,
+      "xp": 2500
+    }
+  ]
+}

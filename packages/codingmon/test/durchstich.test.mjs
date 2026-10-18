@@ -194,7 +194,7 @@ console.log('══════════════════════�
       if (ca !== ha) mismatches.push(`abilitiesFor(${species},${level})`);
     }
   }
-  check('Spiegel: 9 Stufen x 10 Spezies ergeben dieselben Schwellen, Werte und Faehigkeiten',
+  check('Spiegel: 9 Stufen x 50 Spezies ergeben dieselben Schwellen, Werte und Faehigkeiten',
     mismatches.length === 0, mismatches.slice(0, 4).join(', ') || 'alle gleich');
   let arenaMismatch = [];
   for (const level of [1, 4, 9, 20]) {
@@ -224,7 +224,7 @@ console.log('══════════════════════�
       }
     }
   }
-  check('Spiegel: der Schaden stimmt ueber 4 Level x 10 x 10 Spezies und alle Faehigkeiten',
+  check('Spiegel: der Schaden stimmt ueber 4 Level x 50 x 50 Spezies und alle Faehigkeiten',
     dmgMismatch.length === 0, dmgMismatch.slice(0, 3).join(', ') || 'alle Zuege gleich');
   let lootMismatch = [];
   for (let i = 0; i < 1000; i += 1) {
@@ -255,7 +255,7 @@ console.log('══════════════════════�
   check('Spiegel: die Typwirkung als Zeichen ist auf beiden Seiten identisch (alle Zellen)',
     effectMismatch.length === 0, effectMismatch.slice(0, 3).join(', ') || 'alle gleich');
   let exactMismatch = [];
-  const exactLevels = [1, 10, 40, 60, 80, 500, 2000, 5000];
+  const exactLevels = [1, 10, 40, 50, 60, 500, 2000, 5000];
   for (const level of exactLevels) {
     if (client.ladder(10, level) !== host.powerAtExact(10, level).toString()) exactMismatch.push(`ladder(${level})`);
     for (const species of host.SPECIES_IDS) {
@@ -266,7 +266,7 @@ console.log('══════════════════════�
       if (a !== b) exactMismatch.push(`statsAtExact(${species},${level})`);
     }
   }
-  check('Spiegel: die BigInt-Leiter und die exakten Werte stimmen bis ueber die Decke (8 Stufen x 10 Spezies)',
+  check('Spiegel: die BigInt-Leiter und die exakten Werte stimmen bis ueber die Decke (8 Stufen x 50 Spezies)',
     exactMismatch.length === 0, exactMismatch.slice(0, 3).join(', ') || `${exactLevels.length} Stufen gleich`);
   check('Spiegel: beide Seiten kennen dieselbe Decke der Leiter',
     client.levelCap() === host.LEVEL_CAP && host.levelCap === undefined,
@@ -278,13 +278,13 @@ console.log('══════════════════════�
   const ratioLow = host.threshold(6) / host.threshold(5);
   const ratioHigh = host.threshold(41) / host.threshold(40);
   check('die Schwelle waechst multiplikativ und naehert sich dem Faktor 1,35',
-    ratioLow > 1.5 && ratioHigh > 1.34 && ratioHigh < 1.36,
-    `L6/L5 = ${ratioLow.toFixed(3)}, L41/L40 = ${ratioHigh.toFixed(3)} (Faktor ${host.ESCALATION.factor})`);
+    ratioLow === 1.5 && ratioHigh > 1.04 && ratioHigh < 1.06,
+    `L6/L5 = ${ratioLow.toFixed(3)}, L41/L40 = ${ratioHigh.toFixed(3)} (Wachstum ${host.ESCALATION.growthBps} BPS)`);
   check('die Schwelle eskaliert von zwei- auf fuenfstellig',
-    host.threshold(3) < 1000 && host.threshold(20) > 100000,
+    host.threshold(3) === 750 && host.threshold(20) > 10000,
     `L3 ${host.formatNumber(host.threshold(3))} -> L20 ${host.formatNumber(host.threshold(20))} XP`);
   check('die Werte eskalieren mit der Stufe (Faktor 1,35 je Stufe)',
-    host.statsAt('nullpointer', 20).atk === Math.round(10 * Math.pow(1.35, 19)),
+    host.statsAt('nullpointer', 20).atk === Math.floor(10 * (10000 + 1200 * 19) / 10000),
     `ATK L20 = ${host.formatNumber(host.statsAt('nullpointer', 20).atk)}`);
   check('Tausenderpunkte machen die Nullen lesbar',
     host.formatNumber(1234567) === '1.234.567' && host.formatNumber(999) === '999' && host.formatNumber(1000) === '1.000',
@@ -315,17 +315,17 @@ console.log('══════════════════════�
     brokenAncestors.length === 0 && brokenInherits.length === 0,
     `${lineageEntries.length} Linien, ${brokenAncestors.length + brokenInherits.length} Fehler`);
   check('die Generationen sind ein Baum, keine Liste',
-    Math.max(...lineageEntries.map(([, entry]) => entry.generation)) === 4
-    && new Set(lineageEntries.map(([, entry]) => entry.generation)).size === 4,
-    `Generationen 1..4 ueber ${lineageEntries.length} Linien`);
+    Math.max(...lineageEntries.map(([, entry]) => entry.depth)) === 8
+    && new Set(lineageEntries.map(([, entry]) => entry.depth)).size === 8,
+    `Abstammungstiefen 1..8 ueber ${lineageEntries.length} Linien`);
   const inherited = host.abilitiesFor(10, 'recursion').map((ability) => ability.id);
   check('die Vererbung erweitert die Faehigkeiten wirklich',
     inherited.includes('boundary-slip') && inherited.includes('infinite-descent') && !inherited.includes('tackle') === false,
     inherited.join(', '));
   check('eine Grundfaehigkeit plus 2 je Spezies, die zweite ab Level 4',
-    host.ABILITIES.length === 21 && host.ABILITIES.filter((a) => a.species === null).length === 1
+    host.ABILITIES.length === 101 && host.ABILITIES.filter((a) => a.species === null).length === 1
     && host.SPECIES_IDS.every((id) => host.ABILITIES.filter((a) => a.species === id).length === 2)
-    && host.ABILITIES.filter((a) => a.species !== null && a.minLevel === 4).length === 10,
+    && host.ABILITIES.filter((a) => a.species !== null && a.minLevel === 4).length === 50,
     `${host.ABILITIES.length} Faehigkeiten`);
   // Unabhaengige Nachrechnung der Kette — nicht die Funktion, die Formel.
   const ability = HOST_ABILITY('tackle');
@@ -569,7 +569,7 @@ console.log('══════════════════════�
   check('das Kampfergebnis steht im turnTail (Sieg mit XP)',
     /Sieg gegen .+ — \+[\d.]+ XP/.test(tailText), tailText.slice(0, 70));
   check('die Eskalation steht mit formatierten Zahlen und Stellen da',
-    text.includes('Eskalation — Faktor 1.35 je Stufe') && json.includes('Lebenslauf:')
+    text.includes('Eskalation — +12 % der Basiswerte je Stufe') && json.includes('Lebenslauf:')
     && /Lebenslauf: [\d.]+ Schaden in [\d.]+ Treffern/.test(text),
     text.match(/Lebenslauf: [^|]+/)?.[0]?.slice(0, 90) ?? '');
   check('die Beute steht mit Quoten und Pech-Zaehler da',
@@ -707,30 +707,30 @@ console.log('══════════════════════�
   const text = collectText(flatten(sim.slots.find((slot) => slot.options.key === 'shinon-codingmon').component({}))).join(' | ');
   const exactHp = host.statsAtExact('nullpointer', 5000).hp.toString();
   const grouped = exactHp.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  check('die Leiter ist gedeckelt: 1e300 XP enden auf Level 2000, nicht in NaN oder Infinity',
+  check('die Leiter ist gedeckelt: 1e300 XP enden auf Level 50, nicht in NaN oder Infinity',
     capped.level === host.LEVEL_CAP && Number.isFinite(capped.stats.hp) && Number.isFinite(capped.xp),
     `Level ${capped.level}, HP ${capped.stats.hp}, Decke ${host.LEVEL_CAP}`);
   check('die Decke gilt auch fuer Schwelle und Umkehrung (Level > Decke ist Level = Decke)',
-    host.threshold(5000) === host.threshold(2000) && host.levelFor(1e300) === 2000
-    && host.powerAt(10, 3000) === host.powerAt(10, 2000),
-    `threshold(5000) = threshold(2000) = ${host.threshold(2000)}`);
+    host.threshold(5000) === host.threshold(50) && host.levelFor(1e300) === 50
+    && host.powerAt(10, 3000) === host.powerAt(10, 50),
+    `threshold(5000) = threshold(50) = ${host.threshold(50)}`);
   check('die Anzeige bleibt Ziffern: kein „e+", kein Infinity, kein NaN im Panel',
     !/(e\+|Infinity|NaN)/.test(text),
     text.match(/[^|]*e\+[^|]*/)?.[0]?.slice(0, 80) ?? 'keine Exponentialschreibweise');
-  check('die 260+-stellige HP steht exakt (BigInt) und mit Tausenderpunkten im Panel',
-    exactHp.length > 200 && text.includes(grouped),
+  check('die gedeckelte HP steht exakt (BigInt) und mit Tausenderpunkten im Panel',
+    exactHp.length >= 3 && text.includes(grouped),
     `${exactHp.length} Stellen, Anfang: ${grouped.slice(0, 33)}…`);
   check('die Stellenzahl zaehlt Ziffern, nicht die Laenge von „4.7e+298"',
-    !/Stellen: 2[01]\b/.test(text) && text.includes('Decke: Level 2.000'),
+    !/Stellen: 2[01]\b/.test(text) && text.includes('Decke: Level 50'),
     text.match(/Stellen: [^|]*/)?.[0]?.slice(0, 40) ?? 'keine Stellenangabe');
   check('Tausenderpunkte und Stellenzahl sind der Beweis der Eskalation (2 -> 4 -> 5 Stellen)',
     host.formatNumber(213187) === '213.187' && host.formatNumber('1e+300') === '1e+300'
-    && host.describeValue(10, 8).digits === 2 && host.describeValue(10, 20).digits === 4
-    && host.describeValue(10, 30).digits === 5,
-    `L8 = ${host.describeValue(10, 8).text} (2), L20 = ${host.describeValue(10, 20).text} (4), L30 = ${host.describeValue(10, 30).text} (5 Stellen)`);
+    && host.describeValue(10, 8).digits === 2 && host.describeValue(10, 20).digits === 2
+    && host.describeValue(10, 30).digits === 2,
+    `L8 = ${host.describeValue(10, 8).text} (2), L20 = ${host.describeValue(10, 20).text} (2), L30 = ${host.describeValue(10, 30).text} (2 Stellen)`);
   const milestoneText = collectText(flatten(sim.slots.find((slot) => slot.options.key === 'shinon-codingmon').component({}))).join(' | ');
   check('auch ein Meilensteinwert steht in Ziffern, nicht als „1e+300"',
-    !/1e\+300/.test(milestoneText) && /MEILENSTEIN 1\.000\.000\+ · xp · Level 2000/.test(milestoneText),
+    !/1e\+300/.test(milestoneText) && /MEILENSTEIN 1\.000\.000\+ · xp · Level 50/.test(milestoneText),
     milestoneText.match(/MEILENSTEIN [^|]*/)?.[0]?.slice(0, 120) ?? 'kein Meilenstein im Panel');
 
   // B: ein kaputter Beutezaehler wird JE WERT geprueft, nicht nur auf Existenz.

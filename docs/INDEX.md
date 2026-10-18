@@ -76,6 +76,7 @@ gilt nicht als Nachmessung.
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-17 | alle harten Zahlen + Befehle |
 | [`docs/INDEX.md`](INDEX.md) | current | 2026-10-17 | dieser Einstieg und die Statusregel |
 | [`docs/ROADMAP.md`](ROADMAP.md) | plan | 2026-10-17 | kanonische Roadmap: Versionsordnung, Historie, Release-Ziele `0.4.0`/`0.5.0`, `1.0.0`-Kriterien und der `0.1.0`-Pfad |
+| [`docs/CODINGMON-50-IMPLEMENTIERUNGSVERTRAG.md`](CODINGMON-50-IMPLEMENTIERUNGSVERTRAG.md) | plan | 2026-10-18 | Versionierter Umsetzungsvertrag für 50 Arten, D48/D49, Migration, Slots, Motion, Progress-Gates und DoD |
 | [`docs/S3-FRESHCLONE-2026-10-17.md`](S3-FRESHCLONE-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S3: Frischklon-Repro bis Boot |
 | [`docs/S3-FRESH-2026-10-17.md`](S3-FRESH-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S3: HTTP-200-Nachweis |
 | [`docs/S3-FRESH-d8999ab.md`](S3-FRESH-d8999ab.md) | current | 2026-10-17 | Release-Beleg S3 am aktuellen Stand |

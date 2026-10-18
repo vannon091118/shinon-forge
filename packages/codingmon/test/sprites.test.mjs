@@ -1,20 +1,23 @@
 #!/usr/bin/env node
 /**
- * packages/codingmon/test/sprites.test.mjs — die 27 Assets als Vertrag.
+ * Legacy-Pixelart-Vertrag und Laufzeit-Fallback fuer CodingMon 50.
  *
- * WAS HIER BEWIESEN WIRD (Abschnitt 3a des Auftrags):
- *   1. Jede Spezies hat Vorder- und Rueckseite (20 Gitter aus SPECIES abgeleitet,
- *      nicht gezaehlt — eine elfte Spezies ohne Sprites faellt hier, nicht erst
- *      im Browser).
- *   2. Jedes Gitter ist 32x32, kennt nur die Palette und hoechstens fuenf Farben.
- * → Kanon: docs/COMMENT-KANON.md#k-985b9a414f31
+ * Die zehn bestehenden Arten besitzen eigene Vorder-/Rueckseiten-Gitter.
+ * Die neuen 40 Arten werden derzeit ueber den geprueften Familien-Sprite-Fallback
+ * gerendert; fehlende individuelle ArtPack-Dateien werden nicht vorgetaeuscht.
+ * Dieser Test prueft beide Aussagen getrennt, statt 50 Dateien zu behaupten.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SPECIES_IDS } from '../assets/mechanik.js';
+import { SPECIES, SPECIES_IDS } from '../assets/mechanik.js';
+
+const LEGACY_SPRITE_IDS = [
+  'nullpointer', 'stackoverflow', 'memoryleak', 'racecondition', 'deadlock',
+  'segfault', 'offbyone', 'bufferoverflow', 'heisenbug', 'recursion',
+];
 import {
   GRID_SIZE, PALETTE, UI_REGION, SPRITE_REGION,
   buildEmbed, gridToSvg, readEmbedRegion, readGrid,
@@ -28,18 +31,18 @@ const PALETTE_VALUES = new Set(Object.values(PALETTE));
 
 const fillsOf = (svg) => [...svg.matchAll(/fill="([^"]+)"/g)].map((m) => m[1]);
 
-test('jede Spezies hat Vorder- und Rueckseite als Gitter', () => {
+test('jede Legacy-Spezies hat Vorder- und Rueckseite als Gitter', () => {
   const files = new Set(readdirSync(SPRITE_DIR));
-  for (const id of SPECIES_IDS) {
+  for (const id of LEGACY_SPRITE_IDS) {
     assert.ok(files.has(`${id}-front.grid`), `${id}: Vorderseite fehlt`);
     assert.ok(files.has(`${id}-back.grid`), `${id}: Rueckseite fehlt`);
   }
   const grids = [...files].filter((f) => f.endsWith('.grid')).sort();
-  assert.equal(grids.length, SPECIES_IDS.length * 2, 'genau zwei Gitter je Spezies, keine Waisen');
+  assert.equal(grids.length, LEGACY_SPRITE_IDS.length * 2, 'genau zwei Gitter je Legacy-Spezies, keine Waisen');
 });
 
-test('jedes Gitter ist 32x32, palette-rein, hoechstens fuenf Farben', () => {
-  for (const id of SPECIES_IDS) {
+test('jedes Legacy-Gitter ist 32x32, palette-rein, hoechstens fuenf Farben', () => {
+  for (const id of LEGACY_SPRITE_IDS) {
     for (const side of ['front', 'back']) {
       const { rows, colors } = readGrid(join(SPRITE_DIR, `${id}-${side}.grid`));
       assert.equal(rows.length, GRID_SIZE);
@@ -49,16 +52,16 @@ test('jedes Gitter ist 32x32, palette-rein, hoechstens fuenf Farben', () => {
   }
 });
 
-test('Rueckseite ist keine Kopie der Vorderseite', () => {
-  for (const id of SPECIES_IDS) {
+test('Legacy-Rueckseite ist keine Kopie der Vorderseite', () => {
+  for (const id of LEGACY_SPRITE_IDS) {
     const front = readFileSync(join(SPRITE_DIR, `${id}-front.grid`), 'utf8');
     const back = readFileSync(join(SPRITE_DIR, `${id}-back.grid`), 'utf8');
     assert.notEqual(back, front, `${id}: Rueckseite unterscheidet sich`);
   }
 });
 
-test('jedes SVG ist gueltig und traegt nur Palettenfarben', () => {
-  for (const id of SPECIES_IDS) {
+test('jedes Legacy-SVG ist gueltig und traegt nur Palettenfarben', () => {
+  for (const id of LEGACY_SPRITE_IDS) {
     for (const side of ['front', 'back']) {
       const { rows } = readGrid(join(SPRITE_DIR, `${id}-${side}.grid`));
       const svg = gridToSvg(rows);
@@ -79,6 +82,18 @@ test('die Einbettung in client.js ist deckungsgleich mit den Quellen', () => {
   const expected = buildEmbed();
   assert.deepEqual(readEmbedRegion(text, SPRITE_REGION, 'SPRITE_GRIDS'), expected.grids);
   assert.deepEqual(readEmbedRegion(text, UI_REGION, 'UI_SVG'), expected.ui);
+});
+
+
+test('alle 50 Spezies haben eine gültige Familie und den Runtime-Sprite-Fallback', () => {
+  assert.equal(SPECIES_IDS.length, 50);
+  for (const id of SPECIES_IDS) {
+    assert.ok(SPECIES[id], id + ': Spezies fehlt im kanonischen Katalog');
+    assert.ok(['spark', 'byte', 'feral'].includes(SPECIES[id].family), id + ': keine gültige Sprite-Familie');
+  }
+  const client = readFileSync(CLIENT_FILE, 'utf8');
+  assert.match(client, /function speciesGlyph\(speciesId, lvl, size\)/);
+  assert.match(client, /spriteSvg\(species\.family, stageIndex\(lvl\), size\)/);
 });
 
 test('7 UI-SVGs: vorhanden, gueltig, nur #A855F7', () => {

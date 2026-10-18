@@ -1366,7 +1366,10 @@ async function observeLoop(start) {
 }
 
 test('Worker: der Lauf laesst den Eventloop laufen, der Lauf im Host blockiert ihn', async () => {
-  const project = bigProject('eventloop');
+  // 150 files once measured only 95 ms on the Linux runner; the test's
+  // 100-ms premise was therefore false for that fixture. Increase work, not
+  // the acceptance threshold, so the host-side block remains measurable.
+  const project = bigProject('eventloop', 240, 30);
   const hostIndex = fixtureIndex(project, 'eventloop-host');
   const mountIndex = join(workDir('eventloop-mount'), 'indexes');
 
