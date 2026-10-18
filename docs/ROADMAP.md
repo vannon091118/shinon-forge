@@ -1,19 +1,20 @@
-# Roadmap — Versionen und Release-Ziele
+# Roadmap — wohin das Repo geht
 
-> **Status:** plan — wohin das Repo geht, was ein Release kostet, was 1.0 bedeutet. **Stand:** 2026-10-17
+> **Status:** plan — die einzige Liste offener Arbeit: Release-Ziele, Abnahmen, zurückgestellte Punkte. **Stand:** 2026-10-18
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
-Eine Roadmap, die Bestands- und Testergebnisse wiederholt, veraltet bei der nächsten Messung.
-Harte Zahlen und Messungen stehen ausschließlich in `docs/ZAHLEN.md`; konkrete Abnahmen
-stehen in `PLAN.md` §9. Diese Datei benennt nur Release-Ziele und Versionsbedeutungen.
+Regeln dieser Datei: kein Punkt ohne Abnahme (Befehl oder beobachtbares Ergebnis),
+keine Zahl außer Datum und SHA (Bestand und Messungen stehen ausschließlich in
+`docs/ZAHLEN.md`), keine erledigte Arbeit (die steht in `docs/CHANGELOG.md`).
+Ein Punkt zählt als erledigt, sobald Befehl, Exit-Code und Ergebnis in einem Beleg
+stehen — Code ohne belegten Lauf ist offen. `UNGEPRÜFT` ist kein Pass.
 
 ## 1. Versionsordnung (eine Regel, zwei Zeilen)
 
 - **Root** (`package.json`, Lock-Kopf in `package-lock.json` trägt denselben Wert):
   Semver auf der `0.x`-Linie. **Minor** = ein Feature-Batch mit neuen Zusagen und
-  neuen Tests (Beispiel: `0.3.0`, Commit `3add487`). **Patch** = Korrekturen und
-  Doku ohne neue Zusagen. Ein Bump ist ein Commit wie jeder andere: mit
-  Trailer, Wächter und grünem CI-Lauf — kein Nebenkanal.
+  neuen Tests. **Patch** = Korrekturen und Doku ohne neue Zusagen. Ein Bump ist ein
+  Commit wie jeder andere: mit Trailer, Wächter und grünem CI-Lauf — kein Nebenkanal.
 - **Pakete** (`packages/*/package.json`): genau zwei Zeilen, und sie werden
   **nicht** einzeln gebumpt. `1.0.0` für ausgelieferte Pakete, `0.1.0` für
   Vorbereitung (`dsh.inactive` im eigenen Manifest) — entschieden vom Paket
@@ -25,88 +26,69 @@ stehen in `PLAN.md` §9. Diese Datei benennt nur Release-Ziele und Versionsbedeu
 einen Installationsweg — den **Quellklon** (`git clone`, `npm ci`,
 `npm run profile:links`, Profil-Dump, UI-Start und `shinon doctor` read-only).
 Der Freeze ist eine Entscheidung, kein Messwert: **kein Feature-Wunsch wird
-nachträglich in v0.4.0 gezogen.** Er bedeutet nicht, dass die Abnahme schon
-abgeschlossen ist: S3 (Frischklon @ `d8999ab` mit HTTP-200-Beleg, `docs/S3-FRESH-d8999ab.md`)
-und S4 (`shinon doctor` als eigener Unterbefehl, Test 6/6, Hilfe + Fehlerpfade) sind belegt.
-Bis auch S5/S6 erfüllt und ein grüner CI-Lauf des Bump-Commits belegt ist, ist
-`v0.4.0` nicht als Release abgenommen.
+nachträglich in v0.4.0 gezogen.** `shinon update`, persistentes
+`shinon autoupdate`, `.deb`, Live-429-Rotation mit zwei echten Schlüsseln,
+Mobile/Android, Desktop-Shell, Rust-/Single-Binary-Port, Vollbenchmark und
+QoL-Top-10 sind **kein** v0.4.0-Umfang.
 
 **Werkzeuge im Baum, außerhalb des Urteils:** `scripts/install-user.mjs` (`npm run
-install:user`: `install`/`update`/`rollback`/`status`/`history`/`auto`/`units`/`selftest`),
-`npm run verify:install` (read-only Selbsttest eines bestehenden Stands) und
-`scripts/backup-retention.mjs` (`npm run backup:retention`) existieren als
-Bediener-Werkzeuge mit eigenen Gate-Tests — sie sind noch kein belegter
-Release-Installationsweg. Der v0.4.0-Abnahmeweg bleibt der Quellklon, bis
-`PLAN.md` §9.1 einen weiteren Slice führt. Namensgrenze: `npm run install:user
-update` pflegt ein Nutzer-Installat, `npm run update` prüft den DSH-Upstream —
+install:user`), `npm run verify:install` und `scripts/backup-retention.mjs`
+existieren als Bediener-Werkzeuge mit eigenen Gate-Tests — sie sind noch kein
+belegter Release-Installationsweg. Namensgrenze: `npm run install:user update`
+pflegt ein Nutzer-Installat, `npm run update` prüft den DSH-Upstream —
 `shinon update` (Forge-Selbstupdate) bleibt Folgearbeit.
 
-**Außerhalb des Freeze (Ziel v0.5.0 oder später, nur als Folgearbeit
-dokumentiert):** `shinon update` (Forge-Selbstupdate), persistentes
-`shinon autoupdate`, `.deb`-Bau/Installation (`npm run deb` existiert nicht als
-Script-Eintrag), Live-429-Rotation mit zwei echten Schlüsseln,
-Mobile/Android, Desktop-Shell, Rust-/Single-Binary-Port, Vollbenchmark und
-QoL-Top-10. Die Liste steht hier, damit ein Implementierungsauftrag sie nicht
-versehentlich vorzieht.
+**Reihenfolge:** S0 → S1 → S2 → S3 → S4 → S5 → S6. Kein Slice zieht Arbeit aus
+v0.5.0 vor, auch nicht „schnell zwischendurch“.
 
-**Release-Checkliste (Abnahme je Pflicht):** Freeze-Dokumentation hier +
-`PLAN.md` §9.1, Workspace-Isolation (S1, rot-bei-Mutation), Quellklon-Repro
-(S3), read-only Doctor (S4), Gates + Version/Tag/Lock + Quellarchiv + SHA-256
-(S5), echter Modellturn + Audit + CI-Run-ID (S6). `UNGEPRÜFT` ist kein Pass.
+### Slice-Abnahmen (Pflicht, Abnahme, Beleg, Stand)
 
-Die Abnahme je Pflicht steht als Tabelle in `PLAN.md` §9.1 (Punkt, Befehl,
-Exit, Ergebnis); die gemessenen Zahlen dazu stehen ausschließlich in
-`docs/ZAHLEN.md` §2. Ein Punkt ohne dort belegten Lauf ist offen — auch dann,
-wenn der Code dafür schon existiert.
+| Slice | Pflicht (Abnahme) | Beleg | Stand |
+|---|---|---|---|
+| S0 Freeze | Freeze dokumentiert; v0.5.0-Liste vollständig | diese Datei (§1.5, §2) | belegt |
+| S1 Workspace | Prompter und Project Index beantworten dieselbe Workspace-Frage; fremde Root abgelehnt, `..`/Symlink-Ausbruch gestoppt, Veraltetes entfernt — jede Probe wird bei Mutation rot | `npm run test:prompter`, `npm run gate:test` | belegt |
+| S2 Kontext | Eine Quelle je Schritt; Budget vor dem Modellaufruf; Provenienz (Workspace, Quelle, Pfade, Budget) im Datensatz, ohne Prompt-Text und ohne Schlüsselwerte | `npm run test:prompter`, Gate-Naht `context-wiring`, `docs/probes/index-konsolidierung.json` | belegt |
+| S3 Quellklon | Frischer Klon ohne globales DSH: nur die dokumentierten Befehle bis zum UI-Start | `docs/S3-FRESH-d8999ab.md` | belegt |
+| S4 Doctor | `shinon doctor` als Laufzeit-Unterbefehl, read-only, stabile Exitcodes, Schlüssel nur als Anwesenheit | `docs/S4-DOCTOR-2026-10-17.md` | belegt |
+| S5 Schranke | Alle Gates grün, Version/Tag/Lock konsistent, Quellarchiv + SHA-256 | `docs/S5-RELEASE-2026-10-17.md` | teils — **offen:** Tag `v0.4.0` + Schranken-Lauf darauf |
+| S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel, Security-/Dependency-Audit, finale Doku, CI-Run-ID | `docs/S6-MODELLTURN-AUDIT-CI-2026-10-17.md` | **offen** — Audit grün, Modellturn und CI-Run-ID fehlen |
 
-## 2. Historie (gemessen, nicht erzählt)
+## 2. Offene Punkte (vollständig — alles andere ist Folgearbeit oder zurückgestellt)
 
-| Fassung | Commit | Inhalt |
-|---|---|---|
-| `0.2.0` | `ffbf721` | bootfähig, Brand-Overlay live, Gate-Engine, Verträge |
-| `0.3.0` | `3add487` | Skill-Selektion + Persona Du-Form + Profil-Update |
-| `0.4.0` (noch nicht abgenommen) | Release-Ziel dieses Durchgangs | Draht-E2E (`scripts/gate/tests/key-router-wire.test.mjs`), Audit Phase B (`docs/archive/AUDIT_2026-10-13.md`), Pfad-Heilung, CI-Verdict-Kette; S3+S4 belegt, S5/S6 offen |
+### 2.1 v0.4.0-Rest (Release-pflichtig)
 
-Abnahme von `0.4.0`: erst nach Erfüllung sämtlicher Slices in `PLAN.md` §9.1,
-einem grünen CI-Lauf des Bump-Commits (inkl. `Verdikt (fail-closed)`) und lokalem
-`gate:full` PASS. S3/S4 sind belegt; offen sind S5 (Workflow, Tag, Archiv) und S6
-(Modellturn, Audit). Ein passender CI-Run für den Release-Bump existiert noch
-nicht. Eine Run-ID wird hier erst nach dem tatsächlichen Lauf eingetragen.
+- **S5-Schluss:** Tag `v0.4.0` setzen, Schranken-Lauf darauf (Workflow, Tag, Archiv) — erst dann ist S5 belegt.
+- **S6-Schluss:** echter Modellturn mit lokalem Schlüssel (Boot, Urteil, Widerruf, Host-Ende, Neustart, ohne Schlüsselwert im Text; Protokoll unter `docs/probes/`), finale Doku, CI-Run-ID des Release-Bumps.
 
-## 3. Release-Ziele `0.5.0` (Kandidaten, keine Versprechen)
+### 2.2 v0.5.0-Kandidaten (keine Versprechen — was landet, entscheidet der Betreiber)
 
-Jeder Punkt hat seine Abnahme bereits — in `PLAN.md` §9 oder im
-Sieben-Lücken-Handshake (`docs/archive/2026-10-13-ci-lauf-gruen-verdict-schranke-und-sieben-luecken.md`
-§3). Hier steht nur die Liste, damit ein Blick genügt:
+- Live-429-Rotation gegen den echten Anbieter mit echten Schlüsseln (Kette bis zum Loopback-Draht ist belegt).
+- Mobile-first-Prototyp: eigenes schlankes Mobile-Profil, responsive Client-Schicht, Profil-/UI-/Security-CI-Gates, validierte Android-Runtime-Strategie (Details aus dem gefalteten Mobile-Plan: zuerst Profil + Web-UI im Repo, App-Shell erst nach reproduzierbarem Android-Proof; kein globaler Paket-Cut vor Messung; Fremdvergleich `dsh-io/dsh-mobile` als Spike prüfen).
+- `LAST_VERIFIED_FACT` (§19): Loop Guard / Progress Evaluator als alleiniger Produzent, Gate pinnt Ereignis, Produzent, Herkunft und fail-closed-Fälle.
+- Codingmon-Folge: Ereignis-Adapter an echten Lauf-Ereignissen (6.1/6.2-Rest), Kampfende am Agent-Ende (6.4).
+- Bedienung ohne Doku (7.1), Lokalisierung ohne Fallback-Tabellen (7.2), QoL-Liste mit Status je Punkt (7.3, wartet auf die Nutzerliste), Design aus Token-Datei (7.4).
+- Scoring-Folge: K8 Fakten-Store (Konsolidierung, hartes Limit; Ablage liegt bereit), K7b taktische Skill-Erzeugung (Schreibweg bricht K4 — braucht Entscheidung; Ablage `generated-skills/` steht).
+- `profiles/`-Umbau auf Code-Konfiguration (3.6) — nur wenn ein fremder Boot daraus liest/schreibt; derzeit angehalten.
+- Overlay-MVP (3.8) — blockiert, bis die drei Upstream-Punkte entschieden sind (Slot-Definition, Launcher-only-Patch, Remote-Listen-Extensibilität).
+- Onboarding (Eignerentscheidung): keine fest verdrahteten Modell-/Provider-Defaults — der Nutzer entscheidet beim Einstieg, ob der Prompter dasselbe Modell und denselben Schlüssel nutzt oder eigene; Anker ist die DSH-seitige API-Key-Abfrage beim First-Start.
+- Architektur-Folge aus dem Audit: Workspace-Twin zusammenlegen (C3), Prompt-Schichten zu einem Assembler (C4), `preset shinon` statt `cordis`, Katalog-Snapshot statt Einzelprüfungen (P2).
+- Vendor-Baum zu Hash-Manifest verdichten (B5); `.session-eval/`-Zweck klären (B7-Rest; K5-Offenpunkte aus dem Report: Scope-Erkennung, Fehler-Turn-Signal, K7a-Kopplung — siehe Archiv).
 
-- Live-429-Rotation mit zwei echten Schlüsseln (ZAHLEN §4: weiter offen)
-- ~~Echter Modell-Turn 3.9~~ — **kein 0.5.0-Kandidat:** der Turn ist v0.4.0-Pflicht
-  (§1.5, PLAN §9.1); ein Release ohne ihn bleibt `UNGEPRÜFT` und damit kein Go.
-- Mobile-first-Prototyp: eigenes schlankes Profil, responsive Client-Schicht, profil-/UI-/Security-CI-Gates und validierte Android-Runtime-Strategie ([docs/MOBILE-PLAN.md](MOBILE-PLAN.md)); kein globaler Paket-Cut vor Messung.
-- §19 `LAST_VERIFIED_FACT`: Produzent und Gate-Abnahme stehen in `PLAN.md` §6.5; Implementierung bleibt v0.5.0-Ziel
-- `shinon-forge`-Aktivierungsschritt mit Sicherheitsvertrag (siehe §4)
-- Shinon-Selbstupdate (`shinon update`, Release-Abfrage, Prüfsumme), persistentes Autoupdate, transaktionales Update/Rollback — v0.5.0-Arbeit, kein v0.4.0-Punkt
-- `.deb`-Distribution (`npm run deb`, Paket-Metadaten, Installations-/Upgrade-/Entfernungsproben) — v0.5.0-Arbeit, kein v0.4.0-Artefakt
+### 2.3 Zurückgestellt (gated — wird erst bei erfüllter Bedingung gebaut)
 
-Was aus der Liste in `0.5.0` landet, entscheidet der Betreiber — die Liste
-selbst ist vollständig, wenn jeder offene Punkt aus PLAN §9 hier oder in §4
-steht.
+- Benchmarks und Metriken (4.1–4.6): Aufgaben-Set, DSH-Baseline, Shinon-Messung, Feature-Entscheidung mit Messwert.
+- Desktop (5.1–5.3, A10): Tauri-Shell, Shell-Protokoll, Single-Binary — Stufe 1 (`npm run open`) ist scharf; der Rest wartet auf die Engine-Messung und die A10-Entscheidung (Electron vs. Tauri vs. TUI).
+- Engine-Port (8.1–8.4): nur bei positivem 4.1-Befund und eingefrorenen Verträgen.
+- Commit `487c559`-Bewertung: gegenstandslos — der Stand ist committet und gemessen (siehe `docs/CHANGELOG.md`); ein Verdikt über einen Arbeitsbaum von 2026-10-10 baut nichts mehr.
 
-## 4. `1.0.0`-Kriterien und der `0.1.0`-Pfad
+## 3. `1.0.0`-Kriterien
 
 `1.0.0` heißt: jedes Profil-Paket ist ausgeliefert (kein `dsh.inactive` ohne
-begründetes Verdikt wie `PLAN.md` §3.12.1), der Task-Router ist per H5
-entschieden, die Live-Verifikation 3.9 ist grün belegt, und die Branch-Regel
-(`docs/CI.md` §2) ist scharf — nicht nur gebaut.
+begründetes Verdikt), der Task-Router ist per H5 entschieden, die
+Live-Verifikation 3.9 ist grün belegt, und die Branch-Regel (`docs/CI.md` §2)
+ist scharf — nicht nur gebaut.
 
-Der einzige `0.1.0`-Träger (`packages/shinon-forge`, neun fremde CLIs, fünf
-Werkzeuge, Intervall-Daemon) wird `1.0.0` genau dann, wenn sein
-Sicherheitsvertrag steht (welche Kommandos, welches `cwd`, welche `env`, wer
-sieht die Ausgabe, was bei Abbruch), ein Gate ihn pinnt und `dsh.inactive` aus
-`packages/shinon-forge/package.json` fällt. Bis dahin ist `0.1.0` die ehrliche
-Aussage, kein Rückstand.
-
-## 5. Was kein Release ist
+## 4. Was kein Release ist
 
 Kein einzelner Commit, keine grüne Momentaufnahme ohne Run-ID, keine Doku ohne
 Messbefehl. Wer eine Fassung behauptet, nennt Commit-SHA, CI-Run-ID und den

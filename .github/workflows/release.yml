@@ -1,7 +1,7 @@
 name: Shinon Forge Release-Schranke (S5)
 
 # Was dieser Workflow ist: die Abnahme-Schranke für ein Release-Tag, kein
-# Publisher. Er läuft nur auf Tags `v*` und prüft, was PLAN.md §9.1 S5 verlangt —
+# Publisher. Er läuft nur auf Tags `v*` und prüft, was docs/ROADMAP.md §1.5 S5 verlangt —
 # Version/Tag/Lock konsistent, alle Gates grün, Quellarchiv + SHA-256
 # reproduzierbar — und legt das Archiv als Ablauf-Artefakt ab. Er veröffentlicht
 # nichts: das Root-Manifest ist `private: true`, und minimale Publish-Rechte

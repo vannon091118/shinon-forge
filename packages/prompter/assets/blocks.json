@@ -158,6 +158,17 @@
       "herkunft": "packages/persona/index.js (renderNarrative, Interpretation nicht Autorität)"
     },
     {
+      "id": "persona-user-lage",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:user-lage",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 200,
+      "ausloeser": { "haystack": ["genervt", "frust", "nervt", "lob", "nice", "danke", "super", "bock"], "nurWenn": "lastUserMood != null" },
+      "herkunft": "packages/persona/index.js (detectUserMood + renderUserLage: erkannte User-Stimmung als System-Abschnitt, jede Interaktion wirkt)"
+    },
+    {
       "id": "enhancer-system-policy",
       "quelle": "prompter",
       "lage": "one-shot-system",

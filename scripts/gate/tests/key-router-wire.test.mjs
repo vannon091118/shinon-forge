@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * key-router-wire — der Draht beweist die Rotation (PLAN.md §3.12, EBENE 4).
+ * key-router-wire — der Draht beweist die Rotation (Beleg: docs/CHANGELOG.md).
  *
  * WARUM DIESE DATEI EXISTIERT: ein Pool, der gesunde Anbieter waehlt, ist noch
  * keine Rotation des tatsaechlich verwendeten Providers. Der Override-Test

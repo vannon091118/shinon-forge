@@ -1,5 +1,5 @@
 ---
-name: dsh-antwortwege
+name: shinon-antwortwege
 description: Wo Antworten zu DSH/Cordis schnell herkommen - Doku-Karte mit Pfaden, Introspektion des installierten DSH (dump-config, cordis_inspect, .d.ts), Terminologie-Glossar, Version-Wahrheit. Nutzen bevor eine DSH-Frage neu erforscht oder geraten wird.
 ---
 
@@ -7,7 +7,7 @@ description: Wo Antworten zu DSH/Cordis schnell herkommen - Doku-Karte mit Pfade
 
 Die DSH-Doku ist öffentlich und nach **Frage-Typ** sortiert. Erst die passende
 Quelle wählen, dann lesen — und was gelesen wurde, mit Fundstelle festhalten
-(Skill `dsh-beweis-tempo`).
+(Skill `shinon-beweis-tempo`).
 
 ## Doku-Karte (`deepseek-ai/deepseek-harness`, `docs/`)
 
@@ -54,9 +54,9 @@ installierten Fassung** — Probe-Muster `docs/probes/goal-integration.json`:
 | Frage | Ort |
 |---|---|
 | Konvention/Vertrag des Repos | `AGENTS.md`, `docs/ARCHITECTURE.md` |
-| Ist diese Bug-Klasse bekannt? | `.agents/skills/dsh-bug-muster` (Katalog B1–B14) |
+| Ist diese Bug-Klasse bekannt? | `.agents/skills/shinon-bug-muster` (Katalog B1–B14) |
 | Wie nutze ich Cordis hier maximal? | `.agents/skills/cordis-architektur` |
-| Welcher Check wann? | `.agents/skills/dsh-dev-workflow`, `.agents/skills/dsh-test-tempo` |
+| Welcher Check wann? | `.agents/skills/shinon-dev-workflow`, `.agents/skills/shinon-test-tempo` |
 | Was wurde schon RECHERCHIERT? | `docs/research/2026-10-09-cordis-dsh-recherche.md` (Quellen + Belege) — **Ziel fehlt in diesem Baum** (offener Posten, STAND §6.4) |
 | Was wurde schon BEWIESEN? | `docs/probes/*.json` (Claim/Evidence je Behauptung) |
 | Welche Zahlen/Verträge gelten? | `scripts/lib/repo.mjs` (eine Quelle), `docs/contracts/` |
@@ -71,7 +71,7 @@ installierten Fassung** — Probe-Muster `docs/probes/goal-integration.json`:
 3. **Funde mit Fundstelle ablegen** (Datei + Zeile/URL), nicht mit „irgendwo
    gelesen" — ein Fund ohne Fundstelle muss später nochmal gefunden werden.
 4. **Begriffe aus dem Glossar** übernehmen statt Synonyme zu erfinden; Bug-
-   Muster aus `postmortem/`/`dsh-bug-muster` zitieren statt neu zu beschreiben.
+   Muster aus `postmortem/`/`shinon-bug-muster` zitieren statt neu zu beschreiben.
 5. Bekannte Sackgassen: `cordis.js.org` leitet nur um (echte Doku ist das
    DSH-Primer); `docs/framework/*`- und `docs/practice/*`-Rohpfade 404en (über
    die Website navigieren); nicht-authentizierte GitHub-API ist ratenbegrenzt.

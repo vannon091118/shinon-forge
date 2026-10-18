@@ -626,3 +626,37 @@ test('Projektscope: das Shinon-Repo bekommt seine Persona weiterhin (Gegenprobe)
   assert.ok(host.handlers.size > 0, 'Events werden im eigenen Repo beobachtet');
   host.dispose();
 });
+
+// ── 8. Die User-Lage (jede Interaktion wirkt) ───────────────────────────────
+//
+// Anlass: die Antwort klang nach LLM-Standard — keine Nachfrage, keine Empathie,
+// die Persona hatte gefuehlt keine Auswirkung. Der Enhancer normalisiert den
+// Ton weg (Arbeitsauftrag bleibt optimal), also traegt die Persona die erkannte
+// Stimmung als eigenen Abschnitt: Frust und Lob kommen im Output an.
+
+test('persona: erkannte User-Stimmung steht als Abschnitt im Prompt', () => {
+  const host = connect();
+  assert.equal(host.sections.some((entry) => entry.name === 'shinon:user-lage'), false);
+
+  host.dispatch('shinon/event', { event_type: 'message.received', text: 'Boah, heute läuft wirklich alles schief, ich bin genervt.' });
+  const lage = host.sections.find((entry) => entry.name === 'shinon:user-lage');
+  assert.ok(lage, 'User-Lage-Abschnitt fehlt');
+  assert.match(lage.text, /frustriert/);
+
+  // Ersetzen, nicht anhängen: genau ein Lage-Abschnitt bleibt.
+  host.dispatch('shinon/event', { event_type: 'message.received', text: 'Richtig nice, exakt richtig so!' });
+  assert.equal(host.sections.filter((entry) => entry.name === 'shinon:user-lage').length, 1);
+  assert.match(host.sections.find((entry) => entry.name === 'shinon:user-lage').text, /erfreut/);
+  host.dispose();
+});
+
+test('persona: detectUserMood ist deterministisch und fail-closed', () => {
+  assert.equal(bundle.detectUserMood(''), null);
+  assert.equal(bundle.detectUserMood(null), null);
+  assert.equal(bundle.detectUserMood('Alles läuft normal, ganz ruhig.'), null);
+  assert.equal(bundle.detectUserMood('Ich bin genervt, nichts läuft.'), 'frustriert');
+  assert.equal(bundle.detectUserMood('Richtig nice, danke!'), 'erfreut');
+  assert.equal(bundle.renderUserLage(null), null);
+  assert.match(bundle.renderUserLage('frustriert'), /frustriert/);
+  assert.match(bundle.renderUserLage('erfreut'), /Sykophantismus/);
+});

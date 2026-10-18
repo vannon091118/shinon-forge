@@ -5,7 +5,7 @@
  * Warum diese Datei existiert: `bin/shinon.mjs` reichte jedes Argument an DSH
  * durch — `shinon doctor` startete DSH, statt eine eigene Diagnose zu liefern.
  * Das statische Gate (`scripts/gate/plugins/doctor.mjs`) prüft nur
- * Repo-Konsistenz, keine Laufzeit-Gesundheit. PLAN.md §9.1 S4 verlangt den
+ * Repo-Konsistenz, keine Laufzeit-Gesundheit. docs/ROADMAP.md §1.5 S4 verlangt den
  * Laufzeit-Unterbefehl mit drei Eigenschaften, und genau die drei prüft diese
  * → Kanon: docs/COMMENT-KANON.md#k-da88cab557ba
  */

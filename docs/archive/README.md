@@ -18,7 +18,7 @@ Was **nicht** hierher gehört:
   `docs/COMMIT-REGELN.md`, `docs/ROADMAP.md`, `docs/ZAHLEN.md`, `docs/INDEX.md`),
 - Belege mit eigenem Datenfeld (`docs/contracts/`, `docs/probes/`) — sie werden
   neu gemessen, nicht umgeschrieben,
-- `IDEA.md` und `PLAN.md` im Repo-Root (aktiv bzw. laufender Plan).
+- `IDEA.md` im Repo-Root (aktive Kurzidee) — `PLAN.md` ist seit 2026-10-18 eingezogen (offen: `docs/ROADMAP.md`, erledigt: `docs/CHANGELOG.md).
 
 Neue Nachweise entstehen weiter unter `docs/audit/` bzw. `docs/handshakes/`;
 sobald ein Nachweis abgeschlossen ist, wandert er hierher. Ein Nachweis wird
@@ -63,6 +63,11 @@ umgeschrieben — hier steht, wo die Datei heute liegt.
 | `docs/handshakes/2026-10-13-project-index-scan-und-ci-schranke.md` | [`archive/2026-10-13-project-index-scan-und-ci-schranke.md`](2026-10-13-project-index-scan-und-ci-schranke.md) |
 | `docs/legacy-goose-prompts/` | [`archive/legacy-goose-prompts/`](legacy-goose-prompts/) |
 | `prompts/README.md` | [`archive/prompts-README.md`](prompts-README.md) |
+| `PLAN.md` | offen in [`../ROADMAP.md`](../ROADMAP.md), erledigt in [`../CHANGELOG.md`](../CHANGELOG.md) |
+| `docs/STARTER-PLAN.md` | Stufe 1 in [`../CHANGELOG.md`](../CHANGELOG.md), Stufen 2–4 in [`../ROADMAP.md`](../ROADMAP.md) §2.3 |
+| `docs/MOBILE-PLAN.md` | komprimiert in [`../ROADMAP.md`](../ROADMAP.md) §2.2 |
+| `docs/SCORING-KONZEPT.md` | gebaut in [`../CHANGELOG.md`](../CHANGELOG.md), Rest (K7b, K8) in [`../ROADMAP.md`](../ROADMAP.md) §2.2 |
+| `.session-eval/` | [`archive/session-eval-2026-10-17/`](session-eval-2026-10-17/) (K5-Planung, Aufgabe erledigt; Offenpunkte in [`../ROADMAP.md`](../ROADMAP.md) §2.2) |
 
 ## 3. Schon vorher hier
 

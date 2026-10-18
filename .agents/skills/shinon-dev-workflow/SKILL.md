@@ -1,5 +1,5 @@
 ---
-name: dsh-dev-workflow
+name: shinon-dev-workflow
 description: Arbeitsablauf fuer Shinon Forge - welcher Check wann, wo Vertraege geaendert werden, Reihenfolge bei neuen Paketen/Regeln, Commit-Regeln (Vannon-Trailer). Nutzen vor jeder Feature- oder Bugfix-Arbeit im Repo.
 ---
 
@@ -38,7 +38,7 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
 - **Neues Paket** → Ordner `packages/<dir>/` mit genau den vier Dateien
   (`index.js`, `client.js`, `cordis.patch.yml`, `package.json`) plus optional
   `assets/` (Kernlogik OHNE bare Imports, damit CI ohne `node_modules` testen kann)
-  und `test/`. Namensvertrag an vier Stellen ableiten (siehe `dsh-bug-muster` B5),
+  und `test/`. Namensvertrag an vier Stellen ableiten (siehe `shinon-bug-muster` B5),
   `SHARED_DEPS` als peer+dev in beiden Profilen, Paket ins Profil
   (`profiles/shinon/package.json` → `dsh.profile.bundles`) — der `dead-package`-
   Gate flaggt alles, was fehlt.
@@ -86,7 +86,7 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
 |---|---|
 | Architektur-Regeln, Validierung | `docs/ARCHITECTURE.md`, `scripts/lib/repo.mjs` |
 | Commit-Regeln | `docs/COMMIT-REGELN.md`, `scripts/lib/commit-text.mjs` |
-| Pitfalls (Stack-Fallen) | `AGENTS.md` „Pitfalls" + `dsh-bug-muster` |
+| Pitfalls (Stack-Fallen) | `AGENTS.md` „Pitfalls" + `shinon-bug-muster` |
 | Cordis-Mechaniken | `cordis-architektur` + `docs/research/2026-10-09-cordis-dsh-recherche.md` — **Ziel fehlt in diesem Baum** (offener Posten, STAND §6.4) |
 | Verträge/Probes | `docs/contracts/`, `docs/probes/` |
 | Prompt/Persona-Flächen | `docs/archive/prompts-README.md` (System-Prompt-Registry, keine Datei-Templates) |

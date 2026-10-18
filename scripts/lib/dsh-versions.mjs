@@ -15,11 +15,12 @@ import { tokenize } from './source-scan.mjs';
 /** Die Sollquelle — relativ zum Repo-Root. */
 export const MATRIX_FILE = 'scripts/dsh-target-versions.json';
 
-/** Die vier Zielpakete. Mehr kennt die Matrix nicht; ein fünfter Schlüssel ist ein Befund. */
+/** Die fünf Zielpakete. Mehr kennt die Matrix nicht; ein sechster Schlüssel ist ein Befund. */
 export const TARGET_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh',
   '@deepseek-ai/schemastery',
   '@deepseek-ai/dsh-storage-domain',
+  '@deepseek-ai/dsh-storage-json',
   '@deepseek-ai/dsh-typert-protocol',
 ]);
 
@@ -150,7 +151,7 @@ function maskComments(source) {
 }
 
 /**
- * Die Matrix lesen und selbst prüfen: Objekt, genau die vier Zielpakete,
+ * Die Matrix lesen und selbst prüfen: Objekt, genau die fünf Zielpakete,
  * jede Fassung exakt. Ein Tippfehler in einem Schlüssel darf nicht als
  * „nicht zutreffend" durchgehen.
  * @returns {{ targets: Record<string,string>, issues: object[] }}

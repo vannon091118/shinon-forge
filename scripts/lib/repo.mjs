@@ -374,7 +374,7 @@ export function legacyHits(packages) {
 
 /**
  * pnpm-Reste: dieses Repo ruft pnpm nirgends auf und traegt keine pnpm-Datei
- * (PLAN.md Schritt 3.5/A1). Der Befund ist nicht theoretisch — UPSTREAMs
+ * (Beleg: docs/CHANGELOG.md, pnpm-Rückbau). Der Befund ist nicht theoretisch — UPSTREAMs
  * `initProfile` (`@deepseek-ai/dsh-app-boot`) legt bei `dsh plugin add` selbst eine
  * `pnpm-workspace.yaml` im Profilverzeichnis an, und ein `pnpm pack`/`pnpm install`
  * gerät leicht wieder in ein Skript.

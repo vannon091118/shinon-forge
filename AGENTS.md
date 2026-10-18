@@ -29,9 +29,10 @@ remote, so there is deliberately no sync script.
    niemand.
 
 ## Dev environment
-- Node and npm must be on PATH — **npm ist die einzige Paketquelle** (PLAN.md Schritt
-  3.5/A1: `packageManager`, `pnpm-workspace.yaml` und die pnpm-Aufrufe sind raus). Die
-  deklarierten Werte und ihre Prüfbefehle: `docs/ZAHLEN.md` §1.
+- Node and npm must be on PATH — **npm ist die einzige Paketquelle**
+  (`packageManager`, `pnpm-workspace.yaml` und die pnpm-Aufrufe sind raus;
+  Beleg: `docs/CHANGELOG.md`). Die deklarierten Werte und ihre Prüfbefehle:
+  `docs/ZAHLEN.md` §1.
 - pnpm wird vom Repo **nicht** mehr aufgerufen. Zwei Ausnahmen, die bleiben und die man
   kennen muss, weil sie fremder Code sind: `dsh plugin add` (der Upstream-Plugin-Manager)
   spricht weiter pnpm und legt bei Bedarf selbst ein `pnpm-workspace.yaml` im Profil an

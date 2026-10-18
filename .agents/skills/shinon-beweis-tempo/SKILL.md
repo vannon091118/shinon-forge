@@ -1,5 +1,5 @@
 ---
-name: dsh-beweis-tempo
+name: shinon-beweis-tempo
 description: Beweise einmal fuehren statt doppelt verifizieren - Proben-Praxis (docs/probes JSON: Claim/Targets/Expect/Result/Verdict/Evidence), Mutationsprobe, Abnahmetest, Statusklassen, Commit-Schnellregeln. Nutzen wenn eine Behauptung gerade geprueft wurde oder eine Aenderung Nachweise braucht.
 ---
 
@@ -31,7 +31,7 @@ Datei ist eine Liste von Proben (oder ein einzelnes Objekt wie
 - Befehl + Exit + Testzahlen nennen: „`node --test …` → 28/28 grün, Exit 0".
 - Keine Inhalte fremder Dateien kopieren — Namen, Zahlen, Verhalten.
 - Ein Test, der ohne den Beleg grün bleibt, ist kein Beleg (siehe
-  `dsh-test-tempo`: Guard braucht Mutationsbeweis).
+  `shinon-test-tempo`: Guard braucht Mutationsbeweis).
 
 ## Mutationsprobe + Abnahmetest (das schnellste Doppel)
 

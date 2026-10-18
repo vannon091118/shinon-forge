@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * bin/shinon.mjs — der echte Einstieg von Shinon Forge (PLAN.md Schritt 3.4 / D4).
+ * bin/shinon.mjs — der echte Einstieg von Shinon Forge (Beleg: docs/CHANGELOG.md).
  *
  * Ein Aufruf, **keine** Voraussetzung im PATH. Was hier passiert:
  *

@@ -14,7 +14,7 @@
 | Welche CI-Zweige laufen, welcher Name ist verpflichtend? | [`docs/CI.md`](CI.md) |
 | **Wie viele** Pakete, Layer, Tests? | [`docs/ZAHLEN.md`](ZAHLEN.md) |
 | Wohin geht es, was kostet ein Release? | [`docs/ROADMAP.md`](ROADMAP.md) |
-| Wie werden Mobile-Profil, responsiver Prototyp, Ballastabbau und Android-Shell geplant? | [`docs/MOBILE-PLAN.md`](MOBILE-PLAN.md) |
+| Was ist offen, was ist erledigt? | [`docs/ROADMAP.md`](ROADMAP.md) (offen), [`docs/CHANGELOG.md`](CHANGELOG.md) (erledigt) |
 | Was ist belegt, was nur gemessen-rot? | `docs/probes/`, `docs/contracts/` + `docs/ZAHLEN.md` §2/§3 |
 | Was ist abgeschlossen und warum steht es nicht mehr vorn? | [`docs/archive/README.md`](archive/README.md) |
 
@@ -71,27 +71,25 @@ gilt nicht als Nachmessung.
 | [`docs/audit/PERF-BASELINE-2026-10-17.md`](audit/PERF-BASELINE-2026-10-17.md) | current | 2026-10-17 | Performance-Baseline und drei abgeleitete Umbauten je unabhängiger Messmethode: Meta-Batch beim Öffnen (F1), `forgetFile`-Skip (F2), Referenz-Matcher — je mit Vorher/Nachher, TDD und Zerlegung des Kaltlaufs; Rohdaten in `docs/probes/perf-baseline.json` und `docs/probes/index-cold-breakdown.json` |
 | [`docs/audit/G1-ORCHESTRIERUNG-2026-10-17.md`](audit/G1-ORCHESTRIERUNG-2026-10-17.md) | current | 2026-10-17 | G1: Orchestrierungsentscheidung am echten Boot — Capability-Gap-Tabelle gegen den geladenen Profil-Dump, **NO SCHEDULER**, `shinon-task-router.activate` bleibt `false` bis zum echten Goal-Runden-Test |
 | [`docs/audit/G2-NOGO-2026-10-17.md`](audit/G2-NOGO-2026-10-17.md) | current | 2026-10-17 | G2: Gate-DAG **NO-GO** — beide Bedingungen (Gate als Engpass, fehlende Orchestrierung) scheitern gemessen; keine Codeänderung |
-| [`docs/audit/CLAIM_MATRIX_2026-10-17.md`](audit/CLAIM_MATRIX_2026-10-17.md) | current | 2026-10-17 | Claim-Matrix: 294 Kommentar-Blöcke und 39 Doku-Statusblöcke gesammelt, Überschneidungen/Dopplungen/Widersprüche geprüft, Kanonisierung belegt |
+| [`docs/audit/CLAIM_MATRIX_2026-10-17.md`](audit/CLAIM_MATRIX_2026-10-17.md) | current | 2026-10-17 | Claim-Matrix: Kommentar-Blöcke und Doku-Statusblöcke gesammelt, Überschneidungen/Dopplungen/Widersprüche geprüft |
+| [`docs/audit/DOC_REVIEW_2026-10-17.md`](audit/DOC_REVIEW_2026-10-17.md) | current | 2026-10-17 | transienter Doku-Review |
+| [`docs/audit/ORDNUNG-2026-10-18.md`](audit/ORDNUNG-2026-10-18.md) | current | 2026-10-18 | Komplexitäts-Audit: Ballast, Datenstrom, Reihenfolge (P0/P1 erledigt, C1 erledigt, Rest offen) |
 | [`docs/PR-PROMOTION.md`](PR-PROMOTION.md) | current | 2026-10-17 | PR-Promotion: Zustandsautomat, Evidenzregeln (Status zählt nur am genannten SHA) und die Adapter-Grenze — Schreibaktion bewusst außerhalb |
 | [`docs/CI.md`](CI.md) | current | 2026-10-14 | CI als Schranke: Zweige und verpflichtender Statuscheck für `main`, Setz- und Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-17 | alle harten Zahlen + Befehle |
 | [`docs/INDEX.md`](INDEX.md) | current | 2026-10-17 | dieser Einstieg und die Statusregel |
-| [`docs/ROADMAP.md`](ROADMAP.md) | plan | 2026-10-17 | kanonische Roadmap: Versionsordnung, Historie, Release-Ziele `0.4.0`/`0.5.0`, `1.0.0`-Kriterien und der `0.1.0`-Pfad |
+| [`docs/ROADMAP.md`](ROADMAP.md) | plan | 2026-10-18 | die einzige Liste offener Arbeit: Freeze-Abnahmen, v0.5.0-Kandidaten, Zurückgestelltes, `1.0.0`-Kriterien |
 | [`docs/S3-FRESHCLONE-2026-10-17.md`](S3-FRESHCLONE-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S3: Frischklon-Repro bis Boot |
 | [`docs/S3-FRESH-2026-10-17.md`](S3-FRESH-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S3: HTTP-200-Nachweis |
 | [`docs/S3-FRESH-d8999ab.md`](S3-FRESH-d8999ab.md) | current | 2026-10-17 | Release-Beleg S3 am aktuellen Stand |
 | [`docs/S4-DOCTOR-2026-10-17.md`](S4-DOCTOR-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S4: `doctor` als eigener Befehl |
 | [`docs/S5-RELEASE-2026-10-17.md`](S5-RELEASE-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S5 (teilweise): Schranke ohne Tag |
 | [`docs/S6-MODELLTURN-AUDIT-CI-2026-10-17.md`](S6-MODELLTURN-AUDIT-CI-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S6: zwei benannte Blocker, kein Go |
-| [`docs/STARTER-PLAN.md`](STARTER-PLAN.md) | plan | 2026-10-08 | native App/Tauri: Stufe 1 scharf, 2–4 Konzept |
-| [`docs/MOBILE-PLAN.md`](MOBILE-PLAN.md) | plan | 2026-10-14 | Mobile-Profil, ballastarmes UI, CI-/Sicherheits-Gates und Android-Runtime-Spike |
-| [`docs/SCORING-KONZEPT.md`](SCORING-KONZEPT.md) | plan | 2026-10-11 | Scoring-Konzept: K1–K4 als Ist, K5–K8 als Ziel — implizite Signale, Dauerhaftigkeit über den Ledger, Vorlieben-Trennung, ohne Deckel |
-| [`PLAN.md`](../PLAN.md) | plan | 2026-10-17 | laufender Umsetzungsplan des Umbaus (§9.1: Release-Abnahme je Slice) |
+| [`docs/CHANGELOG.md`](CHANGELOG.md) | current | 2026-10-18 | die einzige Liste erledigter Arbeit: je Eintrag Datum, was, und wo der Beleg liegt |
 | [`IDEA.md`](../IDEA.md) | current | 2026-10-13 | Kurzidee; Roh-Export im Archiv |
 | [`docs/archive/README.md`](archive/README.md) | current | 2026-10-17 | der eine History-Ordner: Regel, Umleitungstabelle, Bestand |
 | [`shinon-forge-implementierungsplan.md`](../shinon-forge-implementierungsplan.md) | historical | 2026-10-07 | bleibt im Root, weil eingefrorene Proben und `scripts/gate/tests/prompter-contract.test.mjs` ihn wörtlich zitieren |
 | [`packages/narrative/README.md`](../packages/narrative/README.md) | current | 2026-10-10 | Paket-Doku Narrative Engine |
-| [`packages/shinon-forge/README.md`](../packages/shinon-forge/README.md) | current | 2026-10-10 | Paket-Doku Shinon Forge |
 | [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) | current | 2026-10-17 | Fremdhinweise, getrennt vom eigenen Copyright (A12) |
 | [`vendor/MODIFICATIONS.md`](../vendor/MODIFICATIONS.md) | current | 2026-10-17 | Änderungslog des vendorten DSH-Anteils: welche Fassung hier liegt und welcher Code sie lädt (A4 der Release-Abnahme) |
 | [`LICENSE`](../LICENSE) | current | 2026-10-11 | eigene Lizenz (MIT, `Copyright (c) 2026 Vannon`) — kein Markdown, deshalb ohne Statusblock |
@@ -103,13 +101,9 @@ gilt nicht als Nachmessung.
 Baum; die vollständige Liste und jede Umleitung steht in
 [`docs/archive/README.md`](archive/README.md).
 
-**Neue Nachweise** (noch nicht abgeschlossen) liegen unter `docs/audit/`;
-`docs/handshakes/` existiert derzeit nicht — beendete Handshakes liegen im Archiv.
-Derzeit liegen unter `docs/audit/` der transiente Review
-[`docs/audit/DOC_REVIEW_2026-10-17.md`](audit/DOC_REVIEW_2026-10-17.md), der
-Batch-0-Nachweis [`docs/audit/BATCH0-SCOPE-2026-10-17.md`](audit/BATCH0-SCOPE-2026-10-17.md)
-und die Performance-Baseline [`docs/audit/PERF-BASELINE-2026-10-17.md`](audit/PERF-BASELINE-2026-10-17.md);
-nach Abschluss wandern sie ins Archiv. Belege `docs/contracts/` und `docs/probes/`
+**Neue Nachweise** (noch nicht abgeschlossen) liegen unter `docs/audit/` — der
+Bestand steht in der Tabelle oben; nach Abschluss wandern sie ins Archiv.
+Belege `docs/contracts/` und `docs/probes/`
 sind JSON-Dateien mit eigenem Statusfeld; sie sind Proben **mit Datum** und
 werden nicht nachträglich „aktuell“ gemacht, sondern neu gemessen.
 

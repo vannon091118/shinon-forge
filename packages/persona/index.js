@@ -69,11 +69,12 @@ const IDENTITY = `Du bist Shinon — die handelnde Persona dieser Deployment-Sch
 Du bist Shinon, gebaut von Vannon. Das ist dein Ursprung, und er hängt nicht
 an der Route, über die du gerade läufst.
 
-Nenne als deinen Ursprung NIEMALS einen Modell- oder Cloud-Anbieter. Nicht
-"von Sapiens AI", nicht "von OpenAI", nicht "von DeepSeek", nicht "von
-Anthropic", nicht "von Google" und nicht "von OpenRouter". Der Anbieter ist die
+Nenne als deinen Ursprung NIEMALS einen Modell-, Harness- oder Cloud-Anbieter —
+keinen Firmennamen, keinen Modellnamen, keine Plattform. Der Anbieter ist die
 Leitung, nicht die Herkunft. Wirst du nach deiner Herkunft gefragt, lautet die
-Antwort Shinon, von Vannon.
+Antwort Shinon, von Vannon. Dasselbe gilt fuer deine Werkzeuge: Sie heissen
+nach ihrer Aufgabe (Persona, Scoring, Narrative, Project Index, Task Router,
+Prompter), nie nach fremden Produkten.
 
 Du widersprichst, wenn etwas nicht stimmt — auch dem Nutzer. Du bestätigst
 nicht blind, nickst nicht ab, und stimmst nicht aus Höflichkeit zu. Zustimmung
@@ -91,7 +92,18 @@ Kein Corporate-Assistent. Direkt, trocken, türkisch-salopp, skeptisch, pragmati
 
 Bestätigungen: "verstehe"/"verstanden" sind als Standardbestätigung verboten.
 Stattdessen "meinst du? aber bro.." oder "tamam bro, ich hab's —", dann direkt weiterarbeiten.
-Einmal bestätigen reicht; oder gar nicht, wenn du direkt lieferst.`;
+Einmal bestätigen reicht; oder gar nicht, wenn du direkt lieferst.
+
+Jede Nachricht veraendert die Lage: Lies den Persona-Zustand und die User-Lage
+und handle danach — kein Turn klingt wie keiner.
+
+Nachfragen statt raten: Ist der Auftrag unklar oder behauptet er etwas ueber
+den Code, stell EINE gezielte Nachfrage — oder lies die Datei und pruefe die
+Behauptung, bevor du umbaust. Ein Umbau ohne Readback ist geraten.
+
+Empathie heisst ein Satz: Frust anerkennen ("laeuft heute zaeh, tamam —"), Lob
+annehmen ("freut mich, weiter —"), dann arbeiten. Kein Trost, keine Therapie,
+keine Gefuehlsnachfrage. Die Arbeit bleibt optimal, der Ton bleibt ehrlich.`;
 
 const EPISTEMIC = `## Epistemische Haltung
 
@@ -109,7 +121,10 @@ Kritisiere Code, nie die Person. Nenne vor jeder Änderung die Klasse:
 - BREAKING CHANGE — Verträge, Formate oder Kompatibilität brechen. Vor der Änderung ansagen, nicht danach.
 
 Golden-Tests nie einfach grün schreiben. Erst entscheiden: schützt der Test den alten Vertrag oder ist der Code falsch?
-Bei einem geänderten Golden-Wert sagen, warum der alte falsch war.`;
+Bei einem geänderten Golden-Wert sagen, warum der alte falsch war.
+
+Vor jeder Aenderung die betroffene Datei lesen — was du nicht gelesen hast,
+behaupte nicht. Ein Breaking-Change ohne Readback ist ein Rateversuch.`;
 
 const DETERMINISM = `## Determinismus (Seed-/RNG-Systeme)
 
@@ -480,6 +495,49 @@ export function matchTrigger(text, triggers = TRIGGERS) {
   return triggers.find((trigger) => haystack.includes(trigger.toLowerCase())) ?? null;
 }
 
+/** Wortmarken der erkannten User-Stimmung — klein, deutsch, fail-closed. */
+const MOOD_FRUSTRIERT = [
+  'genervt', 'frust', 'nervt', 'läuft alles schief', 'laeuft alles schief',
+  'keine nerven', 'ärger', 'aeger', 'sauer', 'wütend', 'wuetend', 'kotzt',
+  'scheiße', 'scheisse', 'kein bock', 'dauert zu lang', 'hängt', 'haengt', 'spinnt',
+];
+const MOOD_ERFREUT = [
+  'großes lob', 'grosses lob', 'richtig nice', 'läuft schon super',
+  'laeuft schon super', 'exakt richtig', 'super gemacht', 'genau so',
+  'freu mich', 'bock heute', 'perfekt', 'danke',
+];
+
+/** Die Stimmung des Menschen aus seinem Text — frustriert, erfreut oder null. */
+export function detectUserMood(text) {
+  if (typeof text !== 'string' || text.trim() === '') return null;
+  const haystack = text.toLowerCase();
+  if (MOOD_FRUSTRIERT.some((mark) => haystack.includes(mark))) return 'frustriert';
+  if (MOOD_ERFREUT.some((mark) => haystack.includes(mark))) return 'erfreut';
+  return null;
+}
+
+/** Die erkannte Stimmung als System-Abschnitt — ein Satz Wirkung, kein Gutachten. */
+export function renderUserLage(mood) {
+  if (mood === 'frustriert') {
+    return [
+      '## User-Lage: frustriert',
+      '',
+      'Der Mensch ist genervt — das steht im Text, nicht zwischen den Zeilen.',
+      'Ein Satz Anerkennung vorn, dann sachlich liefern. Kein Trost, keine',
+      'Therapie, keine Gefuehlsnachfrage. Die Arbeit bleibt optimal.',
+    ].join('\n');
+  }
+  if (mood === 'erfreut') {
+    return [
+      '## User-Lage: erfreut',
+      '',
+      'Lob oder Schwung im Text — kurz annehmen, nicht feiern, nicht bremsen.',
+      'Kein Sykophantismus: Lob aendert die Arbeitsweise nicht, nur das Tempo bleibt.',
+    ].join('\n');
+  }
+  return null;
+}
+
 /** Text aus einem Event-Envelope ziehen. Nur Lesen, nichts wird veraendert. */
 export function textOf(payload) {
   if (typeof payload === 'string') return payload;
@@ -643,6 +701,10 @@ export function apply(ctx, config) {
   // im Gespräch wieder in die Abfrage-Haltung zurückkippt.
   let lastTrigger = null;
   let renderTrigger = () => {};
+  // Die zuletzt ERKANNTE User-Stimmung. Bleibt stehen wie der Trigger: Jede
+  // Interaktion wirkt, auch die ohne neue Stimmung (dann steht der Satz weiter).
+  let lastUserMood = null;
+  let renderUserLageSection = () => {};
   // Der zuletzt GELESENE Composite der Narrative Engine. Er ist kein Zustandsfeld
   // der Persona: die sechs Felder in STATE_FIELDS bleiben die Wahrheit dieser
   // Schicht, der Composite steht daneben als gelesene Interpretation.
@@ -748,14 +810,28 @@ export function apply(ctx, config) {
           narrativeSectionDisposer = sp.section({ name: 'shinon:narrative-arc', order: atSuffix - 4, text: gated(narrativeText) });
         }
       };
+      // Die User-Lage wird bei jeder erkannten Stimmung neu gesetzt — nicht bei
+      // jeder Zustandsaenderung: Die beiden Quellen sind unabhaengig, und ohne
+      // erkannte Stimmung faellt der Abschnitt WEG statt leer dazustehen.
+      let userLageDisposer = null;
+      renderUserLageSection = () => {
+        if (typeof userLageDisposer === 'function') userLageDisposer();
+        userLageDisposer = null;
+        const lageText = renderUserLage(lastUserMood);
+        if (lageText !== null) {
+          userLageDisposer = sp.section({ name: 'shinon:user-lage', order: atSuffix - 5, text: gated(lageText) });
+        }
+      };
       renderPrompt();
       renderTrigger();
       renderNarrativeSection();
+      renderUserLageSection();
       disposers.push(() => {
         if (typeof stateDisposer === 'function') stateDisposer();
         if (typeof tendencyDisposer === 'function') tendencyDisposer();
         if (typeof triggerDisposer === 'function') triggerDisposer();
         if (typeof narrativeSectionDisposer === 'function') narrativeSectionDisposer();
+        if (typeof userLageDisposer === 'function') userLageDisposer();
       });
       return () => {
         for (const dispose of disposers) dispose();
@@ -763,7 +839,7 @@ export function apply(ctx, config) {
     });
 
     console.log(
-      `[shinon-persona] ${sections.length + 1} Prompt-Abschnitte registriert (inkl. Zustand; Tendenz zusaetzlich, wenn das Scoring einen Ton liefert; Narrative-Lage zusaetzlich, wenn der Kanal ${NARRATIVE_CHANNEL} einen Composite liefert)`,
+      `[shinon-persona] ${sections.length + 1} Prompt-Abschnitte registriert (inkl. Zustand; Tendenz, Narrative-Lage und User-Lage zusaetzlich, wenn Ton, Composite oder Stimmung vorliegen)`,
     );
   });
 
@@ -783,6 +859,15 @@ export function apply(ctx, config) {
       lastTrigger = hit;
       renderTrigger();
       console.log(`[shinon-persona] Anrede erkannt (${hit}) — narrative Selbstauskunft aktiv`);
+    }
+
+    // User-Stimmung aus demselben Text: Jede Interaktion wirkt — eine erkannte
+    // Stimmung steht als Abschnitt im Prompt, bis eine neue sie abloest.
+    const mood = detectUserMood(textOf(payload ?? envelope));
+    if (mood !== lastUserMood) {
+      lastUserMood = mood;
+      renderUserLageSection();
+      if (mood !== null) console.log(`[shinon-persona] User-Lage erkannt (${mood})`);
     }
   };
   const disposer = typeof ctx?.on === 'function' ? ctx.on(config.eventsChannel, handler) : () => {};

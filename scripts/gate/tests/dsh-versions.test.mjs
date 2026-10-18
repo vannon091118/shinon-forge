@@ -27,6 +27,7 @@ import { targetDshVersion } from '../../dsh-update.mjs';
 const DSH = '9.9.9';
 const SCHM = '4.4.4';
 const STORAGE = '9.9.9';
+const STORAGE_JSON = '9.9.9';
 const TYPERT = '9.9.9';
 const INTEGRITY = 'sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
 
@@ -49,6 +50,7 @@ function fixture(overrides = {}) {
     '@deepseek-ai/dsh': DSH,
     '@deepseek-ai/schemastery': SCHM,
     '@deepseek-ai/dsh-storage-domain': STORAGE,
+    '@deepseek-ai/dsh-storage-json': STORAGE_JSON,
     '@deepseek-ai/dsh-typert-protocol': TYPERT,
     ...overrides.matrix,
   });
@@ -65,6 +67,7 @@ function fixture(overrides = {}) {
       'node_modules/@deepseek-ai/dsh': lockEntry('@deepseek-ai/dsh', DSH),
       'node_modules/@deepseek-ai/schemastery': lockEntry('@deepseek-ai/schemastery', SCHM),
       'node_modules/@deepseek-ai/dsh-storage-domain': lockEntry('@deepseek-ai/dsh-storage-domain', STORAGE),
+      'node_modules/@deepseek-ai/dsh-storage-json': lockEntry('@deepseek-ai/dsh-storage-json', STORAGE_JSON),
       'node_modules/@deepseek-ai/dsh-typert-protocol': lockEntry('@deepseek-ai/dsh-typert-protocol', TYPERT),
     },
   });
@@ -90,7 +93,7 @@ function fixture(overrides = {}) {
   return { root, overrides };
 }
 
-const runtime = { cli: DSH, packages: { '@deepseek-ai/dsh': DSH, '@deepseek-ai/schemastery': SCHM, '@deepseek-ai/dsh-storage-domain': STORAGE, '@deepseek-ai/dsh-typert-protocol': TYPERT } };
+const runtime = { cli: DSH, packages: { '@deepseek-ai/dsh': DSH, '@deepseek-ai/schemastery': SCHM, '@deepseek-ai/dsh-storage-domain': STORAGE, '@deepseek-ai/dsh-storage-json': STORAGE_JSON, '@deepseek-ai/dsh-typert-protocol': TYPERT } };
 
 const run = (root, options = {}) => checkVersions(root, { runtime, ...options });
 const codes = (result) => result.issues.map((found) => found.code);
@@ -123,9 +126,10 @@ test('grüner Baum: keine Befunde, Matrix gelesen', () => {
     '@deepseek-ai/dsh': DSH,
     '@deepseek-ai/schemastery': SCHM,
     '@deepseek-ai/dsh-storage-domain': STORAGE,
+    '@deepseek-ai/dsh-storage-json': STORAGE_JSON,
     '@deepseek-ai/dsh-typert-protocol': TYPERT,
   });
-  assert.ok(result.checks.lockEntries >= 4);
+  assert.ok(result.checks.lockEntries >= 5);
 });
 
 test('Matrix: fehlender Eintrag, Range statt Fassung, unbekanntes Paket', () => {
@@ -269,12 +273,12 @@ test('Quelltext: ein zweiter Versionsliteral ist ein Befund mit Fundstelle', () 
   assert.deepEqual(new Set(codes(result)), new Set(['TARGET_LITERAL_IN_SOURCE']));
   assert.deepEqual(
     result.issues.map((found) => found.where),
-    ['scripts/tool.mjs:1', 'scripts/tool.mjs:1', 'scripts/tool.mjs:1'],
+    ['scripts/tool.mjs:1', 'scripts/tool.mjs:1', 'scripts/tool.mjs:1', 'scripts/tool.mjs:1'],
     'jedes Zielpaket mit derselben Fassung meldet die Zeile einmal',
   );
   assert.deepEqual(
     result.issues.map((found) => found.package).sort(),
-    ['@deepseek-ai/dsh', '@deepseek-ai/dsh-storage-domain', '@deepseek-ai/dsh-typert-protocol'],
+    ['@deepseek-ai/dsh', '@deepseek-ai/dsh-storage-domain', '@deepseek-ai/dsh-storage-json', '@deepseek-ai/dsh-typert-protocol'],
   );
   assert.equal(result.issues[0].actual, DSH);
   assert.equal(result.issues[0].expected, 'aus der Matrix gelesen');
@@ -300,7 +304,7 @@ test('Updater: die Sollfassung kommt aus der Matrix, nicht aus einer Registry', 
   assert.throws(() => targetDshVersion(root), /Sollquelle .* ist ungültig/);
 });
 
-test('die echte Sollquelle des Repos hat genau die vier Zielpakete', () => {
+test('die echte Sollquelle des Repos hat genau die fünf Zielpakete', () => {
   const root = fileURLToPath(new URL('../../../', import.meta.url));
   const { targets, issues } = loadMatrix(root);
   assert.deepEqual(issues, []);

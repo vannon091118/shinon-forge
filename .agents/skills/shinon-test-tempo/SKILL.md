@@ -1,6 +1,6 @@
 ---
-name: dsh-test-tempo
-description: Schnellster Weg zu echtem Signal - welcher Test wann, Skip-Regeln, real entry path, Mutationsbeweis fuer Guards, Stale-Artifact-Falle. Nutzen vor jedem Testlauf, bei roten Checks oder wenn unklar ist, was ein Gruen ueberhaupt beweist. Ergaenzt dsh-dev-workflow (Befehlskarte) und dsh-bug-muster (Bug-Klassen).
+name: shinon-test-tempo
+description: Schnellster Weg zu echtem Signal - welcher Test wann, Skip-Regeln, real entry path, Mutationsbeweis fuer Guards, Stale-Artifact-Falle. Nutzen vor jedem Testlauf, bei roten Checks oder wenn unklar ist, was ein Gruen ueberhaupt beweist. Ergaenzt shinon-dev-workflow (Befehlskarte) und shinon-bug-muster (Bug-Klassen).
 ---
 
 # Test-Tempo: Signal statt Aktivität
@@ -33,7 +33,7 @@ falschen. Regeln aus DSHs Testing-Policy (`docs/testing.md`) und diesem Repo.
 1. **„A guard only guards if the regression fails it."** Ein neuer Check ist erst
    ein Guard, wenn er die Regression sieht: Mutation einbauen → Test muss **rot**
    werden → revertieren → grün. Genau so dokumentieren (`docs/probes/`,
-   siehe Skill `dsh-beweis-tempo`). Ein Guard ohne diesen Beweis ist Dekoration.
+   siehe Skill `shinon-beweis-tempo`). Ein Guard ohne diesen Beweis ist Dekoration.
 2. **„Test the real entry path."** Handmontierte `ctx.plugin({…})`-Suiten beweisen
    nicht, dass das Plugin **so wie ausgeliefert** lädt — `unwrapExports`,
    `inject`-Verlust und Modul-Auflösung laufen nur im echten Loader/Build

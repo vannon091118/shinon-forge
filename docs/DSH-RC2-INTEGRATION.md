@@ -26,7 +26,6 @@ mit Exit 1.
 | Bereich | Änderung | Beleg |
 |---|---|---|
 | Plugin-Kompatibilität | Jedes Paket deklariert `engines.dsh: ">=0.2.1-rc.2"`; der Prüfer wertet den Bereich gegen die Sollfassung aus (DSH prüft ihn beim Mounten). | `packages/*/package.json`, `scripts/lib/dsh-versions.mjs` |
-| Agent-Anweisungen | Der Memory-Sync liest und schreibt über `DSH_AGENTS_HOME` (Default bleibt `~/.agents`, nichts wird verschoben); ein relativer Pfad wird abgelehnt. | `packages/shinon-forge/index.js`, `scripts/gate/tests/agents-home.test.mjs` |
 | npm-Hoisting | Der Seam-Test sucht Host-Pakete im ganzen Installat statt über `require.resolve` vom dsh-Paket; rc.2 legt `dsh-agent-loop` unter `dsh-base`, den Session-Controller unter `dsh`. | `scripts/gate/tests/message-ingress.test.mjs` |
 | schemastery | Root und jedes Paket nennen `3.18.5` exakt, Peer-Bereiche bleiben `~3.18.5-alpha.1` und schließen sie ein; genau eine Kopie im Lock. | `scripts/gate/tests/schemastery-pin.test.mjs` |
 | CI | Der Versionsprüfer läuft im Zweig `static-gate` mit demselben Befehl wie lokal und im Updater. | `.github/workflows/commit-guard.yml` |

@@ -177,7 +177,7 @@ Momentaufnahme, die nichts verspricht.
 
 ## 5. Mobile-Gates — geplant, noch nicht implementiert
 
-Der Umsetzungspfad steht in [docs/MOBILE-PLAN.md](MOBILE-PLAN.md). Die Namen unten sind **geplante Gate-/CI-Verträge**, keine bereits vorhandenen Jobs und keine grünen Prüfungen:
+Der Umsetzungspfad steht in [docs/ROADMAP.md](ROADMAP.md) §2.2. Die Namen unten sind **geplante Gate-/CI-Verträge**, keine bereits vorhandenen Jobs und keine grünen Prüfungen:
 
 | Gate / Job | Prüft | Einbindung |
 |---|---|---|

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * key-router-override — der Pool erreicht die Route (PLAN.md §3.12).
+ * key-router-override — der Pool erreicht die Route (Beleg: docs/CHANGELOG.md).
  *
  * WARUM DIESE DATEI EXISTIERT: der Router verwaltete seinen Pool und
  * beantwortete seine Werkzeuge — aber DSH bekam keinen rotierenden Schlüssel an

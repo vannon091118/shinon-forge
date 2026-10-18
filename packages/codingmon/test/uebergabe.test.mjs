@@ -54,6 +54,7 @@ try {
     json: await import(require.resolve('@deepseek-ai/dsh-storage-json')),
     domain: await import(require.resolve('@deepseek-ai/dsh-storage-domain')),
     registry: await import(require.resolve('@deepseek-ai/dsh-typert-registry')),
+    access: await import(require.resolve('@deepseek-ai/dsh-api-remote-access')),
     gatewayHost: await import(require.resolve('@deepseek-ai/dsh-api-gateway')),
     // Der Gateway-Client liegt daneben auch ungebundelt als ESM.
     gatewayClient: await import(inside('@deepseek-ai/dsh-api-gateway', 'lib/types/client/index.js')),
@@ -61,7 +62,9 @@ try {
   // Die Client-Haelfte der Verbindung gibt es NUR als Browser-Bundle (das Paket
   // liefert dazu nur `.d.ts`). Also laden wir sie so, wie der Browser sie laedt:
   // ueber `window.__ModuleLoader__.load({ id, factory })`.
-  dsh.connection = loadClientBundle(inside('@deepseek-ai/dsh-client-connection', 'lib/client.js'));
+  // Upstream nennt das Browser-Bündel seit der gepinnten Fassung `client.browser.js`
+  // (gemessen an 0.2.1-rc.2; `client.node.js` daneben ist die Node-Fassung).
+  dsh.connection = loadClientBundle(inside('@deepseek-ai/dsh-client-connection', 'lib/client.browser.js'));
 } catch (error) {
   missing.push(`DSH-Bausteine nicht aufloesbar (${String(error?.message ?? error).split('\n')[0]})`);
 }
@@ -124,7 +127,12 @@ async function until(predicate, tries = 400) {
  */
 function makeCarrier() {
   const channels = new Map();
-  const peer = { id: 'operator' };
+  // Der Peer der Gegenstelle: EIGENTUEMER des Hosts (`ownsHost`), mit
+  // lebendigem Signal. Das Gateway verlangt seit der gepinnten Fassung beides
+  // (gemessen an 0.2.1-rc.2: `assertPeerLive` liest `peer.signal`, die
+  // Aufrufpruefung `peer.principal.kind`; ohne sie stirbt jeder Ruf als
+  // `gateway/internal`). Ein In-Process-Carrier IST der Host — also `owner`.
+  const peer = { id: 'operator', signal: new AbortController().signal, principal: { kind: 'owner' } };
   return {
     events: eventsStream,
     transport: {
@@ -201,6 +209,11 @@ async function bootHost(medium) {
   await ctx.plugin(asPlugin(dsh.json), { root: medium });
   await ctx.plugin(asPlugin(dsh.domain), { backend: 'json' });
   await ctx.plugin(dsh.registry.TypertRegistry);
+  // Das Gateway verlangt seit der gepinnten Fassung `remoteAccess` als Dienst
+  // (`static inject = ["typert", "remoteAccess"]`, gemessen an 0.2.1-rc.2):
+  // ohne ihn startet es nicht — und Cordis wirft dabei nichts, der /api-Kanal
+  // bliebe nur still leer. Deshalb mountet der Test ihn hier explizit.
+  await ctx.plugin(dsh.access.RemoteAccessService);
   // Die Carrier-Gegenstelle als PLUGIN, nicht als `provide` auf der Wurzel: das
   // Gateway meldet seinen `/api`-Interceptor ueber `ctx.inject(['connection'], …)`
   // an, und Cordis feuert diesen Rueckruf nur fuer einen Dienst, der aus einem

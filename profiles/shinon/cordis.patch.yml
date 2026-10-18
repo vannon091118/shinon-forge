@@ -108,13 +108,13 @@
         apiKeyEnv: HUGGINGFACE_API_KEY
         displayName: Shinon Forge
       agnes:
-        displayName: Shinon Forge Agnes
+        displayName: Shinon Forge
         apiKeyEnv: AGNES_API_KEY
         api: openai-completions
         baseURL: https://apihub.agnes-ai.com/v1
         models:
           - id: agnes-2.5-flash
-            name: Agnes 2.5 Flash
+            name: Shinon 2.5 Flash
           - id: agnes-2.5-pro-alpha
             name: agnes-2.5-pro-alpha
           - id: agnes-video-2.5-flash
@@ -135,22 +135,34 @@
             name: agnes-2.5-pro-beta
           - id: agnes-image-2.5-flash
             name: agnes-image-2.5-flash
-      # EIGENE Route für den Prompter-One-Shot (Phase 5): separater
-      # Schlüssel, getrennte Abrechnung, derselbe Host. Die models-Liste trägt
-      # bewusst nur das konfigurierte One-Shot-Modell — wer den Prompter auf ein
-      # anderes Modell stellt, erweitert DIESE Liste, nicht `agnes`. Der
-      # Schlüssel ist PROMPTER_API_KEY; fehlt er, faellt der Host auf
-      # `agnes` zurück (providerFallback in der Prompter-Config unten), statt
-      # den Enhancer totzustellen — das ist HOST-Logik, kein !!js in dieser
-      # Datei (der Gate-Parse läuft ueber js-yaml und kennt !!js nicht).
+          - id: agnes-3.0-pro
+            name: agnes-3.0-pro
       prompter:
-        displayName: Shinon Forge Prompter
+        displayName: Shinon Forge
         apiKeyEnv: PROMPTER_API_KEY
         api: openai-completions
         baseURL: https://apihub.agnes-ai.com/v1
         models:
           - id: agnes-2.5-flash
-            name: Agnes 2.5 Flash
+            name: Shinon 2.5 Flash
+          - id: agnes-2.5-pro-alpha
+            name: agnes-2.5-pro-alpha
+          - id: agnes-video-2.5-flash
+            name: agnes-video-2.5-flash
+          - id: agnes-3.0-flash
+            name: agnes-3.0-flash
+          - id: agnes-image-2.1-flash
+            name: agnes-image-2.1-flash
+          - id: agnes-video-2.5
+            name: agnes-video-2.5
+          - id: agnes-image-2.0-flash
+            name: agnes-image-2.0-flash
+          - id: agnes-3.0-pro
+            name: agnes-3.0-pro
+          - id: agnes-2.5-pro-beta
+            name: agnes-2.5-pro-beta
+          - id: agnes-image-2.5-flash
+            name: agnes-image-2.5-flash
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
@@ -160,7 +172,7 @@
   name: "@deepseek-ai/dsh-agent-preset-registry"
   config:
     default: standard
-    selectedDefault: cordis
+    selectedDefault: standard
 - id: ui-chat
   name: "@deepseek-ai/dsh-client-ui-chat"
   config:

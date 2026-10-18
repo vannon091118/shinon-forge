@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * spike-resolved-profile.mjs — Spike zu PLAN.md Schritt 3.3 (D3).
+ * spike-resolved-profile.mjs — Spike zur Profilfrage (Beleg: docs/CHANGELOG.md).
  *
  * Frage: bootet das Produkt mit einem Profil, das **nicht** unter
  * `$DSH_HOME/profiles/<name>` liegt? Die Antwort ist die Vorbedingung dafür,

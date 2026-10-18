@@ -82,7 +82,7 @@ packages exist, which are active and how many profile layers there are is measur
 
 > **Release-Ziel v0.4.0:** der eingefrorene Umfang sieht **einen** Installationsweg
 > vor — den Quellklon mit den Befehlen unten. Der Freeze ist keine Freigabe: die
-> Abnahme aus `PLAN.md` §9.1 ist noch nicht vollständig. `shinon doctor` ist seit
+> Abnahme aus `docs/ROADMAP.md` §1.5 ist noch nicht vollständig. `shinon doctor` ist seit
 > 2026-10-17 ein eigener read-only CLI-Unterbefehl (S4 belegt: Test
 > `scripts/gate/tests/doctor-cli.test.mjs`, Probelauf Exit 0). `shinon update`, persistentes
 > `shinon autoupdate` und ein `.deb` als unterstützter Release-Installationsweg sind
@@ -128,7 +128,7 @@ aktualisiert nicht Shinon Forge.
 
 Daneben enthält der Baum Bediener-Werkzeuge (`npm run install:user`,
 `npm run verify:install`, `npm run backup:retention`); der eingefrorene
-v0.4.0-Abnahmeweg bleibt der Quellklon, bis `PLAN.md` §9.1 einen weiteren
+v0.4.0-Abnahmeweg bleibt der Quellklon, bis `docs/ROADMAP.md` §1.5 einen weiteren
 Slice belegt.
 
 ---
@@ -194,7 +194,6 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 | **[@shinon/codingmon](packages/codingmon)** | Pet-/Kampf-System mit dauerhaftem Zustand und Client→Host-Naht | ✅ |
 | **[@shinon/key-router](packages/key-router)** | Key-Pool mit 429-Rotation: Werkzeuge `key_router_status`/`key_router_rotate`/`key_router_probe`, Provider-Override für konfigurierte Credentials-Referenzen; echte Provider-Rotation mit realen Schlüsseln nicht live geprüft | ✅ |
 | **[@shinon/narrative](packages/narrative)** | Chronicle, Arcs, Relationships, Composite State (Zug 5 aktiviert) | ✅ |
-| **[@shinon/shinon-forge](packages/shinon-forge)** | Memory Sync, Global Runner, Engine Adapters | — |
 | **[@shinon/better-errors](packages/better-errors)** | Config-Ebene ohne Logik: `apply()` loggt nur | ✅ |
 | **[@shinon/token-usage](packages/token-usage)** | zeigt im Sidebar-Fuß die Token-Zahl des JÜNGSTEN Turns (aus dessen eigenen Ereignissen gefaltet, dieselbe Zahl wie DSHs Turn-Zeile) und im Titel daneben die Sitzungssumme (DSH-Sitzungs-Projektion `tokenUsage`, dieselbe Zahl wie DSHs Fußpille) | ✅ |
 | **[@shinon/openapi](packages/openapi)** | Vertrag (`openapi.yaml`) vorhanden, **kein** Server — bewusst nicht aktiviert | — |
@@ -203,11 +202,10 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 | **[@shinon/traceability](packages/traceability)** | flüchtige Toasts im Chat: Tool-Calls mit Ergebnis, Schritte und Fehler als Benachrichtigung | ✅ |
 
 Die Spalte „Profil“ ist gemessen aus `profiles/shinon/package.json` (Zahl: `docs/ZAHLEN.md` §1).
-`mobile`, `openapi` und `shinon-forge` stehen nicht darin — bei `openapi` ist das eine
-dokumentierte Entscheidung (`docs/ARCHITECTURE.md` §4), bei `shinon-forge` ein Verdikt
-(es startet fremde Engines; `PLAN.md` §3.12.1), bei `mobile` Vorbereitung
-(`0.1.0`, Weg ins Mobile-Profil). Alle drei tragen selbst
-`"dsh": { "inactive": true }` im eigenen Manifest (`dead-package`-Gate).
+`mobile` und `openapi` stehen nicht darin — bei `openapi` dokumentierte Entscheidung
+(`docs/ARCHITECTURE.md` §4), bei `mobile` Vorbereitung (`0.1.0`, Weg ins Mobile-Profil).
+Beide tragen selbst `"dsh": { "inactive": true }` im eigenen Manifest (`dead-package`-Gate).
+Das Shinon-Forge-Paket ist gelöscht (Beleg: `docs/CHANGELOG.md`).
 Alle Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
 allein `dsh.profile.bundles` im Profil (Bestandszahlen: `docs/ZAHLEN.md` §1).
 
@@ -297,27 +295,19 @@ Die Befehle aus `package.json` (`scripts`), in der Reihenfolge, in der man sie b
 | `npm run commit:guard -- …` | Commit-Regeln prüfen (`--ci`, `--last n`, `--range`, `--all`) |
 | `npm run hooks:install` | Git-Hooks aktivieren (einmal pro Klon) |
 | `npm run update` | echte Registry-Prüfung (Maximum nach Semver) ins kanonische Profil; offline UNGEPRÜFT statt „keine Updates"; Install-Pfad live ungeprüft |
-| `npm run desktop:launcher` | Desktop-Starter (Konzept, siehe [`docs/STARTER-PLAN.md`](docs/STARTER-PLAN.md)) |
+| `npm run desktop:launcher` | Desktop-Starter (Konzept, Stand: `docs/ROADMAP.md` §2.3) |
 
 ---
 
 ## 🗺 Offene Arbeit (gemessen, nicht gewünscht)
 
-- **Rote Prüfläufe beheben** — Reihenfolge und Ursachen: [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §3.
-  Einer ist Umgebungsarbeit (`schemastery` fehlt im Root, deshalb wird
-  `codingmon-store` rot statt zu überspringen), einer ist ein bewusstes Verhalten
-  (`message-ingress` verweigert die Zusage gegen eine ungeprüfte DSH-Fassung).
-- **Versionsangleich der Pakete**: die Zeile folgt aus dem eigenen Manifest (`dsh.inactive`
-  darf `0.1.0` führen, sonst `1.0.0`) — die gemessene Verteilung steht in
-  `docs/ZAHLEN.md` §1; das statische Gate `doctor` ist grün, der gleichnamige Laufzeit-Unterbefehl ist seit 2026-10-17 implementiert und belegt (v0.4.0-S4).
-- **Nicht aktivierte Pakete** (`mobile`, `openapi`, `shinon-forge`): alle drei sind entschieden, nicht
-  vergessen — `mobile` ist Vorbereitung für das Mobile-Profil, `openapi` hat einen Vertrag ohne Server, `shinon-forge` startet fremde Engines.
-  `key-router` und `popup` sind am 2026-10-13 aktiviert worden (Overlay bzw. Pool-Werkzeuge).
-  Offen bleibt nur die Live-Probe der 429-Rotation gegen den echten Anbieter mit
-  echten Schlüsseln; die Pool-/Override-Kette bis zum Loopback-Draht ist getestet.
-- **Native App** (Stufe 1 scharf, 2–4 Konzept): [`docs/STARTER-PLAN.md`](docs/STARTER-PLAN.md).
-- **Belege nachziehen**, wo nur ältere Messungen existieren: `docs/probes/` nennt je
-  Probe sein Datum.
+Offene Arbeit steht genau einmal — in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Rote Prüfläufe stehen in [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §3, Erledigtes in
+[`docs/CHANGELOG.md`](docs/CHANGELOG.md). Eine zweite Liste hier wäre die
+zweite Wahrheit.
+
+Open work lives in exactly one place — [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Red runs: [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §3, done: [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
 
 ---
 
@@ -329,7 +319,7 @@ Shinon-forge/
 │   ├── core/ persona/ locale-de/ tooltip/ events/ hook/ markers/ dashboard/
 │   ├── prompter/ task-router/ project-index/ codingmon/ key-router/ narrative/ popup/
 │   ├── better-errors/ token-usage/
-│   └── openapi/ shinon-forge/ # bewusst nicht im Profil (Entscheidung bzw. Verdikt)
+│   └── openapi/ # bewusst nicht im Profil (Entscheidung)
 ├── profiles/
 │   ├── shinon/                # kanonisches Profil (dsh.profile.bundles, cordis.patch.yml)
 │   └── headless/              # One-shot-Profil (Modell-Route)
@@ -338,13 +328,11 @@ Shinon-forge/
 │   ├── ZAHLEN.md              # einziger Eigentümer aller harten Zahlen
 │   ├── ARCHITECTURE.md        # Namespace, Paketgrenzen, Profil-Vertrag
 │   ├── COMMIT-REGELN.md       # Commit-Regeln und Durchsetzung
-│   ├── STARTER-PLAN.md        # native App (plan)
 │   ├── S*-Protokolle (S3/S4/S5/S6: Release-Belege 2026-10-17, current)
 │   ├── contracts/             # Verträge (JSON, mit Statusfeld)
 │   ├── probes/                # Falsifikations-Proben (JSON, mit Datum)
-│   ├── archive/               # archivierte Altfassungen (u. a. IDEA-raw-export.md)
+│   ├── archive/               # abgeschlossene Stände (Regel + Umleitung: README dort)
 │   ├── audit/                 # laufende Nachweise (transient, wandern nach Abschluss ins Archiv)
-│   └── archive/               # abgeschlossene Stände + importierte Fremdtexte (u. a. legacy-goose-prompts)
 ├── IDEA.md · shinon-forge-implementierungsplan.md   # current bzw. historical (Statusblock im Kopf)
 ├── scripts/                   # Gate-Engine, Build, Tests, Helfer (gate/, lib/, *.mjs)
 ├── assets/banner.svg
