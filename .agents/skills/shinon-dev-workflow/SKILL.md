@@ -5,8 +5,14 @@ description: Arbeitsablauf fuer Shinon Forge - welcher Check wann, wo Vertraege 
 
 # Dev-Workflow Shinon Forge
 
-Repo-Root ist das `DSH_HOME`. Alles läuft von hier; die Verträge leben an einer
-Stelle. Reihenfolge spart Zeit: schnelle Checks zuerst, teure zuletzt.
+> **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+
+Repo-Root ist **nicht** das `DSH_HOME` (Stand 2026-10-17: das Home liegt unter
+`dev-dsh-home` und wird beim Start aus dem Baum geseedet — `$DSH_HOME/AGENTS.md`
+wäre sonst die benutzerglobale Anweisungsdatei und liefe in jedem Projekt mit).
+Alles läuft vom Repo-Root; die Verträge leben an einer Stelle. Reihenfolge spart
+Zeit: schnelle Checks zuerst, teure zuletzt.
 
 ## Befehlskarte (von schnell nach teuer)
 
@@ -20,7 +26,8 @@ Stelle. Reihenfolge spart Zeit: schnelle Checks zuerst, teure zuletzt.
 | `node --test packages/codingmon/test/uebergabe.test.mjs` | Naht Client->Host, Literal-Drift, beide Cordis-Roots | `node_modules` |
 | `node scripts/pack-test.mjs` | Distribution je Paket: `npm pack` → isoliert installieren → laden | npm (netzgebunden, teuerster Lauf) |
 | `node scripts/shinon-profile-test.mjs` | `dsh --profile shinon --dump-config`, alle Bundle-Layer (Zahl: `docs/ZAHLEN.md` §2) | installiertes DSH |
-| `npm test` | alles oben in der Reihenfolge schnell → teuer | Gesamtstack |
+| `npm test` | statisches Gate + lokale Engine-Slices — der schnelle Pfad (Sekunden); **5 von 25 Gates** laufen dort | nichts |
+| `npm run test:full` | die volle Kette bis Profilboot und Distribution | viel, für CI gedacht |
 | `npm run gate` / `gate:local` / `gate:full` | modularer Gate-Engine, slice-selektiv | siehe `scripts/gate/engine.mjs` |
 | `npm run build` | validiert + generiert `dist/` komplett neu | Gesamtstack |
 
@@ -44,8 +51,9 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
   Gate flaggt alles, was fehlt.
 - **Client-interne Slot-Ids** → `<name>-<purpose>` (z. B. `shinon-core-brand`).
   Pakete referenzieren sich nicht; gemeinsame Logik lebt in `scripts/lib/`.
-- **Platzhalter** (Dashboard, token-usage, better-errors, openapi): UI/Config only —
-  openapi bewusst nicht im Profil. Nicht für „fehlende Logik" halten.
+- **Config-only und inaktiv:** `token-usage`/`better-errors` protokollieren nur,
+  `openapi` hat einen Vertrag ohne Server und ist bewusst nicht im Profil. `dashboard`
+  ist **kein** Platzhalter: es liest die echten `workspaces`/`sessions`-Dienste.
 
 ## Änderungs-Reihenfolge (bewährt)
 
@@ -53,7 +61,8 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
 2. Schnell laufen lassen: `node --test packages/codingmon/test/*.test.mjs`.
 3. `node scripts/shinon-test.mjs` — Namens-/Strukturfehler sofort.
 4. Naht/Integration: uebergabe-Test, store-Test (falls relevant).
-5. Teure Runde: `npm test` (pack-test + Profiltest inklusive).
+5. Teure Runde: `npm run test:full` (Paket-Suiten, Fixtures, Distribution, Profilboot);
+   `npm test` bleibt die schnelle Schleife, nicht die Abnahme.
 6. `npm run build` nur wenn `dist/` gewünscht — es ist generiert, nie handeditiert.
 
 ## Commits (fail-closed)

@@ -5,6 +5,9 @@ description: Beweise einmal fuehren statt doppelt verifizieren - Proben-Praxis (
 
 # Beweis-Tempo: was heute geprüft wird, muss morgen niemand wieder prüfen
 
+> **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+
 Dieses Repo hält Behauptungen als **Proben** fest (`docs/probes/*.json`) — mit
 Beleg statt Prosa. Wer eine Prüfung einmal macht, schreibt sie auf: der nächste
 Lauf (anderer Agent, anderer Tag) liest statt zu forschen.

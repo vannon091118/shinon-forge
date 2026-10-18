@@ -1,8 +1,8 @@
 name: runtime-release
 
 on:
-  push:
-    branches: [main]
+  # Kein Push-Trigger: Ein Lauf erzeugt ein Tag, ein Release und einen Commit im
+  # Schwesterrepo. Das darf nur auf ausdrücklichen Start geschehen (Befund B2).
   workflow_dispatch:
     inputs:
       skip_release:

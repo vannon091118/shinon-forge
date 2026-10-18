@@ -310,10 +310,15 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   `scripts/gate/tests/context-wiring.test.mjs` (names) and
   `scripts/gate/tests/scoring-memory.test.mjs` (behaviour: signal → value → restart →
   retraction → late criticism → corrupt index).
-- Documentation: every Markdown file carries a status block, and hard numbers (packages,
-  layers, test counts, versions) have exactly **one** owner. Read `docs/INDEX.md` §2 and
-  `docs/ZAHLEN.md` before writing a number into any document — nothing in the gate
-  checks documentation drift. The inventory block in `docs/ZAHLEN.md` §1 is generated
+- Documentation: every tracked Markdown file carries a status block — the gate
+  `docs-status` fails a file without one. Exempt are `docs/archive/` (the archival
+  banner replaces it) and `vendor/` (unchanged upstream text, hashed in
+  `MANIFEST.json`). Hard numbers (packages, layers, test counts, versions) have exactly
+  **one** owner. Read `docs/INDEX.md` §2 and `docs/ZAHLEN.md` before writing a number
+  into any document — no gate checks numeric drift between documents,
+  `npm run zahlen:check` covers only the generated inventory block. A documented
+  exception to a documentation rule stands in the file that sets it, with an end date;
+  currently there is none. The inventory block in `docs/ZAHLEN.md` §1 is generated
   (`npm run zahlen:sync`, checked with `npm run zahlen:check`); the run table in §2 is
   measured per pass. History, causes and before/after numbers belong in the commit
   message or `docs/archive/` (the one history folder) — not in a table cell.

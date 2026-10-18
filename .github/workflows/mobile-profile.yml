@@ -1,8 +1,8 @@
 name: Shinon Mobile Profile
 
 on:
-  push:
-    branches: [mobile/runtime-profile-0.01]
+  # Der frühere Push-Trigger zeigte auf mobile/runtime-profile-0.01; den Branch
+  # gibt es auf origin nicht mehr (git ls-remote --heads origin 'mobile/*').
   pull_request:
     branches: [main]
   workflow_dispatch:

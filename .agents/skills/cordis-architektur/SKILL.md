@@ -5,6 +5,9 @@ description: Cordis-Architektur in Shinon Forge ausreizen - Services, inject/pro
 
 # Cordis-Architektur ausreizen
 
+> **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+
 Cordis schenkt Startreihenfolge, Teardown und Konfiguration — wenn man die
 Mechanismen nutzt. Regeln gelten für jedes `packages/<dir>/index.js`.
 

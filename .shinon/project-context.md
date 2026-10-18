@@ -1,5 +1,8 @@
 # Shinon Projekt-Kontext
 
+> **Status:** current — projektspezifischer Kontext für Shinon; keine Zahlenquelle. · **Stand:** 2026-10-19
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+
 Dieser Kontext gilt NUR im Shinon-Projekt. Er enthält interne Daten, die nicht
 in andere Projekte gehören.
 

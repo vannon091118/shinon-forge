@@ -5,6 +5,9 @@ description: Schnellster Weg zu echtem Signal - welcher Test wann, Skip-Regeln, 
 
 # Test-Tempo: Signal statt Aktivität
 
+> **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+
 Zeit geht nicht beim Laufen der Tests verloren, sondern beim Wiederholen der
 falschen. Regeln aus DSHs Testing-Policy (`docs/testing.md`) und diesem Repo.
 
@@ -19,10 +22,12 @@ falschen. Regeln aus DSHs Testing-Policy (`docs/testing.md`) und diesem Repo.
 | eine Naht | `node --test packages/codingmon/test/uebergabe.test.mjs` | Sekunden |
 | Boot/Composition | `node scripts/shinon-profile-test.mjs` | teuer |
 | Distribution | `node scripts/pack-test.mjs` | teuerste |
-| alles | `npm test` | nur am Ende |
+| schnelle lokale Schleife | `npm test` (statisches Gate + Engine-Slices, 5 von 25 Gates) | Sekunden |
+| alles | `npm run test:full` | nur am Ende |
 
-- Erst der **schnellste Test, der die Hypothese schlagen kann** — nicht `npm test`
-  als Erstes. Ein Formelfehler soll vor `pack-test` auffallen.
+- Erst der **schnellste Test, der die Hypothese schlagen kann** — nicht die volle
+  Kette als Erstes. Ein Formelfehler soll vor `pack-test` auffallen. `npm test` ist
+  dabei ausdrücklich erlaubt (Sekunden); `npm run test:full` bleibt die Abnahme.
 - **Skip ist nicht grün.** Tests ohne `node_modules`/`dsh`/Keys überspringen
   sichtbar (Grund im Testnamen) — im Bericht steht der Skip-Grund, nie „bestanden".
 - Ein gezielter `node --test <datei>` mit `--test-name-pattern` spart Minuten;

@@ -5,6 +5,9 @@ description: Wo Antworten zu DSH/Cordis schnell herkommen - Doku-Karte mit Pfade
 
 # Antwortwege: raten ist langsam, nachschlagen ist schnell
 
+> **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
+> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+
 Die DSH-Doku ist öffentlich und nach **Frage-Typ** sortiert. Erst die passende
 Quelle wählen, dann lesen — und was gelesen wurde, mit Fundstelle festhalten
 (Skill `shinon-beweis-tempo`).

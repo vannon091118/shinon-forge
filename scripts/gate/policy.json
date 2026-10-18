@@ -12,13 +12,15 @@
       "profile",
       "typescript",
       "comment-canon",
-      "dsh-singleton"
+      "dsh-singleton",
+      "docs-status"
     ],
     "local": [
       "bundle-resolution",
       "contract",
       "legacy-guard",
-      "dsh-singleton"
+      "dsh-singleton",
+      "docs-status"
     ],
     "slices": {
       "package-drift": {
@@ -105,6 +107,17 @@
           "profiles/",
           "scripts/gate/plugins/markers.mjs",
           "scripts/gate/tests/markers.test.mjs"
+        ]
+      },
+      "docs-status": {
+        "prefixes": [
+          "docs/",
+          "AGENTS.md",
+          "README.md",
+          "IDEA.md",
+          "THIRD_PARTY_NOTICES.md",
+          ".agents/",
+          ".shinon/"
         ]
       },
       "commit-trailer": {
