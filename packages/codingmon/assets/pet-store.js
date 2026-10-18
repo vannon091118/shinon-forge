@@ -9,7 +9,7 @@
  * → Kanon: docs/COMMENT-KANON.md#k-39478e8b79a2
  */
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain';
-import { StoredSnapshotSchema } from './snapshot-schema.js';
+import { SnapshotSchema, StoredSnapshotSchema } from './snapshot-schema.js';
 import { migrateToV3 } from './migration.js';
 import { SPECIES } from './katalog.js';
 
@@ -48,15 +48,16 @@ export const PET_DOMAIN = defineDomain({
 export async function openPetStore(ctx, now = () => new Date()) {
   const domain = await ctx.storageDomain.open(PET_DOMAIN);
   const table = domain.table('snapshots');
-  const migrateStoredSnapshot = (raw) => {
-    if (raw === null) return null;
-    if (raw.schemaVersion >= 3 && raw.breeding !== undefined) return PetStateSchema.parse(raw);
+  const upgradeSnapshot = (raw) => {
+    const validated = SnapshotSchema.parse(raw);
+    if (validated.schemaVersion >= 3 && validated.breeding !== undefined) return validated;
+    if (validated.schemaVersion !== 2) throw new Error('Nur Snapshot v2 kann automatisch auf v3 migriert werden');
     // Host v2 never persisted a roster. Build exactly one deterministic founder
     // from counters that really exist; do not invent historical pets or eggs.
-    const migrated = migrateToV3({ ...raw, schemaVersion: 2 }, { speciesCatalog: SPECIES });
+    const migrated = migrateToV3(validated, { speciesCatalog: SPECIES });
     const founder = migrated.creatures[0];
-    return PetStateSchema.parse({
-      ...raw,
+    return SnapshotSchema.parse({
+      ...validated,
       schemaVersion: 3,
       species: founder.species,
       xp: founder.xp,
@@ -83,14 +84,21 @@ export async function openPetStore(ctx, now = () => new Date()) {
     });
   };
   return {
-    /** Host v2 is migrated in memory; the next successful write persists v3. */
-    read: () => migrateStoredSnapshot(table.get(PET_KEY) ?? null),
+    /** Reads v2 in memory; only a successful write turns the stored record into v3. */
+    read: () => {
+      const stored = table.get(PET_KEY) ?? null;
+      if (stored === null) return null;
+      const upgraded = upgradeSnapshot(PetStateSchema.parse(stored));
+      return PetStateSchema.parse({ ...upgraded, storedAt: stored.storedAt });
+    },
     /**
      * Einen Stand ablegen. Validiert BEVOR geschrieben wird: ein Stand, der den
      * Vertrag verletzt, wirft und beruehrt das Medium nicht.
      */
     write: async (state) => {
-      const record = PetStateSchema.parse({ ...state, storedAt: now().toISOString() });
+      // Validate the caller's complete wire shape before migration or I/O.
+      const canonical = upgradeSnapshot(SnapshotSchema.parse(state));
+      const record = PetStateSchema.parse({ ...canonical, storedAt: now().toISOString() });
       await table.put(PET_KEY, record);
       return record;
     },
