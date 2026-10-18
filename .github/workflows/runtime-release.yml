@@ -78,8 +78,10 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
           echo "DSH: $(node_modules/.bin/dsh --version 2>&1)"
-          node_modules/.bin/dsh --profile mobile --dump-config > /dev/null
+          # Das mobile-Profil booten (wie mobile-profile.yml, mit DSH_HOME-Seed)
+          node scripts/shinon-profile-test.mjs --profile mobile
           echo "mobile-Profil-Boot: OK"
 
       - name: "Runtime-Verzeichnis anlegen (rootfs + forge + node_modules)"
