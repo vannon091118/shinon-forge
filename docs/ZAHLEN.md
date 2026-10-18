@@ -29,12 +29,12 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Schemastery (deklariert) | `3.18.5` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
 | Node (`engines.node`) | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
 | pnpm-Artefakte (getrackt) | 0 | `git ls-files '*pnpm-workspace.yaml' '*pnpm-lock.yaml' \| wc -l` (Aufrufe: Gate-Prüfung „pnpm-Reste“) | 0 |
-| Markdown-Dokumente (getrackt) | 91 | `git ls-files '*.md' \| wc -l` | 0 |
+| Markdown-Dokumente (getrackt) | 88 | `git ls-files '*.md' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | 7 | `ls docs/contracts/*.json \| wc -l` | 0 |
 | Proben unter `docs/probes/` | 33 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 21 Pakete, 182 Dateien, 1421130 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 21 Pakete, 182 Dateien, 1421181 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -67,7 +67,7 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Profil-Dump im echten Boot | **60** Layer-Köpfe, **210** Einträge; `shinon-task-router.activate: false`, `permission.defaultPreset: workspace-write`, `agent-default-model: agnes/agnes-2.5-flash` | 0 | `DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config` |
 | Frischklon-Repro S3 | Klon @ `d8999ab` Exit 0, `npm ci` Exit 0, 29 Links Exit 0, Dump 60/210 Exit 0, Build 185 Dateien Exit 0, UI HTTP 200 (41 314 Bytes HTML, ohne Token 401), gate 546/546 | 0 | `docs/S3-FRESH-d8999ab.md` |
 | Gate-Engine `--full` | **24** Gates gelaufen, **24** grün, **1** `NOT_APPLICABLE` (`typescript`: keine First-Party-TS-Datei), **0** fehlgeschlagen, **0** geskippt; Branding ohne Flag sichtbar übersprungen | 0 | `npm run gate:full` |
-| Gate-Tests | **672** Tests, **668** grün, **0** rot, **4** sichtbar geskippt (Scoring-Ablage: `@deepseek-ai/dsh-storage-json` außerhalb des DSH-Baums nicht auflösbar) — davon 5 für den Kommentar-Kanon (Blockgrenze, Zäune, Blockabschluss, Inhaltsanker, der echte Baum), 6 für den Secrets-Tresor (Sammlung, Bericht ohne Werte, Modus 0600, fail-closed, Wiederherstellung, Idempotenz) und 4 für `uninstall` (Tresor, `--purge`, `--keep-checkout`, leerer Ort) — davon 2 für den Prompter-Trace-Kanal (Literal-Pin, Fenster-Spiegel), 4 für die S1-Wurzelbindung (fremde Root wird verworfen, keine Migration aus fremdem Index, Prompter und Project Index antworten gleich, der Entscheidungsdatensatz nennt Identität und Quelle), 3 für die eine schemastery-Fassung (Manifest-Gleichheit, Harness-Range, genau ein Lock-Eintrag), 1 dafür, dass nur der Nutzertext einen Skill ausdrücklich nennt — die Intent-Expansion nicht — und 6 für `shinon doctor` S4 (eigener Unterbefehl, stabile Codes, read-only, presence-only, Hilfe, Fehlerpfade), 16 für das Nutzer-Installat (Befehlsoberfläche, `auto`-Staging-Verweigerung, `units`-Timer ohne systemd, read-only `selftest` mit Stufen und `--json`) und 6 für die Backup-Aufbewahrung (Obergrenzen, jüngste unantastbar, Dry-Run, Protokoll, Exit-2-Verweigerung), 1 für die Symlink-Grenze des Project-Index (Ausbruch wird nicht gelesen) und 1 für die Propsa-Form der Commit-Policy (ganz oder gar nicht) | 0 | `npm run gate:test` |
+| Gate-Tests | **672** Tests, **672** grün, **0** rot, **0** geskippt — davon 5 für den Kommentar-Kanon (Blockgrenze, Zäune, Blockabschluss, Inhaltsanker, der echte Baum), 6 für den Secrets-Tresor (Sammlung, Bericht ohne Werte, Modus 0600, fail-closed, Wiederherstellung, Idempotenz) und 4 für `uninstall` (Tresor, `--purge`, `--keep-checkout`, leerer Ort) — davon 2 für den Prompter-Trace-Kanal (Literal-Pin, Fenster-Spiegel), 4 für die S1-Wurzelbindung (fremde Root wird verworfen, keine Migration aus fremdem Index, Prompter und Project Index antworten gleich, der Entscheidungsdatensatz nennt Identität und Quelle), 3 für die eine schemastery-Fassung (Manifest-Gleichheit, Harness-Range, genau ein Lock-Eintrag), 1 dafür, dass nur der Nutzertext einen Skill ausdrücklich nennt — die Intent-Expansion nicht — und 6 für `shinon doctor` S4 (eigener Unterbefehl, stabile Codes, read-only, presence-only, Hilfe, Fehlerpfade), 16 für das Nutzer-Installat (Befehlsoberfläche, `auto`-Staging-Verweigerung, `units`-Timer ohne systemd, read-only `selftest` mit Stufen und `--json`) und 6 für die Backup-Aufbewahrung (Obergrenzen, jüngste unantastbar, Dry-Run, Protokoll, Exit-2-Verweigerung), 1 für die Symlink-Grenze des Project-Index (Ausbruch wird nicht gelesen) und 1 für die Propsa-Form der Commit-Policy (ganz oder gar nicht) | 0 | `npm run gate:test` |
 | Codingmon-Tests | **46** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:codingmon` |
 | Scoring-Tests (Kern, Signale, Ablage, Block-Gewichte) | **50** bestanden, **0** rot, **0** übersprungen — importfrei, läuft in CI ohne `npm ci`; die Host-Naht des Lernens fährt `scripts/gate/tests/scoring-block-learning.test.mjs` | 0 | `npm run test:scoring` |
 | Token-Usage-Tests | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:token` |
@@ -94,7 +94,7 @@ Ein nacktes `node --test …` bleibt der ungeschützte Weg und ist kein Beleg.
 | Startscan des Projektindex (353 Dateien) | 2026-10-13 | kalt 2627 ms, unverändert 21 ms, Mount 1 ms, Worker-Bericht 2856 ms | [docs/probes/project-index-startscan.json](probes/project-index-startscan.json) |
 | Branding-Wirkung im echten Chromium | 2026-10-13 | 28 bestanden, 0 fehlgeschlagen | `npm run branding` (braucht `dist/` und Browser) |
 | Skalierungslauf (Kopie + 20 Pakete = 39) | 2026-10-11 | 6 von 6 Stufen grün, ≈ 98 s | [docs/archive/SKALIERUNG_2026-10-11.md](archive/SKALIERUNG_2026-10-11.md) |
-| Frischer Klon: `npm install` + `npm start -- --check` | 2026-10-13 | 731 Pakete, Lockfile byteidentisch, ohne `pnpm`/globales `dsh` | [PLAN.md](../PLAN.md) Schritt 3.4/3.5 |
+| Frischer Klon: `npm install` + `npm start -- --check` | 2026-10-13 | 731 Pakete, Lockfile byteidentisch, ohne `pnpm`/globales `dsh` | [CHANGELOG.md](CHANGELOG.md) (Einstieg, pnpm-Rückbau) |
 | CI-Lauf (Branch-Stand `bf003a2`) | 2026-10-13 | 14 Jobs grün, Conclusion `success` | Run `38474747771` in der Actions-API |
 
 ## 3. Rote Befunde
@@ -102,8 +102,11 @@ Ein nacktes `node --test …` bleibt der ungeschützte Weg und ist kein Beleg.
 In diesem Durchgang: **keine** im abschließenden Lauf. `npm test`, `npm run gate:test`,
 `npm run gate:full` und `npm run build` enden mit Exit 0; der einzige Skip mit
 System ist `typescript` (`NOT_APPLICABLE`, es existiert weiterhin keine
-First-Party-TypeScript-Datei) plus 4 sichtbare Skips in `gate:test` (Scoring-Ablage
-braucht den DSH-Baum, siehe Zeile oben) — kein Rot, kein stiller Skip.
+First-Party-TypeScript-Datei) — kein Rot, kein stiller Skip, kein sichtbarer Skip mehr (die vier
+`codingmon-store`-Skips entfallen, seit `@deepseek-ai/dsh-storage-json` als
+fünftes Zielpaket an der Wurzel steht und die `uebergabe`-Naht die
+rc.2-Mechanik fährt: `RemoteAccessService`, Browser-Bündel `client.browser.js`,
+Owner-Peer mit Signal).
 
 **Ein benannter Flake, behoben statt verdeckt:** der Gate-Test
 `Zeitstempel: verify=stamp schliesst die Luecke, ohne den Baum zu lesen` war in zwei von
