@@ -195,7 +195,7 @@ export function renderStreamEnd(finish, usage, request, elapsedMs) {
  * Antwort aussieht (Zaun, Vorrede, Anfuehrungszeichen), wird entfernt; ist der
  * Rest leer oder identisch mit dem Original, bleibt es beim Verwerfen.
  */
-const PROSE_PREAMBLE = /^(?:sure|okay|ok|gerne|hier ist|here is|the improved prompt|verbesserter prompt|verbesserte fassung)[^\n]{0,80}:\s*/i;
+const PROSE_PREAMBLE = /(?:sure|okay|ok|gerne|hier ist|here is|the improved prompt|verbesserter prompt|verbesserte fassung)[^\n]{0,80}:\s*/i;
 
 export function salvageProse(text, rawPrompt = '') {
   if (typeof text !== 'string') return null;
@@ -204,8 +204,22 @@ export function salvageProse(text, rawPrompt = '') {
   // Sieht die Antwort nach einem VERSUCHTEN JSON aus, ist sie kein Prompt:
   // ein kaputter Objekttext als Veredelung waere schlimmer als der Roh-Prompt.
   if (/^[{[]/.test(body)) return null;
-  const fence = /```(?:[a-z]*)\n([\s\S]*?)```/i.exec(body);
-  if (fence !== null) body = fence[1].trim();
+  if (/^```/.test(body)) {
+    // Die ganze Antwort ist ein Zaun — auch ohne schliessende Marke (abgeschnitten).
+    // Ohne diesen Schritt passiert ein halbes JSON die Sperre oben als "Prosa".
+    body = body
+      .replace(/^```[a-z0-9_-]*[ \t]*\r?\n?/i, '')
+      .replace(/\r?\n?```[ \t]*$/i, '')
+      .trim();
+    if (/^[{[]/.test(body)) return null;
+  } else {
+    const fence = /```[a-z0-9_-]*[ \t]*\r?\n?([\s\S]*?)```/i.exec(body);
+    if (fence !== null) {
+      body = fence[1].trim();
+      // Nach dem Auspacken dieselbe Sperre: JSON im Zaun ist kein Prompt.
+      if (/^[{[]/.test(body)) return null;
+    }
+  }
   body = body.replace(PROSE_PREAMBLE, '').trim();
   body = body.replace(/^["'„“]([\s\S]*)["'“”]$/, '$1').trim();
   if (body.length < 8 || !/\p{L}/u.test(body)) return null;

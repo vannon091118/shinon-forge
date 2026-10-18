@@ -844,6 +844,45 @@ test('SALVAGED_PROSE: Zaun und Vorrede fallen weg, kaputtes JSON wird kein Promp
 });
 
 /**
+ * Der gemessene Leak (2026-10-19): das Modell antwortet mit einem JSON im Zaun,
+ * die Antwort ist abgeschnitten — `parseResult` scheitert an INVALID_JSON, der
+ * Zaun wurde aber als Prosa gerettet, und der Nutzer sah ein halbes Objekt
+ * (`{"enhancedPrompt": "…`) statt seines Prompts. Ein JSON — auch im Zaun, auch
+ * abgeschnitten — ist kein Prompt; der Rohtext bleibt stehen.
+ */
+test('SALVAGED_PROSE: ein JSON im Zaun (auch abgeschnitten) ersetzt den Prompt nicht', async () => {
+  const cases = [
+    '```json\n{"enhancedPrompt": "Analysiere im Shinon-Forge-Repo, wo Fallbacks",',
+    '```json\n{"enhancedPrompt": "Analysiere im Shinon-Forge-Repo, wo Fallbacks und Eskalationen"}\n```',
+    '```json\n[1, 2, 3',
+  ];
+  for (const answer of cases) {
+    const { ctx, records, dispose } = connect({ ...route }, { llm: fakeLlm(answer) });
+    const claimed = [userMessage('analysiere fallbacks')];
+    const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+    assert.equal(decision.messages[0].content[0].text, 'analysiere fallbacks', `Rohtext bleibt: ${answer.slice(0, 24)}`);
+    assert.equal(records[0].outcome, 'rejected', `JSON ist kein Prompt: ${answer.slice(0, 24)}`);
+    assert.ok(records[0].reasons.length > 0);
+    dispose();
+  }
+});
+
+/**
+ * Gegenprobe zur Sperre: ein Prosatext im Zaun, dem die schliessende Marke fehlt,
+ * ist weiterhin rettbar. Sonst wuerde die Reparatur genau die Faelle verwerfen,
+ * fuer die SALVAGED_PROSE gebaut wurde.
+ */
+test('SALVAGED_PROSE: ein offener Prosa-Zaun bleibt rettbar', async () => {
+  const answer = '```text\nBaue die Module und teste sie danach.';
+  const { ctx, records, dispose } = connect({ ...route }, { llm: fakeLlm(answer) });
+  const claimed = [userMessage('baue module')];
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+  assert.equal(records[0].outcome, 'accepted');
+  assert.equal(decision.messages[0].content[0].text, 'Baue die Module und teste sie danach.');
+  dispose();
+});
+
+/**
  * Diagnose-Luecke, gemessen am NO_JSON-Fehlerfall 2026-10-16: der Verwerfungs-
  * grund landete im Sitzungsverlauf, die TATSAECHLICHE Modellantwort nie — die
  * Ursache war damit undiagnostizierbar. Der Rohtext muss deshalb auf stderr
