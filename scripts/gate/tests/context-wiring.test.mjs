@@ -331,8 +331,8 @@ test('MAX: eine Datei gewinnt gegen den Dienst, und ohne beides wird abgelehnt',
   const third = connect({ llm: fakeLlm(result()), service: { contract: index.QUERY_CONTRACT, resolveContext: () => null } });
   await third.ctx.waterfall(prompter.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
   assert.equal(third.records[0].context_source, 'none');
-  // Verhaltensänderung: ohne Project-Index und leerem Runtime-Index heißt der
-  // Grund jetzt MODE_NEEDS_CONTEXT (früher MODE_NEEDS_INDEX am Project-Index-Pfad).
+  // Ohne Project-Index heißt der Grund MODE_NEEDS_CONTEXT: ein fehlender Index
+  // ist kein benutzbarer Kontext.
   assert.deepEqual(third.records[0].reasons, ['MODE_NEEDS_CONTEXT'], 'ein fehlender Index ist nicht dasselbe wie ein fehlender Kontext');
   third.dispose();
 });
@@ -355,9 +355,8 @@ test('MAX: ein fremder Dienst unter unserem Namen wird nicht benutzt', async () 
     assert.equal(llm.calls.length, 0, `${name}: kein Aufruf mit unbrauchbarem Kontext`);
     assert.equal(decision, downstream, name);
     assert.equal(records[0].context_source, 'none', name);
-    // Verhaltensänderung: wenn der Project-Index unbrauchbar ist (falscher Vertrag,
-    // wirft, Unsinn), aber der Runtime-Index leer ist, fällt der Prompter auf
-    // MODE_NEEDS_CONTEXT zurück (nicht mehr CONTEXT_INVALID vom Project-Index-Pfad).
+    // Ist der Project-Index unbrauchbar (falscher Vertrag, wirft, Unsinn),
+    // fällt der Prompter auf MODE_NEEDS_CONTEXT zurück.
     assert.deepEqual(records[0].reasons, ['MODE_NEEDS_CONTEXT'], name);
     dispose();
   }

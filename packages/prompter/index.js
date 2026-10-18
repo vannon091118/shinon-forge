@@ -3,26 +3,18 @@ import z from '@deepseek-ai/schemastery';
 import { isAbsolute, join } from 'node:path';
 import { parseNote, renderStand, reviewNotes, selectNotes, tokens } from './assets/note-core.js';
 import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
-import {
-  createIndex,
-  loadIndex as loadRuntimeIndex,
-  saveIndex as saveRuntimeIndex,
-  indexDirectory as autoIndexDirectory,
-  getContext as runtimeGetContext,
-  writeJsonFile,
-  RUNTIME_INDEX_CONTRACT as RUNTIME_INDEX_CONTRACT_NAME,
-} from './assets/index-manager.js';
 
 // ── Die Module dieses Pakets ────────────────────────────────────────────────
 // Der Modulschnitt hat die Innenflaeche geteilt, nicht die Aussenflaeche: die
 // oeffentlichen Namen unten sind dieselben wie vorher, und `index.js` bleibt die
-// Host-Haelfte (Mount, Listener, Kontextbeschaffung, Index-Pflege).
-import { CONTEXT_CONTRACT, CONTEXT_SOURCES_RUNTIME, CONTEXT_STATES, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, NOT_SUPPLIED, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE, assertVocabulary, contextLabel, noContext, resolveMode, withContext } from './assets/mode-core.js';
+// Host-Haelfte (Mount, Listener, Kontextbeschaffung, Index-Abfrage).
+import { CONTEXT_CONTRACT, CONTEXT_STATES, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, NOT_SUPPLIED, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE, assertVocabulary, contextLabel, noContext, resolveMode, withContext } from './assets/mode-core.js';
 import { Config as _imported_config_schema, ContextSchema, ResultSchema } from './assets/schema.js';
 import { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferences } from './assets/result-contract.js';
 import { UNDEFINED, expandPrompt, resolveIntent } from './assets/intent-resolver.js';
 import { renderContext, renderSkillsBlock } from './assets/render-context.js';
 import { loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
+import { writeJsonFile } from './assets/learned-store.js';
 import { readTone, standFor, standTrace } from './assets/stand.js';
 import { buildEnhancerRequest, collectStream, enhanceGuarded, replacePrompt } from './assets/enhancer.js';
 import { BLOCKS_CONTRACT, BLOCKS_PATH, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks, validateRegistry } from './assets/block-select.js';
@@ -182,8 +174,7 @@ function indexContext(ctx, config, text, runtime) {
  * Angabe), eine KAPUTTE Datei sperrt MAX vollstaendig statt auf den Index
  * auszuweichen: wer eine Quelle benennt, bekommt sie oder einen Grund.
  *
- * Fallback: Wenn der Project Index nicht verfuegbar ist, aber der
- * Runtime-Index geladen wurde, wird dieser genutzt.
+ * Der Index ist der Project Index — EIN Index fuer den Baum, kein zweiter.
  */
 function maxContext(ctx, config, runtime, prompt) {
   if (runtime.contextState === 'invalid') return noContext('CONTEXT_INVALID');
@@ -194,44 +185,6 @@ function maxContext(ctx, config, runtime, prompt) {
     return withContext(runtime.context, 'file');
   }
 
-  // Runtime-Index zuerst: der Prompter pflegt seinen eigenen Index, der
-  // hash-basiert und session-lokal ist. Project-Index nur als Fallback,
-  // wenn der Runtime-Index noch leer ist (noch nichts indexiert wurde).
-  if (runtime.runtimeIndex !== null && runtime.runtimeIndex.entries.size > 0) {
-    try {
-      // Das Budget gilt HIER genauso wie im Project-Index-Pfad: gemessen am
-      // 2026-10-16 baute dieser Aufruf ohne Grenze eine 1.46-MB-Nachricht und
-      // lief damit in sein eigenes 15-s-Limit (NO_JSON fuer jeden Prompt).
-      const ctxData = runtimeGetContext(runtime.runtimeIndex, prompt.text, {
-        maxFiles: config.indexMaxFiles,
-        budgetTokens: config.indexBudgetTokens,
-      });
-      const context = ContextSchema({
-        project: 'Shinon-forge',
-        files: ctxData.files,
-        symbols: ctxData.symbols ?? [],
-        constraints: [],
-        touches: [],
-        dependencies: [],
-      });
-      // S1: Budget-Provenienz am tatsächlichen Request — Zeichen-Näherung
-      // (Token ≈ Zeichen/4), Dateizahl, Quelle. Das Budget gilt VOR dem
-      // Modellaufruf; was es reißt, steht im Datensatz, nicht im Text.
-      runtime.lastBudgetTokens = config.indexBudgetTokens;
-      runtime.lastContextChars = ctxData.chars;
-      runtime.lastContextFiles = ctxData.files.map((f) => f.path);
-      if (!runtime.runtimeIndexSeen) {
-        runtime.runtimeIndexSeen = true;
-        console.log(`[shinon-prompter] MAX-Kontext aus Runtime-Index (${ctxData.count}/${ctxData.totalEntries} Dateien, ${ctxData.chars} Zeichen, Budget ${config.indexBudgetTokens} Token)`);
-      }
-      return withContext(context, 'runtime');
-    } catch (error) {
-      console.error(`[shinon-prompter] Runtime-Index-Kontext fehlerhaft (${error?.message})`);
-      return noContext('CONTEXT_INVALID');
-    }
-  }
-
-  // Project-Index als Fallback: wenn Runtime-Index nicht geladen oder leer.
   const projectResult = indexContext(ctx, config, prompt.text, runtime);
   if (projectResult.source !== 'none') return projectResult;
 
@@ -278,10 +231,9 @@ function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contex
     references: result?.references ?? [],
     rawLength,
     enhancedLength: result?.enhancedPrompt?.length ?? 0,
-    // Runtime-Index + Intent-Erweiterung (Zug 7/8): nur wenn aktiviert.
+    // Intent-Erweiterung (Zug 8): nur wenn aktiviert.
     expansion: runtime?.expansion ?? null,
     intentMatch: turn?.intentMatch ?? null,
-    indexHits: runtime?.indexHits ?? null,
   };
 }
 
@@ -406,9 +358,9 @@ function proposeBlock(config, runtime, proposal) {
       current = [];
     }
     const next = [...current.filter((entry) => entry.id !== core.block.id), core.block];
-    // Der eine Schreibweg (index-manager.js): die Host-Komposition bleibt frei
-    // von Dateisystem-Aufrufen, und die Isolation-Zusage hat eine Adresse.
-    writeJsonFile(path, { contract: LEARNED_CONTRACT, blocks: next });
+    // Der eine Schreibweg (assets/learned-store.js): die Host-Komposition
+    // bleibt frei von Dateisystem-Aufrufen, und die Zusage hat eine Adresse.
+    writeJsonFile(file, { contract: LEARNED_CONTRACT, blocks: next });
     if (runtime.blocks !== null) {
       const merged = mergeLearnedBlocks(runtime.blocks.blocks, next);
       const check = validateRegistry({ contract: BLOCKS_CONTRACT, blocks: merged });
@@ -683,48 +635,9 @@ export function apply(ctx, config) {
   const workspace = { ..._fp, source: _ws.source };
   console.log(`[shinon-prompter] Workspace: ${workspace.root} (id ${workspace.rootId}, quelle ${workspace.source})`);
 
-  // Runtime-Index (Zug 7): eigenhaend verwaltet, hash-basiert, JSON-persistiert.
-  // Fehlt er, faellt MAX auf den Project Index zurueck (oder bleibt gesperrt).
-  // Rangfolge der MAX-Quellen (S1): konfigurierte Datei > root-gebundener
-  // Runtime-Index > Project Index. Eine Runtime-Datei mit Einträgen gewinnt
-  // NICHT allein durch Inhalt — erst die Root-Bindung macht sie zur Quelle.
-  let runtimeIndex = null;
-  if (config.indexStoragePath !== '') {
-    try {
-      runtimeIndex = loadRuntimeIndex(config.indexStoragePath, { expectedRoot: workspace.root });
-      if (runtimeIndex === null) {
-        runtimeIndex = createIndex(workspace.root);
-        console.log(`[shinon-prompter] Runtime-Index erstellt (neu, ${config.indexStoragePath})`);
-      } else {
-        console.log(`[shinon-prompter] Runtime-Index geladen (${runtimeIndex.entries.size} Eintraege)`);
-      }
-    } catch (error) {
-      // FOREIGN_ROOT eingeschlossen: ein fremder Index wird abgelehnt und neu
-      // aufgebaut, nie als Kontext geliefert.
-      console.error(`[shinon-prompter] Runtime-Index nicht ladbar (${error?.message}) — startet leer`);
-      runtimeIndex = createIndex(workspace.root);
-    }
-    // Auto-Index: beim Mount alle Dateien des Source-Verzeichnisses einlesen.
-    if (config.autoIndex && config.indexSourcePath !== '') {
-      try {
-        const source = isAbsolute(config.indexSourcePath) ? config.indexSourcePath : join(workspace.root, config.indexSourcePath);
-        const result = autoIndexDirectory(runtimeIndex, source, null, Date.now(), { root: workspace.root });
-        // Ausgeschlossenes wird beim Namen genannt: ein Index, der Dateien
-        // verschweigt, ohne es zu sagen, lügt über seine Abdeckung.
-        const counts = new Map();
-        for (const item of result.excluded ?? []) counts.set(item.reason, (counts.get(item.reason) ?? 0) + 1);
-        const summary = [...counts.entries()].map(([reason, n]) => `${n}× ${reason}`).join(', ');
-        const sample = (result.excluded ?? []).slice(0, 5).map((item) => `${item.path} (${item.reason})`).join('; ');
-        const rest = (result.excluded ?? []).length > 5 ? ` (+${(result.excluded ?? []).length - 5} weitere)` : '';
-        console.log(
-          `[shinon-prompter] Auto-Index: ${result.indexed} neu, ${result.skipped} uebersprungen, ${result.errors.length} Fehler${summary === '' ? '' : `, ausgeschlossen: ${summary}`}${sample === '' ? '' : ` — ${sample}${rest}`}`,
-        );
-        if (config.indexStoragePath !== '') saveRuntimeIndex(runtimeIndex, config.indexStoragePath);
-      } catch (error) {
-        console.error(`[shinon-prompter] Auto-Index fehlgeschlagen (${error?.message})`);
-      }
-    }
-  }
+  // MAX-Quellen (S1): konfigurierte Datei > Project Index. Der Project Index
+  // traegt den Baum ohnehin (eigener Host, eigener Dienst); ein zweiter Index
+  // im Prompter waere dieselbe Arbeit mit anderem Speicherformat.
 
   // Intent-Patterns (Zug 8): Trigger → Expansion, nur wenn aktiviert.
   let intentRules = null;
@@ -802,7 +715,7 @@ export function apply(ctx, config) {
     console.warn(`[shinon-prompter] Eigener Schluessel fehlt (${config.providerKeyEnv}) — One-Shot faellt auf ${route.provider}/${route.model} zurueck`);
   }
 
-  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null };
+  const runtime = { context, contextState, noteRules, skillRules, intentRules, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null };
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
   // Das Panel liest den Puffer beim Laden: dieselbe Naht wie Marker/Traceability.
   const disposeInject = ctx.on(INDEX_INJECT, (table) => {
@@ -844,16 +757,13 @@ export function apply(ctx, config) {
   const mode = resolveMode(config.mode);
   const contextInfo = mode.needsContext ? `context=${contextState}` : `context=${contextState} (${mode.mode} nutzt ihn nicht)`;
   const notesInfo = config.notesPath === '' ? 'notes=off' : `notes=${notesDir(config)}${noteRules === null ? ' (ohne Regeln)' : ''}`;
-  const runtimeInfo = runtimeIndex !== null
-    ? `runtimeIndex=${runtimeIndex.entries.size}Eintraege`
-    : 'runtimeIndex=off';
   const intentInfo = intentRules !== null
     ? `intent=${intentRules.patterns.length}Patterns`
     : 'intent=off';
   const blocksInfo = blocks !== null
     ? `blocks=${blocks.blocks.length}Bausteine`
     : 'blocks=off';
-  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, route=${routeLabel}, ${contextInfo}, ${notesInfo}, ${runtimeInfo}, ${intentInfo}, ${blocksInfo})`);
+  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, route=${routeLabel}, ${contextInfo}, ${notesInfo}, ${intentInfo}, ${blocksInfo})`);
 
   // Der fünfte Dienst (Phase 4): Vorschläge einreichen — prüfen und
   // aktivieren in einem Aufruf, fail-closed mit Befundliste. Wie der Ton und
@@ -879,7 +789,7 @@ export function apply(ctx, config) {
 }
 
 // ── Oeffentliche Aussenflaeche (unveraendert) ───────────────────────────────
-export { CONTEXT_CONTRACT, CONTEXT_SOURCES_RUNTIME, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE };
+export { CONTEXT_CONTRACT, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE };
 export { ContextSchema, ResultSchema };
 export { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferences };
 export { renderContext, renderSkillsBlock };

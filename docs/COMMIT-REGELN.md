@@ -155,7 +155,10 @@ dieselbe Datei über `scripts/commit-guard.mjs`.
 **Fußboden, von keinem Preset abwählbar:** Signatur-Footer und `co-authored-by`
 bleiben verboten. Die Prüfung ist kein Preset-Feld; der Vertrag hat dafür
 `floor` (beide `true`), und ein Preset kann die Felder gar nicht ausdrücken —
-unbekannte Schlüssel lehnt der Validator ab.
+unbekannte Schlüssel lehnt der Validator ab. Daneben trägt der Vertrag die
+Propsa-Form (`name`, `status`, `rules` mit den sieben Punkten), weil das
+contracts-Gate sie für jede Datei unter `docs/contracts/` verlangt; der
+Policy-Validator prüft daran nur die Form, die Werte-Disziplin gehört dem Gate.
 
 **Auswahl**, Vorrang von oben nach unten:
 

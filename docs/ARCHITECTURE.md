@@ -169,7 +169,6 @@ unberührt: `@shinon/openapi` bleibt inaktiv.
 | UI-Zustand        | DSH-Services (`slots`, `styles`, `locale`) | Client-Hälfte              |
 | Zahlen (Bestand, Prüfläufe) | `docs/ZAHLEN.md` | sonst nirgends |
 | Sollfassungen der DSH-Pakete | niemand sonst | `scripts/dsh-target-versions.json` (Prüfer: `npm run check:dsh-versions`) |
-| Laufzeit-Index (Prompter MAX) | `@shinon/prompter` | `.shinon/prompter-index.json`, gitignoriert |
 | Projekt-Kontext (Persona) | der Nutzer | `.shinon/project-context.md`, getrackt wenn vorhanden |
 | Intent-Klasse eines Turns | `@shinon/prompter` — reiner Resolver `assets/intent-resolver.js` | nirgends gespeichert: jeden Turn frisch aus dem Text, nie aus der Modellantwort |
 | Provenienz-Index (Project Index) | `@shinon/project-index` | **Wegwerfbar**: `$XDG_CACHE_HOME/shinon/indexes/<projekt-hash>/index.sqlite` (Default `~/.cache/shinon/indexes/…`) |
@@ -202,12 +201,13 @@ Zwei verschiedene Orte tragen denselben Namen, und das ist gewollt:
 | Pfad | Angelegt von | Lebenszyklus | Im Git? |
 |---|---|---|---|
 | `.shinon/.gitkeep` | dieses Repo | bleibt | **getrackt** (hält den Ordner) |
-| `.shinon/prompter-index.json` | `@shinon/prompter` (`autoIndex`, beim ersten Lauf) | abgeleitet, jederzeit neu gebaut; Löschen ist folgenlos | **gitignoriert** |
 | `.shinon/project-context.md` | der Nutzer (Persona liest ihn, legt ihn nie an) | Inhalt, keine Laufzeit | getrackt, sobald vorhanden |
+| `.shinon/blocks.learned.json` | `@shinon/prompter` (`shinon_block_propose`, nach Annahme) | Gelerntes, projektweit; neu gelernt = neu geschrieben | getrackt, sobald vorhanden |
 
-Beide Leser sind **fail-open**: fehlt die Datei, fehlt der Abschnitt bzw. der Index
-wird neu gebaut — kein Fehler, keine stille Falschaussage. Was hier steht, ist die
-Antwort auf „wohin schreibt der Lauf?", nicht eine Zusage über Inhalte.
+Alle Leser sind **fail-open**: fehlt die Datei, fehlt der Abschnitt — kein Fehler,
+keine stille Falschaussage. Was hier steht, ist die Antwort auf „wohin schreibt der
+Lauf?", nicht eine Zusage über Inhalte. Einen Laufzeit-Index des Prompters gibt es
+nicht mehr: der MAX-Kontext kommt aus dem Project Index.
 
 Fluss:
 

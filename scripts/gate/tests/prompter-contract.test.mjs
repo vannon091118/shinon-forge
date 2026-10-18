@@ -439,10 +439,10 @@ test('MAX: Referenzen muessen im gelieferten Kontext aufloesbar sein', async () 
  * Dieselbe Datei, zwei Schreibweisen — die Luecke, die der Profil-Lauf am
  * 2026-10-16 gezeigt hat.
  *
- * Der Pruefstand oben liefert RELATIVE Pfade (`packages/prompter/index.js`), der
- * Runtime-Index im echten Betrieb ABSOLUTE. Ein Modell nennt eine Datei aber so,
- * wie ein Mensch sie nennt — mit dem Ergebnis, dass die Referenz auf genau die
- * Datei, ueber die der Prompt ging, als "unbekannt" protokolliert und verworfen
+ * Der Pruefstand liefert RELATIVE Pfade, geliefert werden koennen auch
+ * ABSOLUTE (frueher der eigene Index). Ein Modell nennt eine Datei aber so,
+ * wie ein Mensch sie nennt — die Referenz auf genau die Datei des Prompts
+ * galt als "unbekannt" und wurde verworfen.
  * → Kanon: docs/COMMENT-KANON.md#k-7affc01b909e
  */
 test('MAX: die relative Schreibweise eines gelieferten ABSOLUTEN Pfads ist aufloesbar', () => {
@@ -678,16 +678,16 @@ test('Isolation: der One-Shot-Aufruf traegt keine Tools und keine erfundenen Fel
 /**
  * Die Runtime-Module des Pakets: `index.js` plus die `assets/`-Kerne.
  *
- * EINE benannte Ausnahme: `index-manager.js` ist der Laufzeit-Index und schreibt
- * (writeFileSync/mkdirSync) — das ist seine Aufgabe, kein Leck. Alles andere,
- * insbesondere der One-Shot-Pfad, bleibt ohne Dateisystem, Netz und
- * Prozess-Exit. Der Modulschnitt hat diese Zusage geteilt, nicht aufgehoben.
+ * EINE benannte Ausnahme: `learned-store.js` schreibt die gelernten Bausteine
+ * (writeFileSync/mkdirSync) — das ist das Propose-Seam, kein Leck. Mit dem
+ * zweiten Index fiel die alte Ausnahme weg. Alles andere, insbesondere der
+ * One-Shot-Pfad, bleibt ohne Dateisystem, Netz und Prozess-Exit.
  */
 function runtimeModules() {
   const assets = join(PACKAGE_DIR, 'assets');
   return [
     INDEX_FILE,
-    ...readdirSync(assets).sort().filter((name) => name.endsWith('.js') && name !== 'index-manager.js').map((name) => join(assets, name)),
+    ...readdirSync(assets).sort().filter((name) => name.endsWith('.js') && name !== 'learned-store.js').map((name) => join(assets, name)),
   ];
 }
 
@@ -1302,10 +1302,6 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     temperature: 0,
     timeoutMs: 15000,
     trace: true,
-    autoIndex: false,
-    indexSourcePath: '',
-    indexStoragePath: '',
-    indexMaxFiles: 20,
     intentPatternsPath: './assets/intent-rules.json',
     // Phase 4: die gelernte Baustein-Ablage gehoert dem PROJEKT. Der Vorgabewert
     // ist die eine Konstante des Pakets, nicht ein zweites Literal.

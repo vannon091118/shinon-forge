@@ -103,8 +103,8 @@ test('policy: unbekannte Version, unbekannter Contract-String und fehlendes Pres
 
 test('policy: unbekannte Schlüssel auf jeder Ebene sind Befunde, keine stillen Extras', () => {
   const top = contractCopy();
-  top.rules = {};
-  assert.ok(policyIssues(top).some((issue) => issue.includes('unbekannter Schlüssel „rules"')));
+  top.extra = {};
+  assert.ok(policyIssues(top).some((issue) => issue.includes('unbekannter Schlüssel „extra"')));
 
   const preset = contractCopy();
   preset.presets.minimal.footer = { forbidden: false };
@@ -117,6 +117,26 @@ test('policy: unbekannte Schlüssel auf jeder Ebene sind Befunde, keine stillen 
   const repair = contractCopy();
   repair.presets.minimal.repair = { swapTrailer: 'ja' };
   assert.ok(policyIssues(repair).some((issue) => issue.includes('repair.swapTrailer')));
+});
+
+test('policy: die Propsa-Form steht ganz oder gar nicht — Form hier, Werte im contracts-Gate', () => {
+  assert.deepEqual(policyIssues(contractCopy()), [], 'der echte Vertrag mit Propsa-Form ist gueltig');
+  const none = contractCopy();
+  delete none.name;
+  delete none.status;
+  delete none.rules;
+  assert.deepEqual(policyIssues(none), [], 'ohne Propsa-Form bleibt eine fremde Policy lesbar');
+  for (const key of ['name', 'status', 'rules']) {
+    const partial = contractCopy();
+    delete partial[key];
+    assert.ok(policyIssues(partial).some((issue) => issue.includes(`Policy.${key}`)), `${key} fehlt bei sonst vollständiger Form`);
+  }
+  const badName = contractCopy();
+  badName.name = '  ';
+  assert.ok(policyIssues(badName).some((issue) => issue.includes('Policy.name')));
+  const badRules = contractCopy();
+  badRules.rules = [];
+  assert.ok(policyIssues(badRules).some((issue) => issue.includes('Policy.rules')));
 });
 
 test('policy: die Untergrenze ist nicht abschwächbar', () => {

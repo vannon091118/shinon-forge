@@ -63,7 +63,7 @@ export function contextTokens(context) {
 /**
  * Ist die Referenz eine relative Schreibweise eines GELIEFERTEN Pfads?
  *
- * Gemessen im Profil-Lauf 2026-10-16: der Runtime-Index liefert ABSOLUTE Pfade
+ * Gemessen im Profil-Lauf 2026-10-16: der damalige Runtime-Index lieferte ABSOLUTE Pfade
  * (`/home/vannon/…/packages/prompter/index.js`), das Modell nennt die Datei so,
  * wie ein Mensch sie nennt (`packages/prompter/index.js`) — und die Referenz galt
  * als unbekannt, obwohl die Datei im Kontext stand. Das Protokoll meldete

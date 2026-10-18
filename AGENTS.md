@@ -229,12 +229,13 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   Der Project Index führt dieselbe Datei als **bytegleichen Spiegel**
   (`packages/project-index/assets/workspace.js`, Region `zwilling:workspace-identitaet`,
   geprüft von `SOURCE_TWINS` in Gate und Build): nie eine Seite allein ändern.
-  `process.cwd()` never silently decides the project. Persisted runtime indexes carry
+  `process.cwd()` never silently decides the project. Persisted indexes carry
   `root`/`rootId`; a foreign root is rejected (`FOREIGN_ROOT`) and rebuilt, stale
-  entries are reconciled, `..`/absolute/separator escapes and symlink breakouts are
-  refused, and `.agents/` is never indexed as ordinary source (skills run separately).
-  Every decision record carries workspace, source, paths and budget — never prompt
-  text or key values. Tests: `packages/prompter/test/workspace.test.mjs`.
+  entries are reconciled, `..`/absolute/separator escapes are refused, symlinks are
+  never followed out of the root, and `.agents/` is never indexed as ordinary source
+  (skills run separately). Every decision record carries workspace, source, paths and
+  budget — never prompt text or key values. Tests: `packages/prompter/test/workspace.test.mjs`
+  (the identity twin) and `scripts/gate/tests/project-index.test.mjs` (the one index).
 - Prompt building blocks are DATA (`packages/prompter/assets/blocks.json`, contract
   `shinon.blocks/v1`): each block carries its trigger (haystack markers, intent class,
   scoring stance, self-question markers), a token budget and a placement
@@ -262,12 +263,11 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   classified but **never** expanded — otherwise the agent answers its own invented
   task instead of the question. `matchIntent` matches whole phrases (Unicode word
   boundaries) and returns an empty `expansion` for every question.
-  The runtime index (`packages/prompter/assets/index-manager.js`) has TWO hard
-  budgets, both DATA (`MAX_FILE_CHARS = 262144` — the twin of the project
-  index byte limit — and `MAX_INDEX_CHARS = 8388608`): anything over them is
-  NOT indexed, and every exclusion stands in the result with a reason
-  (`ZU_GROSS` or `BUDGET_ERSCHOEPFT`) that the mount log names file by file —
-  a silent cut would be an index lying about its coverage.
+  The prompter carries **no index of its own** (2026-10-18): MAX asks the Project
+  Index (`shinon_index_query`), the single index of the tree. Its one hard budget
+  is the byte limit (`maxFileBytes = 262144`): anything over it is NOT indexed and
+  stands in the report with the reason `ZU_GROSS` — a silent cut would be an index
+  lying about its coverage. Before/after numbers: `docs/probes/index-konsolidierung.json`.
 
 ## Pitfalls
 - Ein Profil-Bündel löst über `profiles/<name>/node_modules` auf — **vor** dem Root-`node_modules`.

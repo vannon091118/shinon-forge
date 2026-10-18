@@ -53,9 +53,6 @@ export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
 /** Budget des MAX-Kontexts. Derselbe Wert wie der Vorgabewert des Index (§14). */
 export const INDEX_BUDGET_TOKENS = 6000;
 
-/** Kontextquelle: altes Projekt-Index vs. neuer Runtime-Index. */
-export const CONTEXT_SOURCES_RUNTIME = ['none', 'file', 'index', 'runtime'];
-
 /** Vertragsname der Zettel-Regeln (Zug 4). */
 export const NOTE_RULES_CONTRACT = 'shinon.note-rules/v1';
 
@@ -230,7 +227,7 @@ export function resolveMode(mode) {
 
 /** Die Achsen, auf denen der Kontext eines Schritts beschrieben wird. */
 export const CONTEXT_STATES = ['absent', 'loaded', 'invalid'];
-export const CONTEXT_SOURCES = ['none', 'file', 'index', 'runtime'];
+export const CONTEXT_SOURCES = ['none', 'file', 'index'];
 export const CONTEXT_REASONS = ['MODE_NEEDS_CONTEXT', 'MODE_NEEDS_INDEX', 'CONTEXT_INVALID'];
 
 /**

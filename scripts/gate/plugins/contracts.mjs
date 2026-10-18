@@ -1,11 +1,10 @@
 /**
  * contracts — 7-Punkt-Vertragsform (propsa-Prinzip, nativ).
  *
- * Eine Fähigkeit ist erst implementiert, wenn sie falsifizierbar ist. Jeder
- * Vertrag in docs/contracts/*.json muss die sieben Punkte tragen; ein Vertrag
- * mit Lücken ist eine Behauptung, kein Vertrag.
- *
- * Zustände (propsa): IMPLEMENTED | STUB | NOT_IMPLEMENTED | NOT_VERIFIED
+ * Jeder Vertrag in docs/contracts/*.json muss die sieben Punkte tragen; ein
+ * Vertrag mit Lücken ist eine Behauptung, kein Vertrag. Zustaende: IMPLEMENTED
+ * | STUB | NOT_IMPLEMENTED | NOT_VERIFIED — ohne Ausnahme, auch
+ * `commit-policy.json` traegt sie (Eignerentscheidung 2026-10-18).
  * → Kanon: docs/COMMENT-KANON.md#k-e6425c89a590
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';

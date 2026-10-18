@@ -46,6 +46,7 @@ test('contracts: leere rules sind ein Problem', () => {
   assert.ok(contractIssues({ name: 'X', status: 'STUB', rules: [] }, 'x.json').length > 0);
 });
 
+
 const goodProbe = {
   id: 'p1', claim: 'etwas gilt', targets: ['a.js'], expect: 'exit 0',
   result: 'BESTAETIGT', verdict: 'WRITE',

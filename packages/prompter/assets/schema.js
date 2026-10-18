@@ -3,8 +3,7 @@
  *
  * Alle Schemastery-Schemas des Pakets: Ergebnis je Modus, MAX-Kontext, Hook-Config.
  * Schemastery ist peerDependency dieses Pakets und wird hier direkt benutzt —
- * importfrei bleiben die reinen Kerne (`note-core.js`, `index-manager.js`), nicht
- * die Vertragsformen.
+ * importfrei bleiben die reinen Kerne (`note-core.js`), nicht die Vertragsformen.
  */
 import z from '@deepseek-ai/schemastery';
 import { INDEX_BUDGET_TOKENS, MODES, NOTES_DIR_DEFAULT, SKILLS_DIR_DEFAULT } from './mode-core.js';
@@ -112,8 +111,8 @@ export const Config = z.object({
   /**
    * Aktiver Workspace (S1) — DIE EINE Quelle der Projektidentität.
    * Leer = Env `SHINON_WORKSPACE_ROOT`, sonst `process.cwd()`. Wer hier einen
-   * Pfad nennt, bindet Prompter, Runtime-Index, Skills und Zettel an genau
-   * diesen Ordner; ein Index mit fremder Root-Bindung wird abgelehnt.
+   * Pfad nennt, bindet Prompter, Skills und Zettel an genau diesen Ordner;
+   * der Project Index bindet seine Datei an dieselbe Root.
    */
   workspaceRoot: z.string().default(''),
   /** Kontext-Quelle fuer MAX (leer = kein Kontext, MAX wird abgelehnt). */
@@ -151,28 +150,6 @@ export const Config = z.object({
   timeoutMs: z.number().default(15000),
   /** Entscheidungen auf `DECISION_CHANNEL` emittieren. */
   trace: z.boolean().default(true),
-  /**
-   * Runtime-Index aktivieren: der Prompter pflegt SEINEN EIGENEN Index
-   * (hash-basiert, JSON-persistiert) statt sich auf den Project Index zu
-   * verlassen. MAX nutzt ihn als Kontextquelle, wenn der Project Index nicht
-   * verfuegbar ist.
-   */
-  autoIndex: z.boolean().default(false),
-  /**
-   * Verzeichnis, das bei aktiviertem `autoIndex` indiziert wird (relativ zum
-   * ARBEITSVERZEICHNIS). Leer = kein Auto-Index.
-   */
-  indexSourcePath: z.string().default(''),
-  /**
-   * Pfad der Runtime-Index-Datei (relativ zum ARBEITSVERZEICHNIS). Leer =
-   * kein Persistenz, Index lebt nur solange die Sitzung.
-   */
-  indexStoragePath: z.string().default(''),
-  /**
-   * Maximal dateien im Runtime-Index-Kontext. Verhindert explosionsartige
-   * Kontextblöcke bei breiten Suchbegriffen.
-   */
-  indexMaxFiles: z.number().default(20),
   /**
    * Intent-Patterns-Datei (relativ zum Paket). Enthält Trigger → Expansion.
    * Leer = keine Intent-Erweiterung.

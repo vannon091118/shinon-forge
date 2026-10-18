@@ -4,7 +4,7 @@
  * DIE EINE QUELLE der Workspace-Identität (S1).
  *
  * Bis hierher bestimmte `process.cwd()` stillschweigend die Projektidentität —
- * verstreut über `prompt-files.js`, `index.js` und `index-manager.js`. Wer aus
+ * verstreut über `prompt-files.js` und `index.js`. Wer aus
  * einem anderen Ordner startete, las einen anderen Index, andere Skills, andere
  * → Kanon: docs/COMMENT-KANON.md#k-8f36ddaa4a12
  */

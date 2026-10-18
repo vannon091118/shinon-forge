@@ -7,17 +7,12 @@ sessions/
 storages/
 .anonymous-user-id
 
-# .shinon/ — der repo-lokale Laufzeitordner (Lebenszyklus: docs/ARCHITECTURE.md §5).
-# NUR das abgeleitete Artefakt ist ignoriert: der Prompter baut es beim ersten
-# Lauf selbst und kann es jederzeit neu bauen. Die Projekt-Kontextdatei daneben
-# (.shinon/project-context.md) ist INHALT und wird getrackt; der Ordner selbst
-# liegt als .shinon/.gitkeep im Baum, damit ein frischer Klon ihn hat.
-
-# Runtime-Index des Prompters: absolute Pfade des jeweiligen Rechners und der
-# volle Projektinhalt (gemessen 11 MB). Zustand, keine Quelle — aber NUR die
-# Indexdatei: `.shinon/project-context.md` ist geschriebener Inhalt, den die
-# Persona in den Prompt laedt, und bleibt sichtbar.
-.shinon/prompter-index.json
+# .shinon/ — der repo-lokale Inhaltsordner (Lebenszyklus: docs/ARCHITECTURE.md §5).
+# Hier liegt nur noch INHALT: `.shinon/project-context.md` (Persona),
+# `.shinon/blocks.learned.json` (gelernte Bausteine). Der Laufzeit-Index des
+# Prompters ist entfallen; einen Index fuehrt allein der Project Index, und der
+# liegt außerhalb des Baums. Der Ordner selbst liegt als .shinon/.gitkeep im
+# Baum, damit ein frischer Klon ihn hat.
 
 # Messausgaben des Auslastungs-Werkzeugs (.shinon/dev/auslastung.mjs): pro Lauf
 # eine JSONL-Spur und eine Zusammenfassung. Belege, die bleiben sollen, wandern

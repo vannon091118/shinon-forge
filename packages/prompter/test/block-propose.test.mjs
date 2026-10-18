@@ -58,7 +58,6 @@ const mount = (tag) => {
     skillsPath: '',
     contextPath: '',
     intentPatternsPath: '',
-    indexStoragePath: '',
     blocksLearnedPath: overlay,
   }));
   return { host, dispose, propose: host.services.get(PROPOSE_SERVICE), overlay };
@@ -118,7 +117,6 @@ test('sequenz: Annahme landet in Ablage, Auswahl und Neustart', () => {
       skillsPath: '',
       contextPath: '',
       intentPatternsPath: '',
-      indexStoragePath: '',
       blocksLearnedPath: overlay,
     }));
     return { host, dispose, propose: host.services.get(PROPOSE_SERVICE) };

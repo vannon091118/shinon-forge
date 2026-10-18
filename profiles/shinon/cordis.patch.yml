@@ -260,11 +260,8 @@
     trace: true
     # Gelernte Bausteine (Phase 4): Projekt-Ablage über der Paket-Registry.
     blocksLearnedPath: .shinon/blocks.learned.json
-    # Runtime-Index (Zug 7): eigenhaend verwaltet, hash-basiert, JSON-persistiert.
-    autoIndex: true
-    indexSourcePath: .
-    indexStoragePath: .shinon/prompter-index.json
-    indexMaxFiles: 20
+    # Der MAX-Kontext kommt aus dem Project Index (Dienst shinon_index_query).
+    # Einen zweiten, eigenen Index gibt es nicht mehr.
     # Intent-Patterns (Zug 8): Trigger → Full-Task-Expansion, default im Paket.
     intentPatternsPath: ./assets/intent-rules.json
 

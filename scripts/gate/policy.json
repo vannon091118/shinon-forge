@@ -11,19 +11,14 @@
       "legacy-guard",
       "profile",
       "typescript",
-      "comment-canon"
+      "comment-canon",
+      "dsh-singleton"
     ],
     "local": [
       "bundle-resolution",
-      "manifest",
       "contract",
-      "patch",
-      "host-half",
-      "client-half",
       "legacy-guard",
-      "profile",
-      "typescript",
-      "comment-canon"
+      "dsh-singleton"
     ],
     "slices": {
       "package-drift": {

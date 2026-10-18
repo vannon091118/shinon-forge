@@ -817,6 +817,66 @@ function installedBundle(file) {
 }
 
 /**
+ * Jedes `@deepseek-ai/*`-Paket genau EINMAL im Baum — die Regel für Modul-Identität.
+ *
+ * Warum: `dsh-agent-loop` holt den Tool-Scheduler über ein MODULWEITES Symbol aus
+ * `@deepseek-ai/dsh-tools` (`ctx.tools[TOOL_RUNTIME_SCHEDULER]`). Zwei Kopien sind
+ * zwei Symbole; dann ist der Scheduler `undefined` und JEDER Tool-Call stirbt mit
+ * `reading 'prepare'`, während alle statischen Gates grün bleiben (gemessen
+ * 2026-10-18: zehn Kopien im Lock, `npm dedupe` macht daraus eine).
+ */
+export function dshInstanceIssues(base = ROOT, options = {}) {
+  const scope = options.scope ?? '@deepseek-ai';
+  const modules = options.modulesDir ?? join(base, 'node_modules');
+  const show = (file) => {
+    const rel = relative(base, file);
+    return rel === '' || rel === '..' || rel.startsWith(`..${sep}`) ? file : rel;
+  };
+  if (!existsSync(modules)) return { issues: [], status: 'not-applicable', detail: 'kein node_modules — nichts installiert' };
+
+  const found = new Map();
+  const walk = (dir, depth) => {
+    if (depth > 6) return;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const path = join(dir, entry.name);
+      if (entry.name === 'node_modules') {
+        walk(path, depth + 1);
+        continue;
+      }
+      if (entry.name.startsWith('@')) {
+        walk(path, depth + 1);
+        continue;
+      }
+      if (dir.endsWith(scope)) {
+        if (!found.has(entry.name)) found.set(entry.name, []);
+        found.get(entry.name).push(path);
+      }
+      if (existsSync(join(path, 'node_modules'))) walk(join(path, 'node_modules'), depth + 1);
+    }
+  };
+  walk(modules, 0);
+
+  const duplicates = [...found.entries()].filter(([, paths]) => paths.length > 1);
+  const issues = duplicates.map(
+    ([name, paths]) =>
+      `${scope}/${name} liegt ${paths.length}× im Baum (${paths.map(show).join(', ')}) — ` +
+      'Abhilfe: npm dedupe (ein Modul, ein Symbol)',
+  );
+  return {
+    issues,
+    status: issues.length === 0 ? 'pass' : 'fail',
+    detail: `${found.size} ${scope}-Pakete geprüft`,
+  };
+}
+
+/**
  * Die Bündel-Auflösung des aktiven Profils — die EINE Regel für Gate und Doctor.
  *
  * Warum es diese Funktion gibt: ein `shinon`-Start löst jedes Bündel über

@@ -159,7 +159,14 @@ Pfad-/Branch-Filter, kein `continue-on-error: true`, und leitet den Prüfbereich
 nicht selbst im YAML ab (`scripts/lib/ci-range.mjs` tut das, und im Zweifel prüft
 er die **volle** Historie). Das statische Gate (`commit-trailer`) prüft diese
 Eigenschaften am Dateiinhalt, nicht an der Absicht: `npm run gate:full` →
-**Exit 0**, 22 Gates, 0 rot (Gates am 2026-10-17 nachgemessen: das Gate `bundle-resolution` ist hinzugekommen — es prüft die Auflösung der Profil-Bündel in `packages/` und wird von `repo.bundleResolutionIssues()` getragen).
+**Exit 1**, 24 Gates, 1 rot. Nachgemessen am 2026-10-18: `contracts` meldet
+`docs/contracts/commit-policy.json` ohne `name`, `status` und `rules` — ein
+Befund an einer Vertragsdatei, den die beiden neuen Gates nicht verursachen.
+Neu sind `bundle-resolution` (Auflösung der Profil-Bündel in `packages/`, getragen
+von `repo.bundleResolutionIssues()`) und `dsh-singleton` (jedes
+`@deepseek-ai/*`-Paket genau einmal im Baum, getragen von
+`repo.dshInstanceIssues()` — zwei Modul-Instanzen sind zwei Symbole und beenden
+jeden Tool-Call mit `reading 'prepare'`).
 
 **NICHT GEMESSEN:** ob die Branch-Regel in GitHub **gesetzt ist**. Das ist kein
 Dateiinhalt, sondern ein Zustand bei GitHub, und der ist von hier aus nicht

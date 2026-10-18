@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
@@ -226,9 +226,8 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       // Zug 4/5: das Paket liest die Zettel und baut den Stand — der Kern liegt
       // in `assets/`, weil er ohne node_modules testbar sein muss.
       { kind: 'import', target: './assets/note-core.js' },
-      { kind: 'import', target: './assets/index-manager.js' },
       // S1: DIE EINE Workspace-Identität — der Host löst sie einmal auf und
-      // bindet den Runtime-Index daran (kein stilles cwd).
+      // reicht sie an den Project Index weiter (kein stilles cwd).
       { kind: 'import', target: './assets/workspace.js' },
       // Der Modulschnitt: je Verantwortung ein Modul (Seam-Namen und Modus-
       // Vertrag, Schemata, Ergebnisvertrag, XML-Marken, Dateien, Stand,
@@ -241,6 +240,8 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/intent-resolver.js' },
       { kind: 'import', target: './assets/render-context.js' },
       { kind: 'import', target: './assets/prompt-files.js' },
+      // Der einzige Schreibweg des Hosts: gelernte Bausteine (Propose-Seam).
+      { kind: 'import', target: './assets/learned-store.js' },
       { kind: 'import', target: './assets/stand.js' },
       { kind: 'import', target: './assets/enhancer.js' },
       // Die Injection-Runtime (Phase 1-4 + Selektionsvertrag): Registry-Auswahl,
@@ -493,6 +494,33 @@ test('S1: Prompter und Project Index beantworten die Workspace-Frage identisch',
   }
   assert.deepEqual(indexWs.fingerprintRoot('/tmp/shinon-s1-a'), prompterWs.fingerprintRoot('/tmp/shinon-s1-a'));
   assert.equal(indexWs.WORKSPACE_CONTRACT, prompterWs.WORKSPACE_CONTRACT);
+});
+
+/**
+ * S1 — ein Link aus dem Workspace heraus ist kein Quelltext.
+ *
+ * Der Lauf nimmt nur echte Dateien (`Dirent.isFile()`); ein Symlink wird damit
+ * gar nicht erst geoeffnet. Geprueft wird der INHALT, nicht nur der Pfad: ohne
+ * diese Probe waere „nichts indexiert" auch bei einem kaputten Lauf gruen.
+ */
+test('S1: ein Symlink aus der Root heraus wird nicht gelesen', () => {
+  const project = fixtureProject('symlink');
+  const outside = workDir('symlink-aussen');
+  writeFileSync(join(outside, 'geheim.mjs'), 'export const geheim = "niemals im Kontext";\n');
+  try {
+    symlinkSync(join(outside, 'geheim.mjs'), join(project, 'src', 'ausbruch.mjs'));
+  } catch {
+    return; // ohne Symlink-Recht keine Aussage — nicht gruenluegen, sondern ueberspringen
+  }
+  const { file } = fixtureIndex(project, 'symlink');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, {});
+  const paths = rows(db, 'select path from files').map((row) => row.path);
+  assert.equal(paths.includes('src/ausbruch.mjs'), false, 'das Ziel liegt ausserhalb des Workspace');
+  assert.equal(paths.includes('src/a.mjs'), true, 'die echten Dateien bleiben drin');
+  const bodies = rows(db, 'select body from chunks').map((row) => row.body).join('\n');
+  assert.equal(bodies.includes('niemals im Kontext'), false, 'der Inhalt des Ziels wird nie gelesen');
+  db.close();
 });
 
 // ── Zusage: der Lauf indiziert und bleibt inkrementell (Plan §11) ────────────
