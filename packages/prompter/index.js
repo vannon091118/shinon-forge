@@ -9,7 +9,6 @@ import {
   saveIndex as saveRuntimeIndex,
   indexDirectory as autoIndexDirectory,
   getContext as runtimeGetContext,
-  matchIntent as runtimeMatchIntent,
   writeJsonFile,
   RUNTIME_INDEX_CONTRACT as RUNTIME_INDEX_CONTRACT_NAME,
 } from './assets/index-manager.js';
@@ -21,12 +20,22 @@ import {
 import { CONTEXT_CONTRACT, CONTEXT_SOURCES_RUNTIME, CONTEXT_STATES, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, NOT_SUPPLIED, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE, assertVocabulary, contextLabel, noContext, resolveMode, withContext } from './assets/mode-core.js';
 import { Config as _imported_config_schema, ContextSchema, ResultSchema } from './assets/schema.js';
 import { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferences } from './assets/result-contract.js';
+import { UNDEFINED, expandPrompt, resolveIntent } from './assets/intent-resolver.js';
 import { renderContext, renderSkillsBlock } from './assets/render-context.js';
 import { loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
 import { readTone, standFor, standTrace } from './assets/stand.js';
 import { buildEnhancerRequest, collectStream, enhanceGuarded, replacePrompt } from './assets/enhancer.js';
 import { BLOCKS_CONTRACT, BLOCKS_PATH, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks, validateRegistry } from './assets/block-select.js';
 import { LEARNED_CONTRACT, PROPOSE_CONTRACT, PROPOSE_SERVICE, duplicateVsBlocks, mergeLearnedBlocks, validateBlockCore, validateLearnedFile, validateProposalShell } from './assets/block-review.js';
+
+/** Das Global, in das der Host die letzten Entscheidungen legt (der Client liest es). */
+export const TRACE_GLOBAL = '__shinonPrompterTrace';
+
+/** Die Naht, ueber die dsh-host-webserver die Zeilen aller Haelften einsammelt. */
+export const INDEX_INJECT = 'webserver/index-inject';
+
+/** Der Live-Kanal des Trace-Panels (Server-Sent Events, gleiche Herkunft). */
+export const TRACE_ENDPOINT = '/shinon/prompter/trace';
 
 /** Kanal und Vertragsname der Narrative Engine (Zug 6). Literale Spiegel von `@shinon/narrative` (Naht, drift-geprueft). */
 const NARRATIVE_CHANNEL = 'shinon/narrative/state';
@@ -241,9 +250,10 @@ function maxContext(ctx, config, runtime, prompt) {
  */
 function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contextSource = 'none', contextUsed = false) {
   const result = outcome.result;
-  // S1-Provenienz: Workspace-Identität, Quelle, Pfade, Budget, Gründe — aber
-  // nie der Prompt-Text (nur Längen) und nie Schlüsselwerte (die Route trägt
-  // nur Provider/Modell-Namen).
+  const turn = runtime?.turn ?? null;
+  // S1-Provenienz: Workspace-Identität, Quelle, Pfade, Budget, Gründe. Der
+  // ROHE Nutzertext steht als `raw_prompt` ausdruecklich dabei — er ist die
+  // Eingabe, deren Veredelung der Trace zeigen soll; Schluesselwerte nie.
   const ws = runtime?.workspace ?? null;
   return {
     contract: CONTRACT,
@@ -258,14 +268,19 @@ function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contex
     context_budget_tokens: runtime?.lastBudgetTokens ?? null,
     context_chars: runtime?.lastContextChars ?? null,
     context_files: runtime?.lastContextFiles ?? null,
-    intentClassification: result?.intentClassification ?? null,
+    // Die KLASSE ist Runtime-Eigentum: der Resolver hat sie aus dem Text
+    // abgeleitet, bevor das Modell ueberhaupt gefragt wurde. Das Modell kann sie
+    // nicht setzen — `intentClassification` ist kein Feld seines Vertrags mehr.
+    intentClassification: turn?.resolution?.classification ?? null,
+    intentReason: turn?.resolution?.reason ?? null,
+    raw_prompt: turn?.rawPrompt ?? null,
     uncertainties: result?.uncertainties ?? [],
     references: result?.references ?? [],
     rawLength,
     enhancedLength: result?.enhancedPrompt?.length ?? 0,
     // Runtime-Index + Intent-Erweiterung (Zug 7/8): nur wenn aktiviert.
     expansion: runtime?.expansion ?? null,
-    intentMatch: runtime?.intentMatch ?? null,
+    intentMatch: turn?.intentMatch ?? null,
     indexHits: runtime?.indexHits ?? null,
   };
 }
@@ -329,7 +344,7 @@ function blockSelection(ctx, config, runtime, contract, promptText, context, sta
       mode: contract.mode,
       promptText,
       context,
-      intentClass: runtime.intentMatchClass ?? null,
+      intentClass: runtime.turn?.intentMatchClass ?? null,
       stance,
       weights: readBlockWeights(ctx),
       available: {
@@ -417,30 +432,29 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   // System-Prompt kommen aus einer Struktur statt aus fuenf `mode`-Vergleichen.
   const contract = resolveMode(config.mode);
 
-  // Intent-Erweiterung (Zug 8): Kurz-Prompt → Full-Task, bevor Kontext geladen
-  // wird. Nur in MAX, nur wenn Patterns geladen sind, nur bei aktivem Match.
-  // Der erweiterte Text ersetzt prompt.text im One-Shot; der Roh-Text bleibt
-  // in decisionRecord.rawLength erhalten (Originallaenge).
+  // Intent-Klassifikation (Zug 8, P2): der RUNTIME-RESOLVER entscheidet aus dem
+  // Text, in JEDEM Modus und ohne Modellaufruf — auch wenn der One-Shot spaeter
+  // scheitert, steht die Klasse im Datensatz. Die Expansion ist ein eigenes
+  // Angebot und bleibt auf den Kontext-Modus begrenzt.
+  //
+  // Zu Beginn jedes Turns werden alle drei Felder neu gesetzt: kein Treffer des
+  // vorigen Schritts darf stehen bleiben (gemessen als stale intentMatchClass).
+  // P1: JEDER Turn bekommt ein frisches, isoliertes Turn-Objekt. Der Roh-Text
+  // des Menschen steht darin, damit er im Trace verfuegbar ist; Treffer und
+  // Klasse des vorigen Schritts koennen nicht stehen bleiben.
+  runtime.turn = { rawPrompt: prompt.text, resolution: null, intentMatch: null, intentMatchClass: null };
   let expandedText = prompt.text;
-  if (contract.needsContext && runtime.intentRules !== null) {
-    const match = runtimeMatchIntent(prompt.text, runtime.intentRules);
-    if (match !== null) {
-      runtime.intentMatch = match.patternId;
-      runtime.intentMatchClass = match.classification ?? null;
-      // Eine Frage/Lookup-Klassifikation hat KEINE Expansion. Dann bleibt der
-      // Prompt unangetastet: der Agent soll antworten, nicht eine Aufgabe
-      // erfinden (die Erweiterung ist ein Angebot, keine Umdeutung).
-      if (match.expansion !== '') {
-        expandedText = `${prompt.text}\n\n# Aufgabe\n${match.expansion}`;
-        console.log(`[shinon-prompter] Intent erkannt: ${match.label} (${match.classification}) — Expansion angewendet`);
-      } else {
-        console.log(`[shinon-prompter] Intent erkannt: ${match.label} (${match.classification}) — keine Expansion`);
-      }
-    } else {
-      // Kein Treffer heißt kein Treffer: Treffer UND Klasse des VORIGEN Schritts
-      // dürfen nicht stehen bleiben (gemessen als stale intentMatchClass).
-      runtime.intentMatch = null;
-      runtime.intentMatchClass = null;
+  if (runtime.intentRules !== null) {
+    const resolution = resolveIntent(prompt.text, runtime.intentRules);
+    runtime.turn.resolution = resolution;
+    runtime.turn.intentMatch = resolution.matched ? resolution.patternId : null;
+    // UNDEFINED ist eine Aussage, keine Klasse: die Baustein-Auswahl bleibt leer.
+    runtime.turn.intentMatchClass = resolution.classification === UNDEFINED ? null : resolution.classification;
+    if (contract.needsContext && resolution.expansion !== '') {
+      expandedText = expandPrompt(prompt.text, resolution);
+      console.log(`[shinon-prompter] Intent erkannt: ${resolution.label} (${resolution.classification}) — Expansion angewendet`);
+    } else if (resolution.matched) {
+      console.log(`[shinon-prompter] Intent erkannt: ${resolution.label} (${resolution.classification}) — keine Expansion`);
     }
   }
 
@@ -454,7 +468,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     // MAX ohne Kontext gibt es nicht: Code-Referenzen und Touches waeren
     // erfunden. Also wird der Modus abgelehnt, nicht weichgespuelt.
     const outcome = { outcome: 'unavailable', reasons: [supply.reason], result: null };
-    report(ctx, config, { ...decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId), stand: null, blocks: decisionBlocks(blockSelection(ctx, config, runtime, contract, expandedText, null, null)) });
+    report(ctx, config, runtime, { ...decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId), stand: null, blocks: decisionBlocks(blockSelection(ctx, config, runtime, contract, expandedText, null, null)) });
     return next();
   }
 
@@ -497,9 +511,21 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     }
   }
 
-  // Die Route entscheidet der Mount (eigener Schluessel oder Fallback) — hier
-  // nur angewandt. `enhanceGuarded` baut die Anfrage aus diesem Config-Stueck.
-  const outcome = await enhanceGuarded(ctx, contract, { ...config, ...runtime.route }, expandedText, supply.context, stand, skills, payload.signal);
+  // Aktions-Check (P3): klare CHAT- und LOOKUP-Turns brauchen keine Veredelung.
+  // Sie werden DIREKT durchgereicht — der Prompter greift (er entscheidet und
+  // protokolliert), ohne einen Modellaufruf zu bezahlen und ohne das Modell zu
+  // bitten, eine Antwort zu schreiben, die dann den Prompt ersetzen wuerde.
+  const direct = contract.mode !== undefined && runtime.turn?.resolution !== null
+    && runtime.turn?.resolution !== undefined
+    && ['CHAT', 'LOOKUP'].includes(runtime.turn.resolution.classification);
+  const outcome = direct
+    ? {
+      outcome: 'accepted',
+      reasons: ['NO_ENHANCEMENT_NEEDED'],
+      result: { enhancedPrompt: prompt.text, preservedIntent: true, addedRequirements: [], removedRequirements: [], uncertainties: [], references: [] },
+    }
+    : await enhanceGuarded(ctx, contract, { ...config, ...runtime.route }, expandedText, supply.context, stand, skills, payload.signal);
+  if (direct) console.log(`[shinon-prompter] Direkt durchgereicht (${runtime.turn.resolution.classification}) — kein One-Shot`);
 
   // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
   // und darf nicht in einen zweiten next() umgedeutet werden.
@@ -521,7 +547,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   const recorded = effect.replacePrompt && messages === null
     ? { ...outcome, outcome: 'rejected', reasons: effect.missingMessage }
     : outcome;
-  report(ctx, config, { ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection) });
+  report(ctx, config, runtime, { ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection) });
 
   // Nur ein gefundenes akzeptiertes Ergebnis ersetzt die Nutzernachricht. In
   // JEDEM anderen Fall geht die Entscheidung unveraendert weiter — der Roh-Prompt
@@ -531,8 +557,32 @@ async function onPreStep(ctx, config, runtime, payload, next) {
 }
 
 /** Entscheidung emittieren und in die Fenster-Konvention schreiben. */
-function report(ctx, config, record) {
+function report(ctx, config, runtime, record) {
   if (!config.trace) return;
+  // Der ROHE Nutzertext gehoert in den Trace: ohne ihn ist nicht nachvollziehbar,
+  // WAS veredelt wurde. JSON.stringify haelt die Zeile einzeilig und vollstaendig.
+  console.log(`[shinon-prompter] Trace: ${record.outcome} intent=${record.intentClassification ?? 'UNDEFINED'} raw=${JSON.stringify(record.raw_prompt ?? '')}`);
+  // Der Puffer ist die Quelle des Panels: der Kanal allein erreicht den Browser
+  // nicht (Host-Events ueberqueren den Carrier nicht), also legt der Host die
+  // letzten Entscheidungen als Global in die naechste index.html.
+  const trace = runtime?.trace;
+  if (Array.isArray(trace)) {
+    trace.unshift({
+      outcome: record.outcome,
+      mode: record.mode,
+      reasons: record.reasons,
+      context_source: record.context_source ?? null,
+      intent: record.intentClassification ?? 'UNDEFINED',
+      raw_prompt: record.raw_prompt ?? null,
+      at: Date.now(),
+    });
+    trace.length = Math.min(trace.length, 20);
+    // Live an die offenen Panels; ohne Verbindung bleibt der Puffer die Quelle.
+    const sse = runtime?.sse;
+    if (sse !== undefined) for (const response of sse) {
+      try { response.write(`data: ${JSON.stringify(trace)}\n\n`); } catch { /* Verbindung weg */ }
+    }
+  }
   if (record.outcome !== 'accepted') {
     const detail = record.reasons.join(', ');
     if (record.outcome === 'unavailable') console.warn(`[shinon-prompter] nicht verfuegbar (${detail}) — Roh-Prompt gilt`);
@@ -752,8 +802,40 @@ export function apply(ctx, config) {
     console.warn(`[shinon-prompter] Eigener Schluessel fehlt (${config.providerKeyEnv}) — One-Shot faellt auf ${route.provider}/${route.model} zurueck`);
   }
 
-  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules, intentMatchClass: null, blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null };
+  const runtime = { context, contextState, noteRules, skillRules, runtimeIndex, intentRules, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null };
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
+  // Das Panel liest den Puffer beim Laden: dieselbe Naht wie Marker/Traceability.
+  const disposeInject = ctx.on(INDEX_INJECT, (table) => {
+    if (Array.isArray(table)) table.push({ kind: 'global', name: TRACE_GLOBAL, value: runtime.trace });
+  });
+  // Und LIVE: eine schmale SSE-Route. Der Entscheidungs-Kanal erreicht den
+  // Browser nicht, also schiebt der Host neue Eintraege ueber diese Verbindung.
+  runtime.sse = new Set();
+  let disposeRoute = null;
+  const mountTraceRoute = (webCtx) => {
+    const webServer = typeof webCtx?.get === 'function' ? webCtx.get('webServer') : undefined;
+    if (typeof webServer?.register !== 'function') {
+      console.log('[shinon-prompter] webServer ohne register — Trace nur beim Laden der Seite, nicht live');
+      return;
+    }
+    disposeRoute = webServer.register({
+      kind: 'exact',
+      path: TRACE_ENDPOINT,
+      handler: (req, res) => {
+        if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
+        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+        res.write(`data: ${JSON.stringify(runtime.trace)}\n\n`);
+        runtime.sse.add(res);
+        req.on('close', () => runtime.sse.delete(res));
+      },
+    });
+    // Die Route haengt am Fiber, nicht am Prozess: mit dem Dienst verschwindet sie.
+    webCtx.effect?.(() => () => { try { disposeRoute?.(); } catch { /* schon weg */ } });
+  };
+  // `ctx.get` allein saehe den Dienst nicht: Zugriff verlangt eine Deklaration,
+  // und die Reihenfolge der Fiber ist nicht die Reihenfolge der Dienste.
+  if (typeof ctx.inject === 'function') ctx.inject(['webServer'], mountTraceRoute);
+  else mountTraceRoute(ctx);
   const disposeNarrative = ctx.on(NARRATIVE_CHANNEL, (composite) => {
     runtime.narrative = composite ?? null;
   });
@@ -786,6 +868,10 @@ export function apply(ctx, config) {
 
   return () => {
     if (typeof dispose === 'function') dispose();
+    if (typeof disposeInject === 'function') disposeInject();
+    if (typeof disposeRoute === 'function') disposeRoute();
+    for (const response of runtime.sse ?? []) { try { response.end(); } catch { /* weg */ } }
+    runtime.sse?.clear();
     if (typeof disposeNarrative === 'function') disposeNarrative();
     if (typeof releasePropose === 'function') releasePropose();
     console.log('[shinon-prompter] Deaktiviert — Listener abgemeldet');

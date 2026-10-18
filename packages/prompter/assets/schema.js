@@ -36,13 +36,9 @@ export function resultSchema(mode) {
     // diese Luecke schliesst `required()` (siehe der Kommentar ueber dem Schema).
     uncertainties: z.array(z.string()).default([]),
     references: mode === 'MAX' ? z.array(z.string()).required() : z.array(z.string()).default([]),
-    intentClassification: z.union([
-      z.const('CHAT'),
-      z.const('LOOKUP'),
-      z.const('TRANSFORM'),
-      z.const('MULTI_STEP_TASK'),
-      z.const('LONG_RUNNING_GOAL'),
-    ]).required(),
+    // KEIN `intentClassification`: die Klasse ist Runtime-Eigentum
+    // (`assets/intent-resolver.js`) und darf nicht aus einer Modellantwort
+    // kommen — sonst entschiede das Modell ueber das Routing.
   });
 }
 
@@ -151,7 +147,7 @@ export const Config = z.object({
   maxTokens: z.number().default(1200),
   /** Deterministisch: derselbe Prompt soll denselben Vorschlag ergeben. */
   temperature: z.number().default(0),
-  /** Harte Obergrenze des One-Shots. Danach gilt der Roh-Prompt. */
+  /** Harte Obergrenze des One-Shots. Danach gilt der Roh-Prompt. 0 = kein Deckel. */
   timeoutMs: z.number().default(15000),
   /** Entscheidungen auf `DECISION_CHANNEL` emittieren. */
   trace: z.boolean().default(true),

@@ -242,7 +242,7 @@
       "modus": ["MIN", "MID", "MAX"],
       "pflicht": false,
       "budgetTokens": 500,
-      "ausloeser": { "regeln": "shinon.intent-rules/v1 (6 Patterns: update-docs/documentation/tests/bugfix/refactor/read-code)", "trigger": "Trigger-Listen deutsch/englisch, case-insensitive", "nurWenn": "intentPatternsPath gesetzt und Pattern trifft" },
+      "ausloeser": { "regeln": "shinon.intent-rules/v1 (8 Patterns: update-docs/documentation/tests/bugfix/refactor/read-code/long-running-goal/chat)", "trigger": "Trigger-Listen deutsch/englisch, case-insensitive", "nurWenn": "intentPatternsPath gesetzt und Pattern trifft" },
       "herkunft": "packages/prompter/assets/intent-rules.json (Trigger → Klassifikation → Expansion)"
     }
   ]

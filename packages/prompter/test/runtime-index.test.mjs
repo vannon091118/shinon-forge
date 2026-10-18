@@ -335,8 +335,15 @@ test('matchIntent: Lookup wird klassifiziert, hat aber keine Expansion', () => {
   assert.equal(m.expansion, '');
 });
 
+test('matchIntent: Smalltalk ist CHAT — eine Klasse, aber keine Aufgabe', () => {
+  const m = matchIntent('hallo wie gehts', RULES);
+  assert.ok(m);
+  assert.equal(m.patternId, 'chat');
+  assert.equal(m.classification, 'CHAT');
+  assert.equal(m.expansion, '', 'Smalltalk wird nie erweitert');
+});
+
 test('matchIntent: kein Treffer gibt null', () => {
-  assert.equal(matchIntent('hallo wie gehts', RULES), null);
   assert.equal(matchIntent('', RULES), null);
   assert.equal(matchIntent('xyz', RULES), null);
 });

@@ -19,6 +19,12 @@ storages/
 # Persona in den Prompt laedt, und bleibt sichtbar.
 .shinon/prompter-index.json
 
+# Messausgaben des Auslastungs-Werkzeugs (.shinon/dev/auslastung.mjs): pro Lauf
+# eine JSONL-Spur und eine Zusammenfassung. Belege, die bleiben sollen, wandern
+# kuratiert nach docs/probes/ — der rohe Lauf ist Zustand, keine Quelle.
+.shinon/dev/messung-*.jsonl
+.shinon/dev/zusammenfassung-*.json
+
 # Credentials — never commit. Public repo!
 .credentials.yaml
 

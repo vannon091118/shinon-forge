@@ -3,7 +3,7 @@ import z from '@deepseek-ai/schemastery';
 /**
  * shinon-task-router — Phase 5/6, Plan §16 und §17.
  *
- *   LLM  →  validierte Klassifikation (aus @shinon/prompter)
+ *   Runtime-Resolver  →  Klassifikation (aus @shinon/prompter, ohne Modell)
  *        →  Shinon policy (DIESES Paket)
  *        →  goal / no goal
  *        →  DSH Goal State (ctx.goals)
@@ -15,8 +15,9 @@ import z from '@deepseek-ai/schemastery';
 export const CONTRACT = 'shinon.task-router/decision-v1';
 
 /**
- * Der Eingang: der Provenienz-Datensatz des Prompt-Enhancers (§16: „das LLM
- * liefert eine Klassifikation" — ein VALIDIERTER Datensatz, kein Rohtext).
+ * Der Eingang: der Provenienz-Datensatz des Prompt-Enhancers. Die Klasse darin
+ * stammt aus dem Runtime-Resolver des Prompters (Text-Patterns, kein Modell) —
+ * der Router liest damit eine Runtime-Entscheidung, keine Modellantwort.
  *
  * Der Vertragsname steht hier als eigene Konstante statt als Import: die Pakete
  * dieses Repos referenzieren einander nicht. Dass beide denselben Namen fuehren,
@@ -37,16 +38,15 @@ export const DISPOSED_EVENT = 'agent/disposed';
 /** Der Dienstname der Goal-Domaene in `ctx.goals`. */
 export const GOAL_SERVICE = 'goals';
 
-// Die Gleichheit ist GEPINNT, nicht nur behauptet: scripts/gate/tests/task-router.test.mjs
-// laedt beide Pakete und vergleicht INTENT_CLASSES, SOURCE_CONTRACT und SOURCE_CHANNEL
-// gegen die echten Werte des Enhancers — eine Abweichung wird dort rot, nicht still.
-// Eine dritte Quelle gibt es bewusst nicht: Pakete dieses Repos importieren einander nicht,
-// und eine Datei ausserhalb der Pakete reist nicht im Artefakt mit (`pnpm pack`).
+// Kein Paket importiert das andere; ein Abnahmetest pinnt die Gleichheit.
 /**
  * Das geschlossene Vokabular aus §16, wortgleich mit dem Enhancer. Eine Klasse
- * ausserhalb dieser Liste ist keine Klassifikation, sondern Text.
+ * ausserhalb dieser Liste ist keine Klassifikation, sondern Text. UNDEFINED ist
+ * ausdruecklich KEIN Mitglied: der Resolver sagt damit „ich entscheide das
+ * nicht" — wer sie als Klasse fuehrt, hat geraten.
  */
 export const INTENT_CLASSES = ['CHAT', 'LOOKUP', 'TRANSFORM', 'MULTI_STEP_TASK', 'LONG_RUNNING_GOAL'];
+export const INTENT_UNDEFINED = 'UNDEFINED';
 
 /**
  * Gewicht je Klasse — DATEN. §16 nennt fuer CHAT, LOOKUP und TRANSFORM einen
@@ -196,6 +196,7 @@ const DECISION_RULES = [
   { goal: false, when: (f) => f.record === null || typeof f.record !== 'object', reason: () => 'NO_RECORD', fields: () => ({}) },
   { goal: false, when: (f) => f.record.contract !== SOURCE_CONTRACT, reason: () => 'FOREIGN_RECORD', fields: (f) => ({ intent: f.intent }) },
   { goal: false, when: (f) => f.intent === '', reason: () => 'NO_CLASSIFICATION', fields: (f) => ({ intent: f.intent }) },
+  { goal: false, when: (f) => f.intent === INTENT_UNDEFINED, reason: () => 'INTENT_UNDEFINED', fields: (f) => ({ intent: f.intent }) },
   { goal: false, when: (f) => !INTENT_CLASSES.includes(f.intent), reason: (f) => `UNKNOWN_CLASS:${f.intent}`, fields: (f) => ({ intent: f.intent }) },
   { goal: false, when: (f) => f.weight < f.threshold, reason: (f) => `BELOW_THRESHOLD:${f.weight}<${f.threshold}`, fields: (f) => ({ intent: f.intent, weight: f.weight }) },
   { goal: false, when: (f) => !(f.weight > 0), reason: () => 'NO_GOAL_WEIGHT', fields: (f) => ({ intent: f.intent, weight: f.weight }) },
@@ -213,6 +214,8 @@ const DECISION_RULES = [
 function decisionFacts(record, config) {
   const threshold = Number.isFinite(config.threshold) ? config.threshold : DEFAULT_THRESHOLD;
   const minRawLength = Number.isFinite(config.minRawLength) ? config.minRawLength : DEFAULT_MIN_RAW_LENGTH;
+  // Die Klasse kommt aus dem Datensatz des Prompters — dort hat sie der
+  // Runtime-Resolver aus dem Text abgeleitet. Hier wird sie nur GELESEN.
   const intent = typeof record?.intentClassification === 'string' ? record.intentClassification : '';
   const measured = record?.rawLength;
   return {

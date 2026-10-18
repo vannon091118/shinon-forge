@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, realpathSync } from 'node:fs';
 import { join, isAbsolute, dirname, resolve } from 'node:path';
 import { checkRealpathInside, fingerprintRoot, isInsideRoot } from './workspace.js';
+import { resolveIntent } from './intent-resolver.js';
 
 /** Root-Fingerabdruck ohne zweite Wahrheit: die EINE Funktion steht in workspace.js. */
 function fingerprintOfRoot(root) {
@@ -488,65 +489,24 @@ export function writeJsonFile(path, value) {
   writeFileSync(full, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
-/** Fragewörter, mit denen ein Prompt eine Frage ist statt einer Aufgabe. */
-const QUESTION_WORDS = new Set([
-  'was', 'wie', 'warum', 'wieso', 'weshalb', 'wer', 'wo', 'wann', 'welche', 'welcher', 'welches',
-  'welchem', 'welchen', 'wieviel', 'wieviele', 'kann', 'kannst', 'können', 'ist', 'sind', 'hat', 'haben', 'gibt',
-  'why', 'how', 'what', 'which', 'who', 'where', 'when', 'can', 'could', 'is', 'are', 'was', 'were', 'should', 'does', 'do', 'did',
-]);
-
-/** Eine Frage endet mit `?` oder beginnt mit einem Fragewort. */
-function isQuestion(text) {
-  if (text.endsWith('?')) return true;
-  const first = text.split(/[^\p{L}\p{N}]+/u)[0] ?? '';
-  return QUESTION_WORDS.has(first);
-}
-
-/**
- * Ein Trigger gilt als GANZE Phrase, nicht als Substring: `test` trifft nicht
- * `Testament`, `doc` nicht `docker`. Unicode-Grenzen, damit Umlaute zählen.
- */
-function hasPhrase(text, trigger) {
-  const escaped = trigger.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'u').test(text);
-}
-
 /**
  * Prüfen, ob ein Prompt einem der bekannten Intent-Patterns entspricht.
  * Gibt { matched, patternId, label, expansion, classification } oder null.
  *
- * Zwei Regeln, beide fail-closed gegenüber der Nutzerabsicht:
- *   1. Trigger sind Handlungsphrasen (Daten), keine Themenwörter — ein Satz
- *      über Tests ist kein Auftrag, Tests zu schreiben.
- *   2. Eine Frage wird höchstens KLASSIFIZIERT, nie erweitert: `expansion` ist
- * → Kanon: docs/COMMENT-KANON.md#k-bf50f2cfb46f
+ * Die Auswertung hat EINE Heimat: `intent-resolver.js` (reine Funktion, feste
+ * Prioritaet). Hier bleibt die alte Form — kein Treffer ist `null`, Enthaltung
+ * ist dort UNDEFINED. Dort gelten auch die zwei Regeln: Trigger sind
+ * Handlungsphrasen (Daten), keine Themenwörter, und eine Frage wird hoechstens
+ * KLASSIFIZIERT, nie erweitert.
  */
 export function matchIntent(promptText, rules) {
-  if (!rules || !Array.isArray(rules.patterns)) return null;
-  const text = String(promptText ?? '').toLocaleLowerCase().trim();
-  if (text === '') return null;
-
-  let best = null;
-  let bestScore = 0;
-  for (const pattern of rules.patterns) {
-    let score = 0;
-    for (const trigger of (Array.isArray(pattern.trigger) ? pattern.trigger : [])) {
-      if (hasPhrase(text, String(trigger).toLocaleLowerCase())) score += 1;
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      best = {
-        matched: true,
-        patternId: pattern.id,
-        label: pattern.label,
-        expansion: pattern.expansion ?? '',
-        classification: pattern.classification ?? 'MULTI_STEP_TASK',
-      };
-    }
-  }
-  // Eine Frage ist ein Lookup, keine Aufgabe: sonst trug der Entscheidungs-
-  // datensatz (und die Block-Auswahl, die `intentMatchClass` liest) eine
-  // Task-Klassifikation für einen Satz, der nur eine Antwort will.
-  if (best !== null && isQuestion(text)) return { ...best, classification: 'LOOKUP', expansion: '' };
-  return best;
+  const resolved = resolveIntent(promptText, rules);
+  if (!resolved.matched) return null;
+  return {
+    matched: true,
+    patternId: resolved.patternId,
+    label: resolved.label,
+    expansion: resolved.expansion,
+    classification: resolved.classification,
+  };
 }

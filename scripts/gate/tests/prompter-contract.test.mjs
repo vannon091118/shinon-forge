@@ -69,7 +69,6 @@ const goodResult = (over = {}) => ({
   removedRequirements: [],
   uncertainties: [],
   references: [],
-  intentClassification: 'TRANSFORM',
   ...over,
 });
 
@@ -165,7 +164,9 @@ test('Vertrag: ein gueltiges Ergebnis wird angenommen, jede Verletzung benannt',
     { name: 'leerer Prompt', text: reply(goodResult({ enhancedPrompt: '' })), ok: false, reason: 'SCHEMA_INVALID' },
     { name: 'fast nichts', text: reply({ enhancedPrompt: 'x', preservedIntent: true }), ok: false, reason: 'SCHEMA_INVALID' },
     { name: 'preservedIntent kein Boolean', text: reply(goodResult({ preservedIntent: 'ja' })), ok: false, reason: 'SCHEMA_INVALID' },
-    { name: 'unbekannte Intent-Klasse', text: reply(goodResult({ intentClassification: 'VIBE' })), ok: false, reason: 'SCHEMA_INVALID' },
+    // Die Klasse ist Runtime-Eigentum: ein Modell, das sie trotzdem sendet, wird
+    // nicht verworfen — der Vertrag kennt das Feld nicht, also bleibt es wirkungslos.
+    { name: 'Modell sendet eine Intent-Klasse (wirkungslos)', text: reply(goodResult({ intentClassification: 'MULTI_STEP_TASK' })), ok: true },
   ];
   // Regression: Schemastery fuellt ein fehlendes Array still mit []. Ohne
   // `required()` wuerde ein weggelassenes addedRequirements wie "nichts
@@ -382,15 +383,17 @@ test('MAX: der definierte Kontext wird angenommen und als Datenblock gerendert',
   dispose();
 });
 
-test('MAX: eine Frage wird nicht zur Aufgabe — der Prompt geht wortgleich in den One-Shot', async () => {
-  const llm = fakeLlm(reply(goodResult({ intentClassification: 'LOOKUP' })));
+test('MAX: eine Frage wird nicht zur Aufgabe — und kostet keinen One-Shot', async () => {
+  const llm = fakeLlm(reply(goodResult()));
   const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath }, { llm });
   const claimed = [userMessage('Warum ist der Test broken?')];
 
-  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
 
-  const sent = llm.calls[0].messages[0].content[0].text;
-  assert.equal(sent, 'Warum ist der Test broken?', 'kein "# Aufgabe"-Block an einer Frage');
+  assert.equal(llm.calls.length, 0, 'eine Frage braucht keine Veredelung');
+  assert.equal(decision.messages[0].content[0].text, 'Warum ist der Test broken?', 'kein "# Aufgabe"-Block, kein Ersatz');
+  assert.equal(records[0].intentClassification, 'LOOKUP', 'die Klasse kommt aus dem Text');
+  assert.deepEqual(records[0].reasons, ['NO_ENHANCEMENT_NEEDED']);
   assert.equal(records[0].intentMatch, null, 'ein Themenwort ist kein Intent-Treffer');
   dispose();
 });
@@ -720,7 +723,10 @@ test('Laden: das Bundle registriert sich am echten Waterfall', async () => {
   assert.equal(records.length, 1, 'genau ein Provenienz-Datensatz pro Schritt');
   assert.equal(records[0].outcome, 'accepted');
   assert.equal(records[0].contract, bundle.CONTRACT);
-  assert.equal(records[0].intentClassification, 'TRANSFORM');
+  // Die Klasse stammt aus dem Text und dem Resolver. `mach  das  schnell` ist
+  // kein Muster — also steht dort ausdruecklich UNDEFINED, keine geratene Klasse.
+  assert.equal(records[0].intentClassification, 'UNDEFINED');
+  assert.equal(records[0].intentReason, 'NO_MATCH', 'die Enthaltung nennt ihren Grund');
   assert.equal(records[0].context, 'not-applicable');
   // Die Sitzung traegt die Zuordnung fuer §17: der Task Router muss die
   // Klassifikation einem LEBENDEN Agenten zuordnen koennen, und das geht nur
@@ -776,7 +782,6 @@ test('Laden: nach dispose und ohne passenden Event-Namen wird nicht registriert'
 
 test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async () => {
   const cases = [
-    { name: 'Antwort ohne JSON', behaviour: 'Ich habe nichts geaendert.' },
     { name: 'Antwort mit kaputtem JSON', behaviour: '{"enhancedPrompt": }' },
     { name: 'Antwort verletzt das Schema', behaviour: reply({ enhancedPrompt: 'x' }) },
     { name: 'Absicht nicht erhalten', behaviour: reply(goodResult({ preservedIntent: false })) },
@@ -800,6 +805,45 @@ test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async ()
 });
 
 /**
+ * Prosa statt JSON ist der gemessene Regelfall (2026-10-18): das Modell antwortet
+ * in Saetzen, der Enhancer verwarf, und der Prompter griff faktisch nie. Jetzt
+ * wird der TEXT der Antwort uebernommen — Felder (Absicht, Anforderungen,
+ * Referenzen) bleiben unangetastet, und der Rohtext der Eingabe steht im Trace.
+ */
+test('SALVAGED_PROSE: Prosa wird uebernommen statt verworfen — und der Rohtext steht im Trace', async () => {
+  const prose = 'Bitte baue die zwoelf neuen Module und teste sie danach gruendlich.';
+  const llm = fakeLlm(prose);
+  const { ctx, records, dispose } = connect({ ...route }, { llm });
+  const claimed = [userMessage('baue module und teste')];
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(records[0].outcome, 'accepted', 'kein JSON ist kein Grund, den Vorschlag wegzuwerfen');
+  assert.deepEqual(records[0].reasons, ['SALVAGED_PROSE']);
+  assert.equal(decision.messages[0].content[0].text, prose, 'der Prosatext ersetzt den Roh-Prompt');
+  assert.equal(records[0].raw_prompt, 'baue module und teste', 'die Eingabe bleibt im Trace sichtbar');
+  dispose();
+});
+
+test('SALVAGED_PROSE: Zaun und Vorrede fallen weg, kaputtes JSON wird kein Prompt', async () => {
+  const fenced = 'Hier ist der verbesserte Prompt:\n```text\nBaue die Module und teste sie danach.\n```';
+  const llm = fakeLlm(fenced);
+  const { ctx, records, dispose } = connect({ ...route }, { llm });
+  const claimed = [userMessage('baue module')];
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+  assert.equal(records[0].outcome, 'accepted');
+  assert.equal(decision.messages[0].content[0].text, 'Baue die Module und teste sie danach.');
+  dispose();
+
+  // Ein kaputter Objekttext ist kein Prompt: dort bleibt der Roh-Prompt.
+  const broken = connect({ ...route }, { llm: fakeLlm('{"enhancedPrompt": }') });
+  const claimed2 = [userMessage('baue module')];
+  const unchanged = await broken.ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed2), loopDefault(claimed2));
+  assert.equal(unchanged.messages[0].content[0].text, 'baue module');
+  assert.equal(broken.records[0].outcome, 'rejected');
+  broken.dispose();
+});
+
+/**
  * Diagnose-Luecke, gemessen am NO_JSON-Fehlerfall 2026-10-16: der Verwerfungs-
  * grund landete im Sitzungsverlauf, die TATSAECHLICHE Modellantwort nie — die
  * Ursache war damit undiagnostizierbar. Der Rohtext muss deshalb auf stderr
@@ -808,7 +852,6 @@ test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async ()
  */
 test('Diagnose: eine verworfene One-Shot-Antwort wird mit Rohtext protokolliert', async () => {
   const cases = [
-    { name: 'kein JSON (Prosa)', behaviour: 'Ich kann das nicht in JSON fassen.', reason: 'NO_JSON', empty: false },
     { name: 'leere Antwort', behaviour: '', reason: 'NO_JSON', empty: true },
     { name: 'kaputtes JSON', behaviour: '{"enhancedPrompt": }', reason: 'INVALID_JSON', empty: false },
     { name: 'Policy-Verwurf (Antwort bleibt nachvollziehbar)', behaviour: reply(goodResult({ preservedIntent: false })), reason: 'INTENT_NOT_PRESERVED', empty: false },
@@ -938,12 +981,11 @@ test('Roh-Prompt: jede Fallback-Regel aus Plan §7 greift', async () => {
   // Modell geantwortet und die Policy hat sie verworfen (kept: true), bleibt die
   // Antwort im Datensatz NACHVOLLZIEHBAR — verwendet wird sie trotzdem nicht.
   const cases = [
-    { name: 'invalid JSON (Prosa)', behaviour: 'Ich habe den Prompt verbessert.', reason: 'NO_JSON', kept: false },
     { name: 'invalid JSON (kaputt)', behaviour: '{"enhancedPrompt": }', reason: 'INVALID_JSON', kept: false },
     { name: 'schema invalid (Pflichtfeld fehlt)', behaviour: reply({ enhancedPrompt: 'x' }), reason: 'SCHEMA_INVALID', kept: false },
     { name: 'schema invalid (null statt Liste)', behaviour: reply(goodResult({ addedRequirements: null })), reason: 'SCHEMA_INVALID', kept: false },
     { name: 'schema invalid (leerer Prompt)', behaviour: reply(goodResult({ enhancedPrompt: '' })), reason: 'SCHEMA_INVALID', kept: false },
-    { name: 'schema invalid (unbekannte Intent-Klasse)', behaviour: reply(goodResult({ intentClassification: 'VIBE' })), reason: 'SCHEMA_INVALID', kept: false },
+    { name: 'schema invalid (references kein Array)', behaviour: reply(goodResult({ references: 'nein' })), reason: 'SCHEMA_INVALID', kept: false },
     { name: 'preservedIntent != true', behaviour: reply(goodResult({ preservedIntent: false })), reason: 'INTENT_NOT_PRESERVED', kept: true },
     { name: 'addedRequirements != []', behaviour: reply(goodResult({ addedRequirements: ['mehr'] })), reason: 'ADDED_REQUIREMENTS', kept: true },
     { name: 'removedRequirements != []', behaviour: reply(goodResult({ removedRequirements: ['weniger'] })), reason: 'REMOVED_REQUIREMENTS', kept: true },
@@ -1065,19 +1107,19 @@ test('Roh-Prompt: eine werfende Spur aendert die Entscheidung nicht', async () =
   dispose();
 });
 
-test('Mindestvertrag: zusaetzliche Felder sind erlaubt, die Intent-Klasse ist geschlossen', () => {
+test('Mindestvertrag: zusaetzliche Felder sind erlaubt — die Intent-Klasse ist KEIN Feld', () => {
   // Plan §7 nennt einen MINDESTvertrag. Gemessen in Schemastery 3.18.4: ein
-  // unbekannter Schluessel laeuft durch, ein unbekannter Unions-Wert nicht.
-  // Beides ist gewollt — ein Modell, das mehr liefert, soll nicht verworfen
-  // werden; eine erfundene Intent-Klasse waere dagegen Vokabular ausserhalb des
-  // Vertrags. Der Test pinnt das, damit es nicht versehentlich hart wird.
-  const parsed = bundle.parseResult(reply({ ...goodResult(), hinweis: 'extra', confidence: 0.9 }));
+  // unbekannter Schluessel laeuft durch. Das ist hier gewollt, aber es darf
+  // keine Wirkung haben: das Modell kann `intentClassification` senden, der
+  // Datensatz traegt danach trotzdem die Klasse des Runtime-Resolvers.
+  const parsed = bundle.parseResult(reply({ ...goodResult(), hinweis: 'extra', confidence: 0.9, intentClassification: 'VIBE' }));
 
   assert.equal(parsed.ok, true);
   assert.equal(parsed.result.enhancedPrompt, 'Mach das schnell.');
-  const rejected = bundle.parseResult(reply(goodResult({ intentClassification: 'VIBE' })));
-  assert.equal(rejected.ok, false);
-  assert.ok(rejected.reasons[0].startsWith('SCHEMA_INVALID:$.intentClassification'), rejected.reasons[0]);
+  // Schemastery laesst den fremden Schluessel durch (Mindestvertrag) — gelesen
+  // wird er NIRGENDS: der Datensatz der Provenienz nimmt die Runtime-Klasse.
+  assert.equal(parsed.result.intentClassification, 'VIBE', 'das Modellwort reist ungeprueft als Extra mit');
+  assert.equal(bundle.POLICIES.MAX.includes('intentClassification'), false, 'der System-Prompt fordert es nicht mehr an');
 });
 
 test('Roh-Prompt: ohne Route und ohne LLM-Dienst wird gar nicht erst aufgerufen', async () => {
@@ -1097,6 +1139,32 @@ test('Roh-Prompt: ohne Route und ohne LLM-Dienst wird gar nicht erst aufgerufen'
     assert.equal(double.calls.length, 0, name);
     assert.equal(records[0].outcome, 'unavailable', name);
     assert.deepEqual(records[0].reasons, [reason], name);
+    dispose();
+  }
+});
+
+test('Klassifikation: CHAT und LOOKUP kommen ohne Modellaufruf aus dem Text', async () => {
+  // Der Kern des Passes: die Klasse ist Runtime-Eigentum. Hier laeuft der
+  // One-Shot NIE (keine Route) — der Datensatz traegt trotzdem die Klasse, die
+  // der Resolver aus dem Text gelesen hat; unklare Eingabe ist UNDEFINED.
+  const cases = [
+    { text: 'hallo wie gehts', expected: 'CHAT', pattern: 'chat', outcome: 'accepted' },
+    { text: 'erklär mir den code', expected: 'LOOKUP', pattern: 'read-code', outcome: 'accepted' },
+    { text: 'schreib tests fuer scoring', expected: 'MULTI_STEP_TASK', pattern: 'tests', outcome: 'unavailable' },
+    { text: 'mach was', expected: 'UNDEFINED', pattern: null, outcome: 'unavailable' },
+  ];
+  for (const { text, expected, pattern, outcome } of cases) {
+    const double = fakeLlm(reply(goodResult()));
+    const { ctx, records, dispose } = connect({ ...route, provider: '', model: '' }, { llm: double });
+    const claimed = [userMessage(text)];
+
+    await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+    assert.equal(double.calls.length, 0, `${text}: kein Modellaufruf`);
+    assert.equal(records[0].outcome, outcome, text);
+    assert.equal(records[0].intentClassification, expected, text);
+    assert.equal(records[0].intentMatch, pattern, `${text}: der Treffer nennt sein Pattern`);
+    assert.equal(records[0].raw_prompt, text, `${text}: der Rohtext steht im Trace`);
     dispose();
   }
 });

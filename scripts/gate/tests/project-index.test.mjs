@@ -237,6 +237,8 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/mode-core.js' },
       { kind: 'import', target: './assets/schema.js' },
       { kind: 'import', target: './assets/result-contract.js' },
+      // Der Runtime-Resolver der Intent-Klasse: reine Funktion, kein Modell.
+      { kind: 'import', target: './assets/intent-resolver.js' },
       { kind: 'import', target: './assets/render-context.js' },
       { kind: 'import', target: './assets/prompt-files.js' },
       { kind: 'import', target: './assets/stand.js' },

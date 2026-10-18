@@ -265,8 +265,9 @@ test('MAX: mit Index-Dienst kommt der Kontext aus dem INDEX und die Quelle steht
  *
  * Ein Enhancer, der den falschen Workspace liest, ist keine Stilfrage. Der
  * Datensatz nennt deshalb Root, Kurz-Identitaet und QUELLE (explizit, Env, cwd)
- * je Schritt — und niemals den Prompt-Text: eine Spur, die den Inhalt kopiert,
- * waere selbst ein Leck.
+ * je Schritt. Der ROHE Nutzertext steht als `raw_prompt` ausdruecklich dabei —
+ * ohne ihn ist im Trace nicht nachvollziehbar, was veredelt wurde; Schluessel
+ * und Kontextinhalte bleiben draussen.
  */
 test('S1: der Entscheidungsdatensatz nennt die Workspace-Identität und ihre Quelle', async () => {
   const workspace = workDir('s1-workspace');
@@ -283,8 +284,8 @@ test('S1: der Entscheidungsdatensatz nennt die Workspace-Identität und ihre Que
   assert.equal(record.workspace.source, 'config');
   assert.match(record.workspace.rootId, /^[0-9a-f]{16}$/);
   assert.equal(record.workspace_contract, 'shinon.workspace/v1');
-  assert.equal(record.rawLength, prompt.length, 'nur die Laenge, nicht der Text');
-  assert.equal(JSON.stringify(record).includes(prompt), false, 'der Prompt-Text steht nicht in der Spur');
+  assert.equal(record.rawLength, prompt.length, 'die Laenge bleibt gemessen');
+  assert.equal(record.raw_prompt, prompt, 'der Rohtext ist im Trace verfuegbar');
   dispose();
 });
 

@@ -170,6 +170,7 @@ unberührt: `@shinon/openapi` bleibt inaktiv.
 | Zahlen (Bestand, Prüfläufe) | `docs/ZAHLEN.md` | sonst nirgends |
 | Laufzeit-Index (Prompter MAX) | `@shinon/prompter` | `.shinon/prompter-index.json`, gitignoriert |
 | Projekt-Kontext (Persona) | der Nutzer | `.shinon/project-context.md`, getrackt wenn vorhanden |
+| Intent-Klasse eines Turns | `@shinon/prompter` — reiner Resolver `assets/intent-resolver.js` | nirgends gespeichert: jeden Turn frisch aus dem Text, nie aus der Modellantwort |
 | Provenienz-Index (Project Index) | `@shinon/project-index` | **Wegwerfbar**: `$XDG_CACHE_HOME/shinon/indexes/<projekt-hash>/index.sqlite` (Default `~/.cache/shinon/indexes/…`) |
 | Dauerhafter Ledger des Scorings | `@shinon/scoring` schreibt, `@shinon/project-index` bietet den Dienst | **Daten**: `$XDG_DATA_HOME/shinon/ledger.sqlite` (Default `~/.local/share/shinon/ledger.sqlite`) |
 

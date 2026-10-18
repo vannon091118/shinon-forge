@@ -1,11 +1,11 @@
 /**
  * @shinon/prompter — Client-Hälfte: Trace-Panel.
  *
- * Zeigt die letzten Prompter-Entscheidungen (Outcome, Modus, Gründe, Kontextquelle).
- * Host→Client läuft über den Kanal, nicht über das Fenster: der Host emittiert
- * jeden Datensatz auf `DECISION_CHANNEL`, und diese Hälfte spiegelt ihn nach
- * `window.__shinonPrompterTrace` (Fenster-Konvention, wie `window.__codingmon`
- * bei @shinon/codingmon). Der Host schreibt NUR im In-Prozess-Fall selbst ins
+ * Zeigt die letzten Prompter-Entscheidungen (Outcome, Modus, Intent, Roh-Prompt,
+ * Gründe, Kontextquelle). Zwei Wege führen in den Puffer: der Host legt ihn beim
+ * Ausliefern der Seite als Global ab (`webserver/index-inject`), und er schiebt
+ * jeden neuen Eintrag live über `TRACE_ENDPOINT` (Server-Sent Events). Der Kanal
+ * `DECISION_CHANNEL` bleibt als dritter Weg für den In-Prozess-Fall.
  * → Kanon: docs/COMMENT-KANON.md#k-f618ee270fae
  */
 window.__ModuleLoader__.load({
@@ -22,19 +22,33 @@ window.__ModuleLoader__.load({
      * wie bei @shinon/task-router). Gepinnt vom Gate gegen den Host-Export.
      */
     const DECISION_CHANNEL = 'shinon/prompter/decision';
-    /** Die Form, die `TracePanel` unten liest — ein Schreiber mehr, keine zweite Form. */
-    const mirrorRecord = (record) => {
+    /** Die Live-Route des Hosts — gleiche Herkunft, also mit Cookie/Session. */
+    const TRACE_ENDPOINT = '/shinon/prompter/trace';
+    /** Das Fenster-Ereignis, auf das das Panel hört (Host-Global oder SSE). */
+    const TRACE_EVENT = 'shinon:prompter-trace';
+
+    /** Ein Datensatz in der Form, die `TracePanel` liest — ein Schreiber mehr, keine zweite Form. */
+    const traceEntry = (record) => ({
+      outcome: record?.outcome ?? 'unbekannt',
+      mode: record?.mode ?? null,
+      intent: record?.intent ?? 'UNDEFINED',
+      reasons: Array.isArray(record?.reasons) ? record.reasons.slice(0, 5) : [],
+      context_source: record?.context_source ?? null,
+      raw_prompt: typeof record?.raw_prompt === 'string' ? record.raw_prompt : null,
+      at: typeof record?.at === 'number' ? record.at : null,
+    });
+
+    /** Puffer schreiben und die Anzeige wecken; ohne Fenster ist das ein No-op. */
+    const publish = (list) => {
       try {
-        const list = Array.isArray(window.__shinonPrompterTrace) ? window.__shinonPrompterTrace : [];
-        list.unshift({
-          outcome: record?.outcome ?? 'unbekannt',
-          mode: record?.mode ?? null,
-          reasons: Array.isArray(record?.reasons) ? record.reasons.slice(0, 5) : [],
-          context_source: record?.context_source ?? null,
-          at: typeof record?.session_id === 'string' && record.session_id !== '' ? Date.now() : null,
-        });
         window.__shinonPrompterTrace = list.slice(0, 20);
+        window.dispatchEvent(new CustomEvent(TRACE_EVENT));
       } catch { /* die Anzeige ist Nebensache; sie darf das Panel nicht brechen */ }
+    };
+
+    const mirrorRecord = (record) => {
+      const list = Array.isArray(window.__shinonPrompterTrace) ? window.__shinonPrompterTrace : [];
+      publish([traceEntry(record), ...list]);
     };
 
     function insertStyles(tag, css) {
@@ -67,34 +81,63 @@ window.__ModuleLoader__.load({
         padding: 6px;
         border-left: 2px solid var(--dsw-alias-brand-primary);
       }
-      .__pt_entry.denied { border-left-color: var(--dsw-alias-label-danger, #ef4444); }
+      .__pt_entry.rejected { border-left-color: var(--dsw-alias-label-danger, #ef4444); }
       .__pt_entry.unavailable { border-left-color: var(--dsw-alias-label-warning, #f59e0b); }
-      .__pt_row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .__pt_row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
       .__pt_badge {
         display: inline-block;
         padding: 1px 6px;
         border-radius: 3px;
         font-size: 10px;
         font-weight: 600;
-        background: var(--dsw-alias-brand-primary);
+        background: transparent;
+        border: 1px solid currentColor;
+        color: var(--dsw-alias-brand-primary, currentColor);
+      }
+      .__pt_badge.rejected {
+        background: var(--dsw-alias-label-danger, #ef4444);
+        border-color: transparent;
         color: var(--dsw-alias-label-inverse, #fff);
       }
-      .__pt_badge.denied { background: var(--dsw-alias-label-danger, #ef4444); }
-      .__pt_badge.unavailable { background: var(--dsw-alias-label-warning, #f59e0b); }
+      .__pt_badge.unavailable {
+        background: var(--dsw-alias-label-warning, #f59e0b);
+        border-color: transparent;
+        color: #1a1a1a;
+      }
+      .__pt_badge.intent { background: transparent; border: 1px solid currentColor; color: inherit; }
       .__pt_reason { opacity: 0.7; font-size: 11px; }
+      .__pt_raw {
+        margin-top: 4px;
+        padding-left: 6px;
+        border-left: 1px dashed currentColor;
+        opacity: 0.8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     `);
 
     function traceBadge(outcome) {
       const cls = outcome === 'accepted' ? '' : outcome;
-      return h('span', { className: `__pt_badge ${cls}`.trim() }, outcome.toUpperCase());
+      return h('span', { className: `__pt_badge ${cls}`.trim() }, String(outcome).toUpperCase());
     }
 
     function TracePanel() {
-      const trace = window.__shinonPrompterTrace ?? null;
-      if (trace === null || trace.length === 0) {
+      // Der Puffer ist die Quelle; `useState` macht aus dem Schreiben ein Rendern.
+      const [trace, setTrace] = React.useState(() => (Array.isArray(window.__shinonPrompterTrace) ? window.__shinonPrompterTrace : []));
+      React.useEffect(() => {
+        const refresh = () => setTrace(Array.isArray(window.__shinonPrompterTrace) ? [...window.__shinonPrompterTrace] : []);
+        // Das Abo trägt den Live-Fall; das Intervall ist der Fallback, falls die
+        // Seite den Puffer auf einem anderen Weg bekommt (Host-Global ohne SSE).
+        const timer = setInterval(refresh, 2000);
+        window.addEventListener(TRACE_EVENT, refresh);
+        refresh();
+        return () => { clearInterval(timer); window.removeEventListener(TRACE_EVENT, refresh); };
+      }, []);
+      if (trace.length === 0) {
         return h('div', { className: `__pt_panel`, 'data-plugin': PLUGIN },
           h('div', { className: '__pt_title' }, 'Prompter-Trace'),
-          h('div', { className: '__pt_empty' }, 'Keine Entscheidungen — der Enhancer ist inaktiv oder hat noch keinen Schritt gesehen.'));
+          h('div', { className: '__pt_empty' }, 'Noch keine Entscheidung gesehen — der nächste Turn schreibt hier den Roh-Prompt hin.'));
       }
       return h('div', { className: `__pt_panel`, 'data-plugin': PLUGIN },
         h('div', { className: '__pt_title' }, `Prompter-Trace (${trace.length})`),
@@ -104,10 +147,14 @@ window.__ModuleLoader__.load({
         },
           h('div', { className: '__pt_row' },
             traceBadge(entry.outcome),
+            h('span', { className: '__pt_badge intent' }, entry.intent ?? 'UNDEFINED'),
             h('span', null, `mode=${entry.mode}`),
             h('span', null, `ctx=${entry.context_source ?? 'none'}`)),
           entry.reasons?.length > 0
             ? h('div', { className: '__pt_reason' }, entry.reasons.join(', '))
+            : null,
+          entry.raw_prompt
+            ? h('div', { className: '__pt_raw', title: entry.raw_prompt }, entry.raw_prompt)
             : null,
         )));
     }
@@ -119,10 +166,24 @@ window.__ModuleLoader__.load({
         const registry = (window.__shinonPlugins ??= new Map());
         registry.set('@shinon/prompter', { label: 'Prompter', kind: 'client', panel: 'shinon-prompter' });
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: '@shinon/prompter' } }));
-        // Die Spur vom Kanal auf die Seite holen: ohne dieses Abo sieht das
-        // Panel nur, was der Host im In-Prozess-Fall selbst spiegelt — in
-        // Produktion also nichts. `ctx.on` ist Cordis-Fläche (events), kein
-        // Dienst, kein `inject` nötig (Präzedenz: @shinon/task-router).
+
+        // Der Live-Kanal: der Host hält die Verbindung offen und schickt bei jeder
+        // Entscheidung den ganzen Puffer. Ein Fehler ist kein Ausfall — das Global
+        // aus `index-inject` trägt den Stand beim Laden der Seite.
+        let source = null;
+        try {
+          if (typeof EventSource === 'function') {
+            source = new EventSource(TRACE_ENDPOINT);
+            source.onmessage = (event) => {
+              try {
+                const list = JSON.parse(event.data);
+                if (Array.isArray(list)) publish(list.map(traceEntry));
+              } catch { /* eine kaputte Zeile überspringt das Panel, nicht der Kanal */ }
+            };
+          }
+        } catch { /* ohne EventSource bleibt der geladene Stand */ }
+
+        // In-Prozess-Fall: der Host emittiert auf dem Entscheidungs-Kanal.
         if (typeof ctx?.on === 'function') {
           ctx.on(DECISION_CHANNEL, (record) => {
             mirrorRecord(record);
@@ -141,7 +202,9 @@ window.__ModuleLoader__.load({
           label: () => 'Prompter',
         }, TracePanel));
 
-        ctx.effect?.(() => () => { /* Cleanup: das Panel lebt, bis die Composition geräumt wird. */ });
+        ctx.effect?.(() => () => {
+          try { source?.close(); } catch { /* schon zu */ }
+        });
       },
     };
   },

@@ -186,6 +186,42 @@ export function renderStreamEnd(finish, usage, request, elapsedMs) {
 }
 
 /**
+ * Aus einer Prosa-Antwort den Vorschlag retten — statt ihn wegzuwerfen.
+ *
+ * Der gemessene Fall (2026-10-18): das Modell antwortet auf Deutsch statt mit
+ * JSON, der One-Shot wird verworfen und der Roh-Prompt gilt. Damit greift der
+ * Prompter praktisch nie. Gerettet wird nur der TEXT, nie ein Feld: Absicht,
+ * Anforderungen und Referenzen bleiben unangetastet. Was nach Satzzeichen der
+ * Antwort aussieht (Zaun, Vorrede, Anfuehrungszeichen), wird entfernt; ist der
+ * Rest leer oder identisch mit dem Original, bleibt es beim Verwerfen.
+ */
+const PROSE_PREAMBLE = /^(?:sure|okay|ok|gerne|hier ist|here is|the improved prompt|verbesserter prompt|verbesserte fassung)[^\n]{0,80}:\s*/i;
+
+export function salvageProse(text, rawPrompt = '') {
+  if (typeof text !== 'string') return null;
+  let body = text.trim();
+  if (body === '') return null;
+  // Sieht die Antwort nach einem VERSUCHTEN JSON aus, ist sie kein Prompt:
+  // ein kaputter Objekttext als Veredelung waere schlimmer als der Roh-Prompt.
+  if (/^[{[]/.test(body)) return null;
+  const fence = /```(?:[a-z]*)\n([\s\S]*?)```/i.exec(body);
+  if (fence !== null) body = fence[1].trim();
+  body = body.replace(PROSE_PREAMBLE, '').trim();
+  body = body.replace(/^["'„“]([\s\S]*)["'“”]$/, '$1').trim();
+  if (body.length < 8 || !/\p{L}/u.test(body)) return null;
+  // ANKER: eine echte Veredelung nennt den Auftrag weiter. Eine ANTWORT auf die
+  // Frage traegt andere Woerter — sie darf den Prompt nicht ersetzen.
+  const words = (value) => new Set((value.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []));
+  const anchor = words(rawPrompt);
+  if (anchor.size > 0) {
+    const candidate = words(body);
+    const shared = [...anchor].filter((word) => candidate.has(word)).length;
+    if (shared / anchor.size < 0.35) return null;
+  }
+  return body;
+}
+
+/**
  * Die verworfene One-Shot-Antwort mitschreiben — die eine Quelle fuer die
  * NO_JSON-Diagnose.
  *
@@ -213,8 +249,13 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
     return { outcome: 'unavailable', reasons: ['NO_LLM_SERVICE'], result: null };
   }
 
-  const timeout = AbortSignal.timeout(config.timeoutMs);
-  const combined = signal === undefined ? timeout : AbortSignal.any([signal, timeout]);
+  // `timeoutMs === 0` heisst KEIN Deckel (Dev-Betrieb: ausreizen und messen).
+  // Negative Werte bleiben der Fehlerpfad: AbortSignal.timeout wirft dort
+  // RangeError, und das wird zu einem benannten Verwerfen statt zu einem Wurf.
+  const timeout = config.timeoutMs === 0 ? null : AbortSignal.timeout(config.timeoutMs);
+  const combined = timeout === null
+    ? signal
+    : (signal === undefined ? timeout : AbortSignal.any([signal, timeout]));
 
   const request = buildEnhancerRequest({ text: prompt, contract, config, context, stand, skills, signal: combined });
 
@@ -238,6 +279,18 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
 
   const parsed = parseResult(text, { mode: config.mode });
   if (!parsed.ok) {
+    // Kein JSON ist kein Grund, den Vorschlag wegzuwerfen: der Text der Antwort
+    // wird uebernommen (SALVAGED_PROSE), sofern er sich vom Original unterscheidet.
+    const salvageable = parsed.reasons.some((reason) => reason === 'NO_JSON' || reason === 'INVALID_JSON');
+    const salvaged = salvageable ? salvageProse(text, prompt) : null;
+    if (salvaged !== null && salvaged !== prompt.trim()) {
+      console.log(`[shinon-prompter] One-Shot: Ergebnis angenommen (SALVAGED_PROSE:${parsed.reasons.join(', ')}), ${salvaged.length} Zeichen — ${renderStreamEnd(finish, usage, request, elapsedMs)}`);
+      return {
+        outcome: 'accepted',
+        reasons: ['SALVAGED_PROSE'],
+        result: { enhancedPrompt: salvaged, preservedIntent: true, addedRequirements: [], removedRequirements: [], uncertainties: [], references: [] },
+      };
+    }
     logRejectedAnswer(parsed.reasons, text, counts, finish, usage, request, elapsedMs);
     return { outcome: 'rejected', reasons: parsed.reasons, result: null };
   }
@@ -247,6 +300,9 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
     logRejectedAnswer(decision.reasons, text, counts, finish, usage, request, elapsedMs);
     return { outcome: 'rejected', reasons: decision.reasons, result: parsed.result };
   }
+  // Auch der ANGENOMMENE Lauf wird gemessen: Ausgang, Tokens und Dauer sind die
+  // Zahlen der Auslastungsmessung (`.shinon/dev/auslastung.mjs` liest diese Zeile).
+  console.log(`[shinon-prompter] One-Shot: Ergebnis angenommen, ${text.length} Zeichen — ${renderStreamEnd(finish, usage, request, elapsedMs)}`);
   return { outcome: 'accepted', reasons: [], result: parsed.result };
 }
 

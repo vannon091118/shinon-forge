@@ -452,6 +452,27 @@ test('prompter-client: das Kanal-Literal ist der Host-Kanal (kein Drift)', () =>
   assert.equal(match[1], HOST_PROMPTER_DECISION, 'Client-Kanal ≠ Host-Kanal: das Abo liefe ins Leere');
 });
 
+test('prompter: Fenster-Global und Live-Route heißen auf beiden Seiten gleich', () => {
+  // Der Client kann das Host-Modul nicht importieren (eigenes Bündel), also sind
+  // beide Namen Literale. Gemessen 2026-10-17: Host schrieb
+  // `__SHINON_PROMPTER_TRACE__`, das Panel las `__shinonPrompterTrace` — der
+  // Puffer war da und die Anzeige trotzdem leer. Dieser Test pinnt die Paare.
+  const host = readFileSync(fileURLToPath(new URL('packages/prompter/index.js', ROOT)), 'utf8');
+  const globalName = /export const TRACE_GLOBAL = '([^']+)'/.exec(host);
+  const endpoint = /export const TRACE_ENDPOINT = '([^']+)'/.exec(host);
+  assert.ok(globalName !== null, 'Host deklariert TRACE_GLOBAL nicht');
+  assert.ok(endpoint !== null, 'Host deklariert TRACE_ENDPOINT nicht');
+  const client = stripComments(sourceOf('prompter'));
+  assert.ok(
+    client.includes(`window.${globalName[1]}`),
+    `Client liest window.${globalName[1]} nicht — das Panel bliebe leer`,
+  );
+  assert.ok(
+    client.includes(`'${endpoint[1]}'`),
+    `Client fragt ${endpoint[1]} nicht ab — es gäbe keinen Live-Kanal`,
+  );
+});
+
 test('prompter-client: eine Kanal-Entscheidung landet im Fenster-Spiegel', () => {
   const { registration, sandbox } = loadBundle('prompter');
   const seen = {};

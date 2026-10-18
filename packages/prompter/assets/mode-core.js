@@ -176,14 +176,14 @@ export const RESULT_BRIEF = [
   'Du bist ein Prompt-Veredler. Du veraenderst die Formulierung, nicht die Aufgabe.',
   '',
   'Antworte ausschliesslich mit genau einem JSON-Objekt, ohne Erklaerung, ohne Markdown-Zaun:',
-  '{"enhancedPrompt":"…","preservedIntent":true,"addedRequirements":[],"removedRequirements":[],"uncertainties":[],"references":[],"intentClassification":"CHAT"}',
+  '{"enhancedPrompt":"…","preservedIntent":true,"addedRequirements":[],"removedRequirements":[],"uncertainties":[],"references":[]}',
   '',
   'Regeln:',
   '- preservedIntent ist true, solange du die Absicht des Nutzers nicht aenderst.',
   '- addedRequirements und removedRequirements bleiben leer. Wenn du meinst, dass eine',
   '  Anforderung fehlt: nicht erfinden, sondern in uncertainties benennen.',
   '- uncertainties nennt echte Unklarheiten des Originals, in eigenen Worten.',
-  '- intentClassification ist genau einer von: ' + INTENT_CLASSES.join(', ') + '.',
+  '- Die Einordnung in Intent-Klassen trifft die Runtime; du lieferst sie nicht.',
 ].join('\n');
 
 /**

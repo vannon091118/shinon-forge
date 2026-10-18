@@ -1,0 +1,37 @@
+[
+  {
+    "id": "prompter-intent-runtime-live",
+    "claim": "Die Intent-Klasse eines echten Turns stammt aus dem Runtime-Resolver des Prompters (Text-Patterns, kein Modell) und steht auch dann im Entscheidungsdatensatz, wenn der One-Shot scheitert.",
+    "targets": [
+      "packages/prompter/assets/intent-resolver.js",
+      "packages/prompter/assets/intent-rules.json",
+      "packages/prompter/index.js",
+      "packages/task-router/index.js",
+      "scripts/gate/tests/prompter-contract.test.mjs",
+      "scripts/gate/tests/task-router.test.mjs"
+    ],
+    "expect": "Ein echter Boot des Profils shinon mit echtem Provider klassifiziert die Nutzereingabe VOR dem One-Shot. Im Host-Log steht die Klasse aus dem Resolver (CHAT, LOOKUP, ...) samt Pattern; der Task-Router entscheidet auf demselben Datensatz. Das Modell kann die Klasse nicht setzen: intentClassification ist kein Feld des Ergebnisvertrags mehr.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN 2026-10-18 im Home-Baum (/mnt/work/projects/shinon-forge, DSH_HOME=Repo) mit dem Dev-Messwerkzeug .shinon/dev/auslastung.mjs (Profil shinon, Port 3099, echter Provider prompter/agnes-2.5-flash; Schluessel nur in .env, nie im Log). Zwei echte UI-Turns: 'hallo wie gehts' und 'erklär mir den intent-resolver in einem satz'. Host-Log: '[shinon-prompter] Intent erkannt: Smalltalk (CHAT) — keine Expansion' und '[shinon-prompter] Intent erkannt: Code verstehen / erklären (LOOKUP) — keine Expansion' — beide VOR dem One-Shot, ohne Modellantwort. Der Task-Router folgte mit '[shinon-task-router] linearer Turn (BELOW_THRESHOLD:0<2)' — die Klasse kam aus dem Datensatz, nicht aus dem Modell. Der Boot meldet '[shinon-prompter] Intent-Patterns geladen (8 Patterns)' (vorher 6) und 'mode=MAX'. Die Probe ist falsifizierbar: gaebe das Modell die Klasse, waere in den zwei Laeufen LOOKUP/CHAT nicht deterministisch aus dem Text ableitbar; scripts/gate/tests/prompter-contract.test.mjs fuehrt den Fall 'ohne Route, 0 Modellaufrufe' und prueft die Klasse direkt am Datensatz (CHAT/LOOKUP/MULTI_STEP_TASK/UNDEFINED), scripts/gate/tests/task-router.test.mjs prueft, dass ein Modell, das CHAT behauptet, den Router nicht von MULTI_STEP_TASK abbringt und dass UNDEFINED als INTENT_UNDEFINED linear bleibt. Beide Dateien Exit 0 (66 bzw. 26 Tests).",
+    "nachtrag": {
+      "date": "2026-10-18",
+      "scope": "Die frueheren Proben prompter-one-shot.json und task-router.json beschreiben die Klassifikation als Modellausgabe ('das LLM liefert eine Klassifikation').",
+      "note": "UEBERHOLT fuer den Ergebnisvertrag: intentClassification ist aus packages/prompter/assets/schema.js entfernt und aus dem System-Prompt (mode-core.js RESULT_BRIEF) gestrichen; das Modell liefert sie nicht mehr. Die alten Proben bleiben als Messung ihres Zeitpunkts stehen."
+    }
+  },
+  {
+    "id": "prompter-one-shot-fail-closed-live",
+    "claim": "Ein gescheiterter One-Shot (ungueltiges JSON) laesst den Originaltext unveraendert zum Hauptagenten durch; der Turn wird trotzdem erfolgreich beantwortet, und Tokens, Dauer und Grund sind messbar.",
+    "targets": [
+      "packages/prompter/assets/enhancer.js",
+      "packages/prompter/assets/result-contract.js",
+      "scripts/gate/tests/prompter-contract.test.mjs",
+      ".shinon/dev/auslastung.mjs"
+    ],
+    "expect": "Bei NO_JSON/SCHEMA_INVALID/Timeout/Ablehnung ersetzt der Enhancer nichts (OUTCOME_EFFECTS.rejected.replacePrompt=false), der Grund steht im Entscheidungsdatensatz, und die Messung protokolliert Ausgang, Tokens und Latenz des One-Shots. Der Haupt-Turn bleibt 'Completed'.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN 2026-10-18, zwei Messlaeufe des Auslastungs-Tools (Rohdaten .shinon/dev/messung-*.jsonl, Zusammenfassungen .shinon/dev/zusammenfassung-2026-10-18T03-27-32-474Z.json und .shinon/dev/zusammenfassung-2026-10-18T03-39-11-544Z.json; gitignoriert, weil Dev-Ablage). Lauf 1: ein One-Shot, Ausgang 'verworfen:NO_JSON', 119 Zeichen Antwort, inputTokens=9782, outputTokens=120, totalTokens=10158 (davon cacheReadTokens=256), Dauer 2269 ms. Lauf 2: ein One-Shot, Ausgang 'verworfen:NO_JSON', 239 Zeichen, inputTokens=9347, outputTokens=262, totalTokens=9865, Dauer 3621 ms. Host-Log jeweils '[shinon-prompter] verworfen (NO_JSON) — Roh-Prompt gilt'. Die UI zeigt beide Haupt-Turns als 'Completed' (6 s bzw. 34 s, Usage 21.4K bzw. 95.2K Tokens) — der Agent hat den unveraenderten Text beantwortet. Ein ANGENOMMENER Ein-Shot trat in diesen zwei Laeufen nicht auf; der angenommene Pfad ist durch die kontrollierten Streams in scripts/gate/tests/prompter-contract.test.mjs belegt (Exit 0, 66 Tests). Die Messzeile fuer den angenommenen Lauf wurde in enhancer.js ergaenzt ('Ergebnis angenommen, ... — Tokens/Dauer'), damit kuenftige Messungen auch den Erfolgsfall zaehlen. GRENZE, benannt: die Zahlen gelten fuer diese zwei Eingaben, diesen Provider und diese Maschine; sie sind keine Aussage ueber Modellqualitaet."
+  }
+]

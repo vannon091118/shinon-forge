@@ -1,6 +1,6 @@
 {
   "contract": "shinon.intent-rules/v1",
-  "note": "Intent-Patterns des Prompter. Ein Trigger ist eine HANDLUNGSPHRASE (imperativ), kein Themenwort: 'schreib tests' erweitert, 'test' allein nicht. Eine Frage ('warum ist der test broken?') wird klassifiziert, aber nie erweitert — der Agent soll antworten, nicht eine Aufgabe erfinden. Die Liste ist DATEN, nicht Inspiration.",
+  "note": "Intent-Patterns des Prompter. Ein Trigger ist eine HANDLUNGSPHRASE (imperativ), kein Themenwort: 'schreib tests' erweitert, 'test' allein nicht. Eine Frage ('warum ist der test broken?') wird klassifiziert, aber nie erweitert — der Agent soll antworten, nicht eine Aufgabe erfinden. Die Liste ist DATEN, nicht Inspiration. Auch die Konversations- und Zeitphrasen (CHAT, LONG_RUNNING_GOAL) sind ganze Phrasen, keine Themenwörter.",
   "patterns": [
     {
       "id": "update-docs",
@@ -42,6 +42,20 @@
       "label": "Code verstehen / erklären",
       "trigger": ["erklär mir", "erkläre mir", "erklär das", "code verstehen", "wie funktioniert", "was macht", "explain"],
       "classification": "LOOKUP",
+      "expansion": ""
+    },
+    {
+      "id": "long-running-goal",
+      "label": "Langfristiges Ziel",
+      "trigger": ["ueber mehrere tage", "über mehrere tage", "ueber wochen", "über wochen", "langfristig", "auf dauer", "jede nacht", "bis es fertig ist"],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": ""
+    },
+    {
+      "id": "chat",
+      "label": "Smalltalk",
+      "trigger": ["hallo", "hi", "guten morgen", "guten tag", "danke", "vielen dank", "wie geht", "bis spaeter", "bis später"],
+      "classification": "CHAT",
       "expansion": ""
     }
   ]
