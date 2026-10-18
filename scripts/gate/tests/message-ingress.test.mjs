@@ -16,30 +16,42 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dshHarnessDir, dshRoot } from '../../lib/yaml.mjs';
+import { loadMatrix } from '../../lib/dsh-versions.mjs';
 
 /**
- * Die Fassung, an der alle folgenden Aussagen gemessen wurden.
+ * Die Fassung kommt aus der Sollquelle, nicht aus einer zweiten Konstante.
  *
- * Neu gemessen am 2026-10-08 gegen 0.2.1-alpha.1 (vorher 0.2.0-rc.2): der Seam
- * ist unverändert — `send(message, target, wakeup)` mit genau einem
- * `inbox.splice`, genau ein `inbox.claim(` (in preStep) und genau ein
- * `waterfall("agent/pre-step")` im ganzen Harness. Nur die Version ändert sich,
- * die Zusagen nicht.
+ * Der Seam selbst ist über die Fassungen hinweg unverändert: `send(message,
+ * target, wakeup)` mit genau einem `inbox.splice`, genau ein `inbox.claim(`
+ * (in preStep) und genau ein `waterfall("agent/pre-step")` im Harness. Weil
+ * die Aussagen strukturell sind, hält der Test sie auch nach einem Bump — nur
+ * das geladene Paket muss die Sollfassung sein.
  */
-const VERIFIED_DSH_VERSION = '0.2.1-alpha.1';
-
 const REPO = fileURLToPath(new URL('../../..', import.meta.url));
+const VERIFIED_DSH_VERSION = loadMatrix(REPO).targets['@deepseek-ai/dsh'];
 const root = dshRoot();
 assert.ok(root !== null, 'dsh muss im PATH liegen (dshRoot() ist null) — wie beim Profiltest');
-const require = createRequire(join(root, 'package.json'));
 
-/** Ein installiertes DSH-Paket laden: Version plus Quelltext seiner Host-Hälfte. */
+/**
+ * Ein installiertes DSH-Paket laden: Version plus Quelltext seiner Host-Hälfte.
+ *
+ * Seit rc.2 hoisted npm nicht mehr jedes Paket nach oben (`dsh-agent-loop`
+ * liegt unter `dsh-base`, `dsh-api-session-controller` unter `dsh`). Deshalb
+ * wird der Baum abgesucht statt `require.resolve` vom dsh-Paket aus zu rufen —
+ * dessen Auflösungskette kennt die Geschwister-Verzeichnisse nicht.
+ */
 function dshPackage(name) {
-  const pkgFile = require.resolve(`${name}/package.json`);
-  const dir = dirname(pkgFile);
+  const harness = dshHarnessDir();
+  assert.ok(harness !== null, 'der @deepseek-ai-Baum des Installats ist nicht auffindbar');
+  const candidates = [join(harness, name.replace(/^@[^/]+\//, ''))];
+  for (const entry of readdirSync(harness)) {
+    candidates.push(join(harness, entry, 'node_modules', name));
+  }
+  const dir = candidates.find((candidate) => existsSync(join(candidate, 'package.json')));
+  assert.ok(dir !== undefined, `${name} liegt nicht im Installat — dieser Seam-Test braucht das Paket`);
   const sourceFile = join(dir, 'lib/index.js');
   assert.ok(existsSync(sourceFile), `${name}: lib/index.js fehlt`);
-  return { dir, version: JSON.parse(readFileSync(pkgFile, 'utf8')).version, text: readFileSync(sourceFile, 'utf8') };
+  return { dir, version: JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).version, text: readFileSync(sourceFile, 'utf8') };
 }
 
 /**
@@ -75,6 +87,45 @@ function hostModules(pkg) {
     }
   }
   return files;
+}
+
+
+/**
+ * Alle Host-/Client-Haelften des Installats — auch verschachtelte.
+ *
+ * Seit rc.2 hoisted npm nicht mehr flach: der Agent-Loop liegt unter
+ * `dsh-base/node_modules`, der Session-Controller unter `dsh/node_modules`.
+ * Ein Scan nur der obersten Ebene saehe 258 Dateien und **keinen** Produzenten
+ * des Seams — die Aussage „genau ein waterfall" waere dann ueber den falschen
+ * Baum gefallen. Dedupliziert wird ueber Name und Fassung, damit dieselbe
+ * Paketfassung nicht doppelt zaehlt.
+ */
+function harnessHostFiles(harness) {
+  const seen = new Map();
+  const visit = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      const full = join(dir, entry.name);
+      const manifest = join(full, 'package.json');
+      if (!existsSync(manifest)) {
+        visit(full);
+        continue;
+      }
+      const meta = JSON.parse(readFileSync(manifest, 'utf8'));
+      seen.set(`${meta.name}@${meta.version}`, full);
+      const nested = join(full, 'node_modules', '@deepseek-ai');
+      if (existsSync(nested)) visit(nested);
+    }
+  };
+  visit(harness);
+  const files = [];
+  for (const dir of seen.values()) {
+    for (const rel of ['lib/index.js', 'lib/client.js']) {
+      const file = join(dir, rel);
+      if (existsSync(file)) files.push(file);
+    }
+  }
+  return files.sort();
 }
 
 const loop = dshPackage('@deepseek-ai/dsh-agent-loop');
@@ -119,19 +170,16 @@ test('Eingang: es gibt genau einen Konsumenten und genau einen Seam', () => {
   let waterfalls = 0;
   let listeners = 0;
   let mentions = 0;
-  for (const dir of readdirSync(packages).sort()) {
-    for (const rel of ['lib/index.js', 'lib/client.js']) {
-      const file = join(packages, dir, rel);
-      if (!existsSync(file)) continue;
-      files += 1;
-      const text = readFileSync(file, 'utf8');
-      const all = count(text, '"agent/pre-step"');
-      mentions += all;
-      waterfalls += count(text, 'waterfall("agent/pre-step"');
-      listeners += count(text, 'on("agent/pre-step"');
-    }
+  for (const file of harnessHostFiles(packages)) {
+    files += 1;
+    const text = readFileSync(file, 'utf8');
+    mentions += count(text, '"agent/pre-step"');
+    waterfalls += count(text, 'waterfall("agent/pre-step"');
+    listeners += count(text, 'on("agent/pre-step"');
   }
-  assert.ok(files > 300, `zu wenige Dateien gescannt: ${files} in ${packages}`);
+  // Gemessen an 0.2.1-rc.2: 258 Dateien. Die Schwelle ist eine Untergrenze
+  // gegen den falschen Baum (dshRoot() zaehlte einst 18), keine Sollzahl.
+  assert.ok(files > 200, `zu wenige Dateien gescannt: ${files} in ${packages}`);
   assert.equal(waterfalls, 1, 'genau ein waterfall("agent/pre-step") im Harness');
   assert.equal(mentions, waterfalls + listeners, 'jedes weitere Vorkommen ist ein Listener, keine zweite Quelle');
   assert.ok(listeners >= 10, `erwartet viele Listener, gefunden: ${listeners}`);
@@ -174,8 +222,10 @@ test('Eingang: Send-Button und Enter benutzen dieselbe Uebergabe, ohne Prompt-Lo
 test('Eingang: der Host bildet den Weg auf followup oder steer ab', () => {
   // Der einzige Prompt-Eingang des Hosts: Modus entscheidet den Weg, source
   // markiert den Menschen. Genau dieser Marker ist auch unsere Eingangspruefung.
-  const prompt = methodBody(controller.text, 'async prompt(request) {');
-  assert.ok(prompt.includes('kind: "user"'), 'der UI-Weg ist als menschlich markiert');
+  const prompt = methodBody(controller.text, 'async prompt(request, source) {');
+  assert.ok(prompt.includes('createUserMessage({'), 'die Nachricht entsteht an genau dieser Stelle');
+  assert.ok(prompt.includes('source'), 'die Herkunft kommt vom Gateway, nicht aus dem Rumpf');
+  assert.ok(controller.text.includes('kind: "user"'), 'der UI-Weg ist als menschlich markiert');
   assert.ok(prompt.includes('if (request.mode === "steer") agent.steer(message);'), 'Modus steer -> steer()');
   assert.ok(prompt.includes('else agent.followup(message);'), 'sonst -> followup()');
   assert.ok(prompt.includes('admitPromptContent'), 'Anhaenge werden host-seitig zugelassen, nicht im Client');

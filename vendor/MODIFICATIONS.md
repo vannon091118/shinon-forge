@@ -1,25 +1,28 @@
 # vendor/ — herkunftsbelegter Fremdbaum
 
-> **Status:** current — welche Fassung hier liegt und wer sie liest. **Stand:** 2026-10-17
+> **Status:** current — welche Fassung hier liegt und wer sie liest. **Stand:** 2026-10-18
 > **Einstieg:** `docs/INDEX.md` · **Zahlen des Repos:** `docs/ZAHLEN.md`
 > **Nachweis mit den wörtlichen Befehlsausgaben:** `docs/archive/A4_DSH_FASSUNG_2026-10-17.md`
 
 ## Die eine Fassung (A4 der Release-Abnahme)
 
-Vier Stellen nennen dieselbe Fassung. Gemessen am 2026-10-17, mit `node_modules/.bin`
-**vor** dem PATH:
+Fünf Stellen nennen dieselbe Fassung, und die Sollquelle nennt sie zuerst. Gemessen am
+2026-10-18, mit `node_modules/.bin` **vor** dem PATH:
 
 | Quelle | Befehl | Ausgabe |
 |---|---|---|
-| Root-Pin | `node -p "require('./package.json').dependencies['@deepseek-ai/dsh']"` | `0.2.1-alpha.1` |
-| Lock | `grep -A1 '"node_modules/@deepseek-ai/dsh"' package-lock.json` | `0.2.1-alpha.1` |
-| vendorte Fassung | `grep -m1 '"version"' vendor/dsh/MANIFEST.json` | `0.2.1-alpha.1` |
-| installierte Binary | `node_modules/.bin/dsh --version` | `0.2.1-alpha.1` |
+| Sollquelle | `node -p "require('./scripts/dsh-target-versions.json')['@deepseek-ai/dsh']"` | `0.2.1-rc.2` |
+| Root-Pin | `node -p "require('./package.json').dependencies['@deepseek-ai/dsh']"` | `0.2.1-rc.2` |
+| Lock | `grep -A1 '"node_modules/@deepseek-ai/dsh"' package-lock.json` | `0.2.1-rc.2` |
+| vendorte Fassung | `grep -m1 '"version"' vendor/dsh/MANIFEST.json` | `0.2.1-rc.2` |
+| installierte Binary | `node_modules/.bin/dsh --version` | `0.2.1-rc.2` |
 
 Dazu der Integritätsnachweis des Tarballs: sein `sha512` ist **byte-gleich** mit dem
-`integrity`-Feld des Locks (`sha512-DJ8pwG/XqzwDrYQTgJXuIga6ku153Z4vJI/B3MzNtudVCkDaOf4O2pUQh1ToroLHPPe4mxhhFeNJ7ttNculqMw==`),
-sein `sha1` gleich dem Registry-`shasum` (`4f0727d2b8b62d798cfbb5d5df0c797671a3a888`),
+`integrity`-Feld des Locks (`sha512-tvY+yhfKRifthbqPe/OK0AYxM5ZkvqfYq/jMYgJcEUxiRRL1Vwra3Ti5TB6AXgSWQdiPHYh/Vp6SJa9yHwMNuw==`),
+sein `sha1` gleich dem Registry-`shasum` (`a502d1551aabc881020e3cb7961c38901565731a`),
+der Tarball-`sha256` ist `40e3d025c0240c4316ff42dee9bedc7709c0fb38aea10543b47076ed2af52e1d`,
 und jede der 20 vendorten Dateien ist **byte-identisch** mit der installierten Fassung.
+`npm run check:dsh-versions` misst genau diese fünf Quellen in einem Lauf (`scripts/lib/dsh-versions.mjs`).
 
 ## Welcher Code lädt `vendor/`? — **keiner.** (gemessen, nicht vermutet)
 
@@ -57,10 +60,10 @@ zweite Fassung im Weg. Drei gemessene Gründe haben die Richtung entschieden:
   `Repo-Installat` und `dsh: 0.2.1-alpha.1`; `0.2.1-alpha.1` ist damit die Fassung, gegen
   die jede Messung dieses Repos entstanden ist.
 - **Eine Zusage hängt hart an der Fassung.** `scripts/gate/tests/message-ingress.test.mjs`
-  hält `VERIFIED_DSH_VERSION = '0.2.1-alpha.1'` und **verweigert** die Zusage, wenn der
-  geladene Harness eine andere Fassung ist („die Zusagen dieses Tests müssen neu gemessen
-  werden, statt still weiterzugelten"). Ein Pin-Wechsel ist deshalb keine Zeile, sondern
-  eine Neumessung.
+  liest die geprüfte Fassung inzwischen aus `scripts/dsh-target-versions.json` und
+  **verweigert** die Zusage, wenn der geladene Harness eine andere Fassung ist. Seit dem
+  Umzug auf `0.2.1-rc.2` sind die strukturellen Aussagen neu gemessen: der Seam liegt
+  weiterhin in `dsh-agent-loop`, aber npm hoisted ihn unter `dsh-base/node_modules`.
 - **Die Fassungen sind nah beieinander, aber nicht austauschbar.** Gemessen
   (Dateiliste und `sha256` je Datei gegen beide Tarballs): identische Dateiliste (20),
   Unterschiede in **genau zwei** Dateien — `lib/bin.js` (eine Zeile: alpha.2 ergänzt
@@ -88,7 +91,7 @@ einander zu widersprechen.
 
 | Pfad | Inhalt | Herkunft |
 |---|---|---|
-| `vendor/dsh/` | das **veröffentlichte CLI-Paket** `@deepseek-ai/dsh` in der Fassung `0.2.1-alpha.1`, 20 Dateien (`lib/*.js`, `lib/types/*.d.ts`, `LICENSE`, `package.json`, `README*`) | Registry-Tarball, Integrität siehe `vendor/dsh/MANIFEST.json` |
+| `vendor/dsh/` | das **veröffentlichte CLI-Paket** `@deepseek-ai/dsh` in der Fassung `0.2.1-rc.2`, 20 Dateien (`lib/*.js`, `lib/types/*.d.ts`, `LICENSE`, `package.json`, `README*`) | Registry-Tarball, Integrität siehe `vendor/dsh/MANIFEST.json` |
 | `vendor/dsh/MANIFEST.json` | Herkunft, Fassung, Integrität, `sha256` **je Datei** | erzeugt aus dem Tarball (nicht abgetippt) |
 
 **Nicht** vendort ist der Ökosystem-Baum: die 260 Pakete unter `@deepseek-ai/*`
@@ -104,19 +107,17 @@ dann diesen Absatz.
 (nachgestellt, nicht behauptet):
 
 ```bash
-# Tarball laden und Datei für Datei gegen vendor/ vergleichen
-npm pack @deepseek-ai/dsh@0.2.1-alpha.1 --pack-destination /tmp/vendor-dsh
-tar -xzf /tmp/vendor-dsh/deepseek-ai-dsh-0.2.1-alpha.1.tgz -C /tmp/vendor-dsh
-# → Dateiliste 20/20 identisch, sha256 je Datei identisch, 0 Abweichungen
+# Tarball aus der Sollquelle laden, Integrität prüfen, MANIFEST neu schreiben
+node scripts/vendor-dsh.mjs
+# → Dateiliste 20/20, sha256 je Datei, Integrität gegen package-lock.json
 ```
 
 Der `sha256` jeder Datei steht in `vendor/dsh/MANIFEST.json` — dieser Vergleich ist
 damit jederzeit wiederholbar, ohne die Registry zu befragen, und
 `scripts/gate/tests/dsh-pin.test.mjs` führt ihn bei jedem `npm run gate:test` aus.
 
-**Warum kein Commit-Hash im Manifest steht:** die Registry veröffentlicht für
-`0.2.1-alpha.1` **kein** `gitHead` (`npm view @deepseek-ai/dsh@0.2.1-alpha.1 gitHead`
-→ leer, ebenso wie für alpha.2). Belegbar sind Paketfassung, Tarball-Integrität
+**Warum kein Commit-Hash im Manifest steht:** die Registry veröffentlicht auch für
+`0.2.1-rc.2` **kein** `gitHead` (`npm view @deepseek-ai/dsh@0.2.1-rc.2 gitHead` → leer). Belegbar sind Paketfassung, Tarball-Integrität
 (`sha512`), Shasum und der Hash jeder Datei; ein Commit-Hash ist es nicht. Das Manifest
 sagt deshalb `null` und nennt den Grund, statt einen Hash zu erfinden.
 
@@ -134,6 +135,7 @@ Repo-Root. Eigener Code und Fremdtext bleiben getrennt: unser Copyright steht in
 
 ```bash
 node -p "require('./vendor/dsh/MANIFEST.json').files.length"          # 20
+npm run check:dsh-versions                                            # Sollquelle + alle Quellen
 node --test scripts/gate/tests/dsh-pin.test.mjs                       # Fassung + sha256 je Datei
 ```
 

@@ -12,12 +12,36 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createRequire } from 'node:module';
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
+
+/**
+ * Das gemeinsame Agent-Home: `DSH_AGENTS_HOME`, sonst `~/.agents`.
+ *
+ * DSH teilt die Anweisungsdatei ueber diese Variable; wer sie setzt, meint ein
+ * anderes Verzeichnis als das historische `~/.agents` — und genau dorthin
+ * muessen Memory-Sync und Runner schreiben, sonst pflegen zwei Orte dieselbe
+ * Datei. Der Default bleibt `~/.agents`: nichts wird verschoben, nur gelesen.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string}
+ */
+export function agentsHome(env = process.env) {
+  const explicit = env.DSH_AGENTS_HOME;
+  if (explicit !== undefined && explicit.trim() !== '') {
+    if (!isAbsolute(explicit)) throw new Error('DSH_AGENTS_HOME muss ein absoluter Pfad sein');
+    return resolve(explicit);
+  }
+  return join(homedir(), '.agents');
+}
+
+/** Die kanonische Anweisungsdatei im Agent-Home. */
+export function agentsInstructionFile(env = process.env) {
+  return join(agentsHome(env), 'AGENTS.md');
+}
 
 // ── Schemastery (aus DSH, falls verfügbar) ────────────────────────────────────
 
@@ -123,7 +147,7 @@ const runnerState = {
  * Prüfe ob notion-agent installier ist.
  */
 function notionAgentAvailable() {
-  const script = join(homedir(), '.agents/notion-agent/memory-sync.mjs');
+  const script = join(agentsHome(), 'notion-agent/memory-sync.mjs');
   return existsSync(script);
 }
 
@@ -131,7 +155,7 @@ function notionAgentAvailable() {
  * Lese memory.json Metadata.
  */
 function readMemoryState() {
-  const statePath = join(homedir(), '.agents/memory.json');
+  const statePath = join(agentsHome(), 'memory.json');
   if (!existsSync(statePath)) return null;
   try {
     return JSON.parse(readFileSync(statePath, 'utf8'));
@@ -144,7 +168,7 @@ function readMemoryState() {
  * Führe notion-agent sync aus.
  */
 async function runMemorySync() {
-  const script = join(homedir(), '.agents/notion-agent/memory-sync.mjs');
+  const script = join(agentsHome(), 'notion-agent/memory-sync.mjs');
   if (!notionAgentAvailable()) {
     return { ok: false, error: 'notion-agent nicht gefunden' };
   }
@@ -362,7 +386,7 @@ async function pollSessions(ctx, config) {
  */
 async function executeAgentStep(agent, ctx, config) {
   // Memory laden
-  const memoryFile = join(homedir(), '.agents/AGENTS.md');
+  const memoryFile = agentsInstructionFile();
   let memoryContent = '';
   if (existsSync(memoryFile)) {
     memoryContent = readFileSync(memoryFile, 'utf8');
@@ -392,8 +416,8 @@ function buildStepPrompt(agent, memoryContent, config) {
  * Schreibe Heartbeat für Agent.
  */
 function writeAgentHeartbeat(agentId, result) {
-  const heartbeatPath = join(homedir(), `.agents/heartbeats/${agentId}.json`);
-  const dir = join(homedir(), '.agents/heartbeats');
+  const heartbeatPath = join(agentsHome(), `heartbeats/${agentId}.json`);
+  const dir = join(agentsHome(), 'heartbeats');
 
   try {
     if (!existsSync(dir)) {
@@ -527,7 +551,7 @@ const memoryStatusTool = {
       available,
       state,
       freshness,
-      canonicalPath: join(homedir(), '.agents/AGENTS.md'),
+      canonicalPath: agentsInstructionFile(),
       files: state?.files?.map(f => ({ path: f.path, kind: f.kind })) ?? [],
     };
   },

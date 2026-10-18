@@ -12,7 +12,7 @@
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "dsh": {
     "bundle": {
@@ -24,7 +24,16 @@
     }
   },
   "meta": {
-    "title": { "en": "Shinon Forge - Token Usage", "de": "Shinon Forge - Token-Nutzung" },
-    "description": { "en": "Show token usage statistics", "de": "Token-Nutzungsstatistiken anzeigen" }
+    "title": {
+      "en": "Shinon Forge - Token Usage",
+      "de": "Shinon Forge - Token-Nutzung"
+    },
+    "description": {
+      "en": "Show token usage statistics",
+      "de": "Token-Nutzungsstatistiken anzeigen"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
   }
 }

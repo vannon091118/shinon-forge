@@ -116,6 +116,15 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `node --test scripts/gate/tests/codingmon-store.test.mjs` → the durable pet store
   against the real DSH storage family in a real Cordis context (needs `dsh` on PATH and
   the bundled packages resolvable; skips visibly otherwise). Runs inside `gate:test`.
+- `npm run check:dsh-versions` → `node scripts/check-dsh-versions.mjs`: der EINE
+  Versionsprüfer. Er liest `scripts/dsh-target-versions.json` (die einzige Sollquelle)
+  und prüft Root- und Workspace-Manifeste, alle Lock-Einträge (auch verschachtelte),
+  `vendor/dsh/MANIFEST.json`, Installat, `dsh --version` und ob ein Skript die Fassung
+  als zweites Literal führt. Exit 0 nur, wenn alles dieselbe Fassung nennt; jeder Befund
+  nennt Soll, Ist und Fundstelle. Dieselbe Implementierung nutzen CI und `dsh-update`.
+- `node scripts/vendor-dsh.mjs` → erneuert `vendor/dsh/` aus der Sollquelle (Registry-
+  Tarball, Integrität gegen das Lock, `MANIFEST.json` mit sha256 je Datei). Nicht von Hand
+  kopieren: der Prüfer oben vergleicht danach Fassung und Integrität.
 - `npm run build` → `node scripts/build.mjs`: re-validates everything, then wipes and
   regenerates `dist/` (`manifest.json`, `profile.json`, `dist/packages/*`).
 - `npm run scale:check` → `node scripts/scale-check.mjs`: the scaling proof — copies the

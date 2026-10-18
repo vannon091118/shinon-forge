@@ -168,6 +168,7 @@ unberührt: `@shinon/openapi` bleibt inaktiv.
 | Patch-Werte       | Paket (ausgeliefert) bzw. Profil (überschrieben) | `packages/<dir>/cordis.patch.yml`, `profiles/shinon/cordis.patch.yml` |
 | UI-Zustand        | DSH-Services (`slots`, `styles`, `locale`) | Client-Hälfte              |
 | Zahlen (Bestand, Prüfläufe) | `docs/ZAHLEN.md` | sonst nirgends |
+| Sollfassungen der DSH-Pakete | niemand sonst | `scripts/dsh-target-versions.json` (Prüfer: `npm run check:dsh-versions`) |
 | Laufzeit-Index (Prompter MAX) | `@shinon/prompter` | `.shinon/prompter-index.json`, gitignoriert |
 | Projekt-Kontext (Persona) | der Nutzer | `.shinon/project-context.md`, getrackt wenn vorhanden |
 | Intent-Klasse eines Turns | `@shinon/prompter` — reiner Resolver `assets/intent-resolver.js` | nirgends gespeichert: jeden Turn frisch aus dem Text, nie aus der Modellantwort |

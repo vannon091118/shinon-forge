@@ -12,7 +12,7 @@
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "dsh": {
     "bundle": {
@@ -24,7 +24,16 @@
     }
   },
   "meta": {
-    "title": { "en": "Shinon Forge - Event Spine", "de": "Shinon Forge - Event-Spine" },
-    "description": { "en": "Hook/event spine: observe, normalize, validate and emit DSH signals", "de": "Hook/Event-Spine: DSH-Signale beobachten, normalisieren, validieren, emittieren" }
+    "title": {
+      "en": "Shinon Forge - Event Spine",
+      "de": "Shinon Forge - Event-Spine"
+    },
+    "description": {
+      "en": "Hook/event spine: observe, normalize, validate and emit DSH signals",
+      "de": "Hook/Event-Spine: DSH-Signale beobachten, normalisieren, validieren, emittieren"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
   }
 }

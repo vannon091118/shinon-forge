@@ -166,6 +166,12 @@ jobs:
       - name: Statisches Gate fahren
         run: node scripts/shinon-test.mjs
 
+      # Eine Sollquelle, ein Prüfer: Matrix, Manifeste, Lock, Vendor, Installat
+      # und CLI müssen dieselbe Fassung nennen. Derselbe Befehl läuft lokal und
+      # im Updater — eine zweite Implementierung gibt es nicht.
+      - name: DSH-Versionen prüfen (Sollquelle, Lock, Vendor, Installat, CLI)
+        run: node scripts/check-dsh-versions.mjs
+
   # ── Zweig 5: die Fixtures (Validierung, ~36 s) ──────────────────────────────
   fixtures:
     name: Fixtures (Validierung gegen den echten Bau)

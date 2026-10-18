@@ -13,7 +13,7 @@
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "dsh": {
     "bundle": {
@@ -24,7 +24,16 @@
     }
   },
   "meta": {
-    "title": { "en": "Shinon Forge - Project Index", "de": "Shinon Forge - Projektindex" },
-    "description": { "en": "SQLite/FTS5 index of the project, written outside the project", "de": "SQLite/FTS5-Index des Projekts, ausserhalb des Projekts geschrieben" }
+    "title": {
+      "en": "Shinon Forge - Project Index",
+      "de": "Shinon Forge - Projektindex"
+    },
+    "description": {
+      "en": "SQLite/FTS5 index of the project, written outside the project",
+      "de": "SQLite/FTS5-Index des Projekts, ausserhalb des Projekts geschrieben"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
   }
 }

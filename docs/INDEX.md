@@ -63,6 +63,7 @@ gilt nicht als Nachmessung.
 | [`AGENTS.md`](../AGENTS.md) | current | 2026-10-17 | Arbeitsregeln für Agenten |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-17 | Namespace-, Paket- und Profilkonventionen; §5 führt den Lebenszyklus von `.shinon/` |
 | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) | current | 2026-10-08 | Commit-Regeln und ihre Durchsetzung |
+| [`docs/DSH-RC2-INTEGRATION.md`](DSH-RC2-INTEGRATION.md) | current | 2026-10-18 | Umzug auf DSH `0.2.1-rc.2`: eine Sollquelle, ein Prüfer, was am Fork angepasst wurde — und welche Auftragspunkte mit welchem Befund bewusst offen bleiben |
 | [`docs/COMMENT-KANON.md`](COMMENT-KANON.md) | current | 2026-10-17 | Ablage aller Kommentar-Blöcke über 10 LOC, mit Zeiger-Anker je Fundstelle — Ziel der Kürzung, nie Handediting |
 | [`docs/audit/BATCH0-SCOPE-2026-10-17.md`](audit/BATCH0-SCOPE-2026-10-17.md) | current | 2026-10-17 | Batch 0: Scope-Isolation von Persona und globaler `AGENTS.md`, getrenntes DSH-Home, gemessene Runtime-Baseline |
 | [`docs/audit/BATCH0-ABNAHME-2026-10-17.md`](audit/BATCH0-ABNAHME-2026-10-17.md) | current | 2026-10-17 | Abnahme Batch 0 (00G): Gate-Tabelle der Kriterien 1–6, **NO-GO** wegen Sitzungs-Scope der Persona, kleinster offener Fix |
@@ -94,7 +95,7 @@ gilt nicht als Nachmessung.
 | [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) | current | 2026-10-17 | Fremdhinweise, getrennt vom eigenen Copyright (A12) |
 | [`vendor/MODIFICATIONS.md`](../vendor/MODIFICATIONS.md) | current | 2026-10-17 | Änderungslog des vendorten DSH-Anteils: welche Fassung hier liegt und welcher Code sie lädt (A4 der Release-Abnahme) |
 | [`LICENSE`](../LICENSE) | current | 2026-10-11 | eigene Lizenz (MIT, `Copyright (c) 2026 Vannon`) — kein Markdown, deshalb ohne Statusblock |
-| [`vendor/dsh/`](../vendor/dsh/) (20 Dateien + `MANIFEST.json`) | imported | 2026-10-17 | unverändert übernommenes Fremdpaket `@deepseek-ai/dsh@0.2.1-alpha.1` — dieselbe Fassung wie Root-Pin, Lock und installierte Binary, kein Teil des kanonischen Satzes, Herkunft im Manifest |
+| [`vendor/dsh/`](../vendor/dsh/) (20 Dateien + `MANIFEST.json`) | imported | 2026-10-17 | unverändert übernommenes Fremdpaket `@deepseek-ai/dsh@0.2.1-rc.2` — dieselbe Fassung wie Root-Pin, Lock und installierte Binary, kein Teil des kanonischen Satzes, Herkunft im Manifest |
 
 **Archiv (der eine Ort für Abgeschlossenes):** alle abgeschlossenen Audits,
 überholten Pläne, beendeten Handshakes und importierten Texte liegen unter

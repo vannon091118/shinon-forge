@@ -13,7 +13,7 @@
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "dsh": {
     "bundle": {
@@ -27,5 +27,8 @@
   "meta": {
     "title": "Shinon Key Router",
     "description": "Rotiert API-Keys bei 429 aus dem Nutzer-Pool, mit eskalierenden Wartezeiten"
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
   }
 }

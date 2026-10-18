@@ -1,7 +1,7 @@
 # Zahlen — Shinon Forge
 
-> **Status:** current — **einziger Eigentümer** aller harten Zahlen dieses Repos. **Stand:** 2026-10-17
-> **Einstieg:** `docs/INDEX.md` · gemessen mit Node v22.23.3 und npm 10.9.9, dsh `0.2.1-alpha.1` (Repo, zuerst im PATH)
+> **Status:** current — **einziger Eigentümer** aller harten Zahlen dieses Repos. **Stand:** 2026-10-18
+> **Einstieg:** `docs/INDEX.md` · gemessen mit Node v22.23.3 und npm 10.9.9, dsh `0.2.1-rc.2` (Repo, zuerst im PATH)
 
 Regel: **Kein anderes Dokument nennt eine dieser Zahlen.** README, `AGENTS.md` und
 `docs/ARCHITECTURE.md` verweisen hierher. Wer eine Zahl ändert, ändert den Messweg
@@ -25,16 +25,16 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Pakete **nicht** im Profil (erklären sich selbst via `dsh.inactive`) | 3 (mobile, openapi, shinon-forge) | Manifeste unter `packages/*/package.json` lesen | 0 |
 | Version des Repos | `0.4.0` | `node -p "require('./package.json').version"` | 0 |
 | Paketversionen | 20× `1.0.0`, 2× `0.1.0` | `node -e "…"` über `packages/*/package.json` | 0 |
-| DSH-Pin im Root-Manifest | `0.2.1-alpha.1` | `node -p "require('./package.json').dependencies['@deepseek-ai/dsh']"` | 0 |
-| Schemastery (deklariert) | `~3.18.5-alpha.1` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
+| DSH-Pin im Root-Manifest | `0.2.1-rc.2` | `node -p "require('./package.json').dependencies['@deepseek-ai/dsh']"` | 0 |
+| Schemastery (deklariert) | `3.18.5` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
 | Node (`engines.node`) | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
 | pnpm-Artefakte (getrackt) | 0 | `git ls-files '*pnpm-workspace.yaml' '*pnpm-lock.yaml' \| wc -l` (Aufrufe: Gate-Prüfung „pnpm-Reste“) | 0 |
-| Markdown-Dokumente (getrackt) | 81 | `git ls-files '*.md' \| wc -l` | 0 |
+| Markdown-Dokumente (getrackt) | 90 | `git ls-files '*.md' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | 7 | `ls docs/contracts/*.json \| wc -l` | 0 |
-| Proben unter `docs/probes/` | 31 | `ls docs/probes/*.json \| wc -l` | 0 |
+| Proben unter `docs/probes/` | 32 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 22 Pakete, 185 Dateien, 1449724 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 22 Pakete, 186 Dateien, 1469859 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -47,7 +47,7 @@ liest genau diese Datei.
 |---|---|---|---|
 | Node (ausgeführt) | **v22.23.3** | `node --version` (über `scripts/run-with-node.mjs`) | 0 |
 | npm | **10.9.9** | `npm --version` | 0 |
-| DSH im PATH, Repo zuerst | **0.2.1-alpha.1** (der Pin) | `./node_modules/.bin/dsh --version` | 0 |
+| DSH im PATH, Repo zuerst | **0.2.1-rc.2** (der Pin) | `./node_modules/.bin/dsh --version` | 0 |
 | DSH global daneben | **0.2.0-rc.2** — darf abweichen; keine Zusage hängt an dieser Fassung | `dsh --version` ohne `node_modules/.bin` im PATH | 0 |
 | Node-Range des Repos | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
 
