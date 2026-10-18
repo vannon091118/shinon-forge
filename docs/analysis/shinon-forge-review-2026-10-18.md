@@ -96,6 +96,10 @@ Behoben:
 - `packages/key-router/assets/pool-core.js`: `PLAN.md §3.12` → `Plan §3.12`; der
   eingefrorene Zeiger auf `docs/COMMENT-KANON.md` bleibt damit inhaltlich stehen
   (siehe §6.2).
+- `docs/CHANGELOG.md`: die Datei existierte nur im Arbeitsbaum, nicht in git — zwölf
+  Verweise (u. a. `AGENTS.md`, `README.md`, `docs/ROADMAP.md`) zeigten auf einen
+  toten Pfad. Die Datei ist jetzt getrackt; `git ls-files docs/CHANGELOG.md` nennt
+  sie, und `docs/INDEX.md` führt sie weiter als einzige Liste erledigter Arbeit.
 - `docs/CI.md`: der Abschnitt behauptete ein rotes `contracts`-Gate. Nachgemessen:
   `npm run gate:full` → **Exit 0**, 25 Gates, 0 rot. Der Absatz nennt jetzt die
   Messung vom 2026-10-19 und den behobenen Befund.

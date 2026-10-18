@@ -77,6 +77,10 @@ gilt nicht als Nachmessung.
 | [`docs/audit/DOC_REVIEW_2026-10-17.md`](audit/DOC_REVIEW_2026-10-17.md) | current | 2026-10-17 | transienter Doku-Review |
 | [`docs/audit/ORDNUNG-2026-10-18.md`](audit/ORDNUNG-2026-10-18.md) | current | 2026-10-18 | Komplexitäts-Audit: Ballast, Datenstrom, Reihenfolge (P0/P1 erledigt, C1 erledigt, Rest offen) |
 | [`docs/analysis/fallbacks-escalations-2026-10-18.md`](analysis/fallbacks-escalations-2026-10-18.md) | current | 2026-10-19 | Analyse der Fehlerpfade und Eskalationsketten gegen den Baum: sieben Enhancer-Gründe, Router-Gründe, MAX mit Datei-vor-Index, Signaltabelle (fünf gewertet) und die offenen Kanten |
+| [`docs/analysis/shinon-forge-review-2026-10-18.md`](analysis/shinon-forge-review-2026-10-18.md) | current | 2026-10-19 | der externe Review: Befunde gegen den Baum nachgemessen, was behoben wurde und welche Lücken mit Grund offen bleiben |
+| [`.agents/skills/`](../.agents/skills/) (6 Skills) | current | 2026-10-19 | Arbeitsanweisungen für Agenten, gegen `AGENTS.md` und den Baum abgeglichen — eine Regel, ein Ort |
+| [`.shinon/project-context.md`](../.shinon/project-context.md) | current | 2026-10-19 | projektspezifischer Kontext (gilt nur in diesem Projekt), keine Zahlenquelle |
+| [`generated-skills/README.md`](../generated-skills/README.md) | current | 2026-10-12 | Ablage der vom arbeitenden Modell geschriebenen Zettel — Format, Laderegeln, Grenzen |
 | [`docs/PR-PROMOTION.md`](PR-PROMOTION.md) | current | 2026-10-17 | PR-Promotion: Zustandsautomat, Evidenzregeln (Status zählt nur am genannten SHA) und die Adapter-Grenze — Schreibaktion bewusst außerhalb |
 | [`docs/CI.md`](CI.md) | current | 2026-10-14 | CI als Schranke: Zweige und verpflichtender Statuscheck für `main`, Setz- und Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
 | [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-17 | alle harten Zahlen + Befehle |
