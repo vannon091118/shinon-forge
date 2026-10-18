@@ -97,6 +97,13 @@ test('key-router: der echte Request laeuft mit dem gewaehlten Anbieter und desse
     const byName = new Map(tools.map((tool) => [tool.name, tool]));
     assert.ok(byName.has('key_router_probe'), 'das Probe-Werkzeug ist registriert');
 
+    // Die Beobachtung ist registriert UND gibt weiter: der Router entscheidet
+    // nicht ueber Wiederholungen (`llm-retry` tut das), er zaehlt nur.
+    assert.equal(typeof errorHandler, 'function', 'der 429-Beobachter haengt am Ereignis');
+    let forwarded = 0;
+    errorHandler({}, () => { forwarded += 1; });
+    assert.equal(forwarded, 1, 'die Beobachtung faengt den Fehler nicht ab, sie reicht ihn weiter');
+
     // (1) Der erste echte Request: gewaehlter Anbieter, gewaehlter Schluessel.
     const first = await byName.get('key_router_probe').execute({ providerId: 'draht-anbieter' });
     assert.equal(first.ok, true, `der Draht steht: ${JSON.stringify(first)}`);

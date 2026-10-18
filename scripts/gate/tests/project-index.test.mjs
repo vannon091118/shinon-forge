@@ -20,6 +20,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { codeOnly, findForbidden, findMissing } from '../../lib/source-scan.mjs';
 
+/**
+ * Als root (uid 0) ignoriert der Kernel Dateirechte: `chmod 000` sperrt nichts,
+ * und die beiden Rechte-Tests wuerden ohne eigenen Befund rot. Sie werden dann
+ * SICHTBAR uebersprungen — ein Skip mit Grund, kein stilles Gruen.
+ */
+const AS_ROOT = typeof process.getuid === 'function' && process.getuid() === 0;
+const ROOT_SKIP = AS_ROOT ? 'als root (uid 0) greifen Dateirechte nicht' : false;
+
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/project-index/', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const INDEX_FILE = join(PACKAGE_DIR, 'index.js');
@@ -1399,7 +1407,11 @@ async function observeLoop(start) {
 }
 
 test('Worker: der Lauf laesst den Eventloop laufen, der Lauf im Host blockiert ihn', async () => {
-  const project = bigProject('eventloop');
+  // Groesse bewusst so gewaehlt, dass der Host-Lauf auch auf schnellen Runnern
+  // deutlich ueber 100 ms liegt (gemessen: 150 Dateien ergaben 85 ms und rissen
+  // die Praemisse der Schranke). Die Zahl ist kein Zeitbudget, sondern die
+  // Bedingung dafuer, dass `host.ticks === 0` ueberhaupt etwas zeigen kann.
+  const project = bigProject('eventloop', 400, 40);
   const hostIndex = fixtureIndex(project, 'eventloop-host');
   const mountIndex = join(workDir('eventloop-mount'), 'indexes');
 
@@ -1919,7 +1931,7 @@ test('Scan: die Dateireihenfolge ist eine Funktion der Dateimenge, nicht des Dur
  * als root greifen Dateirechte nicht, dann wäre die Probe leer) und verlangt
  * Pfad UND Grund.
  */
-test('Scan: ein unlesbarer Ordner wird benannt, statt still zu fehlen', () => {
+test('Scan: ein unlesbarer Ordner wird benannt, statt still zu fehlen', { skip: ROOT_SKIP }, () => {
   const project = join(workDir('ordnerfehler'), 'projekt');
   mkdirSync(join(project, 'src'), { recursive: true });
   mkdirSync(join(project, 'gesperrt'), { recursive: true });
@@ -1963,7 +1975,7 @@ test('Scan: ein unlesbarer Ordner wird benannt, statt still zu fehlen', () => {
  * daneben steht, welche Datei und warum. Der Unterschied ist der ganze Punkt —
  * „1 übersprungen" konnte eine bewusste Obergrenze sein oder ein Rechtefehler.
  */
-test('Scan: eine unlesbare Datei wird mit Pfad und Grund gemeldet', () => {
+test('Scan: eine unlesbare Datei wird mit Pfad und Grund gemeldet', { skip: ROOT_SKIP }, () => {
   const project = join(workDir('dateifehler'), 'projekt');
   mkdirSync(join(project, 'src'), { recursive: true });
   writeFileSync(join(project, 'src/a.mjs'), 'export const alpha = 1;\n');

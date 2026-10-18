@@ -28,8 +28,7 @@ function prompterBlock(text) {
  * `NO_ROUTE` und veredelte nichts. Deshalb prueft dieser Test MAX und die
  * → Kanon: docs/COMMENT-KANON.md#k-5feebda6c44e
  */
-test('MAX steht im Profil und nutzt den Laufzeit-Index statt des unbrauchbaren Platzhalters', () => {
-  const bundle = readFileSync(bundlePatch, 'utf8');
+test('MAX steht im Profil und keine statische Kontextdatei verdeckt den Laufzeit-Index', () => {
   const profile = readFileSync(profilePatch, 'utf8');
   const block = prompterBlock(profile);
 
