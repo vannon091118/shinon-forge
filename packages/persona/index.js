@@ -1,8 +1,51 @@
 import z from '@deepseek-ai/schemastery';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname, isAbsolute, resolve, relative } from 'node:path';
+import { join, isAbsolute, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { emptySelfModel, observeDecision, observeError, decaySelfModel, selfModelSummary, selfModelView, validateSelfModel } from './assets/self-model.js';
+
+/**
+ * Die Naht Persona -> Core-UI: der Zustand der Persona als Global und live.
+ *
+ * Ein Client-Bundle kann kein Host-File importieren, also traegt jede Seite den
+ * Namen als LITERAL — geprueft als Zwilling in `scripts/lib/repo.mjs`. Drift
+ * waere hier still: ein falscher Name hiesse nur, dass die Leiste weiter ihren
+ * Platzhalter zeigt, und das saehe aus wie „kein Zustand vorhanden“.
+ */
+export const UI_STATE_GLOBAL = '__shinonPersonaState';
+export const UI_STATE_ROUTE = '/shinon/persona/state';
+export const UI_STATE_CONTRACT = 'shinon.persona-ui/v1';
+
+/** Kanal des Veredlers — Literal, weil `@shinon/prompter` nicht importierbar ist. */
+export const PROMPTER_DECISION_CHANNEL = 'shinon/prompter/decision';
+
+/** Die Naht des Webservers, ueber die Globals in die Seite kommen. */
+export const INDEX_INJECT = 'webserver/index-inject';
+
+/**
+ * Die dauerhafte Ablage — derselbe Dienst, den das Scoring nutzt, als LITERAL.
+ *
+ * Kein Paket liest ein anderes; `scripts/gate/tests/context-wiring.test.mjs`
+ * pinnt die Gleichheit der Namen auf beiden Seiten. Ein zweiter Name waere ein
+ * zweites Gedaechtnis, und die Persona schreibt NIE in Projektdateien: sie hat
+ * kein Schreibrecht, nur diesen Dienst fuer ihren EIGENEN Namensraum.
+ */
+export const INDEX_STORE_SERVICE = 'shinon_index_store';
+export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
+
+/** Der Namensraum des Selbstmodells: ein Projekt, ein Stand. */
+export const SELF_MODEL_NAMESPACE = 'shinon.persona-self/v1';
+
+/**
+ * Die Id des Dokuments IN der Ablage.
+ *
+ * Die Ablage haelt Dokumente (memos), keine freien Objekte: `save` schreibt nur
+ * records/memos/scorecard/notes, alles andere faellt still weg. Das Selbstmodell
+ * reist deshalb als EIN Dokument unter dieser Id — geprueft wird es trotzdem
+ * gegen seinen EIGENEN Vertrag.
+ */
+export const SELF_MODEL_MEMO_ID = 'self-model';
 
 /**
  * Der Workspace, den die LAUFENDE Sitzung beansprucht — pro Turn, nicht pro Prozess.
@@ -652,19 +695,35 @@ export const Config = z.object({
    * `process.cwd()`). Leer = aus `SHINON_WORKSPACE_ROOT`, sonst unklar = keine Persona.
    */
   workspaceRoot: z.string().default(''),
+  /**
+   * Der Namensraum des Selbstmodells in der dauerhaften Ablage des Project
+   * Index (`shinon_index_store`). Leer = kein Gedaechtnis ueber Neustarts: das
+   * Modell lebt dann nur im Prozess, und die Ablage bekommt keine Zeile.
+   */
+  selfModelNamespace: z.string().default(SELF_MODEL_NAMESPACE),
 });
 
 export function apply(ctx, config) {
   // Projektscope: Persona nur für den AUSDRÜCKLICH benannten Shinon-Workspace.
   // In fremden oder unklaren Workspaces würden interne Daten exponiert.
-  const workspaceRoot = resolveWorkspaceRoot(config);
-  if (workspaceRoot === null) {
-    console.log('[shinon-persona] Workspace unklar (weder workspaceRoot noch SHINON_WORKSPACE_ROOT) — Persona-Abschnitte werden NICHT registriert');
+  // GEMESSEN 2026-10-18 (Root Cause): die Profil-Config setzt nur
+  // `projectContextPath`, keinen `workspaceRoot`. Der Mount brach deshalb VOR
+  // jeder Registrierung ab — Persona, Ton und Selbstbezug fehlten in JEDEM
+  // Prompt, waehrend der Prozess weiterlief. Der Scope ist aber eine Eigenschaft
+  // der SITZUNG, nicht des Boots: `agent/pre-step` legt `header.cwd` in
+  // `sessionRoot` ab, und `speaksForSession` entscheidet je Abschnitt. Der Mount
+  // registriert also immer; ein fremder Workspace bekommt weiterhin leere
+  // Abschnitte (fail-closed bleibt fail-closed).
+  const declaredRoot = resolveWorkspaceRoot(config);
+  // Ein BEKANNT fremder Scope bleibt ein harter Aus: dort wird weder gelesen noch
+  // gelauscht (kein Abschnitt, kein Handler). Nur der UNBEKANNTE Scope wartet auf
+  // die Sitzung — sonst wäre der Boot wieder die Autorität, die er nicht ist.
+  if (declaredRoot !== null && !isShinonProjectAt(declaredRoot)) {
+    console.log(`[shinon-persona] ${declaredRoot} ist nicht das Shinon-Projekt — Persona-Abschnitte werden NICHT registriert`);
     return () => {};
   }
-  if (!isShinonProjectAt(workspaceRoot)) {
-    console.log(`[shinon-persona] ${workspaceRoot} ist nicht das Shinon-Projekt — Persona-Abschnitte werden NICHT registriert`);
-    return () => {};
+  if (declaredRoot === null) {
+    console.log('[shinon-persona] Kein workspaceRoot deklariert — der Sitzungs-cwd entscheidet je Schritt');
   }
 
   let contract = EMPTY_CONTRACT;
@@ -679,12 +738,38 @@ export function apply(ctx, config) {
    * (Tests, direkte Assembly) gilt die Freigabe des Boots; mit Sitzung entscheidet
    * deren CWD — liegt er außerhalb der Wurzel, bleibt jeder Abschnitt leer.
    */
-  const speaksForSession = () => {
-    const root = sessionRoot.getStore()?.root;
-    if (typeof root !== 'string' || root === '') return true;
-    return isInside(workspaceRoot, root);
+  // GEMESSEN 2026-10-18 in `@deepseek-ai/dsh-agent-loop/lib/index.js:907`:
+  // `systemPrompt.assemble(...)` läuft VOR dem Wasserfall `agent/pre-step`. Der
+  // AsyncLocalStorage aus dem Pre-Step kann die Assembly deshalb NIE erreichen —
+  // der Abschnittstext wird schon vorher ausgewertet. Die Assembly übergibt ihr
+  // `context` aber an jede Textfunktion (`section.text(context)`, Quelle:
+  // dsh-system-prompt `assemble`), und darin steht der Agent samt Sitzung. Das
+  // ist der belastbare Weg: der cwd kommt aus der Assembly, nicht aus der Zeit.
+  const rootOfAssembly = (assemblyCtx) => {
+    const agent = assemblyCtx?.agent;
+    const fromAgent = agent?.session?.header?.cwd ?? agent?.session?.cwd;
+    if (typeof fromAgent === 'string' && fromAgent !== '') return fromAgent;
+    const fromStore = sessionRoot.getStore()?.root;
+    if (typeof fromStore === 'string' && fromStore !== '') return fromStore;
+    return null;
   };
-  const gated = (text) => () => (speaksForSession() ? text : '');
+  let spokenFor = null;
+  const speaksForSession = (assemblyCtx) => {
+    const root = rootOfAssembly(assemblyCtx);
+    if (root !== null) {
+      // Die SITZUNG entscheidet: liegt ihr cwd im Shinon-Projekt, spricht die
+      // Persona. Ein deklarierter Root grenzt zusaetzlich ein — keine Vorbedingung.
+      const speaks = isShinonProjectAt(root) && (declaredRoot === null || isInside(declaredRoot, root));
+      if (spokenFor !== root) {
+        spokenFor = root;
+        console.log(`[shinon-persona] Sitzung ${root} — Persona ${speaks ? 'aktiv' : 'still (fremdes Projekt)'}`);
+      }
+      return speaks;
+    }
+    // Ohne Sitzungsangabe (Tests, direkte Assembly) gilt die Deklaration.
+    return declaredRoot !== null && isShinonProjectAt(declaredRoot);
+  };
+  const gated = (text) => (assemblyCtx) => (speaksForSession(assemblyCtx) ? text : '');
 
   // Der Prompt-Abschnitt wird bei jeder Zustandsänderung neu gesetzt. Vor dem
   // inject ist das ein No-op — der Zustand selbst ist immer schon da.
@@ -713,6 +798,175 @@ export function apply(ctx, config) {
   const persona = createPersonaState(contract, {
     onChange: () => renderPrompt(),
   });
+
+  // ── Das Selbstmodell: Laufzeitspuren -> Prompt und UI ─────────────────────
+  // Ein Modell JE ROOT: die Ablage gehoert dem Projekt, nicht dem Prozess. Die
+  // Belege kommen aus den echten Entscheidungen des Veredlers und den Fehlern
+  // des Laufs; geschrieben wird nach jeder Aenderung, gelesen einmal je Root.
+  const selfModels = new Map();
+  const uiClients = new Set();
+  let lastDecision = null;
+
+  /** Der Zustandsdatensatz der UI — Zahlen und Namen, nie ein Prompt-Text. */
+  const uiSnapshot = () => {
+    const root = sessionRoot.getStore()?.root || declaredRoot;
+    const entry = typeof root === 'string' && root !== '' ? selfModels.get(root) ?? null : null;
+    const state = persona.snapshot();
+    const tone = readTone(ctx, warnedTone);
+    return {
+      contract: UI_STATE_CONTRACT,
+      updatedAt: Date.now(),
+      workspace: typeof root === 'string' && root !== '' ? root : null,
+      state: {
+        identity: state.identity,
+        stance: state.stance,
+        uncertainty: state.uncertainty,
+        mood: state.mood,
+        relation: state.relation,
+        capabilities: [...state.capabilities],
+        limitations: [...state.limitations],
+      },
+      userMood: lastUserMood,
+      // Der KLANG kommt aus dem Vertrag, nicht aus dem Enum: „idle" ist ein
+      // Zustandsname, „Ruhig und bereit" ist das, was im Prompt steht.
+      voice: contract.voice?.[state.mood] ?? null,
+      tone: tone === null ? null : { stance: tone.stance ?? null, ready: tone.ready === true },
+      self: entry === null ? null : selfModelView(entry.model),
+      intent: lastDecision,
+    };
+  };
+
+  /** Die offenen Panels bekommen jede Aenderung sofort — sonst nur beim Laden. */
+  const publishUi = () => {
+    const payload = `data: ${JSON.stringify(uiSnapshot())}\n\n`;
+    for (const response of uiClients) {
+      try {
+        response.write(payload);
+      } catch {
+        uiClients.delete(response);
+      }
+    }
+  };
+
+  let storeWarned = false;
+
+  /** Die Ablage holen: EIN Dienst, EIN Vertrag — sonst kein Gedaechtnis. */
+  const warnStoreOnce = (reason) => {
+    if (storeWarned) return;
+    storeWarned = true;
+    console.warn(`[shinon-persona] Selbstmodell nur im Speicher: ${reason}`);
+  };
+
+  const resolveStore = () => {
+    let found = null;
+    try {
+      found = typeof ctx?.get === 'function' ? ctx.get(INDEX_STORE_SERVICE) ?? null : null;
+    } catch (error) {
+      warnStoreOnce(`Ablage nicht abfragbar (${error?.message ?? error})`);
+      return null;
+    }
+    if (found === null) return null;
+    if (
+      found.contract !== INDEX_STORE_CONTRACT ||
+      typeof found.load !== 'function' ||
+      typeof found.save !== 'function'
+    ) {
+      warnStoreOnce(`fremder Dienst unter ${INDEX_STORE_SERVICE} (Vertrag ${String(found?.contract)})`);
+      return null;
+    }
+    return found;
+  };
+
+  // Ein FEHLENDES Feld heisst "Vorgabe", ein LEERES heisst "aus". Der
+  // Unterschied zaehlt: sonst schaltete ein Profil ohne den Schluessel das
+  // Gedaechtnis still ab, und niemand saehe den Grund.
+  const selfModelNamespace = () => (
+    typeof config.selfModelNamespace === 'string' ? config.selfModelNamespace : SELF_MODEL_NAMESPACE
+  );
+
+  /** Den Stand EINMAL schreiben — dieselbe Ablage wie das Scoring, eigener Raum. */
+  const persistSelfModel = (entry) => {
+    if (entry.namespace === '') return;
+    const store = resolveStore();
+    if (store === null) {
+      warnStoreOnce('kein Index-Dienst');
+      return;
+    }
+    let answer;
+    try {
+      answer = store.save(entry.namespace, {
+        memos: [{ id: SELF_MODEL_MEMO_ID, model: entry.model }],
+      });
+    } catch (error) {
+      warnStoreOnce(`nicht beschreibbar (${error?.message ?? error})`);
+      return;
+    }
+    if (answer === null || typeof answer !== 'object' || answer.ok !== true) {
+      warnStoreOnce(`nicht beschreibbar (${answer?.error ?? 'unbekannte Antwort'})`);
+    }
+  };
+
+  /** Das Modell eines Roots laden — einmal je Root, danach aus dem Speicher. */
+  const selfModelOf = (root) => {
+    const known = selfModels.get(root);
+    if (known !== undefined) return known;
+    const namespace = selfModelNamespace();
+    let model = emptySelfModel(new Date().toISOString());
+    if (namespace !== '') {
+      const store = resolveStore();
+      if (store === null) warnStoreOnce('kein Index-Dienst');
+      else {
+        let answer;
+        try {
+          answer = store.load(namespace);
+        } catch (error) {
+          warnStoreOnce(`nicht lesbar (${error?.message ?? error})`);
+        }
+        const ok = answer !== null && typeof answer === 'object' && answer.ok === true;
+        const memos = ok && Array.isArray(answer.state?.memos) ? answer.state.memos : [];
+        const raw = memos.find((memo) => memo?.id === SELF_MODEL_MEMO_ID)?.model ?? null;
+        if (raw !== null) {
+          const checked = validateSelfModel(raw);
+          if (checked.foreign) console.warn(`[shinon-persona] Selbstmodell fremd (${namespace}) — neuer Stand`);
+          else {
+            model = decaySelfModel(checked.model);
+            if (checked.dropped > 0) console.warn(`[shinon-persona] ${checked.dropped} unlesbare Selbstmodell-Eintraege uebergangen`);
+          }
+        } else if (!ok && answer !== null && answer !== undefined) {
+          warnStoreOnce(`nicht lesbar (${answer?.error ?? 'unbekannte Antwort'})`);
+        }
+      }
+    }
+    const entry = { model, namespace };
+    selfModels.set(root, entry);
+    const view = selfModelView(model);
+    if (view !== null && view.runs > 0) {
+      console.log(`[shinon-persona] Selbstmodell geladen: ${view.runs} Laeufe, ${view.limits.length} Grenzen, ${view.questions.length} offene Fragen`);
+    }
+    return entry;
+  };
+
+  /** EINEN Beleg verbuchen — die einzige Stelle, die das Modell veraendert. */
+  const observeInto = (kind, payload) => {
+    const root = sessionRoot.getStore()?.root || declaredRoot;
+    if (typeof root !== 'string' || root === '' || !isShinonProjectAt(root)) return;
+    const entry = selfModelOf(root);
+    const now = new Date().toISOString();
+    entry.model = kind === 'decision'
+      ? observeDecision(entry.model, payload, now)
+      : observeError(entry.model, payload, now);
+    persistSelfModel(entry);
+    publishUi();
+  };
+
+  /** Der Abschnittstext: belegt, begrenzt — leer, solange nichts belegt ist. */
+  const selfModelText = (assemblyCtx) => {
+    if (!speaksForSession(assemblyCtx)) return '';
+    const root = rootOfAssembly(assemblyCtx) || declaredRoot;
+    if (typeof root !== 'string' || root === '') return '';
+    if (selfModelNamespace() === '') return '';
+    return selfModelSummary(selfModelOf(root).model) ?? '';
+  };
 
   // TODO: [DSH-Refactor] - Die Registrierung steckt in vier verschachtelten Closures (inject →
   // effect → renderPrompt → renderTrigger) mit handgefuehrtem Disposer-Stack; nicht ablesbar
@@ -746,31 +1000,46 @@ export function apply(ctx, config) {
     ];
     if (config.includeAugenhoehe) sections.push(['shinon:augenhoehe', atPrefix + 2, AUGENHOEHE]);
     if (config.alwaysKnowIdentity) sections.push(['shinon:identity-overview', atPrefix + 3, config.identityOverview]);
+    // Das Selbstmodell steht HINTER der Identitaet und VOR dem Zustand: es ist
+    // gelernte Selbstkenntnis, kein Grundsatz und keine Momentaufnahme.
+    if (selfModelNamespace() !== '') sections.push(['shinon:self-model', atSuffix - 6, selfModelText]);
 
     // Projekt-Kontext (Zug 9): projektspezifische Daten, die NUR im Shinon-Projekt
     // geladen werden. Der Pfad ist relativ zum ARBEITSVERZEICHNIS — ähnlich wie
     // agents.md, aber projektspezifisch. Leer = nicht laden.
-    let projectContextText = null;
-    if (config.projectContextPath !== '') {
-      try {
-        const path = isAbsolute(config.projectContextPath)
-          ? config.projectContextPath
-          : join(workspaceRoot, config.projectContextPath);
-        if (existsSync(path)) {
-          projectContextText = readFileSync(path, 'utf8').trim();
-          if (projectContextText !== '') {
-            sections.push(['shinon:project-context', atPrefix + 10, projectContextText]);
-            console.log(`[shinon-persona] Projekt-Kontext geladen (${config.projectContextPath})`);
-          }
+    // Projekt-Kontext wird JE ROOT gelesen und gecacht: der Boot kennt ihn nicht
+    // mehr (kein deklarierter Root), die Sitzung schon. Ein leerer Treffer wird
+    // mitgecacht, damit die Assembly nicht bei jedem Schritt das Dateisystem fragt.
+    const contextPath = typeof config.projectContextPath === 'string' ? config.projectContextPath : '';
+    if (contextPath !== '') {
+      const cache = new Map();
+      sections.push(['shinon:project-context', atPrefix + 10, (assemblyCtx) => {
+        if (!speaksForSession(assemblyCtx)) return '';
+        const root = rootOfAssembly(assemblyCtx) || declaredRoot;
+        if (typeof root !== 'string' || root === '') return '';
+        const path = isAbsolute(contextPath) ? contextPath : join(root, contextPath);
+        if (cache.has(path)) return cache.get(path);
+        let value = '';
+        try {
+          if (existsSync(path)) value = readFileSync(path, 'utf8').trim();
+        } catch (error) {
+          console.warn(`[shinon-persona] Projekt-Kontext nicht lesbar (${error?.message})`);
         }
-      } catch (error) {
-        console.warn(`[shinon-persona] Projekt-Kontext nicht lesbar (${error?.message})`);
-      }
+        cache.set(path, value);
+        if (value !== '') console.log(`[shinon-persona] Projekt-Kontext geladen (${contextPath}, ${root})`);
+        return value;
+      }]);
     }
 
     child.effect(() => {
       const disposers = [];
       for (const [name, order, text] of sections) {
+        // Eine Funktion wird erst bei der Assembly ausgewertet und bringt ihren
+        // Scope selbst mit; ein String wird durch `gated` geschuetzt.
+        if (typeof text === 'function') {
+          disposers.push(sp.section({ name, order, text }));
+          continue;
+        }
         if (typeof text !== 'string' || text.trim() === '') continue;
         disposers.push(sp.section({ name, order, text: gated(text) }));
       }
@@ -872,6 +1141,59 @@ export function apply(ctx, config) {
   };
   const disposer = typeof ctx?.on === 'function' ? ctx.on(config.eventsChannel, handler) : () => {};
 
+  // ── Die Belege: echte Laufzeitspuren, nicht Selbsteinschaetzung ───────────
+  // Der Veredler meldet JEDE Entscheidung (Ausgang, Gruende, offene Fragen, die
+  // Klasse des Auftrags); der Loop meldet jeden Fehler. Beides wird gezaehlt,
+  // beides kann zu einer belegten Grenze bzw. offenen Frage werden — und beides
+  // faellt wieder weg, wenn es nicht mehr auftritt.
+  const decisionDisposer = typeof ctx?.on === 'function'
+    ? ctx.on(PROMPTER_DECISION_CHANNEL, (record) => {
+        if (record === null || typeof record !== 'object') return;
+        // `UNDEFINED` ist die Aussage „keine Klasse", kein Klassenname: in der
+        // UI und im Selbstmodell darf sie nicht wie ein Auftrag aussehen.
+        const classification = typeof record.intentClassification === 'string' ? record.intentClassification : null;
+        lastDecision = {
+          outcome: typeof record.outcome === 'string' ? record.outcome : null,
+          classification: classification === 'UNDEFINED' ? null : classification,
+          pattern: typeof record.intentMatch === 'string' ? record.intentMatch : null,
+          semantic: typeof record.intentSemantic === 'number' ? record.intentSemantic : 0,
+          reasons: Array.isArray(record.reasons) ? record.reasons.slice(0, 4) : [],
+          memory: record.intentMemory ?? null,
+        };
+        observeInto('decision', record);
+      })
+    : () => {};
+  const errorDisposer = typeof ctx?.on === 'function'
+    ? ctx.on('agent/error', (payload) => observeInto('error', payload?.error ?? payload))
+    : () => {};
+  // Beim Laden der Seite steht der aktuelle Zustand im Global; ab dann schiebt
+  // die SSE-Route jede Aenderung nach.
+  const uiInjectDisposer = typeof ctx?.on === 'function'
+    ? ctx.on(INDEX_INJECT, (table) => {
+        if (Array.isArray(table)) table.push({ kind: 'global', name: UI_STATE_GLOBAL, value: uiSnapshot() });
+      })
+    : () => {};
+  let disposeUiRoute = null;
+  const mountUiRoute = (webCtx) => {
+    const webServer = typeof webCtx?.get === 'function' ? webCtx.get('webServer') : undefined;
+    if (typeof webServer?.register !== 'function') return;
+    disposeUiRoute = webServer.register({
+      kind: 'exact',
+      path: UI_STATE_ROUTE,
+      handler: (req, res) => {
+        if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
+        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+        res.write(`data: ${JSON.stringify(uiSnapshot())}\n\n`);
+        uiClients.add(res);
+        req.on('close', () => uiClients.delete(res));
+      },
+    });
+    // Die Route haengt am Fiber, nicht am Prozess.
+    webCtx.effect?.(() => () => { try { disposeUiRoute?.(); } catch { /* schon weg */ } });
+  };
+  if (typeof ctx.inject === 'function') ctx.inject(['webServer'], mountUiRoute);
+  else mountUiRoute(ctx);
+
   // Der Sitzungs-Scope: `agent/pre-step` umschließt den ganzen Schritt, also auch
   // die Assembly des System-Prompts. Was hier gesetzt wird, gilt nur für diesen
   // Schritt und nur in diesem Async-Kontext.
@@ -902,6 +1224,11 @@ export function apply(ctx, config) {
     if (typeof disposer === 'function') disposer();
     if (typeof narrativeDisposer === 'function') narrativeDisposer();
     if (typeof sessionDisposer === 'function') sessionDisposer();
+    if (typeof decisionDisposer === 'function') decisionDisposer();
+    if (typeof errorDisposer === 'function') errorDisposer();
+    if (typeof uiInjectDisposer === 'function') uiInjectDisposer();
+    for (const response of uiClients) { try { response.end(); } catch { /* weg */ } }
+    uiClients.clear();
     console.log('[shinon-persona] Deaktiviert');
   };
 }

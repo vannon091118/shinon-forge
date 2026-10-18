@@ -510,6 +510,29 @@ export const SOURCE_TWINS = [
     ],
   },
   {
+    // Der Veredler meldet seine Entscheidung, die Persona hoert zu: aus dieser
+    // Spur entsteht das Selbstmodell. Ein falscher Kanalname hiesse nur, dass
+    // das Modell nie etwas lernt — und das saehe aus wie „keine Belege“.
+    rule: 'Naht Veredler -> Persona (Entscheidungskanal)',
+    kind: 'literals',
+    owner: 'packages/prompter/assets/mode-core.js',
+    mirror: 'packages/persona/index.js',
+    values: [{ export: 'DECISION_CHANNEL', literal: 'string' }],
+  },
+  {
+    // Die zweite Richtung derselben Beziehung: die Persona schiebt ihren Zustand
+    // in die Seite. Ohne den Namen als Zwilling zeigt die Leiste weiter ihren
+    // Platzhalter, obwohl der Host den echten Zustand laengst hat.
+    rule: 'Naht Persona -> Core-UI (Zustandsglobal + Live-Route)',
+    kind: 'literals',
+    owner: 'packages/persona/index.js',
+    mirror: 'packages/core/client.js',
+    values: [
+      { export: 'UI_STATE_GLOBAL', literal: 'string' },
+      { export: 'UI_STATE_ROUTE', literal: 'string' },
+    ],
+  },
+  {
     rule: 'Naht-Namen Client -> Host',
     kind: 'literals',
     owner: 'packages/codingmon/assets/uebergabe.js',

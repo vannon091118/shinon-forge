@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 
-const PACKAGES = ['prompter', 'project-index', 'scoring'];
+const PACKAGES = ['prompter', 'project-index', 'scoring', 'persona'];
 const ROOT = new URL('../../../', import.meta.url);
 
 /** Beide Bundles isoliert laden, mit dem ECHTEN Schemastery der DSH-Installation. */
@@ -52,6 +52,7 @@ process.on('exit', () => {
 const prompter = loaded.prompter;
 const index = loaded['project-index'];
 const scoring = loaded.scoring;
+const persona = loaded.persona;
 const dshRequire = createRequire(join(dshRoot(), 'package.json'));
 const { Context } = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/cordis')).href);
 
@@ -165,6 +166,13 @@ test('Naht: Dienst- und Vertragsname stimmen in beiden Paketen ueberein', () => 
   assert.equal(scoring.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
   assert.equal(typeof scoring.LEDGER_NAMESPACE, 'string');
   assert.ok(scoring.LEDGER_NAMESPACE.length > 0, 'ohne Namensraum gaebe es keine Adresse');
+
+  // Die Persona haengt am SELBEN Dienst, mit einem EIGENEN Raum: ihr
+  // Selbstmodell ist gelernte Selbstkenntnis, nicht das Protokoll des Scorings.
+  // Beide Namen sind Literale auf beiden Seiten — hier steht, dass sie stimmen.
+  assert.equal(persona.INDEX_STORE_SERVICE, index.STORE_SERVICE, 'derselbe Dienstname');
+  assert.equal(persona.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
+  assert.notEqual(persona.SELF_MODEL_NAMESPACE, scoring.LEDGER_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
 
   // Die dritte Naht (Zug 5): der Ton. Der Veredler liest die Haltung ueber
   // dieselbe Bauform (optionales `get`, gepruefter Vertragsname); die Namen

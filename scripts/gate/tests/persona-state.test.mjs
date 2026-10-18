@@ -362,13 +362,16 @@ test('persona: apply registriert die Identity-Abschnitte und einen Zustandsabsch
 
 test('persona: ein Event auf dem Spine-Kanal aktualisiert den System-Context', () => {
   const host = connect();
-  assert.equal(host.sections.length, 8);
+  // Neun Abschnitte: die sechs Grundsaetze, Augenhöhe, Zustand — und das
+  // Selbstmodell, das NAMENTLICH dazugehoert und nicht in einer Zahl verschwindet.
+  assert.equal(host.sections.length, 9);
+  assert.ok(host.sections.some((entry) => entry.name === 'shinon:self-model'), 'Selbstmodell fehlt');
   assert.ok(host.dispatch('shinon/event', { event_type: 'gate.failed', session_id: 'sess-1' }));
   assert.equal(host.stateOf().mood, 'concerned');
   assert.deepEqual(host.stateOf().limitations, ['gate_failed']);
   // Ersetzen, nicht anhängen: genau ein Zustandsabschnitt bleibt.
   assert.equal(host.sections.filter((entry) => entry.name === 'shinon:state').length, 1);
-  assert.equal(host.sections.length, 8);
+  assert.equal(host.sections.length, 9);
 
   host.dispatch('shinon/event', { event_type: 'gate.passed' });
   assert.deepEqual(host.stateOf().limitations, []);
@@ -399,8 +402,85 @@ test('persona: der Fake-Host kennt on, inject und EINE optionale Leseabfrage —
   }
   assert.ok(host.calls.includes('on:shinon/event'));
   assert.ok(host.calls.some((call) => call === 'inject:systemPrompt'));
-  // Und die eine Abfrage fragt genau nach dem Ton — nach nichts anderem.
-  assert.deepEqual([...new Set(host.calls.filter((call) => call.startsWith('get:')))], [`get:${bundle.SCORING_SERVICE}`]);
+  // Und die Abfragen fragen genau nach Ton und Ablage — nach nichts anderem.
+  // Die Ablage ist LESEND geholt und dient EINEM Namensraum (dem Selbstmodell);
+  // die Persona schreibt weiterhin keine Projektdatei, sie merkt sich nur sich.
+  assert.deepEqual(
+    [...new Set(host.calls.filter((call) => call.startsWith('get:')))],
+    [`get:${bundle.INDEX_STORE_SERVICE}`, `get:${bundle.SCORING_SERVICE}`],
+  );
+  host.dispose();
+});
+
+/**
+ * Die Ablage ECHT: dieselben Schreib-/Lesefunktionen wie der Project Index.
+ *
+ * Eine Attrappe, die beliebiges JSON zurueckgibt, haette den Fehler verdeckt,
+ * den diese Naht hat: die Ablage haelt NUR Dokumente (memos) und ein paar
+ * Kopfzeilen — ein freies Objekt faellt still weg. Genau das wird hier gemessen.
+ */
+const storeCore = await import(new URL('../../../packages/project-index/assets/index-core.js', import.meta.url));
+function fakeStore() {
+  const db = storeCore.openLedger(':memory:');
+  return {
+    contract: bundle.INDEX_STORE_CONTRACT,
+    load: (namespace) => {
+      const state = storeCore.readMemory(db, namespace);
+      return state === null ? { ok: true, state: null } : { ok: true, state };
+    },
+    save: (namespace, state) => ({ ok: true, rows: storeCore.writeMemory(db, namespace, state) }),
+    close: () => db.close(),
+  };
+}
+
+/** Drei angenommene Entscheidungen mit demselben Grund — belegte Wiederkehr. */
+const decision = (outcome = 'accepted') => ({
+  outcome,
+  intentClassification: 'auftrag',
+  intentMatch: 'umbauen',
+  reasons: ['zu breit'],
+  uncertainties: ['welcher Workspace?'],
+});
+
+test('Selbstmodell: Laufzeitspuren werden zur Ablage — und ein NEUSTART liest sie wieder', () => {
+  // Die Schleife aus der Anfrage: Erfahrung → Auswertung → gepruefte
+  // Aktualisierung, ueber den Prozess hinaus. Ein frischer Host mit DERSELBEN
+  // Ablage muss die belegte Grenze im Prompt tragen, ohne sie neu zu lernen.
+  const store = fakeStore();
+  const first = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  assert.equal(first.sections.some((entry) => entry.name === 'shinon:self-model'), true);
+  for (let i = 0; i < 3; i += 1) first.dispatch(bundle.PROMPTER_DECISION_CHANNEL, decision());
+  // Gelesen wird ueber DENSELBEN Weg wie beim Neustart — nicht aus einer Kopie.
+  const stored = store.load(bundle.SELF_MODEL_NAMESPACE).state?.memos ?? [];
+  const saved = stored.find((memo) => memo?.id === bundle.SELF_MODEL_MEMO_ID)?.model ?? null;
+  assert.ok(saved !== null, 'nichts gespeichert');
+  assert.equal(saved.runs, 3);
+  assert.equal(saved.accepted, 3);
+  assert.equal(saved.reasons['zu breit'], 3);
+  first.dispose();
+
+  // Neustart: neuer Host, neuer Speicher, dieselbe Ablage.
+  const second = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  const text = second.sections.find((entry) => entry.name === 'shinon:self-model')?.text ?? '';
+  assert.match(text, /Läufe: 3 \(3 angenommen/);
+  assert.match(text, /Wiederkehrende Grenze: zu breit \(3×\)/);
+  assert.match(text, /Offene Frage \(3×\): welcher Workspace\?/);
+  second.dispose();
+  store.close();
+});
+
+test('Selbstmodell: ohne Ablage bleibt der Prompt ehrlich leer — keine erfundene Erinnerung', () => {
+  // Kein Dienst, kein Gedaechtnis: der Abschnitt ist registriert, traegt aber
+  // keinen Text. Nach einem Beleg im Prozess steht die Zahl da — und die Ablage
+  // fehlt trotzdem, statt still irgendwohin zu schreiben.
+  const host = connect();
+  const before = host.sections.find((entry) => entry.name === 'shinon:self-model')?.text ?? '';
+  assert.equal(before, '');
+  host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, decision());
+  assert.deepEqual([...new Set(host.calls.filter((call) => call.startsWith('get:')))].sort(), [
+    `get:${bundle.INDEX_STORE_SERVICE}`,
+    `get:${bundle.SCORING_SERVICE}`,
+  ]);
   host.dispose();
 });
 
@@ -540,14 +620,18 @@ test('Projekt-Kontext: auch ein ABSOLUTER Pfad wird geladen', () => {
   host.dispose();
 });
 
-test('Projekt-Kontext: fehlende oder leere Datei erzeugt keinen Abschnitt — und keinen leeren', () => {
+test('Projekt-Kontext: fehlende oder leere Datei traegt keinen Text bei — und keinen leeren', () => {
+  // Der Abschnitt ist seit dem Sitzungs-Scope (2026-10-18) ein GETTER: er wird
+  // immer registriert und liefert erst bei der Assembly Text. Die Zusicherung
+  // ist deshalb nicht „kein Eintrag", sondern „kein Text" — der echte
+  // System-Prompt filtert leere Abschnitte (`renderPrompt`).
   const cases = [
     ['fehlend', relative(REPO_ROOT, join(contextDir, 'gibt-es-nicht.md'))],
     ['leer', relative(process.cwd(), contextFixture('leer.md', '   \n\n'))],
   ];
   for (const [name, path] of cases) {
     const host = connect({}, { projectContextPath: path });
-    assert.equal(projectSection(host), undefined, `${name}: kein Abschnitt`);
+    assert.equal(projectSection(host)?.text ?? '', '', `${name}: kein Text`);
     assert.ok(host.sections.length > 0, `${name}: die uebrigen Abschnitte bleiben stehen`);
     host.dispose();
   }
@@ -595,11 +679,17 @@ test('Projektscope: fremder Session-Workspace bekommt keine Persona, auch wenn d
   assert.equal(host.handlers.size, 0, 'auch kein Event-Handler wird registriert');
 });
 
-test('Projektscope: unklarer Workspace (weder Config noch Env) schaltet die Persona AUS', () => {
+test('Projektscope: unklarer Boot-Scope traegt KEINEN Text bei — die Sitzung entscheidet', () => {
+  // Root Cause 2026-10-18: der Mount brach ohne deklarierten Root komplett ab,
+  // damit war die Persona in JEDEM Lauf tot (auch im Shinon-Repo). Der Scope
+  // gehoert aber der Sitzung: ohne Sitzung liefert jeder Abschnitt '' — der
+  // Prompt bleibt persona-frei, bis ein `agent/pre-step` den cwd liefert.
   const host = withoutEnv('SHINON_WORKSPACE_ROOT', () => connect({}, { workspaceRoot: '' }));
 
-  assert.deepEqual(host.sections, [], 'kein Abschnitt ohne benannten Scope');
-  assert.equal(host.handlers.size, 0, 'kein Handler ohne benannten Scope');
+  assert.deepEqual(host.sections.map((entry) => entry.text).filter((text) => text !== ''), [], 'kein Text ohne Scope');
+  assert.ok(host.sections.length > 0, 'die Registrierung steht — sie ist leer, nicht abwesend');
+  assert.equal(host.handlers.has('agent/pre-step'), true, 'der Sitzungs-cwd kann den Scope noch setzen');
+  host.dispose();
 });
 
 test('Projektscope: SHINON_WORKSPACE_ROOT allein entscheidet — fremd bleibt stumm, Repo spricht', () => {
