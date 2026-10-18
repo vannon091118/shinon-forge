@@ -18,7 +18,7 @@ window.__ModuleLoader__.load({
     /** Speicher-Schluessel. Bleibt derselbe, damit alte Staende nicht verloren gehen. */
     const STORAGE_KEY = 'shinon.codingmon/v1';
     /** Stand der Ablage. v2 = Eskalation, Regelwerk, Loot, Sperre. */
-    const STORE_VERSION = 2;
+    const STORE_VERSION = 3;
     /** XP-Basis der ersten Stufe, kumulativ und quadratisch. */
     const XP_BASE = 250;
 
@@ -383,6 +383,7 @@ window.__ModuleLoader__.load({
      * dort muss nicht pollen, um aktuell zu sein.
      */
     const emit = () => {
+      if (mutationBatchDepth > 0) { pendingRender = true; return; }
       for (const fn of listeners) { try { fn(); } catch { /* ein Abnehmer darf den Rest nicht kippen */ } }
       window.dispatchEvent(new CustomEvent('shinon:exp', { detail: { xp: store.xp, level: level() } }));
     };
@@ -392,6 +393,361 @@ window.__ModuleLoader__.load({
       React.useEffect(() => subscribe(() => bump((n) => n + 1)), []);
       return store;
     };
+
+    // ── Persisted breeding state v3 (client mirror of assets/zucht*.js) ────
+    const BREEDING_VERSION = 3;
+    const BXP_FOUNDER = 50;
+    const BXP_CHILD = 0;
+    const BXP_NEUTRAL = 50;
+    const BXP_BPS_PER_POINT = 40;
+    const MOD_CAP_BPS = 3000;
+    const GEN_STATMOD_CAP_BPS = 1500;
+    const LOOTLUCK_CAP_BPS = 5000;
+    const PAIR_GAIN = 10;
+    const HATCH_GAIN = 20;
+    const BP_PER_COMPLETION = 10;
+    const HATCH_BP = 120;
+    const BREEDING_EFFECTS = new Set(['statMod', 'hatchPoints', 'lootLuck']);
+    const BREEDING_POOLS = {
+      cycle: [
+        { slots: 2, baseChanceBps: 1500, entries: [
+          { id: 'tune-a', effect: 'statMod', value: 300, weight: 3 },
+          { id: 'warm-a', effect: 'hatchPoints', value: 10, weight: 2 },
+          { id: 'nose-a', effect: 'lootLuck', value: 1000, weight: 2 },
+        ]},
+        { slots: 2, baseChanceBps: 1200, entries: [
+          { id: 'tune-b', effect: 'statMod', value: 400, weight: 3 },
+          { id: 'warm-b', effect: 'hatchPoints', value: 15, weight: 2 },
+          { id: 'nose-b', effect: 'lootLuck', value: 1500, weight: 2 },
+        ]},
+        { slots: 2, baseChanceBps: 1000, entries: [
+          { id: 'tune-c', effect: 'statMod', value: 500, weight: 2 },
+          { id: 'warm-c', effect: 'hatchPoints', value: 20, weight: 1 },
+          { id: 'nose-c', effect: 'lootLuck', value: 2000, weight: 2 },
+        ]},
+      ],
+      scaleFromGen: 7,
+      scaleStepBps: 200,
+      scaleCapBps: 20000,
+    };
+    const fnv1a32 = (text) => {
+      let hash = 0x811c9dc5;
+      for (let i = 0; i < text.length; i += 1) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+      }
+      return hash >>> 0;
+    };
+    function breedingStream(key) {
+      const seed = fnv1a32(key);
+      let a = seed, b = seed ^ 0x9e3779b9, c = seed ^ 0x85ebca6b, d = seed ^ 0xc2b2ae35;
+      const next = () => {
+        a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+        const t = (a + b) | 0;
+        a = b ^ (b >>> 9);
+        b = (c + (c << 3)) | 0;
+        c = (c << 21) | (c >>> 11);
+        d = (d + 1) | 0;
+        const value = (t + d) | 0;
+        c = (c + value) | 0;
+        return value >>> 0;
+      };
+      for (let i = 0; i < 12; i += 1) next();
+      return next;
+    }
+    function breedingRandInt(next, limit) {
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 0x100000000) throw new RangeError('Zuchtzufall: ungültige Grenze');
+      const cutoff = Math.floor(0x100000000 / limit) * limit;
+      for (;;) {
+        const value = next();
+        if (!Number.isInteger(value) || value < 0 || value >= 0x100000000) throw new TypeError('Zuchtzufall: ungültiger uint32-Wert');
+        if (value < cutoff) return value % limit;
+      }
+    }
+    function breedingWeightedPick(next, entries) {
+      if (!Array.isArray(entries) || entries.length === 0) throw new Error('Zuchtzufall: leerer Pool');
+      const total = entries.reduce((sum, entry) => {
+        if (!Number.isSafeInteger(entry.weight) || entry.weight <= 0) throw new Error('Zuchtzufall: ungültiges Gewicht');
+        return sum + entry.weight;
+      }, 0);
+      if (!Number.isSafeInteger(total) || total > 0x100000000) throw new RangeError('Zuchtzufall: Gewichtssumme außerhalb uint32');
+      let cursor = breedingRandInt(next, total);
+      for (const entry of entries) {
+        if (cursor < entry.weight) return entry;
+        cursor -= entry.weight;
+      }
+      throw new Error('Zuchtzufall: Auswahl außerhalb des Pools');
+    }
+    const breedClamp = (value, low, high) => Math.min(high, Math.max(low, value));
+    function breedingMods(bonuses = []) {
+      if (!Array.isArray(bonuses) || bonuses.some((bonus) => !BREEDING_EFFECTS.has(bonus?.effect)
+        || !Number.isSafeInteger(bonus.value) || bonus.value < 0)) throw new Error('Zuchtboni sind ungültig');
+      const sum = (effect) => bonuses.filter((bonus) => bonus.effect === effect).reduce((total, bonus) => total + bonus.value, 0);
+      return {
+        statMod: breedClamp(sum('statMod'), 0, GEN_STATMOD_CAP_BPS),
+        lootLuck: breedClamp(sum('lootLuck'), 0, LOOTLUCK_CAP_BPS),
+        hatchPoints: sum('hatchPoints'),
+      };
+    }
+    function rollBreedingBonuses({ seed, eggId, gen, bxpA, bxpB }) {
+      if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError('Zucht-Seed muss uint32 sein');
+      if (!/^e[1-9]\d*$/.test(eggId)) throw new TypeError('Ei-ID ist ungültig');
+      for (const value of [bxpA, bxpB]) if (!Number.isSafeInteger(value) || value < 0) throw new RangeError('ZE muss nichtnegativ sein');
+      const pool = gen < 2 ? null : {
+        ...BREEDING_POOLS.cycle[(gen - 2) % BREEDING_POOLS.cycle.length],
+        entries: BREEDING_POOLS.cycle[(gen - 2) % BREEDING_POOLS.cycle.length].entries.map((entry) => ({ ...entry })),
+        scale: gen < BREEDING_POOLS.scaleFromGen ? 10000
+          : Math.min(BREEDING_POOLS.scaleCapBps, 10000 + (gen - BREEDING_POOLS.scaleFromGen) * BREEDING_POOLS.scaleStepBps),
+      };
+      if (pool === null) return [];
+      const avg = Math.floor((bxpA + bxpB) / 2);
+      const luckFactor = Math.min(25000, 10000 + Math.max(0, avg - BXP_NEUTRAL) * 100);
+      const chance = Math.min(6000, Math.floor((pool.baseChanceBps * luckFactor) / 10000));
+      const next = breedingStream(`zucht.bonus|${seed}|${eggId}`);
+      const out = [];
+      for (let slot = 0; slot < pool.slots; slot += 1) {
+        if (breedingRandInt(next, 10000) >= chance) continue;
+        const picked = breedingWeightedPick(next, pool.entries);
+        out.push({ slot, id: picked.id, effect: picked.effect, value: Math.floor((picked.value * pool.scale) / 10000) });
+      }
+      return out;
+    }
+    function legacyLevelFor(xp) {
+      let level = 1;
+      while (level < 2000 && Math.round((250 * (Math.pow(1.35, level) - 1)) / 0.35) <= xp) level += 1;
+      return level;
+    }
+    function createBreedingState(speciesId, source = {}) {
+      const xp = Number.isFinite(source.xp) && source.xp >= 0 ? source.xp : 0;
+      const wins = Number.isSafeInteger(source.wins) && source.wins >= 0 ? source.wins : 0;
+      const losses = Number.isSafeInteger(source.losses) && source.losses >= 0 ? source.losses : 0;
+      const round = Number.isSafeInteger(source.round) && source.round >= 0 ? source.round : 0;
+      const hits = Number.isSafeInteger(source.hits) && source.hits >= 0 ? source.hits : 0;
+      const damageTotal = /^\d+$/.test(String(source.damageTotal ?? '0')) ? String(source.damageTotal ?? '0') : '0';
+      const level = legacyLevelFor(xp);
+      const bxp = BXP_FOUNDER + Math.min(150, 10 * Math.max(0, level - 50));
+      return {
+        schemaVersion: BREEDING_VERSION,
+        seed: fnv1a32(`codingmon-seed|${xp}|${wins}|${losses}|${source.completions ?? 0}`),
+        nextId: 2,
+        active: 'c1',
+        creatures: [{
+          id: 'c1', species: SPECIES[speciesId] ? speciesId : SPECIES_IDS[0],
+          xp, bxp, gen: 1, bonuses: [], clutch: 0, wins, losses, round, hits, damageTotal,
+          hp: Number.isFinite(source.hp) && source.hp > 0 ? source.hp : statsAt(speciesId, levelFor(xp)).hp,
+        }],
+        eggs: [],
+        completions: Number.isSafeInteger(source.completions) && source.completions >= 0 ? source.completions : 0,
+      };
+    }
+    function normalizeBreeding(raw, legacyState) {
+      if (raw?.schemaVersion !== BREEDING_VERSION || !Array.isArray(raw.creatures) || !Array.isArray(raw.eggs)) {
+        return createBreedingState(legacyState.species, legacyState);
+      }
+      const creatures = [];
+      const ids = new Set();
+      for (const value of raw.creatures) {
+        if (!value || typeof value !== 'object' || !/^c[1-9]\d*$/.test(value.id ?? '')
+          || ids.has(value.id) || !SPECIES[value.species]) continue;
+        const bonuses = Array.isArray(value.bonuses) ? value.bonuses.filter((bonus) =>
+          Number.isSafeInteger(bonus?.slot) && bonus.slot >= 0 && typeof bonus.id === 'string'
+          && BREEDING_EFFECTS.has(bonus.effect) && Number.isSafeInteger(bonus.value) && bonus.value >= 0)
+          .map((bonus) => ({ slot: bonus.slot, id: bonus.id, effect: bonus.effect, value: bonus.value })) : [];
+        const creature = {
+          id: value.id, species: value.species,
+          xp: Number.isFinite(value.xp) && value.xp >= 0 ? value.xp : 0,
+          bxp: Number.isSafeInteger(value.bxp) && value.bxp >= 0 ? value.bxp : BXP_FOUNDER,
+          gen: Number.isSafeInteger(value.gen) && value.gen >= 1 ? value.gen : 1,
+          bonuses, clutch: Number.isSafeInteger(value.clutch) && value.clutch >= 0 ? value.clutch : 0,
+          wins: Number.isSafeInteger(value.wins) && value.wins >= 0 ? value.wins : 0,
+          losses: Number.isSafeInteger(value.losses) && value.losses >= 0 ? value.losses : 0,
+          round: Number.isSafeInteger(value.round) && value.round >= 0 ? value.round : 0,
+          hits: Number.isSafeInteger(value.hits) && value.hits >= 0 ? value.hits : 0,
+          damageTotal: /^\d+$/.test(String(value.damageTotal ?? '')) ? String(value.damageTotal) : '0',
+          hp: Number.isFinite(value.hp) && value.hp >= 0 ? value.hp : statsAt(value.species, levelFor(value.xp ?? 0)).hp,
+        };
+        ids.add(creature.id);
+        creatures.push(creature);
+      }
+      if (creatures.length === 0) return createBreedingState(legacyState.species, legacyState);
+      const creatureIds = new Set(creatures.map((creature) => creature.id));
+      const eggs = [];
+      for (const egg of raw.eggs) {
+        if (!egg || typeof egg !== 'object' || !/^e[1-9]\d*$/.test(egg.id ?? '') || ids.has(egg.id)
+          || !SPECIES[egg.species] || !Array.isArray(egg.parents) || egg.parents.length !== 2
+          || egg.parents[0] === egg.parents[1] || egg.parents.some((id) => !creatureIds.has(id))
+          || !Number.isSafeInteger(egg.gen) || egg.gen < 2 || !Number.isSafeInteger(egg.bp) || egg.bp < 0) continue;
+        const bonuses = Array.isArray(egg.bonuses) ? egg.bonuses.filter((bonus) =>
+          Number.isSafeInteger(bonus?.slot) && bonus.slot >= 0 && typeof bonus.id === 'string'
+          && BREEDING_EFFECTS.has(bonus.effect) && Number.isSafeInteger(bonus.value) && bonus.value >= 0)
+          .map((bonus) => ({ slot: bonus.slot, id: bonus.id, effect: bonus.effect, value: bonus.value })) : [];
+        ids.add(egg.id);
+        eggs.push({
+          id: egg.id, seed: Number.isSafeInteger(egg.seed) && egg.seed >= 0 ? egg.seed : raw.seed >>> 0,
+          parents: egg.parents.slice(), species: egg.species, gen: egg.gen, bonuses, bp: egg.bp,
+        });
+      }
+      const maxId = [...ids].reduce((max, id) => Math.max(max, Number(id.slice(1)) || 0), 0);
+      const completions = Number.isSafeInteger(raw.completions) && raw.completions >= 0 ? raw.completions : legacyState.completions;
+      return {
+        schemaVersion: BREEDING_VERSION,
+        seed: Number.isSafeInteger(raw.seed) && raw.seed >= 0 && raw.seed <= 0xffffffff ? raw.seed : 0,
+        nextId: Math.max(maxId + 1, Number.isSafeInteger(raw.nextId) && raw.nextId >= 1 ? raw.nextId : 1),
+        active: creatureIds.has(raw.active) ? raw.active : creatures[0].id,
+        creatures, eggs,
+        completions: Math.max(completions, legacyState.completions ?? 0),
+      };
+    }
+    let mutationBatchDepth = 0;
+    let pendingPersistence = false;
+    let pendingHostSnapshot = false;
+    let pendingRender = false;
+    function withMutationBatch(fn) {
+      mutationBatchDepth += 1;
+      try { return fn(); }
+      finally {
+        mutationBatchDepth -= 1;
+        if (mutationBatchDepth === 0) {
+          const writeLocal = pendingPersistence;
+          const sendHost = pendingHostSnapshot;
+          const render = pendingRender;
+          pendingPersistence = false;
+          pendingHostSnapshot = false;
+          pendingRender = false;
+          if (writeLocal) persistNow();
+          if (sendHost) sendSnapshotNow();
+          if (render) emit();
+        }
+      }
+    }
+    function activeCreature() {
+      const breeding = typeof store === 'undefined' ? null : store?.breeding;
+      return breeding?.creatures?.find((creature) => creature.id === breeding.active) ?? null;
+    }
+    function syncActiveCreature() {
+      const creature = activeCreature();
+      if (!creature) return;
+      creature.species = store.species;
+      creature.xp = Math.max(0, store.xp);
+      creature.wins = store.wins;
+      creature.losses = store.losses;
+      creature.round = store.round;
+      creature.hits = store.hits;
+      creature.damageTotal = store.damageTotal.toString();
+      creature.hp = store.hp;
+    }
+    function effectiveStatsFor(speciesId, lvl, creature = null) {
+      const raw = statsAt(speciesId, lvl);
+      if (!creature || creature.species !== speciesId) return raw;
+      const bonuses = breedingMods(creature.bonuses);
+      const bxpMod = breedClamp((creature.bxp - BXP_NEUTRAL) * BXP_BPS_PER_POINT, -MOD_CAP_BPS, MOD_CAP_BPS);
+      const combined = breedClamp(bxpMod + bonuses.statMod, -MOD_CAP_BPS, MOD_CAP_BPS);
+      return Object.fromEntries(Object.entries(raw).map(([key, value]) => [
+        key, Math.floor((value * (10000 + combined)) / 10000),
+      ]));
+    }
+    function breedingCandidates(a, b) {
+      if (!a || !b) return [];
+      const set = new Set([
+        ...Object.keys(LINEAGE).filter((id) => LINEAGE[id]?.ancestor === a.species),
+        ...Object.keys(LINEAGE).filter((id) => LINEAGE[id]?.ancestor === b.species),
+      ]);
+      const species = [...set];
+      if (species.length === 0) return [...new Set([a.species, b.species])].sort();
+      return species.sort();
+    }
+    function breedingPairCore(state, idA, idB, selectedSpecies) {
+      if (!state || state.schemaVersion !== BREEDING_VERSION || !Array.isArray(state.creatures) || !Array.isArray(state.eggs) || !state.loot) {
+        throw new Error('Zucht: Spielstand v3 ist unvollständig');
+      }
+      if (typeof idA !== 'string' || typeof idB !== 'string' || idA === idB) throw new Error('Zucht benötigt zwei verschiedene Eltern');
+      const a = state.creatures.find((creature) => creature.id === idA);
+      const b = state.creatures.find((creature) => creature.id === idB);
+      if (!a || !b) throw new Error('Zucht: Elternteil nicht gefunden');
+      const cost = 1 + Math.max(a.clutch, b.clutch);
+      if (!Number.isSafeInteger(state.loot.brauchbar) || state.loot.brauchbar < cost) throw new Error(`Zucht kostet ${cost} brauchbare Teile`);
+      const candidates = breedingCandidates(a, b);
+      if (candidates.length > 1 && selectedSpecies === undefined) throw new Error('Nachkommenart muss ausdrücklich ausgewählt werden');
+      const species = selectedSpecies ?? candidates[0];
+      if (!candidates.includes(species)) throw new Error('Die ausgewählte Art ist kein gültiger Nachkomme');
+      const used = new Set([...state.creatures.map((creature) => creature.id), ...state.eggs.map((egg) => egg.id)]);
+      const maxId = [...used].reduce((max, id) => Math.max(max, Number(id.slice(1)) || 0), 0);
+      if (!Number.isSafeInteger(state.nextId) || state.nextId <= maxId || state.nextId >= Number.MAX_SAFE_INTEGER) {
+        throw new Error('Zucht: nächster ID-Zähler ist ungültig');
+      }
+      const eggId = `e${state.nextId}`;
+      const gen = Math.max(a.gen, b.gen) + 1;
+      const bonuses = rollBreedingBonuses({ seed: state.seed, eggId, gen, bxpA: a.bxp, bxpB: b.bxp });
+      const bp = breedingMods(bonuses).hatchPoints;
+      state.nextId += 1;
+      state.loot.brauchbar -= cost;
+      a.bxp += PAIR_GAIN;
+      b.bxp += PAIR_GAIN;
+      a.clutch += 1;
+      b.clutch += 1;
+      state.eggs.push({ id: eggId, seed: state.seed, parents: [a.id, b.id], species, gen, bonuses, bp });
+      return eggId;
+    }
+    function hatchReadyEggs() {
+      const breeding = store.breeding;
+      const ready = breeding.eggs.filter((egg) => egg.bp >= HATCH_BP)
+        .sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
+      const creatureIds = new Set(breeding.creatures.map((creature) => creature.id));
+      if (ready.some((egg) => egg.parents.some((id) => !creatureIds.has(id)))) {
+        note('Schlupf angehalten: ein Eltern-Datensatz fehlt');
+        return [];
+      }
+      if (breeding.nextId >= Number.MAX_SAFE_INTEGER - ready.length) {
+        note('Schlupf angehalten: Kreatur-ID-Zähler erschöpft');
+        return [];
+      }
+      const hatched = [];
+      for (const egg of ready) {
+        for (const parentId of egg.parents) {
+          const parent = breeding.creatures.find((creature) => creature.id === parentId);
+          parent.bxp += HATCH_GAIN;
+        }
+        const creature = {
+          id: `c${breeding.nextId}`, species: egg.species, xp: 0, bxp: BXP_CHILD,
+          gen: egg.gen, bonuses: egg.bonuses.map((bonus) => ({ ...bonus })), clutch: 0,
+          wins: 0, losses: 0, round: 0, hits: 0, damageTotal: '0', hp: statsAt(egg.species, 1).hp,
+        };
+        breeding.creatures.push(creature);
+        breeding.nextId += 1;
+        hatched.push({ eggId: egg.id, creatureId: creature.id, species: creature.species, gen: creature.gen });
+      }
+      const hatchedIds = new Set(hatched.map((result) => result.eggId));
+      breeding.eggs = breeding.eggs.filter((egg) => !hatchedIds.has(egg.id));
+      for (const result of hatched) note(`SCHLUPF ${result.eggId} — ${SPECIES[result.species].label} (Gen ${result.gen}) ist jetzt ${result.creatureId}`);
+      return hatched;
+    }
+    function advanceBreedingCompletions(absoluteCount) {
+      const breeding = store.breeding;
+      if (!Number.isSafeInteger(absoluteCount) || absoluteCount < 0) return 0;
+      const previous = Number.isSafeInteger(breeding.completions) && breeding.completions >= 0 ? breeding.completions : 0;
+      if (absoluteCount <= previous) return 0;
+      const delta = absoluteCount - previous;
+      breeding.completions = absoluteCount;
+      for (const egg of breeding.eggs) egg.bp += BP_PER_COMPLETION * delta;
+      hatchReadyEggs();
+      return delta;
+    }
+    function addCapturedCreature(speciesId, lvl) {
+      if (!SPECIES[speciesId]) return null;
+      const breeding = store.breeding;
+      const nextId = Number.isSafeInteger(breeding.nextId) && breeding.nextId > 0 ? breeding.nextId : 1;
+      if (nextId >= Number.MAX_SAFE_INTEGER) return null;
+      const xp = threshold(Math.min(LEVEL_CAP, Math.max(1, Math.floor(lvl))));
+      const creature = {
+        id: `c${nextId}`, species: speciesId, xp, bxp: BXP_FOUNDER, gen: 1,
+        bonuses: [], clutch: 0, wins: 0, losses: 0, round: 0, hits: 0,
+        damageTotal: '0', hp: statsAt(speciesId, levelFor(xp)).hp,
+      };
+      breeding.creatures.push(creature);
+      breeding.nextId = nextId + 1;
+      note(`FANG — ${SPECIES[speciesId].label} ist der Sammlung beigetreten (${creature.id})`);
+      return creature.id;
+    }
 
     const freshState = (speciesId = SPECIES_IDS[0]) => ({
       version: STORE_VERSION,
@@ -403,6 +759,7 @@ window.__ModuleLoader__.load({
       losses: 0,
       round: 0,
       battle: null,
+      breeding: createBreedingState(speciesId),
       /**
        * Erfolgreiche Agent-Completions (J3) und das wilde Codemon (J2): Der Host
        * zaehlt bestaetigte `turn/end`-Ereignisse, der Client waendet die Differenz
@@ -525,6 +882,25 @@ window.__ModuleLoader__.load({
         state.log = [`${new Date().toLocaleTimeString('de-DE')}  Neuladen mitten im Zug (${pending}) — der Zug ist verfallen`, ...(state.log ?? [])].slice(0, 40);
       }
       if (!Number.isFinite(state.hp) || state.hp <= 0) state.hp = statsAt(state.species, levelFor(state.xp)).hp;
+      state.breeding = normalizeBreeding(raw?.breeding, state);
+      state.version = STORE_VERSION;
+      if (!state.breeding.creatures.some((creature) => creature.id === state.breeding.active)) {
+        state.breeding.active = state.breeding.creatures[0]?.id ?? 'c1';
+      }
+      const active = state.breeding.creatures.find((creature) => creature.id === state.breeding.active);
+      if (active) {
+        state.species = active.species;
+        state.xp = active.xp;
+        state.wins = active.wins;
+        state.losses = active.losses;
+        state.round = active.round;
+        state.hits = active.hits;
+        try { state.damageTotal = BigInt(active.damageTotal); } catch { state.damageTotal = 0n; }
+        const activeMaxHp = effectiveStatsFor(active.species, levelFor(active.xp), active).hp;
+        state.hp = Number.isFinite(active.hp) ? Math.max(0, Math.min(activeMaxHp, active.hp)) : activeMaxHp;
+        if (state.hp <= 0) state.hp = activeMaxHp;
+      }
+      state.completions = Math.max(state.completions, state.breeding.completions);
       return state;
     }
 
@@ -537,8 +913,13 @@ window.__ModuleLoader__.load({
       if (raw) store = revive(JSON.parse(raw));
     } catch { /* kein Storage: das Pet lebt dann nur in dieser Sitzung */ }
 
-    const persist = () => {
+    function persistNow() {
       try { window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(portable())); } catch { /* siehe oben */ }
+    }
+    const persist = () => {
+      syncActiveCreature();
+      if (mutationBatchDepth > 0) { pendingPersistence = true; return; }
+      persistNow();
     };
 
     /**
@@ -567,6 +948,10 @@ window.__ModuleLoader__.load({
     }
 
     function toHost() {
+      if (mutationBatchDepth > 0) { pendingHostSnapshot = true; return true; }
+      return sendSnapshotNow();
+    }
+    function sendSnapshotNow() {
       try {
         const namespace = hostNamespace();
         const send = namespace?.[HOST_METHOD];
@@ -592,6 +977,7 @@ window.__ModuleLoader__.load({
             hp: store.wild.hp,
             maxHp: store.wild.maxHp,
           },
+          breeding: store.breeding,
         };
         // Die Methode liefert ein RemoteResult: { ok: true, value } oder
         // { ok: false, error }. Der Fehlerzweig ist ein ERGEBNIS, kein Wurf —
@@ -623,7 +1009,7 @@ window.__ModuleLoader__.load({
     };
 
     const level = () => levelFor(store.xp);
-    const stats = () => statsAt(store.species, level());
+    const stats = () => effectiveStatsFor(store.species, level(), activeCreature());
     const maxHp = () => stats().hp;
 
     // XP stammen ausschliesslich aus erfolgreichen Host-Completions; Tokens
@@ -652,7 +1038,7 @@ window.__ModuleLoader__.load({
       if (after > before) {
         const learned = abilitiesFor(after, store.species)
           .filter((ability) => ability.minLevel > before);
-        store.hp = statsAt(store.species, after).hp;
+        store.hp = stats().hp;
         note(`LEVEL ${after} — ${formOf(after).label}!${learned.length ? ` Gelernt: ${learned.map((a) => a.label).join(', ')}` : ''}`);
       } else if (reason) {
         note(reason);
@@ -672,11 +1058,16 @@ window.__ModuleLoader__.load({
           const total = Math.max(0, result.value.completions);
           const gained = Math.max(0, total - store.completions);
           if (gained === 0) return;
-          store.completions = total;
-          store.localSteps = total;
-          award(gained, null);
-          checkSpawn();
-          toHost();
+          withMutationBatch(() => {
+            store.completions = total;
+            store.localSteps = total;
+            advanceBreedingCompletions(total);
+            award(gained, null);
+            checkSpawn();
+            persist();
+            toHost();
+            emit();
+          });
         }).catch(() => {});
       } catch { /* ohne Remote-Beitrag bleibt der Spielstand unveraendert */ }
     }
@@ -719,6 +1110,7 @@ window.__ModuleLoader__.load({
         level: wild.level,
         stats,
         reward: rewardFor(wild.level),
+        source: 'wild',
       };
       const lock = beginTurn('start', { arena });
       if (lock === null) return null;
@@ -882,6 +1274,7 @@ window.__ModuleLoader__.load({
         stats: arena.stats,
         reward: arena.reward,
         turn: firstStrike(frozen.stats, arena.stats),
+        source: arena.source ?? 'arena',
         over: null,
       };
       note(`Runde ${store.round}: ${SPECIES[arena.speciesId].label} L${arena.level} erscheint (${formatNumber(arena.reward)} XP)`);
@@ -982,6 +1375,7 @@ window.__ModuleLoader__.load({
         note(`Sieg gegen ${SPECIES[battle.speciesId].label} L${battle.level} — +${formatNumber(reward)} XP · Beute: ${drop.label} (${lootOdds(drop)} %)`
           + `${drop.id === 'shiny' ? ' — SHINY!' : ` · ${store.sinceShiny} Siege seit dem letzten Shiny`}`);
         if (drop.id === 'shiny') celebrate('beute', shinyBefore, store.loot.shiny, drop.label);
+        if (battle.source === 'wild') addCapturedCreature(battle.speciesId, battle.level);
         award(reward + drop.xp, null);
       } else {
         store.losses += 1;
@@ -1014,6 +1408,49 @@ window.__ModuleLoader__.load({
       persist();
       emit();
       return { species: speciesId };
+    }
+
+    function selectCreature(creatureId) {
+      if (!guard('pick')) return null;
+      const target = store.breeding.creatures.find((creature) => creature.id === creatureId);
+      if (!target) return null;
+      syncActiveCreature();
+      store.breeding.active = target.id;
+      store.species = target.species;
+      store.xp = target.xp;
+      store.wins = target.wins;
+      store.losses = target.losses;
+      store.round = target.round;
+      store.hits = target.hits;
+      try { store.damageTotal = BigInt(target.damageTotal ?? '0'); } catch { store.damageTotal = 0n; }
+      const maximum = effectiveStatsFor(target.species, levelFor(target.xp), target).hp;
+      store.hp = Number.isFinite(target.hp) ? Math.max(0, Math.min(maximum, target.hp)) : maximum;
+      if (store.hp <= 0) store.hp = maximum;
+      store.battle = null;
+      note(`Aktiv: ${SPECIES[target.species].label} · Gen ${target.gen} · ZE ${target.bxp}`);
+      persist();
+      toHost();
+      emit();
+      return { active: target.id, species: target.species };
+    }
+    function pairCreatures(idA, idB, selectedSpecies) {
+      if (!guard('breed')) return null;
+      const breeding = {
+        ...store.breeding,
+        creatures: store.breeding.creatures.map((creature) => ({ ...creature, bonuses: creature.bonuses.map((bonus) => ({ ...bonus })) })),
+        eggs: store.breeding.eggs.map((egg) => ({ ...egg, parents: egg.parents.slice(), bonuses: egg.bonuses.map((bonus) => ({ ...bonus })) })),
+        loot: { ...store.loot },
+      };
+      const eggId = breedingPairCore(breeding, idA, idB, selectedSpecies);
+      const { loot, ...breedingState } = breeding;
+      store.breeding = breedingState;
+      store.loot = loot;
+      const egg = store.breeding.eggs.find((entry) => entry.id === eggId);
+      note(`PAARUNG — Ei ${eggId} · ${SPECIES[egg.species].label} · Gen ${egg.gen} · Brut ${egg.bp}/${HATCH_BP}`);
+      persist();
+      toHost();
+      emit();
+      return { eggId, species: egg.species, gen: egg.gen, bp: egg.bp };
     }
 
     /** Die Figur eines Codemons: Familie aus der Spezies, Farbe aus dem Farbton. */
@@ -1134,7 +1571,7 @@ window.__ModuleLoader__.load({
     // ── Panel-Bausteine (Kopf / Werte / Arena / Liste / Bilanz) ─────────────
     /** Kopf: Figur, Spezies-Wahl (alle ZEHN erreichbar), Level und Fortschritt. */
     function PetHead({ s, lvl, onPick }) {
-      const cur = statsAtExact(s.species, lvl);
+      const cur = Object.fromEntries(Object.entries(stats()).map(([key, value]) => [key, BigInt(value)]));
       const next = threshold(lvl + 1);
       const prev = threshold(lvl);
       const lineage = LINEAGE[s.species] ?? {};
@@ -1152,9 +1589,9 @@ window.__ModuleLoader__.load({
           h('label', { className: '__cm_pick' },
             h('span', null, 'Codemon'),
             h('select', {
-              value: s.species,
+              value: s.breeding?.active ?? 'c1',
               onChange: (event) => onPick(event.target.value),
-            }, SPECIES_IDS.map((id) => h('option', { key: id, value: id }, SPECIES[id].label)))),
+            }, (s.breeding?.creatures ?? []).map((creature) => h('option', { key: creature.id, value: creature.id }, `${SPECIES[creature.species].label} · Gen ${creature.gen} · L${levelFor(creature.xp)}`)))),
           // Ist-HP steht im Zustand (Number), Soll-HP in der exakten Leiter.
           // Oberhalb von 2^53 koennen sich die letzten Stellen unterscheiden —
           // die Leiter ist die Wahrheit, der Zustand ist der Spielstand.
@@ -1456,17 +1893,79 @@ window.__ModuleLoader__.load({
         h('span', null, text));
     }
 
+    function BreedingPanel({ s }) {
+      const breeding = s.breeding ?? { creatures: [], eggs: [] };
+      const creatures = breeding.creatures ?? [];
+      const [parentA, setParentA] = React.useState(creatures[0]?.id ?? '');
+      const [parentB, setParentB] = React.useState(creatures[1]?.id ?? '');
+      const [selectedSpecies, setSelectedSpecies] = React.useState('');
+      const [notice, setNotice] = React.useState('');
+      const a = creatures.find((creature) => creature.id === parentA);
+      const b = creatures.find((creature) => creature.id === parentB);
+      const candidates = breedingCandidates(a, b);
+      const effectiveChoice = candidates.includes(selectedSpecies) ? selectedSpecies : (candidates[0] ?? '');
+      const clutch = a && b ? 1 + Math.max(a.clutch, b.clutch) : 0;
+      const canPair = Boolean(a && b && a.id !== b.id && candidates.length > 0
+        && s.loot.brauchbar >= clutch && (candidates.length === 1 || candidates.includes(effectiveChoice))
+        && s.lock === null && s.battle === null);
+      return h('section', { className: '__cm_block __cm_breeding', 'aria-label': 'Sammlung und Zucht' },
+        h('h3', null, `Sammlung & Zucht · ${creatures.length}/50 · ${breeding.eggs?.length ?? 0} Eier`),
+        h('div', { className: '__cm_roster' }, creatures.map((creature) => h('button', {
+          key: creature.id, type: 'button',
+          className: `__cm_roster-card${creature.id === breeding.active ? ' is-active' : ''}`,
+          onClick: () => selectCreature(creature.id),
+          'aria-pressed': creature.id === breeding.active,
+        },
+          h('span', { className: '__cm_roster-art', dangerouslySetInnerHTML: { __html: speciesGlyph(creature.species, levelFor(creature.xp), 42) } }),
+          h('span', { className: '__cm_roster-label' }, SPECIES[creature.species].label),
+          h('span', { className: '__cm_roster-meta' }, `Gen ${creature.gen} · L${levelFor(creature.xp)} · ZE ${creature.bxp}`),
+          creature.id === breeding.active ? h('span', { className: '__cm_roster-active' }, 'AKTIV') : null))),
+        h('div', { className: '__cm_breed-form' },
+          h('label', { className: '__cm_pick' }, h('span', null, 'Elternteil A'),
+            h('select', { value: a?.id ?? '', onChange: (event) => { setParentA(event.target.value); setSelectedSpecies(''); } },
+              creatures.map((creature) => h('option', { key: creature.id, value: creature.id }, `${SPECIES[creature.species].label} · ${creature.id}`)))),
+          h('label', { className: '__cm_pick' }, h('span', null, 'Elternteil B'),
+            h('select', { value: b?.id ?? '', onChange: (event) => { setParentB(event.target.value); setSelectedSpecies(''); } },
+              creatures.map((creature) => h('option', { key: creature.id, value: creature.id }, `${SPECIES[creature.species].label} · ${creature.id}`)))),
+          candidates.length > 1 ? h('label', { className: '__cm_pick' },
+            h('span', null, 'Nachkomme'),
+            h('select', { value: effectiveChoice, onChange: (event) => setSelectedSpecies(event.target.value) },
+              candidates.map((id) => h('option', { key: id, value: id }, SPECIES[id].label)))) : null,
+          h('p', { className: '__cm_sub' },
+            a && b ? `Kosten: ${clutch} brauchbare Teile · ${candidates.length} gültige Art(en) · Brut je Completion +${BP_PER_COMPLETION} BP`
+              : 'Zwei verschiedene Kreaturen auswählen, um die gültigen Nachkommen zu sehen.'),
+          h('button', { type: 'button', className: '__cm_btn', disabled: !canPair,
+            onClick: () => {
+              try {
+                const result = pairCreatures(parentA, parentB, candidates.length > 1 ? effectiveChoice : undefined);
+                setNotice(result ? `Ei ${result.eggId} angelegt: ${SPECIES[result.species].label}` : 'Zucht wartet, bis kein Zug läuft.');
+                setSelectedSpecies('');
+              } catch (error) { setNotice(error?.message ?? 'Paarung abgelehnt'); }
+            } }, 'Paarung starten'),
+          h('span', { className: '__cm_sub' }, `${s.loot.brauchbar} brauchbare Teile verfügbar`),
+          notice ? h('p', { className: '__cm_breed-notice', role: 'status' }, notice) : null),
+        (breeding.eggs ?? []).length === 0 ? h('p', { className: '__cm_sub' }, 'Keine Eier in Brut. Ein Ei erhält pro bestätigter Completion genau +10 BP und schlüpft ab 120 BP.')
+          : h('div', { className: '__cm_eggs' }, breeding.eggs.map((egg) => h('div', { className: '__cm_egg', key: egg.id },
+            h('div', { className: '__cm_egg-heading' },
+              h('strong', null, `${egg.id} · ${SPECIES[egg.species].label}`),
+              h('span', { className: '__cm_sub' }, `Gen ${egg.gen} · ${egg.bonuses.length} Bonus${egg.bonuses.length === 1 ? '' : 'e'}`)),
+            h(Bar, { value: Math.min(HATCH_BP, egg.bp), max: HATCH_BP, tone: 'xp' }),
+            h('p', { className: '__cm_sub' }, `${egg.bp}/${HATCH_BP} Brutpunkte · ${Math.max(0, Math.ceil((HATCH_BP - egg.bp) / BP_PER_COMPLETION))} bestätigte Completions bis Schlupf`),
+            egg.bonuses.length ? h('p', { className: '__cm_sub' }, egg.bonuses.map((bonus) => `${bonus.id} +${bonus.value}`).join(' · ')) : null))));
+    }
+
     function CodingmonPanel() {
       const s = useStore();
       const lvl = levelFor(s.xp);
       // Angezeigt wird die EXAKTE Leiter, gerechnet die schnelle Number-Fassung.
-      const exact = statsAtExact(s.species, lvl);
+      const exact = Object.fromEntries(Object.entries(stats()).map(([key, value]) => [key, BigInt(value)]));
 
       // Der Kampf wohnt im Dock (WildDock), nicht hier: `main` zeigt Stand,
       // Regelwerk ohne Tabelle, Beute und Bilanz.
       return h('div', { className: '__cm_panel' },
         h(PetHead, { s, lvl, onPick: pickSpecies }),
         h(StatsGrid, { stats: exact }),
+        h(BreedingPanel, { s }),
         h(EscalationBlock, { s, lvl }),
         h(Rulebook, { s }),
         h(DropLedger, { s }),
@@ -1513,6 +2012,21 @@ window.__ModuleLoader__.load({
       .__cm_block { margin-bottom: 14px; }
       .__cm_block h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
         color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_breeding { border-top: 1px solid rgba(124,58,237,.25); padding-top: 12px; }
+      .__cm_roster { display: grid; grid-template-columns: repeat(auto-fit,minmax(135px,1fr)); gap: 8px; margin: 8px 0 12px; }
+      .__cm_roster-card { display: grid; grid-template-columns: 42px 1fr; grid-template-rows: auto auto auto; gap: 2px 7px; align-items: center; text-align: left; padding: 7px; color: inherit; background: rgba(255,255,255,.035); border: 1px solid rgba(124,58,237,.23); border-radius: 8px; cursor: pointer; min-width: 0; }
+      .__cm_roster-card.is-active { border-color: var(--cm-spark, #57e8ff); box-shadow: inset 0 0 0 1px rgba(87,232,255,.25); }
+      .__cm_roster-art { grid-row: 1 / span 3; display: block; width: 42px; height: 42px; }
+      .__cm_roster-art svg { width: 42px !important; height: 42px !important; }
+      .__cm_roster-label { font-size: 11px; font-weight: 700; overflow-wrap: anywhere; }
+      .__cm_roster-meta, .__cm_roster-active { font-size: 10px; color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_roster-active { color: #57e8ff; letter-spacing: .08em; }
+      .__cm_breed-form { display: grid; gap: 4px; padding: 8px; border: 1px solid rgba(124,58,237,.22); border-radius: 8px; }
+      .__cm_breed-notice { margin: 4px 0 0; font-size: 12px; }
+      .__cm_eggs { display: grid; gap: 8px; margin-top: 8px; }
+      .__cm_egg { padding: 8px; border: 1px solid rgba(87,232,255,.25); border-radius: 8px; }
+      .__cm_egg-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: 12px; }
+      @media (max-width: 420px) { .__cm_board { grid-template-columns: 1fr; } .__cm_vs { text-align: center; } }
       .__cm_board { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center;
         padding: 10px; border-radius: 8px; background: var(--dsw-alias-bg-layer-1, rgba(255,255,255,.04));
         border: 1px solid rgba(124,58,237,.25); }
@@ -1656,6 +2170,10 @@ window.__ModuleLoader__.load({
           fleeBattle: () => fleeBattle(),
           rest,
           pick: (id) => pickSpecies(id),
+          selectCreature: (id) => selectCreature(id),
+          pair: (idA, idB, species) => pairCreatures(idA, idB, species),
+          breeding: () => ({ ...store.breeding, creatures: store.breeding.creatures.map((creature) => ({ ...creature, bonuses: creature.bonuses.map((bonus) => ({ ...bonus })) })), eggs: store.breeding.eggs.map((egg) => ({ ...egg, parents: egg.parents.slice(), bonuses: egg.bonuses.map((bonus) => ({ ...bonus })) })) }),
+          breedCandidates: (idA, idB) => breedingCandidates(store.breeding.creatures.find((creature) => creature.id === idA), store.breeding.creatures.find((creature) => creature.id === idB)),
           addXp: (xp) => award(xp, `+${xp} XP (manuell)`),
           /** Die laufende Sperre (null = kein Zug). */
           lock: () => lockStatus(),

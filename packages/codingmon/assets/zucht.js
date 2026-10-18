@@ -108,7 +108,7 @@ export function pair(state, idA, idB, { lineage, pools = POOLS, selectedSpecies 
   b.bxp += PAIR_GAIN;
   a.clutch += 1;
   b.clutch += 1;
-  state.eggs.push({ id: eggId, parents: [a.id, b.id], species, gen, bonuses, bp });
+  state.eggs.push({ id: eggId, seed: state.seed, parents: [a.id, b.id], species, gen, bonuses, bp });
   return eggId;
 }
 

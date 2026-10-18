@@ -472,6 +472,12 @@ test('Zusage: nur turn/end mit reason=completed zaehlt XP-Completions in readAct
   const snapshot = {
     schemaVersion: 3, species: 'nullpointer', xp: 0, wins: 0, losses: 0, round: 0,
     damageTotal: '0', hits: 0, loot: { schrott: 0, brauchbar: 0, shiny: 0 }, completions: 0, wild: null,
+    breeding: {
+      schemaVersion: 3, seed: 17, nextId: 2, active: 'c1', completions: 0,
+      creatures: [{ id: 'c1', species: 'nullpointer', xp: 0, bxp: 50, gen: 1, bonuses: [], clutch: 0,
+        wins: 0, losses: 0, round: 0, hits: 0, damageTotal: '0', hp: 44 }],
+      eggs: [],
+    },
   };
   const written = await namespace[uebergabe.UEBERGABE_METHOD](snapshot);
   assert.equal(written.ok, true, 'der Stand liegt auf dem Medium');

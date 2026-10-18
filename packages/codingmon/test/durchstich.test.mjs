@@ -488,7 +488,7 @@ console.log('══════════════════════�
   const raw = sim.storage.getItem('shinon.codingmon/v1');
   const saved = JSON.parse(raw);
   check('der Stand liegt in der Ablage, der Lebenslauf als Dezimaltext (JSON kennt kein BigInt)',
-    typeof saved.damageTotal === 'string' && /^\d+$/.test(saved.damageTotal) && saved.version === 2,
+    typeof saved.damageTotal === 'string' && /^\d+$/.test(saved.damageTotal) && saved.version === 3,
     `damageTotal = "${saved.damageTotal}" als ${typeof saved.damageTotal}`);
   check('der gespeicherte Stand ist JSON-rund (BigInt haette hier geworfen)', saved.damageTotal === api.damageTotal());
 
@@ -504,8 +504,15 @@ console.log('══════════════════════�
     legacyState.xp === 1200 && legacyState.wins === 4 && legacyState.round === 6
     && legacyState.log.includes('alt') && legacy.api.damageTotal() === '0'
     && legacyState.loot.shiny === 0 && typeof legacy.saved().damageTotal === 'string'
-    && legacy.saved().version === 2,
+    && legacy.saved().version === 3,
     `XP ${legacyState.xp}, Siege ${legacyState.wins}, damageTotal "${legacy.api.damageTotal()}"`);
+  check('der Browser-v2-Stand wird zu einem vollständigen v3-Kader migriert',
+    legacyState.breeding?.schemaVersion === 3
+    && legacyState.breeding.creatures.length === 1
+    && legacyState.breeding.creatures[0].species === 'segfault'
+    && legacyState.breeding.creatures[0].xp === 1200
+    && legacyState.breeding.active === 'c1',
+    JSON.stringify({ version: legacyState.breeding?.schemaVersion, roster: legacyState.breeding?.creatures.length, active: legacyState.breeding?.active }));
 
   const stranded = boot({ save: { xp: 300, lock: { id: 'x', action: 'use', payload: {}, at: 1, until: 2, frozen: {} } } });
   check('ein Neuladen mitten im Zug laesst die Sperre fallen und sagt es',

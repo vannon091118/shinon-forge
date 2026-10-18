@@ -42,11 +42,13 @@ export function migrateToV3(old, { speciesCatalog = {} } = {}) {
   const oldLevel = legacyLevelFor(old.xp);
   const bxp = BXP_FOUNDER + Math.min(150, 10 * Math.max(0, oldLevel - 50));
   const seed = fnv1a32(`codingmon-seed|${old.xp}|${nonNegativeInteger(old.wins)}|${nonNegativeInteger(old.losses)}|${nonNegativeInteger(old.completions)}`);
+  const maxHp = statAt(speciesCatalog[species]?.stats?.hp ?? speciesCatalog[species]?.hp ?? 1,
+    Math.min(LEVEL_CAP, Math.max(1, levelFor(old.xp))));
   const creature = {
     id: 'c1', species, xp: old.xp, bxp, gen: 1, bonuses: [], clutch: 0,
     wins: nonNegativeInteger(old.wins), losses: nonNegativeInteger(old.losses),
     round: nonNegativeInteger(old.round), hits: nonNegativeInteger(old.hits),
-    damageTotal: decimalText(old.damageTotal),
+    damageTotal: decimalText(old.damageTotal), hp: maxHp,
   };
   return {
     schemaVersion: 3, seed, nextId: 2, active: 'c1', creatures: [creature], eggs: [],

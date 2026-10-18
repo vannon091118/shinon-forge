@@ -1,100 +1,111 @@
 /**
- * snapshot-schema — der Uebergabe-Vertrag (Client -> Host) als Zod-Schema.
- *
- * WARUM ES DIESE DATEI GIBT: der Stand hat zwei Verbraucher mit zwei
- * verschiedenen Grenzen. Der SPIEGEL (`pet-store.js`) legt ihn dauerhaft ab und
- * ergaenzt dabei den Zeitstempel des Schreibvorgangs; der REMOTE-DIENST
- * (`pet-remote.js`) nimmt ihn ueber die Leitung an und muss ihn pruefen, BEVOR
- * etwas auf ein Medium geht. Beide brauchen dieselben Felder mit denselben
- * → Kanon: docs/COMMENT-KANON.md#k-7489450126b0
+ * One client -> host snapshot contract. Version 2 remains readable for migration;
+ * version 3 requires the complete breeding roster and egg ledger.
  */
 import { z } from 'zod';
 
-/**
- * Der Stand, wie ihn der CLIENT schickt. Der Host ergaenzt beim Ablegen
- * `storedAt` — dieser Zeitstempel ist nicht Teil des Spielstands, sondern der
- * Nachweis des Schreibvorgangs, und er gehoert deshalb nicht in die Eingabe.
- */
-export const SnapshotSchema = z.object({
-  /** Fassung des Client-Speicherformats, z. B. 2. Der Host deutet sie nicht, er merkt sie. */
-  schemaVersion: z.number().int().nonnegative(),
-  /** Spezies-Schluessel der Linie (Client-Vokabular, hier nur Text). */
+const UInt32 = z.number().int().min(0).max(0xffffffff);
+const CreatureId = z.string().regex(/^c[1-9]\d*$/);
+const EggId = z.string().regex(/^e[1-9]\d*$/);
+const BonusSchema = z.object({
+  slot: z.number().int().nonnegative(),
+  id: z.string().min(1),
+  effect: z.enum(['statMod', 'hatchPoints', 'lootLuck']),
+  value: z.number().int().nonnegative(),
+});
+const CreatureSchema = z.object({
+  id: CreatureId,
   species: z.string().min(1),
-  /** Kumulierte XP. */
   xp: z.number().nonnegative(),
-  /** Siege, Niederlagen und die Rundennummer des Clients. */
+  bxp: z.number().int().nonnegative(),
+  gen: z.number().int().min(1),
+  bonuses: z.array(BonusSchema),
+  clutch: z.number().int().nonnegative(),
   wins: z.number().int().nonnegative(),
   losses: z.number().int().nonnegative(),
   round: z.number().int().nonnegative(),
-  /** Der Lebenslauf als Dezimaltext (BigInt laesst sich nicht JSON-serialisieren). */
-  damageTotal: z.string().regex(/^\d+$/, 'der Lebenslauf ist eine Ziffernfolge, kein gerundeter Bruch'),
-  /** Gezaehlte Treffer. */
   hits: z.number().int().nonnegative(),
-  /** Beutezaehler, genau die drei Stufen des Vertrags. */
+  damageTotal: z.string().regex(/^\d+$/),
+  hp: z.number().nonnegative(),
+});
+const EggSchema = z.object({
+  id: EggId,
+  seed: UInt32,
+  parents: z.array(CreatureId).length(2),
+  species: z.string().min(1),
+  gen: z.number().int().min(2),
+  bonuses: z.array(BonusSchema),
+  bp: z.number().int().nonnegative(),
+});
+const BreedingSchema = z.object({
+  schemaVersion: z.literal(3),
+  seed: UInt32,
+  nextId: z.number().int().min(1),
+  active: CreatureId.nullable(),
+  creatures: z.array(CreatureSchema).min(1),
+  eggs: z.array(EggSchema),
+  completions: z.number().int().nonnegative(),
+}).superRefine((state, ctx) => {
+  const ids = new Set();
+  let maxId = 0;
+  for (const item of [...state.creatures, ...state.eggs]) {
+    if (ids.has(item.id)) ctx.addIssue({ code: 'custom', path: ['creatures'], message: `Duplicate creature/egg ID: ${item.id}` });
+    ids.add(item.id);
+    maxId = Math.max(maxId, Number(item.id.slice(1)) || 0);
+  }
+  const creatureIds = new Set(state.creatures.map((creature) => creature.id));
+  if (state.active !== null && !creatureIds.has(state.active)) {
+    ctx.addIssue({ code: 'custom', path: ['active'], message: 'active must refer to an existing creature' });
+  }
+  for (const [index, egg] of state.eggs.entries()) {
+    if (egg.parents[0] === egg.parents[1]) {
+      ctx.addIssue({ code: 'custom', path: ['eggs', index, 'parents'], message: 'egg parents must differ' });
+    }
+    for (const parent of egg.parents) {
+      if (!creatureIds.has(parent)) ctx.addIssue({ code: 'custom', path: ['eggs', index, 'parents'], message: `missing parent ${parent}` });
+    }
+  }
+  if (state.nextId <= maxId) ctx.addIssue({ code: 'custom', path: ['nextId'], message: 'nextId must exceed every stored creature/egg ID' });
+});
+
+const SnapshotBaseSchema = z.object({
+  schemaVersion: z.number().int().nonnegative(),
+  species: z.string().min(1),
+  xp: z.number().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  round: z.number().int().nonnegative(),
+  damageTotal: z.string().regex(/^\d+$/, 'damageTotal must be a decimal string'),
+  hits: z.number().int().nonnegative(),
   loot: z.object({
     schrott: z.number().int().nonnegative(),
     brauchbar: z.number().int().nonnegative(),
     shiny: z.number().int().nonnegative(),
   }),
-  /** Zeitstempel des Clients (ISO-8601), falls er einen mitschickt. */
   savedAt: z.string().optional(),
-  /**
-   * Abgeschlossene Agent-Schritte, wie der Client sie zuletzt vom Host gelesen
-   * hat (`readActivity`). Der Client besitzt die Zahl persistent (localStorage
-   * plus dieser Spiegel); der Host zaehlt fluichtig und fuellt beim Mergen auf.
-   * Default 0: ein Stand der Fassung 2 ohne dieses Feld bleibt lesbar.
-   */
   completions: z.number().int().nonnegative().default(0),
-  /**
-   * Das wilde Codemon, wie der Client es sieht — oder `null`. Der Kampf selbst
-   * (`battle`) bleibt reine Browsersache und geht nicht auf die Platte des
-   * Hosts; das Wild schon, damit ein Neustart es nicht verdampfen laesst (J2).
-   */
   wild: z.object({
-    /** Spezies-Schluessel (Client-Vokabular, hier nur Text). */
     speciesId: z.string().min(1),
-    /** Stufe des Wilden (ganzzahlig, mindestens 1). */
     level: z.number().int().min(1),
-    /** Verbleibende und maximale HP (Zahlen, keine BigInt). */
     hp: z.number().nonnegative(),
     maxHp: z.number().positive(),
   }).nullable().default(null),
+  breeding: BreedingSchema.optional(),
 });
-
-/**
- * Der Stand, wie er AUF DER PLATTE liegt: der Vertrag plus der Zeitstempel des
- * Hosts. Genau diese Form akzeptiert das Medium, und keine andere.
- */
-export const StoredSnapshotSchema = SnapshotSchema.extend({
-  /** Zeitstempel des HOSTS: nicht Teil des Spielstands, nur Nachweis des Schreibvorgangs. */
-  storedAt: z.string(),
-});
-
-/**
- * Der Aktivitaetsstand des Hosts (die Antwort auf `readActivity`). Reine
- * Primitiven aus der Host-Realm: Typert lehnt Realm-fremde Prototypen ab, und
- * auf der Leitung gibt es ohnehin keine. Der Client entscheidet daraus rein
- * (`spawnFor`), ob ein Ball faellt.
- */
+function requireBreedingForV3(value, ctx) {
+  if (value.schemaVersion >= 3 && value.breeding === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['breeding'], message: 'snapshot v3 requires the complete breeding state' });
+  }
+}
+export const SnapshotSchema = SnapshotBaseSchema.superRefine(requireBreedingForV3);
+export const StoredSnapshotSchema = SnapshotBaseSchema.extend({ storedAt: z.string() }).superRefine(requireBreedingForV3);
 export const ActivitySchema = z.object({
-  /** Abgeschlossene Agent-Schritte seit dem Start des Hosts (plus Spiegel-Startwert). */
   completions: z.number().int().nonnegative(),
-  /** Laeuft gerade ein Agent (`running`-Status gesehen, `idle` noch nicht). */
   running: z.boolean(),
-  /** Zeitstempel der Antwort (ISO-8601, Host-Uhr). */
   at: z.string(),
 });
-
-/**
- * Die Quittung des Hosts (die Antwort auf einen angenommenen Stand). Sie ist
- * absichtlich schmal: sie nennt, WAS angekommen ist, nicht was daraus folgt —
- * die Leiter zu rechnen ist Sache des Clients, der Host deutet den Stand nicht.
- */
 export const SnapshotAckSchema = z.object({
-  /** Zeitstempel des Schreibvorgangs, wie er im Datensatz steht. */
   storedAt: z.string(),
-  /** Die Stufe, die der Host aus den angenommenen XP liest (nur zum Nachsehen). */
   level: z.number().int().nonnegative(),
-  /** Die angenommenen XP — die Quittung wiederholt, was sie quittiert. */
   xp: z.number().nonnegative(),
 });

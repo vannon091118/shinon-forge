@@ -10,6 +10,8 @@
  */
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain';
 import { StoredSnapshotSchema } from './snapshot-schema.js';
+import { migrateToV3 } from './migration.js';
+import { SPECIES } from './katalog.js';
 
 /** Der eine Datensatz-Schluessel dieser Einheit. */
 export const PET_KEY = 'state';
@@ -46,9 +48,43 @@ export const PET_DOMAIN = defineDomain({
 export async function openPetStore(ctx, now = () => new Date()) {
   const domain = await ctx.storageDomain.open(PET_DOMAIN);
   const table = domain.table('snapshots');
+  const migrateStoredSnapshot = (raw) => {
+    if (raw === null) return null;
+    if (raw.schemaVersion >= 3 && raw.breeding !== undefined) return PetStateSchema.parse(raw);
+    // Host v2 never persisted a roster. Build exactly one deterministic founder
+    // from counters that really exist; do not invent historical pets or eggs.
+    const migrated = migrateToV3({ ...raw, schemaVersion: 2 }, { speciesCatalog: SPECIES });
+    const founder = migrated.creatures[0];
+    return PetStateSchema.parse({
+      ...raw,
+      schemaVersion: 3,
+      species: founder.species,
+      xp: founder.xp,
+      wins: founder.wins,
+      losses: founder.losses,
+      round: founder.round,
+      damageTotal: founder.damageTotal,
+      hits: founder.hits,
+      completions: migrated.completions,
+      loot: migrated.loot,
+      wild: migrated.wild === null ? null : {
+        speciesId: migrated.wild.speciesId, level: migrated.wild.level,
+        hp: migrated.wild.hp, maxHp: migrated.wild.maxHp,
+      },
+      breeding: {
+        schemaVersion: 3,
+        seed: migrated.seed,
+        nextId: migrated.nextId,
+        active: migrated.active,
+        creatures: migrated.creatures,
+        eggs: migrated.eggs,
+        completions: migrated.completions,
+      },
+    });
+  };
   return {
-    /** Der gespeicherte Stand oder `null` — synchron aus dem Speicher der Domain. */
-    read: () => table.get(PET_KEY) ?? null,
+    /** Host v2 is migrated in memory; the next successful write persists v3. */
+    read: () => migrateStoredSnapshot(table.get(PET_KEY) ?? null),
     /**
      * Einen Stand ablegen. Validiert BEVOR geschrieben wird: ein Stand, der den
      * Vertrag verletzt, wirft und beruehrt das Medium nicht.
