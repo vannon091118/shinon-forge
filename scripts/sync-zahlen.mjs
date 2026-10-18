@@ -15,7 +15,6 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const FILE = join(ROOT, 'docs', 'ZAHLEN.md');
 const START = '<!-- zahlen:bestand:start -->';
 const END = '<!-- zahlen:bestand:end -->';
 

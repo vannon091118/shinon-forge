@@ -2,7 +2,6 @@ import z from '@deepseek-ai/schemastery';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, isAbsolute, resolve, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { emptySelfModel, observeDecision, observeError, decaySelfModel, selfModelSummary, selfModelView, validateSelfModel } from './assets/self-model.js';
 
 /**

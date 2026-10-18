@@ -140,7 +140,7 @@
       "tool/ptc-dispatch-start",
       "web/deepseek-search-llm-request"
     ],
-    "ignoredNote": "Bekannte DSH-Typen, die der Spine absichtlich NICHT abbildet. Sie werden still verworfen (kein onDrop, keine Warnung im Log) und in stats.ignored/ignoredTypes gezählt — sichtbar, aber ohne Log-Flut. Die Liste ist vollständig für die installierte Fassung: deren generierte Liste KNOWN_SESSION_EVENT_TYPES (dsh-session/lib/types/known-event-types.js, 59 Einträge) ist mengengleich mit packages/core/session/src/known-event-types.ts auf master 5badb150 (kein Unterschied in beide Richtungen); 17 dieser Typen sind oben abgebildet, die restlichen 42 stehen hier. Ein NEUER DSH-Typ ist nicht hier und warnt deshalb weiter als UNKNOWN_SIGNAL. Ein Typ darf nie zugleich in typeMap und in ignoredTypes stehen."
+    "ignoredNote": "Bekannte DSH-Typen, die der Spine absichtlich NICHT abbildet. Sie werden still verworfen (kein onDrop, keine Warnung im Log) und in stats.ignored/ignoredTypes gezählt — sichtbar, aber ohne Log-Flut. Die Liste ist vollständig für die installierte Fassung: deren generierte Liste KNOWN_SESSION_EVENT_TYPES (dsh-session/lib/types/known-event-types.js, 59 Einträge) entspricht der installierten Fassung; eine zweite Quelle dieser Liste liegt nicht im Baum, die Zaehlung ist aus der Datei selbst abgeleitet; 17 dieser Typen sind oben abgebildet, die restlichen 42 stehen hier. Ein NEUER DSH-Typ ist nicht hier und warnt deshalb weiter als UNKNOWN_SIGNAL. Ein Typ darf nie zugleich in typeMap und in ignoredTypes stehen."
   },
   "events": {
     "session.created": {

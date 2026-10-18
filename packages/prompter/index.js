@@ -1,4 +1,6 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+// Der host-half-Block verlangt diesen Import (Gate `host-half`); das Schema
+// selbst liegt in `./assets/schema.js`.
 import z from '@deepseek-ai/schemastery';
 import { isAbsolute, join } from 'node:path';
 import { parseNote, renderStand, reviewNotes, selectNotes, tokens } from './assets/note-core.js';

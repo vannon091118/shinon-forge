@@ -1,6 +1,6 @@
 import z from '@deepseek-ai/schemastery';
 import {
-  ABILITIES, ELEMENTS, ESCALATION, LEVEL_CAP, LOOT_TABLE, MILESTONES, PACING, SPECIES, SPECIES_IDS,
+  ABILITIES, ELEMENTS, ESCALATION, LEVEL_CAP, LOOT_TABLE, MILESTONES, PACING, SPECIES_IDS,
   XP_BASE, formatNumber, levelFor, lootOdds,
 } from './assets/mechanik.js';
 import { SNAPSHOT_FIELDS, UEBERGABE_ENDPOINT } from './assets/uebergabe.js';

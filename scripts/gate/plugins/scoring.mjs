@@ -520,7 +520,7 @@ export function tendencyRuleIssues(tendency, rules, scoring, file) {
       issues.push(at(`mechanisms.${id}.where fehlt — ein Mechanismus ohne Ort ist eine Behauptung`));
       continue;
     }
-    const [target, path] = entry.where.split('#');
+    const [target] = entry.where.split('#');
     if (target !== expected) {
       issues.push(at(`mechanisms.${id}.where nennt ${JSON.stringify(target)}, erwartet wird ${expected}`));
       continue;

@@ -10,8 +10,6 @@
  * → Kanon: docs/COMMENT-KANON.md#k-a4a8f65c357f
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { dshBinary, dshSource } from './lib/dsh.mjs';
 import { childEnv, describePaths } from './lib/paths.mjs';

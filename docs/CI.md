@@ -103,7 +103,7 @@ settings" in der Oberfläche; die API-Fassung davon ist `enforce_admins` (oben).
 |---|---|---|---|
 | Lokal, immer | `npm test` | statisches Gate (117 Prüfungen: Manifest, Namensvertrag, Ressourcen, Komposition) + lokale Engine-Slices (Bundle-Auflösung, Host-/Client-Hälften, Legacy-Guard, Profil) — Sekunden, ohne Netz, ohne Boot | Alltag, pre-commit-Hook |
 | Lokal, betroffen | `npm run gate` | `always`-Menge + nur die Slices, deren Pfade im Staged-Diff stehen (Paket-Drift, Dead-Package, Persona, Scoring, …) — der volle Katalog läuft nie lokal | vor dem Commit, auf gestagten Änderungen |
-| CI, vollständig | Workflow-Zweige + `Verdikt (fail-closed)` | `test:full`-Kette (alle Paket-Suiten, Fixtures, Distribution, Profilboot) + `gate:test` (583) + TypeScript — die zentrale Testlinie, parallel auf fremder Hardware | jeder Push/PR |
+| CI, vollständig | Workflow-Zweige + `Verdikt (fail-closed)` | `test:full`-Kette (alle Paket-Suiten, Fixtures, Distribution, Profilboot) + `gate:test` (Zählung: `docs/ZAHLEN.md` §2) + TypeScript — die zentrale Testlinie, parallel auf fremder Hardware | jeder Push/PR |
 | Explizit | `test:full`, `gate:full`, `scale:check`, `branding` | volle Läufe auf Zuruf, nie im Alltag und nie im Hook | Nacht, Release, Neugier |
 
 Jede lokale Prüfung ist eine echte Prüfung (kein Skip als Grün, kein
@@ -115,7 +115,7 @@ fremden Hardware, nicht dieser CPU.
 
 ### 3.1 Audit der lokalen Tests (2026-10-17): was wirklich geprüft wird
 
-Alle 75 Testdateien (26 Paket-Suiten, 49 Gate-Tests) wurden auf Aussagewert
+Alle Testdateien (Bestand: `docs/ZAHLEN.md` §1) wurden auf Aussagewert
 geprüft — Verhalten gegen Existenz, gemessen an Einbruchstellen statt an
 Zählungen. Ergebnis: keine taube Prüfung; drei Formen brauchen einen
 Satz Erklärung, weil sie sonst wie Schwäche aussehen:
@@ -159,10 +159,10 @@ Pfad-/Branch-Filter, kein `continue-on-error: true`, und leitet den Prüfbereich
 nicht selbst im YAML ab (`scripts/lib/ci-range.mjs` tut das, und im Zweifel prüft
 er die **volle** Historie). Das statische Gate (`commit-trailer`) prüft diese
 Eigenschaften am Dateiinhalt, nicht an der Absicht: `npm run gate:full` →
-**Exit 1**, 24 Gates, 1 rot. Nachgemessen am 2026-10-18: `contracts` meldet
-`docs/contracts/commit-policy.json` ohne `name`, `status` und `rules` — ein
-Befund an einer Vertragsdatei, den die beiden neuen Gates nicht verursachen.
-Neu sind `bundle-resolution` (Auflösung der Profil-Bündel in `packages/`, getragen
+**Exit 0**, 25 Gates, 0 rot (nachgemessen am 2026-10-19). Der frühere Rotstand
+im Gate `contracts` (`commit-policy.json` ohne `name`, `status` und `rules`) ist
+behoben — die Datei trägt die drei Felder, das Gate ist grün. Neu sind
+`bundle-resolution` (Auflösung der Profil-Bündel in `packages/`, getragen
 von `repo.bundleResolutionIssues()`) und `dsh-singleton` (jedes
 `@deepseek-ai/*`-Paket genau einmal im Baum, getragen von
 `repo.dshInstanceIssues()` — zwei Modul-Instanzen sind zwei Symbole und beenden

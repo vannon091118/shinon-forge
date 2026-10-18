@@ -9,7 +9,7 @@
  * (Idiom-Regionen), `dead-package` (`KNOWN_INACTIVE`), `doctor`
  * → Kanon: docs/COMMENT-KANON.md#k-0f65fa71eb2c
  */
-import { execFileSync, spawnSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { delimiter, join } from 'path';

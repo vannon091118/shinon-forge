@@ -12,7 +12,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { dshBinary, goodNode } from './lib/dsh.mjs';
+import { dshBinary } from './lib/dsh.mjs';
 import { dshHome, logDir, pathWith } from './lib/paths.mjs';
 
 const PORT = 3099;

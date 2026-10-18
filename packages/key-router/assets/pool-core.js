@@ -42,7 +42,7 @@ export function buildEntries(keys) {
 
 // ── Override: die Übergabe an den Lauf ───────────────────────────────────────
 //
-// Die Mechanik, mit der der Pool die Route erreicht (PLAN.md §3.12). Gemessen am
+// Die Mechanik, mit der der Pool die Route erreicht (Plan §3.12). Gemessen am
 // installierten Harness (0.2.1-alpha.1), nicht geraten:
 //
 //   - Die Route (`agnes`, `apiKeyEnv: AGNES_API_KEY`) löst ihren Schlüssel pro

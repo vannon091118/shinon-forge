@@ -221,7 +221,6 @@ for (let i = 0; i < RUNS; i += 1) {
   jsCounts = round.counts;
 }
 const js = Object.keys(jsRounds[0]).map((label) => ({ label, ms: median(jsRounds.map((round) => round[label])) }));
-const jsTotal = js.reduce((sum, entry) => sum + entry.ms, 0);
 
 const groups = [
   { id: 'open', label: 'Index anlegen (Schema + Meta, erster Lauf)', ms: split.open },

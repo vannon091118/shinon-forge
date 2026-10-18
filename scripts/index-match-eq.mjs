@@ -41,7 +41,6 @@ try {
   const db = new DatabaseSync(dbFile, { readOnly: true });
   const names = [...new Set(db.prepare('select distinct name, kind from symbols').all()
     .filter((row) => core.REFERENCABLE_KINDS.has(row.kind)).map((row) => row.name))].sort();
-  const paths = db.prepare('select path from files order by path').all().map((row) => row.path);
   const matcher = core.createReferenceMatcher(names);
   const norm = (list) => [...list].map(({ name, line }) => `${line}:${name}`).sort();
 

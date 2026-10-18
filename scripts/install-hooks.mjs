@@ -10,7 +10,7 @@
  * → Kanon: docs/COMMENT-KANON.md#k-166493229b9e
  */
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { VANNON_TRAILER } from './lib/commit-text.mjs';
 

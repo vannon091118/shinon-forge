@@ -13,7 +13,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import * as repo from './lib/repo.mjs';
-import { PRUNE_DIRS, isPruned } from './lib/scan.mjs';
+import { isPruned } from './lib/scan.mjs';
 import { installRoot as installRootOf, describePaths, workspaceRoot } from './lib/paths.mjs';
 
 const ROOT = repo.ROOT;
