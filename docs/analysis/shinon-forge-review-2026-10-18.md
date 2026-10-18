@@ -100,6 +100,12 @@ Behoben:
   Verweise (u. a. `AGENTS.md`, `README.md`, `docs/ROADMAP.md`) zeigten auf einen
   toten Pfad. Die Datei ist jetzt getrackt; `git ls-files docs/CHANGELOG.md` nennt
   sie, und `docs/INDEX.md` führt sie weiter als einzige Liste erledigter Arbeit.
+- **Nachtrag 2026-10-19 (live gemessen):** Ein abgeschnittenes JSON im
+  `json`-Zaun (`{"enhancedPrompt": …`) passierte die JSON-Sperre in `salvageProse`,
+  weil sie nur vor dem Zaun griff — der Nutzer sah ein halbes Objekt statt seines
+  Prompts. `packages/prompter/assets/enhancer.js` prüft jetzt nach dem Auspacken
+  erneut; drei Fälle in `scripts/gate/tests/prompter-contract.test.mjs` decken das
+  ab, `npm run gate:test` zählt seither 680 statt 678 Tests.
 - `docs/CI.md`: der Abschnitt behauptete ein rotes `contracts`-Gate. Nachgemessen:
   `npm run gate:full` → **Exit 0**, 25 Gates, 0 rot. Der Absatz nennt jetzt die
   Messung vom 2026-10-19 und den behobenen Befund.
@@ -191,7 +197,7 @@ offen (§6.7).
 | `node --test scripts/gate/tests/project-index.test.mjs` (gezielt) | 3/3 grün, Rechte-Tests als uid 1000 gelaufen |
 | `node --test scripts/gate/tests/prompter-profile-wiring.test.mjs scripts/gate/tests/key-router-wire.test.mjs` | 3/3 grün |
 | `npm run zahlen:check` | nach `zahlen:sync` Exit 0 |
-| `npm run gate:test` | 678/678 grün, 0 Skips (uid 1000) |
+| `npm run gate:test` | 680/680 grün, 0 Skips (uid 1000) |
 | `profile-links --check` | Exit 0, 29 Links, keiner nach außen |
 
 Der Review selbst bleibt als Bericht stehen; dieses Dokument ist die Antwort darauf,
