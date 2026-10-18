@@ -23,17 +23,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22.19.0"
-          cache: npm
-      - name: Mobile-Profil-Contract (fail-closed)
+
+      # Reihenfolge: mobile-profile-contract-test.mjs ist rein statisch
+      # (Manifest + Struktur), check-dsh-versions.mjs braucht node_modules
+      # (die @deepseek-ai/*-Manifeste im Vendor + Lock), dsh-Pakete erst.
+      - name: Mobile-Profil-Contract (statisch, fail-closed)
         run: node scripts/mobile-profile-contract-test.mjs
-      - name: DSH-Versionen (fail-closed)
-        run: node scripts/check-dsh-versions.mjs
       - name: Abhängigkeiten installieren (lockfile-treu)
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
           echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-      - name: Profil mobile auflösen (fail-closed)
+      - name: DSH-Versionen (lockfile + Vendor + Manifest, fail-closed)
+        run: node scripts/check-dsh-versions.mjs
+      - name: Profil mobile auflösen (dsh-Boot, fail-closed)
         run: node scripts/shinon-profile-test.mjs --profile mobile
 
   build-runtime:
