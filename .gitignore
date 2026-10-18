@@ -20,6 +20,12 @@ storages/
 .shinon/dev/messung-*.jsonl
 .shinon/dev/zusammenfassung-*.json
 
+# Das Intent-Gedächtnis des Prompters (Fassung 2) wächst mit JEDEM Turn
+# (Treffer, Klassen, Merkmale, Laufzeit, Folge-Rückmeldung). Projektwissen wie
+# die gelernten Bausteine, aber Laufzeitzustand: kein Commit, kein Rauschen im
+# Diff. Wer einen Stand als Beleg braucht, kopiert ihn kuratiert nach docs/probes/.
+.shinon/intent-memory.json
+
 # Credentials — never commit. Public repo!
 .credentials.yaml
 

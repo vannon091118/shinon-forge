@@ -238,6 +238,9 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/result-contract.js' },
       // Der Runtime-Resolver der Intent-Klasse: reine Funktion, kein Modell.
       { kind: 'import', target: './assets/intent-resolver.js' },
+      // Das Intent-Gedächtnis (Fassung 2): Zählung über alle Läufe und der
+      // gelernte Gewichtsfaktor — reiner Kern, kein I/O, keine Uhr.
+      { kind: 'import', target: './assets/intent-memory.js' },
       { kind: 'import', target: './assets/render-context.js' },
       { kind: 'import', target: './assets/prompt-files.js' },
       // Der einzige Schreibweg des Hosts: gelernte Bausteine (Propose-Seam).

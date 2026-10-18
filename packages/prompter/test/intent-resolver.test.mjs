@@ -8,6 +8,7 @@ import {
   UNDEFINED,
   expandPrompt,
   resolveIntent,
+  textFeatures,
 } from '../assets/intent-resolver.js';
 
 /**
@@ -134,4 +135,215 @@ test('Resolver: die Expansion haengt den Auftrag an, sie ersetzt ihn nicht', () 
   // Ohne Expansion kommt der Text wortgleich zurueck — fail-closed.
   assert.equal(expandPrompt('hallo', resolveIntent('hallo', RULES)), 'hallo');
   assert.equal(expandPrompt('hallo', null), 'hallo');
+});
+
+// ── 6. Der granulare Pool (Fassung 2) ───────────────────────────────────────
+//
+// Acht Patterns sind ein Anfang, kein Verständnis. Der Pool wächst auf 40
+// Zeilen, jede mit eigener Id und eigener Expansion — aber die Regeln bleiben:
+// keine Themenwörter, keine erfundenen Treffer, feste Klassenpriorität.
+
+test('Pool: mindestens 40 granulare Patterns, jede Id genau einmal', () => {
+  assert.ok(RULES.patterns.length >= 40, `nur ${RULES.patterns.length} Patterns`);
+  const ids = RULES.patterns.map((pattern) => pattern.id);
+  assert.equal(new Set(ids).size, ids.length, 'doppelte Id');
+  for (const pattern of RULES.patterns) {
+    assert.ok(Array.isArray(pattern.trigger) && pattern.trigger.length > 0, `${pattern.id}: kein Trigger`);
+    assert.ok(INTENT_CLASSES.includes(pattern.classification), `${pattern.id}: fremde Klasse`);
+    assert.equal(typeof pattern.label, 'string');
+  }
+});
+
+test('Pool: jede der fuenf Klassen ist mehrfach vertreten', () => {
+  for (const classification of INTENT_CLASSES) {
+    const count = RULES.patterns.filter((pattern) => pattern.classification === classification).length;
+    assert.ok(count >= 2, `${classification}: nur ${count} Pattern(s)`);
+  }
+});
+
+test('Pool: ein granularer Treffer nennt seine eigene Id', () => {
+  const cases = [
+    ['baue ein browser-spiel', 'build-game'],
+    ['richte ci ein', 'setup-ci'],
+    ['migriere die config', 'migrate'],
+    ['pruefe die sicherheit', 'security-audit'],
+    ['welche dateien gibt es', 'list-files'],
+    ['vergleiche beide varianten', 'compare-options'],
+  ];
+  for (const [text, id] of cases) {
+    const resolved = resolveIntent(text, RULES);
+    assert.equal(resolved.patternId, id, `${text} → ${resolved.patternId}`);
+    assert.equal(resolved.reason, 'MATCHED');
+  }
+});
+
+// ── 7. Die semantische Schicht: Merkmale belegen, sie erfinden nicht ────────
+
+test('Merkmale: der Text wird eingeordnet, ohne Modell', () => {
+  assert.deepEqual(textFeatures('bau das und danach teste es'), ['imperativ', 'mehrschritt']);
+  assert.deepEqual(textFeatures('ueber wochen jeden tag'), ['ziel']);
+  assert.deepEqual(textFeatures('fix das in packages/prompter/index.js'), ['imperativ', 'pfad']);
+  assert.deepEqual(textFeatures('schau `const x = 1` an'), ['code']);
+  assert.deepEqual(textFeatures('ich bin genervt davon'), ['emotion']);
+  assert.deepEqual(textFeatures('ist das richtig?'), ['frage']);
+  assert.deepEqual(textFeatures(''), []);
+});
+
+test('Merkmale: ohne Phrase bleibt es UNDEFINED — Marker allein sind kein Auftrag', () => {
+  // „struktur duplikat modul“ sind die Begriffsmarker von `refactor`. Sie
+  // beschreiben ein Thema, keinen Auftrag — und ein Thema ist keine Handlung.
+  const resolved = resolveIntent('struktur duplikat modul', RULES);
+  assert.equal(resolved.classification, UNDEFINED);
+  assert.equal(resolved.matched, false);
+  assert.deepEqual(resolved.features, []);
+});
+
+test('Merkmale: ein zutreffendes Merkmal staerkt den vorhandenen Treffer', () => {
+  const ohne = resolveIntent('refaktoriere', RULES);
+  const mit = resolveIntent('refaktoriere den code und danach teste alles', RULES);
+  assert.ok(mit.score > ohne.score, `${mit.score} > ${ohne.score}`);
+  assert.ok(mit.features.includes('mehrschritt'));
+  assert.equal(mit.patternId, 'refactor');
+  // Die reine Trefferzahl bleibt die Untergrenze: ein Merkmal zaehlt nur dazu.
+  assert.ok(ohne.score >= 1);
+});
+
+// ── 8. Erfahrung: Gewichte aus der Gesamtlaufzeit ───────────────────────────
+
+test('Gewichte: ein gedaempftes Pattern ist kein Treffer mehr', () => {
+  const ohne = resolveIntent('refaktoriere den prompter gruendlich', RULES);
+  assert.equal(ohne.patternId, 'refactor');
+  assert.equal(ohne.bias, 1);
+
+  const gedaempft = resolveIntent('refaktoriere den prompter gruendlich', RULES, { weights: { refactor: 0.5 } });
+  assert.equal(gedaempft.classification, UNDEFINED, 'zu viel Korrektur: das Pattern traegt nicht mehr');
+  assert.equal(gedaempft.matched, false);
+});
+
+test('Gewichte: innerhalb einer Klasse entscheidet die Erfahrung', () => {
+  const pair = {
+    patterns: [
+      { id: 'a', label: 'A', trigger: ['alpha'], classification: 'TRANSFORM', expansion: '' },
+      { id: 'b', label: 'B', trigger: ['beta'], classification: 'TRANSFORM', expansion: '' },
+    ],
+  };
+  // Ohne Erfahrung gewinnt die erste Zeile (stabile Reihenfolge, kein Zufall).
+  assert.equal(resolveIntent('alpha beta', pair).patternId, 'a');
+  // Mit Erfahrung gewinnt das staerkere Pattern — und nennt seinen Faktor.
+  const gelernt = resolveIntent('alpha beta', pair, { weights: { b: 1.3 } });
+  assert.equal(gelernt.patternId, 'b');
+  assert.equal(gelernt.bias, 1.3);
+  // Die Klasse bleibt dieselbe: Erfahrung verschiebt die Wahl, nicht den Rang.
+  assert.equal(gelernt.classification, 'TRANSFORM');
+});
+
+test('Gewichte: die Prioritaet bleibt fest — Erfahrung kippt keine Klasse', () => {
+  const pair = {
+    patterns: [
+      { id: 'reden', label: 'Chat', trigger: ['hallo'], classification: 'CHAT', expansion: '' },
+      { id: 'bauen', label: 'Bau', trigger: ['bau mal'], classification: 'MULTI_STEP_TASK', expansion: 'x' },
+    ],
+  };
+  // Beide tragen (Faktor ≥ 1): die Klasse entscheidet die Prioritaet, nicht das Gewicht.
+  const resolved = resolveIntent('hallo, bau mal was', pair, { weights: { reden: 1.35, bauen: 1.1 } });
+  assert.equal(resolved.classification, 'MULTI_STEP_TASK', 'der staerkere Auftrag gewinnt weiterhin');
+  // Ein bis unter die Schwelle gedaempftes Pattern ist dagegen KEIN Treffer —
+  // dann bleibt die schwaechere Klasse uebrig (der eigene Daempfungsfall oben).
+  const gedaempft = resolveIntent('hallo, bau mal was', pair, { weights: { bauen: 0.65 } });
+  assert.equal(gedaempft.classification, 'CHAT');
+});
+
+test('Gewichte: derselbe Text mit denselben Gewichten ergibt dieselbe Antwort', () => {
+  const weights = { refactor: 1.2, tests: 0.9 };
+  const first = resolveIntent('refaktoriere und schreib tests', RULES, { weights });
+  const second = resolveIntent('refaktoriere und schreib tests', RULES, { weights });
+  assert.deepEqual(first, second);
+  assert.equal(first.classification, 'MULTI_STEP_TASK');
+});
+
+// ── 9. Fassung 3: der Pool ist granular (92 Muster) ────────────────────────
+
+test('Pool: deutlich mehr als 40 Muster, jede der fünf Klassen breit vertreten', () => {
+  assert.ok(RULES.patterns.length >= 80, `nur ${RULES.patterns.length} Patterns`);
+  for (const classification of INTENT_CLASSES) {
+    const count = RULES.patterns.filter((pattern) => pattern.classification === classification).length;
+    assert.ok(count >= 5, `${classification}: nur ${count} Pattern(s)`);
+  }
+  // Eine Frage und ein Gruß tragen NIE einen Auftragsblock.
+  for (const pattern of RULES.patterns) {
+    if (pattern.classification === 'CHAT' || pattern.classification === 'LOOKUP') {
+      assert.equal(pattern.expansion, '', `${pattern.id}: ${pattern.classification} erweitert nicht`);
+    }
+  }
+});
+
+test('Pool: feine Muster treffen feine Texte — eine eigene Id je Absicht', () => {
+  const cases = [
+    ['debugge den fehler im parser', 'debug'],
+    ['repariere die tests in scoring', 'fix-tests'],
+    ['typisiere die schnittstelle', 'add-types'],
+    ['loesche den toten pfad', 'delete-code'],
+    ['mail versenden fuer die bestellung', 'mail'],
+    ['baue den hintergrundjob', 'background-job'],
+    ['beobachte die laufzeit ueber tage', 'watch'],
+    ['fass zusammen was sich geaendert hat', 'lookup-summary'],
+  ];
+  for (const [text, id] of cases) {
+    const resolved = resolveIntent(text, RULES);
+    assert.equal(resolved.patternId, id, `${text} → ${resolved.patternId}`);
+  }
+});
+
+// ── 10. Das Lexikon: gelernte Semantik verschiebt das Gewicht ──────────────
+
+test('Lexikon: derselbe Text traegt mehr, wenn die Begriffe gelernt sind', () => {
+  const text = 'parser schreiben fuer die datei';
+  const lexicon = {
+    parser: { classification: 'MULTI_STEP_TASK', confidence: 1, total: 4 },
+    datei: { classification: 'MULTI_STEP_TASK', confidence: 0.8, total: 4 },
+  };
+  const ohne = resolveIntent(text, RULES);
+  const mit = resolveIntent(text, RULES, { lexicon });
+  assert.equal(ohne.patternId, 'parser');
+  assert.equal(mit.patternId, 'parser');
+  assert.equal(ohne.semantic, 0);
+  assert.ok(mit.semantic > 0, 'das Lexikon stuetzt den Treffer');
+  assert.ok(mit.score > ohne.score, `${mit.score} > ${ohne.score}`);
+});
+
+test('Lexikon: ein fremdes Begriffsfeld stuetzt nicht — und erfindet keinen Treffer', () => {
+  const lexicon = {
+    parser: { classification: 'TRANSFORM', confidence: 1, total: 4 },
+  };
+  // Die gleiche Klasse, die das Muster traegt: es gibt nichts zu stuetzen.
+  const fremd = resolveIntent('parser schreiben fuer die datei', RULES, { lexicon });
+  assert.equal(fremd.semantic, 0);
+  // Ohne Phrase bleibt es UNDEFINED — auch mit noch so sicherem Lexikon.
+  const ohnePhrase = resolveIntent('parser datei', RULES, { lexicon });
+  assert.equal(ohnePhrase.classification, UNDEFINED);
+  assert.equal(ohnePhrase.matched, false);
+});
+
+test('Lexikon: die Klassenprioritaet bleibt fest — Semantik kippt keine Klasse', () => {
+  const lexicon = { chat: { classification: 'CHAT', confidence: 1, total: 8 } };
+  const resolved = resolveIntent('hallo, schreib tests fuer scoring', RULES, { lexicon });
+  assert.equal(resolved.classification, 'MULTI_STEP_TASK');
+});
+
+test('Lexikon: kaputte oder fehlende Profile sind kein Fehler', () => {
+  const mitNull = resolveIntent('schreib tests', RULES, { lexicon: null });
+  assert.equal(mitNull.classification, 'MULTI_STEP_TASK');
+  const kaputt = resolveIntent('schreib tests', RULES, { lexicon: { tests: 'nein' } });
+  assert.equal(kaputt.classification, 'MULTI_STEP_TASK');
+  assert.equal(kaputt.semantic, 0);
+});
+
+// ── 11. Die feineren Merkmale ──────────────────────────────────────────────
+
+test('Merkmale: Dringlichkeit, Bestand und Abwaegung sind eigene Merkmale', () => {
+  assert.ok(textFeatures('mach das bitte sofort').includes('dringend'));
+  assert.ok(textFeatures('der fehler ist wieder da').includes('bestand'));
+  assert.ok(textFeatures('lieber variante b statt a').includes('entscheidung'));
+  // Und sie erzeugen weiterhin keinen Treffer.
+  assert.equal(resolveIntent('sofort lieber wieder', RULES).matched, false);
 });

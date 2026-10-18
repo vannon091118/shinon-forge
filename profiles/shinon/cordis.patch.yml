@@ -275,7 +275,12 @@
     # Der MAX-Kontext kommt aus dem Project Index (Dienst shinon_index_query).
     # Einen zweiten, eigenen Index gibt es nicht mehr.
     # Intent-Patterns (Zug 8): Trigger → Full-Task-Expansion, default im Paket.
+    # Fassung 2: 40 granulare Patterns + Merkmale (mehrschritt/ziel/pfad/code).
     intentPatternsPath: ./assets/intent-rules.json
+    # Intent-Gedächtnis: Zählung über ALLE Läufe (Treffer, Klassen, Merkmale,
+    # Laufzeit, Folge-Rückmeldung) und daraus der gelernte Gewichtsfaktor je
+    # Pattern. Relativ zum WORKSPACE — Projektwissen, kein Tarball-Inhalt.
+    intentMemoryPath: .shinon/intent-memory.json
 
 # Popup (Zug 6): das Fortschritts-Overlay ueber dem Eingabefeld.
 #

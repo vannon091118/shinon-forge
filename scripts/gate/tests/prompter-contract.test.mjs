@@ -1303,6 +1303,10 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     timeoutMs: 15000,
     trace: true,
     intentPatternsPath: './assets/intent-rules.json',
+    // Fassung 2: das Intent-Gedächtnis gehört wie die gelernten Bausteine dem
+    // PROJEKT (relativ zum Workspace). Ein leerer Pfad schaltet es ab; der
+    // Vorgabewert ist hier GEPINNT, damit ein stiller Pfadwechsel auffällt.
+    intentMemoryPath: '.shinon/intent-memory.json',
     // Phase 4: die gelernte Baustein-Ablage gehoert dem PROJEKT. Der Vorgabewert
     // ist die eine Konstante des Pakets, nicht ein zweites Literal.
     blocksLearnedPath: bundle.LEARNED_DEFAULT_PATH,

@@ -156,6 +156,13 @@ export const Config = z.object({
    */
   intentPatternsPath: z.string().default('./assets/intent-rules.json'),
   /**
+   * Ablage des Intent-Gedächtnisses (relativ zum WORKSPACE, nicht zum Host-CWD).
+   * Leer = kein Gedächtnis: dann bleibt jede Gewichtung bei 1, und kein Turn
+   * schreibt eine Datei. Die Zählung über alle Läufe ist Projektwissen und
+   * gehört deshalb zum Projekt, nicht in den Tarball.
+   */
+  intentMemoryPath: z.string().default('.shinon/intent-memory.json'),
+  /**
    * Ablage gelernter Bausteine (Phase 4), relativ zum ARBEITSVERZEICHNIS.
    *
    * Dieselbe Regel wie Zettel und Skills: Gelerntes gehört dem PROJEKT, nicht

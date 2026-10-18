@@ -12,6 +12,7 @@ import { CONTEXT_CONTRACT, CONTEXT_STATES, CONTEXT_TAG, CONTRACT, DECISION_CHANN
 import { Config as _imported_config_schema, ContextSchema, ResultSchema } from './assets/schema.js';
 import { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferences } from './assets/result-contract.js';
 import { UNDEFINED, expandPrompt, resolveIntent } from './assets/intent-resolver.js';
+import { addTurnDuration, decay, emptyMemory, feedback, feedbackOf, memorySummary, observe, semanticProfile, validateMemory, weightsFrom } from './assets/intent-memory.js';
 import { renderContext, renderSkillsBlock } from './assets/render-context.js';
 import { loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
 import { writeJsonFile } from './assets/learned-store.js';
@@ -118,6 +119,69 @@ function warnIndex(runtime, detail) {
   if (runtime.indexWarned) return;
   runtime.indexWarned = true;
   console.error(`[shinon-prompter] Index-Kontext nicht nutzbar (${detail}) — MAX bleibt gesperrt`);
+}
+
+/**
+ * Das Intent-Gedächtnis schreiben — der EINE Schreibweg des Hosts.
+ *
+ * Ein Schreibfehler darf den Schritt nie brechen: das Gedächtnis ist Erfahrung,
+ * kein Vertrag. Er wird EINMAL gemeldet, damit ein kaputter Pfad sichtbar bleibt.
+ */
+function persistIntentMemory(runtime, path, memory) {
+  if (typeof path !== 'string' || path === '' || memory === null) return;
+  try {
+    writeJsonFile(path, memory);
+  } catch (error) {
+    if (!runtime.intentWriteWarned) {
+      runtime.intentWriteWarned = true;
+      console.warn(`[shinon-prompter] Intent-Gedächtnis nicht schreibbar (${error?.message}) — Zählung nur im Speicher`);
+    }
+  }
+}
+
+/**
+ * EINEN Turn ins Gedächtnis verbuchen — Beobachtung, Folge-Rückmeldung, Ablage.
+ *
+ * Die Rückmeldung kommt aus dem NÄCHSTEN Text derselben Sitzung: „passt" hebt
+ * das vorige Pattern, „falsch" senkt es. So wird jede Interaktion Information,
+ * ohne dass ein Modell befragt oder der Prompt-Text gespeichert wird.
+ */
+function recordIntent(config, runtime, promptText, resolution, sessionId, promptIndex) {
+  if (runtime.intentMemory === null) return;
+  const key = typeof sessionId === 'string' && sessionId !== '' ? sessionId : '(ohne sitzung)';
+  const previous = runtime.intentLast.get(key) ?? null;
+  // EIN Input, EINE Beobachtung: der Hook feuert je SCHRITT, nicht je Turn —
+  // ein Werkzeug-Loop saehe denselben Text sonst zehnmal. Die Position der
+  // Nachricht ist der stabile Schluessel innerhalb eines Turns; zwischen Turns
+  // waechst sie. Gemessen (2026-10-18): 6 Eingaben zaehlten als 26 Laeufe.
+  const sameInput = previous !== null
+    && previous.index === promptIndex
+    && previous.text === promptText
+    && Number.isInteger(promptIndex);
+  if (sameInput) return;
+  const polarity = previous !== null && previous.patternId !== null && previous.patternId !== undefined
+    ? feedbackOf(promptText)
+    : null;
+
+  let memory = observe(runtime.intentMemory, {
+    classification: resolution.classification,
+    patternId: resolution.matched ? resolution.patternId : null,
+    score: resolution.score ?? 0,
+    features: Array.isArray(resolution.features) ? resolution.features : [],
+    // Der TEXT geht in das Gedächtnis, nicht in die Ablage: `observe` liest nur
+    // die Begriffe und schreibt sie als Klassen-Zählung. Kein Prompt wird gespeichert.
+    text: promptText,
+  }, new Date().toISOString());
+  if (polarity !== null && previous !== null) memory = feedback(memory, previous.patternId, polarity);
+
+  runtime.intentMemory = memory;
+  runtime.intentLast.set(key, {
+    patternId: resolution.matched ? resolution.patternId : null,
+    classification: resolution.classification,
+    index: Number.isInteger(promptIndex) ? promptIndex : -1,
+    text: promptText,
+  });
+  persistIntentMemory(runtime, runtime.intentMemoryPath, memory);
 }
 
 /**
@@ -234,6 +298,16 @@ function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contex
     // Intent-Erweiterung (Zug 8): nur wenn aktiviert.
     expansion: runtime?.expansion ?? null,
     intentMatch: turn?.intentMatch ?? null,
+    // Die Erfahrung als ZAHL: der gelernte Faktor, der auf das Pattern wirkte,
+    // und die Merkmale, die den Treffer belegt haben. Kein Prompt-Text.
+    intentBias: turn?.intentBias ?? null,
+    // Der gelernte Semantik-Anteil dieses Textes: der zweite, dynamische Teil
+    // des Gewichts neben der Rückmeldung — als Zahl, nie als Prompt-Inhalt.
+    intentSemantic: turn?.intentSemantic ?? 0,
+    intentFeatures: Array.isArray(turn?.intentFeatures) ? turn.intentFeatures : [],
+    intentMemory: runtime?.intentMemory === null || runtime?.intentMemory === undefined
+      ? null
+      : memorySummary(runtime.intentMemory),
   };
 }
 
@@ -376,9 +450,16 @@ function proposeBlock(config, runtime, proposal) {
 
 /** Der registrierte Listener. Genau ein `next()` — Durchreichen ist der Normalfall. */
 async function onPreStep(ctx, config, runtime, payload, next) {
+  // Die Uhr laeuft ab dem Hook-Eintritt: die Dauer je Pattern ist gemessen,
+  // nicht geschaetzt — sie geht als Gesamtlaufzeit ins Intent-Gedächtnis.
+  const turnStarted = Date.now();
   const prompt = readPrompt(payload);
   if (prompt === null) return next();
   const sessionId = payload?.agent?.session?.id;
+  if (process.env.SHINON_INTENT_DEBUG === '1') {
+    const header = payload?.agent?.session?.header ?? {};
+    console.log(`[shinon-intent-debug] sid=${sessionId} header=${JSON.stringify(Object.keys(header))} source=${JSON.stringify(prompt.message?.source ?? null)} text=${JSON.stringify(prompt.text.slice(0, 40))}`);
+  }
 
   // EIN aufgeloester Modus je Lauf: Faehigkeiten, Verbote, Kontextbedarf und
   // System-Prompt kommen aus einer Struktur statt aus fuenf `mode`-Vergleichen.
@@ -394,14 +475,27 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   // P1: JEDER Turn bekommt ein frisches, isoliertes Turn-Objekt. Der Roh-Text
   // des Menschen steht darin, damit er im Trace verfuegbar ist; Treffer und
   // Klasse des vorigen Schritts koennen nicht stehen bleiben.
-  runtime.turn = { rawPrompt: prompt.text, resolution: null, intentMatch: null, intentMatchClass: null };
+  runtime.turn = { rawPrompt: prompt.text, resolution: null, intentMatch: null, intentMatchClass: null, intentBias: null, intentSemantic: 0, intentFeatures: [] };
   let expandedText = prompt.text;
   if (runtime.intentRules !== null) {
-    const resolution = resolveIntent(prompt.text, runtime.intentRules);
+    // Die GEWICHTE kommen aus der Gesamtlaufzeit: ein Pattern, das oft daneben
+    // lag, braucht mehr Belege. Ohne Gedächtnis ist die Karte leer — dann
+    // verhält sich der Resolver exakt wie vorher.
+    const weights = runtime.intentMemory === null ? null : weightsFrom(runtime.intentMemory);
+    // Das gelernte Begriffsprofil: welcher Begriff deutet auf welche Klasse.
+    // Es ist die zweite Quelle des Gewichts und wirkt auf JEDEN Turn, auch ohne
+    // Rückmeldung — damit wird jede Eingabe nutzbar, nicht nur die bestätigte.
+    const lexicon = runtime.intentMemory === null ? null : semanticProfile(runtime.intentMemory);
+    const resolution = resolveIntent(prompt.text, runtime.intentRules, { weights, lexicon });
     runtime.turn.resolution = resolution;
     runtime.turn.intentMatch = resolution.matched ? resolution.patternId : null;
     // UNDEFINED ist eine Aussage, keine Klasse: die Baustein-Auswahl bleibt leer.
     runtime.turn.intentMatchClass = resolution.classification === UNDEFINED ? null : resolution.classification;
+    runtime.turn.intentBias = resolution.matched ? resolution.bias : null;
+    runtime.turn.intentSemantic = resolution.semantic ?? 0;
+    runtime.turn.intentFeatures = Array.isArray(resolution.features) ? resolution.features : [];
+    // Jeder Input ist Information — auch der ohne Treffer (unmatched).
+    recordIntent(config, runtime, prompt.text, resolution, payload?.agent?.session?.id, prompt.index);
     if (contract.needsContext && resolution.expansion !== '') {
       expandedText = expandPrompt(prompt.text, resolution);
       console.log(`[shinon-prompter] Intent erkannt: ${resolution.label} (${resolution.classification}) — Expansion angewendet`);
@@ -499,6 +593,12 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   const recorded = effect.replacePrompt && messages === null
     ? { ...outcome, outcome: 'rejected', reasons: effect.missingMessage }
     : outcome;
+  // Die zweite Hälfte der Gesamtlaufzeit: die Dauer fällt erst nach dem Turn an
+  // und hängt an demselben Pattern, das die Beobachtung verbucht hat.
+  if (runtime.intentMemory !== null && runtime.turn?.intentMatch) {
+    runtime.intentMemory = addTurnDuration(runtime.intentMemory, runtime.turn.intentMatch, Date.now() - turnStarted);
+    persistIntentMemory(runtime, runtime.intentMemoryPath, runtime.intentMemory);
+  }
   report(ctx, config, runtime, { ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection) });
 
   // Nur ein gefundenes akzeptiertes Ergebnis ersetzt die Nutzernachricht. In
@@ -513,7 +613,15 @@ function report(ctx, config, runtime, record) {
   if (!config.trace) return;
   // Der ROHE Nutzertext gehoert in den Trace: ohne ihn ist nicht nachvollziehbar,
   // WAS veredelt wurde. JSON.stringify haelt die Zeile einzeilig und vollstaendig.
-  console.log(`[shinon-prompter] Trace: ${record.outcome} intent=${record.intentClassification ?? 'UNDEFINED'} raw=${JSON.stringify(record.raw_prompt ?? '')}`);
+  // Pattern, Erfahrungsfaktor und Merkmale stehen mit in der Zeile: ohne sie ist
+  // ein Lauf mit und ohne Gedächtnis nicht unterscheidbar (gemessen am E2E-Lauf).
+  const pattern = record.intentMatch ?? '-';
+  const bias = record.intentBias === null || record.intentBias === undefined ? '-' : record.intentBias;
+  const features = Array.isArray(record.intentFeatures) && record.intentFeatures.length > 0
+    ? record.intentFeatures.join('+')
+    : '-';
+  const semantic = record.intentSemantic === null || record.intentSemantic === undefined ? '-' : record.intentSemantic;
+  console.log(`[shinon-prompter] Trace: ${record.outcome} intent=${record.intentClassification ?? 'UNDEFINED'} pattern=${pattern} bias=${bias} sem=${semantic} features=${features} raw=${JSON.stringify(record.raw_prompt ?? '')}`);
   // Der Puffer ist die Quelle des Panels: der Kanal allein erreicht den Browser
   // nicht (Host-Events ueberqueren den Carrier nicht), also legt der Host die
   // letzten Entscheidungen als Global in die naechste index.html.
@@ -525,6 +633,10 @@ function report(ctx, config, runtime, record) {
       reasons: record.reasons,
       context_source: record.context_source ?? null,
       intent: record.intentClassification ?? 'UNDEFINED',
+      intent_pattern: record.intentMatch ?? null,
+      intent_bias: record.intentBias ?? null,
+      intent_semantic: record.intentSemantic ?? 0,
+      intent_features: record.intentFeatures ?? [],
       raw_prompt: record.raw_prompt ?? null,
       at: Date.now(),
     });
@@ -715,7 +827,35 @@ export function apply(ctx, config) {
     console.warn(`[shinon-prompter] Eigener Schluessel fehlt (${config.providerKeyEnv}) — One-Shot faellt auf ${route.provider}/${route.model} zurueck`);
   }
 
-  const runtime = { context, contextState, noteRules, skillRules, intentRules, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null };
+  // Intent-Gedächtnis: einmal beim Mounten geladen, je Turn verbucht, nach dem
+  // Turn geschrieben. Fehlt die Datei, ist das kein Fehler — der erste Lauf
+  // legt sie an. Ein fremder Vertrag wird nicht übernommen (fail-closed).
+  let intentMemory = null;
+  let intentMemoryPath = '';
+  if (typeof config.intentMemoryPath === 'string' && config.intentMemoryPath !== '') {
+    intentMemoryPath = isAbsolute(config.intentMemoryPath) ? config.intentMemoryPath : join(workspace.root, config.intentMemoryPath);
+    try {
+      const checked = validateMemory(JSON.parse(readFileSync(intentMemoryPath, 'utf8')));
+      if (checked.foreign) {
+        console.warn(`[shinon-prompter] Intent-Gedächtnis fremd (${config.intentMemoryPath}) — neuer Stand`);
+        intentMemory = emptyMemory(new Date().toISOString());
+      } else {
+        intentMemory = decay(checked.memory);
+        if (checked.dropped > 0) console.warn(`[shinon-prompter] ${checked.dropped} unlesbare Intent-Einträge übergangen`);
+      }
+    } catch (error) {
+      if (error?.code !== 'ENOENT') {
+        console.warn(`[shinon-prompter] Intent-Gedächtnis nicht lesbar (${error?.message}) — neuer Stand`);
+      }
+      intentMemory = emptyMemory(new Date().toISOString());
+    }
+  }
+
+  const runtime = { context, contextState, noteRules, skillRules, intentRules, intentMemory, intentMemoryPath, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null };
+  if (intentMemory !== null) {
+    const summary = memorySummary(intentMemory);
+    console.log(`[shinon-prompter] Intent-Gedächtnis: ${summary.runs} Läufe, ${summary.matched} Treffer, ${summary.patterns} Patterns, ${summary.unmatched} ohne Treffer, Lexikon ${summary.terms} Begriffe (${summary.classifiedTerms} eingeordnet), ${summary.unclaimed} unbeansprucht`);
+  }
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
   // Das Panel liest den Puffer beim Laden: dieselbe Naht wie Marker/Traceability.
   const disposeInject = ctx.on(INDEX_INJECT, (table) => {
