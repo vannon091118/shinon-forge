@@ -92,6 +92,7 @@ jobs:
           mkdir -p runtime-arm64
 
           cp -r rootfs-arm64/* runtime-arm64/
+          mkdir -p runtime-arm64/shinon-forge
 
           tar --exclude='.git' --exclude='node_modules/.cache' --exclude='runtime-arm64' --exclude='rootfs-arm64' -cf - . | \
             (cd runtime-arm64/shinon-forge && tar xf -)
