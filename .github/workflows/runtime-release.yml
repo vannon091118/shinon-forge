@@ -78,9 +78,10 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
-          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-          echo "DSH: $(node_modules/.bin/dsh --version 2>&1)"
-          # Das mobile-Profil booten (wie mobile-profile.yml, mit DSH_HOME-Seed)
+          # dsh aus node_modules/.bin in den systemweiten PATH legen,
+          # damit shinon-profile-test.mjs (DSH-Boot) die CLI findet.
+          export PATH="$PWD/node_modules/.bin:$PATH"
+          echo "DSH: $(dsh --version 2>&1)"
           node scripts/shinon-profile-test.mjs --profile mobile
           echo "mobile-Profil-Boot: OK"
 
