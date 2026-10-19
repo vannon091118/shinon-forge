@@ -61,6 +61,18 @@ jobs:
           echo "short_sha=$SHORT" >> "$GITHUB_OUTPUT"
           echo "Runtime-Tag: runtime-$SHORT"
 
+      # ── 0) Mobile-Gate: Profil-Contract + DSH-Versionen (fail-closed) ──
+      # Vor dem Build: das mobile-Profil muss statisch ok sein.
+      # check-dsh-versions.mjs braucht node_modules → läuft im
+      # gepinnte-Step nach npm ci (wo dsh im PATH ist).
+      # Hier: nur der statische Contract-Test (Manifest + Struktur).
+      - name: "Fail-closed-Gate: mobile-Profil-Contract (statisch)"
+        run: |
+          set -euo pipefail
+          echo "Gate: Mobile-Profil-Contract (statisch: manifest + Struktur)"
+          node scripts/mobile-profile-contract-test.mjs
+          echo "Gate: PASS (statisch; DSH-Versionen + Profil-Boot laufen post-npm-ci)"
+
       - name: "proot-Debian-Rootfs anlegen (glibc, ARM64)"
         run: |
           set -euo pipefail
@@ -81,6 +93,13 @@ jobs:
           # dsh aus node_modules/.bin in den systemweiten PATH legen,
           # damit shinon-profile-test.mjs (DSH-Boot) die CLI findet.
           export PATH="$PWD/node_modules/.bin:$PATH"
+
+          # Fail-closed-Gate (post-npm-ci): DSH-Versionen + Profil-Boot
+          # — jetzt mit node_modules vorhanden. Scheitert hier = kein
+          # Runtime-Release (B-1/B-5, DEC-011).
+          echo "Gate: DSH-Versionen (lockfile + Vendor + Manifest, fail-closed)"
+          node scripts/check-dsh-versions.mjs
+
           echo "DSH: $(dsh --version 2>&1)"
           node scripts/shinon-profile-test.mjs --profile mobile
           echo "mobile-Profil-Boot: OK"
