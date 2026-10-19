@@ -223,14 +223,17 @@ test('Gewichte: ein gedaempftes Pattern ist kein Treffer mehr', () => {
 test('Gewichte: innerhalb einer Klasse entscheidet die Erfahrung', () => {
   const pair = {
     patterns: [
+      // Beide Trigger sind GLEICH LANG: die Laenge entscheidet hier nichts, also
+      // darf die Erfahrung die Wahl treffen. Bei ungleicher Laenge gewinnt die
+      // laengere Phrase — das pinnt der Konflikt-Test (2026-10-20).
       { id: 'a', label: 'A', trigger: ['alpha'], classification: 'TRANSFORM', expansion: '' },
-      { id: 'b', label: 'B', trigger: ['beta'], classification: 'TRANSFORM', expansion: '' },
+      { id: 'b', label: 'B', trigger: ['delta'], classification: 'TRANSFORM', expansion: '' },
     ],
   };
   // Ohne Erfahrung gewinnt die erste Zeile (stabile Reihenfolge, kein Zufall).
-  assert.equal(resolveIntent('alpha beta', pair).patternId, 'a');
+  assert.equal(resolveIntent('alpha delta', pair).patternId, 'a');
   // Mit Erfahrung gewinnt das staerkere Pattern — und nennt seinen Faktor.
-  const gelernt = resolveIntent('alpha beta', pair, { weights: { b: 1.3 } });
+  const gelernt = resolveIntent('alpha delta', pair, { weights: { b: 1.3 } });
   assert.equal(gelernt.patternId, 'b');
   assert.equal(gelernt.bias, 1.3);
   // Die Klasse bleibt dieselbe: Erfahrung verschiebt die Wahl, nicht den Rang.

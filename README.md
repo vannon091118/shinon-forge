@@ -168,6 +168,12 @@ wähle das gewünschte Modell zurück. Gehe nicht von einem automatischen Wechse
 Standardroute aus. Ob eine Route in deiner Umgebung antwortet, hängt an deinem
 Schlüssel und ist deshalb **nicht** Teil der belegten Zusagen dieses Repos.
 
+Die Profil-Standardroute ist **Agnes** — die empfohlene kostenlose Route
+(*recommended free tier*) dieses Repos. Welches Modell läuft, entscheidet allein
+das Profil (`profiles/*/cordis.patch.yml`): die Pakete führen keinen Modellnamen
+und keine Voreinstellung, und die Profil-Verträge prüfen die **Form** — Provider
+gesetzt, Modell im Katalog dieses Providers — statt eines Namens.
+
 ---
 
 ## 🧩 Pakete

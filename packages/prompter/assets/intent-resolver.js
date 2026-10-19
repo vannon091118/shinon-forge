@@ -25,9 +25,9 @@ export { INTENT_CLASSES };
 export const UNDEFINED = 'UNDEFINED';
 
 /**
- * Die feste Prioritaet: hoeher gewinnt. Sie ist total, damit zwei Treffer nie
- * unentschieden bleiben und die Reihenfolge der Daten die Klasse nicht dreht.
- * Die Erfahrung verschiebt nur die Wahl INNERHALB einer Klasse.
+ * Die feste Prioritaet: hoeher gewinnt — aber erst NACH der Phrasenlaenge.
+ * Die Reihenfolge ist total (Laenge, Klasse, Erfahrung, ID), damit zwei Treffer
+ * nie unentschieden bleiben und die Reihenfolge der Daten nichts dreht.
  */
 export const INTENT_PRIORITY = Object.freeze({
   LONG_RUNNING_GOAL: 4,
@@ -196,13 +196,32 @@ function undefinedResolution(reason, features = []) {
 }
 
 /** Phrasentreffer eines Patterns, gewichtet mit seiner Staerke. */
-function phraseScore(pattern, text) {
+function phraseHit(pattern, text) {
   const strength = patternStrength(pattern);
   let score = 0;
+  let longest = 0;
   for (const trigger of (Array.isArray(pattern?.trigger) ? pattern.trigger : [])) {
-    if (hasPhrase(text, String(trigger).toLocaleLowerCase())) score += strength;
+    const phrase = String(trigger).toLocaleLowerCase();
+    if (!hasPhrase(text, phrase)) continue;
+    score += strength;
+    if (phrase.length > longest) longest = phrase.length;
   }
-  return score;
+  return { score, longest };
+}
+
+/**
+ * Die EINE Rangfolge zweier Treffer: laengste Phrase, dann Klasse, dann
+ * Erfahrung, zuletzt die ID. Die ID ist die stabile letzte Ordnung — ohne sie
+ * haenge das Ergebnis an der Reihenfolge der Regeln in der Datei.
+ */
+function outranks(candidate, best) {
+  if (best === null) return true;
+  if (candidate.longest !== best.longest) return candidate.longest > best.longest;
+  const rank = INTENT_PRIORITY[candidate.pattern.classification];
+  const bestRank = INTENT_PRIORITY[best.pattern.classification];
+  if (rank !== bestRank) return rank > bestRank;
+  if (candidate.weighted !== best.weighted) return candidate.weighted > best.weighted;
+  return String(candidate.pattern.id) < String(best.pattern.id);
 }
 
 /** Der gelernte Faktor eines Patterns — 1 ohne Erfahrung (kein Raten). */
@@ -237,24 +256,21 @@ export function resolveIntent(promptText, rules, options = {}) {
   let unknownClass = 0;
   for (const pattern of rules.patterns) {
     if (pattern === null || typeof pattern !== 'object') continue;
-    const phrase = phraseScore(pattern, text);
+    const hit = phraseHit(pattern, text);
     const known = INTENT_CLASSES.includes(pattern.classification);
     if (!known) {
-      if (phrase > 0) unknownClass += 1;
+      if (hit.score > 0) unknownClass += 1;
       continue;
     }
-    if (phrase === 0) continue;
+    if (hit.score === 0) continue;
     // Die Semantik belegt den Treffer, sie erzeugt ihn nicht.
     const semantic = useHeuristics ? semanticSupport(lexicon, text, pattern.classification) : 0;
-    const score = phrase + (useHeuristics ? semanticBonus(pattern, features, textWords) : 0) + semantic;
+    const score = hit.score + (useHeuristics ? semanticBonus(pattern, features, textWords) : 0) + semantic;
     const bias = biasOf(weights, pattern.id);
     const weighted = score * bias;
     if (weighted < MIN_WEIGHTED_SCORE) continue;
-    const rank = INTENT_PRIORITY[pattern.classification];
-    const bestRank = best === null ? -1 : INTENT_PRIORITY[best.pattern.classification];
-    if (rank > bestRank || (rank === bestRank && weighted > best.weighted)) {
-      best = { pattern, score, bias, semantic, weighted };
-    }
+    const candidate = { pattern, score, bias, semantic, weighted, longest: hit.longest };
+    if (outranks(candidate, best)) best = candidate;
   }
 
   if (best === null) {
