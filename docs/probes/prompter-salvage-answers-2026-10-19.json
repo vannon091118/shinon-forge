@@ -1,0 +1,18 @@
+{
+  "id": "prompter-salvage-answers-2026-10-19",
+  "claim": "Die Prosa-Rettung des Prompters übernimmt keine echte Assistenten-Antwort als Prompt, auch wenn sie den Wortschatz des Auftrags teilt.",
+  "targets": [
+    "packages/prompter/assets/enhancer.js",
+    "packages/prompter/test/enhancer-guards.test.mjs",
+    "scripts/gate/tests/prompter-contract.test.mjs"
+  ],
+  "expect": "Von 93 Paaren aus Nutzerauftrag und echter Assistentenantwort (34 Sitzungen) passiert nach der Sperre keine Antwort mehr als ganzer Text; vorher waren es 18. Antwortform (Kopf, Tabelle, Berichtslabel, Gegenrede), Antwortlänge und fehlender Anker verwerfen fail-closed.",
+  "result": "BESTAETIGT",
+  "verdict": "WRITE",
+  "evidence": "GEMESSEN 2026-10-19 über die Sitzungslogs unter sessions/ (34 Dateien session.v4.jsonl.zstd, mit zstd entpackt). Methode: je Assistenten-Nachricht der zuletzt vorausgehende Nutzertext als Roh-Prompt, Textblöcke der Antwort als Kandidat, dann salvageProse(text, raw) — das ist der Pfad, den enhance() bei NO_JSON/INVALID_JSON nimmt. VOR der Änderung: 93 Paare, 18 Antworten kamen unverändert zurück (u. a. Markdown-Kopf '## Intent vs. Persona', Berichtslabel '**Gemacht:**', 'Tamam bro, ich hab's.', 'Hast du die Liste noch nicht?', 'Nö. Bin ich nicht.', 'Verstanden. Dann baue ich um:', 'nn — typo oder Test?'). NACH der Änderung: 0 von 93. Die Sperren in packages/prompter/assets/enhancer.js: ANSWER_OPEN (Kopf/Tabelle/Berichtslabel/Gegenrede), looksLikeAnswer (mehr als 5× bzw. bei Fragen 3× der Auftragslänge, mindestens 240 Zeichen), Ankerpflicht (raw ohne Wort ab 4 Zeichen → kein Beleg → verworfen). Gepinnt auf beiden Ebenen: packages/prompter/test/enhancer-guards.test.mjs (12/12, Korpusfälle) und scripts/gate/tests/prompter-contract.test.mjs (73/73, gerenderter Prompt bleibt der Roh-Prompt).",
+  "limits": [
+    "Die Sitzungen enthalten Assistenten-Antworten, nicht die One-Shot-Antworten des Veredlers; dessen Rohtext steht nur auf stderr und wird nicht persistiert. Gemessen ist die Sperre gegen echte Prosa, nicht gegen echte Enhancer-Antworten.",
+    "Die 18 vorher durchgerutschten Fälle sind Beispiele aus einem Korpus, keine Statistik über alle Modelle oder Sprachen.",
+    "Die Längengrenze ist eine Heuristik: eine sehr lange, echte Veredelung eines kurzen Auftrags wird verworfen (dann gilt der Roh-Prompt) — fail-closed, nicht fail-open."
+  ]
+}

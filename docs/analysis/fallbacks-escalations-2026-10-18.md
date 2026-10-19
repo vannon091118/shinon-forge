@@ -76,6 +76,35 @@ salvageProse('Klar! Hier ist dein verbesserter Prompt: teste das', 'teste das')
 Kein Test pinnt diesen Fall. Solange er offen ist, gilt: die Rettung ist besser
 als ein leerer Prompt, aber sie ist kein Beweis, dass der Text eine Veredelung ist.
 
+**Nachtrag 2026-10-19 — geschlossen.** `salvageProse()` schneidet jetzt auch
+eine Anerkennung OHNE Vorrede ab (`PROSE_LEAD` in
+`packages/prompter/assets/enhancer.js`); die enge Liste lässt `gut`, `also` und
+`nun` bewusst aus, weil diese Wörter einen echten Auftrag beginnen können
+(„Gut. Prüfe …“). Gepinnt auf beiden Ebenen: `packages/prompter/test/enhancer-guards.test.mjs`
+(11/11) und `scripts/gate/tests/prompter-contract.test.mjs` (72/72) —
+„Klar. Baue …“ wird zu „Baue …“, „Klarstellung: …“ bleibt unangetastet.
+
+**Noch ein Nachtrag 2026-10-19 (Korpus).** Gegen die echten Assistenten-Antworten
+aus 34 Sitzungen (93 Paare aus Auftrag und Antwort) kamen **18 Antworten** als
+GANZER Text durch — der Anker allein rettete sie. Neu verwerfen `ANSWER_OPEN`
+(Markdown-Kopf, Tabelle, Berichtslabel, direkte Gegenrede), `looksLikeAnswer`
+(mehr als 5× bzw. bei Fragen 3× der Auftragslänge, mindestens 240 Zeichen) und
+die Ankerpflicht ohne Wörter ab vier Zeichen. Danach: **0 von 93**. Die Zahlen und
+die Methode stehen in `docs/probes/prompter-salvage-answers-2026-10-19.json`; die
+Fälle sind in `packages/prompter/test/enhancer-guards.test.mjs` und
+`scripts/gate/tests/prompter-contract.test.mjs` gepinnt.
+
+**Probe-Journal (2026-10-19).** Damit künftig gegen ECHTE Enhancer-Antworten
+gemessen wird, schreibt der Host jede verworfene One-Shot-Antwort mit Text als
+JSONL-Zeile nach `.shinon/one-shot-journal.jsonl` (`probeJournalPath`, leer =
+aus; gitignoriert). Eine Zeile trägt `contract`
+(`shinon.prompter/one-shot-journal/v1`), `at`, `reasons`, `mode`, `provider`,
+`model`, `prompt`, `answer`, `answerChars`. Geschrieben wird ausschließlich in
+der Host-Komposition (`assets/learned-store.js`); der One-Shot-Pfad bleibt ohne
+Dateisystem. Zusätzlich ist der Veredler seit demselben Datum in der Regel
+immer aktiv: `alwaysEnhance` steht per Vorgabe auf `true`, der alte
+CHAT/LOOKUP-Kurzweg ist nur noch ein ausdrücklicher Profil-Schalter.
+
 ## 2. Eskalation durch den Task Router (`packages/task-router/`)
 
 ### 2.1 Deterministische Threshold-Entscheidung

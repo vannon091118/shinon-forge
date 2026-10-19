@@ -8,6 +8,7 @@
 import z from '@deepseek-ai/schemastery';
 import { INDEX_BUDGET_TOKENS, MODES, NOTES_DIR_DEFAULT, SKILLS_DIR_DEFAULT } from './mode-core.js';
 import { LEARNED_DEFAULT_PATH } from './block-review.js';
+import { SALVAGE_NAMESPACE } from './salvage-store.js';
 
 /**
  * Der Resultatvertrag (Plan §7), je Modus.
@@ -166,6 +167,23 @@ export const Config = z.object({
   temperature: z.number().default(0),
   /** Harte Obergrenze des One-Shots. Danach gilt der Roh-Prompt. 0 = kein Deckel. */
   timeoutMs: z.number().default(15000),
+  /**
+   * Der One-Shot laeuft fuer JEDEN Schritt — auch fuer eine Frage oder ein
+   * "hallo". Vorgabe ist `true` (Nutzerentscheidung 2026-10-19: der Veredler
+   * soll in der Regel immer aktiv sein). `false` stellt den alten Kurzweg
+   * wieder her: klare CHAT-/LOOKUP-Turns gehen ohne Modellaufruf durch.
+   */
+  alwaysEnhance: z.boolean().default(true),
+  /**
+   * Probe-Journal der VERWORFENEN One-Shot-Antworten (JSONL), relativ zum
+   * WORKSPACE. Leer = kein Journal (dann bleibt nur die stderr-Zeile).
+   *
+   * Der Zweck ist die Messung der Prosa-Rettung gegen echte Enhancer-Antworten
+   * statt gegen fremde Assistenten-Antworten. Das Journal enthaelt den
+   * Nutzertext und die Antwort im Klartext und gehoert deshalb dem Projekt:
+   * es liegt unter `.shinon/`, wird nicht ausgeliefert und ist gitignoriert.
+   */
+  probeJournalPath: z.string().default('.shinon/one-shot-journal.jsonl'),
   /** Entscheidungen auf `DECISION_CHANNEL` emittieren. */
   trace: z.boolean().default(true),
   /**
@@ -180,6 +198,16 @@ export const Config = z.object({
    * gehört deshalb zum Projekt, nicht in den Tarball.
    */
   intentMemoryPath: z.string().default('.shinon/intent-memory.json'),
+  /**
+   * Namensraum des dauerhaften SALVAGED_PROSE-Zaehlers in der Ablage
+   * (`shinon_index_store`). Leer = keine Persistenz; dann zaehlt der Prompter
+   * nur im Prozess (das Verhalten vor 2026-10-19).
+   *
+   * Der Zaehler gehoert zum LAUF (Sitzung), nicht zum Workspace — deshalb ein
+   * eigener Namensraum und keine Projektdatei; die Ablage ist ohnehin der eine
+   * dauerhafte Ort, den dieses Profil schon fuer Scoring und Persona nutzt.
+   */
+  salvageNamespace: z.string().default(SALVAGE_NAMESPACE),
   /**
    * Ablage gelernter Bausteine (Phase 4), relativ zum ARBEITSVERZEICHNIS.
    *

@@ -190,6 +190,16 @@ test('Naht: Dienst- und Vertragsname stimmen in beiden Paketen ueberein', () => 
   assert.equal(persona.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
   assert.notEqual(persona.SELF_MODEL_NAMESPACE, scoring.LEDGER_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
 
+  // Der Prompter haengt am selben Dienst, ebenfalls mit einem EIGENEN Raum:
+  // der SALVAGED_PROSE-Zaehler beschreibt den Lauf (Sitzung), nicht das
+  // Protokoll und nicht das Selbstmodell. Auch hier sind beide Namen Literale
+  // auf beiden Seiten — und der Test ist der Ort, der sie zusammennagelt.
+  assert.equal(prompter.INDEX_STORE_SERVICE, index.STORE_SERVICE, 'derselbe Dienstname');
+  assert.equal(prompter.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
+  assert.notEqual(prompter.SALVAGE_NAMESPACE, scoring.LEDGER_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
+  assert.notEqual(prompter.SALVAGE_NAMESPACE, persona.SELF_MODEL_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
+  assert.equal(prompter.SALVAGE_CONTRACT, prompter.SALVAGE_NAMESPACE, 'Vertrag und Adresse sind derselbe Name der Form');
+
   // Die dritte Naht (Zug 5): der Ton. Der Veredler liest die Haltung ueber
   // dieselbe Bauform (optionales `get`, gepruefter Vertragsname); die Namen
   // muessen auf beiden Seiten dieselben sein, sonst bleibt der Block stumm.

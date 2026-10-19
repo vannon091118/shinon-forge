@@ -276,6 +276,9 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/block-select.js' },
       { kind: 'import', target: './assets/block-review.js' },
       { kind: 'import', target: './assets/selection.js' },
+      // Der dauerhafte SALVAGED_PROSE-Zaehler: Form und Deckel sind ein reiner
+      // Kern, die Ablage haengt am Host (derselbe Schnitt wie oben).
+      { kind: 'import', target: './assets/salvage-store.js' },
     ].sort(byTarget),
     'Kanten sind Importe; externe Ziele bleiben drin, weil sie importiert werden',
   );
@@ -287,7 +290,7 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
     if (!edge.target.startsWith('./assets/')) continue;
     assert.ok(existsSync(join(REPO_ROOT, 'packages/prompter', edge.target)), `${edge.target} fehlt`);
   }
-  for (const core of ['assets/mode-core.js', 'assets/note-core.js']) {
+  for (const core of ['assets/mode-core.js', 'assets/note-core.js', 'assets/salvage-store.js']) {
     assert.deepEqual(bundle.extractEdges(prompterModule(core)), [], `${core} ist importfrei`);
   }
 

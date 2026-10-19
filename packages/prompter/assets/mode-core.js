@@ -38,6 +38,18 @@ export const INDEX_SERVICE = 'shinon_index_query';
 export const INDEX_CONTRACT = 'shinon.project-index/query-v1';
 
 /**
+ * Die ZWEITE, schmale Faehigkeit des Project Index: die dauerhafte Ablage.
+ *
+ * Dieselben Namen wie in `@shinon/scoring` und `@shinon/persona` (jedes Paket
+ * traegt sein eigenes Literal; `scripts/gate/tests/context-wiring.test.mjs`
+ * pinnt die Gleichheit). Gelesen wird optional ueber `ctx.get`, nie per
+ * `inject`: ohne Index bleibt der Prompter montiert, dann zaehlt er nur im
+ * Prozess.
+ */
+export const INDEX_STORE_SERVICE = 'shinon_index_store';
+export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
+
+/**
  * Die Ton-Faehigkeit des Scorings (Zug 5) — optional, wie die Abfrage des Index.
  *
  * Der Stand-Block traegt zwei Dinge: die passenden ZETTEL (aus dem Verzeichnis)

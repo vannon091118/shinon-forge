@@ -205,6 +205,54 @@ const PROSE_PREAMBLE = new RegExp(
     + '[^\\n]{0,80}:\\s*',
   'iu',
 );
+/*
+ * Der zweite Fall: ein Füllwort OHNE Vorrede ("Klar. Baue …"). Er wurde
+ * gemessen 2026-10-19: `PROSE_PREAMBLE` verlangt eine Vorrede, also blieb das
+ * Füllwort stehen und der Anker-Check nahm die ganze Antwort an — die Plauderei
+ * wurde zum Prompt. Hier fällt nur eine ANERKENNUNG am Satzanfang weg, nie ein
+ * Inhaltswort: die enge Liste lässt `gut`, `also` und `nun` bewusst aus, weil
+ * diese Wörter auch einen echten Auftrag beginnen können ("Gut. Prüfe …").
+ */
+const PROSE_ACK = '(?:sure|okay|ok|klar|gerne|gern|natürlich|natuerlich|sicher|of course|certainly|alright|all right)';
+const PROSE_LEAD = new RegExp(
+  '^(?:' + PROSE_ACK + '[\\s,.;:!?—–-]+){1,4}',
+  'iu',
+);
+
+/*
+ * Eine ANTWORT ist kein Vorschlag. Gemessen 2026-10-19 an den echten
+ * Assistenten-Antworten der Sitzungslogs: 18 von 93 Antworten gingen als
+ * GANZER Text durch, weil der Anker-Check bei kurzen Auftraegen fast alles
+ * findet. Diese Formen verraten die Antwort, bevor der Anker sie rettet:
+ * Markdown-Kopf, Tabelle, Berichtslabel ("Gemacht/Gefunden/Risiko/Tests/Offen")
+ * und die direkte Anrede ("Nö.", "Hast du …", "Schon beantwortet",
+ * "Kurze Antwort", "Tamam", "Verstanden"). Fail-closed: dann gilt der Roh-Prompt.
+ */
+/** `\b` kennt nur ASCII: neben `ö` in "Nö." gäbe es keine Wortgrenze. */
+const END_WORD = '(?![\\p{L}\\p{N}])';
+const ANSWER_OPEN = [
+  /^#{1,6}\s/u,
+  /^\|/u,
+  new RegExp(`^\\*{0,2}(?:gemacht|gefunden|risiko|tests|offen|antwort)${END_WORD}`, 'iu'),
+  new RegExp(`^(?:nö|no|nein|ja|doch|genau|stimmt|tamam|verstanden|hast du|schon beantwortet|die nachricht wirkt|kurze antwort)${END_WORD}`, 'iu'),
+  new RegExp(`^alles klar${END_WORD}`, 'iu'),
+  /^kurz\s*[,:.!]/iu,
+];
+
+/** Frageformen — eine Antwort auf eine Frage ist keine Veredelung. */
+const QUESTION_OPEN = /^\s*(?:was|wie|wer|wo|wann|warum|wieso|weshalb|welche[rsnm]?|welchen|welchem|kann|kannst|können|könntest|ist|sind|war|hat|haben|gibt es|darf|soll|sollte|what|how|who|where|when|which|why|can|could|is|are|do|does|did|should|would)(?![\p{L}\p{N}])/iu;
+
+/**
+ * Antwortlänge: eine Veredelung bleibt in der Größenordnung des Auftrags.
+ * Eine Frage verträgt weniger Zuwachs als ein knapper Auftrag (3× statt 5×),
+ * weil die Antwort auf eine Frage ein Text ÜBER sie ist — nie ihr Prompt.
+ */
+const looksLikeAnswer = (body, rawPrompt) => {
+  const raw = rawPrompt.trim();
+  if (raw === '') return false;
+  const question = /\?\s*$/.test(raw) || QUESTION_OPEN.test(raw);
+  return body.length > Math.max(240, raw.length * (question ? 3 : 5));
+};
 
 export function salvageProse(text, rawPrompt = '') {
   if (typeof text !== 'string') return null;
@@ -230,17 +278,24 @@ export function salvageProse(text, rawPrompt = '') {
     }
   }
   body = body.replace(PROSE_PREAMBLE, '').trim();
+  body = body.replace(PROSE_LEAD, '').trim();
   body = body.replace(/^["'„“]([\s\S]*)["'“”]$/, '$1').trim();
   if (body.length < 8 || !/\p{L}/u.test(body)) return null;
+  // Antwortform und Antwortlänge sind Ausschlussgründe, keine Kürzung: was
+  // nach Bericht oder Gegenrede aussieht, ist kein Prompt, den man vorne
+  // abschneiden könnte — der Rest wäre immer noch die Antwort.
+  if (ANSWER_OPEN.some((pattern) => pattern.test(body))) return null;
+  if (looksLikeAnswer(body, rawPrompt)) return null;
   // ANKER: eine echte Veredelung nennt den Auftrag weiter. Eine ANTWORT auf die
   // Frage traegt andere Woerter — sie darf den Prompt nicht ersetzen.
   const words = (value) => new Set((value.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []));
   const anchor = words(rawPrompt);
-  if (anchor.size > 0) {
-    const candidate = words(body);
-    const shared = [...anchor].filter((word) => candidate.has(word)).length;
-    if (shared / anchor.size < 0.35) return null;
-  }
+  // OHNE Anker gibt es keinen Beleg, dass der Text den Auftrag weiterfuehrt:
+  // ein Ein-Wort-Auftrag ("nn") ist kein Freibrief fuer beliebige Prosa.
+  if (anchor.size === 0) return null;
+  const candidate = words(body);
+  const shared = [...anchor].filter((word) => candidate.has(word)).length;
+  if (shared / anchor.size < 0.35) return null;
   return body;
 }
 
@@ -268,12 +323,36 @@ export function logRejectedAnswer(reasons, text, counts, finish, usage, request,
   );
 }
 
-export async function enhance(ctx, contract, config, prompt, context, stand, skills, signal) {
+/**
+ * Der Host bekommt jede verworfene Antwort ueber `onReject` — fuer das
+ * Probe-Journal. Der Enhancer selbst schreibt NIE eine Datei (Isolationstest).
+ * Ein Fehler des Journals darf den Schritt nicht brechen.
+ */
+function journalRejection(onReject, config, prompt, outcome, text = null) {
+  // Nur eine echte ANTWORT ist ein Beleg: ein Provider-Fehler ohne Text haette
+  // im Journal nichts zu zeigen (er steht schon auf stderr).
+  if (typeof onReject !== 'function' || typeof text !== 'string') return outcome;
+  try {
+    onReject({
+      contract: 'shinon.prompter/one-shot-journal/v1',
+      reasons: outcome.reasons,
+      mode: config.mode,
+      provider: config.provider,
+      model: config.model,
+      prompt: typeof prompt === 'string' ? prompt.slice(0, 4000) : '',
+      answer: typeof text === 'string' ? text.slice(0, 6000) : null,
+      answerChars: typeof text === 'string' ? text.length : 0,
+    });
+  } catch { /* Journal ist Diagnose, kein Vertrag */ }
+  return outcome;
+}
+
+export async function enhance(ctx, contract, config, prompt, context, stand, skills, signal, onReject = null) {
   if (typeof config.provider !== 'string' || config.provider === '' || typeof config.model !== 'string' || config.model === '') {
-    return { outcome: 'unavailable', reasons: ['NO_ROUTE'], result: null };
+    return journalRejection(onReject, config, prompt, { outcome: 'unavailable', reasons: ['NO_ROUTE'], result: null });
   }
   if (typeof ctx?.llm?.stream !== 'function') {
-    return { outcome: 'unavailable', reasons: ['NO_LLM_SERVICE'], result: null };
+    return journalRejection(onReject, config, prompt, { outcome: 'unavailable', reasons: ['NO_LLM_SERVICE'], result: null });
   }
 
   // `timeoutMs === 0` heisst KEIN Deckel (Dev-Betrieb: ausreizen und messen).
@@ -300,7 +379,7 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
     console.warn(
       `[shinon-prompter] One-Shot fehlgeschlagen (LLM_FAILED:${error?.name ?? 'Error'}) nach ${Date.now() - started}ms: ${brief(error?.message ?? error)}; ${describeRequest(request)}`,
     );
-    return { outcome: 'rejected', reasons: [`LLM_FAILED:${error?.name ?? 'Error'}`], result: null };
+    return journalRejection(onReject, config, prompt, { outcome: 'rejected', reasons: [`LLM_FAILED:${error?.name ?? 'Error'}`], result: null });
   }
   const elapsedMs = Date.now() - started;
 
@@ -322,13 +401,13 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
       };
     }
     logRejectedAnswer(parsed.reasons, text, counts, finish, usage, request, elapsedMs);
-    return { outcome: 'rejected', reasons: parsed.reasons, result: null };
+    return journalRejection(onReject, config, prompt, { outcome: 'rejected', reasons: parsed.reasons, result: null }, text);
   }
 
   const decision = acceptance(parsed.result, { needsContext: contract.needsContext, context });
   if (!decision.accepted) {
     logRejectedAnswer(decision.reasons, text, counts, finish, usage, request, elapsedMs);
-    return { outcome: 'rejected', reasons: decision.reasons, result: parsed.result };
+    return journalRejection(onReject, config, prompt, { outcome: 'rejected', reasons: decision.reasons, result: parsed.result }, text);
   }
   // Auch der ANGENOMMENE Lauf wird gemessen: Ausgang, Tokens und Dauer sind die
   // Zahlen der Auslastungsmessung (`.shinon/dev/auslastung.mjs` liest diese Zeile).
@@ -350,15 +429,15 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
  * Die Grenze ist bewusst schmal: Fehler von `next()` sind NICHT unsere Fehler
  * und werden hier nicht gefangen (siehe onPreStep).
  */
-export async function enhanceGuarded(ctx, contract, config, prompt, context, stand, skills, signal) {
+export async function enhanceGuarded(ctx, contract, config, prompt, context, stand, skills, signal, onReject = null) {
   try {
-    return await enhance(ctx, contract, config, prompt, context, stand, skills, signal);
+    return await enhance(ctx, contract, config, prompt, context, stand, skills, signal, onReject);
   } catch (error) {
     const name = error?.constructor?.name ?? 'Error';
     // Der Grund bleibt kurz (INTERNAL_ERROR:<Name>), die Ursache steht im Log:
     // ein fail-open-Pfad, der nicht sagt, WAS scheiterte, ist nicht bedienbar.
     console.error(`[shinon-prompter] interner Fehler (${name}: ${error?.message ?? error}) — Roh-Prompt gilt`);
-    return { outcome: 'rejected', reasons: [`INTERNAL_ERROR:${name}`], result: null };
+    return journalRejection(onReject, config, prompt, { outcome: 'rejected', reasons: [`INTERNAL_ERROR:${name}`], result: null });
   }
 }
 

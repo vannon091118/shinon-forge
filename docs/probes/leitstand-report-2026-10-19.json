@@ -1,4 +1,14 @@
 {
+  "id": "leitstand-report-2026-10-19",
+  "claim": "Der Leitstand-Abschlussreport verbindet 9 Turns mit 159 Schritten: 4 von 9 Prompts wurden ersetzt, 5 von 6 Mutationen erkannt und 4 repariert, der Index deckt 1 von 25 Dateien, und das Scoring-Gedächtnis gilt über Workspaces hinweg.",
+  "targets": [
+    "docs/probes/leitstand-report-2026-10-19.json",
+    "docs/probes/leitstand-mutations-2026-10-19.json",
+    "/home/vannon/.local/share/shinon/ledger.sqlite"
+  ],
+  "expect": "`session.stats` nennt 9 Turns und 159 Schritte; `prompter` nennt 9 Traces, 4 angenommen, 5 verworfen; `mutations` nennt 6 Fälle, 5 erkannt, 4 repariert (Rate 0,833); `findings.indexCoverage` nennt 1 von 25 Dateien und `stale: true`; `findings.scoringMemory.globalAcrossWorkspaces` ist wahr.",
+  "result": "BESTAETIGT",
+  "verdict": "RESEARCH",
   "at": "2026-10-19T00:13:30.153Z",
   "workspace": "/home/vannon/Dokumente/deepseek-harness/default-workspace",
   "sources": {

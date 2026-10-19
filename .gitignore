@@ -30,6 +30,11 @@ dev-dsh-home/
 # Diff. Wer einen Stand als Beleg braucht, kopiert ihn kuratiert nach docs/probes/.
 .shinon/intent-memory.json
 
+# Das Probe-Journal der verworfenen One-Shot-Antworten (`probeJournalPath`):
+# Nutzertext und Modellantwort im Klartext, angehaengt je Verwerfung. Es ist
+# Messzustand, keine Quelle — kuratierte Auszuege wandern nach docs/probes/.
+.shinon/one-shot-journal.jsonl
+
 # Credentials — never commit. Public repo!
 .credentials.yaml
 

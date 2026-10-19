@@ -1,4 +1,14 @@
 {
+  "id": "leitstand-mutations-2026-10-19",
+  "claim": "Von sechs absichtlich in den Leitstand eingebauten Mutationen wurden fünf erkannt und vier repariert; wer den Fund trägt — Modell, Test, Abnahme oder injizierter Kontext — steht je Fall in `quelle`.",
+  "targets": [
+    "docs/probes/leitstand-mutations-2026-10-19.json",
+    "docs/probes/leitstand-report-2026-10-19.json",
+    "/home/vannon/Dokumente/deepseek-harness/default-workspace"
+  ],
+  "expect": "`cases` enthält sechs Einträge; `erkannt` ist bei fünf wahr und `repariert` bei vier; die Rate ist 0,833. Jede Zeile nennt Anker, Turn von Erkennung/Reparatur und eine Quelle (oder null). `structural` nennt zusätzlich die unentdeckte Testkopie und den fehlenden GET-Verlauf.",
+  "result": "BESTAETIGT",
+  "verdict": "WRITE",
   "contract": "shinon.e2e-mutations/v1",
   "run": "leitstand-2026-10-19",
   "workspace": "/home/vannon/Dokumente/deepseek-harness/default-workspace",

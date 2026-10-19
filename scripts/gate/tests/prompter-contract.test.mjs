@@ -120,7 +120,9 @@ function connect(config = {}, { llm, services } = {}) {
   // Modus-Vertrag, Annahme-Regeln und Isolation, und deren Aufrufe tragen ihren
   // Block genau. Wer die Zettel pruefen will, gibt einen eigenen Pfad mit
   // (Abschnitt 7). Wer Skills prueft, gibt `skillsPath` mit (Zug 6).
-  const resolved = bundle.Config({ notesPath: '', skillsPath: '', ...config });
+  // Kein Probe-Journal im Test: sonst schriebe jeder Verwerfungsfall in den
+  // Baum. Wer das Journal prueft, gibt einen absoluten Pfad mit.
+  const resolved = bundle.Config({ notesPath: '', skillsPath: '', probeJournalPath: '', ...config });
   const dispose = quiet(() => bundle.apply(host, resolved));
   return { ctx, records, config: resolved, dispose };
 }
@@ -399,18 +401,37 @@ test('MAX: der definierte Kontext wird angenommen und als Datenblock gerendert',
   dispose();
 });
 
-test('MAX: eine Frage wird nicht zur Aufgabe — und kostet keinen One-Shot', async () => {
-  const llm = fakeLlm(reply(goodResult()));
+test('MAX: eine Frage wird nicht zur Aufgabe — der One-Shot ist trotzdem aktiv', async () => {
+  const refined = 'Warum ist der Test broken? Nenne die fehlschlagende Assertion und den ersten Fehler.';
+  const llm = fakeLlm(reply(goodResult({ enhancedPrompt: refined })));
   const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath }, { llm });
   const claimed = [userMessage('Warum ist der Test broken?')];
 
   const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
 
-  assert.equal(llm.calls.length, 0, 'eine Frage braucht keine Veredelung');
-  assert.equal(decision.messages[0].content[0].text, 'Warum ist der Test broken?', 'kein "# Aufgabe"-Block, kein Ersatz');
+  // Nutzerentscheidung 2026-10-19: der Veredler ist in der Regel IMMER aktiv.
+  // Der One-Shot sieht die Frage, aber die Intent-Erweiterung bleibt leer —
+  // eine Frage wird nicht zur Aufgabe umgeschrieben.
+  assert.equal(llm.calls.length, 1, 'der One-Shot laeuft auch fuer eine Frage');
+  assert.equal(llm.calls[0].messages[0].content[0].text, 'Warum ist der Test broken?', 'kein "# Aufgabe"-Block');
+  assert.equal(decision.messages[0].content[0].text, refined);
   assert.equal(records[0].intentClassification, 'LOOKUP', 'die Klasse kommt aus dem Text');
-  assert.deepEqual(records[0].reasons, ['NO_ENHANCEMENT_NEEDED']);
+  assert.deepEqual(records[0].reasons, []);
   assert.equal(records[0].intentMatch, null, 'ein Themenwort ist kein Intent-Treffer');
+  dispose();
+});
+
+test('MAX: nur `alwaysEnhance: false` nimmt CHAT/LOOKUP wieder aus dem One-Shot', async () => {
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect(
+    { ...route, mode: 'MAX', contextPath: dummyContextPath, alwaysEnhance: false },
+    { llm },
+  );
+  const claimed = [userMessage('Warum ist der Test broken?')];
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+  assert.equal(llm.calls.length, 0, 'der ausdrueckliche Kurzweg kostet keinen Aufruf');
+  assert.equal(decision.messages[0].content[0].text, 'Warum ist der Test broken?');
+  assert.deepEqual(records[0].reasons, ['NO_ENHANCEMENT_NEEDED']);
   dispose();
 });
 
@@ -865,6 +886,8 @@ test('SALVAGED_PROSE: Zaun und Vorrede fallen weg, kaputtes JSON wird kein Promp
  * Fuellwort ein ("Klar, gerne. Hier ist der verbesserte Prompt: …"). Der
  * Vorrede-Schnitt greift, das Fuellwort davor bleibt — und damit passiert die
  * GESAMTE Antwort als Veredelung, obwohl nur der Satz danach der Prompt ist.
+ * Zweiter Fall derselben Ursache: das Fuellwort steht OHNE Vorrede am Anfang
+ * ("Klar. Baue …"). Auch dann beginnt der Prompt beim ersten Inhaltssatz.
  * Gepinnt wird der gerenderte Prompt, nicht die Absicht: das Fuellwort darf in
  * `decision.messages` nicht mehr auftauchen.
  */
@@ -873,6 +896,9 @@ test('SALVAGED_PROSE: ein Fuellwort vor der Vorrede laesst nicht die ganze Antwo
   for (const answer of [
     `Klar, gerne. Hier ist der verbesserte Prompt: ${refined}`,
     `Also, hier ist der verbesserte Prompt: ${refined}`,
+    // Zweiter Fall (gemessen 2026-10-19): Fuellwort OHNE Vorrede.
+    `Klar. ${refined}`,
+    `Gerne! ${refined}`,
   ]) {
     const { ctx, records, dispose } = connect({ ...route }, { llm: fakeLlm(answer) });
     const claimed = [userMessage('baue module und teste sie danach')];
@@ -886,10 +912,66 @@ test('SALVAGED_PROSE: ein Fuellwort vor der Vorrede laesst nicht die ganze Antwo
 });
 
 /**
+ * Dieselbe Grenze, andere Form (Sitzungslogs 2026-10-19): eine ANTWORT auf den
+ * Auftrag (Berichtslabel, Tabelle, direkte Gegenrede) ist kein Vorschlag. Sie
+ * wird verworfen, nicht vorne gekuerzt — sonst stuende die Antwort im Prompt.
+ */
+test('SALVAGED_PROSE: eine ANTWORT auf den Auftrag ersetzt den Prompt nicht', async () => {
+  const raw = 'baue module und teste sie danach';
+  const answer = '**Gemacht:** die Module sind gebaut, ich teste sie danach.\n\n**Gefunden:** nichts Auffälliges.';
+  const { ctx, records, dispose } = connect({ ...route }, { llm: fakeLlm(answer) });
+  const claimed = [userMessage(raw)];
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+  assert.equal(records[0].outcome, 'rejected');
+  assert.equal(decision.messages[0].content[0].text, raw, 'die Antwort hat den Prompt ersetzt');
+  assert.notEqual(decision.messages[0].content[0].text, answer);
+  dispose();
+});
+
+/**
+ * Das Probe-Journal sammelt die VERWORFENEN Antworten des echten One-Shots —
+ * damit die Prosa-Rettung spaeter gegen Enhancer-Antworten messbar wird, nicht
+ * gegen fremde Assistenten-Antworten. Eine Zeile je Verwerfung, angehaengt.
+ */
+test('Probe-Journal: eine verworfene Antwort steht als JSONL-Zeile im Journal', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shinon-prompter-journal-'));
+  const journal = join(dir, 'journal.jsonl');
+  const raw = 'baue module und teste sie danach';
+  const answer = '**Gemacht:** die Module sind gebaut, ich teste sie danach.';
+  const { ctx, records, dispose } = connect({ ...route, probeJournalPath: journal }, { llm: fakeLlm(answer) });
+  const claimed = [userMessage(raw)];
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+  assert.equal(records[0].outcome, 'rejected');
+
+  const lines = readFileSync(journal, 'utf8').trim().split('\n');
+  assert.equal(lines.length, 1, 'genau eine Zeile je Verwerfung');
+  const entry = JSON.parse(lines[0]);
+  assert.equal(entry.contract, 'shinon.prompter/one-shot-journal/v1');
+  assert.deepEqual(entry.reasons, ['NO_JSON']);
+  assert.equal(entry.mode, 'MIN');
+  assert.equal(entry.prompt, raw, 'der Auftrag reist mit — sonst ist die Antwort nicht messbar');
+  assert.equal(entry.answer, answer);
+  assert.ok(typeof entry.at === 'string' && entry.at.includes('T'), 'der Zeitpunkt fehlt');
+  dispose();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('Probe-Journal: eine angenommene Antwort schreibt nichts', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shinon-prompter-journal-'));
+  const journal = join(dir, 'journal.jsonl');
+  const { ctx, dispose } = connect({ ...route, probeJournalPath: journal }, { llm: fakeLlm(reply(goodResult())) });
+  const claimed = [userMessage('mach das schnell')];
+  await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+  assert.throws(() => readFileSync(journal, 'utf8'), 'ein angenommener Lauf legt kein Journal an');
+  dispose();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+/**
  * „Zu oft" muss messbar sein, nicht fuehlbar: der Datensatz traegt Grund,
  * Zeichenzahl und den wievielten SALVAGED_PROSE-Fall DIESER Sitzung — und die
- * Trace-Zeile nennt dieselben drei Werte. Der Zaehler ist pro Prozess; ein
- * Neustart beginnt fuer die Sitzung wieder bei 1 (kein persistenter Zaehler).
+ * Trace-Zeile nennt dieselben drei Werte. OHNE Ablage bleibt es beim Zaehler
+ * im Prozess; dafuer steht der Neustart-Fall direkt unter diesem Test.
  */
 test('SALVAGED_PROSE: Grund, Zeichenzahl und Fallzahl stehen im Datensatz und im Trace — je Sitzung', async () => {
   const refined = 'Baue die Module und teste sie danach.';
@@ -934,6 +1016,105 @@ test('SALVAGED_PROSE: Grund, Zeichenzahl und Fallzahl stehen im Datensatz und im
   );
   assert.equal(other.records[0].salvage.count, 1, 'Sitzungen zaehlen getrennt');
   other.dispose();
+});
+
+/**
+ * Die Anfrage dahinter: die Haeufigkeit soll auch einen NEUSTART ueberleben.
+ * Hier wird genau das gemessen — zwei Prozesse, eine Ablage. Der zweite kennt
+ * den ersten nicht, liest den Stand aber und schreibt bei 3 weiter; die Zahl
+ * steht im Entscheidungsdatensatz, damit „zu oft" nachpruefbar bleibt.
+ *
+ * Der Raum ist der EIGENE des Prompters: derselbe Dienst, nicht derselbe
+ * Stand wie Scoring oder Persona (das pinnt `context-wiring`).
+ */
+test('SALVAGED_PROSE: die Fallzahl ueberlebt einen Neustart — und trennt Sitzungen', async () => {
+  const refined = 'Baue die Module und teste sie danach.';
+  const answer = `Klar, gerne. Hier ist der verbesserte Prompt: ${refined}`;
+  // Eine Ablage, die wirklich haelt: Map als "Platte", der echte Dienst hat
+  // load/save — nur ohne SQLite, weil dieser Test den Host nicht braucht.
+  const memory = new Map();
+  const written = [];
+  const store = {
+    contract: bundle.INDEX_STORE_CONTRACT,
+    load: (namespace) => ({ ok: true, state: memory.get(namespace) ?? null }),
+    save: (namespace, state) => {
+      memory.set(namespace, state);
+      written.push(namespace);
+      return { ok: true, rows: 1 };
+    },
+  };
+  const services = { [bundle.INDEX_STORE_SERVICE]: store };
+  const fire = async (connection, sessionId = 'sess-1') => {
+    const claimed = [userMessage('baue module und teste sie danach')];
+    await connection.ctx.waterfall(
+      bundle.PRE_STEP_EVENT,
+      { ...stepPayload(claimed), agent: { session: { id: sessionId } } },
+      loopDefault(claimed),
+    );
+    return connection.records.at(-1);
+  };
+
+  const first = connect({ ...route }, { llm: fakeLlm(answer), services });
+  assert.equal((await fire(first)).salvage.count, 1);
+  assert.equal((await fire(first)).salvage.count, 2);
+  first.dispose();
+  assert.deepEqual([...new Set(written)], [bundle.SALVAGE_NAMESPACE], 'genau der eigene Raum, kein fremder');
+
+  // Neustart: neuer Context, neuer Prozesszaehler, DIESELBE Ablage.
+  const second = connect({ ...route }, { llm: fakeLlm(answer), services });
+  const afterRestart = await fire(second);
+  assert.equal(afterRestart.salvage.count, 3, 'die Zahl kommt aus der Ablage, nicht aus dem Prozess');
+  // Eine andere Sitzung beginnt fuer sich bei 1 und liegt im selben Raum daneben.
+  assert.equal((await fire(second, 'sess-2')).salvage.count, 1, 'Sitzungen zaehlen getrennt');
+  second.dispose();
+
+  const persisted = memory.get(bundle.SALVAGE_NAMESPACE)?.memos?.find((memo) => memo?.id === bundle.SALVAGE_MEMO_ID)?.salvage;
+  assert.ok(persisted, 'nichts in der Ablage');
+  assert.equal(persisted.contract, bundle.SALVAGE_CONTRACT);
+  assert.equal(persisted.sessions['sess-1'].count, 3);
+  assert.equal(persisted.sessions['sess-1'].byReason.NO_JSON, 3);
+  assert.equal(persisted.sessions['sess-2'].count, 1);
+});
+
+/**
+ * Die Gegenprobe: ein LEERER Namensraum schaltet die Ablage ab (dieselbe Regel
+ * wie beim Selbstmodell der Persona), ein FREMDER Stand wird nicht uebernommen.
+ * Beides muss fail-closed sein — sonst behauptete eine Zahl eine Historie, die
+ * niemand geschrieben hat.
+ */
+test('SALVAGED_PROSE: leerer Namensraum schreibt nicht, fremder Stand wird verworfen', async () => {
+  const refined = 'Baue die Module und teste sie danach.';
+  const answer = `Klar, gerne. Hier ist der verbesserte Prompt: ${refined}`;
+  const memory = new Map();
+  let saves = 0;
+  const store = {
+    contract: bundle.INDEX_STORE_CONTRACT,
+    load: (namespace) => ({ ok: true, state: memory.get(namespace) ?? null }),
+    save: (namespace, state) => { saves += 1; memory.set(namespace, state); return { ok: true, rows: 1 }; },
+  };
+  const services = { [bundle.INDEX_STORE_SERVICE]: store };
+  const fire = async (connection, sessionId = 'sess-1') => {
+    const claimed = [userMessage('baue module und teste sie danach')];
+    await connection.ctx.waterfall(
+      bundle.PRE_STEP_EVENT,
+      { ...stepPayload(claimed), agent: { session: { id: sessionId } } },
+      loopDefault(claimed),
+    );
+    return connection.records.at(-1);
+  };
+
+  const off = connect({ ...route, salvageNamespace: '' }, { llm: fakeLlm(answer), services });
+  assert.equal((await fire(off)).salvage.count, 1);
+  assert.equal(saves, 0, 'leerer Namensraum heisst AUS, nicht Vorgabe');
+  off.dispose();
+
+  // Ein Stand mit fremdem Vertrag: der Zaehler faengt bei 1 an, statt ihn zu deuten.
+  memory.set(bundle.SALVAGE_NAMESPACE, {
+    memos: [{ id: bundle.SALVAGE_MEMO_ID, salvage: { contract: 'fremd/v1', sessions: { 'sess-1': { count: 99 } } } }],
+  });
+  const foreign = connect({ ...route }, { llm: fakeLlm(answer), services });
+  assert.equal((await fire(foreign)).salvage.count, 1, 'fremder Vertrag zaehlt nicht als Historie');
+  foreign.dispose();
 });
 
 /**
@@ -1275,10 +1456,12 @@ test('Roh-Prompt: ohne Route und ohne LLM-Dienst wird gar nicht erst aufgerufen'
   }
 });
 
-test('Klassifikation: CHAT und LOOKUP kommen ohne Modellaufruf aus dem Text', async () => {
+test('Klassifikation: mit `alwaysEnhance: false` kommen CHAT und LOOKUP ohne Modellaufruf aus', async () => {
   // Der Kern des Passes: die Klasse ist Runtime-Eigentum. Hier laeuft der
-  // One-Shot NIE (keine Route) — der Datensatz traegt trotzdem die Klasse, die
-  // der Resolver aus dem Text gelesen hat; unklare Eingabe ist UNDEFINED.
+  // One-Shot NIE (keine Route UND Kurzweg ausdruecklich gewaehlt) — der
+  // Datensatz traegt trotzdem die Klasse, die der Resolver aus dem Text gelesen
+  // hat; unklare Eingabe ist UNDEFINED. Die Vorgabe ist `alwaysEnhance: true`;
+  // dieser Test pinnt den ausdruecklichen Kurzweg.
   const cases = [
     { text: 'hallo wie gehts', expected: 'CHAT', pattern: 'chat', outcome: 'accepted' },
     { text: 'erklär mir den code', expected: 'LOOKUP', pattern: 'read-code', outcome: 'accepted' },
@@ -1287,7 +1470,7 @@ test('Klassifikation: CHAT und LOOKUP kommen ohne Modellaufruf aus dem Text', as
   ];
   for (const { text, expected, pattern, outcome } of cases) {
     const double = fakeLlm(reply(goodResult()));
-    const { ctx, records, dispose } = connect({ ...route, provider: '', model: '' }, { llm: double });
+    const { ctx, records, dispose } = connect({ ...route, provider: '', model: '', alwaysEnhance: false }, { llm: double });
     const claimed = [userMessage(text)];
 
     await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
@@ -1433,12 +1616,22 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     maxTokens: 1200,
     temperature: 0,
     timeoutMs: 15000,
+    // Der Veredler ist in der Regel IMMER aktiv (Nutzerentscheidung
+    // 2026-10-19); der Kurzweg bleibt ein ausdruecklicher Profil-Schalter.
+    alwaysEnhance: true,
+    // Probe-Journal der verworfenen One-Shot-Antworten: Projektzustand unter
+    // `.shinon/`, gitignoriert, nicht Teil des Tarballs.
+    probeJournalPath: '.shinon/one-shot-journal.jsonl',
     trace: true,
     intentPatternsPath: './assets/intent-rules.json',
     // Fassung 2: das Intent-Gedächtnis gehört wie die gelernten Bausteine dem
     // PROJEKT (relativ zum Workspace). Ein leerer Pfad schaltet es ab; der
     // Vorgabewert ist hier GEPINNT, damit ein stiller Pfadwechsel auffällt.
     intentMemoryPath: '.shinon/intent-memory.json',
+    // Der dauerhafte SALVAGED_PROSE-Zaehler liegt im EIGENEN Raum der Ablage
+    // (Lauf, nicht Workspace). Der Vorgabewert ist die Konstante des Pakets;
+    // leer schaltet ihn ab, und das ist der einzige Weg dazu.
+    salvageNamespace: bundle.SALVAGE_NAMESPACE,
     // Phase 4: die gelernte Baustein-Ablage gehoert dem PROJEKT. Der Vorgabewert
     // ist die eine Konstante des Pakets, nicht ein zweites Literal.
     blocksLearnedPath: bundle.LEARNED_DEFAULT_PATH,

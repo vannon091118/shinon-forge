@@ -10,16 +10,17 @@ import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
 // Der Modulschnitt hat die Innenflaeche geteilt, nicht die Aussenflaeche: die
 // oeffentlichen Namen unten sind dieselben wie vorher, und `index.js` bleibt die
 // Host-Haelfte (Mount, Listener, Kontextbeschaffung, Index-Abfrage).
-import { CONTEXT_CONTRACT, CONTEXT_STATES, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, NOT_SUPPLIED, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE, assertVocabulary, contextLabel, noContext, resolveMode, withContext } from './assets/mode-core.js';
+import { CONTEXT_CONTRACT, CONTEXT_STATES, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, NOT_SUPPLIED, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE, assertVocabulary, contextLabel, noContext, resolveMode, withContext } from './assets/mode-core.js';
 import { Config as _imported_config_schema, ContextSchema, ResultSchema } from './assets/schema.js';
 import { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferences } from './assets/result-contract.js';
 import { UNDEFINED, expandPrompt, resolveIntent } from './assets/intent-resolver.js';
 import { addTurnDuration, decay, emptyMemory, feedback, feedbackOf, memorySummary, observe, semanticProfile, validateMemory, weightsFrom } from './assets/intent-memory.js';
 import { renderContext, renderSkillsBlock } from './assets/render-context.js';
 import { loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
-import { writeJsonFile } from './assets/learned-store.js';
+import { appendJsonLine, writeJsonFile } from './assets/learned-store.js';
 import { readTone, standFor, standTrace } from './assets/stand.js';
 import { buildEnhancerRequest, collectStream, enhanceGuarded, replacePrompt } from './assets/enhancer.js';
+import { SALVAGE_CONTRACT, SALVAGE_MEMO_ID, SALVAGE_NAMESPACE, emptySalvage, salvageCountOf, validateSalvage, withSalvageCount } from './assets/salvage-store.js';
 import { BLOCKS_CONTRACT, BLOCKS_PATH, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks, validateRegistry } from './assets/block-select.js';
 import { LEARNED_CONTRACT, PROPOSE_CONTRACT, PROPOSE_SERVICE, duplicateVsBlocks, mergeLearnedBlocks, validateBlockCore, validateLearnedFile, validateProposalShell } from './assets/block-review.js';
 
@@ -181,6 +182,25 @@ function warnIndex(runtime, detail) {
 }
 
 /**
+ * Eine verworfene One-Shot-Antwort ins Probe-Journal schreiben (JSONL).
+ *
+ * Das Journal ist die Grundlage, um die Prosa-Rettung gegen ECHTE
+ * Enhancer-Antworten zu messen statt gegen fremde Assistenten-Antworten. Ein
+ * Schreibfehler darf den Schritt nie brechen; gemeldet wird er einmal.
+ */
+function journalRejectedAnswer(runtime, entry) {
+  if (typeof runtime.probeJournalPath !== 'string' || runtime.probeJournalPath === '') return;
+  try {
+    appendJsonLine(runtime.probeJournalPath, { at: new Date().toISOString(), ...entry });
+  } catch (error) {
+    if (!runtime.journalWarned) {
+      runtime.journalWarned = true;
+      console.warn(`[shinon-prompter] Probe-Journal nicht schreibbar (${error?.message}) — keine Aufzeichnung`);
+    }
+  }
+}
+
+/**
  * Das Intent-Gedächtnis schreiben — der EINE Schreibweg des Hosts.
  *
  * Ein Schreibfehler darf den Schritt nie brechen: das Gedächtnis ist Erfahrung,
@@ -337,20 +357,119 @@ function maxContext(ctx, config, runtime, prompt) {
  * und die Naht nicht nachpruefbar.
  */
 /**
- * Einen SALVAGED_PROSE-Fall zaehlen — je Sitzung, im Prozess.
+ * Den dauerhaften SALVAGED_PROSE-Stand EINMAL holen — beim ersten Fall.
+ *
+ * Warum nicht im `apply`: die Mount-Reihenfolge eines Profils ist keine Zusage.
+ * Der erste echte Fall liegt sicher hinter allen Mounts; davor waere „kein
+ * Dienst" nur eine Vermutung. Ein fehlender Index ist kein Fehler: dann bleibt
+ * der Zaehler im Prozess und es steht EINE Zeile im Log, warum.
+ *
+ * Die Form wird geprueft wie jede andere gespeicherte Evidenz: fremder Vertrag
+ * oder unlesbare Zeilen werden nicht uebernommen, sondern gezaehlt gemeldet.
+ */
+function loadSalvage(runtime) {
+  if (runtime.salvageLoaded) return;
+  runtime.salvageLoaded = true;
+  const fallback = (reason) => {
+    runtime.salvageState = emptySalvage();
+    runtime.salvagePersist = false;
+    runtime.warnSalvage(`${reason} — SALVAGED_PROSE zaehlt je Sitzung nur im Prozess`);
+  };
+  // Leerer Namensraum heisst AUS (dieselbe Regel wie beim Selbstmodell der
+  // Persona) — nicht "Vorgabe", sonst schaltete ein Profil ohne den Schluessel
+  // die Ablage still ab und niemand saehe den Grund.
+  if (runtime.salvageNamespace === '') {
+    runtime.salvageState = emptySalvage();
+    runtime.salvagePersist = false;
+    return;
+  }
+  const store = runtime.resolveSalvageStore();
+  if (store === null) {
+    // Ein Profil OHNE Project Index ist der Normalfall, kein Fehler: der
+    // Zaehler bleibt dann im Prozess, ohne dass jeder Turn eine Zeile schreibt.
+    runtime.salvageState = emptySalvage();
+    runtime.salvagePersist = false;
+    return;
+  }
+  let answer;
+  try {
+    answer = store.load(runtime.salvageNamespace);
+  } catch (error) {
+    fallback(`Ablage nicht lesbar (${error?.message ?? error})`);
+    return;
+  }
+  if (answer === null || typeof answer !== 'object' || answer.ok !== true) {
+    fallback(`Ablage nicht lesbar (${answer?.error ?? 'unbekannte Antwort'})`);
+    return;
+  }
+  const raw = answer.state;
+  if (raw === null || raw === undefined) {
+    runtime.salvageState = emptySalvage();
+    return;
+  }
+  const memos = Array.isArray(raw?.memos) ? raw.memos : [];
+  const memo = memos.find((entry) => entry !== null && typeof entry === 'object' && entry.id === SALVAGE_MEMO_ID) ?? null;
+  const checked = validateSalvage(memo === null ? null : memo.salvage);
+  runtime.salvageState = checked.state;
+  if (checked.foreign) {
+    runtime.warnSalvage(`gespeicherter Stand verletzt ${SALVAGE_CONTRACT} — neu begonnen`);
+    return;
+  }
+  if (checked.dropped > 0) {
+    console.warn(`[shinon-prompter] ${checked.dropped} unlesbare SALVAGED_PROSE-Sitzungszeilen uebergangen`);
+  }
+}
+
+/**
+ * Den Stand schreiben — EIN Memo im eigenen Raum, keine Projektdatei.
+ *
+ * Der Schreibweg ist der des Project Index (`shinon_index_store`), derselbe wie
+ * Scoring und Persona. Scheitert er, bleibt der Prozesszaehler gueltig; die
+ * Warnung nennt den Grund einmal und wiederholt sich nicht bei jedem Turn.
+ */
+function persistSalvage(runtime) {
+  if (runtime.salvagePersist !== true) return;
+  if (runtime.salvageState === null || typeof runtime.salvageState !== 'object') return;
+  const store = runtime.resolveSalvageStore();
+  if (store === null) return;
+  let answer;
+  try {
+    answer = store.save(runtime.salvageNamespace, {
+      memos: [{ id: SALVAGE_MEMO_ID, salvage: runtime.salvageState }],
+    });
+  } catch (error) {
+    runtime.warnSalvage(`Ablage nicht beschreibbar (${error?.message ?? error}) — SALVAGED_PROSE bleibt im Prozess`);
+    return;
+  }
+  if (answer === null || typeof answer !== 'object' || answer.ok !== true) {
+    runtime.warnSalvage(`Ablage nicht beschreibbar (${answer?.error ?? 'unbekannte Antwort'}) — SALVAGED_PROSE bleibt im Prozess`);
+  }
+}
+
+/**
+ * Einen SALVAGED_PROSE-Fall zaehlen — je Sitzung, ueber Neustarts hinweg.
  *
  * Der Zaehler ist die Messung fuer „zu oft": Grund, Zeichenzahl und der
- * wievielte Fall reisen mit dem Datensatz. Nach einem Host-Neustart beginnt
- * die Sitzung wieder bei 1; persistiert wird die Zahl absichtlich nicht —
- * sie beschreibt den Lauf, nicht den Workspace.
+ * wievielte Fall reisen mit dem Datensatz. Die Zahl kommt aus der Ablage und
+ * wird dort fortgeschrieben; der Map-Zaehler im Prozess bleibt die Untergrenze,
+ * falls ein Schreibvorgang scheitert. Ohne Ablage ist das Verhalten exakt das
+ * von vorher (je Sitzung, je Prozess) — nur mit einer Zeile im Log.
  */
 function countSalvage(runtime, sessionId, salvage) {
   const key = typeof sessionId === 'string' && sessionId !== '' ? sessionId : '(ohne sitzung)';
+  loadSalvage(runtime);
+  const reason = typeof salvage?.reason === 'string' && salvage.reason !== '' ? salvage.reason : 'NO_JSON';
   const counts = runtime?.salvageCounts instanceof Map ? runtime.salvageCounts : null;
-  const count = counts === null ? 1 : (counts.get(key) ?? 0) + 1;
+  const inProcess = counts === null ? 0 : (counts.get(key) ?? 0);
+  const stored = salvageCountOf(runtime?.salvageState, key);
+  const count = Math.max(inProcess, stored) + 1;
   if (counts !== null) counts.set(key, count);
+  if (runtime?.salvageState !== null && runtime?.salvageState !== undefined) {
+    runtime.salvageState = withSalvageCount(runtime.salvageState, key, reason, new Date().toISOString());
+    persistSalvage(runtime);
+  }
   return {
-    reason: typeof salvage?.reason === 'string' && salvage.reason !== '' ? salvage.reason : 'NO_JSON',
+    reason,
     chars: Number.isInteger(salvage?.chars) ? salvage.chars : 0,
     answer_chars: Number.isInteger(salvage?.answerChars) ? salvage.answerChars : 0,
     count,
@@ -656,11 +775,14 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     }
   }
 
-  // Aktions-Check (P3): klare CHAT- und LOOKUP-Turns brauchen keine Veredelung.
-  // Sie werden DIREKT durchgereicht — der Prompter greift (er entscheidet und
-  // protokolliert), ohne einen Modellaufruf zu bezahlen und ohne das Modell zu
-  // bitten, eine Antwort zu schreiben, die dann den Prompt ersetzen wuerde.
-  const direct = contract.mode !== undefined && runtime.turn?.resolution !== null
+  // Aktions-Check (P3) — seit 2026-10-19 ein OPTIONALER Kurzweg, nicht die
+  // Vorgabe: der Veredler laeuft fuer JEDEN Schritt, auch fuer "hallo" und fuer
+  // Fragen. Nur eine ausdrueckliche Profil-Angabe `alwaysEnhance: false` nimmt
+  // klare CHAT-/LOOKUP-Turns wieder aus (dann kostet Smalltalk keinen
+  // One-Shot). Der Kurzweg reicht den Text DIREKT durch und protokolliert ihn.
+  const journalRejected = (entry) => journalRejectedAnswer(runtime, entry);
+  const direct = config.alwaysEnhance === false
+    && contract.mode !== undefined && runtime.turn?.resolution !== null
     && runtime.turn?.resolution !== undefined
     && ['CHAT', 'LOOKUP'].includes(runtime.turn.resolution.classification);
   const outcome = direct
@@ -669,7 +791,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
       reasons: ['NO_ENHANCEMENT_NEEDED'],
       result: { enhancedPrompt: prompt.text, preservedIntent: true, addedRequirements: [], removedRequirements: [], uncertainties: [], references: [] },
     }
-    : await enhanceGuarded(ctx, contract, { ...config, ...runtime.route }, expandedText, supply.context, stand, skills, payload.signal);
+    : await enhanceGuarded(ctx, contract, { ...config, ...runtime.route }, expandedText, supply.context, stand, skills, payload.signal, journalRejected);
   if (direct) console.log(`[shinon-prompter] Direkt durchgereicht (${runtime.turn.resolution.classification}) — kein One-Shot`);
 
   // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
@@ -955,7 +1077,42 @@ export function apply(ctx, config) {
     }
   }
 
-  const runtime = { context, contextState, noteRules, skillRules, intentRules, intentMemory, intentMemoryPath, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, salvageCounts: new Map() };
+  // Probe-Journal (2026-10-19): die verworfenen One-Shot-Antworten, relativ zum
+  // WORKSPACE — wie das Intent-Gedaechtnis. Leer = kein Journal.
+  let probeJournalPath = '';
+  if (typeof config.probeJournalPath === 'string' && config.probeJournalPath !== '') {
+    probeJournalPath = isAbsolute(config.probeJournalPath) ? config.probeJournalPath : join(workspace.root, config.probeJournalPath);
+  }
+  const runtime = { context, contextState, noteRules, skillRules, intentRules, intentMemory, intentMemoryPath, probeJournalPath, journalWarned: false, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, salvageCounts: new Map(), salvageNamespace: typeof config.salvageNamespace === 'string' ? config.salvageNamespace : SALVAGE_NAMESPACE, salvageState: null, salvageLoaded: false, salvagePersist: true, salvageWarned: false };
+  // Die Ablage kommt ueber dieselbe optionale Naht wie der Kontext: `ctx.get`,
+  // kein `inject` — ein Profil ohne Project Index montiert den Prompter weiter.
+  // Ein ERFOLGREICH gefundener Dienst wird gemerkt; ein fehlender nicht, denn
+  // er kann spaeter im Boot erscheinen (Mount-Reihenfolge ist keine Zusage).
+  let salvageStore = null;
+  runtime.warnSalvage = (message) => {
+    if (runtime.salvageWarned) return;
+    runtime.salvageWarned = true;
+    console.warn(`[shinon-prompter] ${message}`);
+  };
+  runtime.resolveSalvageStore = () => {
+    if (salvageStore !== null) return salvageStore;
+    let found = null;
+    try {
+      found = typeof ctx?.get === 'function' ? ctx.get(INDEX_STORE_SERVICE) ?? null : null;
+    } catch (error) {
+      runtime.warnSalvage(`Ablage nicht abfragbar (${error?.message ?? error}) — SALVAGED_PROSE zaehlt je Sitzung nur im Prozess`);
+      return null;
+    }
+    if (
+      found !== null &&
+      (found.contract !== INDEX_STORE_CONTRACT || typeof found.load !== 'function' || typeof found.save !== 'function')
+    ) {
+      runtime.warnSalvage(`fremder Dienst unter ${INDEX_STORE_SERVICE} (Vertrag ${String(found?.contract)}) — SALVAGED_PROSE zaehlt je Sitzung nur im Prozess`);
+      return null;
+    }
+    salvageStore = found;
+    return salvageStore;
+  };
   if (intentMemory !== null) {
     const summary = memorySummary(intentMemory);
     console.log(`[shinon-prompter] Intent-Gedächtnis: ${summary.runs} Läufe, ${summary.matched} Treffer, ${summary.patterns} Patterns, ${summary.unmatched} ohne Treffer, Lexikon ${summary.terms} Begriffe (${summary.classifiedTerms} eingeordnet), ${summary.unclaimed} unbeansprucht`);
@@ -1033,7 +1190,7 @@ export function apply(ctx, config) {
 }
 
 // ── Oeffentliche Aussenflaeche (unveraendert) ───────────────────────────────
-export { CONTEXT_CONTRACT, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE };
+export { CONTEXT_CONTRACT, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE };
 export { ContextSchema, ResultSchema };
 export { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferences };
 export { renderContext, renderSkillsBlock };
@@ -1042,4 +1199,5 @@ export { standFor, standTrace };
 export { buildEnhancerRequest, collectStream, replacePrompt };
 export { BLOCKS_CONTRACT, BLOCKS_PATH, DEFAULT_TOTAL_BUDGET, SELF_QUESTION_MARKERS, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, buildHaystack, candidateBlocks, decisionBlocks, matchBlock, selectBlocks, validateRegistry, tokens as blockSelectTokens } from './assets/block-select.js';
 export { LEARNED_CONTRACT, LEARNED_DEFAULT_PATH, PROPOSE_CONTRACT, PROPOSE_SERVICE, duplicateVsBlocks, mergeLearnedBlocks, validateBlockCore, validateLearnedFile, validateProposalShell } from './assets/block-review.js';
+export { MAX_SALVAGE_SESSIONS, SALVAGE_CONTRACT, SALVAGE_MEMO_ID, SALVAGE_NAMESPACE, emptySalvage, salvageCountOf, validateSalvage, withSalvageCount } from './assets/salvage-store.js';
 export { MAX_UNCERTAINTY, MIN_UNCERTAINTY, SELECTION_CONTRACT, parseSelection, renderCandidates, selectionSystemBrief } from './assets/selection.js';
