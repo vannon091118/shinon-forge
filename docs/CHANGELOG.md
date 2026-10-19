@@ -13,6 +13,70 @@ den Rest); hier steht die kurze, datierte Zeile.
 
 ## 2026-10-20
 
+- **Modellwahl bleibt variabel.** Der Gate-Test der One-Shot-Route verlangte
+  bis heute „der Haupt-Turn läuft NICHT auf dem Prompter-Provider" — ein
+  Modell-Literal mit anderem Namen, das jede Route-Auswahl zum Gate-Fall
+  machte. Geprüft wird jetzt die FORM: der gewählte Provider steht im Katalog
+  des Profils, und der Fallback des One-Shots ist eine definierte Route
+  (`scripts/gate/tests/profile-config-override.test.mjs`, Fall 5). Wer ein
+  Modell testet, wechselt die Route, ohne eine Zusage zu brechen.
+
+- **Welle 2, Teil 2: der Index wird warm, ohne Dauerbeobachter.** Der Kaltlauf
+  beim Mount bleibt der Start; `resolveContext` prüft danach nur die KANDIDATEN
+  der Abfrage über den vorhandenen Inode-Stempel (Gerät, Inode, Größe, mtime,
+  ctime) und liest ausschließlich geänderte oder neue Dateien neu
+  (`refreshIndex`/`probeCandidates` in
+  `packages/project-index/assets/index-core.js`, gedeckelt durch
+  `WARM_CANDIDATE_LIMIT`). Kein Watcher, kein Vollscan je Turn, und der
+  Kontextvertrag bleibt bei seinen sechs Schlüsseln: der Bericht reist über
+  `onRefresh` (Diagnose), nicht als siebter Schlüssel. Ein gelöschter Kandidat
+  verliert seine Zeilen, ein im Prompt genannter neuer Pfad wird aufgenommen,
+  und der Secret-Schutz bleibt unverändert (roh gelesen, nur redigiert
+  indexiert). Belege: `scripts/gate/tests/index-warm.test.mjs` (7 Tests; die
+  Mutation „Stempel ohne ctime/Inode" macht die Änderungs-Probe rot) und der
+  reproduzierbare Messlauf `npm run index:warm` — Zahlen in `docs/ZAHLEN.md` §2.
+
+- **Welle 2, Teil 1: Abbruchquote gemessen.** Der Enhancer-Ausfall ist keine
+  Logzeile mehr, sondern ein Feld: `packages/prompter/assets/abort-core.js`
+  (importfrei) klassifiziert jeden nicht ersetzten Turn nach
+  `abort-reasons.json` (`shinon.abort-reasons/v1`; Timeout, leerer Stream,
+  ungültiges JSON, kein JSON, Salvage, fehlende Route) und rechnet Zähler,
+  Quote und Top-Grund; `packages/prompter/index.js` hängt nur das Ergebnis an
+  (`withAbort`) und trägt `abort`, `abort_counts` und `abort_quote` im
+  Entscheidungsdatensatz und im Fensterspiegel. Das Panel zeigt
+  `abbr=<abbrüche>/<turns> <prozent>%` mit dem häufigsten Grund im Tooltip, das
+  Popup faltet dieselben Einträge über die bestehende Zwillingsregion
+  `zwilling:popup-trajectory` (kein zweiter Kanal); `abort.rank` reist mit,
+  damit beide bei Gleichstand dieselbe Priorität anwenden. Ein neuer Grund ist
+  ein Dateneintrag, keine Client-Änderung. Gemessen gegen den Leitstand
+  (9 Turns, 5 Ausfälle → 5/9, Top `KEIN_JSON`):
+  `packages/prompter/test/abort-core.test.mjs`, `abort-trace.test.mjs`,
+  `packages/popup/test/trajectory-core.test.mjs`,
+  `scripts/gate/tests/popup-overlay.test.mjs`,
+  `scripts/gate/tests/client-activation.test.mjs`; Vertrag:
+  `docs/contracts/abort.json`.
+
+- **Welle 1: Riegel, Matrix, Form.**
+  (1) Der pre-commit prüft `zahlen:check` VOR `npm test`: §1 der ZAHLEN muss
+  vor dem Commit stimmen, §2 bleibt ein datierter Messwert, und der Hook
+  schreibt nie (`zahlen:sync` steht nicht darin). Dieselbe Zeile steht in der
+  Installer-Vorlage, damit `npm run hooks:install` den Riegel nicht wieder
+  herausnimmt; `scripts/gate/tests/hooks-zahlen.test.mjs` hält beides fest.
+  (2) `packages/prompter/assets/intent-conflicts.js` erzeugt aus
+  `intent-rules.json` die Konfliktmatrix (exakt, Präfix, Teilwort, gleiche
+  Expansion, gleiche Klasse) und der Resolver löst nach der Regel „längste
+  Phrase, dann Klasse, dann Erfahrung, dann ID" — die Datenreihenfolge
+  entscheidet nichts mehr. Die echte Datei hat 92 Patterns, 402 Trigger und
+  genau eine exakte Doppelung (`wie funktioniert` → `read-code`,
+  `how-works`). Belege: `packages/prompter/test/intent-conflicts.test.mjs`,
+  `scripts/gate/tests/intent-through.test.mjs`.
+  (3) Die Modellroute wird als FORM geprüft: `scripts/lib/model-route.mjs`
+  liest Provider, Katalog und Wahl aus dem Profil-Patch, `routeIssues` nennt
+  jeden Formfehler, und `scripts/mobile-profile-contract-test.mjs` pinnt kein
+  Modell-Literal mehr. Agnes steht als empfohlene kostenlose Route in
+  `README.md`. Beleg: `scripts/gate/tests/model-route.test.mjs`.
+
+
 - **Fähigkeitskarte:** 26 Fragen über 21 Pakete, je genau ein Eigentümer; die
   Karte (`shinon.capabilities/v1`) nennt Frage, Paket, Naht, Grenze und Beleg,
   und der Kern lehnt doppelte Fragen oder Begriffe fail-closed ab. Der
