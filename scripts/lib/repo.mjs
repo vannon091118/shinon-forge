@@ -6,7 +6,25 @@
  * prüfen und nicht auseinanderdriften.
  *
  * Namensvertrag - alle Quellen müssen denselben Namen führen:
- * → Kanon: docs/COMMENT-KANON.md#k-9dcaced34b1a
+ *
+ *   Quelle                                  Feld    erwarteter Wert
+ *   packages/<dir>/package.json             name    @shinon/<dir>
+ *   packages/<dir>/cordis.patch.yml         id      shinon-<dir>
+ *   packages/<dir>/cordis.patch.yml         name    @shinon/<dir>
+ *   packages/<dir>/client.js                id      @shinon/<dir>   (ModuleLoader)
+ *   profiles/<profil>/package.json          bundles @shinon/<dir> je aktiviertem Paket
+ *
+ * Geprüfte Regeln:
+ *   Manifest    Exports-Ziele, dsh.bundle.patch, dsh.client.platform, peer+dev,
+ *               unbekannte dsh-Felder
+ *   Patch       YAML-Schema der DSH-Loader-Patches: Struktur, Typen, required
+ *               keys, unbekannte Keys (näher an DSH als die frühere Regex-Prüfung)
+ *   Ressourcen  jede Referenz aus Manifest und Patch-Config existiert, ist eine
+ *               Datei, liegt im Paket und parst in ihrem Format
+ *   Komposition Profil-Manifest, doppelte insert-ids über alle Layer, azyklischer
+ *               Paketgraph
+ *   Idiome      generierte Plugin-Bausteine deckungsgleich mit ihrer einen Quelle
+ *               (scripts/lib/plugin-idioms.mjs) — und keine Kopie daneben
  */
 import { execFileSync } from 'child_process';
 import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, realpathSync, statSync } from 'fs';
@@ -374,13 +392,15 @@ export function legacyHits(packages) {
 
 /**
  * pnpm-Reste: dieses Repo ruft pnpm nirgends auf und traegt keine pnpm-Datei
- * (Beleg: docs/CHANGELOG.md, pnpm-Rückbau). Der Befund ist nicht theoretisch — UPSTREAMs
+ * (PLAN.md Schritt 3.5/A1). Der Befund ist nicht theoretisch — UPSTREAMs
  * `initProfile` (`@deepseek-ai/dsh-app-boot`) legt bei `dsh plugin add` selbst eine
  * `pnpm-workspace.yaml` im Profilverzeichnis an, und ein `pnpm pack`/`pnpm install`
  * gerät leicht wieder in ein Skript.
  *
  * Deshalb hat die Invariante hier EINEN Eigentuemer mit praezisen Mustern statt eines
- * → Kanon: docs/COMMENT-KANON.md#k-152c9aa2c45e
+ * `grep pnpm` ueber Dateinamen: geprueft werden die zwei echten pnpm-Artefakte, ein
+ * echter Prozess-/Script-Aufruf und die Script-Eintraege des Root-Manifests. Ein
+ * Wortvorkommen in Kommentar oder Dokument ist kein Befund.
  */
 export const PNPM_ARTIFACTS = ['pnpm-workspace.yaml', 'pnpm-lock.yaml'];
 /**
@@ -445,7 +465,20 @@ export function pnpmIssues(root = ROOT) {
  * reist eigenstaendig (ein Host mit nur EINEM der beiden Pakete darf nicht am
  * fehlenden anderen scheitern; kein Paket erklaert ein `@shinon/*`-Paket als
  * Abhaengigkeit). Ein `import` ueber die Paketgrenze waere der einzige Weg zu
- * → Kanon: docs/COMMENT-KANON.md#k-5943fb806509
+ * EINER Datei — und der kostet genau diese Eigenstaendigkeit.
+ *
+ * Der Transport ist deshalb eine Zwillingsregel mit EINEM Besitzer. Die Dopplung
+ * ist damit nicht weg, aber Drift kann nicht mehr landen: Gate und Build pruefen
+ * jede Regel bei jedem Lauf.
+ *
+ *   kind 'region'    Beide Seiten tragen den Regeltext zwischen zwei Markern,
+ *                    BYTEGLEICH. Der Besitzer steht im Marker und in dieser Liste.
+ *   kind 'literals'  Der Spiegel kann keinen Text teilen (ein selbststaendiges
+ *                    Client-Bundle zieht kein `import`): ausgewaehlte WERTE des
+ *                    Besitzers muessen als Literal im Spiegel stehen.
+ *
+ * Diese Liste ist die Besitzer-Erklaerung des Repos — nicht die Datei, die
+ * zufaellig zuerst da war.
  */
 export const SOURCE_TWINS = [
   {
@@ -788,7 +821,13 @@ export function activeProfile(root = readRoot()) {
  * mit
  *   package.json         dsh.profile.bundles - die Bundle-Patch-Layer in Reihenfolge
  *   cordis.patch.yml     die User-Ebene (top-level YAML-Array von Patch-Einträgen)
- * → Kanon: docs/COMMENT-KANON.md#k-1792d65d4401
+ * (eine `pnpm-workspace.yaml` legt UPSTREAMs initProfile bei Bedarf selbst an, wenn ein
+ * Profil `dsh plugin add` nutzt; dieses Repo trackt keine — Schritt 3.5/A1)
+ * Bundles sind Pakete mit dsh.bundle.patch; das Repo-Root ist ein gültiges
+ * DSH_HOME, weil es profiles/ enthält.
+ *
+ * `bundles` sind alle Bundle-Namen, `entries` nur die Bundles aus diesem Repo
+ * (Scope-Pakete). Fremde Bundles wie @deepseek-ai/dsh-base stehen nur in `bundles`.
  */
 /** Liegt `target` in `dir` (oder ist es `dir` selbst)? */
 function isInside(dir, target) {
@@ -803,7 +842,14 @@ function isInside(dir, target) {
  * Repo (lokal, muss existieren); ein Ziel ausserhalb `packages/` (absoluter Pfad
  * oder aus dem Repo heraus) ist ein fremdes Bundle — wie die `@deepseek-ai/*`-
  * Eintraege, die schon immer erlaubt waren.
- * → Kanon: docs/COMMENT-KANON.md#k-ead9b6e4ff9e
+ *
+ * Kein Eintrag, kein `link:`/`file:`-Ziel → `null`: ein unbekannter `@shinon/*`-
+ * Name ohne Ziel bleibt ein Fehler (Tippfehler-Schutz bleibt fail-closed).
+ *
+ * @param {string} name - Bundle-Name aus `dsh.profile.bundles`.
+ * @param {object|null} manifest - das Profil-Manifest.
+ * @param {string} profileDir - Verzeichnis des Profils (Bezug fuer relative Ziele).
+ * @returns {string|null} das aufgeloeste Ziel, wenn es fremd ist, sonst `null`.
  */
 export function foreignBundleTarget(name, manifest, profileDir) {
   const spec = manifest?.dependencies?.[name];
@@ -822,7 +868,9 @@ export function foreignBundleTarget(name, manifest, profileDir) {
  *   `link`     ein Symlink; `target` ist sein aufgelöstes Ziel
  *   `broken`   ein Symlink ins Leere; `target` ist sein ROHTEXT (er zeigt irgendwohin)
  *   `real`     kein Symlink, sondern eine echte Kopie — sie folgt dem Manifest nicht
- * → Kanon: docs/COMMENT-KANON.md#k-7422f0982f82
+ *
+ * @param {string} file - Pfad des erwarteten Eintrags.
+ * @returns {{kind: 'link'|'broken'|'real', target: string}|null}
  */
 function installedBundle(file) {
   let stats;
@@ -907,7 +955,17 @@ export function dshInstanceIssues(base = ROOT, options = {}) {
  * herauszeigt, BESCHATTET das Repo-Paket — Node lädt dann fremden Code, ohne dass
  * irgendein Gate es merkt (gemessen 2026-10-17: `@shinon/traceability` zeigte auf
  * `../../../Projekt Type/traceability-proto`, dessen `Config = {}` den Boot mit
- * → Kanon: docs/COMMENT-KANON.md#k-093928499e48
+ * `... (reading 'validate')` abriss). Deshalb prüft diese Funktion die Naht, an der
+ * die Beschattung entsteht, und nicht das Paket.
+ *
+ * Geprüft wird, was da ist. Ein FEHLENDER Eintrag ist kein Fehler — ein frischer
+ * Klon hat kein `profiles/<name>/node_modules`, und DSH installiert ihn beim Start
+ * aus dem Manifest. Ein vorhandener Eintrag dagegen muss dem Manifest folgen.
+ *
+ * @param {object} root - Root-Manifest (nur `name` wird gelesen: der Scope).
+ * @param {{profileName?: string, profilesDir?: string, packagesDir?: string, base?: string}} [options]
+ *   Übersteuerungen für Tests (Miniatur-Baum) und Doctor (fremde Wurzel).
+ * @returns {string[]} Befunde; jeder nennt Quelle, aufgelöstes Ziel und Abhilfe.
  */
 export function bundleResolutionIssues(root = readRoot(), options = {}) {
   const packagesDir = options.packagesDir ?? PACKAGES_DIR;
@@ -1075,7 +1133,8 @@ export function resolveProfile(profileName, packages, root = readRoot()) {
  * Genau diese Prüfung hätte den Fremd-Link vom 2026-10-17 abgefangen: dessen
  * `Config = {}` fiel erst im Boot als `reading 'validate'` auf. Ohne
  * installiertes Schemastery ist die Prüfung nicht durchführbar und meldet das
- * → Kanon: docs/COMMENT-KANON.md#k-ea458e8d9a71
+ * (fail-closed) — ein stiller Skip wäre die Lücke wieder.
+ * @returns {Promise<string[]>} Befunde (leer = alle Configs sind Schemata).
  */
 export async function configShapeIssues(packages) {
   const issues = [];
@@ -1104,7 +1163,14 @@ export async function configShapeIssues(packages) {
  *   1. Ein `profiles/<name>/node_modules/@shinon/<pkg>`-Eintrag, dessen
  *      `realpath` NICHT unter `<root>/packages/` liegt, beschattet das Repo-Paket.
  *      Gemessen am 2026-10-17 zeigte `@shinon/traceability` auf einen externen
- * → Kanon: docs/COMMENT-KANON.md#k-965ff1e1d7ef
+ *      Prototyp; der Boot starb an `Config = {}` mit `reading 'validate'`. Ein
+ *      toter Link wird ebenfalls gemeldet, nicht still übersprungen.
+ *   2. pnpm-Reste (`.pnpm`, `.modules.yaml`, `.pnpm-workspace-state-v1.json`)
+ *      unter `profiles/<name>/node_modules`: dieses Repo installiert mit npm; ein
+ *      `dsh plugin add` (Upstream) darf sie anlegen, wir committen sie nie.
+ *
+ * Ein FEHLENDES `node_modules` ist kein Befund — ein frischer Klon hat keins.
+ * @returns {string[]} Befunde (leer = die installierte Ebene ist sauber).
  */
 export function profileInstallIssues(root = ROOT, options = {}) {
   const packagesDir = options.packagesDir ?? join(ROOT, 'packages');

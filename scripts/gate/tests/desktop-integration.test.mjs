@@ -6,7 +6,20 @@
  * `.desktop`-Start aus `process.execPath` zusammen — dem Interpreter, mit dem der
  * Launcher zufällig gestartet wurde. Ein `.desktop`-Eintrag überlebt den Aufruf,
  * der ihn geschrieben hat: zeigt er danach auf ein untaugliches Node, startet der
- * → Kanon: docs/COMMENT-KANON.md#k-0da7e92c5dad
+ * Klick in einen Fehler, den niemand sieht. Außerdem gab es keinen
+ * Paketierungsweg (nur einen Satz in `docs/STARTER-PLAN.md`).
+ *
+ * Gepinnt wird:
+ *   1. Exec nennt ABSOLUTE Pfade, und das Node-Binary ist gegen `engines`
+ *      verifiziert (gestartet mit dem SYSTEM-Node, der das NICHT ist),
+ *   2. die Quoting übersteht eine echte Shell (Arbeitsbaum mit Leerzeichen),
+ *   3. der Lauf ist idempotent und `--check` erkennt einen veralteten Eintrag,
+ *   4. `--uninstall` entfernt genau die Einträge,
+ *   5. `node scripts/deb-build.mjs` baut mit `dpkg-deb` ein echtes Paket nach
+ *      /opt/shinon-forge — ohne node_modules, ohne Laufzeitdaten.
+ *
+ * Läuft mit `node --test`; kein Netz, kein Modell. Ohne `dpkg-deb` meldet der
+ * Paketteil SICHTBAR „übersprungen mit Grund\" statt grün zu lügen.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

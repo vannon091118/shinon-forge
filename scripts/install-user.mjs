@@ -7,7 +7,77 @@
  * Hand). Handarbeit ist nicht wiederholbar: niemand weiß später, welcher Stand
  * läuft, ein misslungenes Update hinterlässt einen halbfertigen Baum, und ob
  * der neue Stand überhaupt startet, merkt man erst am Bildschirm. Dieses
- * → Kanon: docs/COMMENT-KANON.md#k-edd9ef983fc6
+ * Werkzeug macht aus der Kette einen Befehl und aus dem Start eine Abnahme.
+ *
+ * Vier Unterbefehle, ein Zustand:
+ *
+ *   install    Klon (falls nötig), Checkout des Ziels, `npm ci`, Profil-Links,
+ *              Abnahme. Zieht standardmäßig `origin/main` (git fetch), nicht
+ *              den lokalen Arbeitsbaum — ein Installat soll den veröffentlichten
+ *              Stand tragen.
+ *   update     derselbe Ablauf; ist der Stand schon aktuell, wird nur die
+ *              Abnahme gefahren (kein sinnloses Neuinstallieren von 621 Paketen).
+ *   rollback   Neuinstallation des vorherigen Standes (`--to <sha>` auch frei
+ *              wählbar) aus dem Lockfile — sparsam auf der Platte, braucht Netz.
+ *   status     was läuft, welcher Stand davor liegt, was die letzte Abnahme sagte.
+ *   history    das dauerhafte Protokoll aller Abnahmen als Tabelle (oder --json).
+ *   auto       der Timer-Lauf: neuen Stand in ein STAGING bauen, dort abnehmen
+ *              und das Live-Verzeichnis erst bei grünem Urteil umschalten.
+ *   units      den systemd-User-Timer schreiben/entfernen, der `auto` aufruft.
+ *   selftest   der Ein-Befehl-Selbsttest (auch `npm run verify:install`): check,
+ *              doctor, Boot und HTTP-Nachweis gegen einen bestehenden Stand.
+ *              READ-ONLY — kein Checkout, kein `npm ci`, keine Zustandsänderung,
+ *              kein Rückweg; Exit 0 nur bei vollständiger Kette (4/4), sonst 1.
+ *
+ * WARUM ES `auto` NEBEN `update` GIBT (gemessener Unterschied, keine Kosmetik):
+ * `update` installiert IN das laufende Verzeichnis und prüft danach — für die
+ * Dauer des `npm ci` steht dort ein ungeprüfter Stand, und ein rotes Urteil
+ * muss danach zurückgerollt werden. `auto` baut den Kandidaten daneben, nimmt
+ * IHN ab und benennt erst dann um (zwei `rename`s, kein Kopieren). Ein rotes
+ * Urteil kostet damit nichts: das Live-Installat hat den Kandidaten nie
+ * gesehen. Nach der Umschaltung wird der neue Ort erneut abgenommen; ist sie
+ * rot, tauschen dieselben zwei Umbenennungen zurück.
+ *
+ * Jede Abnahme wird in `<stateDir>/logs/verify-log.jsonl` geschrieben — eine
+ * Zeile je Lauf, ohne Geheimnisse (kein Token, keine Schlüssel): Stand, Trigger,
+ * Boot-Dauer, Gesamtdauer, Plugins, Fehlerzahl, HTTP-Bytes, Ergebnis. Damit
+ * lassen sich Boot-Zeiten und Fehlerzeilen über Versionen vergleichen, statt
+ * sich auf die Erinnerung an den letzten Bildschirm zu verlassen.
+ *
+ * ROT HEISST NICHT STEHENBLEIBEN: besteht ein neu installierter Stand die
+ * Abnahme nicht, kehrt der Befehl von selbst auf den letzten GRÜNEN Stand
+ * zurück (der zuletzt abgenommene, nicht bloß der vorherige), installiert ihn
+ * aus dessen Lockfile und prüft ihn erneut. Der Exit-Code bleibt 1 — das
+ * Update ist gescheitert und soll nicht als Erfolg durchgehen —, aber das
+ * Installat steht wieder auf einem belegten Stand. Der Rückweg wird in der
+ * Historie als `auto-rollback` geführt. `--no-rollback` schaltet die
+ * Selbstheilung aus, wenn jemand den roten Stand untersuchen will.
+ *
+ * Die Abnahme ist der Kern, nicht ein Anhängsel: `shinon --check`, `shinon
+ * doctor`, dann ein echter Boot auf Loopback mit eigenem Port, Warten auf
+ * `dsh web:`, HTTP-Nachweis (Token → Sitzung → Seite) und Zählung der
+ * Fehlerzeilen. Exit 0 gibt es nur, wenn die ganze Kette steht. Der Server wird
+ * danach über die PID aus dem Listener beendet, nicht über ein Muster.
+ *
+ * Grenzen, absichtlich:
+ *   - Kein `git clean`: ein `--dry-run` gibt es nicht, aber auch kein Löschen
+ *     unversionierter Dateien. Ein `.env` im Installat überlebt jedes Update.
+ *   - Läuft eine Instanz aus dem Zielverzeichnis, verweigert der Befehl das
+ *     Neuinstallieren (npm ci würde ihr node_modules unter den Füßen
+ *     wegziehen) — `--force` ist die ausdrückliche Ausnahme.
+ *   - Ein Rollback ist eine Neuinstallation, kein Symlinkwechsel: der Zustand
+ *     (Sessions, Ledger, Index) liegt außerhalb und bleibt unberührt.
+ *
+ * Aufruf:
+ *   node scripts/install-user.mjs install  [--prefix DIR] [--ref R] [--source URL] [--no-verify]
+ *   node scripts/install-user.mjs update   [--prefix DIR] [--ref R] [--no-verify] [--force]
+ *   node scripts/install-user.mjs rollback [--prefix DIR] [--to SHA] [--no-verify] [--force] [--no-rollback]
+ *   node scripts/install-user.mjs status   [--prefix DIR] [--quiet]
+ *   node scripts/install-user.mjs history  [--limit N] [--json]
+ *   node scripts/install-user.mjs auto     [--prefix DIR] [--staging DIR] [--ref R] [--quiet]
+ *   node scripts/install-user.mjs units    [--interval ZEIT] [--no-enable] [--remove]
+ *   Abnahme: [--port N] [--timeout S] [--no-rollback]
+ * Exit: 0 = Stand installiert und abgenommen · 1 = Abnahme rot · 2 = Bedien- oder Umgebungsfehler
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';

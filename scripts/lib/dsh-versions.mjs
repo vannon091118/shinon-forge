@@ -4,7 +4,6 @@
  * Die Matrix ist die einzige Autorität. Geprüft werden Manifeste, Lock (auch
  * verschachtelt), Vendor, Installat, CLI und ein zweiter Versionsliteral im
  * Quelltext; Befunde werden gesammelt, den Exit-Code setzt der Aufrufer.
- * → Kanon: docs/COMMENT-KANON.md#k-dsh-versions
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';

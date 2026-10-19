@@ -7,7 +7,22 @@
  * Vier Ebenen, bewusst getrennt:
  *   1. Die reine Extraktion (Zeilenheuristik) gegen Fixtures UND gegen echte
  *      Dateien dieses Repos — die Grenze wird gemessen, nicht behauptet.
- * → Kanon: docs/COMMENT-KANON.md#k-34d55a3bd058
+ *   2. Das Schema: die Primärdaten aus Plan §9, namentlich und zählbar, plus die
+ *      gemessene Tatsache, dass `references` ein SQLite-Schlüsselwort ist.
+ *   3. Ein echter Lauf gegen ein Fixture-Projekt: Vollauf, unveränderter zweiter
+ *      Lauf, geänderter Inhalt, gelöschte Datei, zu große Datei, FTS5.
+ *   4. Der Host-Pfad: der Lauf im Worker und im Host liefern denselben Index,
+ *      der Mount startet den Lauf und blockiert den Start nicht, und ein
+ *      scheiternder Worker wird protokolliert statt geworfen.
+ *
+ * Warum ein Fixture-Projekt und nicht nur dieses Repo: nur so sind „unverändert",
+ * „gelöscht" und „zu groß" deterministisch herstellbar. Gegen die echten Dateien
+ * dieses Repos läuft zusätzlich die Extraktion, damit die Zusage an echtem Text
+ * hängt und nicht an erfundenen Beispielen.
+ *
+ * Läuft mit `node --test` (CI: .github/workflows/commit-guard.yml). Kein Netz,
+ * kein Modell, kein node_modules im Repo (`dsh` muss im PATH liegen — wie beim
+ * Profiltest, weil das echte Schemastery aus der DSH-Installation kommt).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -912,7 +927,8 @@ test('Zeitstempel: die benannte Lücke und ihr Gegenmittel verify=all', () => {
  * wiederhergestellt werden; ein Ersatz der Datei bewegt den Inode.
  *
  * Die Kostenaussage steckt im Bericht selbst (`readBytes`), nicht nur in einem
- * → Kanon: docs/COMMENT-KANON.md#k-d5584f40faa5
+ * Messskript: der stillste Lauf liest null Bytes, und der Lauf, der die Luecke
+ * schliesst, liest genau die eine verdaechtige Datei.
  */
 test('Zeitstempel: verify=stamp schliesst die Luecke, ohne den Baum zu lesen', () => {
   const project = fixtureProject('stamp-luecke');
@@ -1316,7 +1332,8 @@ test('Mount: ein scheiternder Worker wird protokolliert und im Host wiederholt',
 // Dieses Schema nennt Groesse und Hash `bytes` und `digest`: §10 nennt die
 // ANGABEN, kein SQL. Die Tests pinnen deshalb die Bedeutung und nicht die
 // Schreibweise — Groesse und mtime gegen das Dateisystem, der Digest als sha256
-// → Kanon: docs/COMMENT-KANON.md#k-796e46177eae
+// des ROHEN Inhalts. Dass der Digest nicht dem redigierten Text folgt, ist kein
+// Detail: er entscheidet, ob sich eine Datei geaendert hat.
 
 test('Indexdatei: path, language, Groesse, mtime und sha256 stimmen Zeile fuer Zeile', () => {
   const project = fixtureProject('dateizeile');
@@ -1553,7 +1570,8 @@ function secretProject(label) {
  *                      weil `listFiles` nur Textendungen aufnimmt. Sie sind
  *                      deshalb auch ohne Schutz nie im Index — der Grund, warum
  *                      die Musterliste aus Plan §13 zu einem Teil redundant ist.
- * → Kanon: docs/COMMENT-KANON.md#k-e08e648c0d8d
+ *   SCHUTZ_REGELN      Dateien MIT indexierbarer Endung, die Zugangsdaten sind.
+ *                      Genau hier lag der echte Fund: `.credentials.yaml`.
  */
 const EXCLUDED_BY_EXTENSION = ['.env', 'tief/verschachtelt/.env.production', 'keys/server.pem', '.ssh/id_rsa'];
 const PROTECTED_LISTED = ['.credentials.yaml', 'credentials.json', 'secrets.yml', 'settings/.env.yaml', 'src/secrets.mjs'];

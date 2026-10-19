@@ -6,7 +6,36 @@
  * WARUM GENERIERT UND NICHT PER IMPORT GETEILT — gemessen, nicht angenommen:
  *   - Jedes Paket wird einzeln verpackt. `scripts/pack-test.mjs` packt genau
  *     `package.json`, `index.js`, `client.js`, `cordis.patch.yml` plus die
- * → Kanon: docs/COMMENT-KANON.md#k-784278a52113
+ *     referenzierten Ressourcen in ein Tarball und lädt es im Isolat. Eine
+ *     `import`-Zeile auf `scripts/lib/…` läge außerhalb dieses Tarballs; das
+ *     Paket ließe sich dort nicht mehr laden.
+ *   - Eine Client-Hälfte ist ein self-contained Bundle
+ *     (`window.__ModuleLoader__.load`, React kommt per `require`). Sie kann kein
+ *     Repo-Modul erreichen.
+ *   Beides zusammen heißt: Teilen ist in der Laufzeit nicht möglich. Also steht
+ *   der Baustein einmal hier, die Pakete tragen generierte Blöcke, und ein
+ *   Drift-Test hält beide Seiten gleich — keine handgepflegte Kopie.
+ *
+ * Marken im Ziel: `// >>> shinon:dsh-idiom <id> …` bis `// <<< shinon:dsh-idiom <id>`.
+ * Zwischen den Marken steht Zeile für Zeile genau das, was `render(region)`
+ * liefert (Einrückung eingeschlossen). Fehlt eine Marke, wird nichts geraten:
+ * der Schreiber bricht ab, die Prüfung meldet es.
+ *
+ * WO DIE PARAMETER STEHEN — und warum sie nicht mehr zentral liegen:
+ * Ein Baustein mit paketspezifischen Werten (Tabellenname, Schlüssel, Label)
+ * trägt sie in seiner **Startmarke** (` params={…}` am Zeilenende). Vorher stand
+ * diese Zuordnung in einer zentralen `REGIONS`-Liste in DIESER Datei; mit vielen
+ * Plugins musste jedes neue Paket dort eingetragen werden, und ein neues Paket
+ * war bis dahin rot (gemessen: 20 neue Pakete → 60 Befunde in `host-half`,
+ * `client-half`, `dsh-test` und `gate:test`). Jetzt findet die Prüfung die
+ * Regionen im Baum selbst: **jede Datei erklärt ihre eigene Region**, die
+ * Garantie bleibt dieselbe — der Block muss zeichengenau `render(region)` sein.
+ *
+ * Werkzeuge:
+ *   `npm run idioms`        schreibt alle Blöcke neu (scripts/sync-idioms.mjs)
+ *   `npm run idioms:check`  prüft nur und bricht mit Exit 1 bei Drift ab
+ *   Gate                    host-half und client-half prüfen ihre Hälfte mit
+ *                           `idiomIssues(root, half)`; ebenso `dsh-test` und `build`
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
@@ -242,7 +271,8 @@ function diffLines(want, found) {
  *     seiner eigenen Startmarke (die Quelle wird also nicht abgeschrieben).
  *   - Jede Signatur-Fundstelle liegt in einem SOLCHEN, gültigen Block — eine
  *     handgepflegte Kopie daneben fällt auf, auch wenn kein Block abweicht.
- * → Kanon: docs/COMMENT-KANON.md#k-3acde3de8682
+ *
+ * @returns {string[]} Befunde (leer = ein Quelltext-Stand, keine Kopie)
  */
 export function idiomIssues(rootPath, half) {
   const issues = [];

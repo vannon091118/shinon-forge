@@ -2,10 +2,16 @@
 /**
  * shinon-profile-test.mjs - Exit Gate fuer das bootfaehige Profil (Block 2)
  *
- * Laedt das aktive Profil wie DSH: `DSH_HOME=<geseedetes Home> dsh --profile
- * <name> --dump-config`. Das Home ist TEMPORAER und aus dem Baum geseedet —
- * dieselbe Form, die der Starter anlegt (`scripts/lib/dsh-home.mjs`).
- * → Kanon: docs/COMMENT-KANON.md#k-049acec77c27
+ * Laedt das aktive Profil genau so, wie DSH es laedt:
+ *
+ *   DSH_HOME=<Repo-Root> dsh --profile <name> --dump-config
+ *
+ * Das Repo-Root ist ein gueltiges DSH_HOME, weil es profiles/ enthaelt; damit
+ * ist der Lauf reproduzierbar, ohne etwas nach ~/.dsh zu installieren.
+ *
+ * Rot, solange profiles/<name> kein DSH-Profil ist (kein package.json ->
+ * "profile does not exist"), gruen, sobald DSH das Profil aufloest und jeden
+ * Bundle-Layer listet. Eingebunden in `npm test`.
  */
 import { execFileSync } from 'child_process';
 import { existsSync } from 'fs';

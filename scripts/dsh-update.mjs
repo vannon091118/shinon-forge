@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 /**
- * dsh-update.mjs — Aktualisierung gegen die Sollquelle, nie gegen ein Maximum.
+ * dsh-update.mjs - DSH Upstream Update Script
  *
- * Die Fassung steht in `scripts/dsh-target-versions.json` und nirgends sonst.
- * Nach dem Install misst `checkVersions` Pin, Lock, Vendor, Installat und CLI;
- * eine Abweichung beendet den Lauf mit Exit 1.
- * → Kanon: docs/COMMENT-KANON.md#k-dd28ec2eac28
+ * Vergleicht die installierte DSH-Fassung mit der Registry und installiert
+ * bei einem echten Update die Bundles in das KANONISCHE Profil (nicht `web`).
+ *
+ * Ehrlichkeitsregeln dieser Datei (keine Scheinaussagen):
+ * - Die Versionsaussage stammt aus einer gemessenen Registry-Abfrage
+ *   (`npm view @deepseek-ai/dsh versions --json`, Maximum nach Semver).
+ * - Ist die Registry nicht erreichbar, lautet die Antwort UNGEPRÜFT —
+ *   niemals „keine Updates“.
+ * - Alle Pfade und Namen sind abgeleitet (`lib/dsh.mjs`-Auflösung,
+ *   `activeProfile()` aus dem dev-Skript): keine hartcodierten Heimpfade,
+ *   kein fest verdrahtetes Profil, kein `dsh`-Aufruf über den bloßen PATH-Namen.
  */
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readFileSync } from 'node:fs';

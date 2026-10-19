@@ -17,7 +17,19 @@ import { LEARNED_DEFAULT_PATH } from './block-review.js';
  * wird still mit `[]` gefüllt (gemessen an 3.18.4). Ohne `required()` würde ein
  * Modell, das `addedRequirements` einfach weglässt, als "nichts hinzugefügt"
  * durchgehen — die Lücke sähe genau wie Compliance aus. Mit `required()` ist ein
- * → Kanon: docs/COMMENT-KANON.md#k-941496eaef11
+ * fehlendes Feld ein Schemafehler und führt zum Roh-Prompt.
+ *
+ * Für `references` gilt genau das NUR in MAX. Das Feld gehört zum MAX-Auftrag
+ * (`references.code`) und wird nur dort gelesen: `acceptance()` prüft jede
+ * Referenz gegen den gelieferten Kontext. In MIN und MID bedeutet ein fehlendes
+ * Feld nichts, und ein Pflichtfeld kostet dort eine sonst einwandfreie Antwort —
+ * gemessen am 2026-10-08: `SCHEMA_INVALID:$.references missing required value`
+ * bei `mode=MIN`, der Roh-Prompt galt. Deshalb ist die Pflicht an den Modus
+ * gebunden, in dem der Wert konsumiert wird. Was bleibt: ein ANWESENDES, aber
+ * falsches Feld (etwa `null`) wird in jedem Modus abgelehnt.
+ *
+ * `intentClassification` ist keine Empfehlung an das Modell, sondern Daten: nur
+ * diese fünf Werte passieren. Eine unbekannte Klasse wird verworfen.
  */
 export function resultSchema(mode) {
   return z.object({
@@ -76,7 +88,13 @@ export const ContextSchema = z.object({
  * wird gemeldet (`NO_ROUTE`), nicht stillschweigend als Erfolg verbucht.
  *
  * `contextPath` ist der definierte Kontext-Input fuer MAX: eine JSON-Datei in der
- * → Kanon: docs/COMMENT-KANON.md#k-8b2fcb37ec27
+ * Form von `ContextSchema`, relativ zum Paket aufgeloest. Leer heisst nicht mehr
+ * „MAX gibt es nicht": dann wird der Project Index gefragt (`INDEX_SERVICE`),
+ * und MAX gilt, wenn eine der beiden Quellen einen Kontext liefert. Der
+ * Entscheidungsdatensatz nennt, WELCHE (`context_source`). Eine konfigurierte,
+ * aber kaputte Datei sperrt MAX dagegen weiterhin (`CONTEXT_INVALID`) — eine
+ * ausdrueckliche Angabe, die nicht stimmt, darf nicht stillschweigend auf eine
+ * andere Quelle ausweichen.
  */
 export const Config = z.object({
   /** DSH-Event-Namen, auf die sich der Enhancer registriert. */

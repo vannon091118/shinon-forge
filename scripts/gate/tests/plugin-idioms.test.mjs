@@ -7,7 +7,19 @@
  * `settings.configure`-Block, mehrere Client-Hälften denselben Locale-Fallback —
  * dieselbe Prüfung, mehrfach gepflegt. Teilen ist hier nicht möglich
  * (jedes Paket wird einzeln verpackt, eine Client-Hälfte ist ein self-contained
- * → Kanon: docs/COMMENT-KANON.md#k-2ccb9a11e41d
+ * Bundle, siehe Kopf der Quelle); also tragen die Pakete ABLEITUNGEN, und dieser
+ * Test pinnt, dass die Ableitung wirklich eine ist:
+ *
+ *   1. Der Baum ist deckungsgleich: kein Block weicht von der Quelle ab, und
+ *      keine Fundstelle der Signatur steht außerhalb eines Blocks.
+ *   2. Die Prüfung ist nicht vakuum-grün: eine getippte Abweichung, eine fehlende
+ *      Marke, eine überzählige Marke und eine neue Kopie ohne Marke werden
+ *      JEWEILS rot — in einem temporären Wurzelverzeichnis, nicht am echten Baum.
+ *   3. Der Schreiber repariert Drift, ist idempotent und rät nicht: fehlt eine
+ *      Marke, bleibt die Datei unangetastet (fail-closed).
+ *
+ * Läuft mit `node --test` (CI: .github/workflows/commit-guard.yml). Kein Netz,
+ * kein Modell, kein node_modules.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

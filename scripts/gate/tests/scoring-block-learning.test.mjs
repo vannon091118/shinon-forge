@@ -7,7 +7,17 @@
  * statt der echten SQLite (kein DSH nötig).
  *
  * WARUM HIER und nicht in `packages/scoring/test/`: dieser Weg fährt die
- * → Kanon: docs/COMMENT-KANON.md#k-702219ebf3d6
+ * HOST-Hälfte (`packages/scoring/index.js`) und damit `@deepseek-ai/schemastery`.
+ * Die Paket-Suiten laufen in CI in einem Zweig OHNE `npm ci` — genau wie bei
+ * `prompter` würde ein `../index.js`-Import diesen Zweig rot machen, ohne dass
+ * eine Zusage bricht (gemessen 2026-10-17: Job 117312423811, 50/51, `ERR_MODULE_NOT_FOUND`).
+ * Die reinen Kerne bleiben in `packages/scoring/test/`; die Naht läuft hier,
+ * wo `npm ci` gelaufen ist.
+ *
+ * Gepinnt wird: die Auswahl des Veredlers (nur Ids, Sitzung) wird mit dem
+ * nächsten Signal gewertet; die Gewichte überdauern den Neustart im selben
+ * Snapshot wie das Protokoll; späte Kritik ersetzt statt zu stapeln; der
+ * Widerruf nimmt exakt zurück; Bemerkung und Unbekanntes werten nie.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

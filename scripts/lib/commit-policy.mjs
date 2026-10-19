@@ -6,7 +6,9 @@
  * stehen in commit-policy-file.mjs.
  *
  * Fail-closed in drei Richtungen: ein unbekannter Schlüssel, eine unbekannte
- * → Kanon: docs/COMMENT-KANON.md#k-2d8c5ca52d5c
+ * Version oder ein unbekanntes Preset ergibt Fehler — nie einen stillen Rückfall
+ * auf schwächere Regeln. Die Fußboden-Regeln (Signatur-Footer, co-authored-by)
+ * sind kein Preset-Feld und damit nicht abwählbar.
  */
 import { VANNON_TRAILER } from './commit-text.mjs';
 

@@ -8,7 +8,22 @@ import z from '@deepseek-ai/schemastery';
  * weil er ein eigenständiges Bundle ist. Der Datensatz wandert über
  * `webserver/index-inject` als `window.__SHINON_TRACEABILITY_CONFIG__` in den
  * Index — dieselbe Naht, über die DSH Theme, Dokument-Vorschau und
- * → Kanon: docs/COMMENT-KANON.md#k-aaed9acb4716
+ * Modelleinstellungen ausliefert.
+ *
+ * WAS DIESE HÄLFTE NICHT TUT (konsolidiert, mit Grund):
+ *
+ *   - Sie lauscht NICHT auf `tool/call`/`tool/result`/`step/start`/`agent/error`.
+ *     Das sind Record-Typen des SESSION-LOGS (belegt: `session.v4.jsonl`, 199×
+ *     `tool/call`), keine Events eines Cordis-Bus — ein `ctx.on` darauf bliebe
+ *     still. Das Falten des Ereignisfensters ist Arbeit der Client-Hälfte,
+ *     exakt wie bei `@shinon/popup`.
+ *   - Sie schreibt NICHTS in `globalThis.window`: der Host läuft in Node, wo es
+ *     kein `window` gibt. Genau das war der Befund, durch den das
+ *     Trace-Panel des Prompters leer blieb.
+ *
+ * Der Vertrag des Datensatzes ist `TOAST_CONTRACT` — der Besitzer steht hier,
+ * der Client trägt denselben Wert als Literal (SOURCE_TWINS, geprüft von Gate
+ * und Build; `scripts/gate/tests/traceability.test.mjs` pinnt die Naht).
  */
 
 /** Das Global, in das der Host seine wirksamen Grenzen legt (der Client liest es). */

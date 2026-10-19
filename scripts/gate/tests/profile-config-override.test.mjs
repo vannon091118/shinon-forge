@@ -7,7 +7,24 @@
  * `packages/prompter/cordis.patch.yml` `mode: MAX` und eine Route; das Profil
  * fasste denselben Eintrag an, um `skillsPath` zu setzen — und damit fiel alles
  * auf Schema-Defaults zurueck (MIN, leere Route). Der Enhancer mountete, meldete
- * → Kanon: docs/COMMENT-KANON.md#k-16a92d51f247
+ * `NO_ROUTE` und veredelte nie etwas. Kein Fehler, keine Warnung, kein roter Test:
+ * die Werte sahen wirksam aus und waren es nie.
+ *
+ * DREI ZUSAGEN, aufsteigend scharf:
+ *
+ *   1. KLASSE — keine id traegt ihre Config in BEIDEN Ebenen. Genau diese
+ *      Doppelung produziert die stille Ersetzung, egal welches Paket sie trifft.
+ *   2. SUBSTANZ — die id-gezielte Config im Profil ist nicht leer. Ohne diese
+ *      Zusage waere Zusage 1 durch Loeschen aller Werte erfuellbar: die Falle
+ *      waere weg und der Prompter trotzdem tot (fail-open).
+ *   3. RUNTIME — `dsh --profile <p> --dump-config` liefert fuer den Prompter
+ *      genau die Werte, die das Profil nennt. Das ist der Beweis am echten
+ *      Resolver statt an einer Datei. Braucht `dsh`; ohne es wird sichtbar
+ *      uebersprungen (dieselbe Regel wie beim Store- und Uebergabetest).
+ *
+ * Zusage 3 ist die einzige, die den Fehler AUCH am laufenden Profil gefunden
+ * haette. Sie ist bewusst dabei und bewusst nicht die einzige: ein Test, der
+ * ohne `dsh` schweigt, darf die anderen Zusagen nicht mitnehmen.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

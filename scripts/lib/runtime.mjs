@@ -6,7 +6,19 @@
  * erlaubt) und Node 22.0–22.18 ebenso (obwohl `^22.19.0` erst ab 22.19 gilt) —
  * und `node:sqlite` fehlt in zu alten Fassungen ganz, sodass der Fehler nicht
  * hier, sondern tief im Index auftrat. Außerdem standen zwei Heimpfade fest im
- * → Kanon: docs/COMMENT-KANON.md#k-9ab80e0ce68b
+ * Code (`~/.local/opt/node-v22.23.3-…`, `~/.nvm/…/v24.21.0`): auf einem anderen
+ * Rechner ist das keine Auflösung, sondern eine Behauptung.
+ *
+ * DIE RANGE IST EINE QUELLE: `engines.node` im Root-Manifest. Dieses Modul
+ * liest sie und schreibt keine zweite Liste — wer die unterstützte Fassung
+ * ändert, ändert sie dort. Die exakte Fassung, mit der dieses Repo gemessen ist,
+ * steht weiterhin in der Zahlendatei (`docs/ZAHLEN.md` §1) und NICHT als zweite
+ * Konstante im Code.
+ *
+ * Ein Kandidat gilt nur, wenn er ZWEI Proben besteht:
+ *   1. `--version` passt zur Range (nicht nur die Hauptversion),
+ *   2. der `node:sqlite`-Rauchtest: DatabaseSync(':memory:'), `select 1`, close.
+ * Netz und Modellschlüssel sind dafür nicht nötig.
  */
 
 import { execFileSync } from 'node:child_process';

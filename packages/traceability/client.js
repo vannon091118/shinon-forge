@@ -6,7 +6,37 @@
  * Browser-Hälfte kommen aus einer kompilierten Liste in
  * `@deepseek-ai/dsh-api-remotes`, und die Connection-Naht ist reines
  * Anfrage/Antwort ohne Abo. Diese Hälfte foldet deshalb die SITZUNG selbst:
- * → Kanon: docs/COMMENT-KANON.md#k-b02592ec21d4
+ *
+ *   ctx.get('uiSession')?.adapter?.current?.getSnapshot()   → welche Sitzung
+ *   ctx.get('sessions')?.binding(id)                        → deren Bindung
+ *   …binding.eventSource.getSnapshot().entries              → das Ereignisfenster
+ *   …binding.eventSource.subscribe(fn)                      → jede Änderung
+ *
+ * Denselben Weg gehen `@shinon/popup` und `@shinon/token-usage`; er ist gemessen
+ * (der Vertrag der installierten DSH-Fassung: `ctx.get(name)` ist die optionale
+ * Abfrage, ein direkter Dienst-Zugriff wirft ohne `inject`).
+ *
+ * DIE EINE NAHT ZUM HOST: die WIRKSAMEN Grenzen (enabled/maxVisible/duration)
+ * legt der Host beim Ausliefern der Seite über `webserver/index-inject` als
+ * `window.__SHINON_TRACEABILITY_CONFIG__` in den Index — dieselbe Naht, die
+ * `@shinon/markers` für seine Grenzen benutzt. Der Name steht hier als LITERAL,
+ * weil dieses Bundle eigenständig ist; `scripts/lib/repo.mjs` (SOURCE_TWINS)
+ * und `scripts/gate/tests/traceability.test.mjs` vergleichen beide Seiten.
+ *
+ * WAS HIER NICHT MEHR STEHT (gemessene Befunde, konsolidiert):
+ *   - Kein zweites Ereignis-Abo auf dem Host: die vier Record-Typen
+ *     (`tool/call`, `tool/result`, `step/start`, `agent/error`) sind Formen des
+ *     SESSION-LOGS, keine Bus-Events — der Host hätte nichts empfangen. Das
+ *     Fenster zu falten ist dieser Hälfte eigene Arbeit, wie bei popup.
+ *   - Kein `globalThis.window`-Schreibvorgang am Host: der Host läuft in Node,
+ *     wo es kein `window` gibt (der Befund, durch den das Trace-Panel leer
+ *     blieb). Konfiguration wandert über den Index in die Seite, nicht über ein
+ *     Fenster zur Laufzeit.
+ *
+ * FEHLERISOLIERUNG: die Beobachtung darf das Rendern nie stören — Lesen und
+ * Abo laufen in try/catch, Verstöße werden gezählt und EINMAL gemeldet
+ * (dieselbe Regel wie `@shinon/markers`). Was trotzdem wirft, fängt der
+ * Plattform-Ring ab (`SlotErrorBoundary` in `dsh-client-ui-renderer`).
  */
 window.__ModuleLoader__.load({
   id: '@shinon/traceability',

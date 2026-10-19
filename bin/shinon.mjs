@@ -1,13 +1,43 @@
 #!/usr/bin/env node
 /**
- * bin/shinon.mjs — der echte Einstieg von Shinon Forge (Beleg: docs/CHANGELOG.md).
+ * bin/shinon.mjs — der echte Einstieg von Shinon Forge (PLAN.md Schritt 3.4 / D4).
  *
  * Ein Aufruf, **keine** Voraussetzung im PATH. Was hier passiert:
  *
  *   1. Node-Heilung: verlangt wird die Range aus `engines` im Root-Manifest
  *      (darunter sterben `node:sqlite` und `parseEnv` schon beim Import). Läuft
  *      die Datei unter einem untauglichen Node, startet sie sich mit dem ersten
- * → Kanon: docs/COMMENT-KANON.md#k-066458efe5c7
+ *      VERIFIZIERTEN Node aus `scripts/lib/runtime.mjs` selbst neu — geprüft
+ *      werden `--version` gegen die Range UND der `node:sqlite`-Rauchtest.
+ *   2. dsh-Auflösung: genau EINE Quelle — `dshBinary()` aus `scripts/lib/dsh.mjs`
+ *      (Repo-Installat, Vendor, PATH, bekannte Prefixe). Sie liefert ein
+ *      `[node, bin.js]`-Paar: kein Shebang-Node und kein Shell-Quoting dazwischen.
+ *      `--check` nennt zusätzlich die HERKUNFT (`dshSource()`), damit „findet sein
+ *      dsh ohne globales Installat" nicht behauptet, sondern gezeigt wird.
+ *   3. Start: `node <bin.js> --profile <aktiv> …` mit `DSH_HOME=<Repo-Root>`;
+ *      eigene Argumente werden durchgereicht (`shinon --no-open --port 3085`).
+ *
+ * **Kein Stub.** Die Audit-Befunde A-INV-03 (`docs/archive/DEPENDENCY_FINDINGS.md`)
+ * und A-INV-03 (`docs/archive/ARCHITECTURE_MAP.md`) beschreiben genau diesen Pfad
+ * als „verwaist: nur Logs, kein `bin`-Feld, kein Script verweist darauf". Diese
+ * Fassung arbeitet: sie löst auf, prüft und startet — und sie steht im
+ * `bin`-Feld des Root-Manifests, also unter dem Namen `shinon`.
+ *
+ * Was hier NOCH nicht passiert (bewusst, nicht vergessen): der Einstieg startet
+ * das aufgelöste dsh mit `--profile <name>`. Der Bootpfad, der ohne
+ * `$DSH_HOME/profiles/<name>` auskommt (`resolvedProfile`, Schritt 3.3 ist dafür
+ * belegt), wird hier erst eingehängt, wenn die Profilwerte aus Code kommen
+ * (Schritt 3.6) — sonst gäbe es zwei Orte, an denen das Profil definiert ist.
+ * Ebenso bleibt `vendor/dsh` unverdrahtet: es läuft das Repo-Installat, also der Pin
+ * aus `package.json`. Die vendorte Kopie trägt seit dem 2026-10-17 dieselbe Fassung
+ * wie Pin, Lock und Installat und hat **keinen** Laufzeitleser — welcher Code sie
+ * lädt (heute: keiner), welche Kandidaten `dshRoot()` kennt und was ein Umzug auf
+ * eine andere Fassung kostet, steht in `vendor/MODIFICATIONS.md`.
+ *
+ * Aufruf:  shinon [--check] [dsh-Argumente …]      (bzw. `npm start [-- …]`)
+ *          shinon doctor [--json]                 (Laufzeit-Diagnose, S4)
+ * Exit:    0 = läuft bzw. geprüft bzw. doctor-gesund · 1 = doctor-Befunde
+ *          · 2 = Umgebungsfehler (fail-closed)
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { constants as osConstants } from 'node:os';
@@ -52,7 +82,9 @@ if (!running && process.env.SHINON_START_REEXEC !== '1') {
  * ließ aber Self-Heal-Kind und dsh als Waisen weiterlaufen — Port blieb offen.
  * Deshalb erhält JEHE Ebene hier ihre Handler: das Kind bekommt dasselbe Signal
  * (INT/TERM/HUP); stirbt das Kind per Signal, werden die eigenen Listener
- * → Kanon: docs/COMMENT-KANON.md#k-cd1719de90f7
+ * entfernt und dasselbe Signal neu aufgelegt. Der Prozess stirbt dann ECHT
+ * signalisiert (Shell: 128+Nummer) und nicht über einen Listener, der sich
+ * selbst neu anstößt — das wäre eine Endlosschleife.
  */
 function forwardSignalsTo(child) {
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];

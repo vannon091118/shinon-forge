@@ -7,7 +7,21 @@
  * DSH-Ablauf erhalten bleibt."
  *
  * Deshalb wird hier NICHT gegen einen selbstgebauten Fake-Host geprüft, sondern
- * → Kanon: docs/COMMENT-KANON.md#k-8b7ce787e486
+ * gegen die echten Bausteine der installierten DSH-Version: das Bundle wird über
+ * seine echte apply()-Schnittstelle registriert (mit dem ECHTEN Schemastery der
+ * DSH-Installation, nicht gestubbt), und der Waterfall läuft über einen echten
+ * Cordis-Context — also über dieselbe Mechanik, die
+ * @deepseek-ai/dsh-agent-loop für `agent/pre-step` benutzt.
+ *
+ * Wäre die Waterfall-Semantik falsch verstanden (falscher Rückgabewert, kein
+ * next(), doppeltes next()), würden diese Tests fehlschlagen.
+ *
+ * Aufbau: die Tests sind der Vertrag. Jeder Test benennt eine Zusage und deckt
+ * ihre Fälle als Tabelle ab, statt Fälle zu wiederholen.
+ *
+ * Läuft mit `node --test` (CI: .github/workflows/commit-guard.yml). Kein
+ * node_modules im Repo, kein Netz, kein Modell. `dsh` muss im PATH liegen —
+ * dieselbe Voraussetzung wie für den Profiltest.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

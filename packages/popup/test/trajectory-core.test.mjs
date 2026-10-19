@@ -7,7 +7,13 @@
  *
  *   - Das Fenster liefert `{ type: 'event', event }`; Chunks und Fremdes fallen weg.
  *   - Ein `turn/start` setzt die Lesart zurück, ein `turn/end` schließt sie ab.
- * → Kanon: docs/COMMENT-KANON.md#k-5cb9ff2f3777
+ *   - Ein `tool/call` ist offen, bis sein `tool/result` es über
+ *     `data.message.source.callId` schließt — der laufende Aufruf ist der jüngste
+ *     offene.
+ *   - Ohne `callId` wird NICHTS geschlossen (kein Raten).
+ *   - Die Werkzeugliste ist gedeckelt (das Fenster wächst unbegrenzt).
+ *
+ * Läuft mit `node --test` (`npm test`) — kein DSH, kein node_modules.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

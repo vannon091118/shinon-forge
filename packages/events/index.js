@@ -10,7 +10,29 @@ import { readFileSync } from 'node:fs';
  *   DSH-Signal → Normalisierung → Contract-Gate → Emission
  *                    │                 │
  *                    │                 └─ ungültig ⇒ VERWERFEN (fail-closed für das Event)
- * → Kanon: docs/COMMENT-KANON.md#k-5029c455e3a2
+ *                    └─ niemals eine Aktion, niemals ein Schreibzugriff, niemals ein Modell
+ *
+ * Zwei Fail-Richtungen, bewusst getrennt (DOKI-Prinzip):
+ *   - fail-closed für das EVENT: ein Event, das den Contract verletzt, wird nie emittiert.
+ *   - fail-open für den HOST: die Beobachtung darf den beobachteten Prozess nie blockieren
+ *     (kein Throw aus einem Handler heraus, kein Absturz bei fehlendem Signal).
+ *
+ * Der Spine ist ein Durchleiter, keine Autorität (`authority: NONE` im Vertrag).
+ * Er darf keinen State setzen, keine Datei schreiben, kein Netz und kein Modell aufrufen.
+ * Das Gate prüft genau diese Grenze statisch (scripts/gate/plugins/events-spine.mjs).
+ *
+ * Drei Ausgänge, bewusst getrennt:
+ *   EMITTIERT  — der Typ steht in der typeMap (oder auf einem shinon/*-Signal).
+ *   IGNORIERT  — der Typ steht in carrier.ignoredTypes: bekannt, bewusst nicht
+ *                modelliert. Kein Ereignis, kein onDrop, keine Warnung; gezählt
+ *                in stats.ignored/ignoredTypes. DSH emittiert Dutzende Typen
+ *                (approval/*, compaction/*, ptc-dispatch/*, …), die niemand
+ *                abbilden will — als UNKNOWN_SIGNAL würden sie das Log fluten.
+ *   VERWORFEN  — alles andere: unbekannt oder vertragsbrüchig, fail-closed.
+ * Ein NEUER DSH-Typ ist nicht ignoriert und warnt deshalb weiter.
+ *
+ * Der Vertrag selbst liegt als Daten in ./assets/event-spine.json — nicht im Code.
+ * Ein neuer Event-Typ ist damit zuerst eine Datenänderung, kein Code-Umbau.
  */
 
 /** Fallback, falls der Vertrag nicht geladen werden kann; wird nie emittiert. */

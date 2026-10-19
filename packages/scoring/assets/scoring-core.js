@@ -6,7 +6,9 @@
  * Daten) und `@shinon/codingmon` (assets/mechanik.js). `index.js` re-exportiert
  * diesen Kern, die Host-Anbindung (Dateien laden) bleibt dort.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-8f45c798f974
+ * replay(Anfangszustand, Event-Strom) → { scorecard, injection, digest }.
+ * Rein und deterministisch: kein Math.random, kein Date.now, kein Modell.
+ * Unbekanntes ändert nichts (fail-closed); gezählt wird es trotzdem.
  */
 
 /** Vier Nachkommastellen nach jedem Event: kein Float-Rauschen im Golden-Wert. */
@@ -88,7 +90,8 @@ function snapshotScores(state) {
  * `event.weight` skaliert das Delta (Vorgabe 1). Der Faktor kommt aus der
  * Signaltabelle (Stärke → Faktor) und wird hier angewandt — nicht als zweite
  * Delta-Tabelle, sondern als Multiplikator auf den Vertragswert. Ein Ereignis
- * → Kanon: docs/COMMENT-KANON.md#k-de37b8714556
+ * ohne `weight` verhält sich damit exakt wie vorher (der Golden-Replay der
+ * Fixture bleibt unverändert).
  */
 export function applyEvent(contracts, state, event) {
   const scoring = contracts?.scoring ?? {};
@@ -213,7 +216,17 @@ export function replay(contracts, initial, stream) {
  * Replay oben schon kennt. Nichts davon ist geraten:
  *
  *   - Nur was in der Tabelle steht, erzeugt ein Signal. Alles andere ergibt
- * → Kanon: docs/COMMENT-KANON.md#k-caec6905770f
+ *     einen benannten Grund und aendert nichts (fail-closed).
+ *   - Menschen-Text ist nur Text mit `data.source.kind === 'user'` — gemessen
+ *     an den echten Sitzungsereignissen traegt Harness-Text ('agent-instructions',
+ *     'runtime-context') denselben Typ user/message. Ohne die Marke zaehlt er nicht.
+ *   - Wiederholung wird am INHALT gemessen (gemeinsame und ueberlappende Woerter),
+ *     nicht an der Uhr: kein Date.now, keine Sekundenregel.
+ *   - Der Widerruf rechnet exakt: die Zeile verschwindet aus dem Protokoll und die
+ *     Tafel wird aus dem Rest neu nachgerechnet — kein Gegen-Delta, kein Rest.
+ *
+ * Die Funktionen hier sind rein und deterministisch (keine Imports, keine Zeit,
+ * kein Zufall): dieselbe Folge von Ereignissen ergibt dieselbe Tafel.
  */
 
 /** Einen Punktpfad lesen: readPath({a:{b:1}}, 'a.b') → 1. Unbekanntes ergibt undefined. */
@@ -323,7 +336,8 @@ export function strengthFactor(rules, strengthId) {
  *   kind      'score' (es gibt ein Ereignis fuer den Replay), 'retract' (eine
  *             Zeile wird zurueckgenommen), 'note' (beobachtet, nie gewertet)
  *   event     das Ereignis fuer den Replay — oder null
- * → Kanon: docs/COMMENT-KANON.md#k-3888533791a6
+ *   reason    benannter Grund, wenn NICHTS passiert (jeder Grund ist ein Test wert)
+ *   question  der gerade gesehene Menschen-Text (der Host merkt ihn sich)
  */
 export function translateSignal(envelope, payload, rules, session = {}) {
   const empty = {
@@ -437,7 +451,24 @@ export function translateSignal(envelope, payload, rules, session = {}) {
  * Wer sie liest — Prompter, Persona — entscheidet ueber die Wirkung; hier steht
  * nur die Rechnung. Kein `Math.random`, kein `Date.now`, kein Modell: dieselben
  * Zeilen ergeben dieselbe Tendenz.
- * → Kanon: docs/COMMENT-KANON.md#k-bd6814cf86c3
+ *
+ * Was die Regeln liefern (`assets/tendency-rules.json`):
+ *   classes   — welche Signale eine Klasse speisen und welchen Pol sie traegt
+ *   levels    — Anteil → Wort, absteigend; die letzte Stufe traegt 0
+ *   stances   — geordnete Bedingungen ueber diese Worte; die erste passende gilt
+ *   minSignals— darunter wird NICHTS behauptet (fail-closed, kein Duennschluss)
+ *
+ * ZWEI ZAHLEN, nicht eine: `signals` ist das GANZE Protokoll (ehrliche Summe),
+ * `counted` ist die Evidenzlage, auf der die Anteile und die Mindestevidenz
+ * rechnen — naemlich die Zeilen, die eine Klasse auch liest. Eine Zeile aus
+ * einer aelteren Regel (ein Signal, das heute keine Klasse fuehrt) darf die
+ * Anteile nicht verwaessern, aber sie darf auch keine Haltung erzeugen; sie
+ * steht als `unmatched` sichtbar da. Zurueckgenommenes zaehlt gar nicht mit:
+ * ein Widerruf nimmt die Zeile aus dem Protokoll, und was nicht mehr dasteht,
+ * faerbt die Tendenz nicht.
+ * @param tendency - der Vertrag `assets/tendency-rules.json`.
+ * @param records - die Protokollzeilen des Sammlers (`kind: 'score'`).
+ * @returns { contract, ready, signals, counted, unmatched, counts, shares, levels, stance, reason }
  */
 export function deriveTendency(tendency, records = []) {
   const classes = Array.isArray(tendency?.classes) ? tendency.classes : [];
@@ -512,7 +543,27 @@ export function deriveTendency(tendency, records = []) {
  * `forgetSession` raeumt ihn auf, ein neues `session.created` schliesst die
  * Sitzung ab (der Merkzettel geht, es entsteht KEINE leere Huelle — eine Huelle
  * ohne Inhalt waere nur Ballast, der sich ueber die Laufzeit ansammelt), und
- * → Kanon: docs/COMMENT-KANON.md#k-8c408ccbe0ca
+ * `closeAllSessions` schliesst alle offenen, wenn der Host endet. DSH kennt im
+ * Spine kein Sitzungsende-Ereignis — das ist eine benannte Luecke, und deshalb
+ * ist der PROZESS die Grenze: was der Host noch weiss, schliesst er selbst ab,
+ * statt eine Ereignisform zu erfinden, die es nicht gibt.
+ *
+ * Die Tafel entsteht aus dem Protokoll: `replay` ueber alle Zeilen. Ein Widerruf
+ * ist damit exakt — die Zeile faellt weg, der Rest wird neu gerechnet, und altes
+ * Evidence verblasst weiter nach dem Vertrag. Genau diese Eigenschaft traegt den
+ * Neustart: das Protokoll ist die Wahrheit, die Tafel ist daraus hergeleitet,
+ * und was nicht mehr im Protokoll steht, zaehlt auch nach dem Laden nicht mehr.
+ *
+ * WAS HIER NICHT HINEINGEHOERT: das Schreiben. Der Sammler kennt keine Datei,
+ * keine Datenbank und keine Zeit. Er MELDET seinen Stand (`onPersist`) — wohin
+ * er geht, entscheidet der Host. Ein reiner Kern, der den Rueckruf nicht
+ * bekommt, verhaelt sich exakt wie vorher (er rechnet im Speicher).
+ *
+ * EINE HUELLE OHNE INHALT IST KEIN ZUSTAND: im Speicher entsteht fuer jede
+ * Sitzung, die ein Ereignis hatte, ein Merkzettel (auch ohne Frage — die
+ * Zaehler brauchen ihn). Geschrieben wird er nur, wenn er eine Frage kennt: er
+ * ist sonst nur Ballast, der sich ueber die Laufzeit zu einer Zeile je Sitzung
+ * summierte, und er sagt nichts, was nicht schon "kein Merkzettel" sagt.
  */
 export function createSignalCollector({ contracts, rules, onPersist = null } = {}) {
   const initial = initialState(contracts?.scoring ?? {});

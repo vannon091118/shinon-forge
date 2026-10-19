@@ -7,7 +7,13 @@
  * fremd (wie die `@deepseek-ai/*`-Eintraege), und es darf hier fehlen. Drei Dinge
  * werden gezeigt:
  *
- * → Kanon: docs/COMMENT-KANON.md#k-d56a37513cc9
+ *   1. Die Klassifikation stimmt: lokal (in packages/) → nicht fremd, ausserhalb →
+ *      fremd, und ohne Ziel bleibt es fail-closed ein Fehler (Tippfehler-Schutz).
+ *   2. Der echte Baum ist damit gruen: das aktive Profil meldet keinen fehlenden
+ *      lokalen Bundle mehr, und jedes als fremd gemeldete Ziel liegt wirklich
+ *      ausserhalb von packages/.
+ *   3. Das Gate-Plugin `registry` wiederholt die Regel (sonst waere der eine Fix
+ *      nur die Haelfte).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

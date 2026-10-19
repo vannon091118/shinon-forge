@@ -154,12 +154,10 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `npm run update` → `node scripts/dsh-update.mjs` (upstream DSH refresh; see Pitfalls).
 
 ## Conventions
-- Comments are capped at **10 LOC per block** (`scripts/comment-limit.mjs`, Gate-Plugin
-  `comment-canon`, runs locally in the pre-commit hook). Anything longer moves to
-  `docs/COMMENT-KANON.md` and the block keeps a pointer
-  `→ Kanon: docs/COMMENT-KANON.md#k-<hash>`; the anchor is a content hash so word-identical
-  twin regions receive the same pointer and stay byte-equal. Never edit `#region` /
-  `#endregion` or `shinon:dsh-idiom` marker lines — they are fences, not prose.
+- Comments live with the code they explain — there is **no length cap** and no
+  external comment archive. A long "why" block stays where the reader needs it.
+  Never edit `#region` / `#endregion` or `shinon:dsh-idiom` marker lines — they
+  are fences, not prose.
 - A package is identified by its folder: `packages/<dir>/`. All names derive from it and
   must agree in four places — this is the enforced "name contract":
   - `packages/<dir>/package.json` `name` → `@shinon/<dir>`

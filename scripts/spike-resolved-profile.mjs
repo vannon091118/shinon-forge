@@ -1,13 +1,48 @@
 #!/usr/bin/env node
 /**
- * spike-resolved-profile.mjs — Spike zur Profilfrage (Beleg: docs/CHANGELOG.md).
+ * spike-resolved-profile.mjs — Spike zu PLAN.md Schritt 3.3 (D3).
  *
  * Frage: bootet das Produkt mit einem Profil, das **nicht** unter
  * `$DSH_HOME/profiles/<name>` liegt? Die Antwort ist die Vorbedingung dafür,
  * dass `profiles/` überhaupt aus dem Repo verschwinden kann (Schritt 3.6).
  *
  * Der Weg des Spikes ist ausdrücklich nicht der benannte Profilweg:
- * → Kanon: docs/COMMENT-KANON.md#k-315887a16444
+ *
+ *   benannt   `runProfile({ profile: '<name>' })`  → `loadProfile(name, …, home)`
+ *             → `resolveProfileDir(name, $DSH_HOME)` = `$DSH_HOME/profiles/<name>`
+ *   Spike     `loadProfileDirectory(dir, installAnchor)` — Upstreams eigener
+ *             Weg für „application-owned profiles whose package project and
+ *             lifecycle belong to that application“ — plus
+ *             `runProfile({ resolvedProfile: { profile, installAnchor } })`.
+ *
+ * Was der Spike beweist (jede Zusage ist am Ende eine Behauptung, die beim
+ * kleinsten Zweifel rot wird — fail-closed, Exit 2):
+ *
+ *   1. Die Bündel-Liste kommt aus CODE (BUNDLES unten), nicht aus einer Datei
+ *      unter `profiles/`. Der Spike schreibt das Profil-Verzeichnis selbst.
+ *   2. `profile.dir` liegt NICHT unter `<Repo>/profiles/` und nicht unter
+ *      `$DSH_HOME/profiles/` — beides wird vorher geprüft, nicht gehofft.
+ *   3. Alle Bündel lösen auf (`layers`), keines wird übersprungen
+ *      (`skippedBundles` leer).
+ *   4. Die Bündel MOUNTEN wirklich: jede Client-freie Host-Hälfte schreibt beim
+ *      `apply()` genau eine Zeile. Der Spike fängt sie ab, statt sie nur
+ *      durchlaufen zu lassen — `[shinon-events]` liest dabei zusätzlich seine
+ *      FASSUNG aus dem Profil-Patch und sein `assets/`-Dokument aus dem Paket,
+ *      also die ganze Kette Config → Plugin → Asset.
+ *   5. Der Lauf bleibt schlüsselfrei: kein Wert einer Umgebungsvariable, deren
+ *      NAME nach Geheimnis klingt (KEY/TOKEN/SECRET/PASSWORD), darf in der
+ *      Ausgabe vorkommen. Der Snapshot ist leer — es gibt nichts zu leaken.
+ *   6. Der Abbau läuft (`shutdown`) und der Baum ist vorher aktiv
+ *      (`ctx.fiber.state === 2`, `loader` vorhanden).
+ *
+ * Was der Spike NICHT beweist: keinen Modellaufruf, keinen Browser, kein
+ * `dsh --profile` über die CLI, und keine der drei UI-Hälften der Bündel (die
+ * laufen im Client). Er beantwortet genau eine Frage: trägt der Bootpfad ein
+ * Profil aus dem eigenen Verzeichnis?
+ *
+ * Aufruf:  node scripts/spike-resolved-profile.mjs [--dir <pfad>]
+ * Exit:    0 = belegt · 2 = widerlegt (eine Zusage ist rot) · 3 = Aufbau
+ *          gescheitert (Bündel nicht auflösbar, Node zu alt, kein dsh)
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -28,7 +63,8 @@ const PROFILE_NAME = 'product';
  * schreiben nichts. `better-errors` und `token-usage` registrieren nur und
  * loggen; `events` lädt seinen Vertrag aus `assets/` und emittiert — hier
  * niemandes Ereignis. Wer diese Liste erweitert, prüft dieselben vier
- * → Kanon: docs/COMMENT-KANON.md#k-027436516646
+ * Eigenschaften neu: der Spike darf keinen fremden Boot und keine Sitzung
+ * anfassen.
  */
 const BUNDLES = ['@shinon/better-errors', '@shinon/token-usage', '@shinon/events'];
 

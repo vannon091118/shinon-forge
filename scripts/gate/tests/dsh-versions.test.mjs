@@ -6,7 +6,6 @@
  * Vendor-Metadaten, Installat, CLI und ein zweiter Versionsliteral im
  * Quelltext. Jeder Fall baut seinen eigenen Baum unter tmpdir — der echte
  * Repo-Baum wird nicht angefasst und keine Registry befragt.
- * → Kanon: docs/COMMENT-KANON.md#k-dsh-versions-test
  */
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';

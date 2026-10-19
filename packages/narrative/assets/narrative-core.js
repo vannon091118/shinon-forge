@@ -6,7 +6,8 @@
  *
  * Seit 2026-10-17 leitet der Kern NICHTS aus einem Hash ab: Mood, Thema und
  * Beziehungsstufe kommen aus benannten Regeln (`rules` im Vertrag), jeder
- * → Kanon: docs/COMMENT-KANON.md#k-a26b3e47ea18
+ * Übergang trägt Event-ID, Grund und Evidenzlevel. Unbekannte Events ändern
+ * kein semantisches Feld — sie stehen in der Chronik, sonst nichts.
  */
 
 /** Die Evidenzlevel, die ein Übergang nennen darf. */

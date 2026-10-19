@@ -7,7 +7,15 @@
  *          `.env`-Chmod, Route aus dem effektiven Profil-Dump.
  *   boot   Startet den Host im Hintergrund (Port 3099, --no-open), Protokoll
  *          unter logDir()/s6/, Prozessdaten als JSON daneben.
- * → Kanon: docs/COMMENT-KANON.md#k-1a92de5cb5a8
+ *   stop   SIGTERM an den gelogten Host — das Host-Ende des Protokolls.
+ *
+ * Der Turn selbst (Urteil, Widerruf) geht über die echtes UI — der Weg aus
+ * docs/probes/store-cost.json (#4): 'Good response' → 'Task result' →
+ * 'Submit', Widerruf 'Remove rating'. Das Runbook führt ihn.
+ *
+ * Der Schlüssel: `.env` im Repo-Root, chmod 600 — nie committen, nie ausgeben,
+ * nie in eine Antwort kopieren. Hier wird nur der NAME geprüft; der Wert
+ * verlässt diese Maschine nicht.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';

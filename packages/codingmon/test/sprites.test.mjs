@@ -7,7 +7,14 @@
  *      nicht gezaehlt — eine elfte Spezies ohne Sprites faellt hier, nicht erst
  *      im Browser).
  *   2. Jedes Gitter ist 32x32, kennt nur die Palette und hoechstens fuenf Farben.
- * → Kanon: docs/COMMENT-KANON.md#k-985b9a414f31
+ *   3. Jedes erzeugte SVG ist gueltig (Namensraum, viewBox, mindestens ein
+ *      Rechteck) und traegt nur Palettenfarben.
+ *   4. Die Einbettung in `client.js` ist deckungsgleich mit den Quelldateien
+ *      (`--embed` schreibt, dieser Test vergleicht — keine stille Drift).
+ *   5. Die 7 UI-SVGs existieren, sind gueltig und kennen nur `#A855F7`.
+ *
+ * Reine Dateiarbeit aus `assets/` plus dem Generator: laeuft ohne node_modules
+ * (CI: `npm run test:codingmon`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

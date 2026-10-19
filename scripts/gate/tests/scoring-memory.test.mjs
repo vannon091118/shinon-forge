@@ -7,7 +7,22 @@
  * Dateisystem), `scoring-signals.test.mjs` faehrt beide Haelften an einem Bus
  * (dessen Host hat aber kein `ctx.get`, also keine Ablage). Hier haengen DREI
  * echte Bundles an einem Host — Events-Spine, Project-Index, Scoring — und
- * → Kanon: docs/COMMENT-KANON.md#k-36e6754562b7
+ * gemessen wird, was sonst nur behauptet waere:
+ *
+ *   Signal werten -> der Wert steht in der SQLite des Index -> Host neu
+ *   aufsetzen -> der Stand ist wieder da. Der Widerruf wirkt auch nach dem
+ *   Neustart, spaete Kritik trifft dieselbe frueher bewertete Antwort (derselbe
+ *   Betreff, ersetzt statt gestapelt), eine beendete Sitzung wird sauber
+ *   abgeschlossen, ein KAPUTTER Index ergibt einen leeren, aber laufenden Start
+ *   — und die Abfrage-Faehigkeit des Index bleibt unberuehrt.
+ *
+ * Die zwei Nahten sind als Daten gepinnt (Dienstname, Vertragsname, Namensraum):
+ * kein Paket liest das andere, also muss ein Test von aussen nachsehen.
+ *
+ * Laeuft mit `node --test` — die Pakete werden in ein temporaeres Verzeichnis
+ * kopiert und mit dem ECHTEN Schemastery der DSH-Installation geladen (die
+ * einzige peer-Dependency, die hier nicht im Paket liegt). Damit braucht dieser
+ * Test `dsh` im PATH, wie `context-wiring.test.mjs` daneben.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

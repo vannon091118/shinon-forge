@@ -1,13 +1,36 @@
 #!/usr/bin/env node
 /**
- * key-router-wire — der Draht beweist die Rotation (Beleg: docs/CHANGELOG.md).
+ * key-router-wire — der Draht beweist die Rotation (PLAN.md §3.12, EBENE 4).
  *
  * WARUM DIESE DATEI EXISTIERT: ein Pool, der gesunde Anbieter waehlt, ist noch
  * keine Rotation des tatsaechlich verwendeten Providers. Der Override-Test
  * (`key-router-override.test.mjs`) beweist, dass `credentials.resolve` den
  * Pool bedient — aber zwischen `resolve` und dem Anbieter steht noch der
  * REQUEST. Erst wenn ein echter Request mit dem gewaehlten Schluessel am
- * → Kanon: docs/COMMENT-KANON.md#k-479c6716c93a
+ * gewaehlten Anbieter ankommt, ist die Kette geschlossen.
+ *
+ * WAS HIER ECHT IST: `apply()` mit Dienst-Attrappen (wie im Override-Test),
+ * das echte `key_router_probe`-Werkzeug, echtes `fetch` gegen einen echten
+ * HTTP-Server — aber nur auf Loopback (127.0.0.1, ephemerer Port): kein Paket
+ * verlaesst die Maschine. Die Schluessel sind Kanarienvogel (kein Material).
+ *
+ * WAS GEMESSEN WIRD, STUFE FUER STUFE:
+ *
+ *   1. Der erste Probe-Request traegt `Authorization: Bearer <K_A>` an die
+ *      baseUrl des gewaehlten Anbieters — Auswahl, Kopfzeilen, Draht.
+ *   2. Antwortet der Anbieter EINMAL mit 429, markiert genau dieser Versuch
+ *      seinen Platz (failCount hoch, Cooldown laeuft).
+ *   3. Der naechste Request traegt `Bearer <K_B>` — die Rotation ist auf dem
+ *      Draht angekommen, nicht nur im Pool.
+ *   4. Nirgendwo Schluesselmaterial: weder in den Werkzeug-Antworten noch im
+ *      Status — nur auf dem Draht, nur Richtung Anbieter.
+ *
+ * Was der Test NICHT beweist (ehrlich): eine 429-Rotation gegen die laufende
+ * Route mit echten Schluesseln — dafuer braeuchte es zwei echte Schluessel und
+ * einen erzwungenen 429 in dieser Umgebung. Das steht in docs/ZAHLEN.md §4,
+ * nicht hier.
+ *
+ * Laeuft mit `node --test` (`npm run gate:test`, CI mit `npm ci`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -7,7 +7,23 @@
  * jede Log-Zeile. Was ein Werkzeug zurückgibt, landet im Kontext des Modells und
  * in der Sitzungstranskription — ein „Präfix zur Wiedererkennung" ist dort ein
  * Leck, kein Komfort. Das Paket war inaktiv, also fiel es niemandem auf; beim
- * → Kanon: docs/COMMENT-KANON.md#k-e4b062f19c9f
+ * Aktivieren wäre es still mitgelaufen.
+ *
+ * DREI EBENEN, damit die Zusage nicht an einer Schreibweise hängt:
+ *
+ *   1. QUELLE (läuft ohne node_modules) — das Schema hat kein Schlüsselfeld, und
+ *      die einzigen `console.log`/`console.warn`-Aufrufe des Pakets stehen in den
+ *      beiden Filtern (`say`/`warn`). Wer künftig daneben loggt, wird rot, egal
+ *      wie er die Zeile formuliert.
+ *   2. KERN (läuft ohne node_modules) — `redact` und `statusOf` auf ihre Zusage:
+ *      der Zustand trägt Beschriftungen, der Text wird gefiltert.
+ *   3. AUSGELIEFERTES PAKET (braucht `node_modules`, sonst sichtbarer Skip) — das
+ *      echte `apply` mit einer Kanarienvogel-Umgebung: jedes Werkzeug wird
+ *      aufgerufen, jeder Log-Aufruf abgefangen, und danach wird gesucht, was nicht
+ *      vorkommen darf. Der Verbindungstest läuft gegen ein gestelltes `fetch`, das
+ *      beweist, dass der Schlüssel im KOPF ankommt — und danach nirgends mehr.
+ *
+ * Läuft mit `node --test` (`npm run gate:test`, CI ohne node_modules).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

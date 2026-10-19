@@ -7,7 +7,14 @@
  *   - Die Wartezeit wächst exponentiell, ist gedeckelt und mit gestelltem Zufall
  *     nachrechenbar (der erste Fehlschlag wartet `initialDelayMs`, nicht das
  *     Doppelte).
- * → Kanon: docs/COMMENT-KANON.md#k-a2ba73f0ea2e
+ *   - Ausgewählt wird der Platz mit den wenigsten Fehlschlägen unter den
+ *     verfügbaren; sind alle im Cooldown, gewinnt der früheste.
+ *   - `force` WECHSELT den Platz (sonst dreht eine erzwungene Rotation im Kreis).
+ *   - Nach außen geht NUR die Beschriftung (`key#N`): `statusOf` trägt kein
+ *     Schlüsselmaterial, `redact` entfernt es aus jedem Text, und `buildProbeRequest`
+ *     setzt es ausschließlich in die Kopfzeilen.
+ *
+ * Läuft mit `node --test` (`npm test`) — kein DSH, kein node_modules.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

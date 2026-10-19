@@ -6,7 +6,35 @@
  * einen Sidebar-Eintrag malt, ist von einem kaputten nicht zu unterscheiden; das
  * Paket erklärte sich deshalb im eigenen Manifest als inaktiv.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-cf9fdc4a21d3
+ * DER DATENWEG (der einzige, der einem Out-of-Tree-Bundle offensteht): ein
+ * Client-Bundle kann KEINEN Host-Endpunkt registrieren — die Remote-Beiträge der
+ * Browser-Hälfte kommen aus einer kompilierten Liste in
+ * `@deepseek-ai/dsh-api-remotes`, und die Connection-Naht ist reines
+ * Anfrage/Antwort (`rpc.call`) ohne Abo. Der Host emittiert seine
+ * Trajectory-Einträge weiterhin auf `shinon/trajectory` (index.js), hier als
+ * Probe-API ohne In-Tree-Konsument (siehe Gate-Test `popup-overlay.test.mjs`) —
+ * dieser Client faltet stattdessen die SITZUNG:
+ *
+ *   ctx.get('uiSession')?.adapter?.current?.getSnapshot()   → welche Sitzung
+ *   ctx.get('sessions')?.binding(id)                        → deren Bindung
+ *   …binding.eventSource.getSnapshot().entries              → das Ereignisfenster
+ *   …binding.eventSource.subscribe(fn)                      → jede Änderung
+ *
+ * Denselben Weg geht `@shinon/token-usage`; er ist gemessen, nicht behauptet
+ * (der Vertrag der installierten DSH-Fassung: `ctx.get(name)` ist die optionale
+ * Abfrage, ein direkter Dienst-Zugriff wirft ohne `inject`).
+ *
+ * DIE REGEL SELBST steht als bytegleiche Region aus dem Kern
+ * (packages/popup/assets/trajectory-core.js): ein Client-Bundle ist eigenständig
+ * und zieht kein `import` über die Paketgrenze. Die Region ist die Zusage, dass
+ * der Browser dieselbe Rechnung fährt wie die Unit-Tests — geprüft von
+ * `scripts/lib/repo.mjs` (Zwilling) bei jedem Gate-Lauf.
+ *
+ * WAS SIE RENDERT: den Fortschritt des laufenden Vorgangs (Schritt, offene
+ * Aufrufe, zuletzt benutztes Werkzeug) im Dock über dem Eingabefeld — derselbe
+ * Slot, den `@shinon/core` (Info-Leiste) und `@shinon/codingmon` (EXP-Leiste)
+ * schon besetzen. Ohne laufenden Turn rendert sie NICHTS (ein leeres Overlay wäre
+ * eine Oberfläche, die nichts aussagt) — sichtbar bleibt die Sidebar-Zeile.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/popup',
@@ -75,7 +103,14 @@ function eventsOf(entries) {
  * letzten Abschnitt der Sitzung. Ein neues `turn/start` setzt sie zurück, ein
  * `turn/end` schließt sie ab — die Anzeige ist damit „läuft" oder „bereit", und
  * beides ist aus den Ereignissen ablesbar statt behauptet.
- * → Kanon: docs/COMMENT-KANON.md#k-84b84a002cbc
+ *
+ * Ohne `callId` ist ein Aufruf nicht zuordenbar. Er zählt trotzdem als OFFEN —
+ * fail-closed: es gibt keine Evidenz, dass er fertig ist, und „geschlossen" wäre
+ * eine Behauptung. Sein synthetischer Schlüssel kann von keinem `tool/result`
+ * getroffen werden (die tragen echte callIds), also bleibt er es auch.
+ *
+ * @param entries - Einträge des Sitzungsfensters (`binding.eventSource…entries`).
+ * @param limit - wie viele Werkzeugnamen behalten werden.
  */
 function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT) {
   const open = new Map();

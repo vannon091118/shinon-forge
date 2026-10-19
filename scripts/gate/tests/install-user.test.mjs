@@ -7,7 +7,14 @@
  * Nutzer-Installat und trifft Entscheidungen, die man nicht am Bildschirm
  * erkennen kann — welchen Unterbefehl er kennt, wann er sich weigert und was
  * `status` über einen leeren Ort sagt. Ein Werkzeug, das bei einem falschen
- * → Kanon: docs/COMMENT-KANON.md#k-9668127c3c07
+ * Argument still das Falsche tut, wäre schlimmer als Handarbeit.
+ *
+ * Geprüft wird NUR die Oberfläche (kein Netz, kein npm ci, kein Boot): die
+ * Abnahme selbst ist ein Laufzeitbeleg und steht im Protokoll der Sitzung,
+ * nicht in einem Test, der ohne Registry und ohne 621 Pakete laufen muss.
+ *
+ * Die Zustandsdatei wird über `SHINON_STATE_DIR` in ein Temp-Verzeichnis
+ * gelenkt — der Test liest und schreibt nie den echten Installationszustand.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

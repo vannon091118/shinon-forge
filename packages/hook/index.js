@@ -9,7 +9,36 @@ import { createHash } from 'node:crypto';
  * Waterfall-Listener auf `agent/pre-step` und reicht den Schritt kontrolliert
  * durch.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-e614774c8c2f
+ * Verifizierte Grundlage — installiertes DSH 0.2.0-rc.2, nichts davon geraten:
+ *
+ *   Signatur   @deepseek-ai/dsh-agent/lib/types/runtime-types.d.ts
+ *              'agent/pre-step'(this: Scoped<Agent>, payload: {
+ *                agent: Agent; messages: UserMessage[]; turn: number;
+ *                step: number; signal: AbortSignal;
+ *              }, next: () => Promise<PreStepDecision>): Promise<PreStepDecision>
+ *              @mode waterfall
+ *   Entscheidung  type PreStepDecision =
+ *                 { kind: 'reject' } | { kind: 'enter'; messages; startsRequestSeries? }
+ *   Weitergabe    „Calling `next()` preserves the current messages."
+ *   Dispatch      @deepseek-ai/dsh-agent-loop/lib/index.js fährt den Waterfall mit
+ *                 dem Default-Downstream { kind: 'enter', messages }; `agent` wird
+ *                 vom fused Dispatcher (@deepseek-ai/dsh-agent, `agentEvents`) in
+ *                 die Nutzlast injiziert.
+ *   Lifecycle     ctx.on liefert einen Disposer; apply() gibt ihn zurück.
+ *   Referenz      @deepseek-ai/dsh-hooks-claude-code bindet genau diesen Seam
+ *                 app-weit und lehnt einen Schritt mit { kind: 'reject' } ab.
+ *
+ * Verantwortungsgrenze: registrieren, Lifecycle, Korrelation, kontrollierte
+ * Weitergabe. KEINE Prompt-Logik, kein SQLite, keine Goal-Schleife, kein
+ * Browser, keine Persona.
+ *
+ * Zwei Fail-Richtungen, bewusst getrennt (dieselbe DOKI-Grenze wie im
+ * Event-Spine): fail-closed für den DATENSATZ — ein Schritt, der den Vertrag
+ * verletzt, wird nie als Trace emittiert; fail-open für den HOST — die
+ * Beobachtung darf den beobachteten Prozess nie blockieren. Eine Nutzlast, die
+ * wir nicht verstehen, wird deshalb laut protokolliert und durchgereicht.
+ * `onContractViolation: 'reject'` kehrt genau das um — eine bewusste
+ * Einstellung, kein stiller Fallback.
  */
 
 /** Vertragsname der erzeugten Datensätze. */
@@ -58,7 +87,12 @@ const ID_LENGTH = 12;
  *
  * `required()` trägt diese Zusage: in Schemastery sind Objekt-Schlüssel
  * **optional**. Ohne `required()` lieferte `normalizeEvent({})` hier ein
- * → Kanon: docs/COMMENT-KANON.md#k-00acdc929186
+ * Ergebnis statt eines Fehlers — `{"payload_ref": ""}` —, ein hohler Datensatz
+ * hätte den Gate also passiert. Das ist geschlossen.
+ *
+ * `payload_ref` behält seinen `.default('')`: der Vertrag aus Wave 2 erklärt
+ * das Feld ausdrücklich als vorbelegt, und das ist eine andere Zusage als
+ * "Pflichtfeld".
  */
 /**
  * Die zehn Event-Typen, die ein Datensatz dieses Hooks tragen darf — EINE

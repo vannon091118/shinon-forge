@@ -7,7 +7,20 @@
  * Laufzeit-Gesundheit in einer frischen Umgebung: Node-Range, dsh-Auflösung,
  * Profil-Bündel-Auflösung, statische Repo-Konsistenz (dieselbe Regel wie das
  * Gate-Plugin `scripts/gate/plugins/doctor.mjs`, kein zweiter Regelsatz) und
- * → Kanon: docs/COMMENT-KANON.md#k-5b134c7199f6
+ * Schlüssel-Präsenz. Er schreibt nichts: kein Profil-Link, kein Index, kein
+ * Log, kein DSH-Start.
+ *
+ * Exit-Codes (stabil, in PLAN.md §9.1 S4 dokumentiert):
+ *   0 = gesund (keine Befunde)
+ *   1 = Befunde (Repo-Drift oder Bündel-Verstoß — behebbar, kein Absturz)
+ *   2 = Umgebung (kein tauglicher Node, kein dsh, kein Profil — fail-closed)
+ *
+ * Schlüssel sind presence-only: der Bericht nennt je Name nur vorhanden/fehlt,
+ * niemals Werte, Längen oder Präfixe. Ein Test setzt einen Fake-Wert und
+ * prüft, dass er in stdout/stderr nicht vorkommt.
+ *
+ * Aufruf:  node scripts/doctor.mjs [--json] [--root <pfad>]
+ *           shinon doctor [--json]
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';

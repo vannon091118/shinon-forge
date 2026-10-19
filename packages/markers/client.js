@@ -6,7 +6,19 @@
  * Marker in ein fremdes Chrome-Fenster; hier ist der Marker ein DSH-Client-
  * Plugin und das Panel ist KEIN schwebendes div, sondern der native Side Panel:
  *
- * → Kanon: docs/COMMENT-KANON.md#k-d316f8fedd75
+ *   ctx.slots.register({ name: 'main', key: 'shinon-markers' }, MarkerPanel)
+ *   ctx.slots.register({ name: 'sidebar.panellist', id: 'shinon-markers', … }, MarkerIcon)
+ *
+ * Gespiegelte Regeln (identisch zum Vertrag in assets/marker-model.json):
+ *   - Marke: id, label, selector, text, rect, href, url, ts
+ *   - Ausschnitt-Label: tag#id.class (höchstens zwei Klassen)
+ *   - Selektor: stabiler Pfad, höchstens 6 Stufen, :nth-of-type bei Geschwistern
+ *   - Nutzlast: Brutalords Zeilenformat (`payload.line`)
+ *   - Speicher: localStorage __mk.marks / __mk.comments (Browserseite)
+ *   - Taste `m` schaltet den Modus, Escape verlässt ihn
+ *
+ * Nicht gespiegelt: CDP-Verbindung, Chrome-Daemon, Injektion in fremde Seiten.
+ * Self-contained: kein top-level `import`, React kommt aus `require`.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/markers',

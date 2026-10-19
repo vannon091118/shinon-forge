@@ -7,7 +7,8 @@
  * der Enhancer NO_ROUTE und der Roh-Prompt gilt — unveraendertes Fail-open).
  * Der Name der Umgebungsvariable kommt aus der Config (nie ein Wert in der
  * Config) — dieselbe Regel wie beim Key-Router.
- * → Kanon: docs/COMMENT-KANON.md#k-0d1e79ab85b8
+ *
+ * Läuft mit `node --test`; kein Netz, kein Modell.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

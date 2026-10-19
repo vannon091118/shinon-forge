@@ -6,7 +6,9 @@
  *   - was auf der Platte liegt (packages/*)
  *   - was die Pakete deklarieren (package.json dsh.bundle.patch)
  *   - was das Profil lädt (dsh.profile.bundles)
- * → Kanon: docs/COMMENT-KANON.md#k-fde21885c05c
+ *
+ * Eine Registry, die driftet, ist keine Registry. Geprüft wird Auflösbarkeit,
+ * nicht nur Vorhandensein: ein Bundle ohne Patch-Datei kann DSH nicht mounten.
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';

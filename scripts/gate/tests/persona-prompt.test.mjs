@@ -7,7 +7,22 @@
  * `node:path` importiert. Der ReferenceError fiel in das try/catch des Blocks
  * und wurde zu einer Warnung:
  *
- * → Kanon: docs/COMMENT-KANON.md#k-97fdc6865b4a
+ *   [shinon-persona] Projekt-Kontext nicht lesbar (isAbsolute is not defined)
+ *
+ * Die Persona startete also OHNE den Projekt-Kontext — in JEDEM Lauf, weil das
+ * Profil `projectContextPath: .shinon/project-context.md` setzt und damit genau
+ * den relativen Zweig nimmt. Der Fehler war nur deswegen leise, weil eine
+ * fehlende Datei und ein kaputter Import dieselbe Warnung ergaben.
+ *
+ * WARUM HIER UND NICHT AM FAKE-HOST: `persona-state.test.mjs` prüft das
+ * Paketverhalten ohne node_modules und sieht nur die Abschnittsliste. DIESER
+ * Test hängt dasselbe Bundle an den ECHTEN Dienst
+ * `@deepseek-ai/dsh-system-prompt` aus der gepinnten Installation und liest den
+ * zusammengebauten Prompt über dessen öffentliche Schnittstelle
+ * (`assemble()` + `renderPrompt()`). Erst damit ist „der Inhalt landet im
+ * System-Prompt" gemessen statt behauptet.
+ *
+ * Läuft mit `node --test`; braucht `dsh` im PATH (wie prompter-contract).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

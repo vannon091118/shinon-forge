@@ -7,7 +7,23 @@
  *            Prompt-Resultatvertrag liefern."
  *   Phase 3  „MIN/MID ändern keine Anforderungen; MAX akzeptiert einen
  *            definierten Context-Input."
- * → Kanon: docs/COMMENT-KANON.md#k-b94affa894de
+ *
+ * Vier Ebenen, bewusst getrennt:
+ *   1. Der Vertrag (Plan §7) als reine Funktionen: Parsen, Schema, Annahme-Policy.
+ *   2. Der Modus-Vertrag als Daten: Fähigkeiten, erzeugte Prompts, Verbote.
+ *   3. Der echte Durchlauf: das Bundle hängt über seine apply()-Schnittstelle an
+ *      einem ECHTEN Cordis-Context, gefahren wird der echte Waterfall
+ *      `agent/pre-step` mit dem Default-Downstream des Agent-Loops.
+ *   4. Die Isolation: der Aufruf trägt keine Fähigkeit.
+ *
+ * Der Modell-Provider ist zwangsläufig eine Attrappe (extern, braucht
+ * Zugangsdaten); alles andere — Dispatcher, Waterfall, next()-Kette,
+ * Message-Identität, Schema, Kontextdatei — ist echt. Die Attrappe zählt die
+ * Aufrufe und reicht die Optionen zur Prüfung heraus, damit die Isolation und
+ * der Kontextblock an einem echten Aufruf belegt sind.
+ *
+ * Läuft mit `node --test` (CI: .github/workflows/commit-guard.yml). Kein
+ * node_modules im Repo, kein Netz, kein Modell.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -439,11 +455,12 @@ test('MAX: Referenzen muessen im gelieferten Kontext aufloesbar sein', async () 
  * Dieselbe Datei, zwei Schreibweisen — die Luecke, die der Profil-Lauf am
  * 2026-10-16 gezeigt hat.
  *
- * Der Pruefstand liefert RELATIVE Pfade, geliefert werden koennen auch
- * ABSOLUTE (frueher der eigene Index). Ein Modell nennt eine Datei aber so,
- * wie ein Mensch sie nennt — die Referenz auf genau die Datei des Prompts
- * galt als "unbekannt" und wurde verworfen.
- * → Kanon: docs/COMMENT-KANON.md#k-7affc01b909e
+ * Der Pruefstand oben liefert RELATIVE Pfade (`packages/prompter/index.js`), der
+ * Runtime-Index im echten Betrieb ABSOLUTE. Ein Modell nennt eine Datei aber so,
+ * wie ein Mensch sie nennt — mit dem Ergebnis, dass die Referenz auf genau die
+ * Datei, ueber die der Prompt ging, als "unbekannt" protokolliert und verworfen
+ * wurde. Die Regel verlangt einen Treffer an der Verzeichnisgrenze, damit eine
+ * andere Datei gleichen Namens nicht durchrutscht.
  */
 test('MAX: die relative Schreibweise eines gelieferten ABSOLUTEN Pfads ist aufloesbar', () => {
   const root = '/home/vannon/Dokumente/Projekte/Shinon-forge';
@@ -1940,7 +1957,14 @@ test('Stand: eine leere Antwort des Scorings ist kein Ton', async () => {
  * `expandedText` als `explicitText` in die Skill-Auswahl — dann hätte ein
  * Skill-Name, der nur in einer Regeldatei steht, als „vom Nutzer genannt"
  * gegolten und den Prioritätsrang vor besser passenden Skills bekommen. Der
- * → Kanon: docs/COMMENT-KANON.md#k-1d7a3e2654ce
+ * Nutzer hat ihn nie genannt; die Regel hat ihn genannt. `assets/stand.js`
+ * übergibt seit jeher `promptText` — hier wird die zweite Stelle gepinnt.
+ *
+ * Der Fall ist so gebaut, dass die beiden Ausgänge SICHTBAR auseinandergehen:
+ * `a-arch` trifft dreimal (quartz, runtime, architektur), `z-spezial` einmal
+ * (sein eigener Name, aus der Expansion). Mit der alten Übergabe gewinnt
+ * `z-spezial` als „explizit"; mit der richtigen Reihenfolge gewinnt `a-arch`
+ * über die Trefferzahl.
  */
 test('Skills: die Intent-Expansion nennt keinen Skill „explizit"', async () => {
   const skillsRoot = mkdtempSync(join(tmpdir(), 'shinon-prompter-skills-'));

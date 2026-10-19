@@ -6,7 +6,6 @@
  * Installat und CLI gegen `scripts/dsh-target-versions.json`. Exit 0 nur,
  * wenn jede Quelle dieselbe Fassung nennt; sonst 1 mit Soll, Ist und Fundstelle.
  * Dieselbe Implementierung nutzen CI und der Updater (`scripts/dsh-update.mjs`).
- * → Kanon: docs/COMMENT-KANON.md#k-dsh-versions-cli
  */
 import { checkVersions, MATRIX_FILE } from './lib/dsh-versions.mjs';
 import { ROOT } from './lib/dsh.mjs';

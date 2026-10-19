@@ -7,7 +7,9 @@
  * ergibt immer dasselbe Wild (oder keines). Daneben die Typwirkung als Zeichen
  * (`effectiveness`): dieselbe Zahl wie in `resolveAttack`, aber mit Symbol statt
  * Tabelle — die Kampfansicht zeigt `×1,5 ▲`, keine Matrix.
- * → Kanon: docs/COMMENT-KANON.md#k-18f4ff319cf5
+ *
+ * Reine Mathematik aus `assets/mechanik.js`: laeuft ohne node_modules
+ * (CI: `npm run test:codingmon`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -7,7 +7,8 @@
  * die Sicherung braucht. Diese Tests pinnen genau die vier Zusagen, die im
  * Kopf von `scripts/backup-retention.mjs` stehen — und sie laufen in einem
  * Temp-Ordner, damit kein Test je die echten Sicherungen des Nutzers sieht.
- * → Kanon: docs/COMMENT-KANON.md#k-b45547fe86bf
+ *
+ * Kein Netz, kein Boot, kein npm: reines Dateisystem, deshalb in jedem CI-Lauf.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

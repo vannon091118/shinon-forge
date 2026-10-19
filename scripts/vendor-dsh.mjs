@@ -7,7 +7,6 @@
  * gegen das Lockfile und schreibt `vendor/dsh/` samt `MANIFEST.json` neu
  * (sha256 und Bytes je Datei). Danach misst `check-dsh-versions.mjs`, ob
  * Pin, Lock, Vendor, Installat und CLI dieselbe Fassung nennen.
- * → Kanon: docs/COMMENT-KANON.md#k-vendor-dsh
  */
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';

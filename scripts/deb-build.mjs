@@ -7,7 +7,23 @@
  *   - Ein Installat braucht einen KLAREN Root: `/opt/shinon-forge`. Zur Laufzeit
  *     ist er read-only (das ist die Zusage, an der die Pfad-Trennung hängt); alle
  *     Nutzerdaten liegen unter XDG (config/data/state/cache), siehe
- * → Kanon: docs/COMMENT-KANON.md#k-61a04b901e9b
+ *     `scripts/lib/paths.mjs`.
+ *   - Das Tarball-Paket ist NICHT dabei: `node_modules` (gemessen: dreistellige
+ *     MB) gehört nicht in ein .deb dieser Größenordnung. Stattdessen liefert das
+ *     Paket den Code plus eine Anweisung (`postinst`), die Abhängigkeiten einmal
+ *     mit `npm ci --omit=dev` in den Root zu ziehen — den Pfad nennt der
+ *     Starter selbst, wenn er fehlt.
+ *   - Kein zweites Installationsformat: kein AppImage, kein Flatpak, keine
+ *     Kopie daneben. Ein Weg, ein Root.
+ *
+ * Gebaut wird AUSSCHLIESSLICH mit `dpkg-deb` (auf Mint vorhanden) und mit
+ * denselben Early-Pruning-Regeln wie jeder andere Baumlauf dieses Repos:
+ * `node_modules`, `.git`, `dist`, Cache-, Werkzeug- und Laufzeitordner kommen
+ * nicht ins Paket.
+ *
+ * Aufruf:  node scripts/deb-build.mjs [--out <dir>] [--keep]
+ * npm-Entry: `npm run deb`
+ * Exit: 0 = Paket gebaut · 1 = Befund (fehlt dpkg-deb) · 2 = Bedienfehler
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, chmodSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';

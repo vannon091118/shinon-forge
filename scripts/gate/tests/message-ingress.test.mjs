@@ -7,7 +7,18 @@
  * durch DENSELBEN Runtime-Seam `agent/pre-step` — und der Send-Button enthaelt
  * keine eigene Prompt-Logik.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-38e58c249e52
+ * Warum das pruefbar ist, ohne einen Browser zu starten: der Harness hat genau
+ * EINEN Einfuegepunkt (Agent.send -> inbox.splice) und genau EINEN Konsumenten
+ * (preStep -> waterfall 'agent/pre-step'), und der Modellaufruf liegt hinter
+ * diesem Seam. Wer immer eine Nachricht einspeist, benutzt `send`; wer immer den
+ * Seam umgehen wollte, muesste `inbox` direkt fuellen — und auch dann laeuft er
+ * durch `preStep`, weil es keinen zweiten Konsumenten gibt.
+ *
+ * Die Zusagen gelten fuer die INSTALLIERTE Fassung. Ein DSH-Update macht sie
+ * nicht falsch, sondern ungeprueft — deshalb bricht der letzte Test bei einer
+ * anderen Version absichtlich, statt still weiterzugelten.
+ *
+ * Läuft mit `node --test` (CI). Kein Netz, kein Modell, kein Browser.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

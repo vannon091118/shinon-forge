@@ -7,7 +7,22 @@
  * scheitert `node --test` tief im Project Index mit
  * `ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite`, und `gate:test` findet kein `dsh`.
  * Beides ist kein Code-Fehler, sondern eine Umgebungsfalle — und eine Falle,
- * → Kanon: docs/COMMENT-KANON.md#k-db3c1f71444c
+ * die man nicht bei jedem Lauf neu erklären sollte.
+ *
+ * WAS: setzt `$ROOT/node_modules/.bin` VOR den PATH und re-exect sich selbst mit
+ * einer VERIFIZIERTEN Node-Laufzeit (`scripts/lib/runtime.mjs`: Range aus
+ * `engines.node`, `node:sqlite`-Rauchtest), wenn die laufende Fassung zu alt ist.
+ * Ist gar keine taugliche Laufzeit da, endet der Lauf fail-closed mit den
+ * geprüften Pfaden und Gründen — kein stiller Rückfall auf das kaputte Node.
+ *
+ * Aufruf:
+ *   node scripts/run-with-node.mjs node --test packages/x/test/*.test.mjs
+ *   node scripts/run-with-node.mjs scripts/shinon-test.mjs
+ *   node scripts/run-with-node.mjs --runtime        # nur die Auflösung zeigen
+ *
+ * Der Wrapper führt KEINE Shell aus: Argumente werden als Vektor übergeben, und
+ * `*`-Muster löst `fs.globSync` selbst auf (erst ab der verifizierten Fassung,
+ * deshalb dynamisch geladen — unter Node 18 existiert die Funktion nicht).
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';

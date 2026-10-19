@@ -6,7 +6,14 @@
  * READY-Zeile kommt nie, und der Fehler sieht aus wie ein kaputtes Profil. Die
  * Nummer wird deshalb VOR dem Boot gewählt, und zwar mit einem echten
  * Bind-Versuch: „Port frei" ist eine Messung, keine Annahme.
- * → Kanon: docs/COMMENT-KANON.md#k-5859775b438d
+ *
+ * GRENZE, benannt statt verschwiegen: zwischen Probe und DSHs eigenem Bind
+ * liegt ein Fenster (TOCTOU). Es ist klein; der Wrapper liest den tatsächlich
+ * bedienten Port aus der READY-Zeile zurück und meldet eine Abweichung. Wer
+ * jedes Fenster ausschließen will, gibt `--port 0` und läßt das Betriebssystem
+ * binden (dsh-host-webserver: `server.listen(config.port)`).
+ *
+ * Reine Logik plus EIN echter Socket auf 127.0.0.1 — kein Netz nach außen.
  */
 import { createServer } from 'node:net';
 

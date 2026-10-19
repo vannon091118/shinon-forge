@@ -3,12 +3,77 @@ import z from '@deepseek-ai/schemastery';
 /**
  * shinon-task-router — Phase 5/6, Plan §16 und §17.
  *
- *   Runtime-Resolver  →  Klassifikation (aus @shinon/prompter, ohne Modell)
+ *   LLM  →  validierte Klassifikation (aus @shinon/prompter)
  *        →  Shinon policy (DIESES Paket)
  *        →  goal / no goal
  *        →  DSH Goal State (ctx.goals)
  *        →  DSH Goal Round Driver        ← NICHT unser Code
- * → Kanon: docs/COMMENT-KANON.md#k-99eb498d7536
+ *        →  DSH Agent
+ *
+ * §16 (dieses Pakets erste Haelfte): „Das LLM liefert eine Klassifikation. Die
+ * Runtime entscheidet." Das Modell liefert ein ETIKETT, dieses Paket entscheidet
+ * nach einer Policy, die als DATEN dasteht. Naeheres an INTENT_WEIGHTS/decide().
+ *
+ * §17 (die zweite Haelfte): „DSHs vorhandenen Goal-/Round-Mechanismus
+ * verwenden. Nicht selbst implementieren: while (goal.active)." GENAU SO IST ES
+ * GEBAUT: es gibt in dieser Datei keine Schleife, keinen Timer und keinen
+ * eigenen Goal-Zustand. Die Aktivierung ist ein Aufruf an den vorhandenen
+ * Dienst; alles danach — Dauerhaftigkeit, Runden, Quiescence, Abbruch bei
+ * Fehlern — gehoert DSH.
+ *
+ * VERIFIZIERTE API — installiertes DSH 0.2.0-rc.2, nichts davon geraten
+ * (@deepseek-ai/dsh-goal):
+ *
+ *   Dienst   `ctx.goals` — class GoalService (TypertRemoteService)
+ *            get(agent) -> GoalView | undefined
+ *            create(agent, { objective, maxGoalRounds? }) -> GoalView   (erzeugt
+ *              UND armt; eine abgeschlossene Absicht darf ersetzt werden, jede
+ *              andere Phase muss stattdessen fortgesetzt/geloescht werden)
+ *            edit/pause/resume/complete/block/clear/disarm — hier NICHT benutzt
+ *   Config   defaultMaxGoalRounds — Default der Installation: 256
+ *   Fehler   GoalError mit code ∈ {GOAL_AGENT_NOT_LIVE, GOAL_ALREADY_EXISTS,
+ *            GOAL_STALE_REVISION, GOAL_INVALID_*...}
+ *   Ereignis `goal/changed` (emit, agent-scoped) nach jeder dauerhaften Mutation
+ *   Driver   @deepseek-ai/dsh-goal-round-driver: lauscht auf agent/status
+ *            (idle = Quiescence), goal/changed und die Lifecycle-Ereignisse;
+ *            reserviert RUNDEN mit agent.followup(<goal_round>-Prompt), blockt
+ *            am Rundenlimit selbst (code 'round-limit') und entwaffnet bei
+ *            agent/error und agent/disposed.
+ *
+ * WAS SHINON AUS §17 BEITRAEGT — und nur das:
+ *   * Goal-Eignung ................ §16 (Rangfolge, Schwelle, Substanzgrenze)
+ *   * Aktivierungsentscheidung .... `activate` (Policy-Schalter) + der Aufruf
+ *   * Stop-Policy ................. `maxGoalRounds` — DSHs Default waere 256
+ *                                   Runden; Shinons Wert ist eine Entscheidung
+ *                                   und steht im Profil, nicht im Code
+ *   * Block-Policy ................ kein Ueberschreiben: existiert bereits eine
+ *                                   Absicht, wird sie NICHT angetastet
+ *                                   (GOAL_EXISTS) — eine Entscheidung eines
+ *                                   Menschen ist keine Zufallsvariable
+ *   * Progress-Auswertung ......... NICHT hier (§19 loop-guard)
+ *
+ * §18 (GOAL MICRO-STATE) — die ZUSAETZLICHE Projektion dieses Pakets:
+ * OBJECTIVE, CURRENT_STATE, LAST_VERIFIED_FACT, CURRENT_BLOCKER, NEXT_ACTION.
+ * Die Zusage, die dabei mehr wiegt als die fuenf Felder: „Dieser Zustand ist
+ * keine zweite autoritative Session-Historie.“ GEBAUT als ein Dienst
+ * (`shinon_goal_micro_state`), der bei JEDEM Aufruf frisch aus `ctx.goals`
+ * liest und nichts speichert — kein eigener State, kein Listener, keine
+ * Meldung, kein Zeitstempel. Autoritativ bleiben DSHs Goal-View und die
+ * Session-Daten; die Projektion gibt OBJECTIVE, CURRENT_STATE und
+ * CURRENT_BLOCKER wortgleich zurueck, leitet nichts davon ab und erfindet
+ * nichts (leer statt geraten). LAST_VERIFIED_FACT hat einen benannten
+ * Quellschlitz und sonst keine Quelle. NEXT_ACTION ist eine Beratung als
+ * DATEN — ausgefuehrt wird sie nirgends; die EINZIGE Schreibstelle an
+ * Goal-State bleibt `create` in activateGoal (§17).
+ *
+ * FAIL-CLOSED, jede Richtung benannt: ohne lebenden Agenten, ohne Dienst, ohne
+ * Aktivierungsschalter oder ohne Substanz gibt es KEINEN Goal — und der Grund
+ * steht im Datensatz. Die ENTSCHEIDUNG (goal/linear) ist dabei unabhaengig von
+ * der AKTIVIERUNG: §16 bleibt richtig, auch wenn es keine Goal-Domaene gibt.
+ *
+ * WAS DIESES PAKET AUSDRUECKLICH NICHT BEHAUPTET: dass ein Modell richtig
+ * klassifiziert. Geprueft sind Policy, Vokabular, Entscheidung und der
+ * Aktivierungsaufruf — nicht die Urteilskraft eines Modells.
  */
 
 /** Vertragsname der Router-Entscheidung. */
@@ -252,7 +317,11 @@ export function decide(record, config = {}) {
  * Terminal, Instruktionen, Erinnerungen, Werkzeug-Feedback). Ohne diesen Test
  * waere die jeweils letzte Nachricht irgendein Harness-Text — und der wuerde
  * veredelt und ersetzt (Enhancer) bzw. als Auftrag gelesen (Router). Fremde
- * → Kanon: docs/COMMENT-KANON.md#k-b7a8cb95e475
+ * Herkunft heisst deshalb: nicht anfassen.
+ *
+ * Die Nachricht kommt MIT zurueck, weil ein Aufrufer sie ueber ihre Identitaet
+ * wiederfinden muss — ueber einen Index zu raten waere ein stiller Fehler. Der
+ * Text ist UNGETRIMMT; was ein Aufrufer davon will, entscheidet er.
  */
 function lastHumanMessage(messages) {
   const list = Array.isArray(messages) ? messages : [];
@@ -351,7 +420,8 @@ const activationVerdict = ({ activated = false, reason, goalId = '', maxGoalRoun
  * GOAL_STALE_REVISION, GOAL_NOT_FOUND, GOAL_CHANGE_VERSION und GOAL_INVALID_*
  * (@deepseek-ai/dsh-goal). Ein Fehler MIT Code wird als Code gemeldet; ein
  * Fehler OHNE Code kommt nicht aus dieser Taxonomie und wird als `NAME:<Klasse>`
- * → Kanon: docs/COMMENT-KANON.md#k-562017bf4059
+ * gemeldet. Vorher entschied `error?.code ?? error?.name ?? 'Error'`, und ein
+ * fremder Fehler sah damit aus wie ein Code der Domaene.
  */
 function classifyGoalError(error) {
   const code = error?.code;
@@ -481,7 +551,20 @@ export const MICRO_UNAVAILABLE = 'UNAVAILABLE';
  * diesen Wert liest, um zu handeln. Die einzige Schreibstelle an Goal-State
  * bleibt `create` in activateGoal (§17). Die Tabelle ist eine Entscheidung,
  * keine Wahrheit — sie steht deshalb hier als Daten und nicht als Verzweigung.
- * → Kanon: docs/COMMENT-KANON.md#k-24f9e61a8e70
+ *
+ *   NO_GOAL / UNAVAILABLE . NONE — nichts zu erinnern bzw. nichts zu raten
+ *   active:armed ......... ROUND — die naechste Runde reserviert DSHs
+ *                            Round-Driver, nicht wir (§17)
+ *   active:disarmed ...... NONE — der Prozess darf nicht automatisch
+ *                            weiterfahren; eine Weiterfahrt waere DSHs
+ *                            Angelegenheit, keine unsere
+ *   paused ............... RESUME — Fortsetzen ist ein Befehl an DSH
+ *   blocked .............. HUMAN — die Blockade heben WIR NICHT selbst
+ *                            (§17 Block-Policy: nicht ueberschreiben)
+ *   complete ............. NONE — die Absicht ist erfuellt
+ *   unbekannte Phase ..... NONE — fail-closed: wer die Phase nicht kennt,
+ *                            empfiehlt nichts (die Phase selbst wird
+ *                            trotzdem gespiegelt, sie ist autoritativ)
  */
 export const NEXT_ACTIONS = {
   [MICRO_NO_GOAL]: 'NONE',
@@ -539,7 +622,24 @@ export function nextActionFor(state, activation = '') {
  * QUELLENREGEL je Feld (§18: „Autoritative Zustände bleiben die dafür
  * vorgesehenen DSH-Services und Session-Daten“):
  *
- * → Kanon: docs/COMMENT-KANON.md#k-aea0e2db1f0f
+ *   OBJECTIVE ......... view.objective — die vom Menschen gewollte Absicht,
+ *                       die DSH dauerhaft fuehrt. Wortgleich, nie veraedelt.
+ *   CURRENT_STATE ...... view.phase wortgleich (autoritativ); NO_GOAL und
+ *                       UNAVAILABLE sind AUSSAGEN DIESES Lesers, nicht DSH-
+ *                       Phasen, und deshalb benannt statt gemischt.
+ *   LAST_VERIFIED_FACT AUSSCHLIESSLICH aus der benannten Quelle
+ *                       (options.fact). Die Projektion leitet ihn nicht ab,
+ *                       merkt ihn sich nicht und entnimmt ihn schon gar nicht
+ *                       dem Modelltext — leer statt erfunden. Es gibt heute
+ *                       noch keine Evidenzquelle, die ihn fuellt (§19); das
+ *                       Feld und sein Schlitz sind gebaut, die Quelle fehlt.
+ *   CURRENT_BLOCKER .... view.blockedReason, und nur bei Phase `blocked`
+ *                       (die Types sagen: „present exactly while blocked“).
+ *                       Kein Grund vorhanden → leer, nicht raten.
+ *   NEXT_ACTION ........ NEXT_ACTIONS — Beratung, die nie ausgefuehrt wird.
+ *
+ * FAIL-CLOSED in beide Richtungen: kein View → NO_GOAL, unlesbarer View →
+ * UNAVAILABLE, unbekannte Phase → gespiegelt und ohne Empfehlung.
  */
 /**
  * Wie erreichbar der autoritative Zustand war — die Achse, die NO_GOAL von
@@ -607,7 +707,12 @@ export function projectMicroState(view, options = {}) {
  * zwischen zwei Aufrufen geschah, liegt bei DSH und in den Session-Daten.
  * Genau EINE Leseoperation: `get` des Ziel-Dienstes. Jede SCHREIBmethode
  * dieses Dienstes (create, edit, pause, block, ...) wird von dieser Schicht
- * → Kanon: docs/COMMENT-KANON.md#k-559c39d1c208
+ * nie aufgerufen — die einzige Schreibstelle bleibt activateGoal (§17), und
+ * dass sie die einzige bleibt, prueft ein Abnahmetest mit einer Attrappe, auf
+ * der jede Schreibmethode wirft.
+ *
+ * Fehler werden NICHT zu NO_GOAL: „ich kann nicht lesen“ ist eine andere
+ * Aussage als „es gibt keins“. Beide fail-closed, beide benannt (UNAVAILABLE).
  */
 export function createMicroStateService(ctx) {
   return {

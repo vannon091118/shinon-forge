@@ -66,7 +66,6 @@ gilt nicht als Nachmessung.
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | current | 2026-10-17 | Namespace-, Paket- und Profilkonventionen; §5 führt den Lebenszyklus von `.shinon/` |
 | [`docs/COMMIT-REGELN.md`](COMMIT-REGELN.md) | current | 2026-10-08 | Commit-Regeln und ihre Durchsetzung |
 | [`docs/DSH-RC2-INTEGRATION.md`](DSH-RC2-INTEGRATION.md) | current | 2026-10-18 | Umzug auf DSH `0.2.1-rc.2`: eine Sollquelle, ein Prüfer, was am Fork angepasst wurde — und welche Auftragspunkte mit welchem Befund bewusst offen bleiben |
-| [`docs/COMMENT-KANON.md`](COMMENT-KANON.md) | current | 2026-10-17 | Ablage aller Kommentar-Blöcke über 10 LOC, mit Zeiger-Anker je Fundstelle — Ziel der Kürzung, nie Handediting |
 | [`docs/audit/BATCH0-SCOPE-2026-10-17.md`](audit/BATCH0-SCOPE-2026-10-17.md) | current | 2026-10-17 | Batch 0: Scope-Isolation von Persona und globaler `AGENTS.md`, getrenntes DSH-Home, gemessene Runtime-Baseline |
 | [`docs/audit/BATCH0-ABNAHME-2026-10-17.md`](audit/BATCH0-ABNAHME-2026-10-17.md) | current | 2026-10-17 | Abnahme Batch 0 (00G): Gate-Tabelle der Kriterien 1–6, **NO-GO** wegen Sitzungs-Scope der Persona, kleinster offener Fix |
 | [`docs/audit/NARRATIVE-C3-2026-10-17.md`](audit/NARRATIVE-C3-2026-10-17.md) | current | 2026-10-17 | Narrative/Relationship: Hash-Ableitungen entfernt, explizite Regeln (`rules` v2) mit Evidenzlevel — Vorher/Nachher und Regressionstests |

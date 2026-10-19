@@ -7,7 +7,9 @@
  * `opacity` animieren — kein `margin`, `top` oder `left` im Keyframe\") ist eine
  * Eigenschaft des Quelltextes und wird deshalb am Quelltext gehalten, nicht in
  * einem Screenshot. Die Probe ersetzt KEINE Messung im Browser; sie verhindert,
- * → Kanon: docs/COMMENT-KANON.md#k-5c2ed91c33fc
+ * dass die Regel still verrottet, sobald eine neue Animation dazukommt.
+ *
+ * Lauf: `npm run test:codingmon` bzw. `node --test packages/codingmon/test/*.test.mjs`.
  */
 import { readFileSync } from 'node:fs';
 import { describe, test } from 'node:test';

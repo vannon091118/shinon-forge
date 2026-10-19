@@ -6,7 +6,18 @@
  * keine einzige Stelle, die eines dieser Elemente gerendert hätte. Eine
  * Oberfläche, die Klassen definiert, die niemand benutzt, ist von einer kaputten
  * nicht zu unterscheiden. Ersetzt durch das, was wirklich da ist.
- * → Kanon: docs/COMMENT-KANON.md#k-d1e6b11e02d7
+ *
+ * WARUM ES KEIN PANEL GIBT (gemessen, nicht bequem): der Zustand des Pools lebt
+ * in der HOST-Hälfte. Ein Out-of-Tree-Bundle kann keinen Host-Endpunkt
+ * registrieren — die Remote-Beiträge der Browser-Hälfte kommen aus einer
+ * kompilierten Liste in `@deepseek-ai/dsh-api-remotes`, und die Connection-Naht
+ * ist reines Anfrage/Antwort ohne Abo. `@shinon/popup` löst dasselbe Problem,
+ * indem es die SITZUNG liest; einen Pool gibt es dort nicht. Der Status ist
+ * deshalb ein Werkzeug des Hosts (`key_router_status`) — und ein Panel, das diese
+ * Zahl nur behaupten könnte, wird nicht gebaut.
+ *
+ * Was bleibt: ein Eintrag in `__shinon_plugins` und eine Zeile in der
+ * Sidebar-Liste. Beide behaupten nichts über eine Oberfläche, die es nicht gibt.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/key-router',

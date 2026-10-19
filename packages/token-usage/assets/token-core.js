@@ -6,7 +6,28 @@
  * `require`) und kann keine Repo-Datei importieren. Deshalb steht die Regel
  * EINMAL hier und als **bytegleiche Region** in `packages/token-usage/client.js`;
  * die Zwillings-Regel in `scripts/lib/repo.mjs` (`SOURCE_TWINS`, Marker
- * → Kanon: docs/COMMENT-KANON.md#k-cd450594e437
+ * `zwilling:token-turn`) lässt Drift im Gate und im Build auffallen, nicht erst
+ * im Betrieb. Kein `import`, kein DOM, keine Uhr, kein Zufall — kein `Date.now`,
+ * kein `Math.random`; die Zeit kommt als Datum aus dem Ereignis, nie aus dem
+ * Prozess.
+ *
+ * DIE NAHT, AUS DER DIE ZAHLEN KOMMEN (nicht erfunden, gemessen):
+ *  1. **Je Turn** — die dauerhaften Ereignisse des Turns. DSH führt sie im
+ *     Browser als `SessionEventWindow` (`SessionEventSource` der Sitzungs-
+ *     Bindung: „Observable contiguous Session event window", `entries` mit
+ *     `turn/start` … `turn/end`). Genau daraus rechnet das Chat-Bundle seine
+ *     Zeile „Usage 18.5K tok" — mit `deriveTurnTokenUsage` aus
+ *     `@deepseek-ai/dsh-token-meter` (`lib/types/turn-usage.js`). Diese Datei
+ *     trägt DIESE Regel: dieselben Ereignisse, dieselbe Faltung, keine neue
+ *     Ereignisform und kein neuer Projektionsschlüssel.
+ *  2. **Je Sitzung** — die Sitzungs-Projektion `tokenUsage` von
+ *     `@deepseek-ai/dsh-token-meter`, im Browser über
+ *     `ISession.projections.faceOf(key)` gelesen (der Weg, den `useProjection`
+ *     nennt). Sie ist der Rückfall, wenn für keinen Turn eine Beweislage
+ *     vorliegt.
+ *  Beide Regeln sind hier wortgleich zu DSHs eigenen Funktionen portiert und
+ *  werden in `scripts/gate/tests/token-usage-projection.test.mjs` über den
+ *  ganzen Wertebereich gegen die ausgelieferten Vendor-Funktionen gemessen.
  */
 // #region zwilling:token-turn — Besitzer: packages/token-usage/assets/token-core.js; Spiegel: packages/token-usage/client.js (bytegleich, scripts/lib/repo.mjs)
 const TOKEN_USAGE_KEY = 'tokenUsage';
@@ -127,7 +148,8 @@ function sameAttempt(state, turn, step) {
  * Lebenslauf-Grenze, ist eine Usage unvollständig oder widerspricht die exakte
  * Summe den Buckets, ist die ganze Offenlegung nicht verfügbar (`undefined`) —
  * die Anzeige fällt dann sichtbar auf ihren Stand zurück statt zu schätzen.
- * → Kanon: docs/COMMENT-KANON.md#k-35e5d3644878
+ * @param events - turn-lokale dauerhafte Ereignisse von `turn/start` bis `turn/end`.
+ * @returns exakte Aggregat-Usage oder undefined, wenn sie nicht beweisbar ist.
  */
 function deriveTurnUsage(events) {
   let state = { kind: 'idle' };
@@ -278,7 +300,9 @@ function displayPercentUnits(units, decimalPlaces) {
  * (`99.5`, `99.99`, `99.9991`, …) — DSH verkauft einen verfehlten Treffer nie
  * als perfekten.
  * @param cacheReadTokens - exakte, aus dem Cache bediente Prompt-Token.
- * → Kanon: docs/COMMENT-KANON.md#k-8c3450c1e801
+ * @param promptTokens - exakte Prompt-Token insgesamt.
+ * @param decimalPlaces - 0 für die Sitzungs-Pille, 1 für die Turn-Offenlegung.
+ * @returns Prozent-Text oder null, wenn es keinen Prompt-Token gab.
  */
 function formatCacheHitPercent(cacheReadTokens, promptTokens, decimalPlaces = 0) {
   if (promptTokens === 0) return null;

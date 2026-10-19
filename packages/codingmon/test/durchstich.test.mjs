@@ -7,7 +7,15 @@
  * die CSS-/Anzeige-Schicht. Gefahren wird das ECHTE Client-Bundle in einem
  * vm-Kontext mit Attrappen-Uhr, Attrappen-DOM und fest gesetztem Math.random —
  * kein DSH, kein Browser, kein Modell und keine Installation (der Host-Vertrag
- * → Kanon: docs/COMMENT-KANON.md#k-92e73217687a
+ * kommt aus ../assets/mechanik.js, das ohne Bare-Import laedt).
+ *
+ * WAS DIE ATTRAPPEN NICHT BEWEISEN (ehrlich): die Wartezeit laeuft in einer
+ * Attrappen-Uhr, nicht in einem echten Browser; React, Layout und Compositor
+ * sind Attrappen. Bewiesen ist der VERTRAG des Bundles: Sperre, ein Ergebnis je
+ * Zug, ein Wurf je Sieg, Host-Spiegel, Persistenz, Meilensteine und Abbau.
+ *
+ * Die Zusagen des Laufs stehen als Einzelmeldungen im Protokoll; der Test selbst
+ * ist EINE Zusage: keine Abweichung.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

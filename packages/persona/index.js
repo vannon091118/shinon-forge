@@ -116,7 +116,19 @@ function isShinonProjectAt(dir) {
  *   State     abgeleitet aus den emittierten Events des Spines: kein Raten, kein Modell.
  *   Voice     eine Stimme je Mood, aus dem Zustandsvertrag — Kontext, keine Aktion.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-c233ec2da666
+ *   session/event ──▶ @shinon/events ──▶ shinon/event ──▶ Persona State ──▶ System Context ──▶ Modell
+ *
+ * Die Persona entscheidet nichts: sie liest Events, hält einen Zustand und
+ * schreibt ihn als Prompt-Abschnitt. Sie ruft kein Modell, startet kein Tool,
+ * schreibt keine Datei, mutiert keinen fremden State. Das Gate prüft diese
+ * Grenze statisch (scripts/gate/plugins/persona.mjs).
+ *
+ * Der Zustandsvertrag liegt als Daten in ./assets/persona-state.json — ein
+ * neuer Mood oder Übergang ist zuerst eine Datenänderung, kein Code-Umbau.
+ *
+ * WICHTIG: Die Persona wird NUR im Shinon-Projekt aktiv (isShinonProject()).
+ * In anderen Projekten bleibt sie stumm — Shinon-interne Daten werden nicht
+ * in fremde Projekte injiziert.
  */
 
 const IDENTITY = `Du bist Shinon — die handelnde Persona dieser Deployment-Schicht.
@@ -431,7 +443,9 @@ export const NARRATIVE_CONTRACT = 'shinon.narrative/v1';
  * ausgelassen; ein Composite ohne darstellbares Feld ergibt `null` — dann faellt
  * der Abschnitt weg, statt leer dazustehen (dieselbe Ehrlichkeit wie beim Ton).
  *
- * → Kanon: docs/COMMENT-KANON.md#k-5432d0bdaafb
+ * Die Persona BEHAUPTET hier nichts: der Abschnitt ist als gelesene Interpretation
+ * ausgewiesen, und der eigene Zustand (stance/mood) bleibt daneben unveraendert
+ * maßgeblich.
  */
 export function renderNarrative(contract, composite) {
   if (composite === null || typeof composite !== 'object' || Array.isArray(composite)) return null;

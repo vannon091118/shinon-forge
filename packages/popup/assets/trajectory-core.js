@@ -6,7 +6,41 @@
  * `@shinon/narrative` (narrative-core.js) und `@shinon/prompter` (note-core.js).
  *
  * WARUM DIE FALTUNG IN EINER MARKIERTEN REGION STEHT: die Client-Hälfte kann
- * → Kanon: docs/COMMENT-KANON.md#k-3573fb010fc1
+ * diese Datei NICHT importieren (ein Client-Bundle ist eigenständig; es zieht
+ * React per `require`, nicht per `import`). Sie trägt denselben Text deshalb als
+ * bytegleiche Kopie — dieselbe Bauform wie die Turn-Faltung der Token-Anzeige
+ * (`zwilling:token-turn`). Die Region markiert genau den geteilten Text; die
+ * `export`-Zeile darunter gehört nur dieser Datei, denn `export` wäre im
+ * Funktionsrumpf eines Client-Bundles ein Syntaxfehler.
+ *
+ * WARUM ES DIESEN KERN GIBT — der gemessene Befund: `@shinon/popup` hieß
+ * „Trajectory-Overlay" und hatte KEINEN Renderer. Der Host emittierte Einträge
+ * auf `shinon/trajectory`, und die Client-Hälfte sagte in ihrem eigenen Kopf,
+ * dass sie sie nicht rendert. Ein Overlay, das nichts anzeigt, ist von einem
+ * kaputten nicht zu unterscheiden.
+ *
+ * DER DATENWEG, und warum er nicht über den Host läuft: ein Out-of-Tree-Bundle
+ * kann keinen Host-Endpunkt registrieren (die Remote-Beiträge der Browser-Hälfte
+ * kommen aus einer kompilierten Liste in `@deepseek-ai/dsh-api-remotes`), und die
+ * Connection-Naht ist reines Anfrage/Antwort (`rpc.call`) ohne Abo. Was der
+ * Client DAGEGEN lesen kann, ist die Sitzung selbst — genau der Weg, den
+ * `@shinon/token-usage` schon geht:
+ *
+ *   ctx.get('uiSession')?.adapter?.current?.getSnapshot()   → welche Sitzung
+ *   ctx.get('sessions')?.binding(id)                        → deren Bindung
+ *   …binding.eventSource.getSnapshot().entries              → das Ereignisfenster
+ *   …binding.eventSource.subscribe(fn)                       → jede Änderung
+ *
+ * DIE FELDPFADE SIND GEMESSEN, nicht geraten — sie stehen im Vertrag der
+ * installierten DSH-Fassung (`@deepseek-ai/dsh-session/lib/types/types.d.ts`):
+ *
+ *   'tool/call'    { turn, step, callId, name, arguments }
+ *   'tool/result'  { turn, step, message, … }   → callId unter message.source.callId
+ *   'turn/start'   { turn }        'turn/end'   { turn }
+ *   'step/start'   { turn, step }
+ *
+ * Die Ereignisse liegen im Fenster als `{ type: 'event', event }` — dieselbe
+ * Form, die `@shinon/token-usage` faltet (`entry.type === 'event'`).
  */
 
 /** Vertragsname der Anzeige (Daten, nicht Code). */
@@ -38,7 +72,14 @@ function eventsOf(entries) {
  * letzten Abschnitt der Sitzung. Ein neues `turn/start` setzt sie zurück, ein
  * `turn/end` schließt sie ab — die Anzeige ist damit „läuft" oder „bereit", und
  * beides ist aus den Ereignissen ablesbar statt behauptet.
- * → Kanon: docs/COMMENT-KANON.md#k-84b84a002cbc
+ *
+ * Ohne `callId` ist ein Aufruf nicht zuordenbar. Er zählt trotzdem als OFFEN —
+ * fail-closed: es gibt keine Evidenz, dass er fertig ist, und „geschlossen" wäre
+ * eine Behauptung. Sein synthetischer Schlüssel kann von keinem `tool/result`
+ * getroffen werden (die tragen echte callIds), also bleibt er es auch.
+ *
+ * @param entries - Einträge des Sitzungsfensters (`binding.eventSource…entries`).
+ * @param limit - wie viele Werkzeugnamen behalten werden.
  */
 function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT) {
   const open = new Map();

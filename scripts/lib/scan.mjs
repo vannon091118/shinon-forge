@@ -6,7 +6,20 @@
  * IGNORED_DIRS), jede mit einer anderen Menge. Ein Lauf, der `node_modules`
  * betritt, kostet auf schwacher Hardware Minuten; ein Lauf, der einem Symlink
  * folgt, verlässt den Baum (und ein Schreibzugriff darüber landet außerhalb).
- * → Kanon: docs/COMMENT-KANON.md#k-1876fcced4a0
+ *
+ * Zwei Zusagen, die hier zusammen entstehen:
+ *   1. PRUNE: bekannte Fremd-/Cache-Ordner werden VOR der Rekursion verworfen,
+ *      nicht erst nach dem Lesen ihrer Einträge.
+ *   2. KEINE SYMLINKS: `readdirSync(…, { withFileTypes: true })` meldet einen
+ *      Symlink als `isSymbolicLink()`; er wird nie betreten — auch dann nicht,
+ *      wenn er auf ein Verzeichnis zeigt. lstat-Semantik, kein realpath-Sprung.
+ *
+ * Die Liste hier ist die Quelle. `packages/project-index/assets/index-core.js`
+ * kann sie nicht importieren (der Kern läuft im Worker und darf nur `node:*`
+ * laden, und er wird in jedes Tarball gepackt) — deshalb pinnt
+ * `scripts/gate/tests/scan-pruning.test.mjs` beide Listen gegeneinander, wie es
+ * die Zwillingsregel für Client-Literale tut. Wer hier etwas ergänzt, sieht den
+ * Drift im Gate, statt ihn zu übersehen.
  */
 
 import { readdirSync, statSync } from 'node:fs';

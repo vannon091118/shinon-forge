@@ -7,7 +7,54 @@
  * alle übrigen Suiten grün waren. Der Grund lag nicht in der Logik, sondern im
  * Zugriff: die drei Hälften lesen `ctx.locale`, deklarieren aber `inject: ['slots']`.
  * Ein Cordis-Context ist ein PROXY; ein direkter Dienst-Zugriff ohne Deklaration
- * → Kanon: docs/COMMENT-KANON.md#k-6adb1972ed54
+ * wirft (`cannot get property "locale" without inject`) und kostet die ganze
+ * Aktivierung. Die bis dahin einzigen Client-Tests hängten die Bundles an ein
+ * PLATTES Attrappen-`ctx` an — ein flaches Objekt kann nicht werfen, also war der
+ * Fehler unsichtbar (docs/testing.md: „test the real entry path“).
+ *
+ * Zwei Wachen, absichtlich mit verschiedenem Geltungsbereich (der Vertrag, den sie
+ * prüfen, steht in der ausgelieferten Fassung: `dsh-cordis-client-runner/lib/client.js`
+ * — „`ctx.get(name)` performs optional lookup; direct `ctx.serviceName` access is
+ * gated by the fiber's `inject` declaration“):
+ *
+ *   1. STATIK (keine Abhängigkeiten, läuft auch in CI ohne Install): jede
+ *      `packages/<dir>/client.js` darf `ctx.<dienst>` nur lesen, wenn `<dienst>` in
+ *      ihrer `inject`-Liste steht oder eine dokumentierte Cordis-Fläche ist
+ *      (`ctx.effect` aus `fiber.d.ts`, `ctx.on`/`ctx.emit` aus `events.d.ts`, …).
+ *      Kommentare und Strings zählen nicht — der Scan läuft über `codeOnly`
+ *      (`scripts/lib/source-scan.mjs`). Geprüft werden **nur** die Client-Hälften:
+ *      die Host-Hälften lesen ihre Dienste in `ctx.inject([...], (ctx) => …)`-
+ *      Rückrufen, wo der verschachtelte Context seine eigene Deklaration hat —
+ *      ein statischer Scan kann das nicht verfolgen (gemessen: `key-router`,
+ *      `prompter`, `shinon-forge`, `narrative`, `codingmon` `index.js` wären
+ *      Fehlalarme), und der Host-Boot hat seine eigene Diagnose (`dsh-app-boot`).
+ *   2. DYNAMIK (braucht `node_modules`, sonst sichtbarer Skip): jedes Bundle wird in
+ *      einem vm-Kontext mit Browser-Attrappen geladen und über `ctx.plugin(...)` an
+ *      eine ECHTE Cordis-Wurzel gehängt, die `slots` und `locale` aus einer
+ *      Plugin-Fiber anbietet — dieselbe Komposition wie im Client. Zusage: `apply`
+ *      läuft, wirft nicht, und das Menü-Label kommt aus der Registry
+ *      (`@shinon/locale-de`s Wörterbuch), ohne Locale-Dienst aus der deutschen
+ *      Tabelle — beides ohne Wurf.
+ *
+ *   3. MARKE (statisch + dynamisch): drei sichtbare Regressionen, gemessen am
+ *      ausgelieferten Bundle statt am Augenschein. (a) Das Background-Branding
+ *      hing am Hero-Slot und lag damit INNEN in der 34px-Hitbox der Hero-Zeile —
+ *      `position:absolute; inset:0` deckte dort nur die Hitbox, das Fenster sah
+ *      nichts. Es gehört in `shell.overlay` (kind list, scope root), den der
+ *      ui-layout-`AppFrame` frame-weit rendert. (b) Die Laufanzeige („Arbeitet“)
+ *      trug DSHs Wal als CSS-Maske; Shinons Zeichen, seine Palette und seine
+ *      Bewegung müssen das ersetzen. (c) Die Marken-Slots der Sidebar und des
+ *      Hero sind Single-Slots MIT Fallback — gibt ein Besetzer auf, haengt dort
+ *      wieder DSHs Fisch. Deshalb genau EIN Besetzer je Slot, und das eigene
+ *      Zeichen ist aus Kurven gebaut, nicht aus Pixeln.
+ *
+ * Was der Test NICHT beweist (ehrlich): der Locale-Dienst ist eine Attrappe mit
+ * derselben Schnittstelle (`addLanguage`/`register`/`bind`), nicht der echte
+ * DSH-Dienst; ein voller `dsh --profile shinon`-Boot ist hier nicht möglich (die
+ * CLI ist nicht installiert). React, DOM und Uhr sind Attrappen. Die CSS-Regeln
+ * werden als Text geprueft — ob der Browser sie GENAU so anwendet, zeigt erst
+ * ein lebender Boot (Spezifitaet: Attribut + Klasse schlaegt die gelieferte
+ * Klassen-Regel; die Konvention steht hier als Zusage, nicht als Messung).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

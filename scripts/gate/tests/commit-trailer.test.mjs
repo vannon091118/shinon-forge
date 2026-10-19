@@ -7,7 +7,10 @@
  *      Tausch tut — inklusive Idempotenz.
  *   2. Mechanismus: Hooks und CI-Workflow werden gegen ihre Zusagen geprüft
  *      (fail-closed prüfen, nicht reparieren; immer laufen, nicht filtern).
- * → Kanon: docs/COMMENT-KANON.md#k-55c75852748d
+ *   3. Echter Lauf: der Wächter als CLI gegen eine Datei und gegen ein
+ *      temporäres Git-Repository — Exit-Codes zählen, nicht Absichten.
+ *
+ * Läuft mit `node --test` — kein node_modules, kein Netz.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

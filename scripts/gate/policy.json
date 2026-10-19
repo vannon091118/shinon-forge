@@ -11,7 +11,6 @@
       "legacy-guard",
       "profile",
       "typescript",
-      "comment-canon",
       "dsh-singleton",
       "docs-status"
     ],

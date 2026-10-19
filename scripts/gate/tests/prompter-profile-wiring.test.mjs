@@ -26,7 +26,8 @@ function prompterBlock(text) {
  * stand und das Profil denselben Eintrag nur wegen `skillsPath` anfasste, war
  * beides wirkungslos — der Prompter mountete mit MIN und leerer Route, meldete
  * `NO_ROUTE` und veredelte nichts. Deshalb prueft dieser Test MAX und die
- * → Kanon: docs/COMMENT-KANON.md#k-5feebda6c44e
+ * Abwesenheit des unbrauchbaren `contextPath` dort, wo sie greifen, UND dass
+ * das Paket keine Config mehr traegt, die den Blick darauf verstellen koennte.
  */
 test('MAX steht im Profil und keine statische Kontextdatei verdeckt den Laufzeit-Index', () => {
   const profile = readFileSync(profilePatch, 'utf8');

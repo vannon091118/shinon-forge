@@ -1,13 +1,47 @@
 #!/usr/bin/env node
 /**
- * key-router-override — der Pool erreicht die Route (Beleg: docs/CHANGELOG.md).
+ * key-router-override — der Pool erreicht die Route (PLAN.md §3.12).
  *
  * WARUM DIESE DATEI EXISTIERT: der Router verwaltete seinen Pool und
  * beantwortete seine Werkzeuge — aber DSH bekam keinen rotierenden Schlüssel an
  * die Hand. Der alte Stand hatte das Problem an der falschen Stelle gesucht (zwei
  * Ereignisnamen ohne Emitter) und die Schlüssel obendrein aus `process.env`
  * gelesen, wo die `.env`-Werte nie stehen — im echten Boot blieb der Pool leer.
- * → Kanon: docs/COMMENT-KANON.md#k-a0977c801963
+ * Ein Override, den niemand prüft, ist eine Behauptung mit Konfiguration.
+ *
+ * GEMESSEN AM INSTALLIERTEN HARNESS (0.2.1-alpha.1), NICHT GERATEN:
+ *
+ *   - Die Route löst ihren Schlüssel pro Aufruf über
+ *     `ctx.get("credentials").resolve(ref)` auf (`resolveApiKey` in
+ *     `dsh-llm-pi-ai`, eine Funktion, kein Wert); fehlt der Dienst, gilt die
+ *     Startumgebung mit drei Schichten (Prozess, Projekt-`.env`,
+ *     Benutzer-`.env`). Die Referenz ist zur Laufzeit eine Zeichenkette
+ *     (`brandString` gibt den Wert unverändert zurück).
+ *   - Eine fehlgeschlagene Anfrage läuft als Middleware über
+ *     `agent/request-error` (Nutzdaten: provider, failure mit stabilem `code`);
+ *     die Wiederholungs-Entscheidung fällt `llm-retry` — wer dort nur beobachtet
+ *     und `next()` weitergibt, ändert nichts daran.
+ *
+ * DREI EBENEN:
+ *
+ *   1. QUELLE (ohne node_modules) — das Profil nennt für jeden Anbieter einen
+ *      Umgebungsnamen (ohne Referenz kein Override — fail-closed), und die
+ *      Naht-Ereignisnamen stehen als Literale in `index.js` (ein vertippter Name
+ *      wäre ein Zuhörer ohne Sender, exakt der alte Fehler).
+ *   2. VERHALTEN (ohne node_modules, am ausgelieferten Paket mit
+ *      Dienst-Attrappen) — die Klammer bedient die verwaltete Referenz aus dem
+ *      Pool, gibt Fremdes weiter, rückt nach einem beobachteten 429 vor und
+ *      stellt nach `dispose` den Dienst wieder her. Jeder Schritt mit
+ *      Kanarienvogel-Schlüsseln und abgefangenem Log.
+ *   3. KETTE (braucht `node_modules`, sonst sichtbarer Skip wie beim
+ *      Store-Test) — entfällt hier: `schemastery` ist installiert, der Test
+ *      läuft direkt.
+ *
+ * Was der Test NICHT beweist (ehrlich): eine echte 429-Rotation gegen die
+ * laufende Route — dafür bräuchte es zwei echte Schlüssel und einen erzwungenen
+ * 429 in dieser Umgebung. Das steht in docs/ZAHLEN.md §4, nicht hier.
+ *
+ * Läuft mit `node --test` (`npm run gate:test`, CI mit `npm ci`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

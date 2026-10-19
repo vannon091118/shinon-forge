@@ -7,7 +7,10 @@
  *      abgeschwächter Fußboden.
  *   2. Preset-Matrix: je Preset positive und negative Nachrichten.
  *   3. Auswahl und Parität: Projektdatei/Env/Flag, und dass Hook (--file),
- * → Kanon: docs/COMMENT-KANON.md#k-987f6fcf8e49
+ *      CLI (--stdin) und CI (--ci) für dieselbe Nachricht dasselbe Urteil und
+ *      denselben Exitcode liefern.
+ *   4. Reparatur-Grenze: --fix entfernt nur Footer-Zeilen; ein Preset ohne
+ *      Reparatur schreibt nichts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

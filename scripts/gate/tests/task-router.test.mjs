@@ -7,7 +7,27 @@
  * schiefgehen koennen, werden getrennt geprueft:
  *
  *   1. DAS VOKABULAR. Der Router und der Enhancer fuehren dieselbe Liste. Kein
- * → Kanon: docs/COMMENT-KANON.md#k-687e05f7f81b
+ *      Paket importiert das andere; die Uebereinstimmung wird hier von AUSSEN
+ *      gepinnt. Zwei Listen, die auseinanderlaufen, waeren ein stiller Fehler:
+ *      der Router wuerde jede Klasse des Enhancers als unbekannt verwerfen.
+ *   2. DIE POLICY. Die Tabelle aus §16 (CHAT/LOOKUP/TRANSFORM linear,
+ *      MULTI_STEP_TASK/LONG_RUNNING_GOAL Kandidat) ist eine ZAHLENTABELLE plus
+ *      Schwelle, und die Entscheidung ist eine reine Funktion. Damit ist sie
+ *      ohne Modell, ohne Netz und ohne Zustand nachpruefbar.
+ *
+ * Drei Ebenen, bewusst getrennt:
+ *   a. Die Daten: Vokabular, Gewichte, Schwelle — und ihre Uebereinstimmung
+ *      zwischen beiden Paketen.
+ *   b. Die Entscheidung als reine Funktion: die Verhaltenstabelle aus §16, die
+ *      Schwelle als POLICY (heben und senken aendert das Ergebnis, ohne Code
+ *      anzufassen) und die Fail-closed-Faelle (kein Etikett -> kein Kandidat).
+ *   c. Der ECHTE Durchlauf: beide Bundles haengen an EINEM echten
+ *      Cordis-Context, gefahren wird der echte Waterfall `agent/pre-step`, der
+ *      Enhancer emittiert seinen validierten Datensatz auf dem echten Bus, und
+ *      der Router entscheidet daraus. Der Modell-Provider ist zwangslaeufig eine
+ *      Attrappe (extern, braucht Zugangsdaten); alles andere ist echt.
+ *
+ * Kein Netz, kein Modell, kein node_modules im Repo.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
