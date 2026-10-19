@@ -266,6 +266,13 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/intent-memory.js' },
       { kind: 'import', target: './assets/render-context.js' },
       { kind: 'import', target: './assets/prompt-files.js' },
+      // Die Faehigkeitskarte (2026-10-20): welche Frage gehoert welchem Paket.
+      // Daten + reiner Kern; die Zeigerpruefung kommt aus der Provenienz-Leiter.
+      { kind: 'import', target: './assets/capability-map.js' },
+      // Die Provenienz-Leiter (2026-10-19): fünf Klassen, Zeigerpflicht,
+      // keine Beförderung — ein reiner Kern ohne Bare-Import, damit sein Test
+      // ohne node_modules läuft.
+      { kind: 'import', target: './assets/provenance.js' },
       // Der einzige Schreibweg des Hosts: gelernte Bausteine (Propose-Seam).
       { kind: 'import', target: './assets/learned-store.js' },
       { kind: 'import', target: './assets/stand.js' },

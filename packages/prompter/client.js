@@ -36,6 +36,33 @@ window.__ModuleLoader__.load({
       intent: record?.intent ?? 'UNDEFINED',
       reasons: Array.isArray(record?.reasons) ? record.reasons.slice(0, 5) : [],
       context_source: record?.context_source ?? null,
+      // Die Provenienz-Leiter als Zensus: wie viele Belege welcher Klasse und
+      // wie viele Luecken. Der VOLLE Datensatz reist auf dem Entscheidungs-Kanal;
+      // hier steht nur, was das Panel in einer Zeile zeigen kann. Der Zensus
+      // akzeptiert beide Formen (Array aus dem Kanal, Zahl aus dem Fenster).
+      provenance: record?.provenance && typeof record.provenance === 'object'
+        ? {
+            contract: typeof record.provenance.contract === 'string' ? record.provenance.contract : '',
+            entries: Array.isArray(record.provenance.entries)
+              ? record.provenance.entries.length
+              : Number.isInteger(record.provenance.entries) ? record.provenance.entries : 0,
+            violations: Array.isArray(record.provenance.violations)
+              ? record.provenance.violations.length
+              : Number.isInteger(record.provenance.violations) ? record.provenance.violations : 0,
+            complete: record.provenance.complete === true,
+          }
+        : null,
+      // Der Aufgabenbrief als Adresse: welches Paket die Frage besitzt und wie
+      // lang der Block war. Der Text selbst reist nicht ins Fenster — er steht
+      // im Prompt, und ein Blocktext im Panel waere eine zweite Kopie.
+      brief: record?.brief && typeof record.brief === 'object'
+        ? {
+            id: typeof record.brief.id === 'string' ? record.brief.id : '',
+            owner: typeof record.brief.owner === 'string' ? record.brief.owner : '',
+            chars: Number.isInteger(record.brief.chars) ? record.brief.chars : 0,
+          }
+        : null,
+      brief_reason: typeof record?.brief_reason === 'string' ? record.brief_reason : null,
       // Prosa-Rettung sichtbar machen: Grund, Zeichenzahl und der wievielte
       // Fall dieser Sitzung — sonst sieht ein geretteter Prosafall wie eine
       // normale Veredelung aus, und „zu oft" bleibt eine Vermutung.
@@ -161,7 +188,20 @@ window.__ModuleLoader__.load({
             traceBadge(entry.outcome),
             h('span', { className: '__pt_badge intent' }, entry.intent ?? 'UNDEFINED'),
             h('span', null, `mode=${entry.mode}`),
-            h('span', null, `ctx=${entry.context_source ?? 'none'}`)),
+            h('span', null, `ctx=${entry.context_source ?? 'none'}`),
+            entry.provenance
+              ? h('span', {
+                  // Kein Vertragsname als Literal im Client: er steht im Host-Kern
+                  // (`assets/provenance.js`) und reist im Datensatz mit. Ein
+                  // zweiter Name waere eine zweite Wahrheit ohne Drift-Test.
+                  title: `${entry.provenance.contract ? `${entry.provenance.contract} · ` : ''}${entry.provenance.violations} Verletzung(en)${entry.provenance.complete ? '' : ' · unvollständig'}`,
+                }, `prov=${entry.provenance.entries}`)
+              : null),
+            entry.brief
+              ? h('span', { title: `Aufgabenbrief: @shinon/${entry.brief.owner} · ${entry.brief.chars} Zeichen` }, `brief=${entry.brief.id}`)
+              : (entry.brief_reason && entry.outcome === 'accepted'
+                ? h('span', { title: `Kein Aufgabenbrief: ${entry.brief_reason}` }, 'brief=-')
+                : null),
           entry.reasons?.length > 0
             ? h('div', { className: '__pt_reason' }, entry.reasons.join(', '))
             : null,

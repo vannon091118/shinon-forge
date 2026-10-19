@@ -1,6 +1,6 @@
 # Changelog — erledigte Arbeit mit Beleg
 
-> **Status:** current — die einzige Liste erledigter Arbeit: je Eintrag Datum, was, und wo der Beleg liegt. **Stand:** 2026-10-18
+> **Status:** current — die einzige Liste erledigter Arbeit: je Eintrag Datum, was, und wo der Beleg liegt. **Stand:** 2026-10-20
 > **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Regeln dieser Datei: nur Abgeschlossenes mit Beleg (Beleg = Testlauf, Gate, Probe
@@ -10,6 +10,34 @@ Punkte (die stehen in `docs/ROADMAP.md`). Ein Eintrag wird nicht umgeschrieben �
 höchstens ergänzt. Detailtiefe früherer Durchgänge steht im Archiv
 (`docs/archive/CHANGELOG.md` für die Umbau-Schritte, je Nachweis-Dokument für
 den Rest); hier steht die kurze, datierte Zeile.
+
+## 2026-10-20
+
+- **Fähigkeitskarte:** 26 Fragen über 21 Pakete, je genau ein Eigentümer; die
+  Karte (`shinon.capabilities/v1`) nennt Frage, Paket, Naht, Grenze und Beleg,
+  und der Kern lehnt doppelte Fragen oder Begriffe fail-closed ab. Der
+  Aufgabenbrief (fünf Felder, harte Zeichengrenze) hängt hinter dem veredelten
+  Prompt und reist als `DERIVED`-Eintrag in die Provenienz; ohne Treffer oder bei
+  Gleichstand gibt es keinen Brief, und `brief_reason` nennt den Grund. Belege:
+  `docs/contracts/capabilities.json`,
+  `packages/prompter/assets/capabilities.json`,
+  `packages/prompter/test/capability-map.test.mjs`,
+  `scripts/gate/tests/capabilities.test.mjs`.
+
+## 2026-10-19
+
+- **Provenienz-Leiter als Runtime-Vertrag:** fünf Klassen (`FACT`, `DERIVED`,
+  `JUDGEMENT`, `NARRATIVE`, `PROPOSAL`), Zeigerpflicht auf relativen Pfad oder
+  Vertrags-ID, keine Beförderung. Der Entscheidungsdatensatz trägt
+  `provenance_contract` und `provenance`, die Fensterspur den Zensus; ein
+  ungültiger Eintrag steht mit Grund in `violations`, statt zu verschwinden.
+  Belege: `docs/contracts/provenance.json`,
+  `packages/prompter/test/provenance.test.mjs`,
+  `packages/prompter/test/provenance-trace.test.mjs`.
+- **Spurfelder des Index-Kontexts:** `context_budget_tokens`, `context_chars`
+  und  `context_files` werden jetzt auch für `shinon_index_query` gesetzt — vorher
+  nannte der Datensatz für den Index weder Dateien noch Zeichen. Beleg:
+  `packages/prompter/test/provenance-trace.test.mjs` (Index-Fall).
 
 ## 2026-10-18
 

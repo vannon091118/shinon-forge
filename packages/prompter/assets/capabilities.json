@@ -1,0 +1,241 @@
+{
+  "contract": "shinon.capabilities/v1",
+  "note": "Welche Frage gehört welchem Paket. Ein Paket darf mehrere Fragen besitzen; eine Frage und ein Begriff gehören genau einem. Die Grenze (notAnswers) ist Pflicht — ohne sie ist die Karte eine Werbung.",
+  "maxBriefChars": 700,
+  "capabilities": [
+    {
+      "id": "projektkontext-auffinden",
+      "frage": "Wo wird Projektkontext für einen Schritt gefunden?",
+      "owner": "project-index",
+      "seam": { "kind": "service", "name": "shinon_index_query", "contract": "shinon.project-index/query-v1" },
+      "terms": ["projektkontext", "welche dateien", "kontext für einen schritt"],
+      "notAnswers": ["keine Urteile über Codequalität", "keine Haltung", "kein vollständiges Paket"],
+      "evidence": ["packages/project-index/index.js"]
+    },
+    {
+      "id": "urteile-speichern",
+      "frage": "Wo werden Urteile dauerhaft gespeichert?",
+      "owner": "project-index",
+      "seam": { "kind": "service", "name": "shinon_index_store", "contract": "shinon.project-index/store-v1" },
+      "terms": ["urteile speichern", "urteile dauerhaft", "gedächtnis ablegen", "stand speichern"],
+      "notAnswers": ["keine Berechnung von Urteilen", "kein Projektindex"],
+      "evidence": ["packages/project-index/index.js"]
+    },
+    {
+      "id": "haltung-aus-signalen",
+      "frage": "Wie wird aus Signalen eine Haltung?",
+      "owner": "scoring",
+      "seam": { "kind": "service", "name": "shinon_scoring_state", "contract": "shinon.scoring-state/read-v1" },
+      "terms": ["haltung und ton", "eine haltung", "stimmung aus signalen"],
+      "notAnswers": ["keine Fakten über Dateien", "keine Prompt-Auswahl"],
+      "evidence": ["packages/scoring/index.js"]
+    },
+    {
+      "id": "baustein-gewichte",
+      "frage": "Welche Prompt-Bausteine haben gelerntes Gewicht?",
+      "owner": "scoring",
+      "seam": { "kind": "service", "name": "shinon_block_weights", "contract": "shinon.block-weights/read-v1" },
+      "terms": ["baustein gewichte", "gelerntes gewicht", "gewichteter baustein"],
+      "notAnswers": ["keine Haltung", "keine Signalzählung"],
+      "evidence": ["packages/scoring/assets/block-weights.js"]
+    },
+    {
+      "id": "prompt-veredeln",
+      "frage": "Wie wird der Nutzerprompt veredelt?",
+      "owner": "prompter",
+      "seam": { "kind": "contract", "name": "shinon.prompter/result-v1" },
+      "terms": ["prompt veredeln", "nutzerprompt veredelt", "prompt verbessern"],
+      "notAnswers": ["keine Projektkenntnis", "keine Garantie auf gültiges JSON"],
+      "evidence": ["packages/prompter/index.js"]
+    },
+    {
+      "id": "prompt-herkunft",
+      "frage": "Wo steht, welche Art Aussage in den Prompt gereist ist?",
+      "owner": "prompter",
+      "seam": { "kind": "contract", "name": "shinon.provenance/v1" },
+      "terms": ["provenienz der aussage", "welche art aussage", "herkunft der aussage"],
+      "notAnswers": ["keine Bewertung der Aussage", "kein Dateiinhalt"],
+      "evidence": ["packages/prompter/assets/provenance.js"]
+    },
+    {
+      "id": "baustein-vorschlagen",
+      "frage": "Wie wird ein neuer Prompt-Baustein vorgeschlagen?",
+      "owner": "prompter",
+      "seam": { "kind": "service", "name": "shinon_block_propose", "contract": "shinon.block-propose/v1" },
+      "terms": ["baustein vorschlagen", "baustein vorgeschlagen", "neuer baustein"],
+      "notAnswers": ["keine automatische Aktivierung ohne Prüfung"],
+      "evidence": ["packages/prompter/index.js"]
+    },
+    {
+      "id": "ziel-oder-linear",
+      "frage": "Wann wird ein Turn ein Ziel statt eines linearen Schritts?",
+      "owner": "task-router",
+      "seam": { "kind": "contract", "name": "shinon.task-router/decision-v1" },
+      "terms": ["ziel erkennen", "ein ziel statt", "mehrschrittige aufgabe", "linearer schritt"],
+      "notAnswers": ["keine Ausführung des Ziels", "keine Intent-Erkennung"],
+      "evidence": ["packages/task-router/index.js"]
+    },
+    {
+      "id": "ziel-mikrostand",
+      "frage": "Wo steht der Fortschritt eines Ziels?",
+      "owner": "task-router",
+      "seam": { "kind": "service", "name": "shinon_goal_micro_state", "contract": "shinon.task-router/micro-state-v1" },
+      "terms": ["ziel fortschritt", "fortschritt eines ziels", "mikrostand"],
+      "notAnswers": ["keine Zielausführung", "keine Dauerbeobachtung"],
+      "evidence": ["packages/task-router/index.js"]
+    },
+    {
+      "id": "identitaet-und-review",
+      "frage": "Wer entscheidet über Identität und Vorschlags-Review?",
+      "owner": "persona",
+      "seam": { "kind": "service", "name": "shinon_persona_review", "contract": "shinon.persona-review/v1" },
+      "terms": ["identität", "vorschlag prüfen", "wer bist du"],
+      "notAnswers": ["keine Fakten", "keine Prompt-Veredelung"],
+      "evidence": ["packages/persona/index.js"]
+    },
+    {
+      "id": "narrative-lage",
+      "frage": "Woher kommt die erzählerische Lage?",
+      "owner": "narrative",
+      "seam": { "kind": "channel", "name": "shinon/narrative/state", "contract": "shinon.narrative/v1" },
+      "terms": ["erzählerische lage", "narrative lage", "story"],
+      "notAnswers": ["keine Belege", "keine Handlungsentscheidung"],
+      "evidence": ["packages/narrative/index.js"]
+    },
+    {
+      "id": "ereignis-spine",
+      "frage": "Wo werden Laufzeit-Signale gesammelt?",
+      "owner": "events",
+      "seam": { "kind": "channel", "name": "shinon/event" },
+      "terms": ["ereignis-spine", "signale sammeln", "laufzeit-signale"],
+      "notAnswers": ["keine Autorität", "keine Wahrheit"],
+      "evidence": ["packages/events/index.js"]
+    },
+    {
+      "id": "schritt-freigabe",
+      "frage": "Wo wird ein Agentenschritt freigegeben oder blockiert?",
+      "owner": "hook",
+      "seam": { "kind": "event", "name": "agent/pre-step" },
+      "terms": ["schritt freigeben", "vor dem schritt", "agentenschritt", "hook"],
+      "notAnswers": ["keine Prompt-Veredelung", "keine Modellwahl"],
+      "evidence": ["packages/hook/index.js"]
+    },
+    {
+      "id": "markierungen-grenzen",
+      "frage": "Wo werden Markierungen begrenzt?",
+      "owner": "markers",
+      "seam": { "kind": "global", "name": "__DSH_MARKERS_CONFIG__" },
+      "terms": ["markierung", "markierungen", "kommentar grenze"],
+      "notAnswers": ["keine Inhaltsprüfung", "keine Prompt-Bausteine"],
+      "evidence": ["packages/markers/index.js"]
+    },
+    {
+      "id": "spur-als-toast",
+      "frage": "Wo wird die Spur als Hinweis angezeigt?",
+      "owner": "traceability",
+      "seam": { "kind": "global", "name": "__SHINON_TRACEABILITY_CONFIG__" },
+      "terms": ["toast", "spur anzeigen", "spur als hinweis"],
+      "notAnswers": ["keine Entscheidung", "kein Trace-Speicher"],
+      "evidence": ["packages/traceability/index.js"]
+    },
+    {
+      "id": "deutsche-texte",
+      "frage": "Wo stehen die deutschen Texte?",
+      "owner": "locale-de",
+      "seam": null,
+      "terms": ["deutsche texte", "deutschen texte", "übersetzung", "locale"],
+      "notAnswers": ["keine Übersetzung zur Laufzeit"],
+      "evidence": ["packages/locale-de/client.js"]
+    },
+    {
+      "id": "marke-in-der-oberflaeche",
+      "frage": "Wo sitzt die Marke in der Oberfläche?",
+      "owner": "core",
+      "seam": null,
+      "terms": ["marke", "brand", "seitenleiste"],
+      "notAnswers": ["keine Funktion außerhalb der Marke"],
+      "evidence": ["packages/core/client.js"]
+    },
+    {
+      "id": "tips-und-hinweise",
+      "frage": "Wo stehen Tooltips und Hinweise?",
+      "owner": "tooltip",
+      "seam": null,
+      "terms": ["tooltip", "tooltips und hinweise", "hilfetext"],
+      "notAnswers": ["keine Laufzeitentscheidung"],
+      "evidence": ["packages/tooltip/client.js"]
+    },
+    {
+      "id": "sitzungsfenster-falten",
+      "frage": "Wie wird das Sitzungsfenster gefaltet?",
+      "owner": "popup",
+      "seam": null,
+      "terms": ["sitzungsfenster", "fenster falten", "popup"],
+      "notAnswers": ["keine Sitzungsinhalte"],
+      "evidence": ["packages/popup/client.js"]
+    },
+    {
+      "id": "token-zaehlen",
+      "frage": "Wer zählt Token und Kosten?",
+      "owner": "token-usage",
+      "seam": null,
+      "terms": ["token zählen", "token und kosten", "kosten"],
+      "notAnswers": ["keine Abrechnung", "keine Modellwahl"],
+      "evidence": ["packages/token-usage/index.js"]
+    },
+    {
+      "id": "fehler-lesbar",
+      "frage": "Wo werden Fehler lesbar gemacht?",
+      "owner": "better-errors",
+      "seam": null,
+      "terms": ["fehler lesbar", "fehlermeldung"],
+      "notAnswers": ["keine Fehlerbehandlung im Host"],
+      "evidence": ["packages/better-errors/index.js"]
+    },
+    {
+      "id": "workspaces-und-sitzungen",
+      "frage": "Wo sehe ich Workspaces und Sitzungen?",
+      "owner": "dashboard",
+      "seam": { "kind": "service", "name": "workspaces", "read": true },
+      "terms": ["workspaces", "sitzungen anzeigen"],
+      "notAnswers": ["keine Workspace-Verwaltung", "keine Sitzungssteuerung"],
+      "evidence": ["packages/dashboard/client.js"]
+    },
+    {
+      "id": "anbieter-und-429",
+      "frage": "Wer beobachtet Anbieter und 429?",
+      "owner": "key-router",
+      "seam": null,
+      "terms": ["anbieter", "429", "schlüssel"],
+      "notAnswers": ["keine Wiederholung", "keine Prompt-Veredelung"],
+      "evidence": ["packages/key-router/index.js"]
+    },
+    {
+      "id": "pet-und-begleiter",
+      "frage": "Wo lebt der Begleiter (Pet)?",
+      "owner": "codingmon",
+      "seam": { "kind": "service", "name": "shinon_codingmon_store", "contract": "shinon.codingmon/store-v1" },
+      "terms": ["pet", "begleiter", "codingmon"],
+      "notAnswers": ["keine Arbeit am Projekt", "keine Messung der Qualität"],
+      "evidence": ["packages/codingmon/index.js"]
+    },
+    {
+      "id": "openapi-vertrag",
+      "frage": "Gibt es einen OpenAPI-Server?",
+      "owner": "openapi",
+      "seam": null,
+      "terms": ["openapi", "api vertrag"],
+      "notAnswers": ["kein laufender Server"],
+      "evidence": ["packages/openapi/openapi.yaml"]
+    },
+    {
+      "id": "mobile-oberflaeche",
+      "frage": "Ist die mobile Oberfläche aktiv?",
+      "owner": "mobile",
+      "seam": null,
+      "terms": ["mobile oberfläche", "handy"],
+      "notAnswers": ["nicht im Profil aktiv"],
+      "evidence": ["packages/mobile/package.json"]
+    }
+  ]
+}

@@ -83,7 +83,7 @@ gilt nicht als Nachmessung.
 | [`docs/PR-PROMOTION.md`](PR-PROMOTION.md) | current | 2026-10-17 | PR-Promotion: Zustandsautomat, Evidenzregeln (Status zählt nur am genannten SHA) und die Adapter-Grenze — Schreibaktion bewusst außerhalb |
 | [`docs/CI.md`](CI.md) | current | 2026-10-14 | CI als Schranke: Zweige und verpflichtender Statuscheck für `main`, Setz- und Nachkontroll-Befehl — und was davon gebaut, aber noch nicht scharf ist |
 | [`docs/probes/e2e-leitstand-2026-10-19.md`](probes/e2e-leitstand-2026-10-19.md) | current | 2026-10-19 | E2E-Stresstest in einem echten Projekt: 9 Turns, 6 gepflanzte Inkonsistenzen, Befund je Paket (Index eingefroren, Enhancer-Ausfälle, Persona aus) — Belege als JSON daneben |
-| [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-17 | alle harten Zahlen + Befehle |
+| [`docs/ZAHLEN.md`](ZAHLEN.md) | current | 2026-10-19 | alle harten Zahlen + Befehle |
 | [`docs/INDEX.md`](INDEX.md) | current | 2026-10-17 | dieser Einstieg und die Statusregel |
 | [`docs/ROADMAP.md`](ROADMAP.md) | plan | 2026-10-18 | die einzige Liste offener Arbeit: Freeze-Abnahmen, v0.5.0-Kandidaten, Zurückgestelltes, `1.0.0`-Kriterien |
 | [`docs/S3-FRESHCLONE-2026-10-17.md`](S3-FRESHCLONE-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S3: Frischklon-Repro bis Boot |
@@ -92,7 +92,7 @@ gilt nicht als Nachmessung.
 | [`docs/S4-DOCTOR-2026-10-17.md`](S4-DOCTOR-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S4: `doctor` als eigener Befehl |
 | [`docs/S5-RELEASE-2026-10-17.md`](S5-RELEASE-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S5 (teilweise): Schranke ohne Tag |
 | [`docs/S6-MODELLTURN-AUDIT-CI-2026-10-17.md`](S6-MODELLTURN-AUDIT-CI-2026-10-17.md) | current | 2026-10-17 | Release-Beleg S6: zwei benannte Blocker, kein Go |
-| [`docs/CHANGELOG.md`](CHANGELOG.md) | current | 2026-10-18 | die einzige Liste erledigter Arbeit: je Eintrag Datum, was, und wo der Beleg liegt |
+| [`docs/CHANGELOG.md`](CHANGELOG.md) | current | 2026-10-19 | die einzige Liste erledigter Arbeit: je Eintrag Datum, was, und wo der Beleg liegt |
 | [`IDEA.md`](../IDEA.md) | current | 2026-10-13 | Kurzidee; Roh-Export im Archiv |
 | [`docs/archive/README.md`](archive/README.md) | current | 2026-10-17 | der eine History-Ordner: Regel, Umleitungstabelle, Bestand |
 | [`shinon-forge-implementierungsplan.md`](../shinon-forge-implementierungsplan.md) | historical | 2026-10-07 | bleibt im Root, weil eingefrorene Proben und `scripts/gate/tests/prompter-contract.test.mjs` ihn wörtlich zitieren |

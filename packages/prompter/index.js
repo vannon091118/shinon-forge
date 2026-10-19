@@ -16,11 +16,13 @@ import { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferen
 import { UNDEFINED, expandPrompt, resolveIntent } from './assets/intent-resolver.js';
 import { addTurnDuration, decay, emptyMemory, feedback, feedbackOf, memorySummary, observe, semanticProfile, validateMemory, weightsFrom } from './assets/intent-memory.js';
 import { renderContext, renderSkillsBlock } from './assets/render-context.js';
-import { loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
+import { loadCapabilityMap, loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
 import { appendJsonLine, writeJsonFile } from './assets/learned-store.js';
 import { readTone, standFor, standTrace } from './assets/stand.js';
 import { buildEnhancerRequest, collectStream, enhanceGuarded, replacePrompt } from './assets/enhancer.js';
 import { SALVAGE_CONTRACT, SALVAGE_MEMO_ID, SALVAGE_NAMESPACE, emptySalvage, salvageCountOf, validateSalvage, withSalvageCount } from './assets/salvage-store.js';
+import { PROVENANCE_CONTRACT, provenanceLabel, provenanceRecord, provenanceSummary } from './assets/provenance.js';
+import { CAPABILITIES_CONTRACT, appendTaskBrief, briefRecord, matchCapability, renderTaskBrief, taskBrief } from './assets/capability-map.js';
 import { BLOCKS_CONTRACT, BLOCKS_PATH, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks, validateRegistry } from './assets/block-select.js';
 import { LEARNED_CONTRACT, PROPOSE_CONTRACT, PROPOSE_SERVICE, duplicateVsBlocks, mergeLearnedBlocks, validateBlockCore, validateLearnedFile, validateProposalShell } from './assets/block-review.js';
 
@@ -310,6 +312,13 @@ function indexContext(ctx, config, text, runtime) {
       runtime.indexSeen = true;
       console.log(`[shinon-prompter] MAX-Kontext aus dem Index (${INDEX_SERVICE}, Budget ${config.indexBudgetTokens} Token)`);
     }
+    // Dieselben Spurfelder wie beim Datei-Kontext: vorher nannte der Datensatz
+    // fuer den Index weder Dateien noch Zeichen (gemessen im Leitstand). Die
+    // Provenienz braucht die Pfade ohnehin — zwei Quellen fuer dieselbe Zahl
+    // waeren eine zweite Wahrheit.
+    runtime.lastBudgetTokens = config.indexBudgetTokens;
+    runtime.lastContextChars = (context.files ?? []).reduce((sum, file) => sum + (file?.content?.length ?? 0), 0);
+    runtime.lastContextFiles = (context.files ?? []).map((file) => file?.path);
     return withContext(context, 'index');
   } catch (error) {
     warnIndex(runtime, `${INDEX_SERVICE}: ${error?.message ?? error}`);
@@ -342,7 +351,94 @@ function maxContext(ctx, config, runtime, prompt) {
 }
 
 /**
- * Provenienz-Datensatz: was entschieden wurde, ohne den Prompt-Text zu kopieren.
+ * Die Einträge der Provenienz-Leiter fuer diesen Turn.
+ *
+ * Nur was WIRKLICH in den Prompt gereist ist, bekommt einen Eintrag. Deshalb
+ * haengt der Kontext an `record.context === 'used'` und nicht daran, ob eine
+ * Datei geladen wurde: MIN/MID laden den Kontext, nutzen ihn aber nicht. Ein
+ * Eintrag fuer ungenutzten Text waere eine Behauptung ueber den Prompt, die
+ * niemand nachpruefen kann.
+ *
+ * Die Zuordnung ist absichtlich grob und benannt:
+ *
+ *   Index-Treffer   DERIVED, Zeiger ist der Pfad (Stand: Indexlauf)
+ *   Datei-Kontext   FACT, Zeiger ist der Pfad (beim Mounten geladen)
+ *   Scoring-Ton     JUDGEMENT, Zeiger ist der Vertrag
+ *   Narrative       NARRATIVE, Zeiger ist der Vertrag
+ *   One-Shot       PROPOSAL, Zeiger ist der Ergebnisvertrag
+ *
+ * Der direkte Durchreicher (`NO_ENHANCEMENT_NEEDED`) ist KEIN Vorschlag: er
+ * gibt den Roh-Prompt zurueck. Ihn als PROPOSAL zu fuehren wuerde behaupten,
+ * das Modell habe etwas vorgeschlagen.
+ */
+function provenanceFor(record, context) {
+  const entries = [];
+  const source = record?.context_source;
+  if (record?.context === 'used' && (source === 'index' || source === 'file')) {
+    // Der Kontext kommt aus dem AUFGELOESTEN Angebot des Schritts, nicht aus
+    // `runtime.context`: das ist der beim Mounten geladene Datei-Kontext und
+    // beim Index leer. Genau diese Verwechslung liess den Index-Fall ohne
+    // Eintrag (gemessen im Trace-Test).
+    const files = Array.isArray(context?.files) ? context.files : [];
+    for (const file of files) {
+      if (typeof file?.path !== 'string') continue;
+      entries.push({
+        class: source === 'index' ? 'DERIVED' : 'FACT',
+        pointer: file.path,
+        source: source === 'index' ? INDEX_SERVICE : 'prompter.contextPath',
+      });
+    }
+  }
+  const stance = record?.stand?.stance;
+  if (typeof stance === 'string' && stance !== '') {
+    entries.push({ class: 'JUDGEMENT', pointer: SCORING_SERVICE_CONTRACT, source: SCORING_SERVICE });
+  }
+  if (record?.stand?.narrative !== null && record?.stand?.narrative !== undefined) {
+    entries.push({ class: 'NARRATIVE', pointer: NARRATIVE_CONTRACT, source: NARRATIVE_CHANNEL });
+  }
+  const reasons = Array.isArray(record?.reasons) ? record.reasons : [];
+  if (record?.outcome === 'accepted' && !reasons.includes('NO_ENHANCEMENT_NEEDED')) {
+    entries.push({ class: 'PROPOSAL', pointer: CONTRACT, source: 'one-shot' });
+  }
+  // Der Aufgabenbrief ist aus der Karte ABGELEITET: er sagt, wer zustaendig ist,
+  // nicht ob die Antwort stimmt. Genau deshalb DERIVED und nicht FACT — und der
+  // Zeiger ist der Vertrag, keine Datei.
+  if (record?.brief !== null && record?.brief !== undefined) {
+    entries.push({ class: 'DERIVED', pointer: CAPABILITIES_CONTRACT, source: 'prompter.capabilityMap' });
+  }
+  return provenanceRecord(entries);
+}
+
+/**
+ * Den Aufgabenbrief fuer diesen Turn bauen — oder den Grund, warum keiner reist.
+ *
+ * Gematcht wird gegen die KARTE, nicht gegen ein Modell: dieselbe Frage ergibt in
+ * jedem Lauf denselben Eigentuemer. Ein Gleichstand wird nicht alphabetisch
+ * entschieden (MEHRDEUTIG), und ein Brief ueber der Grenze wird verweigert statt
+ * gekuerzt — ein halber Brief waere eine halbe Zustaendigkeit.
+ */
+function briefFor(runtime, text) {
+  const read = runtime?.capabilityMap;
+  if (read === undefined || read === null || read.map === null) return { reason: read?.reason ?? 'KARTE_FEHLT' };
+  const match = matchCapability(text, read.map);
+  if (!match.ok) return { reason: match.reason };
+  const rendered = renderTaskBrief(
+    taskBrief(match.capability, { workspace: runtime?.workspace?.root ?? null }),
+    { maxChars: read.map.maxBriefChars },
+  );
+  if (!rendered.ok) return { reason: rendered.reason, chars: rendered.chars };
+  return { rendered, record: briefRecord(match.capability, rendered) };
+}
+
+/** Den Entscheidungsdatensatz um die Leiter ergaenzen (ein neuer Datensatz, keine Mutation). */
+function withProvenance(record, context) {
+  return { ...record, provenance_contract: PROVENANCE_CONTRACT, provenance: provenanceFor(record, context) };
+}
+
+/**
+ * Entscheidungsdatensatz: was entschieden wurde, ohne den Prompt-Text zu kopieren.
+ * (Die Provenienz-Leiter daneben ist etwas anderes: sie sagt, WELCHE ART Aussage
+ * im Prompt stand. Hier steht die Workspace-Herkunft des Schritts.)
  * Genau einer pro Schritt — auch im Randfall, damit die Spur nicht doppelt laeuft.
  *
  * `session_id` traegt die Zuordnung, nicht den Inhalt: der Task Router (§17) muss
@@ -732,7 +828,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     // MAX ohne Kontext gibt es nicht: Code-Referenzen und Touches waeren
     // erfunden. Also wird der Modus abgelehnt, nicht weichgespuelt.
     const outcome = { outcome: 'unavailable', reasons: [supply.reason], result: null };
-    report(ctx, config, runtime, { ...decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId), stand: null, blocks: decisionBlocks(blockSelection(ctx, config, runtime, contract, expandedText, null, null)) });
+    report(ctx, config, runtime, withProvenance({ ...decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId), stand: null, blocks: decisionBlocks(blockSelection(ctx, config, runtime, contract, expandedText, null, null)), brief: null, brief_reason: 'KEIN_LAUF' }, null));
     return next();
   }
 
@@ -802,8 +898,24 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   // der Rueckfall ist die Durchreiche, damit ein solcher Fall nie den Schritt
   // bricht — dieselbe Fail-Richtung wie im ganzen Paket.
   const effect = OUTCOME_EFFECTS[outcome.outcome] ?? OUTCOME_EFFECTS.rejected;
+  // Der Aufgabenbrief haengt am ERSETZTEN Prompt, nicht am Roh-Prompt: er sagt dem
+  // Main-Agenten, WER die Frage beantwortet und WO der Beleg liegt. Der direkte
+  // Kurzweg bleibt unberuehrt (sein Versprechen ist: keine Aenderung), und ohne
+  // gefundene Nachricht gibt es nichts anzuhaengen. Der Grund steht im Datensatz,
+  // nicht nur im Log — `brief_reason` nennt ihn.
+  const briefState = effect.replacePrompt && outcome.outcome === 'accepted' && !direct
+    ? briefFor(runtime, expandedText)
+    : { reason: direct ? 'DIREKT' : 'KEIN_ERSETZEN' };
+  // `outcome.result` ist bei jedem nicht angenommenen Ausgang `null` — und dann
+  // wird nichts ersetzt. Der Zugriff steht deshalb hinter derselben Bedingung
+  // wie der Ersatz selbst, nicht davor.
+  const replacement = effect.replacePrompt && typeof outcome.result?.enhancedPrompt === 'string'
+    ? (briefState.rendered === undefined
+      ? outcome.result.enhancedPrompt
+      : appendTaskBrief(outcome.result.enhancedPrompt, briefState.rendered))
+    : null;
   const messages = effect.replacePrompt
-    ? replacePrompt(decision?.messages, prompt.message, outcome.result.enhancedPrompt)
+    ? replacePrompt(decision?.messages, prompt.message, replacement)
     : null;
 
   // Ersetzen kann nur, wer die Nachricht findet. Hier wird aus einem ANGENOMMENEN
@@ -814,13 +926,16 @@ async function onPreStep(ctx, config, runtime, payload, next) {
   const recorded = effect.replacePrompt && messages === null
     ? { ...outcome, outcome: 'rejected', reasons: effect.missingMessage }
     : outcome;
+  const brief = briefState.record !== undefined
+    ? (messages !== null ? { record: briefState.record, reason: null } : { record: null, reason: 'NACHRICHT_FEHLT' })
+    : { record: null, reason: briefState.reason ?? 'KEIN_BRIEF' };
   // Die zweite Hälfte der Gesamtlaufzeit: die Dauer fällt erst nach dem Turn an
   // und hängt an demselben Pattern, das die Beobachtung verbucht hat.
   if (runtime.intentMemory !== null && runtime.turn?.intentMatch) {
     runtime.intentMemory = addTurnDuration(runtime.intentMemory, runtime.turn.intentMatch, Date.now() - turnStarted);
     persistIntentMemory(runtime, runtime.intentMemoryPath, runtime.intentMemory);
   }
-  report(ctx, config, runtime, { ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection) });
+  report(ctx, config, runtime, withProvenance({ ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection), brief: brief.record, brief_reason: brief.reason }, supply.context));
 
   // Nur ein gefundenes akzeptiertes Ergebnis ersetzt die Nutzernachricht. In
   // JEDEM anderen Fall geht die Entscheidung unveraendert weiter — der Roh-Prompt
@@ -845,7 +960,9 @@ function report(ctx, config, runtime, record) {
   const salvage = record.salvage === null || record.salvage === undefined
     ? ''
     : ` salvage=${record.salvage.reason} chars=${record.salvage.chars} n=${record.salvage.count}`;
-  console.log(`[shinon-prompter] Trace: ${record.outcome} intent=${record.intentClassification ?? 'UNDEFINED'} pattern=${pattern} bias=${bias} sem=${semantic} features=${features} raw=${JSON.stringify(record.raw_prompt ?? '')}${salvage}`);
+  const provenance = provenanceLabel(record.provenance);
+  const brief = record.brief?.id ?? record.brief_reason ?? '-';
+  console.log(`[shinon-prompter] Trace: ${record.outcome} intent=${record.intentClassification ?? 'UNDEFINED'} pattern=${pattern} bias=${bias} sem=${semantic} features=${features} brief=${brief}${provenance === '' ? '' : ` ${provenance}`} raw=${JSON.stringify(record.raw_prompt ?? '')}${salvage}`);
   // Der Puffer ist die Quelle des Panels: der Kanal allein erreicht den Browser
   // nicht (Host-Events ueberqueren den Carrier nicht), also legt der Host die
   // letzten Entscheidungen als Global in die naechste index.html.
@@ -856,6 +973,9 @@ function report(ctx, config, runtime, record) {
       mode: record.mode,
       reasons: record.reasons,
       context_source: record.context_source ?? null,
+      provenance: provenanceSummary(record.provenance),
+      brief: record.brief ?? null,
+      brief_reason: record.brief_reason ?? null,
       intent: record.intentClassification ?? 'UNDEFINED',
       intent_pattern: record.intentMatch ?? null,
       intent_bias: record.intentBias ?? null,
@@ -898,6 +1018,11 @@ function report(ctx, config, runtime, record) {
         mode: record.mode,
         reasons: record.reasons?.slice(0, 5) ?? [],
         context_source: record.context_source ?? null,
+        provenance: provenanceSummary(record.provenance),
+        // Dieselben zwei Felder wie im Puffer oben: zwei Spiegel mit
+        // verschiedenen Formen waeren zwei Wahrheiten ohne Drift-Test.
+        brief: record.brief ?? null,
+        brief_reason: record.brief_reason ?? null,
         salvage: record.salvage ?? null,
         at: record.session_id ? Date.now() : null,
       });
@@ -951,6 +1076,16 @@ export function apply(ctx, config) {
       console.error(`[shinon-prompter] Zettel-Regeln nicht verwendbar (${error?.message}) — es wird kein Zettel geladen`);
     }
   }
+
+  // Die Faehigkeitskarte wird EINMAL beim Mounten geladen: sie ist eine Landkarte,
+  // kein Live-Index. Ist sie defekt, bleibt der Aufgabenbrief weg und der Enhancer
+  // laeuft weiter — der Grund steht im Log, nicht in einem stillen Fallback.
+  const capabilityRead = loadCapabilityMap();
+  if (capabilityRead.map === null) {
+    console.warn(`[shinon-prompter] Faehigkeitskarte nicht verwendbar (${capabilityRead.reason}${capabilityRead.detail === undefined ? '' : `: ${capabilityRead.detail}`}) — kein Aufgabenbrief`);
+    for (const issue of capabilityRead.issues) console.warn(`[shinon-prompter] Faehigkeitskarte: ${issue}`);
+  }
+  const capabilityMap = capabilityRead;
 
   // Die Skill-Regeln werden ebenfalls EINMAL beim Mounten geladen. Ein fehlendes
   // .agents/skills/ ist KEIN Defekt: Skills gehören dem Projekt, nicht dem
@@ -1083,7 +1218,7 @@ export function apply(ctx, config) {
   if (typeof config.probeJournalPath === 'string' && config.probeJournalPath !== '') {
     probeJournalPath = isAbsolute(config.probeJournalPath) ? config.probeJournalPath : join(workspace.root, config.probeJournalPath);
   }
-  const runtime = { context, contextState, noteRules, skillRules, intentRules, intentMemory, intentMemoryPath, probeJournalPath, journalWarned: false, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, salvageCounts: new Map(), salvageNamespace: typeof config.salvageNamespace === 'string' ? config.salvageNamespace : SALVAGE_NAMESPACE, salvageState: null, salvageLoaded: false, salvagePersist: true, salvageWarned: false };
+  const runtime = { context, contextState, noteRules, skillRules, capabilityMap, intentRules, intentMemory, intentMemoryPath, probeJournalPath, journalWarned: false, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, salvageCounts: new Map(), salvageNamespace: typeof config.salvageNamespace === 'string' ? config.salvageNamespace : SALVAGE_NAMESPACE, salvageState: null, salvageLoaded: false, salvagePersist: true, salvageWarned: false };
   // Die Ablage kommt ueber dieselbe optionale Naht wie der Kontext: `ctx.get`,
   // kein `inject` — ein Profil ohne Project Index montiert den Prompter weiter.
   // Ein ERFOLGREICH gefundener Dienst wird gemerkt; ein fehlender nicht, denn
@@ -1190,7 +1325,7 @@ export function apply(ctx, config) {
 }
 
 // ── Oeffentliche Aussenflaeche (unveraendert) ───────────────────────────────
-export { CONTEXT_CONTRACT, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE };
+export { CAPABILITIES_CONTRACT, CONTEXT_CONTRACT, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, PROVENANCE_CONTRACT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE };
 export { ContextSchema, ResultSchema };
 export { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferences };
 export { renderContext, renderSkillsBlock };

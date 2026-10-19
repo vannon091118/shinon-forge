@@ -1,0 +1,74 @@
+{
+  "name": "@shinon/prompter — Provenienz-Leiter (fünf Klassen, Zeigerpflicht, keine Beförderung)",
+  "status": "IMPLEMENTED",
+  "note": "Der Runtime-Kern steht in packages/prompter/assets/provenance.js (importfrei), die Spur in packages/prompter/index.js (Entscheidungsdatensatz + kompakte Fensterspur). Geprüft von packages/prompter/test/provenance.test.mjs (Vokabular, Zeiger, alle 25 Paare ohne Beförderung, Determinismus) und packages/prompter/test/provenance-trace.test.mjs (echter agent/pre-step mit Fake-LLM: Datensatz auf dem Kanal, Zensus im Fenster, kein Prompt-Text im Block). Die Form prüft das Gate `contracts`.",
+  "classes": [
+    {
+      "id": "FACT",
+      "meaning": "eine Aussage aus einer gelesenen Quelle, die als Ganzes vorliegt (Datei, Kommando, Test); der Zeiger nennt sie",
+      "examples": ["Datei aus contextPath", "gelesene Datei mit Pfad und Zeile"]
+    },
+    {
+      "id": "DERIVED",
+      "meaning": "abgeleitetes Wissen aus dem Index; kann veralten, ist nie Autorität",
+      "examples": ["Treffer aus shinon_index_query"]
+    },
+    {
+      "id": "JUDGEMENT",
+      "meaning": "eine Haltung oder ein Urteil, das aus Signalen gerechnet wurde",
+      "examples": ["Ton und Stance aus shinon_scoring_state"]
+    },
+    {
+      "id": "NARRATIVE",
+      "meaning": "Kohärenz und Story; ausdrücklich kein Beleg",
+      "examples": ["Composite der Narrative Engine"]
+    },
+    {
+      "id": "PROPOSAL",
+      "meaning": "ein Vorschlag des One-Shots; ablehnbar, nicht bindend",
+      "examples": ["angenommene Veredelung aus shinon.prompter/result-v1"]
+    }
+  ],
+  "pointer_forms": [
+    "relativer Dateipfad, optional :Zeile (1-basiert), z. B. packages/prompter/index.js:479",
+    "Vertrags-ID shinon.<name>/<version>, z. B. shinon.scoring-state/read-v1"
+  ],
+  "rules": [
+    {
+      "positive": "Jeder Eintrag der Spur trägt genau eine der fünf Klassen FACT, DERIVED, JUDGEMENT, NARRATIVE, PROPOSAL; die Klasse steht als Zeichenkette im Datensatz und wird nicht aus dem Modell übernommen. FACT heißt: die Quelle liegt als Ganzes vor (auch wenn sie beim Mounten gelesen wurde).",
+      "forbidden": "Eine sechste Klasse, ein Alias (etwa FAKT oder FACTUAL), eine leere Klasse oder eine Klasse, die aus einer Modellantwort stammt.",
+      "fallback": "Eine unbekannte Klasse wird nicht übernommen; der Eintrag steht als Verletzung mit Grund KLASSE_UNBEKANNT in der Spur, und der Turn läuft weiter.",
+      "error": "KLASSE_UNBEKANNT (steht als Grund in provenance.violations)",
+      "trace": "provenance.classes zählt alle fünf Klassen (auch die mit 0); provenance.violations nennt Klasse und Grund, nie den Prompt-Text.",
+      "replay": "provenanceRecord ist rein: gleiche Einträge ergeben denselben Datensatz; der Test fährt alle fünf Klassen und den unbekannten Fall.",
+      "invariant": "Object.keys(classes) ist exakt die Fünfmenge; jede Zahl ist eine nicht-negative Ganzzahl."
+    },
+    {
+      "positive": "Jeder Eintrag trägt einen Zeiger: einen relativen Dateipfad mit optionaler Zeile oder eine Vertrags-ID shinon.<name>/<version>.",
+      "forbidden": "Ein absoluter Pfad, ein Pfad mit .., ein leerer Zeiger, Zeile 0, ein Windows-Laufwerk, ein Backslash-Trenner oder ein Zeiger auf den Prompt-Text.",
+      "fallback": "Ein ungültiger Zeiger wird nicht übernommen; der Eintrag steht als Verletzung mit Grund in provenance.violations, complete wird false, der Prompt bleibt unverändert.",
+      "error": "ZEIGER_* (ZEIGER_LEER, ZEIGER_ABSOLUT, ZEIGER_AUSBRUCH, ZEIGER_FORM, ZEIGER_ZEILE, ZEIGER_FREMD; der Grund steht in provenance.violations)",
+      "trace": "provenance.violations trägt {class, pointer, reason}; provenance.complete nennt die Lücke; provenance.duplicates zählt Wiederholungen. Der Datensatz enthält keinen Dateiinhalt.",
+      "replay": "parsePointer ist eine reine Stringprüfung ohne Dateisystem: derselbe Zeiger ergibt dasselbe Ergebnis, auch wenn die Datei fehlt.",
+      "invariant": "Kein akzeptierter Eintrag ohne Zeiger; entries + violations + omitted + duplicates ergibt die Zahl der übergebenen Einträge."
+    },
+    {
+      "positive": "Die Klasse eines Eintrags bleibt für den Turn unverändert. Eine ehrlichere Aussage entsteht nur durch eine neue Quelle und damit durch einen neuen Eintrag.",
+      "forbidden": "DERIVED zu FACT, JUDGEMENT zu FACT, NARRATIVE zu FACT, PROPOSAL zu FACT; jede Rangfolge, die als Aufstieg gelesen werden kann, und jedes Umschreiben einer bestehenden Klasse.",
+      "fallback": "canPromote(from, to) ist nur für from === to wahr; jeder andere Übergang bleibt falsch, und es gibt kein rank-Feld, das ihn ermöglichen würde.",
+      "error": "PROVENANCE_PROMOTION_FORBIDDEN",
+      "trace": "Der Datensatz führt Klassen als Kategorien; die Reihenfolge in PROVENANCE_CLASSES ist Deklaration, nicht Wertung.",
+      "replay": "Der Test fährt alle 25 Klassenpaare und erwartet genau fünf wahre (Identität) und zwanzig falsche.",
+      "invariant": "Kein Codepfad schreibt die Klasse eines bestehenden Eintrags um; ein neuer Beleg ist ein neuer Eintrag."
+    },
+    {
+      "positive": "Der Entscheidungsdatensatz trägt provenance_contract und provenance; die kompakte Fensterspur trägt den Zensus.",
+      "forbidden": "Prompt-Text, Dateiinhalt oder Schlüsselwerte im Provenienz-Block; ein Trace mit eingehängtem Kontext, aber ohne Provenienz.",
+      "fallback": "Ist die Spur abgeschaltet (trace: false), bleibt die Entscheidung unberührt; der Datensatz wird nicht emittiert und die Provenienz nicht berechnet.",
+      "error": "PROVENANCE_TRACE_MISSING",
+      "trace": "DECISION_CHANNEL trägt den vollen Datensatz; runtime.trace und window.__shinonPrompterTrace tragen provenanceSummary.",
+      "replay": "Der Trace-Test fährt einen echten agent/pre-step mit Fake-LLM und prüft den Datensatz auf dem Kanal und den Zensus im Fenster.",
+      "invariant": "Jede Datei im verwendeten Kontext hat genau einen Eintrag; keine Zeichenkette im Block ist länger als ein Pfad oder eine Vertrags-ID."
+    }
+  ]
+}
