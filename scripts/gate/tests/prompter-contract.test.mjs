@@ -869,6 +869,57 @@ test('SALVAGED_PROSE: ein Fuellwort vor der Vorrede laesst nicht die ganze Antwo
 });
 
 /**
+ * „Zu oft" muss messbar sein, nicht fuehlbar: der Datensatz traegt Grund,
+ * Zeichenzahl und den wievielten SALVAGED_PROSE-Fall DIESER Sitzung — und die
+ * Trace-Zeile nennt dieselben drei Werte. Der Zaehler ist pro Prozess; ein
+ * Neustart beginnt fuer die Sitzung wieder bei 1 (kein persistenter Zaehler).
+ */
+test('SALVAGED_PROSE: Grund, Zeichenzahl und Fallzahl stehen im Datensatz und im Trace — je Sitzung', async () => {
+  const refined = 'Baue die Module und teste sie danach.';
+  const answer = `Klar, gerne. Hier ist der verbesserte Prompt: ${refined}`;
+  const { ctx, records, dispose } = connect({ ...route }, { llm: fakeLlm(answer) });
+
+  const logs = [];
+  const real = console.log;
+  console.log = (...args) => logs.push(args.join(' '));
+  try {
+    for (let i = 0; i < 2; i += 1) {
+      const claimed = [userMessage('baue module und teste sie danach')];
+      await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+    }
+  } finally {
+    console.log = real;
+  }
+
+  assert.equal(records.length, 2);
+  assert.deepEqual(records[0].salvage, {
+    reason: 'NO_JSON',
+    chars: refined.length,
+    answer_chars: answer.length,
+    count: 1,
+  });
+  assert.equal(records[1].salvage.count, 2, 'zwei Faelle derselben Sitzung werden gezaehlt');
+  assert.equal(records[1].salvage.chars, refined.length, 'die Zeichenzahl meint den uebernommenen Text');
+  const trace = logs.filter((line) => line.includes('Trace:'));
+  assert.ok(
+    trace.some((line) => line.includes(`salvage=NO_JSON chars=${refined.length} n=2`)),
+    `Trace nennt Grund, Zeichenzahl und Fallzahl: ${trace.at(-1) ?? '(keine Trace-Zeile)'}`,
+  );
+  dispose();
+
+  // Eine andere Sitzung beginnt fuer sich bei 1 — der Zaehler ist kein Globus.
+  const other = connect({ ...route }, { llm: fakeLlm(answer) });
+  const claimed = [userMessage('baue module und teste sie danach')];
+  await other.ctx.waterfall(
+    bundle.PRE_STEP_EVENT,
+    { ...stepPayload(claimed), agent: { session: { id: 'sess-2' } } },
+    loopDefault(claimed),
+  );
+  assert.equal(other.records[0].salvage.count, 1, 'Sitzungen zaehlen getrennt');
+  other.dispose();
+});
+
+/**
  * Der gemessene Leak (2026-10-19): das Modell antwortet mit einem JSON im Zaun,
  * die Antwort ist abgeschnitten — `parseResult` scheitert an INVALID_JSON, der
  * Zaun wurde aber als Prosa gerettet, und der Nutzer sah ein halbes Objekt

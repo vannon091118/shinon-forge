@@ -201,6 +201,26 @@ test('Salvage: ein Fuellwort vor der Vorrede bleibt nicht im Prompt', () => {
   assert.equal(salvageProse(refined, raw), refined, 'ein sauberer Vorschlag bleibt unangetastet');
 });
 
+test('Salvage-Datensatz: Grund und Zeichenzahl reisen mit dem Ergebnis', async () => {
+  // Ohne diese Felder ist im Trace nur „accepted" zu sehen: ein geretteter
+  // Prosafall sieht wie eine normale Veredelung aus, und „zu oft" bleibt eine
+  // Vermutung. Die Zahl der Zeichen meint den uebernommenen Text, die zweite
+  // die ganze Antwort — die Differenz ist der weggeschnittene Chatter.
+  const refined = 'Fixe den Test, ohne die Assertions zu schwächen.';
+  const answer = `Klar, gerne. Hier ist der verbesserte Prompt: ${refined}`;
+  const fake = fakeLlm(() => chunks([{ type: 'text-delta', text: answer }, { type: 'finish', reason: 'stop' }]));
+
+  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined);
+
+  assert.equal(outcome.outcome, 'accepted');
+  assert.deepEqual(outcome.reasons, ['SALVAGED_PROSE']);
+  assert.deepEqual(outcome.salvage, {
+    reason: 'NO_JSON',
+    chars: refined.length,
+    answerChars: answer.length,
+  });
+});
+
 test('kein Key-Router im Enhancer-Pfad: der Aufruf geht an ctx.llm.stream', () => {
   const source = readFileSync(fileURLToPath(new URL('../assets/enhancer.js', import.meta.url)), 'utf8');
   assert.match(source, /ctx\.llm\.stream\(request\)/, 'der One-Shot ruft den LLM-Dienst');

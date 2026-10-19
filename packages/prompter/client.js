@@ -34,6 +34,16 @@ window.__ModuleLoader__.load({
       intent: record?.intent ?? 'UNDEFINED',
       reasons: Array.isArray(record?.reasons) ? record.reasons.slice(0, 5) : [],
       context_source: record?.context_source ?? null,
+      // Prosa-Rettung sichtbar machen: Grund, Zeichenzahl und der wievielte
+      // Fall dieser Sitzung — sonst sieht ein geretteter Prosafall wie eine
+      // normale Veredelung aus, und „zu oft" bleibt eine Vermutung.
+      salvage: record?.salvage && typeof record.salvage === 'object'
+        ? {
+            reason: typeof record.salvage.reason === 'string' ? record.salvage.reason : '?',
+            chars: Number.isInteger(record.salvage.chars) ? record.salvage.chars : 0,
+            count: Number.isInteger(record.salvage.count) ? record.salvage.count : 0,
+          }
+        : null,
       raw_prompt: typeof record?.raw_prompt === 'string' ? record.raw_prompt : null,
       at: typeof record?.at === 'number' ? record.at : null,
     });
@@ -152,6 +162,9 @@ window.__ModuleLoader__.load({
             h('span', null, `ctx=${entry.context_source ?? 'none'}`)),
           entry.reasons?.length > 0
             ? h('div', { className: '__pt_reason' }, entry.reasons.join(', '))
+            : null,
+          entry.salvage
+            ? h('div', { className: '__pt_reason' }, `Prosa: ${entry.salvage.reason} · ${entry.salvage.chars} Zeichen · ${entry.salvage.count}. Fall dieser Sitzung`)
             : null,
           entry.raw_prompt
             ? h('div', { className: '__pt_raw', title: entry.raw_prompt }, entry.raw_prompt)

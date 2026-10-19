@@ -310,6 +310,9 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
       return {
         outcome: 'accepted',
         reasons: ['SALVAGED_PROSE'],
+        // Die Messung reist mit: warum gerettet (NO_JSON/INVALID_JSON), wie
+        // viele Zeichen uebernommen wurden und wie lang die ganze Antwort war.
+        salvage: { reason: parsed.reasons.join('+'), chars: salvaged.length, answerChars: text.length },
         result: { enhancedPrompt: salvaged, preservedIntent: true, addedRequirements: [], removedRequirements: [], uncertainties: [], references: [] },
       };
     }

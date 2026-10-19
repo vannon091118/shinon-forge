@@ -267,8 +267,34 @@ function maxContext(ctx, config, runtime, prompt) {
  * Ohne dieses Feld waere die Zuordnung ein Raten nach Reihenfolge.
  * → Kanon: docs/COMMENT-KANON.md#k-7bf397ab7eeb
  */
+/**
+ * Einen SALVAGED_PROSE-Fall zaehlen — je Sitzung, im Prozess.
+ *
+ * Der Zaehler ist die Messung fuer „zu oft": Grund, Zeichenzahl und der
+ * wievielte Fall reisen mit dem Datensatz. Nach einem Host-Neustart beginnt
+ * die Sitzung wieder bei 1; persistiert wird die Zahl absichtlich nicht —
+ * sie beschreibt den Lauf, nicht den Workspace.
+ */
+function countSalvage(runtime, sessionId, salvage) {
+  const key = typeof sessionId === 'string' && sessionId !== '' ? sessionId : '(ohne sitzung)';
+  const counts = runtime?.salvageCounts instanceof Map ? runtime.salvageCounts : null;
+  const count = counts === null ? 1 : (counts.get(key) ?? 0) + 1;
+  if (counts !== null) counts.set(key, count);
+  return {
+    reason: typeof salvage?.reason === 'string' && salvage.reason !== '' ? salvage.reason : 'NO_JSON',
+    chars: Number.isInteger(salvage?.chars) ? salvage.chars : 0,
+    answer_chars: Number.isInteger(salvage?.answerChars) ? salvage.answerChars : 0,
+    count,
+  };
+}
+
 function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contextSource = 'none', contextUsed = false) {
   const result = outcome.result;
+  // Nur ein ANGENOMMENER Prosafall zaehlt: ein zurueckgenommener Treffer
+  // (missingMessage) ist keine Veredelung und darf „zu oft" nicht aufblaehen.
+  const salvage = outcome.outcome === 'accepted' && outcome.salvage !== null && typeof outcome.salvage === 'object'
+    ? countSalvage(runtime, sessionId, outcome.salvage)
+    : null;
   const turn = runtime?.turn ?? null;
   // S1-Provenienz: Workspace-Identität, Quelle, Pfade, Budget, Gründe. Der
   // ROHE Nutzertext steht als `raw_prompt` ausdruecklich dabei — er ist die
@@ -310,6 +336,8 @@ function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contex
     intentMemory: runtime?.intentMemory === null || runtime?.intentMemory === undefined
       ? null
       : memorySummary(runtime.intentMemory),
+    // Prosa-Rettung: Grund, Zeichenzahl, Fallzahl — null, wenn keine Rettung.
+    salvage,
   };
 }
 
@@ -623,7 +651,10 @@ function report(ctx, config, runtime, record) {
     ? record.intentFeatures.join('+')
     : '-';
   const semantic = record.intentSemantic === null || record.intentSemantic === undefined ? '-' : record.intentSemantic;
-  console.log(`[shinon-prompter] Trace: ${record.outcome} intent=${record.intentClassification ?? 'UNDEFINED'} pattern=${pattern} bias=${bias} sem=${semantic} features=${features} raw=${JSON.stringify(record.raw_prompt ?? '')}`);
+  const salvage = record.salvage === null || record.salvage === undefined
+    ? ''
+    : ` salvage=${record.salvage.reason} chars=${record.salvage.chars} n=${record.salvage.count}`;
+  console.log(`[shinon-prompter] Trace: ${record.outcome} intent=${record.intentClassification ?? 'UNDEFINED'} pattern=${pattern} bias=${bias} sem=${semantic} features=${features} raw=${JSON.stringify(record.raw_prompt ?? '')}${salvage}`);
   // Der Puffer ist die Quelle des Panels: der Kanal allein erreicht den Browser
   // nicht (Host-Events ueberqueren den Carrier nicht), also legt der Host die
   // letzten Entscheidungen als Global in die naechste index.html.
@@ -640,6 +671,7 @@ function report(ctx, config, runtime, record) {
       intent_semantic: record.intentSemantic ?? 0,
       intent_features: record.intentFeatures ?? [],
       raw_prompt: record.raw_prompt ?? null,
+      salvage: record.salvage ?? null,
       at: Date.now(),
     });
     trace.length = Math.min(trace.length, 20);
@@ -675,6 +707,7 @@ function report(ctx, config, runtime, record) {
         mode: record.mode,
         reasons: record.reasons?.slice(0, 5) ?? [],
         context_source: record.context_source ?? null,
+        salvage: record.salvage ?? null,
         at: record.session_id ? Date.now() : null,
       });
       w.__shinonPrompterTrace = list.slice(0, 20);
@@ -853,7 +886,7 @@ export function apply(ctx, config) {
     }
   }
 
-  const runtime = { context, contextState, noteRules, skillRules, intentRules, intentMemory, intentMemoryPath, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null };
+  const runtime = { context, contextState, noteRules, skillRules, intentRules, intentMemory, intentMemoryPath, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, salvageCounts: new Map() };
   if (intentMemory !== null) {
     const summary = memorySummary(intentMemory);
     console.log(`[shinon-prompter] Intent-Gedächtnis: ${summary.runs} Läufe, ${summary.matched} Treffer, ${summary.patterns} Patterns, ${summary.unmatched} ohne Treffer, Lexikon ${summary.terms} Begriffe (${summary.classifiedTerms} eingeordnet), ${summary.unclaimed} unbeansprucht`);
