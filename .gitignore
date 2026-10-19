@@ -7,6 +7,10 @@ sessions/
 storages/
 .anonymous-user-id
 
+# Repo-lokales DSH-Home (falls ein Lauf DSH_HOME in den Baum legt):
+# Symlinks auf profiles/sessions/logs — Zustand, kein Inhalt.
+dev-dsh-home/
+
 # .shinon/ — der repo-lokale Inhaltsordner (Lebenszyklus: docs/ARCHITECTURE.md §5).
 # Hier liegt nur noch INHALT: `.shinon/project-context.md` (Persona),
 # `.shinon/blocks.learned.json` (gelernte Bausteine). Der Laufzeit-Index des
