@@ -844,6 +844,31 @@ test('SALVAGED_PROSE: Zaun und Vorrede fallen weg, kaputtes JSON wird kein Promp
 });
 
 /**
+ * Der gemessene Leak (2026-10-19): das Modell leitet seine Prosa mit einem
+ * Fuellwort ein ("Klar, gerne. Hier ist der verbesserte Prompt: …"). Der
+ * Vorrede-Schnitt greift, das Fuellwort davor bleibt — und damit passiert die
+ * GESAMTE Antwort als Veredelung, obwohl nur der Satz danach der Prompt ist.
+ * Gepinnt wird der gerenderte Prompt, nicht die Absicht: das Fuellwort darf in
+ * `decision.messages` nicht mehr auftauchen.
+ */
+test('SALVAGED_PROSE: ein Fuellwort vor der Vorrede laesst nicht die ganze Antwort durch', async () => {
+  const refined = 'Baue die Module und teste sie danach.';
+  for (const answer of [
+    `Klar, gerne. Hier ist der verbesserte Prompt: ${refined}`,
+    `Also, hier ist der verbesserte Prompt: ${refined}`,
+  ]) {
+    const { ctx, records, dispose } = connect({ ...route }, { llm: fakeLlm(answer) });
+    const claimed = [userMessage('baue module und teste sie danach')];
+    const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+    assert.equal(records[0].outcome, 'accepted');
+    assert.deepEqual(records[0].reasons, ['SALVAGED_PROSE']);
+    assert.equal(decision.messages[0].content[0].text, refined, `Fuellwort/Vorrede bleibt: ${answer.slice(0, 20)}`);
+    assert.notEqual(decision.messages[0].content[0].text, answer, 'die ganze Antwort ist kein Prompt');
+    dispose();
+  }
+});
+
+/**
  * Der gemessene Leak (2026-10-19): das Modell antwortet mit einem JSON im Zaun,
  * die Antwort ist abgeschnitten — `parseResult` scheitert an INVALID_JSON, der
  * Zaun wurde aber als Prosa gerettet, und der Nutzer sah ein halbes Objekt

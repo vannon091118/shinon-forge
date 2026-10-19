@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { OUTCOME_EFFECTS } from '../index.js';
 import { resolveMode } from '../assets/mode-core.js';
 // Die Mechanik direkt aus dem Kern: `index.js` re-exportiert die Guards nicht.
-import { buildEnhancerRequest, enhanceGuarded, replacePrompt } from '../assets/enhancer.js';
+import { buildEnhancerRequest, enhanceGuarded, replacePrompt, salvageProse } from '../assets/enhancer.js';
 
 const MIN = resolveMode('MIN');
 const PROMPT = 'fixe den test, bitte ohne die assertions zu schwächen';
@@ -179,6 +179,26 @@ test('accepted ersetzt nur Textblöcke; der Fallback ersetzt gar nichts', () => 
   for (const outcome of ['rejected', 'unavailable']) {
     assert.equal(OUTCOME_EFFECTS[outcome].replacePrompt, false, `${outcome} darf nichts ersetzen`);
   }
+});
+
+test('Salvage: ein Fuellwort vor der Vorrede bleibt nicht im Prompt', () => {
+  // Der gemessene Fall: "Klar, gerne. Hier ist der verbesserte Prompt: …" — der
+  // Vorrede-Schnitt griff, das Fuellwort davor blieb stehen und die ANTWORT
+  // wanderte als Ganzes in den Prompt. Das Fuellwort ist Bedienprosa, kein
+  // Auftrag: es darf den Text nicht anfuehren.
+  const raw = 'baue module und teste sie danach';
+  const refined = 'Baue die Module und teste sie danach.';
+  const cases = [
+    `Klar, gerne. Hier ist der verbesserte Prompt: ${refined}`,
+    `Also, hier ist der verbesserte Prompt: ${refined}`,
+    `Okay. Here is the improved prompt: ${refined}`,
+    `Natürlich! Verbesserter Prompt: ${refined}`,
+  ];
+  for (const answer of cases) {
+    assert.equal(salvageProse(answer, raw), refined, `Fuellwort bleibt stehen: ${answer.slice(0, 24)}`);
+  }
+  // Gegenprobe: ohne Vorrede wird nichts abgeschnitten.
+  assert.equal(salvageProse(refined, raw), refined, 'ein sauberer Vorschlag bleibt unangetastet');
 });
 
 test('kein Key-Router im Enhancer-Pfad: der Aufruf geht an ctx.llm.stream', () => {

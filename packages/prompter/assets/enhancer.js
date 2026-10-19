@@ -195,7 +195,15 @@ export function renderStreamEnd(finish, usage, request, elapsedMs) {
  * Antwort aussieht (Zaun, Vorrede, Anfuehrungszeichen), wird entfernt; ist der
  * Rest leer oder identisch mit dem Original, bleibt es beim Verwerfen.
  */
-const PROSE_PREAMBLE = /(?:sure|okay|ok|gerne|hier ist|here is|the improved prompt|verbesserter prompt|verbesserte fassung)[^\n]{0,80}:\s*/i;
+/** Bedienprosa vor der Vorrede ("Klar, gerne.") — nie Teil des Prompts. */
+const PROSE_FILLER = '(?:sure|okay|ok|klar|gerne|gern|natürlich|natuerlich|sicher|also|nun|gut|well|alright|all right|of course|certainly)';
+/** Die Vorrede, optional von bis zu vier Fuellwoertern angefuehrt, nur am Anfang. */
+const PROSE_PREAMBLE = new RegExp(
+  '^(?:' + PROSE_FILLER + '[^\\p{L}\\p{N}]*){0,4}'
+    + '(?:sure|okay|ok|gerne|gern|hier ist|hier sind|here is|the improved prompt|verbesserter prompt|verbesserte fassung)'
+    + '[^\\n]{0,80}:\\s*',
+  'iu',
+);
 
 export function salvageProse(text, rawPrompt = '') {
   if (typeof text !== 'string') return null;
