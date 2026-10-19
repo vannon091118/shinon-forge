@@ -15,6 +15,12 @@ import { MEMORY_CONTRACT, acceptedCommitments, decideProposal, decayMemory, empt
  */
 export const UI_STATE_GLOBAL = '__shinonPersonaState';
 export const UI_STATE_ROUTE = '/shinon/persona/state';
+/** Die Pruef-Naht als HTTP-Flaeche: GET zeigt, POST entscheidet. */
+export const REVIEW_ROUTE = '/shinon/persona/review';
+/** Der Startstand fuer das Panel — der Host legt ihn in die Seite, wie den Zustand. */
+export const REVIEW_GLOBAL = '__shinonPersonaReview';
+/** Deckel fuer den Entscheidungs-Body: zwei Felder, nie ein Dokument. */
+const REVIEW_BODY_LIMIT = 8192;
 export const UI_STATE_CONTRACT = 'shinon.persona-ui/v1';
 
 /** Kanal des Veredlers — Literal, weil `@shinon/prompter` nicht importierbar ist. */
@@ -892,12 +898,20 @@ export function apply(ctx, config) {
     };
   };
 
-  /** Die offenen Panels bekommen jede Aenderung sofort — sonst nur beim Laden. */
+  /*
+   * Die offenen Panels bekommen jede Aenderung sofort — sonst nur beim Laden.
+   * Der Pruef-Stand reist als EIGENES Ereignis (`review`): das Zustands-Panel
+   * liest weiter das unbenannte `data`, das Pruef-Panel haengt an `review` und
+   * braucht keinen Abruf-Timer. Beide Ereignisse tragen JSON, nie Prompt-Text.
+   */
+  const reviewEvent = () => `event: review\ndata: ${JSON.stringify(reviewService.review())}\n\n`;
   const publishUi = () => {
     const payload = `data: ${JSON.stringify(uiSnapshot())}\n\n`;
+    const review = reviewEvent();
     for (const response of uiClients) {
       try {
         response.write(payload);
+        response.write(review);
       } catch {
         uiClients.delete(response);
       }
@@ -1338,26 +1352,80 @@ export function apply(ctx, config) {
   // die SSE-Route jede Aenderung nach.
   const uiInjectDisposer = typeof ctx?.on === 'function'
     ? ctx.on(INDEX_INJECT, (table) => {
-        if (Array.isArray(table)) table.push({ kind: 'global', name: UI_STATE_GLOBAL, value: uiSnapshot() });
+        if (!Array.isArray(table)) return;
+        table.push({ kind: 'global', name: UI_STATE_GLOBAL, value: uiSnapshot() });
+        // Das Panel soll beim Laden schon die offenen Vorschlaege zeigen; ohne
+        // diesen Startstand waere es bis zum ersten Abruf leer.
+        table.push({ kind: 'global', name: REVIEW_GLOBAL, value: reviewService.review() });
       })
     : () => {};
-  let disposeUiRoute = null;
+  const routeDisposers = [];
+  /** Einen JSON-Body lesen — gedeckelt, fail-closed, ohne den Request zu haengen. */
+  const readJsonBody = (req) => new Promise((resolve) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > REVIEW_BODY_LIMIT) { resolve({ ok: false, error: 'BODY_TOO_LARGE' }); return; }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      try {
+        resolve({ ok: true, value: JSON.parse(Buffer.concat(chunks).toString('utf8')) });
+      } catch {
+        resolve({ ok: false, error: 'INVALID_JSON' });
+      }
+    });
+    req.on('error', () => resolve({ ok: false, error: 'BODY_UNREADABLE' }));
+  });
+
   const mountUiRoute = (webCtx) => {
     const webServer = typeof webCtx?.get === 'function' ? webCtx.get('webServer') : undefined;
     if (typeof webServer?.register !== 'function') return;
-    disposeUiRoute = webServer.register({
+    routeDisposers.push(webServer.register({
       kind: 'exact',
       path: UI_STATE_ROUTE,
       handler: (req, res) => {
         if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
         res.write(`data: ${JSON.stringify(uiSnapshot())}\n\n`);
+        // Der Startstand des Pruef-Panels kommt auf derselben Verbindung — ein
+        // zweiter Kanal waere ein zweites Fenster auf denselben Zustand.
+        res.write(reviewEvent());
         uiClients.add(res);
         req.on('close', () => uiClients.delete(res));
       },
+    }));
+    // Jede Entscheidung ist ein ausdruecklicher Akt: GET zeigt die Belege,
+    // POST nimmt genau eine `accepted`/`rejected`-Entscheidung entgegen.
+    routeDisposers.push(webServer.register({
+      kind: 'exact',
+      path: REVIEW_ROUTE,
+      handler: async (req, res) => {
+        const json = (status, value) => {
+          res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+          res.end(JSON.stringify(value));
+        };
+        if (req.method === 'GET') { json(200, reviewService.review()); return; }
+        if (req.method !== 'POST') { json(405, { ok: false, error: 'METHOD_NOT_ALLOWED' }); return; }
+        const body = await readJsonBody(req);
+        if (!body.ok) { json(400, { ok: false, error: body.error }); return; }
+        const id = typeof body.value?.id === 'string' ? body.value.id : '';
+        const decision = body.value?.decision;
+        if (id === '' || (decision !== 'accepted' && decision !== 'rejected')) {
+          json(400, { ok: false, error: 'INVALID_REQUEST' });
+          return;
+        }
+        const result = reviewService.decide(id, decision);
+        json(result.ok ? 200 : 409, result);
+      },
+    }));
+    // Die Routen haengen am Fiber, nicht am Prozess.
+    webCtx.effect?.(() => () => {
+      for (const dispose of routeDisposers.splice(0)) {
+        try { dispose?.(); } catch { /* schon weg */ }
+      }
     });
-    // Die Route haengt am Fiber, nicht am Prozess.
-    webCtx.effect?.(() => () => { try { disposeUiRoute?.(); } catch { /* schon weg */ } });
   };
   if (typeof ctx.inject === 'function') ctx.inject(['webServer'], mountUiRoute);
   else mountUiRoute(ctx);

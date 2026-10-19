@@ -566,6 +566,23 @@ export const SOURCE_TWINS = [
     ],
   },
   {
+    // Die Pruef-Naht zeigt in BEIDE Richtungen: der Host legt den Startstand ins
+    // Fenster und oeffnet die Route, das Panel liest beides. Ein falscher Name
+    // hiesse nur, dass das Panel leer aussieht — wie „nichts zu entscheiden“.
+    rule: 'Naht Persona-Pruefung (Panel <-> Host)',
+    kind: 'literals',
+    owner: 'packages/persona/index.js',
+    mirror: 'packages/persona/client.js',
+    values: [
+      { export: 'REVIEW_ROUTE', literal: 'string' },
+      { export: 'REVIEW_GLOBAL', literal: 'string' },
+      { export: 'REVIEW_CONTRACT', literal: 'string' },
+      // Das Panel haengt an der BESTEHENDEN Zustands-Route (SSE), nicht an einem
+      // zweiten Kanal: derselbe Name, derselbe Strom.
+      { export: 'UI_STATE_ROUTE', literal: 'string' },
+    ],
+  },
+  {
     rule: 'Naht-Namen Client -> Host',
     kind: 'literals',
     owner: 'packages/codingmon/assets/uebergabe.js',

@@ -61,6 +61,12 @@ function createHost(services = {}) {
   const calls = [];
   const provided = {};
   const child = {
+    // Der echte Cordis-Kontext kann lesen (`get`); die Persona nutzt das NUR,
+    // um den `webServer` fuer ihre Routen zu holen — nie zum Handeln.
+    get(name) {
+      calls.push(`child.get:${name}`);
+      return services[name];
+    },
     effect(run) {
       calls.push('effect');
       const dispose = run();
@@ -411,14 +417,15 @@ test('persona: unbekanntes Event lässt den Kontext unberührt', () => {
   host.dispose();
 });
 
-test('persona: der Fake-Host kennt on, inject und EINE optionale Leseabfrage — nichts anderes', () => {
+test('persona: der Fake-Host kennt on, inject und nur LESENDE Abfragen — nichts anderes', () => {
   const host = connect();
   // `get` ist dazugekommen, als die Tendenz gelesen wurde (Zug 5) — und es ist
   // LESEND. Der Host bleibt ohne jede Faehigkeit zum Handeln: kein Modell, kein
-  // Werkzeug, kein Schreiben.
+  // Werkzeug, kein Schreiben. Der zweite Leser ist der `webServer`, an dem die
+  // Pruef-Route haengt; er bekommt nur `register`, nie einen Aufruf.
   assert.deepEqual(Object.keys(host.ctx).sort(), ['get', 'inject', 'on', 'provide']);
   for (const call of host.calls) {
-    assert.ok(/^(on|inject|effect|getSectionOrder|section|get|provide):?/.test(call), `unerwarteter Aufruf: ${call}`);
+    assert.ok(/^(on|inject|effect|getSectionOrder|section|get|child\.get|provide):?/.test(call), `unerwarteter Aufruf: ${call}`);
   }
   assert.ok(host.calls.includes('on:shinon/event'));
   assert.ok(host.calls.some((call) => call === 'inject:systemPrompt'));
@@ -426,12 +433,16 @@ test('persona: der Fake-Host kennt on, inject und EINE optionale Leseabfrage —
   // das wird hier ausgeloest — die Zusicherung gilt dem fertigen Prompt, nicht
   // der Registrierung.
   for (const section of host.sections) void section.text;
-  // Und die Abfragen fragen genau nach Ton und Ablage — nach nichts anderem.
-  // Die Ablage ist LESEND geholt und dient zwei eigenen Namensraeumen
+  // Und die Abfragen fragen genau nach Ton, Ablage und Webserver — nach nichts
+  // anderem. Die Ablage ist LESEND geholt und dient zwei eigenen Namensraeumen
   // (Selbstmodell, Gedaechtnis); die Persona schreibt keine Projektdatei.
   assert.deepEqual(
     [...new Set(host.calls.filter((call) => call.startsWith('get:')))].sort(),
     [`get:${bundle.INDEX_STORE_SERVICE}`, `get:${bundle.SCORING_SERVICE}`].sort(),
+  );
+  assert.deepEqual(
+    [...new Set(host.calls.filter((call) => call.startsWith('child.get:')))].sort(),
+    ['child.get:webServer'],
   );
   host.dispose();
 });
@@ -848,6 +859,130 @@ test('Selbstverbesserung: Vorschlag aus Belegen, Annahme ist ein eigener Akt', (
   assert.match(again.sections.find((entry) => entry.name === 'shinon:commitments').text, /3 Belege/);
   again.dispose();
   store.close();
+});
+
+/** Eine Route so aufrufen, wie Node sie aufruft: Request mit Listenern, Response mit Feldern. */
+function routeRequest(route, { method = 'GET', body = null } = {}) {
+  const res = {
+    status: 0,
+    headers: null,
+    payload: '',
+    writeHead(status, headers) { this.status = status; this.headers = headers; },
+    write(chunk) { this.payload += chunk; },
+    end(chunk) { if (chunk !== undefined) this.payload += chunk; },
+  };
+  const listeners = new Map();
+  const req = { method, on(name, fn) { listeners.set(name, fn); }, emit(name, arg) { listeners.get(name)?.(arg); } };
+  const done = route.handler(req, res);
+  if (body !== null) {
+    req.emit('data', Buffer.from(JSON.stringify(body)));
+    req.emit('end');
+  }
+  return Promise.resolve(done).then(() => ({ status: res.status, json: () => JSON.parse(res.payload) }));
+}
+
+test('Pruef-Route: GET zeigt Belege, POST entscheidet ueber genau eine Naht (fail-closed)', async () => {
+  const routes = [];
+  const saved = [];
+  const store = {
+    contract: bundle.INDEX_STORE_CONTRACT,
+    load: () => ({ ok: true, state: { memos: [] } }),
+    save: (namespace) => { saved.push(namespace); return { ok: true, rows: 1 }; },
+  };
+  const host = connect({
+    webServer: { register(options) { routes.push(options); return () => {}; } },
+    [bundle.INDEX_STORE_SERVICE]: store,
+  });
+  const route = routes.find((entry) => entry.path === bundle.REVIEW_ROUTE);
+  assert.ok(route, 'die Pruef-Route ist nicht registriert');
+  assert.ok(routes.some((entry) => entry.path === bundle.UI_STATE_ROUTE), 'die Zustands-Route fehlt');
+
+  // Drei benannte Verwuerfe ergeben genau EINEN Vorschlag mit drei Belegen.
+  for (let i = 0; i < 3; i += 1) {
+    host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
+  }
+
+  const listed = await routeRequest(route);
+  assert.equal(listed.status, 200);
+  const review = listed.json();
+  assert.equal(review.contract, bundle.REVIEW_CONTRACT);
+  const open = review.proposals.filter((proposal) => proposal.status === 'proposed');
+  assert.equal(open.length, 1, 'genau ein offener Vorschlag');
+  assert.equal(open[0].evidence, 3, 'der Vorschlag traegt seine Belege');
+  assert.match(open[0].claim, /prompter:no_json/, 'der Vorschlag nennt den Grund');
+
+  // Falsche Entscheidung und unbekannte Id: nichts wird geschrieben.
+  const bad = await routeRequest(route, { method: 'POST', body: { id: open[0].id, decision: 'vielleicht' } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.json().error, 'INVALID_REQUEST');
+  const unknown = await routeRequest(route, { method: 'POST', body: { id: 'gibt-es-nicht', decision: 'accepted' } });
+  assert.equal(unknown.status, 409);
+  assert.equal(unknown.json().error, 'UNKNOWN_PROPOSAL');
+
+  const accepted = await routeRequest(route, { method: 'POST', body: { id: open[0].id, decision: 'accepted' } });
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.json().ok, true);
+  const after = (await routeRequest(route)).json();
+  assert.equal(after.proposals[0].status, 'accepted');
+  assert.equal(after.commitments.length, 1, 'erst die Annahme erzeugt eine Auflage');
+  assert.match(host.sections.find((section) => section.name === 'shinon:commitments').text, /Selbstauflagen/);
+
+  // Doppelte Entscheidung ist ein Konflikt, kein stiller zweiter Akt.
+  const twice = await routeRequest(route, { method: 'POST', body: { id: open[0].id, decision: 'rejected' } });
+  assert.equal(twice.status, 409);
+  assert.equal(saved.includes(bundle.MEMORY_NAMESPACE), true, 'die Entscheidung wurde persistiert');
+
+  // Der Startstand fuer das Panel steht im index-inject-Global.
+  const table = [];
+  host.dispatch(bundle.INDEX_INJECT, table);
+  const injected = table.find((entry) => entry.name === bundle.REVIEW_GLOBAL);
+  assert.ok(injected, 'das Panel bekommt keinen Startstand');
+  assert.equal(injected.value.proposals[0].status, 'accepted');
+  host.dispose();
+});
+
+/** Eine SSE-Route verbinden: der Handler schreibt, der Client sammelt nur. */
+function sseRequest(route) {
+  const res = {
+    chunks: [],
+    writeHead() {},
+    write(chunk) { this.chunks.push(String(chunk)); },
+    end(chunk) { if (chunk !== undefined) this.chunks.push(String(chunk)); },
+  };
+  route.handler({ method: 'GET', on() {} }, res);
+  return res;
+}
+
+test('Zustands-Route: der Pruef-Stand reist als eigenes SSE-Ereignis und wird geschoben', async () => {
+  const routes = [];
+  const store = {
+    contract: bundle.INDEX_STORE_CONTRACT,
+    load: () => ({ ok: true, state: { memos: [] } }),
+    save: () => ({ ok: true, rows: 1 }),
+  };
+  const host = connect({
+    webServer: { register(options) { routes.push(options); return () => {}; } },
+    [bundle.INDEX_STORE_SERVICE]: store,
+  });
+  for (let i = 0; i < 3; i += 1) {
+    host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
+  }
+  const stream = sseRequest(routes.find((entry) => entry.path === bundle.UI_STATE_ROUTE));
+  const opened = stream.chunks.join('');
+  assert.match(opened, /^data: /m, 'der Zustand fehlt beim Verbinden');
+  assert.match(opened, /event: review\ndata: /, 'der Pruef-Stand fehlt beim Verbinden');
+
+  const reviewRoute = routes.find((entry) => entry.path === bundle.REVIEW_ROUTE);
+  const open = (await routeRequest(reviewRoute)).json().proposals.find((proposal) => proposal.status === 'proposed');
+  assert.ok(open, 'kein offener Vorschlag zum Entscheiden');
+  const decided = await routeRequest(reviewRoute, { method: 'POST', body: { id: open.id, decision: 'accepted' } });
+  assert.equal(decided.status, 200);
+
+  // Der verbundene Client bekommt den neuen Stand GESCHOBEN — ohne zweiten Abruf.
+  const pushed = stream.chunks.join('');
+  assert.equal((pushed.match(/event: review/g) ?? []).length, 2, 'die Entscheidung wird nicht geschoben');
+  assert.match(pushed, /"status":"accepted"/, 'der geschobene Stand ist alt');
+  host.dispose();
 });
 
 test('Identitaetsscope global: Identitaet spricht ueberall, Projekt-Kontext bleibt am Shinon-Projekt', () => {
