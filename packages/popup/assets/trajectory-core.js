@@ -65,6 +65,59 @@ function eventsOf(entries) {
 }
 
 /**
+ * Die ABBRUCHQUOTE aus den Prompter-Entscheidungen falten.
+ *
+ * Dieselben Einträge, die das Prompter-Panel liest (Fensterspiegel), werden hier
+ * gezählt: `abort` trägt den klassifizierten Grund, `abort_counts` den Zähler
+ * je Grund. KEIN Grund wird hier beim Namen genannt — ein neuer Grund ist ein
+ * Dateneintrag in `packages/prompter/assets/abort-reasons.json`, und diese
+ * Faltung liest nur `abort.id`/`abort.label`. Genau deshalb braucht ein neuer
+ * Grund keine Client-Änderung.
+ *
+ * `top` ist der häufigste Grund; bei Gleichstand gewinnt der zuerst gesehene —
+ * deterministisch, weil die Einträge in Puffer-Reihenfolge (neuester zuerst)
+ * ankommen und die Schleife stabil ist.
+ */
+function foldAborts(entries) {
+  const counts = {};
+  const ranks = {};
+  const labels = {};
+  let turns = 0;
+  let aborts = 0;
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    if (!isRecord(entry) || typeof entry.outcome !== 'string') continue;
+    turns += 1;
+    const abort = isRecord(entry.abort) && typeof entry.abort.id === 'string' ? entry.abort : null;
+    if (abort === null) continue;
+    aborts += 1;
+    counts[abort.id] = (counts[abort.id] ?? 0) + 1;
+    // `rank` reist im Datensatz (Position in `abort-reasons.json`); ohne ihn
+    // gäbe es hier eine zweite Rangfolge unter demselben Namen.
+    if (Number.isInteger(abort.rank)) ranks[abort.id] = abort.rank;
+    if (typeof abort.label === 'string' && abort.label !== '') labels[abort.id] = abort.label;
+  }
+  // Häufigster Grund; bei Gleichstand der kleinere `rank`, danach die ID. Die
+  // Eingabereihenfolge entscheidet nie.
+  let top = null;
+  for (const id of Object.keys(counts)) {
+    if (top === null) { top = id; continue; }
+    if (counts[id] !== counts[top]) { if (counts[id] > counts[top]) top = id; continue; }
+    const rankA = Number.isInteger(ranks[id]) ? ranks[id] : Number.MAX_SAFE_INTEGER;
+    const rankB = Number.isInteger(ranks[top]) ? ranks[top] : Number.MAX_SAFE_INTEGER;
+    if (rankA !== rankB) { if (rankA < rankB) top = id; continue; }
+    if (id < top) top = id;
+  }
+  return {
+    turns,
+    aborts,
+    quote: turns === 0 ? 0 : aborts / turns,
+    top,
+    topLabel: top === null ? null : (labels[top] ?? top),
+    counts,
+  };
+}
+
+/**
  * Den Fortschritt aus dem Ereignisfenster falten — deterministisch, ohne Uhr.
  *
  * Die Lesart ist eine Momentaufnahme des FENSTERS: das Fenster ist
@@ -80,8 +133,9 @@ function eventsOf(entries) {
  *
  * @param entries - Einträge des Sitzungsfensters (`binding.eventSource…entries`).
  * @param limit - wie viele Werkzeugnamen behalten werden.
+ * @param aborts - Prompter-Entscheidungen (Fensterspiegel); leer = keine Quote.
  */
-function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT) {
+function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT, aborts = []) {
   const open = new Map();
   const tools = [];
   let turn = null;
@@ -138,6 +192,7 @@ function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT) {
     running: named.length > 0 ? named[named.length - 1] : null,
     tools: [...tools],
     active: turn !== null,
+    aborts: foldAborts(aborts),
   };
 }
 
@@ -165,4 +220,4 @@ function progressReading(reading) {
 }
 // #endregion zwilling:popup-trajectory
 
-export { ENTRY_KIND, TOOL_HISTORY_LIMIT, eventsOf, foldTrajectory, progressReading };
+export { ENTRY_KIND, TOOL_HISTORY_LIMIT, eventsOf, foldAborts, foldTrajectory, progressReading };

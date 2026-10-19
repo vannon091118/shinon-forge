@@ -63,6 +63,18 @@ window.__ModuleLoader__.load({
           }
         : null,
       brief_reason: typeof record?.brief_reason === 'string' ? record.brief_reason : null,
+      // Die Abbruchquote: der Host rechnet sie `abort-core.js`, der Client zeigt
+      // nur die vier Zahlen und das Label. Kein Grund wird hier genannt — ein
+      // neuer Grund ist ein Dateneintrag im Prompter, keine Client-Änderung.
+      abort_quote: record?.abort_quote && typeof record.abort_quote === 'object'
+        ? {
+            turns: Number.isInteger(record.abort_quote.turns) ? record.abort_quote.turns : 0,
+            aborts: Number.isInteger(record.abort_quote.aborts) ? record.abort_quote.aborts : 0,
+            quote: Number.isFinite(record.abort_quote.quote) ? record.abort_quote.quote : 0,
+            top: typeof record.abort_quote.top === 'string' ? record.abort_quote.top : null,
+            topLabel: typeof record.abort_quote.topLabel === 'string' ? record.abort_quote.topLabel : null,
+          }
+        : null,
       // Prosa-Rettung sichtbar machen: Grund, Zeichenzahl und der wievielte
       // Fall dieser Sitzung — sonst sieht ein geretteter Prosafall wie eine
       // normale Veredelung aus, und „zu oft" bleibt eine Vermutung.
@@ -197,6 +209,13 @@ window.__ModuleLoader__.load({
                   title: `${entry.provenance.contract ? `${entry.provenance.contract} · ` : ''}${entry.provenance.violations} Verletzung(en)${entry.provenance.complete ? '' : ' · unvollständig'}`,
                 }, `prov=${entry.provenance.entries}`)
               : null),
+            i === 0 && entry.abort_quote && entry.abort_quote.turns > 0
+              ? h('span', {
+                  // Quote und häufigster Grund — beides gerechnet, beides aus
+                  // dem Datensatz: das Panel zählt nicht selbst.
+                  title: `${entry.abort_quote.aborts} von ${entry.abort_quote.turns} Entscheidungen abgebrochen · häufigster Grund: ${entry.abort_quote.topLabel ?? '—'}`,
+                }, `abbr=${entry.abort_quote.aborts}/${entry.abort_quote.turns} ${Math.round(entry.abort_quote.quote * 100)}%`)
+              : null,
             entry.brief
               ? h('span', { title: `Aufgabenbrief: @shinon/${entry.brief.owner} · ${entry.brief.chars} Zeichen` }, `brief=${entry.brief.id}`)
               : (entry.brief_reason && entry.outcome === 'accepted'

@@ -122,6 +122,31 @@ test('ungültiges JSON: NO_JSON, und die verworfene Antwort wird mit Chunk-Zähl
   assert.match(log, /Finish: reason=stop/, 'der Finish-Grund steht dabei');
 });
 
+test('leerer Strom: EMPTY_STREAM ist ein eigener Grund, kein Formatfehler', async () => {
+  // Gemessen am Leitstand: eine Antwort ohne ein Zeichen stand als `NO_JSON` im
+  // Datensatz — derselbe Grund wie falsch formatiertes JSON, obwohl gar keine
+  // Antwort kam. Die Abbruchquote braucht die Trennung (`LEERER_STREAM`).
+  const fake = fakeLlm(() => chunks([{ type: 'finish', reason: 'stop' }]));
+  const { value: resolved, lines } = await captureWarn(() => enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined));
+
+  assert.equal(resolved.outcome, 'rejected');
+  assert.deepEqual(resolved.reasons, ['EMPTY_STREAM']);
+  assert.equal(fake.calls.length, 1);
+  assert.match(lines.join('\n'), /verworfene One-Shot-Antwort \(EMPTY_STREAM\)/, 'der Grund steht im Log, nicht nur im Datensatz');
+});
+
+test('leerer Strom MIT Abbruch bleibt ein Abbruch — das Finish reist als Daten', async () => {
+  // Die Reihenfolge der Abbruch-Regeln entscheidet: Timeout vor leerem Strom.
+  // Ohne `failure.finish` wäre ein abgebrochener Strom ein "leerer" Strom.
+  const fake = fakeLlm(() => chunks([
+    { type: 'finish', reason: { kind: 'aborted', failure: { message: 'Request was aborted' } } },
+  ]));
+  const { value: resolved } = await captureWarn(() => enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined));
+
+  assert.deepEqual(resolved.reasons, ['EMPTY_STREAM']);
+  assert.deepEqual(resolved.failure, { finish: { kind: 'aborted', failure: { message: 'Request was aborted' } } });
+});
+
 test('fehlende Route: NO_ROUTE ohne jeden Modellaufruf', async () => {
   const fake = fakeLlm(() => chunks([]));
   const outcome = await enhanceGuarded(fake, MIN, { ...baseConfig, provider: '' }, PROMPT, null, null, null, undefined);

@@ -534,7 +534,17 @@ test('prompter-client: eine Kanal-Entscheidung landet im Fenster-Spiegel', () =>
   registration.factory(requireStub()).apply(fake);
   const handler = seen[HOST_PROMPTER_DECISION];
   assert.equal(typeof handler, 'function', 'kein Abo auf dem Host-Kanal — das Panel bliebe ewig leer');
-  handler({ outcome: 'rejected', mode: 'MAX', reasons: ['NO_JSON'], context_source: 'runtime', session_id: 's1' });
+  handler({
+    outcome: 'rejected',
+    mode: 'MAX',
+    reasons: ['NO_JSON'],
+    context_source: 'runtime',
+    session_id: 's1',
+    // Die Abbruchquote reist im Datensatz; das Panel liest sie aus dem Spiegel.
+    abort: { id: 'KEIN_JSON', label: 'Keine JSON-Antwort' },
+    abort_counts: { KEIN_JSON: 1 },
+    abort_quote: { contract: 'shinon.prompter/abort-v1', turns: 9, aborts: 5, quote: 5 / 9, top: 'KEIN_JSON', topLabel: 'Keine JSON-Antwort', counts: { KEIN_JSON: 3 } },
+  });
   const trace = sandbox.sandbox.__shinonPrompterTrace;
   assert.equal(Array.isArray(trace), true, 'kein Spiegel im Fenster');
   assert.equal(trace.length, 1);
@@ -542,4 +552,57 @@ test('prompter-client: eine Kanal-Entscheidung landet im Fenster-Spiegel', () =>
   assert.equal(trace[0].mode, 'MAX');
   assert.equal(trace[0].context_source, 'runtime');
   assert.deepEqual([...trace[0].reasons], ['NO_JSON']);
+  // Was das Panel BRAUCHT, muss den Kanal überstehen: die Zahlen und die zwei
+  // Gründe. Mehr Felder trägt der Spiegel nicht (der volle Datensatz bleibt auf
+  // dem Kanal) — ein Panel, das `counts` läse, läse dort nichts.
+  assert.deepEqual({ ...trace[0].abort_quote }, {
+    turns: 9, aborts: 5, quote: 5 / 9, top: 'KEIN_JSON', topLabel: 'Keine JSON-Antwort',
+  }, 'die Abbruchquote fällt auf dem Weg über den Kanal weg');
+});
+
+test('prompter-panel: Quote und häufigster Grund stehen in der Zeile', () => {
+  // Der Host schreibt den Fensterspiegel; hier steht er VOR dem Mounten (der
+  // geladene Stand, nicht der Live-Kanal). Gerendert wird das ausgelieferte
+  // Bundle — die Zahl im Text und der Grund im Tooltip.
+  const { registration, sandbox } = loadBundle('prompter');
+  sandbox.sandbox.__shinonPrompterTrace = [{
+    outcome: 'rejected',
+    mode: 'MAX',
+    intent: 'UNDEFINED',
+    context_source: 'runtime',
+    reasons: ['NO_JSON'],
+    abort: { id: 'KEIN_JSON', label: 'Keine JSON-Antwort' },
+    abort_counts: { KEIN_JSON: 1 },
+    abort_quote: { contract: 'shinon.prompter/abort-v1', turns: 9, aborts: 5, quote: 5 / 9, top: 'KEIN_JSON', topLabel: 'Keine JSON-Antwort', counts: { KEIN_JSON: 3 } },
+  }];
+  const captured = [];
+  const fake = {
+    slots: {
+      inject: (_key, callback) => { callback(); return () => {}; },
+      register: (options, component) => { captured.push({ options, component }); return () => {}; },
+    },
+    effect: () => () => {},
+    on: () => () => {},
+  };
+  // Ein React, das den Initialisierer von `useState` AUSFÜHRT — die Attrappe aus
+  // dem Helfer reicht sie durch, und dann wäre `trace` eine Funktion.
+  const react = {
+    createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
+    useState: (value) => [typeof value === 'function' ? value() : value, () => {}],
+    useEffect: () => {},
+    Fragment: Symbol('react.fragment'),
+  };
+  const requireWith = (specifier) => {
+    if (specifier === 'react') return react;
+    throw new Error(`unerwartetes require('${specifier}')`);
+  };
+  registration.factory(requireWith).apply(fake);
+  const panel = captured.find((item) => item.options.name === 'main');
+  assert.ok(panel !== undefined, 'das Panel registriert sich nicht im main-Slot');
+  const nodes = flatten(render(panel.component({})));
+  const text = nodes.map((element) => (Array.isArray(element.children) ? element.children.filter((child) => typeof child === 'string').join('') : '')).join(' ');
+  assert.match(text, /abbr=5\/9 56%/, 'die Quote steht nicht in der Zeile');
+  const quoted = nodes.find((element) => typeof element.props?.title === 'string' && element.props.title.includes('häufigster Grund'));
+  assert.ok(quoted !== undefined, 'der häufigste Grund hat keinen Tooltip');
+  assert.match(quoted.props.title, /5 von 9 Entscheidungen abgebrochen · häufigster Grund: Keine JSON-Antwort/);
 });

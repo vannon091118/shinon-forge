@@ -212,3 +212,24 @@ test('trajectory: der Host-Kanal ist Probe-API, keine Ende-zu-Ende-Behauptung', 
   assert.doesNotMatch(clientRuntime, /(?:\.on|\.subscribe)\s*\(\s*['\"]shinon\/trajectory/, 'der Client abonniert den Probe-Kanal nicht');
   assert.match(client, /readTrajectoryOf\(ctx\).*?eventSource/s, 'das Overlay liest stattdessen das Sitzungsfenster direkt');
 });
+
+test('abbrueche: das Popup liest DENSELBEN Fensterspiegel wie das Prompter-Panel', () => {
+  // Ein zweiter Kanal waere eine zweite Wahrheit: das Panel zeigte eine Quote, das
+  // Popup eine andere (oder keine). Der Name des Globals steht im Host als Export
+  // (`TRACE_GLOBAL`), in der Client-Haelfte nur als Literal — Client-Bundles
+  // koennen den Host nicht importieren. Diese Pruefung erweitert die bestehende
+  // Zwillings-Regel (`scripts/lib/repo.mjs`, `zwilling:popup-trajectory`) um den
+  // einen Namen, den die Region selbst nicht enthaelt.
+  const host = read('packages/prompter/index.js');
+  const owner = /export const TRACE_GLOBAL = '([^']+)';/.exec(host);
+  assert.ok(owner !== null, 'packages/prompter/index.js: TRACE_GLOBAL fehlt');
+  const popup = /const TRACE_GLOBAL = '([^']+)';/.exec(read('packages/popup/client.js'));
+  assert.ok(popup !== null, 'packages/popup/client.js: TRACE_GLOBAL fehlt (die Abbruch-Faltung liest nichts)');
+  assert.equal(popup[1], owner[1], 'Popup und Prompter lesen verschiedene Fenster-Globals');
+
+  // Und der Popup-Client liest ihn auch wirklich — ein Literal, das niemand
+  // liest, waere ein Name ohne Wirkung.
+  const client = read('packages/popup/client.js');
+  assert.match(client, /globalThis\?\.window\?\.\[TRACE_GLOBAL\]/, 'der Client liest den Global nirgends');
+  assert.match(client, /foldTrajectory\(.*abortEntries\(\)\)/, 'die Entscheidungen erreichen die Faltung nicht');
+});

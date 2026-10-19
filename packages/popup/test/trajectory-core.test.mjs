@@ -17,7 +17,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ENTRY_KIND, TRAJECTORY_CONTRACT, TOOL_HISTORY_LIMIT, eventsOf, foldTrajectory, progressReading } from '../assets/trajectory-core.js';
+import { ENTRY_KIND, TRAJECTORY_CONTRACT, TOOL_HISTORY_LIMIT, eventsOf, foldAborts, foldTrajectory, progressReading } from '../assets/trajectory-core.js';
+
+/** Keine Prompter-Entscheidung gelesen: die Quote ist leer, nicht geraten. */
+const NO_ABORTS = { turns: 0, aborts: 0, quote: 0, top: null, topLabel: null, counts: {} };
 
 const entry = (event) => ({ type: ENTRY_KIND, event });
 const turnStart = (turn = 1) => entry({ type: 'turn/start', data: { turn } });
@@ -46,7 +49,7 @@ test('popup: nur echte Ereignisse zählen — Chunks und Fremdes fallen weg', ()
 
 test('popup: ohne Ereignisse ist die Lesart leer und inaktiv', () => {
   const reading = foldTrajectory([]);
-  assert.deepEqual(reading, { turn: null, step: 0, calls: 0, open: 0, running: null, tools: [], active: false });
+  assert.deepEqual(reading, { turn: null, step: 0, calls: 0, open: 0, running: null, tools: [], active: false, aborts: NO_ABORTS });
   assert.deepEqual(foldTrajectory(undefined), reading);
 });
 
@@ -124,6 +127,43 @@ test('popup: die Lesart ist ein Sprach-Schluessel plus Zahlen — keine Sprache 
   assert.deepEqual(reading.values, { step: 2, open: 1, calls: 1, tool: 'read' });
   assert.equal(progressReading(foldTrajectory([])).key, null, 'ohne Vorgang gibt es keinen Text');
   assert.equal(progressReading(foldTrajectory([turnStart(1), turnEnd(1)])).key, null, 'ein beendeter Turn ist kein Vorgang');
+});
+
+test('popup: die Abbruchquote kommt aus denselben Entscheidungen wie das Panel', () => {
+  // Die Einträge sind der Fensterspiegel des Prompters (`abort` trägt den
+  // klassifizierten Grund). Der Kern kennt KEINEN Grund beim Namen — er liest
+  // nur `id`/`label`; genau deshalb braucht ein neuer Grund keine Client-Änderung.
+  const entries = [
+    { outcome: 'accepted', abort: null },
+    { outcome: 'rejected', abort: { id: 'KEIN_JSON', label: 'Keine JSON-Antwort', rank: 3 } },
+    { outcome: 'rejected', abort: { id: 'TIMEOUT', label: 'Timeout', rank: 0 } },
+    { outcome: 'rejected', abort: { id: 'KEIN_JSON', label: 'Keine JSON-Antwort', rank: 3 } },
+    // Ein Grund, den es in `abort-reasons.json` noch nicht gibt: er zählt,
+    // ohne dass diese Datei angefasst wird.
+    { outcome: 'rejected', abort: { id: 'RATE_LIMIT', label: 'Anbieter-Limit', rank: 7 } },
+  ];
+  const reading = foldTrajectory([], TOOL_HISTORY_LIMIT, entries);
+  assert.equal(reading.aborts.turns, 5);
+  assert.equal(reading.aborts.aborts, 4);
+  assert.equal(reading.aborts.quote, 0.8);
+  assert.equal(reading.aborts.top, 'KEIN_JSON');
+  assert.equal(reading.aborts.topLabel, 'Keine JSON-Antwort');
+  assert.deepEqual(reading.aborts.counts, { KEIN_JSON: 2, TIMEOUT: 1, RATE_LIMIT: 1 });
+
+  // Gleichstand entscheidet der `rank` aus dem Datensatz — dieselbe Rangfolge
+  // wie im Host, ohne dass das Popup `abort-reasons.json` kennt.
+  const tie = [
+    { outcome: 'rejected', abort: { id: 'KEIN_JSON', label: 'Keine JSON-Antwort', rank: 3 } },
+    { outcome: 'rejected', abort: { id: 'TIMEOUT', label: 'Timeout', rank: 0 } },
+  ];
+  assert.equal(foldAborts(tie).top, 'TIMEOUT');
+  assert.equal(foldAborts([...tie].reverse()).top, 'TIMEOUT', 'die Reihenfolge entscheidet nichts');
+
+  // Ohne Einträge bleibt die Quote leer statt „0 %".
+  assert.deepEqual(foldAborts([]), NO_ABORTS);
+  assert.deepEqual(foldAborts(undefined), NO_ABORTS);
+  // Ein Eintrag ohne Ausgang ist keine Entscheidung — er zählt nicht als Turn.
+  assert.deepEqual(foldAborts([{ abort: { id: 'KEIN_JSON' } }, 'kein objekt']), NO_ABORTS);
 });
 
 test('popup: gleiches Fenster, gleiche Lesart (keine Uhr, kein Zufall)', () => {

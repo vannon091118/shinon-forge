@@ -323,3 +323,25 @@ export function loadCapabilityMap(path = new URL('../assets/capabilities.json', 
   if (issues.length > 0) return { map: null, issues, reason: 'KARTE_UNGUELTIG' };
   return { map, issues: [], reason: null };
 }
+
+/**
+ * Die Abbruch-Regeln laden — EINMAL beim Mounten.
+ *
+ * Die Regeln sind DATEN (`abort-reasons.json`): ein neuer Grund ist ein Eintrag
+ * dort, kein Codepfad. Ein Defekt sperrt die Quote, nicht den Enhancer
+ * (fail-open) — aber er wird gemeldet, und `reason` nennt ihn.
+ */
+export function loadAbortReasons(path = new URL('../assets/abort-reasons.json', import.meta.url)) {
+  let table;
+  try {
+    table = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    return { table: null, reason: 'REGELN_UNLESBAR', detail: error?.message ?? String(error) };
+  }
+  if (table === null || typeof table !== 'object' || !Array.isArray(table.reasons) || table.reasons.length === 0) {
+    return { table: null, reason: 'REGELN_UNGUELTIG', detail: 'reasons fehlt oder ist leer' };
+  }
+  const broken = table.reasons.find((entry) => entry === null || typeof entry !== 'object' || typeof entry.id !== 'string' || entry.id === '');
+  if (broken !== undefined) return { table: null, reason: 'REGELN_UNGUELTIG', detail: 'Eintrag ohne id' };
+  return { table, reason: null, detail: null };
+}

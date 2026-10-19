@@ -1165,7 +1165,10 @@ test('SALVAGED_PROSE: ein offener Prosa-Zaun bleibt rettbar', async () => {
  */
 test('Diagnose: eine verworfene One-Shot-Antwort wird mit Rohtext protokolliert', async () => {
   const cases = [
-    { name: 'leere Antwort', behaviour: '', reason: 'NO_JSON', empty: true },
+    // Eine Antwort ohne ein Zeichen ist seit Welle 2 ein EIGENER Grund
+    // (`EMPTY_STREAM`) — vorher stand dafür `NO_JSON`, derselbe Grund wie für
+    // falsch formatiertes JSON, obwohl gar keine Antwort kam.
+    { name: 'leere Antwort', behaviour: '', reason: 'EMPTY_STREAM', empty: true },
     { name: 'kaputtes JSON', behaviour: '{"enhancedPrompt": }', reason: 'INVALID_JSON', empty: false },
     { name: 'Policy-Verwurf (Antwort bleibt nachvollziehbar)', behaviour: reply(goodResult({ preservedIntent: false })), reason: 'INTENT_NOT_PRESERVED', empty: false },
   ];

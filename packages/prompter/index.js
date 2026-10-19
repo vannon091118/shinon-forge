@@ -16,13 +16,14 @@ import { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferen
 import { UNDEFINED, expandPrompt, resolveIntent } from './assets/intent-resolver.js';
 import { addTurnDuration, decay, emptyMemory, feedback, feedbackOf, memorySummary, observe, semanticProfile, validateMemory, weightsFrom } from './assets/intent-memory.js';
 import { renderContext, renderSkillsBlock } from './assets/render-context.js';
-import { loadCapabilityMap, loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
+import { loadAbortReasons, loadCapabilityMap, loadContext, loadJsonContract, loadNoteRules, loadSkillRules, notesDir, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
 import { appendJsonLine, writeJsonFile } from './assets/learned-store.js';
 import { readTone, standFor, standTrace } from './assets/stand.js';
 import { buildEnhancerRequest, collectStream, enhanceGuarded, replacePrompt } from './assets/enhancer.js';
 import { SALVAGE_CONTRACT, SALVAGE_MEMO_ID, SALVAGE_NAMESPACE, emptySalvage, salvageCountOf, validateSalvage, withSalvageCount } from './assets/salvage-store.js';
 import { PROVENANCE_CONTRACT, provenanceLabel, provenanceRecord, provenanceSummary } from './assets/provenance.js';
 import { CAPABILITIES_CONTRACT, appendTaskBrief, briefRecord, matchCapability, renderTaskBrief, taskBrief } from './assets/capability-map.js';
+import { ABORT_CONTRACT, abortLabel, abortRecord, abortSummary } from './assets/abort-core.js';
 import { BLOCKS_CONTRACT, BLOCKS_PATH, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks, validateRegistry } from './assets/block-select.js';
 import { LEARNED_CONTRACT, PROPOSE_CONTRACT, PROPOSE_SERVICE, duplicateVsBlocks, mergeLearnedBlocks, validateBlockCore, validateLearnedFile, validateProposalShell } from './assets/block-review.js';
 
@@ -436,6 +437,18 @@ function withProvenance(record, context) {
 }
 
 /**
+ * Den Entscheidungsdatensatz um die Abbruchklassifikation ergänzen.
+ *
+ * HIER STEHT NUR DIE ÜBERGABE: `abortRecord` klassifiziert und zählt, diese
+ * Funktion hängt das Ergebnis an. Kein Grund wird hier genannt — sonst wäre ein
+ * neuer Grund eine Codeänderung.
+ */
+function withAbort(record, runtime) {
+  const info = abortRecord(record, runtime?.abortTable ?? null);
+  return { ...record, abort: info.abort, abort_counts: info.abort_counts };
+}
+
+/**
  * Entscheidungsdatensatz: was entschieden wurde, ohne den Prompt-Text zu kopieren.
  * (Die Provenienz-Leiter daneben ist etwas anderes: sie sagt, WELCHE ART Aussage
  * im Prompt stand. Hier steht die Workspace-Herkunft des Schritts.)
@@ -828,7 +841,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     // MAX ohne Kontext gibt es nicht: Code-Referenzen und Touches waeren
     // erfunden. Also wird der Modus abgelehnt, nicht weichgespuelt.
     const outcome = { outcome: 'unavailable', reasons: [supply.reason], result: null };
-    report(ctx, config, runtime, withProvenance({ ...decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId), stand: null, blocks: decisionBlocks(blockSelection(ctx, config, runtime, contract, expandedText, null, null)), brief: null, brief_reason: 'KEIN_LAUF' }, null));
+    report(ctx, config, runtime, withAbort(withProvenance({ ...decisionRecord(contract, runtime, outcome, prompt.text.length, sessionId), stand: null, blocks: decisionBlocks(blockSelection(ctx, config, runtime, contract, expandedText, null, null)), brief: null, brief_reason: 'KEIN_LAUF' }, null), runtime));
     return next();
   }
 
@@ -935,7 +948,7 @@ async function onPreStep(ctx, config, runtime, payload, next) {
     runtime.intentMemory = addTurnDuration(runtime.intentMemory, runtime.turn.intentMatch, Date.now() - turnStarted);
     persistIntentMemory(runtime, runtime.intentMemoryPath, runtime.intentMemory);
   }
-  report(ctx, config, runtime, withProvenance({ ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection), brief: brief.record, brief_reason: brief.reason }, supply.context));
+  report(ctx, config, runtime, withAbort(withProvenance({ ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection), brief: brief.record, brief_reason: brief.reason }, supply.context), runtime));
 
   // Nur ein gefundenes akzeptiertes Ergebnis ersetzt die Nutzernachricht. In
   // JEDEM anderen Fall geht die Entscheidung unveraendert weiter — der Roh-Prompt
@@ -962,27 +975,38 @@ function report(ctx, config, runtime, record) {
     : ` salvage=${record.salvage.reason} chars=${record.salvage.chars} n=${record.salvage.count}`;
   const provenance = provenanceLabel(record.provenance);
   const brief = record.brief?.id ?? record.brief_reason ?? '-';
-  console.log(`[shinon-prompter] Trace: ${record.outcome} intent=${record.intentClassification ?? 'UNDEFINED'} pattern=${pattern} bias=${bias} sem=${semantic} features=${features} brief=${brief}${provenance === '' ? '' : ` ${provenance}`} raw=${JSON.stringify(record.raw_prompt ?? '')}${salvage}`);
-  // Der Puffer ist die Quelle des Panels: der Kanal allein erreicht den Browser
-  // nicht (Host-Events ueberqueren den Carrier nicht), also legt der Host die
-  // letzten Entscheidungen als Global in die naechste index.html.
+  // Der Puffer ist die Quelle des Panels UND die Grundlage der Quote: die
+  // Entscheidung trägt ihre eigenen Zähler, der Puffer summiert sie. Ohne
+  // Puffer bleibt die Quote dieses Turns leer statt geraten.
   const trace = runtime?.trace;
+  const traceEntry = {
+    outcome: record.outcome,
+    abort: record.abort ?? null,
+    abort_counts: record.abort_counts ?? {},
+  };
+  const abortQuote = abortSummary([traceEntry, ...(Array.isArray(trace) ? trace : [])], runtime?.abortTable ?? null);
+  const emitted = { ...record, abort_quote: abortQuote };
+  const abortLine = abortLabel(abortQuote);
+  console.log(`[shinon-prompter] Trace: ${emitted.outcome} intent=${emitted.intentClassification ?? 'UNDEFINED'} pattern=${pattern} bias=${bias} sem=${semantic} features=${features} brief=${brief}${abortLine === '' ? '' : ` ${abortLine}`}${provenance === '' ? '' : ` ${provenance}`} raw=${JSON.stringify(emitted.raw_prompt ?? '')}${salvage}`);
   if (Array.isArray(trace)) {
     trace.unshift({
-      outcome: record.outcome,
-      mode: record.mode,
-      reasons: record.reasons,
-      context_source: record.context_source ?? null,
-      provenance: provenanceSummary(record.provenance),
-      brief: record.brief ?? null,
-      brief_reason: record.brief_reason ?? null,
-      intent: record.intentClassification ?? 'UNDEFINED',
-      intent_pattern: record.intentMatch ?? null,
-      intent_bias: record.intentBias ?? null,
-      intent_semantic: record.intentSemantic ?? 0,
-      intent_features: record.intentFeatures ?? [],
-      raw_prompt: record.raw_prompt ?? null,
-      salvage: record.salvage ?? null,
+      outcome: emitted.outcome,
+      abort: emitted.abort ?? null,
+      abort_counts: emitted.abort_counts ?? {},
+      abort_quote: abortQuote,
+      mode: emitted.mode,
+      reasons: emitted.reasons,
+      context_source: emitted.context_source ?? null,
+      provenance: provenanceSummary(emitted.provenance),
+      brief: emitted.brief ?? null,
+      brief_reason: emitted.brief_reason ?? null,
+      intent: emitted.intentClassification ?? 'UNDEFINED',
+      intent_pattern: emitted.intentMatch ?? null,
+      intent_bias: emitted.intentBias ?? null,
+      intent_semantic: emitted.intentSemantic ?? 0,
+      intent_features: emitted.intentFeatures ?? [],
+      raw_prompt: emitted.raw_prompt ?? null,
+      salvage: emitted.salvage ?? null,
       at: Date.now(),
     });
     trace.length = Math.min(trace.length, 20);
@@ -992,13 +1016,13 @@ function report(ctx, config, runtime, record) {
       try { response.write(`data: ${JSON.stringify(trace)}\n\n`); } catch { /* Verbindung weg */ }
     }
   }
-  if (record.outcome !== 'accepted') {
-    const detail = record.reasons.join(', ');
-    if (record.outcome === 'unavailable') console.warn(`[shinon-prompter] nicht verfuegbar (${detail}) — Roh-Prompt gilt`);
+  if (emitted.outcome !== 'accepted') {
+    const detail = emitted.reasons.join(', ');
+    if (emitted.outcome === 'unavailable') console.warn(`[shinon-prompter] nicht verfuegbar (${detail}) — Roh-Prompt gilt`);
     else console.warn(`[shinon-prompter] verworfen (${detail}) — Roh-Prompt gilt`);
   }
   try {
-    if (typeof ctx?.emit === 'function') ctx.emit(DECISION_CHANNEL, record);
+    if (typeof ctx?.emit === 'function') ctx.emit(DECISION_CHANNEL, emitted);
   } catch (error) {
     // Gemessen: ein werfender Zuhoerer kommt bis hierher durch. Die Entscheidung
     // ist gefallen, die Spur ist Nebensache — sie darf den Schritt nicht mitreissen.
@@ -1014,17 +1038,20 @@ function report(ctx, config, runtime, record) {
     if (w !== undefined) {
       const list = Array.isArray(w.__shinonPrompterTrace) ? w.__shinonPrompterTrace : [];
       list.unshift({
-        outcome: record.outcome,
-        mode: record.mode,
-        reasons: record.reasons?.slice(0, 5) ?? [],
-        context_source: record.context_source ?? null,
-        provenance: provenanceSummary(record.provenance),
-        // Dieselben zwei Felder wie im Puffer oben: zwei Spiegel mit
-        // verschiedenen Formen waeren zwei Wahrheiten ohne Drift-Test.
-        brief: record.brief ?? null,
-        brief_reason: record.brief_reason ?? null,
-        salvage: record.salvage ?? null,
-        at: record.session_id ? Date.now() : null,
+        outcome: emitted.outcome,
+        abort: emitted.abort ?? null,
+        abort_counts: emitted.abort_counts ?? {},
+        abort_quote: abortQuote,
+        mode: emitted.mode,
+        reasons: emitted.reasons?.slice(0, 5) ?? [],
+        context_source: emitted.context_source ?? null,
+        provenance: provenanceSummary(emitted.provenance),
+        // Dieselben Felder wie im Puffer oben: zwei Spiegel mit verschiedenen
+        // Formen waeren zwei Wahrheiten ohne Drift-Test.
+        brief: emitted.brief ?? null,
+        brief_reason: emitted.brief_reason ?? null,
+        salvage: emitted.salvage ?? null,
+        at: emitted.session_id ? Date.now() : null,
       });
       w.__shinonPrompterTrace = list.slice(0, 20);
     }
@@ -1086,6 +1113,15 @@ export function apply(ctx, config) {
     for (const issue of capabilityRead.issues) console.warn(`[shinon-prompter] Faehigkeitskarte: ${issue}`);
   }
   const capabilityMap = capabilityRead;
+
+  // Die Abbruch-Regeln werden EINMAL geladen: sie sind DATEN, kein Code. Ein
+  // neuer Grund ist ein Eintrag in `abort-reasons.json`; die Klassifikation
+  // selbst liegt in `assets/abort-core.js`, nicht hier. Ein Defekt sperrt die
+  // Quote, nicht den Enhancer — aber er wird gemeldet.
+  const abortRead = loadAbortReasons();
+  if (abortRead.table === null) {
+    console.warn(`[shinon-prompter] Abbruch-Regeln nicht verwendbar (${abortRead.reason}${abortRead.detail === undefined ? '' : `: ${abortRead.detail}`}) — Abbrüche bleiben unklassifiziert`);
+  }
 
   // Die Skill-Regeln werden ebenfalls EINMAL beim Mounten geladen. Ein fehlendes
   // .agents/skills/ ist KEIN Defekt: Skills gehören dem Projekt, nicht dem
@@ -1218,7 +1254,7 @@ export function apply(ctx, config) {
   if (typeof config.probeJournalPath === 'string' && config.probeJournalPath !== '') {
     probeJournalPath = isAbsolute(config.probeJournalPath) ? config.probeJournalPath : join(workspace.root, config.probeJournalPath);
   }
-  const runtime = { context, contextState, noteRules, skillRules, capabilityMap, intentRules, intentMemory, intentMemoryPath, probeJournalPath, journalWarned: false, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, salvageCounts: new Map(), salvageNamespace: typeof config.salvageNamespace === 'string' ? config.salvageNamespace : SALVAGE_NAMESPACE, salvageState: null, salvageLoaded: false, salvagePersist: true, salvageWarned: false };
+  const runtime = { context, contextState, noteRules, skillRules, capabilityMap, abortTable: abortRead.table, intentRules, intentMemory, intentMemoryPath, probeJournalPath, journalWarned: false, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, narrativeContract: NARRATIVE_CONTRACT, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, salvageCounts: new Map(), salvageNamespace: typeof config.salvageNamespace === 'string' ? config.salvageNamespace : SALVAGE_NAMESPACE, salvageState: null, salvageLoaded: false, salvagePersist: true, salvageWarned: false };
   // Die Ablage kommt ueber dieselbe optionale Naht wie der Kontext: `ctx.get`,
   // kein `inject` — ein Profil ohne Project Index montiert den Prompter weiter.
   // Ein ERFOLGREICH gefundener Dienst wird gemerkt; ein fehlender nicht, denn
@@ -1325,7 +1361,7 @@ export function apply(ctx, config) {
 }
 
 // ── Oeffentliche Aussenflaeche (unveraendert) ───────────────────────────────
-export { CAPABILITIES_CONTRACT, CONTEXT_CONTRACT, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, PROVENANCE_CONTRACT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE };
+export { ABORT_CONTRACT, CAPABILITIES_CONTRACT, CONTEXT_CONTRACT, CONTEXT_TAG, CONTRACT, DECISION_CHANNEL, INDEX_BUDGET_TOKENS, INDEX_CONTRACT, INDEX_SERVICE, INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, INTENT_CLASSES, MODES, MODE_CAPABILITIES, MODE_DELTAS, NOTES_DIR_DEFAULT, NOTE_RULES_CONTRACT, NOTE_RULES_PATH, OPERATION_LABELS, POLICIES, PRE_STEP_EVENT, PROVENANCE_CONTRACT, REQUIREMENT_OPERATIONS, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILLS_DIR_DEFAULT, SKILL_RULES_CONTRACT, SKILL_RULES_PATH, STAND_CONTRACT, UNTRUSTED_RULE };
 export { ContextSchema, ResultSchema };
 export { OUTCOME_EFFECTS, acceptance, contextTokens, parseResult, resolveReferences };
 export { renderContext, renderSkillsBlock };

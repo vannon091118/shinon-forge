@@ -379,9 +379,31 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
     console.warn(
       `[shinon-prompter] One-Shot fehlgeschlagen (LLM_FAILED:${error?.name ?? 'Error'}) nach ${Date.now() - started}ms: ${brief(error?.message ?? error)}; ${describeRequest(request)}`,
     );
-    return journalRejection(onReject, config, prompt, { outcome: 'rejected', reasons: [`LLM_FAILED:${error?.name ?? 'Error'}`], result: null });
+    // Der Fehler selbst reist als DATEN mit: die Klassifikation (Timeout,
+    // Abbruch, Netzfehler) ist Sache von `abort-core.js`, nicht dieser Datei.
+    return journalRejection(onReject, config, prompt, {
+      outcome: 'rejected',
+      reasons: [`LLM_FAILED:${error?.name ?? 'Error'}`],
+      failure: { name: error?.name ?? 'Error', message: brief(error?.message ?? error) },
+      result: null,
+    });
   }
   const elapsedMs = Date.now() - started;
+
+  // Eine Antwort ohne ein einziges Zeichen ist eine EIGENE Ursache. Sie landete
+  // bisher als `NO_JSON` im Datensatz — derselbe Grund wie eine falsch
+  // formatierte Antwort, obwohl hier gar keine Antwort war. `failure.finish`
+  // reist mit, damit ein abgebrochener Strom weiterhin als `TIMEOUT` zählt und
+  // nicht als leerer Strom (`abort-reasons.json` prüft in dieser Reihenfolge).
+  if (text.trim() === '') {
+    logRejectedAnswer(['EMPTY_STREAM'], text, counts, finish, usage, request, elapsedMs);
+    return journalRejection(onReject, config, prompt, {
+      outcome: 'rejected',
+      reasons: ['EMPTY_STREAM'],
+      failure: { finish: finish?.reason ?? null },
+      result: null,
+    }, text);
+  }
 
   const parsed = parseResult(text, { mode: config.mode });
   if (!parsed.ok) {
@@ -401,7 +423,15 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
       };
     }
     logRejectedAnswer(parsed.reasons, text, counts, finish, usage, request, elapsedMs);
-    return journalRejection(onReject, config, prompt, { outcome: 'rejected', reasons: parsed.reasons, result: null }, text);
+    // Ein abgebrochener Stream ist KEIN Formatfehler: `finish.reason` nennt den
+    // Abbruch (`{kind:'aborted', failure:{message:'Request was aborted'}}`), und
+    // ohne dieses Feld wäre "Timeout" im Datensatz nicht mehr zu erkennen.
+    return journalRejection(onReject, config, prompt, {
+      outcome: 'rejected',
+      reasons: parsed.reasons,
+      failure: { finish: finish?.reason ?? null },
+      result: null,
+    }, text);
   }
 
   const decision = acceptance(parsed.result, { needsContext: contract.needsContext, context });
