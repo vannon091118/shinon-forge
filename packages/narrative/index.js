@@ -1,6 +1,6 @@
 import z from '@deepseek-ai/schemastery';
 import { readFileSync } from 'node:fs';
-import { advance, initialState } from './assets/narrative-core.js';
+import { advance, initialState, validateNarrativeState } from './assets/narrative-core.js';
 
 /**
  * @shinon/narrative — Narrative Engine (Zug 5: aktiviert).
@@ -23,6 +23,7 @@ export {
   deriveNarrator,
   initialState,
   relationshipState,
+  validateNarrativeState,
 } from './assets/narrative-core.js';
 
 /** Vertragsname des Zustands (Daten, nicht Code). */
@@ -34,11 +35,21 @@ export const STATE_CONTRACT = 'shinon.narrative/v1';
  */
 export const STATE_CHANNEL = 'shinon/narrative/state';
 
+/** Die dauerhafte Ablage — derselbe Dienst wie beim Scoring und der Persona. */
+export const STORE_SERVICE = 'shinon_index_store';
+export const STORE_CONTRACT = 'shinon.project-index/store-v1';
+
+/** Der Namensraum des fortgeschriebenen Zustands: eigener Raum, eigenes Memo. */
+export const STATE_NAMESPACE = 'shinon.narrative-state/v1';
+export const STATE_MEMO_ID = 'narrative';
+
 export const Config = z.object({
   eventsChannel: z.string().default('shinon/event'),
   chronicleLimit: z.number().min(10).max(200).default(50),
   freezeThreshold: z.number().min(10).max(50).default(20),
   relationshipWindow: z.number().min(5).max(50).default(20),
+  /** Leer = kein Gedaechtnis ueber Neustarts; der Zustand lebt dann nur im Prozess. */
+  stateNamespace: z.string().default(STATE_NAMESPACE),
 });
 
 /** Den Vertrag aus assets/ laden — ohne ihn laeuft nichts (fail-closed). */
@@ -56,7 +67,73 @@ export function apply(ctx, config) {
     console.error(`[shinon-narrative] Vertrag nicht lesbar (${error?.message ?? error}) — keine Ableitung`);
   }
 
-  const state = initialState(config.freezeThreshold);
+  // ── Die dauerhafte Ablage ─────────────────────────────────────────────────
+  // Ohne sie war der Verlauf nach jedem Neustart weg. Gelesen wird EINMAL beim
+  // Mount, geschrieben nach jedem Takt: der Zustand ist klein, die Zahl der
+  // Ereignisse je Turn ebenso.
+  const namespace = typeof config.stateNamespace === 'string' ? config.stateNamespace : STATE_NAMESPACE;
+  let warned = false;
+  const warnOnce = (reason) => {
+    if (warned) return;
+    warned = true;
+    console.warn(`[shinon-narrative] Zustand nur im Speicher: ${reason}`);
+  };
+  const resolveStore = () => {
+    let found = null;
+    try {
+      found = typeof ctx?.get === 'function' ? ctx.get(STORE_SERVICE) ?? null : null;
+    } catch (error) {
+      warnOnce(`Ablage nicht abfragbar (${error?.message ?? error})`);
+      return null;
+    }
+    if (found === null) return null;
+    if (found.contract !== STORE_CONTRACT || typeof found.load !== 'function' || typeof found.save !== 'function') {
+      warnOnce(`fremder Dienst unter ${STORE_SERVICE} (Vertrag ${String(found?.contract)})`);
+      return null;
+    }
+    return found;
+  };
+  const loadState = () => {
+    const empty = initialState(config.freezeThreshold);
+    if (namespace === '') return { state: empty, loaded: false, reason: 'NO_NAMESPACE' };
+    const store = resolveStore();
+    if (store === null) return { state: empty, loaded: false, reason: 'NO_STORE' };
+    let answer;
+    try {
+      answer = store.load(namespace);
+    } catch (error) {
+      warnOnce(`nicht lesbar (${error?.message ?? error})`);
+      return { state: empty, loaded: false, reason: 'READ_FAILED' };
+    }
+    const memos = answer?.ok === true && Array.isArray(answer.state?.memos) ? answer.state.memos : [];
+    const raw = memos.find((memo) => memo?.id === STATE_MEMO_ID) ?? null;
+    const checked = validateNarrativeState(raw, STATE_CONTRACT);
+    if (checked.state === null) return { state: empty, loaded: false, reason: checked.reason };
+    return { state: checked.state, loaded: true, reason: null };
+  };
+  const persist = () => {
+    if (namespace === '') return;
+    const store = resolveStore();
+    if (store === null) return;
+    let answer;
+    try {
+      answer = store.save(namespace, { memos: [{ id: STATE_MEMO_ID, contract: STATE_CONTRACT, state }] });
+    } catch (error) {
+      warnOnce(`nicht beschreibbar (${error?.message ?? error})`);
+      return;
+    }
+    if (answer === null || typeof answer !== 'object' || answer.ok !== true) {
+      warnOnce(`nicht beschreibbar (${answer?.error ?? 'unbekannte Antwort'})`);
+    }
+  };
+
+  const restored = loadState();
+  const state = restored.state;
+  if (restored.loaded) {
+    console.log(`[shinon-narrative] Zustand geladen (${STATE_NAMESPACE}, seq ${state.composite.seq}, ${state.chronicle.length} Chronik-Eintraege)`);
+  } else if (restored.reason !== 'NO_NAMESPACE' && restored.reason !== 'NO_STORE') {
+    console.log(`[shinon-narrative] Kein uebernommener Zustand (${restored.reason}) — Anfang`);
+  }
 
   const handler = (envelope, payload) => {
     if (contract === null) return;
@@ -68,6 +145,7 @@ export function apply(ctx, config) {
       context: payload,
     };
     advance(state, contract, event, config);
+    persist();
     if (typeof ctx?.emit === 'function') ctx.emit(STATE_CHANNEL, state.composite);
   };
 
@@ -75,12 +153,14 @@ export function apply(ctx, config) {
   if (contract !== null) {
     console.log(
       `[shinon-narrative] Aktiviert — ${config.chronicleLimit} Ereignisse Hot, Freeze bei ${config.freezeThreshold}` +
-        `; Mood und Erzaehler aus dem Vertrag (${STATE_CONTRACT}), kein Zufall, keine Uhr`,
+        `; Mood und Erzaehler aus dem Vertrag (${STATE_CONTRACT}), kein Zufall, keine Uhr` +
+        `; Ablage ${namespace === '' ? 'aus' : namespace}${restored.loaded ? ' (Stand geladen)' : ' (Anfang)'}`,
     );
   }
 
   return () => {
     if (typeof disposer === 'function') disposer();
+    if (restored.loaded) persist();
     console.log('[shinon-narrative] Deaktiviert');
   };
 }

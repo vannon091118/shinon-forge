@@ -1,0 +1,78 @@
+{
+  "at": "2026-10-19T00:12:05.182Z",
+  "workspace": "/home/vannon/Dokumente/deepseek-harness/default-workspace",
+  "prompt": "Welche Dateien regeln die Zustandsmaschine und die Kapazitaet?",
+  "files": [
+    "BRIEF.md",
+    "PLAN.md",
+    "README.md",
+    "docs/ADR-0001-zustandsmaschine.md",
+    "docs/ADR-0002-nebenlaeufigkeit.md",
+    "docs/BETRIEB.md",
+    "package.json",
+    "src/api/server.js",
+    "src/data/leitstand.db",
+    "src/domain/assignment.js",
+    "src/domain/shipment.js",
+    "src/domain/vehicle.js",
+    "src/store/database.js",
+    "src/store/migrations/001_initial.sql",
+    "src/store/repositories.js",
+    "src/web/api.js",
+    "src/web/index.html",
+    "src/web/render.js",
+    "src/web/state.js",
+    "test/api.test.mjs",
+    "test/assignment.test.mjs",
+    "test/domain.test.mjs",
+    "test/store.test.mjs",
+    "test/vehicle.test.mjs",
+    "test/web.test.mjs"
+  ],
+  "index": {
+    "found": true,
+    "file": "/home/vannon/.cache/shinon/indexes/c21665be886c7421/index.sqlite",
+    "rootId": "c21665be886c7421",
+    "updatedAtMs": 1792364912613,
+    "schemaVersion": 2,
+    "files": 1,
+    "symbols": 6,
+    "chunks": 2,
+    "memoryRows": 0,
+    "indexedPaths": [
+      "BRIEF.md"
+    ],
+    "query": {
+      "files": [],
+      "symbols": 0,
+      "tokens": null
+    }
+  },
+  "ledger": {
+    "file": "/home/vannon/.local/share/shinon/ledger.sqlite",
+    "rows": 95,
+    "scores": 70,
+    "summaries": 25,
+    "sessions": 22,
+    "orphanSessions": 0,
+    "workspaceField": false,
+    "signals": {
+      "accept": 63,
+      "rephrase": 5,
+      "dismiss": 2
+    },
+    "byNamespace": [
+      {
+        "namespace": "shinon.persona-self/v1",
+        "rows": 2
+      },
+      {
+        "namespace": "shinon.scoring/ledger-v1",
+        "rows": 95
+      }
+    ]
+  },
+  "trace": {
+    "skipped": "kein --trace-url"
+  }
+}

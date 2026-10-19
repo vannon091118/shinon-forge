@@ -214,11 +214,15 @@
     freezeThreshold: 20
     relationshipWindow: 20
 
-# Persona (Zug 1-5): Nur im Shinon-Projekt aktiv — der Check sitzt in apply().
-# Projekt-Kontext wird aus .shinon/project-context.md geladen (falls vorhanden).
-# Leer bleibt = kein Projektkontext (fail-open).
+# Persona (Zug 1-8): Die IDENTITAET spricht in jeder Sitzung dieses Deployments
+# (`identityScope: global`) und wird beim Boot nicht neu geschrieben. Projekt-
+# Kontext, projektspezifische Erinnerungen und der Selbstmodell-Stand bleiben
+# am Workspace; das Langzeitgedaechtnis liegt in der Ablage des Project Index
+# (shinon.persona-memory/v1), nie in Projektdateien. `workspace` waere die alte,
+# engere Vorgabe — hier ist die weitere bewusst gewaehlt.
 - id: shinon-persona
   config:
+    identityScope: global
     projectContextPath: .shinon/project-context.md
 
 # Prompter (Zug 6) — das Bindeglied. Er ist der EINE Punkt im Schritt, an dem

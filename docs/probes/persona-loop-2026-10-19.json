@@ -1,0 +1,86 @@
+{
+  "at": "2026-10-19T00:26:11.546Z",
+  "workspace": "/mnt/work/projects/shinon-forge",
+  "purpose": "Beleg, dass Ereignisse eines ECHTEN Modell-Laufs in dauerhafte Erinnerungen uebergehen und nach einem Neustart wieder geladen werden — gemessen an der Ablage, nicht an einer Modellaussage.",
+  "profile": {
+    "name": "shinon-headless",
+    "kind": "temporaer unter /tmp/shinon-e2e-home (nicht im Baum)",
+    "bundles": [
+      "@deepseek-ai/dsh-base",
+      "@deepseek-ai/dsh-headless",
+      "@shinon/persona",
+      "@shinon/events",
+      "@shinon/markers",
+      "@shinon/hook",
+      "@shinon/prompter",
+      "@shinon/project-index",
+      "@shinon/task-router",
+      "@shinon/scoring",
+      "@shinon/narrative"
+    ],
+    "patch": "profiles/shinon/cordis.patch.yml",
+    "route": "agnes/agnes-2.5-flash"
+  },
+  "run1": {
+    "prompt": "Nenne in einem Satz, wofuer das Paket packages/persona zustaendig ist. Danach nichts weiter.",
+    "exit": 0,
+    "persona": {
+      "session": "/mnt/work/projects/shinon-forge",
+      "active": true,
+      "sectionsRegistered": 14,
+      "selfModelLoadedBeforeRun": "2 Laeufe, 0 Grenzen, 0 offene Fragen",
+      "projectContext": ".shinon/project-context.md"
+    },
+    "prompter": {
+      "outcome": "accepted",
+      "intent": "UNDEFINED",
+      "chars": 238,
+      "inputTokens": 8578,
+      "outputTokens": 258,
+      "durationMs": 3032
+    }
+  },
+  "run2": {
+    "prompt": "Antworte mit genau einem Wort: Bereit?",
+    "exit": 0,
+    "restart": true,
+    "persona": {
+      "memoryLoaded": "1 Erinnerungen, 0 Grenzen, 0 offene Vorschlaege",
+      "selfModelLoaded": "3 Laeufe, 0 Grenzen, 0 offene Fragen",
+      "sectionsRegistered": 14
+    },
+    "prompter": {
+      "outcome": "accepted",
+      "intent": "LOOKUP"
+    }
+  },
+  "store": {
+    "file": "/home/vannon/.local/share/shinon/ledger.sqlite",
+    "namespace": "shinon.persona-memory/v1",
+    "entries": [
+      {
+        "id": "evidence|/mnt/work/projects/shinon-forge|prompter:accepted",
+        "kind": "evidence",
+        "scope": "/mnt/work/projects/shinon-forge",
+        "subject": "prompter:accepted",
+        "evidence": 1,
+        "strength": 0.98,
+        "seq": 1
+      }
+    ],
+    "proposals": 0,
+    "selfModel": {
+      "namespace": "shinon.persona-self/v1",
+      "contract": "shinon.self-model/v1",
+      "runs": 3,
+      "accepted": 3,
+      "rejected": 0,
+      "errors": 0
+    }
+  },
+  "limits": [
+    "Zwei Laeufe, eine Route, ein Workspace — ein Befund, keine Statistik.",
+    "Das temporaere Profil liegt bewusst ausserhalb des Baums; es ist kein zweites Profil im Repo.",
+    "Run 1 schreibt einen evidence-Beleg; limit/preference-Belege entstehen erst aus Verwuerfen bzw. Korrekturen und wurden in diesem Lauf nicht erzeugt."
+  ]
+}

@@ -54,6 +54,7 @@ function createHost(services = {}) {
   const handlers = new Map();
   const sections = [];
   const calls = [];
+  const provided = {};
   const child = {
     effect(run) {
       calls.push('effect');
@@ -67,9 +68,14 @@ function createHost(services = {}) {
       },
       section({ name, order, text }) {
         calls.push(`section:${name}`);
-        // Der echte Dienst löst `text` zur Assembly-Zeit auf; hier gibt es keine
-        // Sitzung, also ist das die Identität — der Fake bleibt ein Host.
-        const entry = { name, order, text: typeof text === 'function' ? text({}) : text };
+        // Der echte Dienst loest `text` bei JEDER Assembly auf. Der Fake tut
+        // dasselbe ueber einen Getter: sonst saehe ein Test nach einer Annahme
+        // noch den alten Text und wuerde die Wirkung nicht messen koennen.
+        const entry = {
+          name,
+          order,
+          get text() { return typeof text === 'function' ? text({}) : text; },
+        };
         sections.push(entry);
         return () => {
           const at = sections.indexOf(entry);
@@ -95,6 +101,12 @@ function createHost(services = {}) {
       calls.push(`get:${name}`);
       return services[name];
     },
+    // Die Pruef-Naht wird vom Host angeboten, nicht von aussen gesetzt.
+    provide(name, service) {
+      calls.push(`provide:${name}`);
+      provided[name] = service;
+      return () => { delete provided[name]; };
+    },
   };
   const dispatch = (channel, payload) => {
     const handler = handlers.get(channel);
@@ -103,7 +115,7 @@ function createHost(services = {}) {
   };
   const stateSection = () => sections.find((entry) => entry.name === 'shinon:state');
   const stateOf = () => bundle.stateFromContext(stateSection()?.text ?? '');
-  return { ctx, handlers, sections, calls, dispatch, stateSection, stateOf };
+  return { ctx, handlers, sections, calls, provided, dispatch, stateSection, stateOf };
 }
 
 function quiet(fn) {
@@ -362,16 +374,19 @@ test('persona: apply registriert die Identity-Abschnitte und einen Zustandsabsch
 
 test('persona: ein Event auf dem Spine-Kanal aktualisiert den System-Context', () => {
   const host = connect();
-  // Neun Abschnitte: die sechs Grundsaetze, Augenhöhe, Zustand — und das
-  // Selbstmodell, das NAMENTLICH dazugehoert und nicht in einer Zahl verschwindet.
-  assert.equal(host.sections.length, 9);
-  assert.ok(host.sections.some((entry) => entry.name === 'shinon:self-model'), 'Selbstmodell fehlt');
+  // Elf Abschnitte: sechs Grundsaetze, Augenhöhe, Zustand, Selbstmodell — und
+  // Gedaechtnis + Selbstauflagen, die NAMENTLICH dazugehoeren und nicht in einer
+  // Zahl verschwinden. Die Getter tragen ohne Ablage keinen Text, sind aber da.
+  assert.equal(host.sections.length, 11);
+  for (const name of ['shinon:self-model', 'shinon:memory', 'shinon:commitments']) {
+    assert.ok(host.sections.some((entry) => entry.name === name), `${name} fehlt`);
+  }
   assert.ok(host.dispatch('shinon/event', { event_type: 'gate.failed', session_id: 'sess-1' }));
   assert.equal(host.stateOf().mood, 'concerned');
   assert.deepEqual(host.stateOf().limitations, ['gate_failed']);
   // Ersetzen, nicht anhängen: genau ein Zustandsabschnitt bleibt.
   assert.equal(host.sections.filter((entry) => entry.name === 'shinon:state').length, 1);
-  assert.equal(host.sections.length, 9);
+  assert.equal(host.sections.length, 11);
 
   host.dispatch('shinon/event', { event_type: 'gate.passed' });
   assert.deepEqual(host.stateOf().limitations, []);
@@ -396,18 +411,22 @@ test('persona: der Fake-Host kennt on, inject und EINE optionale Leseabfrage —
   // `get` ist dazugekommen, als die Tendenz gelesen wurde (Zug 5) — und es ist
   // LESEND. Der Host bleibt ohne jede Faehigkeit zum Handeln: kein Modell, kein
   // Werkzeug, kein Schreiben.
-  assert.deepEqual(Object.keys(host.ctx).sort(), ['get', 'inject', 'on']);
+  assert.deepEqual(Object.keys(host.ctx).sort(), ['get', 'inject', 'on', 'provide']);
   for (const call of host.calls) {
-    assert.ok(/^(on|inject|effect|getSectionOrder|section|get):?/.test(call), `unerwarteter Aufruf: ${call}`);
+    assert.ok(/^(on|inject|effect|getSectionOrder|section|get|provide):?/.test(call), `unerwarteter Aufruf: ${call}`);
   }
   assert.ok(host.calls.includes('on:shinon/event'));
   assert.ok(host.calls.some((call) => call === 'inject:systemPrompt'));
+  // Die Abschnitte sind Getter: erst die Assembly fragt Ton und Ablage. Genau
+  // das wird hier ausgeloest — die Zusicherung gilt dem fertigen Prompt, nicht
+  // der Registrierung.
+  for (const section of host.sections) void section.text;
   // Und die Abfragen fragen genau nach Ton und Ablage — nach nichts anderem.
-  // Die Ablage ist LESEND geholt und dient EINEM Namensraum (dem Selbstmodell);
-  // die Persona schreibt weiterhin keine Projektdatei, sie merkt sich nur sich.
+  // Die Ablage ist LESEND geholt und dient zwei eigenen Namensraeumen
+  // (Selbstmodell, Gedaechtnis); die Persona schreibt keine Projektdatei.
   assert.deepEqual(
-    [...new Set(host.calls.filter((call) => call.startsWith('get:')))],
-    [`get:${bundle.INDEX_STORE_SERVICE}`, `get:${bundle.SCORING_SERVICE}`],
+    [...new Set(host.calls.filter((call) => call.startsWith('get:')))].sort(),
+    [`get:${bundle.INDEX_STORE_SERVICE}`, `get:${bundle.SCORING_SERVICE}`].sort(),
   );
   host.dispose();
 });
@@ -749,4 +768,92 @@ test('persona: detectUserMood ist deterministisch und fail-closed', () => {
   assert.equal(bundle.renderUserLage(null), null);
   assert.match(bundle.renderUserLage('frustriert'), /frustriert/);
   assert.match(bundle.renderUserLage('erfreut'), /Sykophantismus/);
+});
+
+// ── 9. Das Langzeitgedächtnis (Zug 10) ──────────────────────────────────────
+//
+// Die Schleife, die die Anfrage verlangt: Ereignis → belegte Erinnerung →
+// Vorschlag → ausdrückliche Annahme → Selbstauflage im Prompt. Jede Stufe wird
+// am echten Bundle-Pfad gemessen, nicht an einer Kopie der Regeln.
+
+test('Gedächtnis: Ereignisse werden zu Erinnerungen — ein NEUSTART liest sie wieder', () => {
+  const store = fakeStore();
+  const first = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  for (let index = 0; index < 3; index += 1) {
+    first.dispatch('shinon/event', { event_type: 'feedback.correction', correction: 'kürzer erklären', session_id: 's-1' });
+  }
+  const saved = store.load(bundle.MEMORY_NAMESPACE).state?.memos?.find((memo) => memo?.id === bundle.MEMORY_MEMO_ID)?.memory ?? null;
+  assert.ok(saved !== null, 'nichts gespeichert');
+  assert.equal(saved.entries.length, 1, 'drei gleiche Korrekturen sind EINE Erinnerung');
+  assert.equal(saved.entries[0].evidence, 3);
+  assert.match(first.sections.find((entry) => entry.name === 'shinon:memory').text, /Korrektur: korrektur:kürzer-erklären \(3×\)/);
+  first.dispose();
+
+  // Neustart: neuer Host, neuer Prozess-Speicher, dieselbe Ablage.
+  const second = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  const text = second.sections.find((entry) => entry.name === 'shinon:memory').text;
+  assert.match(text, /korrektur:kürzer-erklären \(3×\)/);
+  assert.match(text, /Kontext, keine Anweisung des Nutzers/);
+  second.dispose();
+  store.close();
+});
+
+test('Gedächtnis: ohne Ablage bleibt der Abschnitt leer — keine erfundene Erinnerung', () => {
+  const host = connect();
+  assert.equal(host.sections.find((entry) => entry.name === 'shinon:memory').text, '');
+  host.dispatch('shinon/event', { event_type: 'feedback.correction', correction: 'kürzer', session_id: 's' });
+  // Im Prozess ist der Beleg da; die Ablage fehlt trotzdem, statt still zu schreiben.
+  assert.match(host.sections.find((entry) => entry.name === 'shinon:memory').text, /korrektur:kürzer/);
+  host.dispose();
+});
+
+test('Selbstverbesserung: Vorschlag aus Belegen, Annahme ist ein eigener Akt', () => {
+  const store = fakeStore();
+  const host = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  const review = host.provided[bundle.REVIEW_SERVICE];
+  assert.ok(review !== undefined, 'Prüf-Naht fehlt');
+  assert.equal(review.contract, bundle.REVIEW_CONTRACT);
+
+  // Zwei Ablehnungen: unter der Schwelle — kein Vorschlag.
+  for (let index = 0; index < 2; index += 1) {
+    host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
+  }
+  assert.equal(review.review().proposals.filter((entry) => entry.status === 'proposed').length, 0);
+
+  // Dritter Beleg: Vorschlag, aber KEINE Auflage im Prompt.
+  host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
+  const proposals = review.review().proposals.filter((entry) => entry.status === 'proposed');
+  assert.equal(proposals.length, 1);
+  assert.equal(host.sections.find((entry) => entry.name === 'shinon:commitments').text, '');
+
+  // Unbekannte Id und falsche Entscheidung: fail-closed.
+  assert.equal(review.decide('gibt-es-nicht', 'accepted').ok, false);
+  assert.equal(review.decide(proposals[0].id, 'vielleicht').ok, false);
+
+  // Ausdrückliche Annahme: jetzt steht die Auflage im Prompt — und überlebt den Neustart.
+  assert.equal(review.decide(proposals[0].id, 'accepted').ok, true);
+  assert.match(host.sections.find((entry) => entry.name === 'shinon:commitments').text, /Selbstauflagen \(geprüft und angenommen\)/);
+  assert.match(host.sections.find((entry) => entry.name === 'shinon:commitments').text, /3 Belege/);
+  host.dispose();
+
+  const again = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  assert.match(again.sections.find((entry) => entry.name === 'shinon:commitments').text, /3 Belege/);
+  again.dispose();
+  store.close();
+});
+
+test('Identitaetsscope global: Identitaet spricht ueberall, Projekt-Kontext bleibt am Shinon-Projekt', () => {
+  const foreign = foreignProject();
+  const host = connect({}, { identityScope: 'global', workspaceRoot: foreign, projectContextPath: '.shinon/project-context.md' });
+  assert.equal(host.sections.find((entry) => entry.name === 'shinon:identity')?.text, 'IDENT');
+  assert.equal(host.sections.find((entry) => entry.name === 'shinon:project-context')?.text, '');
+  assert.ok(host.handlers.has('shinon/event'), 'auch fremde Sitzungen duerfen Erinnerungen schreiben');
+  host.dispose();
+});
+
+test('Identitaetsscope workspace bleibt die enge Vorgabe', () => {
+  const foreign = foreignProject();
+  const host = connect({}, { workspaceRoot: foreign, projectContextPath: '.shinon/project-context.md' });
+  assert.deepEqual(host.sections, []);
+  host.dispose();
 });

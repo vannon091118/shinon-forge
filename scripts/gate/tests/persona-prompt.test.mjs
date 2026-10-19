@@ -229,3 +229,78 @@ test('Projektscope: OHNE deklarierten Root entscheidet die Sitzung — nicht der
     'kein Shinon-Text in fremder Sitzung',
   );
 });
+
+test('Langzeitgedächtnis: Erinnerung und angenommene Selbstauflage stehen im ECHTEN System-Prompt', async () => {
+  // Der Beweis, den die Anfrage verlangt: nicht „die Persona haette Zugriff",
+  // sondern der gerenderte Prompt traegt Identitaet, Erinnerung und Auflage.
+  const memory = {
+    contract: 'shinon.persona-memory/v1',
+    version: 1,
+    seq: 4,
+    firstSeen: '2026-10-18T20:00:00.000Z',
+    lastSeen: '2026-10-19T02:00:00.000Z',
+    entries: [
+      {
+        id: 'limit|global|prompter:nojson',
+        kind: 'limit',
+        scope: 'global',
+        subject: 'prompter:nojson',
+        detail: 'NO_JSON',
+        evidence: 3,
+        strength: 3,
+        firstSeen: '2026-10-18T20:00:00.000Z',
+        lastSeen: '2026-10-19T02:00:00.000Z',
+        seq: 3,
+      },
+      {
+        id: 'preference|global|korrektur:kurzer',
+        kind: 'preference',
+        scope: 'global',
+        subject: 'korrektur:kurzer',
+        detail: 'nicht so lang',
+        evidence: 2,
+        strength: 2,
+        firstSeen: '2026-10-18T20:00:00.000Z',
+        lastSeen: '2026-10-19T02:00:00.000Z',
+        seq: 4,
+      },
+    ],
+    proposals: [
+      {
+        id: 'p:limit|global|prompter:nojson',
+        kind: 'commitment',
+        claim: 'Bei "prompter:nojson" zuerst die Ursache prüfen, bevor der nächste Lauf startet.',
+        evidence: 3,
+        status: 'accepted',
+        createdAt: '2026-10-19T01:00:00.000Z',
+        decidedAt: '2026-10-19T02:00:00.000Z',
+        source: 'limit|global|prompter:nojson',
+      },
+    ],
+  };
+
+  const { prompt, sections } = await systemPromptWith('', {}, {
+    sessionCwd: REPO_ROOT,
+    prepare: (ctx) => ctx.provide(bundle.INDEX_STORE_SERVICE, {
+      contract: bundle.INDEX_STORE_CONTRACT,
+      load: (namespace) => ({
+        ok: true,
+        state: { memos: namespace === bundle.MEMORY_NAMESPACE ? [{ id: bundle.MEMORY_MEMO_ID, memory }] : [] },
+      }),
+      save: () => ({ ok: true, rows: 1 }),
+    }),
+  });
+
+  assert.ok(sections.includes('shinon:identity'), 'Identitaet fehlt');
+  assert.ok(sections.includes('shinon:memory'), 'Gedaechtnis-Abschnitt fehlt');
+  assert.ok(sections.includes('shinon:commitments'), 'Selbstauflagen-Abschnitt fehlt');
+  assert.ok(prompt.includes(IDENTITY_MARK), 'Identitaet steht nicht im Prompt');
+  assert.match(prompt, /## Erinnerungen \(belegt, nicht behauptet\)/);
+  assert.match(prompt, /Grenze: prompter:nojson \(3×\) — NO_JSON/);
+  assert.match(prompt, /Korrektur: korrektur:kurzer \(2×\) — nicht so lang/);
+  assert.match(prompt, /## Selbstauflagen \(geprüft und angenommen\)/);
+  assert.ok(
+    prompt.indexOf('## Erinnerungen') < prompt.indexOf('## Selbstauflagen'),
+    'Erlebnisse stehen vor den daraus abgeleiteten Auflagen',
+  );
+});

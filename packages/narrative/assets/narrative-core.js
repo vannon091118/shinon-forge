@@ -124,6 +124,28 @@ export function deriveComposite(contract, prevComposite, event) {
   };
 }
 
+/**
+ * Einen gespeicherten Zustand pruefen — Form, nicht Meinung.
+ *
+ * Fremder Vertrag oder kaputte Huelle: `state: null` und ein benannter Grund.
+ * Der Aufrufer faellt dann auf den leeren Anfang zurueck, statt einen
+ * halbgueltigen Verlauf fortzuschreiben.
+ */
+export function validateNarrativeState(raw, contractName = null) {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return { state: null, reason: 'NOT_AN_OBJECT' };
+  if (contractName !== null && raw.contract !== contractName) return { state: null, reason: 'FOREIGN_CONTRACT' };
+  const state = raw.state;
+  if (
+    state === null || typeof state !== 'object' || Array.isArray(state) ||
+    state.composite === null || typeof state.composite !== 'object' ||
+    !Array.isArray(state.chronicle) || !Array.isArray(state.arcs) ||
+    state.relationships === null || typeof state.relationships !== 'object'
+  ) {
+    return { state: null, reason: 'BAD_SHAPE' };
+  }
+  return { state, reason: null };
+}
+
 /** Der leere Anfangszustand: kein Ereignis, kein Arc, kein Paar. */
 export function initialState(freezeThreshold) {
   return {
