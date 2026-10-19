@@ -209,8 +209,23 @@ export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }
  *
  * Die Abfrage ERZEUGT KEINEN Index: `openIndex` legt fehlende Dateien an, eine
  * Suche darf das nicht. Deshalb steht davor `existsSync`.
+ *
+ * WARM (Welle 2, 2026-10-20): Ist der Index da, frischt die Abfrage ihre
+ * KANDIDATEN auf — je Kandidat ein `stat` gegen den Inode-Stempel, und nur eine
+ * geänderte oder neue Datei wird gelesen (`refreshIndex` im Kern). Kein Watcher,
+ * kein Vollscan je Turn; der Kontextvertrag bleibt bei sechs Schlüsseln, und der
+ * Bericht reist über `onRefresh` (Diagnose), nicht als siebter Schlüssel.
+ * Gemessen im Leitstand: 1 von 25 Dateien im Index, Kontext leer — daher dieser
+ * Pfad.
  */
-export function createQueryService({ indexFile, budgetTokens = DEFAULT_CONTEXT_BUDGET, workspaceRoot = '' }) {
+export function createQueryService({
+  indexFile,
+  budgetTokens = DEFAULT_CONTEXT_BUDGET,
+  workspaceRoot = '',
+  chunkLines = 40,
+  maxFileBytes = 262144,
+  trace = true,
+}) {
   return {
     contract: QUERY_CONTRACT,
     resolveContext(prompt, options = {}) {
@@ -227,7 +242,32 @@ export function createQueryService({ indexFile, budgetTokens = DEFAULT_CONTEXT_B
         // zweite Wahrheit ueber denselben Index waere eine Fehlerquelle.
         const root = indexMeta(db).root;
         if (typeof root !== 'string' || root === '') return null;
-        return resolveContext(db, { prompt, project: basename(root), budgetTokens: budget });
+        return resolveContext(db, {
+          prompt,
+          project: basename(root),
+          budgetTokens: budget,
+          // Die Wurzel kommt aus dem INDEX (oben geprueft), nicht vom Aufrufer:
+          // aufgefrischt wird genau der Baum, den dieser Index beschreibt.
+          root,
+          refresh: true,
+          chunkLines,
+          maxFileBytes,
+          onRefresh: (report) => {
+            if (!trace) return;
+            if (report?.error !== undefined) {
+              console.error(`[shinon-project-index] Auffrischung fehlgeschlagen (${report.error}) — Antwort kommt aus dem letzten Stand`);
+              return;
+            }
+            // Nur EINE Zeile, wenn sich etwas geaendert hat: eine Abfrage ohne
+            // Aenderung ist der Normalfall und gehoert nicht ins Log.
+            if (report.written === 0 && report.removed === 0) return;
+            console.log(
+              `[shinon-project-index] Abfrage warm: ${report.checked} geprueft, ${report.stamped} ueber Stempel, ` +
+              `${report.read} gelesen (${report.readBytes} B), ${report.written} neu (${report.added} davon neu im Index), ` +
+              `${report.removed} entfernt, ${report.touches} Kanten, ${report.ms} ms`,
+            );
+          },
+        });
       } finally {
         db.close();
       }
@@ -366,7 +406,13 @@ export function apply(ctx, config) {
   // Zustand einmal, und ein Host ohne `provide` ist kein Fehler des Laufs.
   const canProvide = typeof ctx?.provide === 'function';
   const releaseQuery = canProvide
-    ? ctx.provide(QUERY_SERVICE, createQueryService({ indexFile: file, workspaceRoot: options.root }))
+    ? ctx.provide(QUERY_SERVICE, createQueryService({
+      indexFile: file,
+      workspaceRoot: options.root,
+      chunkLines: options.chunkLines,
+      maxFileBytes: options.maxFileBytes,
+      trace: config.trace,
+    }))
     : null;
   const releaseStore = canProvide
     ? ctx.provide(STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile, workspaceRoot: options.root }))

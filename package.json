@@ -26,6 +26,7 @@
     "branding": "node scripts/branding-check.mjs",
     "idioms": "node scripts/sync-idioms.mjs",
     "idioms:check": "node scripts/sync-idioms.mjs --check",
+    "index:warm": "node scripts/run-with-node.mjs scripts/index-warm-measure.mjs",
     "zahlen:sync": "node scripts/run-with-node.mjs scripts/sync-zahlen.mjs",
     "zahlen:check": "node scripts/run-with-node.mjs scripts/sync-zahlen.mjs --check",
     "test": "node scripts/run-with-node.mjs scripts/shinon-test.mjs && node scripts/run-with-node.mjs scripts/gate/engine.mjs --local",

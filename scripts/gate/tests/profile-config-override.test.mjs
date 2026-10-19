@@ -145,7 +145,17 @@ test('profile-config-override: die One-Shot-Route traegt einen eigenen Schlüsse
 
   const turn = targets.get('agent-default-model');
   assert.ok(turn !== undefined, 'der Haupt-Turn wird vom Profil nicht gezielt');
-  assert.notEqual(turn?.provider, 'prompter', 'der Haupt-Turn darf nicht auf der One-Shot-Route laufen');
+  // DIE WAHL DES HAUPT-TURNS IST FREI. Wer ein Modell testet, wechselt die
+  // Route im Profil und soll dafuer kein Gate erklaeren muessen — dieselbe
+  // Regel wie in Welle 1: die Route ist eine FORM, kein Name. Geprueft wird
+  // deshalb die Form: der gewaehlte Provider steht im Katalog DIESES Profils,
+  // und der Fallback des One-Shots ist ebenfalls eine definierte Route. Eine
+  // feste Erwartung „Haupt-Turn ist nicht prompter" waere ein Modell-Literal
+  // mit anderem Namen gewesen und ist am 2026-10-20 gefallen.
+  const catalog = llm.config?.providers ?? {};
+  const defined = (name) => typeof name === 'string' && Object.prototype.hasOwnProperty.call(catalog, name);
+  assert.equal(defined(turn?.provider), true, `Haupt-Turn: Provider "${turn?.provider}" steht nicht im Katalog`);
+  assert.equal(defined(prompter.providerFallback), true, `Fallback-Provider "${prompter.providerFallback}" steht nicht im Katalog`);
 
   const router = targets.get('shinon-key-router');
   const slots = (router?.providers ?? []).map((entry) => entry.id);

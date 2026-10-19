@@ -1685,6 +1685,235 @@ export function searchChunks(db, query, limit = 10) {
   }
 }
 
+// ══ Der Warm-Pfad: Kandidaten auffrischen, nicht den Baum ════════════════════
+//
+// WARUM HIER UEBERHAUPT DAS DATEISYSTEM GELESEN WIRD: der Index entsteht beim
+// Mount (Kaltlauf) und veraltet ab dem ersten Schreibvorgang des Projekts.
+// Gemessen im Leitstand (`docs/probes/e2e-leitstand-2026-10-19.md` §4): der Lauf
+// indizierte beim Boot 1 Datei, am Ende standen 25 im Baum, im Index weiter 1 —
+// die Abfrage lieferte `[]`, und MAX arbeitete mit leerem Kontext. Ein Watcher
+// ist keine Option (Dauerbeobachter, ein Prozess mehr, Plattformfrage), ein
+// Vollscan je Turn auch nicht (er kostet den ganzen Baum). Der Mittelweg ist der
+// INODE-STEMPEL, den der Kaltlauf ohnehin in `files.stamp` schreibt: je Kandidat
+// EIN `stat`, und nur was sich geaendert hat, wird gelesen und neu indexiert.
+//
+// DER SECRET-SCHUTZ BLEIBT, und zwar ohne Ausnahme: gelesen wird roh, in den
+// Index geht ausschliesslich der redigierte Text — derselbe `indexFile`-Weg wie
+// im Kaltlauf. Schicht 1 gilt hier genauso (ein Zugangsdatentraeger wird nicht
+// geoeffnet), und der Kontext wird weiterhin NUR aus dem Index gebaut: der
+// Resolver gibt nie Platteninhalt zurueck, er frischt die abgeleitete Kopie auf.
+
+/** Vertragsname des Auffrisch-Berichts (Diagnose, keine zweite Naht). */
+export const WARM_CONTRACT = 'shinon.project-index/warm-v1';
+
+/**
+ * Wie viele Kandidaten eine Abfrage hoechstens prueft.
+ *
+ * Eine Grenze, keine Messung: der Kontext haelt hoechstens 6000 Token, und der
+ * Rang laesst mehr als diese Zahl Kandidaten praktisch nie ins Budget. Ohne
+ * Deckel waere der Warm-Pfad ein Vollscan mit anderem Namen.
+ */
+export const WARM_CANDIDATE_LIMIT = 32;
+
+/**
+ * Wuerde `listFiles` diesen Pfad aufnehmen? Dieselbe Regel, damit der Warm-Pfad
+ * nichts indexiert, was der Kaltlauf wieder wegwerfen wuerde (und nichts
+ * ausserhalb der Wurzel liest).
+ */
+function indexablePath(path) {
+  if (typeof path !== 'string' || path === '') return false;
+  if (isAbsolute(path)) return false;
+  const parts = path.split(/[\\/]/);
+  if (parts.some((part) => part === '..' || SKIP_DIRS.has(part))) return false;
+  return SOURCE_EXTENSIONS.some((extension) => path.endsWith(extension));
+}
+
+/**
+ * NEUE Dateien, die der Prompt beim Namen nennt: ein Pfad-Token, der auf der
+ * Platte existiert, im Index aber fehlt.
+ *
+ * Ohne diesen Schritt koennte der Warm-Pfad nur auffrischen, was er schon kennt —
+ * eine gerade angelegte Datei waere unsichtbar, bis der naechste Kaltlauf kommt.
+ * Geprueft wird nur, was wie ein Pfad aussieht (Endung aus `SOURCE_EXTENSIONS`),
+ * und je Token genau EIN `stat`: kein Verzeichnis wird aufgelistet.
+ */
+export function probeCandidates(root, prompt, limit = WARM_CANDIDATE_LIMIT) {
+  const found = [];
+  if (typeof root !== 'string' || root === '') return found;
+  for (const token of promptTokens(prompt)) {
+    if (found.length >= limit) break;
+    if (!indexablePath(token) || !token.includes('/')) continue;
+    if (found.includes(token)) continue;
+    let info;
+    try {
+      info = statSync(join(resolve(root), token));
+    } catch {
+      continue;
+    }
+    if (!info.isFile() || protectedReason(token) !== null) continue;
+    found.push(token);
+  }
+  return found.sort(byPath);
+}
+
+/**
+ * Die Referenzen der neu geschriebenen Dateien auffrischen — dieselbe Regel wie
+ * im Kaltlauf (Loeschen, dann mit EINEM Matcher je Lauf neu suchen). Gelesen
+ * wird der Text, den der Aufrufer schon hat: kein zweiter Lesevorgang.
+ */
+function refreshReferences(db, entries) {
+  const names = [
+    ...new Set(
+      db.prepare('select distinct name, kind from symbols').all()
+        .filter((row) => REFERENCABLE_KINDS.has(row.kind))
+        .map((row) => row.name),
+    ),
+  ].sort();
+  const matcher = createReferenceMatcher(names);
+  const insert = db.prepare('insert or ignore into "references"(path, name, line) values (?, ?, ?)');
+  let found = 0;
+  for (const entry of entries) {
+    db.prepare('delete from "references" where path = ?').run(entry.path);
+    for (const reference of matcher.scan(redactSecrets(entry.text).text)) {
+      found += insert.run(entry.path, reference.name, reference.line).changes;
+    }
+  }
+  return found;
+}
+
+/**
+ * Die Kandidaten einer Abfrage auffrischen — der Warm-Pfad.
+ *
+ * Je Kandidat genau ein `stat`; gelesen wird NUR, wenn der Inode-Stempel
+ * abweicht (oder fehlt, dann fail-closed). Der Bericht zaehlt, was passiert ist,
+ * damit „warm" messbar bleibt statt behauptet:
+ *
+ *   stamped    Stempel gleich, kein Byte gelesen   (der Normalfall)
+ *   rehashed   gelesen, Inhalt gleich — nur der Stempel wandert
+ *   rewritten  gelesen und neu geparst (geaenderte Datei)
+ *   added      gelesen und neu geparst (Datei war dem Index unbekannt)
+ *   removed    Zeilen geloescht, weil die Datei weg oder geschuetzt ist
+ *
+ * Was hier NICHT passiert: `symbols_digest` wird nicht fortgeschrieben. Aendert
+ * sich die Symbolmenge, merkt der naechste Kaltlauf das (er vergleicht den
+ * Digest) und macht seinen einen vollstaendigen Referenzdurchgang — genau EINMAL,
+ * statt ihn in jede Abfrage zu legen.
+ */
+export function refreshIndex(db, root, paths, options = {}) {
+  const chunkLines = Number.isInteger(options.chunkLines) ? options.chunkLines : 40;
+  const maxFileBytes = Number.isInteger(options.maxFileBytes) ? options.maxFileBytes : 262144;
+  const started = Date.now();
+  const absoluteRoot = resolve(root);
+  const candidates = [...new Set(Array.isArray(paths) ? paths : [])].filter(indexablePath).sort(byPath);
+  const report = {
+    contract: WARM_CONTRACT,
+    candidates: candidates.length,
+    checked: 0,
+    stamped: 0,
+    read: 0,
+    readBytes: 0,
+    written: 0,
+    rehashed: 0,
+    added: 0,
+    removed: 0,
+    skipped: 0,
+    touches: 0,
+    references: 0,
+    ms: 0,
+  };
+  if (candidates.length === 0) {
+    report.ms = Date.now() - started;
+    return report;
+  }
+  const before = new Map(
+    db.prepare('select path, digest, stamp from files').all().map((row) => [row.path, row]),
+  );
+
+  db.exec('begin');
+  try {
+    /** Die geschriebenen Dateien mit Text — fuer Touches und Referenzen. */
+    const rewritten = [];
+    for (const path of candidates) {
+      // Schicht 1 vor dem ersten `stat` — wie im Kaltlauf.
+      if (protectedReason(path) !== null) {
+        if (before.has(path)) {
+          forgetFile(db, path);
+          report.removed += 1;
+        }
+        continue;
+      }
+      const absolute = join(absoluteRoot, path);
+      let info;
+      try {
+        info = statSync(absolute);
+      } catch {
+        // Zwischen zwei Abfragen verschwunden: die Zeilen muessen mitgehen,
+        // sonst liefert der Index Kontext aus einer Datei, die es nicht gibt.
+        if (before.has(path)) {
+          forgetFile(db, path);
+          report.removed += 1;
+        }
+        continue;
+      }
+      if (!info.isFile()) continue;
+      report.checked += 1;
+      const known = before.get(path);
+      const stamp = inodeStamp(absolute, Math.round(info.mtimeMs));
+      // DER STEMPEL IST DIE ENTSCHEIDUNG. Groesse und mtime allein waeren die
+      // benannte Luecke aus §11 (gleiche Groesse, zurueckgesetzte mtime); der
+      // Stempel traegt Identitaet und ctime und ist deshalb hier die Bedingung.
+      if (known !== undefined && stamp !== null && known.stamp === stamp) {
+        report.stamped += 1;
+        continue;
+      }
+      const read = readTextWithReason(absolute, maxFileBytes);
+      if (!read.ok) {
+        if (known !== undefined) {
+          forgetFile(db, path);
+          report.removed += 1;
+        }
+        report.skipped += 1;
+        continue;
+      }
+      report.read += 1;
+      report.readBytes += read.bytes;
+      const digest = createHash('sha256').update(read.text).digest('hex');
+      if (known !== undefined && known.digest === digest) {
+        // Neu gelesen, aber derselbe Inhalt (chmod, Touch): nur die Zeile
+        // auffrischen — kein erneutes Parsen, keine neuen Chunks.
+        db.prepare('update files set language = ?, bytes = ?, mtime_ms = ?, stamp = ?, indexed_at_ms = ? where path = ?')
+          .run(languageOf(path) ?? 'text', read.bytes, read.mtimeMs, stamp, Date.now(), path);
+        report.rehashed += 1;
+        continue;
+      }
+      const entry = indexFile(db, root, absolute, read, { chunkLines, stamp, known: known !== undefined });
+      rewritten.push({ ...entry, text: read.text });
+      report.written += 1;
+      if (known === undefined) report.added += 1;
+    }
+
+    if (rewritten.length > 0) {
+      const all = new Set(db.prepare('select path from files').all().map((row) => row.path));
+      const insertTouch = db.prepare('insert or ignore into touches(path, target, kind) values (?, ?, ?)');
+      for (const entry of rewritten) {
+        for (const touch of resolveTouches(root, entry, all)) {
+          report.touches += insertTouch.run(touch.path, touch.target, touch.kind).changes;
+        }
+      }
+      db.prepare('delete from touches where target not in (select path from files)').run();
+      report.references = refreshReferences(db, rewritten);
+      setMeta(db, 'updated_at_ms', String(Date.now()));
+    }
+    db.exec('commit');
+  } catch (error) {
+    db.exec('rollback');
+    throw error;
+  }
+
+  report.ms = Date.now() - started;
+  return report;
+}
+
 // ══ Der MAX-Kontext (Plan §14/§15) ═══════════════════════════════════════════
 //
 // Diese Sektion ist die fehlende Haelfte zwischen Index und Enhancer: der Index
@@ -1698,9 +1927,11 @@ export function searchChunks(db, query, limit = 10) {
 //
 // DREI EIGENSCHAFTEN, die keine Geschmacksfrage sind:
 //
-//   1. NUR DER INDEX IST DIE QUELLE. Kein Dateisystemzugriff in dieser Sektion.
-//      Der Index traegt redigierten Text (Plan §13), die Platte den Rohinhalt —
-//      ein Resolver, der die Datei nachliest, umgeht den Secret-Schutz.
+//   1. DER INDEX IST DIE QUELLE DES KONTEXTS. Der Warm-Pfad (oben) frischt
+//      Kandidaten auf und schreibt dabei nur REDIGIERTEN Text in den Index; was
+//      in den Kontext geht, kommt ausschliesslich aus den Index-Tabellen. Der
+//      Resolver gibt nie Platteninhalt zurueck — er haelt die abgeleitete Kopie
+//      aktuell, damit sie nicht luegt.
 //   2. DAS BUDGET IST HART. Was nicht hineinpasst, wird an der Zeilengrenze
 //      abgeschnitten; danach ist Schluss, statt die naechste Datei halb
 //      anzufangen. Ein halber Kontext verspricht mehr, als er traegt.
@@ -1855,6 +2086,53 @@ export function rankContextCandidates(db, prompt) {
 }
 
 /**
+ * Die Rangfolge dieser Abfrage — und, wenn verlangt, der Warm-Pfad davor.
+ *
+ * Der Warm-Pfad ist OPT-IN (`refresh: true` UND eine Wurzel): ohne beides bleibt
+ * die Abfrage eine reine Indexlesung wie zuvor, damit ein Aufrufer, der den
+ * Baum nicht kennt, nichts anfasst. Die Naht in `index.js` setzt beides.
+ *
+ * Rangfolge VOR dem Auffrischen, weil sie die Kandidatenmenge bestimmt (ein
+ * Kandidat ist, was der Index fuer relevant haelt); nach dem Auffrischen wird
+ * nur dann NEU rangiert, wenn sich am Index wirklich etwas geaendert hat —
+ * sonst zaehlte jede Abfrage zwei Ranglaeufe fuer nichts.
+ *
+ * Ein Fehler des Warm-Pfads bricht die Abfrage NICHT: der Index bleibt die
+ * Quelle, und der Grund geht an `onRefresh` (benannt, nicht verschluckt).
+ */
+function rankedForQuery(db, prompt, options) {
+  const root = typeof options.root === 'string' ? options.root : '';
+  const onRefresh = typeof options.onRefresh === 'function' ? options.onRefresh : null;
+  const ranking = rankContextCandidates(db, prompt);
+  if (options.refresh !== true || root === '') return ranking;
+  const limit = Number.isInteger(options.candidateLimit) && options.candidateLimit >= 0
+    ? options.candidateLimit
+    : WARM_CANDIDATE_LIMIT;
+  let warm;
+  try {
+    const candidates = [
+      ...new Set([
+        ...probeCandidates(root, prompt, limit),
+        ...ranking.slice(0, limit).map((candidate) => candidate.path),
+      ]),
+    ].sort(byPath);
+    warm = refreshIndex(db, root, candidates, {
+      chunkLines: options.chunkLines,
+      maxFileBytes: options.maxFileBytes,
+    });
+  } catch (error) {
+    warm = { contract: WARM_CONTRACT, error: error?.message ?? String(error) };
+  }
+  if (onRefresh !== null) {
+    try {
+      onRefresh(warm);
+    } catch { /* die Senke ist Diagnose, kein Vertrag */ }
+  }
+  const changed = warm?.error === undefined && (warm.written > 0 || warm.removed > 0);
+  return changed ? rankContextCandidates(db, prompt) : ranking;
+}
+
+/**
  * An der Zeilengrenze schneiden. Ein Kontext, der mitten in einer Zeile endet,
  * ist ein halber Ausdruck; ein ganzer Zeilenrest ist wenigstens lesbar.
  */
@@ -1883,7 +2161,7 @@ export function resolveContext(db, options = {}) {
   const project = typeof options.project === 'string' ? options.project : '';
   const charBudget = budget * CHARS_PER_TOKEN;
 
-  const ranked = rankContextCandidates(db, prompt);
+  const ranked = rankedForQuery(db, prompt, options);
   const chunksOf = db.prepare('select body from chunks where path = ? order by start_line');
   const files = [];
   let used = 0;

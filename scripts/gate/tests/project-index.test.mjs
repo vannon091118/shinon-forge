@@ -269,6 +269,9 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       // Die Faehigkeitskarte (2026-10-20): welche Frage gehoert welchem Paket.
       // Daten + reiner Kern; die Zeigerpruefung kommt aus der Provenienz-Leiter.
       { kind: 'import', target: './assets/capability-map.js' },
+      // Die Abbruchquote (Welle 2, 2026-10-20): Klassifikation, Zähler und
+      // Quote als importfreier Kern; `index.js` hängt nur das Ergebnis an.
+      { kind: 'import', target: './assets/abort-core.js' },
       // Die Provenienz-Leiter (2026-10-19): fünf Klassen, Zeigerpflicht,
       // keine Beförderung — ein reiner Kern ohne Bare-Import, damit sein Test
       // ohne node_modules läuft.
