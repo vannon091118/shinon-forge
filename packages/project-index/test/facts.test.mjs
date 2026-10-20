@@ -294,7 +294,9 @@ test('migration: kein Schritt löscht eine Tabelle, und eine neuere Fassung wird
     }
   }
   assert.equal(FACTS_VERSION, MIGRATIONS.length);
-  assert.deepEqual(MIGRATIONS.map((step) => step.to), [1, 2]);
+  assert.deepEqual(MIGRATIONS.map((step) => step.to), [1, 2, 3]);
+  // Zug 2 ergänzt den Extraktions-Hash; ein neuer Schritt fügt hinzu, er baut nicht um.
+  assert.equal(/^alter table facts add column extract_hash text$/.test(MIGRATIONS[2].sql[0]), true);
 
   const dir = tempDir();
   try {

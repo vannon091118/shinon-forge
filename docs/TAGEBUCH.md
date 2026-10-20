@@ -591,6 +591,32 @@ eine echte Migration v1 → v2: der alte Fakt behält Status und Quellen, die ne
 kommt daneben. Kein Migrationsschritt enthält `drop table` oder `delete from`; eine Datei
 mit neuerer Fassung wird abgelehnt statt geraten.
 
+## 2026-10-20 — Wissens-Runtime, Zug 2: Quellen bekommen Extraktoren, Fakten ein Verfallsdatum
+
+Zug 2 trennt zwei Fragen, die vorher eine waren: **woher** ein Fakt stammt und **ob**
+seine Quelle sich inhaltlich geändert hat. `packages/project-index/assets/facts-extract.js`
+kennt genau drei Quellen — Vertragsdatei, Commit-Nachricht, Index-Symbole. Es gibt keinen
+generischen Fallback: eine unbekannte Quelle ist `QUELLE_UNBEKANNT` und liefert nichts.
+Grenzen sind laut, nicht still — ein Wert über 400 Zeichen fällt mit `WERT_ZU_LANG` heraus,
+statt gekürzt zu werden, und eine Quelle über 40 Fakten meldet den Rest als
+`BUDGET_ERSCHOEPFT`. Jeder erzeugte Fakt trägt Zeiger und Revision seiner Quelle und
+startet als `DISCOVERED`; die Extraktion erfindet keine Herkunft.
+
+`facts-invalidate.js` dreht die Abhängigkeitskanten um: ändert sich eine Quelle, werden
+erst ihre direkten Fakten stale und dann alles, was auf ihnen steht. Ein Zyklus ist ein
+Befund (`ZYKLUS`), keine Endlosschleife. Revalidierung hängt am Extraktions-Hash, nicht an
+der Revision: derselbe Inhalt nach neuer Revision macht den Fakt wieder `VALID`; ein
+fehlender oder abweichender Hash lässt ihn `STALE`.
+
+Die Kaskade war zuerst langsam, und die Messung sagt warum: 208,01 ms für 200 Fakten, weil
+`markStale` je Zeile eine eigene Transaktion öffnete und damit je Zeile ein fsync zahlte.
+Gebündelt in einer Transaktion sind es 10,2 ms bei demselben Ergebnis — 200 von 200 Fakten
+stale, 0 übersprungen (`docs/probes/facts-invalidierung.json`).
+
+`packages/project-index/test/facts-pipeline.test.mjs` prüft 11 Fälle, darunter beide
+Mutationen, auf die es ankommt: ein abweichender Hash revalidiert **nicht**, und ein
+unabhängiger Fakt bleibt nach der Änderung einer fremden Quelle `VALID`.
+
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
 **Was fiel:** 73 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`

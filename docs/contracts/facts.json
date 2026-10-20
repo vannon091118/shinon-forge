@@ -1,7 +1,7 @@
 {
   "name": "@shinon/project-index — Faktenebene (Lebenszyklus, Kennung, Quelle, Store)",
   "status": "IMPLEMENTED",
-  "note": "Zug 1 der Wissens-Runtime (docs/WISSENS-RUNTIME-PLAN.md §2). Der reine Kern liegt in packages/project-index/assets/facts-core.js (importfrei), der Speicher in assets/facts-store.js (eigene facts.sqlite, additive Migrationen über PRAGMA user_version). Geprüft von packages/project-index/test/facts.test.mjs: 15 Tests über alle 64 Statuspaare, alle 25 Klassenpaare, jede Zeigerform, Persistenz über einen Neustart, Zyklenverbot und die Migration v1 → v2 mit Erhalt der Zeilen. Die Form prüft das Gate `contracts`. Regeln zu Extraktion (Zug 2), Snapshot (Zug 3), Reconciliation und Post-Checks (Zug 4) folgen in eigenen Sitzungen und erweitern diesen Vertrag additiv.",
+  "note": "Zug 1 der Wissens-Runtime (docs/WISSENS-RUNTIME-PLAN.md §2). Der reine Kern liegt in packages/project-index/assets/facts-core.js (importfrei), der Speicher in assets/facts-store.js (eigene facts.sqlite, additive Migrationen über PRAGMA user_version). Geprüft von packages/project-index/test/facts.test.mjs: 15 Tests über alle 64 Statuspaare, alle 25 Klassenpaare, jede Zeigerform, Persistenz über einen Neustart, Zyklenverbot und die Migration v1 → v2 mit Erhalt der Zeilen. Die Form prüft das Gate `contracts`. Zug 2 ergänzt additiv drei Regeln: die quellenspezifische Extraktion (packages/project-index/assets/facts-extract.js), die STALE-Kaskade über die Umkehrkanten (assets/facts-invalidate.js) und die Revalidierung über den Extraktions-Hash; geprüft von packages/project-index/test/facts-pipeline.test.mjs. Regeln zu Snapshot (Zug 3), Reconciliation und Post-Checks (Zug 4) folgen in eigenen Sitzungen und erweitern diesen Vertrag additiv.",
   "contract": "shinon.facts/v1",
   "store": {
     "file": "facts.sqlite (eigene Datei im Zustandsordner, nicht die des Index)",
@@ -75,6 +75,33 @@
       "trace": "facts.status und facts.status_at tragen den Weg; die Quellen beider Seiten stehen in fact_sources. Die vollständige Reconciliation-Regel folgt in Zug 4 und erweitert diesen Vertrag additiv.",
       "replay": "Die Regel ist heute als Übergangstabelle prüfbar: VALID erreicht REJECTED nur über DISPUTED, und der Test prüft genau diesen Weg.",
       "invariant": "Ein gelöster Widerspruch hat einen Akteur und einen Zeitpunkt; ein ungelöster bleibt DISPUTED und verschwindet nicht."
+    },
+    {
+      "positive": "Eine Quelle wird von genau einem Extraktor gelesen: Vertragsdatei (contract), Commit-Nachricht (commit) oder Index-Symbole (symbols). Der Extraktor erzeugt Aussagen samt Quelle und Revision und liefert sie sortiert, sodass derselbe Inhalt dieselbe Liste und denselben Extraktions-Hash ergibt.",
+      "forbidden": "Ein generischer Extraktor, der beliebigen Text in Zeilen oder Sätze zerlegt; eine Ausgabe ohne Quelle; eine Reihenfolge, die von der Eingabereihenfolge abhängt; ein stilles Abschneiden eines zu langen Werts.",
+      "fallback": "Eine unbekannte Quelle ist ein Befund (QUELLE_UNBEKANNT) und liefert keine Fakten; ein zu langer Wert wird mit WERT_ZU_LANG verworfen, ein Rest über dem Budget mit BUDGET_ERSCHOEPFT gemeldet — nie gekürzt.",
+      "error": "QUELLE_UNBEKANNT, QUELLE_UNLESBAR, QUELLE_OHNE_REGELN, QUELLE_FORM, QUELLE_OHNE_PFAD, QUELLE_OHNE_REVISION, WERT_ZU_LANG, BUDGET_ERSCHOEPFT",
+      "trace": "extractFacts gibt { ok, facts, dropped, error } zurück; dropped nennt Index und Grund. Jeder Fakt trägt pointer und rev seiner Quelle und startet als DISCOVERED.",
+      "replay": "Die Extraktoren sind reine Funktionen über den Quelltext: derselbe Inhalt ergibt dieselbe Faktenliste, und der Test vergleicht zwei Läufe sowie die sortierte Symbolausgabe gegen vertauschte Eingabe.",
+      "invariant": "Kein Fakt ohne Quelle und Revision; die Ausgabe ist sortiert, und MAX_VALUE_CHARS = 400 sowie MAX_FACTS_PER_SOURCE = 40 sind harte Grenzen mit Befund."
+    },
+    {
+      "positive": "Eine geänderte Quelle macht ihre direkten Fakten STALE und danach alles, was auf ihnen steht; die Kaskade folgt den Umkehrkanten von fact_deps und ist deterministisch sortiert.",
+      "forbidden": "Eine Invalidierung über Vorwärtskanten (die Abhängigkeiten des Fakts statt seiner Nachfolger), eine Reihenfolge nach Einfügezeit, eine stillschweigende Teilmengen-Invalidierung und eine Kaskade über einen zyklischen Graphen.",
+      "fallback": "Ein Zyklus ist ein Befund: staleClosure gibt { ok: false, reason: 'ZYKLUS' } zurück und markiert nichts, statt zu kreisen oder willkürlich zu stoppen.",
+      "error": "ZYKLUS (aus staleClosure/findCycle), QUELLE_UNBEKANNT (applySourceChange auf einen Zeiger ohne Fakten)",
+      "trace": "applySourceChange nennt die revalidierten und die stale gesetzten Kennungen; markStale schreibt die ganze Kaskade in einer Transaktion und meldet übersprungene Einträge mit Grund.",
+      "replay": "reverseEdges und staleClosure sind rein: derselbe Graph ergibt dieselbe sortierte Liste, und der Test ruft die Kaskade zweimal auf und vergleicht.",
+      "invariant": "Jede Kaskade enthält ihre direkten Fakten; kein unabhängiger Fakt wird stale, und jede Kennung steht höchstens einmal in der Liste."
+    },
+    {
+      "positive": "Trägt eine geänderte Quelle denselben Extraktions-Hash wie zuvor, gilt der Fakt wieder: der Weg führt über VALIDATING nach VALID mit dem Akteur validator.",
+      "forbidden": "Eine Revalidierung ohne vorherigen Hash, mit einem abweichenden Hash, ohne Akteur oder durch direkten Sprung von STALE nach VALID.",
+      "fallback": "Fehlt einer der beiden Hashes oder unterscheiden sie sich, bleibt es bei STALE; mayRevalidate nennt den Grund (KEIN_VORHERIGER_HASH, KEIN_NEUER_HASH, INHALT_GEAENDERT).",
+      "error": "KEIN_VORHERIGER_HASH, KEIN_NEUER_HASH, INHALT_GEAENDERT, UEBERGANG_VERBOTEN (Sprung ohne VALIDATING)",
+      "trace": "facts.extract_hash trägt den Fingerabdruck des Wissensinhalts; der Test setzt einen Fakt auf STALE, schickt denselben Hash und prüft Status VALID sowie die gewanderte Revision, und schickt danach einen anderen Hash und prüft, dass er nicht revalidiert.",
+      "replay": "mayRevalidate ist eine reine Vergleichesfunktion ohne Zustand; extractionHash hängt nur von den sortierten Aussagen ab, nicht von der Kennung oder der Zeit.",
+      "invariant": "Revalidiert wird nur bei Gleichheit zweier vorhandener Hashes; ein anderer Hash führt immer zu STALE."
     }
   ]
 }
