@@ -727,6 +727,45 @@ dass sie begrenzt ist und eine bestehende Absicht nicht überschreibt.
 
 ---
 
+## 2026-10-21 — Der CodingMon-Branch holt sich `main` zurück, und zwei Zahlen werden bewusst angehoben
+
+Der Branch `feat/codingmon-50-zucht-visual-gamification` stand drei Tage still, während
+`main` um 70 Commits weiterlief — Wissens-Runtime, Skill-Lebenszyklus, Paketbau. Dazu lag
+im Arbeitsbaum des Hauptordners ein Zwischenstand von 427 Dateien, den niemand committet
+hatte: der Branch selbst plus der damalige Arbeitsbaum der Mission. Bevor irgendetwas
+zusammengeführt wurde, stand deshalb die Sicherung: `git commit-tree` schrieb den Baum als
+Commit, ein Tag hält ihn fest, und erst danach wurde der Arbeitsbaum auf `HEAD`
+zurückgesetzt. Nichts, was in keinem Commit stand, ist bei diesem Zug verloren gegangen.
+
+Der Merge selbst war kleiner, als der Abstand vermuten ließ: fünf Konflikte. Zwei davon
+gehören `main` (`docs/INDEX.md` ist dort neu geschnitten, `scripts/gate/tests/project-index.test.mjs`
+trägt die zuletzt am Runner gemessene Eventloop-Größe), drei gehören dem Branch
+(`mechanik.js`, `snapshot-schema.js`, `sprites.test.mjs`). Die eigentliche Entscheidung war
+die Paketgrenze: `packages/codingmon/` gilt als Ganzes vom Branch — die ausgelagerten
+Tabellen in `assets/katalog.js`, die Zucht, die Migration und der 50-Arten-Katalog sind
+**eine** Fassung. Ein zeilenweiser Automatik-Merge hätte hier zwei Implementierungen
+übereinandergelegt, und das Ergebnis wäre an jeder Stelle erkennbar und an keiner benutzbar.
+
+Zwei Zahlen des Struktur-Riegels mussten danach steigen, und das ist die unangenehme
+Hälfte des Tages. `packages/codingmon/client.js` wuchs mit dem Zucht-Spiegel von 1988 auf
+2371 Zeilen. Teilen geht hier nicht: eine Client-Hälfte ist ein selbsttragendes Bündel, sie
+kann nicht relativ importieren, und genau deshalb trägt die Klasse `client` einen eigenen
+Bestand statt einer Grenze, die sie nie erreicht. Die Alternative — 380 Zeilen lebende Spiellogik löschen, damit eine Zahl
+hält — wäre die schlechtere Lüge. `packages/codingmon/test/durchstich.test.mjs` wuchs von
+777 auf 784 Zeilen, weil die Paritätstests jetzt 50 statt 10 Spezies prüfen. Beide Zahlen
+sind in `docs/contracts/structure.json` mit dieser Herleitung angehoben; der Regeltext
+nennt die Ausnahme jetzt ausdrücklich, statt sie zu verschweigen.
+
+Der 214 Zeilen lange Implementierungsvertrag aus dem Oktober ist dabei entfallen: er
+beschrieb einen Plan („Produktionscode ist noch nicht integriert"), den der Branch selbst
+widerlegt. Was daran bindend bleibt, steht als zwei Zeilen in `docs/ROADMAP.md` §2.2.
+
+**Anker:** `6ee5533` · Belege: `packages/codingmon/assets/katalog.js`, `packages/codingmon/assets/zucht.js`, `packages/codingmon/assets/migration.js`, `docs/contracts/structure.json`, `docs/ROADMAP.md`
+
+Belege: `npm run test:codingmon` **PASS Exit 0, 63 von 63 Tests, 0 übersprungen**.
+
+---
+
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
 **Was fiel:** 73 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`
