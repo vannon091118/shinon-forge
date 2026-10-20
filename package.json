@@ -38,7 +38,7 @@
     "test:codingmon": "node scripts/run-with-node.mjs node --test packages/codingmon/test/*.test.mjs",
     "test:scoring": "node scripts/run-with-node.mjs node --test packages/scoring/test/*.test.mjs",
     "test:claims": "node scripts/run-with-node.mjs node --test packages/persona/test/*.test.mjs",
-    "test:facts": "node scripts/run-with-node.mjs node --test packages/project-index/test/facts.test.mjs packages/project-index/test/facts-pipeline.test.mjs packages/project-index/test/facts-snapshot.test.mjs packages/project-index/test/facts-reconcile.test.mjs",
+    "test:facts": "node scripts/run-with-node.mjs node --test packages/project-index/test/facts.test.mjs packages/project-index/test/facts-pipeline.test.mjs packages/project-index/test/facts-snapshot.test.mjs packages/project-index/test/facts-reconcile.test.mjs packages/project-index/test/facts-service.test.mjs",
     "test:prompter": "node scripts/run-with-node.mjs node --test packages/prompter/test/*.test.mjs",
     "test:narrative": "node scripts/run-with-node.mjs node --test packages/narrative/test/*.test.mjs",
     "test:popup": "node scripts/run-with-node.mjs node --test packages/popup/test/*.test.mjs",

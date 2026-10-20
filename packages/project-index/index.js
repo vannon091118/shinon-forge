@@ -425,7 +425,7 @@ export function apply(ctx, config) {
   // Die dritte, schmale Faehigkeit (Zug 3): der Prompter liest einen Snapshot,
   // nie die Datenbank. Fehlt die Datei, ist der Dienst ehrlich leer.
   const releaseFacts = canProvide
-    ? ctx.provide(FACTS_SNAPSHOT_SERVICE, createFactsService({ file: factsFile, trace: config.trace }))
+    ? ctx.provide(FACTS_SNAPSHOT_SERVICE, createFactsService({ file: factsFile, root: options.root, trace: config.trace }))
     : null;
   const factsState = canProvide
     ? `Fakten ${FACTS_SNAPSHOT_SERVICE} bereitgestellt (${FACTS_SNAPSHOT_CONTRACT}: ${factsFile})`
