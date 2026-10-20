@@ -319,7 +319,14 @@ Heute: `AGENTS.md`, `scripts/lib/commit-text.mjs`, `.github/workflows/release.ym
 
 ---
 
-## 2026-10-20 — Sechzehn Zwillinge werden einer
+## 2026-10-20 — Sechzehn Zwillinge werden einer, und die Wissens-Runtime bekommt einen Ort
+
+Dieses Kapitel ist der Tag, an dem der Baum umgebaut, ausgeliefert, mit Skills versorgt
+und um eine Wissens-Runtime erweitert wurde. Es steht als **ein** Tageskapitel da, weil das
+Tagebuch einen Tag nicht in acht Kapitel zerlegt — die Abschnitte darunter sind Etappen
+desselben Tages, nicht eigene Tage.
+
+**Anker:** `4a1bc31..ae0991d` · Tag: die zweite Hälfte des Tages in einem Bereich · Belege: `packages/task-router/assets/goal-budget.js`, `packages/task-router/assets/intent-policy.js`, `docs/probes/h5-entscheidung.json`, `docs/contracts/structure.json`, `packages/project-index/assets/facts-core.js`, `docs/contracts/facts.json`
 
 `d0691b2` gab dem Main-Agenten eine Fähigkeitskarte und einen Aufgabenbrief. Dann die
 drei Wellen: Riegel, Matrix, Form (`09827dc`), die gemessene Abbruchquote (`5ab788e`),
@@ -534,11 +541,9 @@ Auschecken desselben Repos teilen sich ein DSH-Home, und die Seeding-Regel
 verweigert dann korrekt den fremden Link. Beides gehoert in die Hand des
 Menschen, nicht in eine stille Ueberschreibung.
 
-**Anker:** `4a1bc31` · Belege: `scripts/lib/payload.mjs`, `scripts/lib/huelle.mjs`, `scripts/deb-build.mjs`, `scripts/win-build.mjs`, `.github/workflows/package-build.yml`, `scripts/gate/tests/packaging.test.mjs`, `docs/probes/pakete-2026-10-20.md`
-
 ---
 
-## 2026-10-20 — Der Skill-Lebenszyklus: ein Weg, nicht zwei
+### Der Skill-Lebenszyklus: ein Weg, nicht zwei
 
 Die Lernzettel (`generated-skills/*.json`) waren eine zweite Wahrheitsquelle neben
 `.agents/skills/*/SKILL.md`. Zwei Zettel wurden in `shinon-dev-workflow` und
@@ -563,7 +568,7 @@ Nicht gemessen: ein echter Modellturn mit Lernauslösung und Veröffentlichung i
 Der Host-Test fährt die Pfade mit einem Fake-LLM; die DSH-Entdeckung ist über den nativen
 Skill-Provider gemessen (`scripts/gate/tests/skill-discovery.test.mjs`, 42 ms bis zum Katalog).
 
-## 2026-10-20 — Wissens-Runtime, Zug 1: Fakten bekommen einen eigenen Ort
+### Wissens-Runtime, Zug 1: Fakten bekommen einen eigenen Ort
 
 Die Wissens-Runtime beginnt mit dem Vertrag, nicht mit dem Feature. `docs/contracts/facts.json`
 trägt sieben Regeln in der 7-Punkt-Form: Lebenszyklus, Kennung, Quelle, Klasse,
@@ -591,7 +596,7 @@ eine echte Migration v1 → v2: der alte Fakt behält Status und Quellen, die ne
 kommt daneben. Kein Migrationsschritt enthält `drop table` oder `delete from`; eine Datei
 mit neuerer Fassung wird abgelehnt statt geraten.
 
-## 2026-10-20 — Wissens-Runtime, Zug 2: Quellen bekommen Extraktoren, Fakten ein Verfallsdatum
+### Wissens-Runtime, Zug 2: Quellen bekommen Extraktoren, Fakten ein Verfallsdatum
 
 Zug 2 trennt zwei Fragen, die vorher eine waren: **woher** ein Fakt stammt und **ob**
 seine Quelle sich inhaltlich geändert hat. `packages/project-index/assets/facts-extract.js`
@@ -617,7 +622,7 @@ stale, 0 übersprungen (`docs/probes/facts-invalidierung.json`).
 Mutationen, auf die es ankommt: ein abweichender Hash revalidiert **nicht**, und ein
 unabhängiger Fakt bleibt nach der Änderung einer fremden Quelle `VALID`.
 
-## 2026-10-20 — Wissens-Runtime, Zug 3: der Block kommt aus der Runtime, nicht aus dem Modell
+### Wissens-Runtime, Zug 3: der Block kommt aus der Runtime, nicht aus dem Modell
 
 Zug 3 schließt die Lücke, die den ganzen Plan trägt: geprüftes Wissen muss beim
 Hauptmodell ankommen, auch wenn der One-Shot nichts davon erwähnt. `facts-snapshot.js`
@@ -643,7 +648,7 @@ Der Projekt-Index bietet jetzt eine **dritte** schmale Fähigkeit an; die beiden
 die die Naht pinnen, sind additiv erweitert (`shinon_facts_snapshot` mit genau `contract`
 und `snapshot`). Keine bestehende Naht wurde geweitet.
 
-## 2026-10-20 — Wissens-Runtime, Zug 4: Widersprüche bleiben stehen, Prüfungen werden belegt
+### Wissens-Runtime, Zug 4: Widersprüche bleiben stehen, Prüfungen werden belegt
 
 Zug 4 führt zusammen, was zusammengehört, und lässt stehen, was sich widerspricht.
 `facts-reconcile.js` gruppiert nach Scope, Subjekt und Prädikat: gleicher Wert ergibt **einen**
@@ -662,7 +667,7 @@ im wissensgebundenen Weg (`strictFacts`) eine unbekannte Referenz mit
 Der Modus hängt am Snapshot, nicht an einer Einstellung: `pre-step.js` liest den Snapshot
 vor dem One-Shot und schaltet ihn nur dann ein.
 
-## 2026-10-20 — Wissens-Runtime, Zug 5: ein Vorschlag wird nicht durch Wiederholung wahr
+### Wissens-Runtime, Zug 5: ein Vorschlag wird nicht durch Wiederholung wahr
 
 Der Claim-Lebenszyklus liegt in `packages/persona/assets/claim-core.js` und ist rein:
 `proposed → accepted/rejected → superseded`, mit einer Tabelle, die den Akteur prüft.
@@ -682,6 +687,45 @@ als **Vorschlag** im bestehenden `proposals`-Feld des Gedächtnisses ab und übe
 Grund `NICHT_ENTSCHIEDEN`. `observeJudgement` schreibt nur Kürzel wie `urteil:DENY` in die
 Gründe des Selbstmodells; ein fehlendes Urteil zählt als DENY, nie als ALLOW. Damit hat die
 Persona weiterhin genau eine Wahrheit, und die Scoring bleibt eine Signalquelle.
+
+### Autonomie: die Fortsetzung bekommt eine Grenze, die Aktivierung eine Bedingung
+
+Der Autonomie-Schritt war der letzte offene Punkt aus §17: eine automatisch aktivierte
+Fortsetzung ist eine Entscheidung über **fremdes** Budget — jede Runde ist ein vollständiger
+Agentenschritt mit Modellaufrufen. Bis heute ging `maxGoalRounds` aus der Config ungeprüft
+an DSH: ein Profilwert von `0` oder von einer Million wäre still durchgereicht worden, und
+niemand hätte am Entscheidungsdatensatz gesehen, dass die Fortsetzung nicht das tut, was
+dasteht. `goalRoundsVerdict` prüft die Zahl jetzt **vor** dem `create` — keine Zahl oder
+kleiner als 1 heißt `ROUNDS_UNGUELTIG`, über der Obergrenze `ROUNDS_ZU_HOCH`. Gekappt wird
+nichts: ein still gekürzter Wert behauptete später eine andere Rundenzahl als die, mit der
+DSH wirklich läuft. Shinons Obergrenze liegt bei 12 Runden gegen DSHs 256; die Zahl ist
+eine Entscheidung im Profil, keine Konstante im Paket.
+
+Die zweite Hälfte ist unangenehmer, weil sie nichts baut: **H5 ist nicht gemessen.**
+Benchmark 4.6 aus `docs/ROADMAP.md` §2.3 verlangt Aufgaben-Set, DSH-Baseline und einen
+Shinon-Messwert — keines davon existiert in diesem Baum. Also bleibt `activate: false`
+stehen, und das ist die Entscheidung, nicht ihr Fehlen. `docs/probes/h5-entscheidung.json`
+schreibt genau das auf, mit `verdict: NOT_MEASURED`. Damit die Zusage nicht nur im Text
+steht, liest `scripts/gate/tests/task-router-h5.test.mjs` **beide** Dateien und vergleicht
+sie: solange die Probe `NOT_MEASURED` sagt, darf im Profil kein `activate: true` stehen —
+und umgekehrt muss ein belegtes H5 den Schalter einschalten. Die Gegenprobe ist gefahren:
+mit `activate: true` im Profil wird der Test rot, danach zurückgespielt.
+
+Nebenbei hat der Zug eine Grenze sichtbar gemacht, die vorher nur im Vertrag stand:
+`packages/task-router/index.js` stand auf seinem eingefrorenen Bestand von 797 Zeilen und
+wäre mit der Runden-Policy auf 833 gewachsen. Statt den Eintrag zu erhöhen, sind zwei
+Eigentümer ausgezogen — `assets/goal-budget.js` (Default, Obergrenze, Prüfung) und
+`assets/intent-policy.js` (§16-Vokabular und Gewichte). Beide sind importfrei; `index.js`
+re-exportiert die Namen wortgleich und steht jetzt bei 770 Zeilen. Der Eintrag in
+`docs/contracts/structure.json` ist auf 770 gesenkt, weil er nur sinken darf.
+
+Belege: `npm run gate:test` **801 pass, 0 fail, 2 sichtbar geskippt, Exit 0**;
+`npm test` **PASS, Exit 0**; `task-router.test.mjs` + `task-router-h5.test.mjs` **31 von
+31 grün**. Grenze, benannt: es gibt weiterhin keinen Modellturn mit echtem Schlüssel, also
+keine Aussage darüber, ob eine automatische Fortsetzung besser arbeitet — nur darüber,
+dass sie begrenzt ist und eine bestehende Absicht nicht überschreibt.
+
+---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
