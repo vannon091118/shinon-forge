@@ -405,6 +405,47 @@ Strassenschild, das Laden ist der Weg. Die Zaehlungen aller vier Laeufe stehen
 in `docs/ZAHLEN.md` §2, jeder mit Exit 0; die einzige Ausnahme bleibt die
 Branding-Messung, die ohne Chromium sichtbar uebersprungen wird.
 
+Der Tag endet mit dem Beleg, den keine Pruefung ersetzen kann: **ein echter
+Modellturn** ueber das Profil `shinon`, Route `prompter/agnes-2.5-flash`, im
+Modus Read Only, Frage nach Zeilenobergrenze und Klasse aus
+`docs/contracts/structure.json`. Er lief durch: erster sichtbarer Text nach
+2 963 ms, fertige Antwort nach 33 s, zwei Schritte, und die Antwort stimmt
+(550, `core`). Die Token-, Latenz- und Indexzahlen stehen mit Route und
+Zeitstempel in `docs/ZAHLEN.md` — hier steht, was sie bedeuten.
+
+Der warme Index hat in diesem Lauf **geliefert**: `context_source=index` im
+Tracesatz, 41 Dateien, 38,97 ms Median, und die zwei Dateien, die das Modell
+dann selbst las (`structure.json`, `pre-step.js`), standen auf Platz eins und
+zwei. Das ist die Trefferquote, die zaehlt: nicht wie viele Chunks im Kontext
+liegen, sondern ob die richtigen darunter sind. Beim Boot hatte der Index 434
+Dateien gelesen, eine wegen Groesse uebersprungen und drei Zugangsdateien nie
+geladen — die Grenze ist benannt, nicht still.
+
+Der Prompter hat den Prompt ersetzt (One-Shot angenommen, 4 444 ms, 11 078
+Token hinein) und diesmal `intent=LOOKUP` erkannt statt `UNDEFINED` wie in
+allen neun Turns des Leitstand-Laufs vom 19. — die Faehigkeitskarte hatte fuer
+diese Frage allerdings keinen Treffer (`brief=KEIN_TREFFER`), weil sie die
+Frage nach dem Struktur-Riegel nicht kennt. Ein Nein an der richtigen Stelle.
+
+Die **Abbruchstrecke griff nicht**, und das ist das ehrliche Ergebnis: `abort=0/1`,
+null Abbrueche in einem Turn, 4 444 von 15 000 ms verbraucht. Eine Strecke, die
+nicht ausgeloest wird, ist nicht geprueft, nur bereit — der Zaehler steht im
+Trace, die Bedingung trat nicht ein. Wer sie unter Last sehen will, braucht
+einen zweiten Turn; dieser Pass durfte genau einen fahren.
+
+Der **Begleiter** hat seine Abnahme: `shinon_codingmon_store` wird im echten
+Cordis-Root unter `shinon.codingmon/store-v1` bereitgestellt (4 von 4 Faellen,
+kein Skip), der laufende Host meldet „Spiegel aktiv — Domain codingmon_pet v1,
+Empfaenger codingmon/writeSnapshot", und ueber `shinon.capabilities/v1` ist der
+Dienst auffindbar: die Frage „Wo lebt der Begleiter (Pet)?" trifft
+`pet-und-begleiter`, der Brief nennt Dienst und Vertrag. Was **nicht** passierte:
+ein Stand ging nicht ueber die Leitung — der Browser haengt seine Remote-
+Beitraege aus einer kompilierten Liste ein (`@deepseek-ai/dsh-api-remotes`), und
+diese Liste kennt `codingmon` nicht. Der Dienst ist da, der Anrufer fehlt; die
+Luecke steht seit dem 2026-10-19 in `AGENTS.md` und ist hier zum ersten Mal an
+einem echten Lauf ablesbar. Eine Ablage ohne Anruf ist wie ein Briefkasten ohne
+Einwurf — er ist vorhanden, leer und gepflegt.
+
 Heute zusaetzlich: `scripts/lib/diary.mjs`, `scripts/lib/canon.mjs`,
 `scripts/lib/structure.mjs`, `docs/contracts/structure.json`,
 `packages/prompter/assets/pre-step.js`, `packages/prompter/assets/runtime-state.js`,
