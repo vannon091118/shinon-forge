@@ -339,7 +339,7 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `npm run notes:check` (`scripts/notes-check.mjs`) — Notizen-Integrität prüfen.
 - `npm run dev:web` / `npm run dev:mobile` — Profil-Starts mit festen Ports/URLs.
 - `npm run test:mobile-profile` / `npm run dev:web` — Mobile-Profil-Kontrakt (`profiles/mobile`).
-- `npm run test:codingmon` (bereits genannt), zusätzlich: `test:scoring`, `test:token`, `test:prompter`, `test:narrative`, `test:popup`, `test:key-router`, `test:traceability`, `test:hook` — Paket-eigene Slicen; alle über `scripts/run-with-node.mjs`.
+- `npm run test:codingmon` (bereits genannt), zusätzlich: `test:scoring`, `test:token`, `test:prompter`, `test:narrative`, `test:popup`, `test:key-router`, `test:traceability`, `test:hook`, `test:facts` (Faktenkern, Pipeline, Snapshot, Reconciliation, Dienst), `test:claims` (Claim-Lebenszyklus der Persona) — Paket-eigene Slicen; alle über `scripts/run-with-node.mjs`.
 - `npm run s6:check` / `s6:boot` / `s6:stop` — Turn-Zyklus (S6) Steuerung (`scripts/s6-turn.mjs`).
 - `npm run perf:baseline` (`scripts/perf-baseline.mjs`), `index:warm` / `index:cold-cost` / `index:match-eq` — Index-Leistungsnachweise.
 - `npm run desktop:launcher` / `desktop:launcher:uninstall` — Desktop-Installer (`scripts/desktop-launcher.mjs`).
@@ -376,10 +376,14 @@ Alle Skripte laufen über `scripts/run-with-node.mjs` (verifizierter Node ≥ 22
   a  placeholder: it reads the real `workspaces`/`sessions` services (evidence:
   `docs/probes/workspace-list.json`). The `dead-package` gate flags any package missing from
   the profile.
-- The Project Index offers **two** narrow capabilities, each with its own contract name:
-  `shinon_index_query` (`resolveContext`, Plan §14/§17 — the MAX context) and
+- The Project Index offers **three** narrow capabilities, each with its own contract name:
+  `shinon_index_query` (`resolveContext`, Plan §14/§17 — the MAX context),
   `shinon_index_store` (`load`/`save` on one namespace, `shinon.project-index/store-v1` — the
-  Scoring's durable memory, Zug 2). Never widen the first one: the context seam is pinned by
+  Scoring's durable memory, Zug 2) and `shinon_facts_snapshot` (`snapshot`, read-only, contract
+  `shinon.facts/snapshot-v1` — der Wissensblock des Prompters, Wissens-Runtime Zug 3: nur
+  `VALID` kommt hinein, das Budget bricht mit `BUDGET_UEBERSCHRITTEN` samt Soll und Ist ab
+  und kürzt nie still, eine fehlende Faktendatei ergibt `null` statt eines erfundenen
+  Blocks). Never widen the first one: the context seam is pinned by
   test to exactly `['contract', 'resolveContext']`, so a *second* narrow service is the
   answer, never a bigger one. The `memory` table is the only part of the index that is **not**
   derived from the project (judgements, their subject, the computed scorecard), so a
