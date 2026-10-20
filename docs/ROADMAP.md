@@ -68,6 +68,8 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 - Codingmon-Folge: Ereignis-Adapter an echten Lauf-Ereignissen (6.1/6.2-Rest), Kampfende am Agent-Ende (6.4).
 - Bedienung ohne Doku (7.1), Lokalisierung ohne Fallback-Tabellen (7.2), QoL-Liste mit Status je Punkt (7.3, wartet auf die Nutzerliste), Design aus Token-Datei (7.4).
 - Scoring-Folge: K8 Fakten-Store (Weg konkretisiert in `docs/WISSENS-RUNTIME-PLAN.md`, Züge 1–4 mit Probe je Zug; Konsolidierung, hartes Limit; Ablage liegt bereit), K7b taktische Skill-Erzeugung (Schreibweg bricht K4 — braucht Entscheidung; Ablage `generated-skills/` steht).
+- **Urteilsschicht** (L2 des historischen Plans; Befund in `docs/VISION-ABGLEICH.md` §3 A): der Fakten-Store aus K8 ist die untere Hälfte — es fehlt das Organ, das daraus ein **Urteil** macht. Abnahme: eine Behauptung überquert eine Paketgrenze, ihr Status hebt sich von `unverified` auf `supported` ohne menschliche Bestätigung, ein `CONFLICT` erscheint im Snapshot **und verweigert die Aktion**.
+- **Zwei DoD-Punkte, die in keiner offenen Liste standen** (Befund `docs/VISION-ABGLEICH.md` §3 F): Capability Router (Phase 8 — alternative Fähigkeitspfade nach Priorität auflösen) und Browser Vision (Phase 9, `packages/vision-fallback/`). Sie stehen hier, damit sie nicht verschwinden; **keine Zusagen** — was landet, entscheidet der Betreiber.
 - `profiles/`-Umbau auf Code-Konfiguration (3.6) — nur wenn ein fremder Boot daraus liest/schreibt; derzeit angehalten.
 - Overlay-MVP (3.8) — blockiert, bis die drei Upstream-Punkte entschieden sind (Slot-Definition, Launcher-only-Patch, Remote-Listen-Extensibilität).
 - Onboarding (Eignerentscheidung): keine fest verdrahteten Modell-/Provider-Defaults — der Nutzer entscheidet beim Einstieg, ob der Prompter dasselbe Modell und denselben Schlüssel nutzt oder eigene; Anker ist die DSH-seitige API-Key-Abfrage beim First-Start.
@@ -75,6 +77,10 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
   hält 1526 Zeilen und 18 `let`-Bindungen in EINEM `apply`-Closure — der Prompter-Schnitt
   (2026-10-20) ging, weil dort schon ein `runtime`-Objekt der alleinige Zustand war. Hier
   steht zuerst der Zustands-Eigentümer auf dem Programm; erst danach dieselbe Teilung.
+  Danach die **Eigentümerfrage**: heute steuert die Haltung das Verhalten
+  (`packages/prompter/assets/pre-step.js` liest sie aus dem Scoring), und die Persona liest
+  denselben Dienst nur — ob die Persona den Zustand besitzt oder nur darstellt, ist eine
+  Betreiberentscheidung (Befund `docs/VISION-ABGLEICH.md` §3 B).
 - Architektur-Folge aus dem Audit: Workspace-Twin zusammenlegen (C3), Prompt-Schichten zu einem Assembler (C4), `preset shinon` statt `cordis`, Katalog-Snapshot statt Einzelprüfungen (P2).
 - Vendor-Baum zu Hash-Manifest verdichten (B5); `.session-eval/`-Zweck klären (B7-Rest; K5-Offenpunkte aus dem Report: Scope-Erkennung, Fehler-Turn-Signal, K7a-Kopplung — siehe Archiv).
 

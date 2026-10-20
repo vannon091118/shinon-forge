@@ -34,6 +34,7 @@ wiederholen keine offenen Punkte — die stehen in `ROADMAP.md`.
 | [`CI-UND-GATES.md`](CI-UND-GATES.md) | Gate-Engine und ihre Plugins, policy.json, Git-Hooks, die vier GitHub-Workflows, Testpfade |
 | [`PAKETE.md`](PAKETE.md) | Nachschlagewerk zu allen Paketen unter `packages/`: Zweck, Eintritt, Tests, Naht |
 | [`SCRIPTS.md`](SCRIPTS.md) | Nachschlagewerk zu `scripts/` und `bin/`: Zweck jedes Skripts und ob ein npm-Script darauf zeigt |
+| [`VISION-ABGLEICH.md`](VISION-ABGLEICH.md) | Befund: die Vision (fünf Organe, ein Kreislauf) gegen den Code-Kern — wo er abweicht, wie tief, und welche Probe fehlt |
 
 ## Verträge und Proben
 
@@ -47,5 +48,6 @@ wiederholen keine offenen Punkte — die stehen in `ROADMAP.md`.
 1. [`IDEA.md`](../IDEA.md) — drei Prinzipien (22 Zeilen).
 2. [`../README.md`](../README.md) — Quickstart und Überblick.
 3. [`ARCHITEKTUR.md`](ARCHITEKTUR.md) — wie der Baum hängt.
-4. [`../AGENTS.md`](../AGENTS.md) — verbindliche Regeln, bevor die erste Änderung entsteht.
-5. [`TAGEBUCH.md`](TAGEBUCH.md) — was wann warum geschah.
+4. [`VISION-ABGLEICH.md`](VISION-ABGLEICH.md) — was der Code-Kern heute ist und wo er von der Vision abweicht.
+5. [`../AGENTS.md`](../AGENTS.md) — verbindliche Regeln, bevor die erste Änderung entsteht.
+6. [`TAGEBUCH.md`](TAGEBUCH.md) — was wann warum geschah.

@@ -376,12 +376,15 @@ Alle Skripte laufen über `scripts/run-with-node.mjs` (verifizierter Node ≥ 22
   `scripts/gate/tests/context-wiring.test.mjs` (names) and
   `scripts/gate/tests/scoring-memory.test.mjs` (behaviour: signal → value → restart →
   retraction → late criticism → corrupt index).
-- Documentation: `docs/` carries exactly four prose files — `TAGEBUCH.md` (history),
-  `ZAHLEN.md` (numbers), `ROADMAP.md` (open work), `COMMIT-REGELN.md` (enforcement) —
-  plus `contracts/` and `probes/`. Everything else was cut on 2026-10-20; what it said
-  lives in the diary, anchored to commits. History belongs in `docs/TAGEBUCH.md`, never
-  in a new file. Hard numbers (packages, layers, test counts, versions) have exactly
-  **one** owner: `docs/ZAHLEN.md` — read it before writing a number anywhere.
+- Documentation: `docs/` carries the operating documents and the map that says who
+  is responsible for what (`docs/INDEX.md`): history in `docs/TAGEBUCH.md`, numbers in
+  `docs/ZAHLEN.md`, open work in `docs/ROADMAP.md`, enforcement in
+  `docs/COMMIT-REGELN.md` — plus `contracts/` and `probes/`. The bulk of the prose was
+  cut on 2026-10-20; what it said lives in the diary, anchored to commits. History
+  belongs in `docs/TAGEBUCH.md`, never in a new file; a new document belongs in `docs/`
+  **and** in the map `docs/INDEX.md`. Hard numbers (packages, layers, test counts,
+  versions) have exactly **one** owner: `docs/ZAHLEN.md` — read it before writing a
+  number anywhere.
   `npm run zahlen:check` covers the generated inventory block; the run table in §2 is
   measured per pass.
 - A Client -> Host endpoint needs someone to SELECT it. Host-side `./typert` discovery exists

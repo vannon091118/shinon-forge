@@ -453,6 +453,33 @@ Heute zusaetzlich: `scripts/lib/diary.mjs`, `scripts/lib/canon.mjs`,
 
 **Anker:** `d0691b2..1a5b1d4` · Tag: 17 Commits bis `1a5b1d4` · Belege: `packages/seams/assets/seams.js`, `packages/seams/assets/seams.json`, `scripts/gate/tests/seams-core.test.mjs`, `docs/contracts/structure.json`, `packages/prompter/assets/pre-step.js`
 
+### Der Befund am Abend: die Vision gegen den Code-Kern
+
+Der Tag hatte mit dem echten Turn angefangen und endete mit einer Frage, die
+die vorherige Arbeit von oben sieht: **was ist der Kern des Codes heute, und wo
+weicht er von der Vision ab?** Nicht als Absicht, sondern als Befund mit
+Pfaden — die Vision aus dem Roh-Export (`git show ffbf721:IDEA.md`), dem
+historischen Plan und dem Schichtenplan; der Ist-Stand aus dem Baum.
+
+Das Ergebnis ist unbequem und präzise: die **Form** ist präziser als die
+Vision — alle Verträge unter `docs/contracts/` tragen die sieben Punkte, die
+Gate-Engine ist echt, Replay, Provenienz, Narrative, Self-Model und Gedächtnis
+sind gebaut. Die **Substanz** ist eine Ebene zu dünn: es gibt kein Organ, das
+fragt, ob eine Aussage wahr ist; die Haltung, die das Verhalten steuert, kommt
+aus dem Scoring und die Persona liest sie nur; eine Aktivierungs-Wahrheit gibt
+es nicht — der Katalogeintrag trägt den Status „beobachtet". Und zwei Kästchen
+des DoD-Plans waren in keiner offenen Liste, bis sie heute Abend wieder in
+`docs/ROADMAP.md` standen.
+
+Das ist keine Kritik an der Arbeit, sondern ihre Vermessung: der Abstand
+zwischen dem, was der Baum kann, und dem, was die Figur sein sollte, ist an
+drei Stellen messbar — und an der vierten (der fehlenden Urteilsschicht) ist
+er nur als Abwesenheit messbar. Das steht jetzt in `docs/VISION-ABGLEICH.md`,
+jeder Befund mit Pfad und Zeile, jeder Abwesenheitsbefund mit dem Befehl, mit
+dem man ihn nachzählen kann.
+
+**Anker:** `d0691b2..1a5b1d4` · Tag: 17 Commits bis `1a5b1d4` · Belege: `docs/VISION-ABGLEICH.md`, `docs/ROADMAP.md`, `docs/INDEX.md`, `packages/persona/index.js`, `packages/prompter/assets/pre-step.js`
+
 ---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
@@ -520,6 +547,8 @@ dieses Tagebuch keine Erfolgsliste ist.
 | `docs/archive/CHANGELOG.md` (2026-10-11): pnpm bleibt die Paketquelle, die Bindung ist offen | null getrackte pnpm-Dateien, kein `packageManager`; die `workspace:*`-Bindung ist weiter offen — `package.json`, `package-lock.json` | `e3e2576` |
 | `docs/INDEX.md` (Fassung 2026-10-19): 90 getrackte Markdown-Dateien, 699 Gate-Tests | heute 74 `.md` unter `docs/` und 759 Gate-Tests — `scripts/gate/tests/` | `541682f` |
 | `docs/S5-RELEASE-2026-10-17.md`: Tag `v0.4.0` fehlt und braucht eine Freigabe | **stimmt weiterhin** — `git tag` zeigt `v0.2.0`, `v0.3.0` und fünf `runtime-*`; der Satz ist nicht widerlegt, sondern offen — `docs/ROADMAP.md` | `c30112c` |
+| `shinon-forge-implementierungsplan.md` §27: „Definition of Done — Shinon Runtime v1" — 23 Kästchen als fertiges System | zwei Kästchen sind nirgends gebaut und standen bis zum 2026-10-20 in **keiner** offenen Liste: Capability Router und Browser Vision (das Paket `packages/vision-fallback/` gibt es nicht) — sie stehen jetzt in `docs/ROADMAP.md` §2.2 | `c0d99cf` |
+| `docs/FOUNDATION-PLAN.md` (L0): Telemetrie macht `token-usage` **echt** — das Panel ist eine View über Telemetrie, nicht „📊 --" | `packages/token-usage/index.js` loggt in `apply()` und tut sonst nichts; das Paket war vom ersten Commit an so — `packages/token-usage/index.js` | `ffbf721` |
 
 Wo eine Zeile keine Quelle mehr hat (weil das Dokument in einer früheren Aufräumwelle
 verschwand), steht der Pfad, der die Behauptung heute trägt — nicht ein erfundenes Zitat.
