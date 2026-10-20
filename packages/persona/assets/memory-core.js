@@ -304,6 +304,47 @@ export function renderMemory(memory, options = {}) {
 }
 
 /**
+ * Einen Claim des Claim-Kerns in die vorhandenen Vorschläge übernehmen (Zug 5
+ * der Wissens-Runtime). Die Brücke ändert KEINE Regel: `accepted` wird nur
+ * übernommen, wenn der Claim von `human` oder `review` entschieden wurde. Ein
+ * Claim, den `scoring` angenommen haben will, bleibt ein Vorschlag — die
+ * Scoring liefert Signale, sie besitzt keine Persona-Wahrheit.
+ */
+export function adoptClaim(memory, claim, now = null) {
+  const base = isRecord(memory) ? memory : emptyMemory(now);
+  const id = text(claim?.id);
+  const subject = text(claim?.subject);
+  if (id === null || subject === null) return { memory: base, changed: false, reason: 'KEIN_CLAIM' };
+  const decided = claim?.state === 'accepted' && (claim?.decidedBy === 'human' || claim?.decidedBy === 'review');
+  // proposed bleibt proposed; ein "angenommener" Claim ohne zuständigen Akteur
+  // bleibt ebenfalls Vorschlag; alles andere ist abgelehnt.
+  const status = decided
+    ? 'accepted'
+    : claim?.state === 'proposed' || claim?.state === 'accepted'
+      ? 'proposed'
+      : 'rejected';
+  const entry = {
+    id: `c:${id}`,
+    kind: 'commitment',
+    claim: (text(claim.detail) ?? text(claim.predicate) ?? subject).slice(0, MEMORY_DETAIL_CHARS),
+    evidence: Math.max(1, Math.min(MEMORY_EVIDENCE_CAP, Array.isArray(claim.evidence) ? claim.evidence.length : 1)),
+    status,
+    createdAt: text(now),
+    decidedAt: decided ? text(now) : null,
+    source: text(claim.source) ?? 'claim-core',
+  };
+  const proposals = [...base.proposals];
+  const at = proposals.findIndex((proposal) => proposal.id === entry.id);
+  if (at === -1) proposals.push(entry);
+  else proposals[at] = { ...proposals[at], ...entry, createdAt: proposals[at].createdAt ?? entry.createdAt };
+  return {
+    memory: { ...base, proposals: proposals.slice(-MEMORY_MAX_PROPOSALS) },
+    changed: true,
+    reason: claim?.state === 'accepted' && !decided ? 'NICHT_ENTSCHIEDEN' : '',
+  };
+}
+
+/**
  * Vorschläge aus belegten Wiederholungen. Der Vorschlag ist deterministisch
  * formuliert und wird NIE automatisch angenommen — Annahme ist ein eigener Akt.
  */

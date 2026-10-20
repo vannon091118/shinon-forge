@@ -662,6 +662,27 @@ im wissensgebundenen Weg (`strictFacts`) eine unbekannte Referenz mit
 Der Modus hängt am Snapshot, nicht an einer Einstellung: `pre-step.js` liest den Snapshot
 vor dem One-Shot und schaltet ihn nur dann ein.
 
+## 2026-10-20 — Wissens-Runtime, Zug 5: ein Vorschlag wird nicht durch Wiederholung wahr
+
+Der Claim-Lebenszyklus liegt in `packages/persona/assets/claim-core.js` und ist rein:
+`proposed → accepted/rejected → superseded`, mit einer Tabelle, die den Akteur prüft.
+**Nur `human` oder `review` nimmt an**; `scoring` darf Signale liefern und Vorschläge
+machen, aber keine Überzeugung setzen. Ein Claim startet immer als `proposed`, ein Beleg
+ist Pflicht, und gleiche Belege zählen nicht doppelt (Deckel 9).
+
+Die Urteilsschicht spricht `ALLOW` oder `DENY` mit sortierten Gründen: ein ungelöster
+Sicherheitskonflikt sperrt die **betroffene** Aktion (gleicher Scope), nicht das ganze
+Projekt; ein nur vorgeschlagener Claim trägt keine Aktion (`CLAIM_NICHT_AKZEPTIERT`).
+`judgementRecord` trägt Vertrag, Aktion, Urteil, Gründe und die Zahl der Claims — keinen
+Claim-Text.
+
+Die Brücke in die vorhandenen Module ist absichtlich dünn: `adoptClaim` legt einen Claim
+als **Vorschlag** im bestehenden `proposals`-Feld des Gedächtnisses ab und übernimmt
+`accepted` nur bei `decidedBy` human oder review — sonst bleibt es `proposed` mit dem
+Grund `NICHT_ENTSCHIEDEN`. `observeJudgement` schreibt nur Kürzel wie `urteil:DENY` in die
+Gründe des Selbstmodells; ein fehlendes Urteil zählt als DENY, nie als ALLOW. Damit hat die
+Persona weiterhin genau eine Wahrheit, und die Scoring bleibt eine Signalquelle.
+
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
 **Was fiel:** 73 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`

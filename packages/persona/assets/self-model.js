@@ -163,6 +163,26 @@ export function observeDecision(model, record, now = null) {
 }
 
 /**
+ * EIN Urteil verbuchen (Zug 5 der Wissens-Runtime). Übernommen werden nur der
+ * Ausgang und die Gründe — Zahlen und Kürzel, kein Claim-Text.
+ */
+export function observeJudgement(model, judgement, now = null) {
+  const base = isRecord(model) ? model : emptySelfModel(now);
+  const verdict = judgement?.verdict === 'ALLOW' ? 'ALLOW' : 'DENY';
+  const next = {
+    ...base,
+    reasons: { ...(isRecord(base.reasons) ? base.reasons : {}) },
+    lastSeen: text(now) ?? base.lastSeen ?? null,
+    firstSeen: text(base.firstSeen) ?? text(now) ?? null,
+  };
+  bump(next.reasons, `urteil:${verdict}`, MAX_REASONS);
+  for (const reason of Array.isArray(judgement?.reasons) ? judgement.reasons : []) {
+    bump(next.reasons, `urteil:${reason}`, MAX_REASONS);
+  }
+  return next;
+}
+
+/**
  * EINEN Fehler des Laufs verbuchen. Nur die ART zählt (`name`), nie der Text:
  * eine Fehlermeldung kann Pfade und Werte tragen, und die gehören nicht ins
  * Modell. Die Art genügt, um „hier breche ich wiederholt ab" zu belegen.
