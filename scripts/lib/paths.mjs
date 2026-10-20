@@ -128,7 +128,7 @@ export function isInstalled(env = process.env) {
  * @param {string} path
  * @returns {string}
  */
-function realPath(path) {
+export function realPath(path) {
   try {
     return realpathSync(path);
   } catch {

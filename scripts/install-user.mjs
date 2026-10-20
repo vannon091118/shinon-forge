@@ -79,7 +79,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { createServer, connect } from 'node:net';
 import * as paths from './lib/paths.mjs';
 import { resolveRuntime } from './lib/runtime.mjs';
@@ -419,7 +419,7 @@ async function verify(prefix = PREFIX) {
   }
   report.dsh = /dsh:\s+(\S+)/.exec(checkText)?.[1] ?? null;
   report.herkunft = /Herkunft:\s+(.+)/.exec(checkText)?.[1]?.trim() ?? null;
-  if (report.herkunft === null || !report.herkunft.includes(prefix)) {
+  if (report.herkunft === null || !paths.realPath((report.herkunft.split('—').pop() ?? '').trim()).startsWith(`${paths.realPath(prefix)}${sep}`)) {
     report.errors.push(`Herkunft zeigt nicht auf das Installat (${report.herkunft ?? 'fehlt'})`);
     return report;
   }
