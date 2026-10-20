@@ -15,7 +15,7 @@ Zwei Regeln für dieses Dokument:
 2. **Nichts wird geglättet.** Wo ein Beleg nicht mehr einzeln nachweisbar ist, steht
    `nicht mehr einzeln belegbar` daneben — das ist ehrlicher als eine erfundene Zeile.
 
-Der Prüfschritt `diaryIssues()` (`scripts/lib/repo.mjs`) liest dieses Dokument bei jedem
+Der Prüfschritt `diaryIssues()` (`scripts/lib/diary.mjs`) liest dieses Dokument bei jedem
 statischen Gate und jedem Build: ein Kapitel ohne echten Anker, ein Anker mit falschem
 Datum, ein toter Pfad oder eine fehlende Tagesreihe sind rot. Das Tagebuch kann deshalb
 nicht verrotten, ohne dass die Kette stehen bleibt.
@@ -355,7 +355,32 @@ Heute: `packages/seams/assets/seams.js`, `packages/seams/assets/seams.json`,
 `scripts/gate/tests/seams-core.test.mjs`, `scripts/lib/repo.mjs`,
 `docs/contracts/canon.json`.
 
-**Anker:** `d0691b2..541682f` · Tag: 8 Commits · Belege: `packages/seams/assets/seams.js`, `packages/seams/assets/seams.json`, `scripts/gate/tests/seams-core.test.mjs`
+### Die Wellen, die danach kamen
+
+Der Kanon und der Struktur-Riegel waren an diesem Tag noch **ungebucht** — sie
+standen im Arbeitsbaum, waehrend die Doku sie schon beschrieb. Erst am Abend
+wurden sie zu Commits, und das aenderte ihre Beweislage: `c0d99cf` schnitt die
+Akten (73 Dateien, 10040 Zeilen) und reparierte 35 Verweise; `a2a80f4` gab dem
+Tagebuch seinen Riegel (`scripts/lib/diary.mjs`) und nahm ihm damit die
+Moeglichkeit, sich selbst zu glauben; `38b66cc` buchte den Kanon samt Registry
+und den drei Umbenennungen; `68d7b14` setzte die Struktur-Grenzen mit 31
+benannten Bestandsdateien; `89f6daa` loeste den ersten davon ein, indem der
+Prompter-Einstieg von 1350 auf 256 Zeilen schrumpfte und Lauf, Zustand und
+Ausgang eigene Module bekamen; `ca10572` zog die Zahlen nach.
+
+Was dabei gelernt wurde, steht nicht in den Commit-Nachrichten: der Struktur-
+Riegel verlangt, dass der Bestand **sinkt**, nicht dass er passt — die
+Reihenfolge der Commits ist deshalb Teil der Aussage. Und der Tagebuch-Riegel
+haette den Tag ohne diesen Abschnitt rot gelassen, weil er fuer jeden Tag mit
+Commits ein Kapitel verlangt: die Geschichte ist hier keine Beigabe, sondern
+eine der Bedingungen, unter denen der Baum ueberhaupt gruen sein darf.
+
+Heute zusaetzlich: `scripts/lib/diary.mjs`, `scripts/lib/canon.mjs`,
+`scripts/lib/structure.mjs`, `docs/contracts/structure.json`,
+`packages/prompter/assets/pre-step.js`, `packages/prompter/assets/runtime-state.js`,
+`packages/prompter/assets/trace-report.js`, `scripts/gate/tests/prompter-split.test.mjs`.
+
+**Anker:** `d0691b2..ca10572` · Tag: 14 Commits · Belege: `packages/seams/assets/seams.js`, `packages/seams/assets/seams.json`, `scripts/gate/tests/seams-core.test.mjs`, `docs/contracts/structure.json`, `packages/prompter/assets/pre-step.js`
 
 ---
 
