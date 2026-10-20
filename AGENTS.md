@@ -237,11 +237,33 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   carry the preparation version — the version rule is derived from that same field, so
   nothing outside its own folder has to be edited (one exception, named because it is
   real: a menu label needs one line in `packages/locale-de/client.js`, the owner of the
-  texts). Recipe and the measured cost per new plugin: `docs/ARCHITECTURE.md` §2.1.
+  texts). Recipe: this section; the measured cost per new plugin: `npm run scale:check`.
 - The declared Schemastery version (`docs/ZAHLEN.md` §1) has no `z.enum` — model enums as
   `z.union([z.const('a'), z.const('b')])`.
-- If a contract changes, edit it in `scripts/lib/repo.mjs` (the shared source) — never in
-  `scripts/shinon-test.mjs` or `build.mjs` directly.
+- If a contract changes, edit it in its OWNER under `scripts/lib/` — `repo.mjs` (shape,
+  naming, profile), `canon.mjs` (names), `diary.mjs` (history), `structure.mjs` (classes,
+  limits), `model-route.mjs` (route form) — never in `scripts/shinon-test.mjs` or
+  `build.mjs` directly. Each owner carries its registry in `docs/contracts/`.
+- **Structure: one class per file, one owner per concern.** Every code file under
+  `packages/`, `scripts/` and `bin/` belongs to exactly one class in
+  `docs/contracts/structure.json` (host entry, client half, core, test, gate plugin,
+  script). A class limit is derived from a measurement (3 × median, rounded), never
+  guessed; a file above its limit is named in `bestand` and may only shrink, and a
+  client half carries no `Config`, a host entry carries `apply`, a gate plugin carries
+  `check`. Growing past the limit without an entry, or writing a file no class owns, is
+  a gate finding (`structureIssues`, `npm run build` runs it too). Split by OWNERSHIP
+  when a file carries two: a name table belongs with the seam it names, not with the
+  renderer that repeats it. Counts: `docs/ZAHLEN.md` §1.2.
+  The worked example is `packages/prompter` (2026-10-20): `index.js` keeps the public
+  names, `Config`/`inject`/`apply` and the registrations; the run is
+  `assets/pre-step.js`, the state `assets/runtime-state.js`, the trace output
+  `assets/trace-report.js`. Two rules follow from it: an entry file never reads a
+  file or builds the state object (only the state owner does), and the imported
+  surface stays name-for-name identical — `scripts/gate/tests/prompter-split.test.mjs`
+  pins all 99 names, forbids the modules importing `index.js`, and fails on a single
+  lost export. Precondition for the next one: a single `runtime`-like owner already
+  exists; a host entry that holds its state in a dozen closure `let`s must get that
+  owner first (`packages/persona/index.js` is the open case, 18 bindings).
 - Client-internal slot ids follow `<name>-<purpose>` (e.g. `shinon-core-brand`,
   `shinon-info-banner`). Packages don't reference each other — with ONE exception:
   `@shinon/seams` (`packages/seams/assets/seams.js`) is the import-free host seam

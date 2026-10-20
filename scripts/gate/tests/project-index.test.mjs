@@ -233,10 +233,18 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
   const prompter = readFileSync(join(REPO_ROOT, 'packages/prompter/index.js'), 'utf8');
   const prompterModule = (relativePath) => readFileSync(join(REPO_ROOT, 'packages/prompter', relativePath), 'utf8');
   const symbolsIn = (source) => new Set(bundle.extractSymbols(source).map((symbol) => symbol.name));
-  for (const expected of ['readPrompt', 'apply']) {
-    assert.ok(symbolsIn(prompter).has(expected), `Symbol ${expected} fehlt in index.js`);
-  }
-  for (const [file, expected] of [['assets/enhancer.js', 'enhanceGuarded'], ['assets/schema.js', 'Config']]) {
+  // Der Schnitt vom 2026-10-20: `index.js` verdrahtet, die drei neuen Module
+  // tragen Lauf, Zustand und Ausgang — geprueft wird jeder Eigentuemer.
+  assert.ok(symbolsIn(prompter).has('apply'), 'Symbol apply fehlt in index.js');
+  for (const [file, expected] of [
+    ['assets/pre-step.js', 'onPreStep'],
+    ['assets/pre-step.js', 'readPrompt'],
+    ['assets/runtime-state.js', 'loadRuntime'],
+    ['assets/runtime-state.js', 'effectiveRoute'],
+    ['assets/trace-report.js', 'reportTrace'],
+    ['assets/enhancer.js', 'enhanceGuarded'],
+    ['assets/schema.js', 'Config'],
+  ]) {
     assert.ok(symbolsIn(prompterModule(file)).has(expected), `Symbol ${expected} fehlt in ${file}`);
   }
   // Vergleich als Menge: die Reihenfolge der Importe in index.js ist keine
@@ -246,17 +254,16 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
     bundle.extractEdges(prompter).sort(byTarget),
     [
       { kind: 'import', target: '@deepseek-ai/schemastery' },
-      // Seit 2026-10-20: der Naht-Kern (Narrative-Kanal, letzte menschliche
-      // Nachricht). Vorher standen beide hier als Literal bzw. als Kopie.
+      // Der Naht-Kern: `index.js` bindet die beiden Kanal-Namen, der Lauf
+      // liest sie aus demselben Kern (`assets/pre-step.js`).
       { kind: 'import', target: '@shinon/seams/core' },
-      { kind: 'import', target: 'node:fs' },
-      { kind: 'import', target: 'node:path' },
+      // Der Schnitt vom 2026-10-20 — die drei Eigentuemer-Module des Hosts:
+      // Lauf, Zustand, Ausgang. `node:fs`/`node:path` gingen mit dem Zustand.
+      { kind: 'import', target: './assets/pre-step.js' },
+      { kind: 'import', target: './assets/runtime-state.js' },
       // Zug 4/5: das Paket liest die Zettel und baut den Stand — der Kern liegt
       // in `assets/`, weil er ohne node_modules testbar sein muss.
       { kind: 'import', target: './assets/note-core.js' },
-      // S1: DIE EINE Workspace-Identität — der Host löst sie einmal auf und
-      // reicht sie an den Project Index weiter (kein stilles cwd).
-      { kind: 'import', target: './assets/workspace.js' },
       // Der Modulschnitt: je Verantwortung ein Modul (Seam-Namen und Modus-
       // Vertrag, Schemata, Ergebnisvertrag, XML-Marken, Dateien, Stand,
       // One-Shot). Die Liste steht hier vollstaendig, damit eine neue Kante
@@ -264,25 +271,18 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/mode-core.js' },
       { kind: 'import', target: './assets/schema.js' },
       { kind: 'import', target: './assets/result-contract.js' },
-      // Der Runtime-Resolver der Intent-Klasse: reine Funktion, kein Modell.
-      { kind: 'import', target: './assets/intent-resolver.js' },
-      // Das Intent-Gedächtnis (Fassung 2): Zählung über alle Läufe und der
-      // gelernte Gewichtsfaktor — reiner Kern, kein I/O, keine Uhr.
-      { kind: 'import', target: './assets/intent-memory.js' },
       { kind: 'import', target: './assets/render-context.js' },
       { kind: 'import', target: './assets/prompt-files.js' },
       // Die Faehigkeitskarte (2026-10-20): welche Frage gehoert welchem Paket.
       // Daten + reiner Kern; die Zeigerpruefung kommt aus der Provenienz-Leiter.
       { kind: 'import', target: './assets/capability-map.js' },
       // Die Abbruchquote (Welle 2, 2026-10-20): Klassifikation, Zähler und
-      // Quote als importfreier Kern; `index.js` hängt nur das Ergebnis an.
+      // Quote als importfreier Kern; `pre-step.js` hängt nur das Ergebnis an.
       { kind: 'import', target: './assets/abort-core.js' },
       // Die Provenienz-Leiter (2026-10-19): fünf Klassen, Zeigerpflicht,
       // keine Beförderung — ein reiner Kern ohne Bare-Import, damit sein Test
       // ohne node_modules läuft.
       { kind: 'import', target: './assets/provenance.js' },
-      // Der einzige Schreibweg des Hosts: gelernte Bausteine (Propose-Seam).
-      { kind: 'import', target: './assets/learned-store.js' },
       { kind: 'import', target: './assets/stand.js' },
       { kind: 'import', target: './assets/enhancer.js' },
       // Die Injection-Runtime (Phase 1-4 + Selektionsvertrag): Registry-Auswahl,

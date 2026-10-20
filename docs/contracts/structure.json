@@ -97,7 +97,6 @@
     "packages/popup/client.js": 426,
     "packages/project-index/assets/index-core.js": 2220,
     "packages/prompter/client.js": 285,
-    "packages/prompter/index.js": 1350,
     "packages/scoring/assets/scoring-core.js": 784,
     "packages/task-router/index.js": 797,
     "packages/token-usage/client.js": 574,
