@@ -34,6 +34,7 @@ import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { levelFor } from './mechanik.js';
 import { ActivitySchema, SnapshotAckSchema, SnapshotSchema } from './snapshot-schema.js';
 import {
+  ACTIVITY_TYPE, REMOTE_CONTRIBUTION, SNAPSHOT_ACK_TYPE, SNAPSHOT_TYPE,
   UEBERGABE_ACTIVITY_ENDPOINT, UEBERGABE_ACTIVITY_METHOD, UEBERGABE_ENDPOINT, UEBERGABE_METHOD,
   UEBERGABE_NAMESPACE, UEBERGABE_PACKAGE, UEBERGABE_PARAMETER, UEBERGABE_SERVICE,
 } from './uebergabe.js';
@@ -148,48 +149,21 @@ export function mountPetRemote(ctx, store, activity) {
  * @returns {object} Beitrag aus Paketname und einem Endpunkt.
  */
 export function petRemoteContribution() {
+  // Die FORM kommt aus `uebergabe.js` (eine Quelle), die Fabriken kommen hier
+  // dazu: das Gateway loest die strenge Definition auf dem Host auf, und nur
+  // dort wird `create` je gerufen.
+  const factories = new Map([
+    [SNAPSHOT_TYPE, () => SnapshotSchema],
+    [SNAPSHOT_ACK_TYPE, () => SnapshotAckSchema],
+    [ACTIVITY_TYPE, () => ActivitySchema],
+  ]);
+  const withFactory = (codec) => ({ ...codec, create: factories.get(codec.typeSymbol) });
   return {
-    package: UEBERGABE_PACKAGE,
-    descriptors: [
-      {
-        id: `${UEBERGABE_PACKAGE}#${UEBERGABE_ENDPOINT}`,
-        service: UEBERGABE_SERVICE,
-        namespace: UEBERGABE_NAMESPACE,
-        method: UEBERGABE_METHOD,
-        invocation: { kind: 'direct' },
-        parameters: [
-          {
-            name: UEBERGABE_PARAMETER,
-            wire: UEBERGABE_PARAMETER,
-            source: 'json',
-            codec: {
-              mode: 'strict',
-              typeSymbol: `${UEBERGABE_PACKAGE}#Snapshot`,
-              create: () => SnapshotSchema,
-            },
-          },
-        ],
-        result: {
-          mode: 'strict',
-          typeSymbol: `${UEBERGABE_PACKAGE}#SnapshotAck`,
-          create: () => SnapshotAckSchema,
-        },
-        sourceLocation: { file: 'packages/codingmon/assets/pet-remote.js', line: 1, column: 1 },
-      },
-      {
-        id: `${UEBERGABE_PACKAGE}#${UEBERGABE_ACTIVITY_ENDPOINT}`,
-        service: UEBERGABE_SERVICE,
-        namespace: UEBERGABE_NAMESPACE,
-        method: UEBERGABE_ACTIVITY_METHOD,
-        invocation: { kind: 'direct' },
-        parameters: [],
-        result: {
-          mode: 'strict',
-          typeSymbol: `${UEBERGABE_PACKAGE}#Activity`,
-          create: () => ActivitySchema,
-        },
-        sourceLocation: { file: 'packages/codingmon/assets/pet-remote.js', line: 1, column: 1 },
-      },
-    ],
+    package: REMOTE_CONTRIBUTION.package,
+    descriptors: REMOTE_CONTRIBUTION.descriptors.map((descriptor) => ({
+      ...descriptor,
+      parameters: descriptor.parameters.map((parameter) => ({ ...parameter, codec: withFactory(parameter.codec) })),
+      result: withFactory(descriptor.result),
+    })),
   };
 }

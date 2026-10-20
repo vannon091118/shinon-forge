@@ -59,3 +59,57 @@ export const SNAPSHOT_FIELDS = [
   'schemaVersion', 'species', 'xp', 'wins', 'losses', 'round', 'damageTotal', 'hits', 'loot', 'savedAt',
   'completions', 'wild',
 ];
+
+/**
+ * Die Typnamen des Wire-Vertrags. Sie stehen im Beitrag auf BEIDEN Seiten und
+ * sind deshalb hier definiert: `<paket>#<Typ>` ist die Form, die Typert fuer
+ * Schemata verlangt.
+ */
+export const SNAPSHOT_TYPE = `${UEBERGABE_PACKAGE}#Snapshot`;
+export const SNAPSHOT_ACK_TYPE = `${UEBERGABE_PACKAGE}#SnapshotAck`;
+export const ACTIVITY_TYPE = `${UEBERGABE_PACKAGE}#Activity`;
+
+/**
+ * Der Remote-Beitrag als DATEN — ohne Codec-Fabriken.
+ *
+ * WARUM OHNE `create`: die Fabrik ist auf dem HOST noetig (das Gateway loest
+ * dort die strenge Definition auf), im BROWSER wird sie nie gerufen — der
+ * Client baut den Aufruf aus Namensraum, Methode und Wire-Feldern und prueft
+ * nichts; geprueft wird am Host (`pet-store.js`). Diese Datei ist darum die
+ * gemeinsame QUELLE der Form: `pet-remote.js` setzt die Fabriken ein, und
+ * `client.js` traegt dieselbe Form als Literal (sein Bundle kann nichts
+ * importieren) — `test/uebergabe.test.mjs` vergleicht beide Zeichen fuer
+ * Zeichen, damit die Dopplung nicht STILL driftet.
+ */
+export const REMOTE_CONTRIBUTION = {
+  package: UEBERGABE_PACKAGE,
+  descriptors: [
+    {
+      id: `${UEBERGABE_PACKAGE}#${UEBERGABE_ENDPOINT}`,
+      service: UEBERGABE_SERVICE,
+      namespace: UEBERGABE_NAMESPACE,
+      method: UEBERGABE_METHOD,
+      invocation: { kind: 'direct' },
+      parameters: [
+        {
+          name: UEBERGABE_PARAMETER,
+          wire: UEBERGABE_PARAMETER,
+          source: 'json',
+          codec: { mode: 'strict', typeSymbol: SNAPSHOT_TYPE },
+        },
+      ],
+      result: { mode: 'strict', typeSymbol: SNAPSHOT_ACK_TYPE },
+      sourceLocation: { file: 'packages/codingmon/assets/pet-remote.js', line: 1, column: 1 },
+    },
+    {
+      id: `${UEBERGABE_PACKAGE}#${UEBERGABE_ACTIVITY_ENDPOINT}`,
+      service: UEBERGABE_SERVICE,
+      namespace: UEBERGABE_NAMESPACE,
+      method: UEBERGABE_ACTIVITY_METHOD,
+      invocation: { kind: 'direct' },
+      parameters: [],
+      result: { mode: 'strict', typeSymbol: ACTIVITY_TYPE },
+      sourceLocation: { file: 'packages/codingmon/assets/pet-remote.js', line: 1, column: 1 },
+    },
+  ],
+};
