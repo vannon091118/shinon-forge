@@ -47,7 +47,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync,
   rmSync, statSync, symlinkSync, writeFileSync,
@@ -178,6 +178,28 @@ export function stageCode({ source, stage }) {
 }
 
 /**
+ * Das npm, das zu diesem Node gehoert.
+ *
+ * WARUM NICHT einfach 'npm': unter Windows heisst das Programm `npm.cmd`,
+ * und ein execFile darauf endet mit `ENOENT` — gemessen im Windows-Bau der
+ * CI (Run 39494345164, Job „Paket bauen (Windows-ZIP)"). Es gibt zwei Wege:
+ * laeuft der Aufruf ueber `npm run`, kennt die Umgebung `npm_execpath` —
+ * dann wird genau dieses npm über den laufenden Node gestartet, ohne
+ * Shell-Drehungen. Sonst gilt die Plattformregel: `npm.cmd` unter Windows,
+ * `npm` sonst. Dieselbe Regel fuehrt `scripts/install-user.mjs` (dort
+ * `npmCommand()`), damit es nicht zwei Regeln im Baum gibt.
+ *
+ * @returns {{command: string, prefix: string[]}}
+ */
+export function npmCommand(env = process.env) {
+  const execpath = env.npm_execpath;
+  if (typeof execpath === 'string' && execpath !== '' && existsSync(execpath)) {
+    return { command: process.execPath, prefix: [execpath] };
+  }
+  return { command: process.platform === 'win32' ? 'npm.cmd' : 'npm', prefix: [] };
+}
+
+/**
  * Die Produktions-Abhaengigkeiten in die Nutzlast legen.
  *
  * `npm ci --omit=dev` im Staging: der Lockfile des Baums ist die Quelle, das
@@ -185,14 +207,26 @@ export function stageCode({ source, stage }) {
  * Entwicklerpakete. Ein kopierter `node_modules` waere schneller, traegt aber
  * die Entwicklerpakete mit und ist plattformgebunden (falsche native Dateien
  * auf dem Zielsystem).
+ *
+ * `spawnSync` statt `execFileSync`: auf Windows ist `npm.cmd` eine Stapel-
+ * datei, und der Weg dorthin laeuft ueber die Kommandozeile. `spawnSync`
+ * nimmt das ueber libuv an (es startet `cmd.exe /c`), `execFileSync` tut es
+ * nicht — daher der gemessene `ENOENT`.
  * @param {{stage: string, cwd?: string}} options
  */
 export function installModules({ stage }) {
-  execFileSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], {
+  const { command, prefix } = npmCommand();
+  const result = spawnSync(command, [...prefix, 'ci', '--omit=dev', '--no-audit', '--no-fund'], {
     cwd: stage,
     stdio: ['ignore', 'inherit', 'inherit'],
     env: { ...process.env, npm_config_update_notifier: 'false' },
   });
+  if (result.error) {
+    throw new Error(`installModules: npm liess sich nicht starten (${result.error.message})`);
+  }
+  if (result.status !== 0) {
+    throw new Error(`installModules: npm ci endete mit Exit ${result.status}`);
+  }
   return join(stage, 'node_modules');
 }
 

@@ -56,8 +56,14 @@ jobs:
         run: |
           set -euo pipefail
           cd dist-package
-          sha256sum ./*.deb > ./*.deb.sha256
-          cat ./*.deb.sha256
+          # Die Datei bekommt den NAMEN des Pakets plus .sha256. Ein
+          # `sha256sum ./*.deb > ./*.deb.sha256` legt dagegen eine Datei an, die
+          # wörtlich `*.deb.sha256` heisst (die Shell expandiert das Glob im
+          # Redirect-Ziel nicht, weil es noch nicht existiert) — und der
+          # Artefakt-Upload lehnt einen Stern im Dateinamen ab. Gemessen im
+          # Lauf 39494345164.
+          for f in ./*.deb; do sha256sum "$f" > "$f.sha256"; done
+          cat ./*.sha256
 
       - name: 'Paketinhalt pruefen (kein node_modules des Entwicklerbaums, kein .git)'
         run: |
@@ -74,6 +80,7 @@ jobs:
       # mitgelieferte Laufzeit. Ein gebautes Paket ist noch kein
       # installierbares Paket.
       - name: 'Install-Nachweis: dpkg -i, Starter, doctor'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
           sudo dpkg -i dist-package/*.deb
@@ -126,6 +133,7 @@ jobs:
         run: node scripts/run-with-node.mjs node --test scripts/gate/tests/packaging.test.mjs
 
       - name: 'Paket bauen (Windows-ZIP)'
+        timeout-minutes: 30
         run: node scripts/win-build.mjs --out dist-package
 
       - name: 'Archivinhalt pruefen (Starter, Installer, mitgelieferte Laufzeit)'
@@ -147,6 +155,7 @@ jobs:
       # geht — nur ohne Handarbeit.
       - name: 'Install-Nachweis: entpacken, install.ps1, Startmenue, uninstall.ps1'
         shell: pwsh
+        timeout-minutes: 30
         run: |
           $ErrorActionPreference = 'Stop'
           $zip = Get-ChildItem dist-package/*.zip | Select-Object -First 1

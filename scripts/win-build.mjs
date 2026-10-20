@@ -107,7 +107,11 @@ rmSync(archive, { force: true });
 /** Das ZIP-Werkzeug des Bauhosts: PowerShell unter Windows, sonst `zip`. */
 function zipDirectory(source, target) {
   if (process.platform === 'win32') {
-    execFileSync('powershell.exe', ['-NoProfile', '-Command', `Compress-Archive -Path '${source}\\*' -DestinationPath '${target}' -Force`], { stdio: 'inherit' });
+    // `tar -a` (bsdtar, auf jedem Windows-Server ab 2019 dabei) schreibt das
+    // ZIP direkt und schnell. `Compress-Archive` waere der naechste Weg, aber
+    // das dauert bei 54000 Dateien minutenlang — ein Paketbau, der eine halbe
+    // Stunde braucht, wird zu oft abgebrochen, bevor er fertig ist.
+    execFileSync('tar.exe', ['-a', '-c', '-f', target, '-C', source, '.'], { stdio: 'inherit' });
     return;
   }
   execFileSync('zip', ['-r', '-q', '-y', target, '.'], { cwd: source, stdio: 'inherit' });

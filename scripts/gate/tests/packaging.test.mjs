@@ -28,7 +28,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, s
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
-  buildPayload, launcherCmd, launcherSh, nodeArchiveName, nodeTarget, payloadViolations,
+  buildPayload, launcherCmd, launcherSh, nodeArchiveName, nodeTarget, npmCommand, payloadViolations,
 } from '../../lib/payload.mjs';
 import {
   debControl, debDesktopEntry, debPathStarter, debPostinst, installPs1, uninstallPs1,
@@ -225,4 +225,24 @@ test('der Paketbau gehoert in die CI, nicht in den Arbeitsbaum', () => {
   assert.match(manifest.scripts.deb ?? '', /deb-build\.mjs/, 'npm run deb');
   assert.match(manifest.scripts.win ?? '', /win-build\.mjs/, 'npm run win');
   assert.equal(manifest.scripts['package:all'], undefined, 'kein Combined-Bau: der Windows-Bau laeuft auf Windows');
+});
+
+test('der Paketbau nimmt das npm, das zu diesem Node gehoert', () => {
+  // Gemessen: der Windows-Bau der CI (Run 39494345164) endete mit
+  // `spawnSync npm ENOENT` — unter Windows heisst das Programm `npm.cmd`, und
+  // ein execFile darauf findet es nicht.
+  const withoutExecpath = npmCommand({});
+  if (process.platform === 'win32') {
+    assert.equal(withoutExecpath.command, 'npm.cmd', 'unter Windows ist es npm.cmd');
+  } else {
+    assert.equal(withoutExecpath.command, 'npm', 'unter Linux ist es npm');
+  }
+  assert.deepEqual(withoutExecpath.prefix, [], 'ohne npm_execpath gibt es keinen Praefix');
+
+  // Mit npm_execpath (also unter `npm run`) wird genau dieses npm ueber den
+  // laufenden Node gestartet — ohne Shell und ohne zweite Regel.
+  const script = join(ROOT, 'scripts', 'lib', 'payload.mjs');
+  const withExecpath = npmCommand({ npm_execpath: script });
+  assert.equal(withExecpath.command, process.execPath, 'der laufende Node startet das npm');
+  assert.deepEqual(withExecpath.prefix, [script], 'und zwar genau das genannte npm');
 });
