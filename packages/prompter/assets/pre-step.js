@@ -19,10 +19,11 @@ import { join } from 'node:path';
 import { abortRecord } from './abort-core.js';
 import { WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks } from './block-select.js';
 import { CAPABILITIES_CONTRACT, appendTaskBrief, briefRecord, matchCapability, renderTaskBrief, taskBrief } from './capability-map.js';
+import { knowledgeTrace, renderKnowledgeBlock } from './knowledge-block.js';
 import { enhanceGuarded, replacePrompt } from './enhancer.js';
 import { addTurnDuration, memorySummary, semanticProfile, weightsFrom } from './intent-memory.js';
 import { UNDEFINED, expandPrompt, resolveIntent } from './intent-resolver.js';
-import { CONTRACT, DECISION_CHANNEL, INDEX_CONTRACT, INDEX_SERVICE, NOT_SUPPLIED, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, contextLabel, noContext, resolveMode, withContext } from './mode-core.js';
+import { CONTRACT, DECISION_CHANNEL, FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, NOT_SUPPLIED, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, contextLabel, noContext, resolveMode, withContext } from './mode-core.js';
 import { readSkills, selectSkills } from './prompt-files.js';
 import { PROVENANCE_CONTRACT, provenanceRecord } from './provenance.js';
 import { OUTCOME_EFFECTS } from './result-contract.js';
@@ -31,6 +32,29 @@ import { readTone, standFor, standTrace } from './stand.js';
 import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT, lastHumanMessage } from '@shinon/seams/core';
 import { countSalvage, journalRejectedAnswer, persistIntentMemory, recordIntent } from './runtime-state.js';
 import { reportTrace } from './trace-report.js';
+
+/**
+ * Den Wissens-Snapshot beim Projekt-Index holen. Kein `inject`: fehlt der
+ * Dienst, laeuft der Schritt ohne Block weiter (dieselbe Regel wie beim Index).
+ * Ein kaputter Dienst ist ein geloggter Befund und kein Grund, den Turn zu
+ * brechen — der Block ist eine Verstaerkung, keine Bedingung.
+ */
+function readKnowledgeSnapshot(ctx, runtime) {
+  let service;
+  try {
+    service = typeof ctx?.get === 'function' ? ctx.get(FACTS_SNAPSHOT_SERVICE) : undefined;
+  } catch {
+    service = undefined;
+  }
+  if (!service || typeof service.snapshot !== 'function' || service.contract !== FACTS_SNAPSHOT_CONTRACT) return null;
+  try {
+    const snapshot = service.snapshot({ intent: runtime?.turn?.resolution?.classification ?? 'UNBEKANNT' });
+    return snapshot && typeof snapshot === 'object' ? snapshot : null;
+  } catch (error) {
+    console.warn(`[shinon-prompter] Wissens-Snapshot nicht lesbar (${error?.message ?? error}) — Schritt ohne Block`);
+    return null;
+  }
+}
 
 /**
  * Den zu verbessernden Prompt aus der Nutzlast holen: Nachricht, Text und Index
@@ -506,14 +530,26 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   // `outcome.result` ist bei jedem nicht angenommenen Ausgang `null` — und dann
   // wird nichts ersetzt. Der Zugriff steht deshalb hinter derselben Bedingung
   // wie der Ersatz selbst, nicht davor.
+  // Der Wissensblock kommt aus der Runtime, nicht aus dem Modell: er haengt am
+  // Ende des Prompts, gleich ob der One-Shot angenommen, abgelehnt oder
+  // uebersprungen wurde und gleich ob der Veredler lief. Ohne Snapshot bleibt
+  // der Text unveraendert — ein leerer Block waere eine Behauptung.
+  const knowledge = renderKnowledgeBlock(readKnowledgeSnapshot(ctx, runtime));
+  const withKnowledge = (text) => (knowledge.text === '' ? text : `${text}\n\n${knowledge.text}`);
   const replacement = effect.replacePrompt && typeof outcome.result?.enhancedPrompt === 'string'
-    ? (briefState.rendered === undefined
+    ? withKnowledge(briefState.rendered === undefined
       ? outcome.result.enhancedPrompt
       : appendTaskBrief(outcome.result.enhancedPrompt, briefState.rendered))
     : null;
+  // Kein Ersatz heisst NICHT "kein Wissen": auf dem Direktpfad und nach einem
+  // abgelehnten One-Shot wird der Roh-Prompt um den Block ergaenzt, ueber
+  // dieselbe Identitaets-Ersetzung wie oben. Findet sie die Nachricht nicht,
+  // bleibt der Schritt unveraendert (dieselbe Fail-Richtung wie im Paket).
   const messages = effect.replacePrompt
     ? replacePrompt(decision?.messages, prompt.message, replacement)
-    : null;
+    : (knowledge.text === ''
+      ? null
+      : replacePrompt(decision?.messages, prompt.message, withKnowledge(prompt.text)));
 
   // Ersetzen kann nur, wer die Nachricht findet. Hier wird aus einem ANGENOMMENEN
   // Ergebnis ein `rejected`-Datensatz — die einzige Stelle, an der sich der
@@ -532,7 +568,7 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
     runtime.intentMemory = addTurnDuration(runtime.intentMemory, runtime.turn.intentMatch, Date.now() - turnStarted);
     persistIntentMemory(runtime, runtime.intentMemoryPath, runtime.intentMemory);
   }
-  reportTrace(ctx, config, runtime, withAbort(withProvenance({ ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection), brief: brief.record, brief_reason: brief.reason }, supply.context), runtime));
+  reportTrace(ctx, config, runtime, withAbort(withProvenance({ ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection), brief: brief.record, brief_reason: brief.reason, knowledge: knowledgeTrace(knowledge) }, supply.context), runtime));
 
   // Nur ein gefundenes akzeptiertes Ergebnis ersetzt die Nutzernachricht. In
   // JEDEM anderen Fall geht die Entscheidung unveraendert weiter — der Roh-Prompt

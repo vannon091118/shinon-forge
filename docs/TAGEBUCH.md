@@ -617,6 +617,32 @@ stale, 0 übersprungen (`docs/probes/facts-invalidierung.json`).
 Mutationen, auf die es ankommt: ein abweichender Hash revalidiert **nicht**, und ein
 unabhängiger Fakt bleibt nach der Änderung einer fremden Quelle `VALID`.
 
+## 2026-10-20 — Wissens-Runtime, Zug 3: der Block kommt aus der Runtime, nicht aus dem Modell
+
+Zug 3 schließt die Lücke, die den ganzen Plan trägt: geprüftes Wissen muss beim
+Hauptmodell ankommen, auch wenn der One-Shot nichts davon erwähnt. `facts-snapshot.js`
+kompiliert Intent, Fähigkeiten, gültige Fakten, Constraints, Revisionen und offene
+Konflikte zu **einem** deterministischen Snapshot; nur `VALID` kommt hinein, alles andere
+steht als Auslassung mit Grund daneben. Das Budget bricht ab (`BUDGET_UEBERSCHRITTEN` mit
+Soll und Ist), statt still zu kürzen.
+
+Der Prompter liest den Snapshot über den Dienst `shinon_facts_snapshot`
+(`shinon.facts/snapshot-v1`) — er öffnet die Faktendatei nicht selbst, weil Pakete nicht
+ineinandergreifen. `knowledge-block.js` rendert daraus `<project_facts>` und
+`<constraints>`; `pre-step.js` hängt den Block am **Ende** der Nutzernachricht an, über
+dieselbe Identitäts-Ersetzung wie den Veredler-Text. Damit gilt er in allen Ausgängen:
+angenommen, abgelehnt, übersprungen, Direktpfad. Fehlt der Dienst oder wirft er, bleibt der
+Prompt unverändert und der Grund steht im Entscheidungsdatensatz.
+
+Gemessen (`docs/probes/facts-snapshot.json`): 60 Fakten kompilieren in 1,39 ms, rendern in
+0,39 ms zu 4 418 Zeichen, 100 Kompilierungen in 9,45 ms. Der Handoff ist im echten
+`agent/pre-step` mit Fake-LLM und Fake-Dienst in allen vier Ausgängen geprüft — der Block
+steht im **finalen** `messages`-Array, nicht nur im Log.
+
+Der Projekt-Index bietet jetzt eine **dritte** schmale Fähigkeit an; die beiden Gate-Tests,
+die die Naht pinnen, sind additiv erweitert (`shinon_facts_snapshot` mit genau `contract`
+und `snapshot`). Keine bestehende Naht wurde geweitet.
+
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
 **Was fiel:** 73 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`

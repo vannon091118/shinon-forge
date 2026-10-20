@@ -102,6 +102,24 @@
       "trace": "facts.extract_hash trägt den Fingerabdruck des Wissensinhalts; der Test setzt einen Fakt auf STALE, schickt denselben Hash und prüft Status VALID sowie die gewanderte Revision, und schickt danach einen anderen Hash und prüft, dass er nicht revalidiert.",
       "replay": "mayRevalidate ist eine reine Vergleichesfunktion ohne Zustand; extractionHash hängt nur von den sortierten Aussagen ab, nicht von der Kennung oder der Zeit.",
       "invariant": "Revalidiert wird nur bei Gleichheit zweier vorhandener Hashes; ein anderer Hash führt immer zu STALE."
+    },
+    {
+      "positive": "Ein Snapshot wird aus Intent, Fähigkeiten, gültigen Fakten, Constraints, Quellrevisionen und offenen Konflikten deterministisch kompiliert; nur Fakten mit Status VALID kommen hinein, alle anderen stehen als Auslassung mit Grund daneben.",
+      "forbidden": "Ein Fakt mit STALE, DISPUTED oder REJECTED im Snapshot; eine stille Auswahl ohne Auslassungsgrund; ein Snapshot, dessen Hash von der Reihenfolge der Eingabelisten abhängt; eine beliebige Zeit als Eingabe.",
+      "fallback": "compileSnapshot nennt jede ausgelassene Kennung mit STATUS_<wert>; das Budget bricht mit BUDGET_UEBERSCHRITTEN und Soll/Ist ab, statt zu kürzen — dann gibt es keinen Block, keinen halben.",
+      "error": "BUDGET_UEBERSCHRITTEN (mit required.facts, required.chars, maxFacts, maxChars)",
+      "trace": "Der Snapshot trägt contract, version, intent, capabilities, facts mit Revisionen, constraints, conflicts, revisions und hash; das Gate und der Test vergleichen zwei Läufe mit vertauschten Listen.",
+      "replay": "compileSnapshot und snapshotHash sind rein: dieselben Eingaben ergeben denselben Hash, und 100 Läufe über 60 Fakten brauchen 9,45 ms.",
+      "invariant": "Kein Fakt im Snapshot ohne Status VALID; die Auslassungen plus die enthaltenen Fakten ergeben die Zahl der übergebenen Fakten."
+    },
+    {
+      "positive": "Der Wissensblock wird von der Runtime an den Prompt gehängt, nicht vom Modell: `<project_facts>` und `<constraints>` stehen am Ende der Nutzernachricht, gleich ob der One-Shot angenommen, abgelehnt oder übersprungen wurde und gleich ob der Direktpfad griff.",
+      "forbidden": "Ein Block, der nur bei angenommenem One-Shot erscheint; ein Block aus dem Modelltext; ein zweiter Block (Doppelung) oder eine stille Kürzung des Blocks; ein Block ohne Vertragsprüfung des Dienstes; ein Turn-Abbruch, weil der Dienst fehlt oder wirft.",
+      "fallback": "Fehlt der Dienst, hat er einen fremden Vertrag oder wirft er, bleibt der Prompt unverändert und der Grund steht im Entscheidungsdatensatz (KEIN_SNAPSHOT, FREMDER_VERTRAG, LEER).",
+      "error": "KEIN_SNAPSHOT, FREMDER_VERTRAG, LEER (in knowledge.reason), BUDGET_UEBERSCHRITTEN (Dienst liefert dann keinen Snapshot)",
+      "trace": "Der Entscheidungsdatensatz trägt knowledge { contract, facts, constraints, conflicts, hash, reason } — Zahlen und Hash, keinen Blocktext.",
+      "replay": "renderKnowledgeBlock ist rein und sortiert Fakten, Constraints und Konflikte; der Test fährt angenommenen, abgelehnten und direkten Ausgang und prüft den Block im finalen messages-Array.",
+      "invariant": "Bei vorhandenem Snapshot enthält die letzte Nutzernachricht genau einen `<project_facts>`-Block; ohne Snapshot ist der Prompt bytegleich zum Roh-Prompt."
     }
   ]
 }

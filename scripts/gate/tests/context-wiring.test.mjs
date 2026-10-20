@@ -129,7 +129,16 @@ test('Index: die angebotenen Faehigkeiten sind schmal und tragen einen Vertragsn
   const dispose = quiet(() => index.apply(ctx, index.Config({ root: fixture('schmal'), indexRoot: workDir('schmal-index'), worker: false, trace: false })));
 
   const names = provided.map((entry) => entry.name).sort();
-  assert.deepEqual(names, [index.QUERY_SERVICE, index.STORE_SERVICE].sort(), 'genau zwei Faehigkeiten');
+  // Zug 3 der Wissens-Runtime: eine DRITTE schmale Faehigkeit (der Fakten-Snapshot).
+  // Die Regel bleibt: jede Naht ist schmal, keine wird geweitet.
+  assert.deepEqual(
+    names,
+    [index.QUERY_SERVICE, index.STORE_SERVICE, 'shinon_facts_snapshot'].sort(),
+    'drei schmale Faehigkeiten',
+  );
+  const facts = provided.find((entry) => entry.name === 'shinon_facts_snapshot').value;
+  assert.deepEqual(Object.keys(facts).sort(), ['contract', 'snapshot'], 'der Snapshot: Vertragsname und EINE Operation');
+  assert.equal(facts.contract, 'shinon.facts/snapshot-v1');
   const query = provided.find((entry) => entry.name === index.QUERY_SERVICE).value;
   assert.deepEqual(Object.keys(query).sort(), ['contract', 'resolveContext'], 'schmal: Vertragsname und EINE Operation');
   assert.equal(query.contract, index.QUERY_CONTRACT);

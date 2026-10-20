@@ -1,0 +1,35 @@
+{
+  "probe": "wissens-runtime/zug-3-snapshot-und-handoff",
+  "date": "2026-10-20",
+  "question": "Ist der Snapshot schnell genug für jeden Schritt, und erreicht der Block den Hauptagenten unabhängig vom One-Shot?",
+  "method": "60 gültige Fakten mit je einer Revision kompiliert und gerendert, 100 Kompilierungen in einer Schleife gemessen. Zusätzlich der echte `agent/pre-step`-Pfad mit Fake-LLM und Fake-Dienst in drei Ausgängen: angenommen, abgelehnt, Direktpfad.",
+  "measurement": {
+    "facts": 60,
+    "compile_ms": 1.39,
+    "render_ms": 0.39,
+    "text_chars": 4418,
+    "compile_100_ms": 9.45,
+    "snapshot_hash_sample": "f_e378e2cb88dee699",
+    "cache_hit_for_identical_key": true,
+    "cache_miss_for_unknown_key": true,
+    "handoff": {
+      "accepted_one_shot": "Block im finalen messages-Array, hinter dem Veredler-Text",
+      "rejected_one_shot": "Block im finalen messages-Array, Roh-Prompt bleibt",
+      "direct_path": "Block im finalen messages-Array, kein One-Shot gelaufen",
+      "no_service": "Prompt bytegleich zum Roh-Prompt, knowledge.reason = KEIN_SNAPSHOT",
+      "throwing_service": "Turn läuft weiter, Warnzeile, kein Block"
+    }
+  },
+  "limits": [
+    "Ein Lauf je Zahl; die Dauerzahlen sind Größenordnungen aus einem temporären Prozess.",
+    "Der Handoff ist mit einem Fake-Dienst gemessen. Ein voller Modellturn mit echtem DSH und echtem Schlüssel wurde in dieser Umgebung nicht gefahren.",
+    "Constraints kommen derzeit aus dem Aufrufer des Dienstes; eine automatische Ableitung aus Vertragsdateien, Commit-Regeln und Gate-Ergebnissen steht noch aus (Zug 4)."
+  ],
+  "artifacts": {
+    "compiler": "packages/project-index/assets/facts-snapshot.js",
+    "service": "packages/project-index/assets/facts-service.js",
+    "renderer": "packages/prompter/assets/knowledge-block.js",
+    "host_path": "packages/prompter/assets/pre-step.js",
+    "tests": ["packages/project-index/test/facts-snapshot.test.mjs", "packages/prompter/test/knowledge-block.test.mjs"]
+  }
+}

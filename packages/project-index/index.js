@@ -1,6 +1,8 @@
 import z from '@deepseek-ai/schemastery';
 import { existsSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
+import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, createFactsService } from './assets/facts-service.js';
+import { FACTS_FILE_NAME } from './assets/facts-store.js';
 import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
 import {
   CONTRACT,
@@ -399,6 +401,9 @@ export function apply(ctx, config) {
     verify: config.verify,
   };
   const file = indexPath(options.indexRoot, options.root);
+  // Die Fakten liegen bewusst NICHT in der Indexdatei: eigener Lebenszyklus,
+  // eigene Fassung, kein gemeinsamer Rebuild (Probe: docs/probes/facts-store-entscheidung.json).
+  const factsFile = resolve(options.root, '.shinon', FACTS_FILE_NAME);
 
   // Die Naht zum Enhancer: genau eine Operation, sofort verfuegbar, ohne Index
   // ehrlich leer. Ob sie angeboten werden konnte, steht in DERSELBEN
@@ -417,6 +422,14 @@ export function apply(ctx, config) {
   const releaseStore = canProvide
     ? ctx.provide(STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile, workspaceRoot: options.root }))
     : null;
+  // Die dritte, schmale Faehigkeit (Zug 3): der Prompter liest einen Snapshot,
+  // nie die Datenbank. Fehlt die Datei, ist der Dienst ehrlich leer.
+  const releaseFacts = canProvide
+    ? ctx.provide(FACTS_SNAPSHOT_SERVICE, createFactsService({ file: factsFile, trace: config.trace }))
+    : null;
+  const factsState = canProvide
+    ? `Fakten ${FACTS_SNAPSHOT_SERVICE} bereitgestellt (${FACTS_SNAPSHOT_CONTRACT}: ${factsFile})`
+    : `Fakten ${FACTS_SNAPSHOT_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
   const queryState = canProvide
     ? `Abfrage ${QUERY_SERVICE} bereitgestellt (${QUERY_CONTRACT})`
     : `Abfrage ${QUERY_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
@@ -465,6 +478,7 @@ export function apply(ctx, config) {
     console.log(`[shinon-project-index] Aktiviert — ${CONTRACT}, ${file}, Lauf nach dem Start (${config.worker ? 'Worker' : 'Host'}), Schutz an (Plan §13)`);
     console.log(`[shinon-project-index] ${queryState}`);
     console.log(`[shinon-project-index] ${storeState}`);
+    console.log(`[shinon-project-index] ${factsState}`);
   }
 
   // Ein noch nicht gestarteter Lauf wird gestoppt; ein laufender schreibt zu
@@ -473,5 +487,6 @@ export function apply(ctx, config) {
     clearImmediate(pending);
     if (typeof releaseQuery === 'function') releaseQuery();
     if (typeof releaseStore === 'function') releaseStore();
+    if (typeof releaseFacts === 'function') releaseFacts();
   };
 }

@@ -67,6 +67,11 @@ export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
  */
 export const SCORING_SERVICE = 'shinon_scoring_state';
 export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
+// Zug 3 der Wissens-Runtime: der Projekt-Index bietet einen Snapshot an, der
+// Prompter liest ihn über diesen Namen. Das Literal steht auf beiden Seiten und
+// wird in packages/prompter/test/knowledge-block.test.mjs gegen den Vertrag geprüft.
+export const FACTS_SNAPSHOT_SERVICE = 'shinon_facts_snapshot';
+export const FACTS_SNAPSHOT_CONTRACT = 'shinon.facts/snapshot-v1';
 
 /** Budget des MAX-Kontexts. Derselbe Wert wie der Vorgabewert des Index (§14). */
 export const INDEX_BUDGET_TOKENS = 6000;
