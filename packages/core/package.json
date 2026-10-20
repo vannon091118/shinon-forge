@@ -12,7 +12,7 @@
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "dsh": {
     "bundle": {
@@ -29,8 +29,17 @@
     }
   },
   "meta": {
-    "title": { "en": "Shinon Forge - Core", "de": "Shinon Forge - Kern" },
-    "description": { "en": "Custom design and branding for Shinon Forge", "de": "Eigenes Design und Branding für Shinon Forge" }
+    "title": {
+      "en": "Shinon Forge - Core",
+      "de": "Shinon Forge - Kern"
+    },
+    "description": {
+      "en": "Custom design and branding for Shinon Forge",
+      "de": "Eigenes Design und Branding für Shinon Forge"
+    }
   },
-  "icon": "./assets/icon.svg"
+  "icon": "./assets/icon.svg",
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
+  }
 }

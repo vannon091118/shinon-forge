@@ -7,17 +7,39 @@ sessions/
 storages/
 .anonymous-user-id
 
-# .shinon/ — der repo-lokale Laufzeitordner (Lebenszyklus: docs/ARCHITECTURE.md §5).
-# NUR das abgeleitete Artefakt ist ignoriert: der Prompter baut es beim ersten
-# Lauf selbst und kann es jederzeit neu bauen. Die Projekt-Kontextdatei daneben
-# (.shinon/project-context.md) ist INHALT und wird getrackt; der Ordner selbst
-# liegt als .shinon/.gitkeep im Baum, damit ein frischer Klon ihn hat.
+# Repo-lokales DSH-Home (falls ein Lauf DSH_HOME in den Baum legt):
+# Symlinks auf profiles/sessions/logs — Zustand, kein Inhalt.
+dev-dsh-home/
 
-# Runtime-Index des Prompters: absolute Pfade des jeweiligen Rechners und der
-# volle Projektinhalt (gemessen 11 MB). Zustand, keine Quelle — aber NUR die
-# Indexdatei: `.shinon/project-context.md` ist geschriebener Inhalt, den die
-# Persona in den Prompt laedt, und bleibt sichtbar.
-.shinon/prompter-index.json
+# .shinon/ — der repo-lokale Inhaltsordner (Lebenszyklus: `AGENTS.md`).
+# Hier liegt nur noch INHALT: `.shinon/project-context.md` (Persona),
+# `.shinon/blocks.learned.json` (gelernte Bausteine). Der Laufzeit-Index des
+# Prompters ist entfallen; einen Index fuehrt allein der Project Index, und der
+# liegt außerhalb des Baums. Der Ordner selbst liegt als .shinon/.gitkeep im
+# Baum, damit ein frischer Klon ihn hat.
+
+# Der Blueprint-Kit zum CodingMon-50-Rework (Plan, Specs, ArtPack mit 50
+# Creature-SVGs, Katalogseiten, Kontaktboegen, PNG-Vorschauen) liegt als
+# SCRATCH-Material lokal: die SVGs sind die Quelle fuer die spaetere
+# Asset-Einbettung auf dem Feature-Branch, der Kit selbst ist kein Produkt.
+.shinon/tmp-blueprint/
+
+# Messausgaben des Auslastungs-Werkzeugs (.shinon/dev/auslastung.mjs): pro Lauf
+# eine JSONL-Spur und eine Zusammenfassung. Belege, die bleiben sollen, wandern
+# kuratiert nach docs/probes/ — der rohe Lauf ist Zustand, keine Quelle.
+.shinon/dev/messung-*.jsonl
+.shinon/dev/zusammenfassung-*.json
+
+# Das Intent-Gedächtnis des Prompters (Fassung 2) wächst mit JEDEM Turn
+# (Treffer, Klassen, Merkmale, Laufzeit, Folge-Rückmeldung). Projektwissen wie
+# die gelernten Bausteine, aber Laufzeitzustand: kein Commit, kein Rauschen im
+# Diff. Wer einen Stand als Beleg braucht, kopiert ihn kuratiert nach docs/probes/.
+.shinon/intent-memory.json
+
+# Das Probe-Journal der verworfenen One-Shot-Antworten (`probeJournalPath`):
+# Nutzertext und Modellantwort im Klartext, angehaengt je Verwerfung. Es ist
+# Messzustand, keine Quelle — kuratierte Auszuege wandern nach docs/probes/.
+.shinon/one-shot-journal.jsonl
 
 # Credentials — never commit. Public repo!
 .credentials.yaml
@@ -65,6 +87,17 @@ attachments/
 
 # Fremde Arbeitsnotizen — bewusst untracked, kein Teil des Repos.
 # (Vergleichsanalysen anderer Projekte; ohne Statusblock, nicht Teil des
-# kanonischen Doku-Satzes aus docs/INDEX.md.)
+# kanonischen Doku-Satzes aus `AGENTS.md`.)
 docs/FEATURE_ANALYSIS.md
 docs/FEATURE_RANKING.md
+
+# Installationspakete — gebaute Artefakte, nie eingecheckt. Der BAU gehoert
+# in die CI (.github/workflows/package-build.yml): ein gebautes .deb oder
+# Windows-ZIP ist ein Ergebnis, kein Quelltext. `dist-deb/`, `dist-win/` und
+# `dist-package/` sind die Ausgabeverzeichnisse der beiden Bauern.
+dist-deb/
+dist-win/
+dist-package/
+
+# Laufzeit-Cache des Paketbaus (die geholte Node-Laufzeit des Archivs).
+.cache/

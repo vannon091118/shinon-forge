@@ -7,7 +7,14 @@
  * und einen Spiegel — und Drift kann nicht landen. Drei Dinge werden hier gezeigt:
  *
  *   1. Der Baum ist driftfrei: Gate und Build sehen keinen Verstoss.
- * → Kanon: docs/COMMENT-KANON.md#k-efd6e1e2e599
+ *   2. Die Regel FAENGT Drift: eine abweichende Region, eine fehlende Region und ein
+ *      fehlendes Literal werden je einzeln gemeldet. Ohne diesen Teil waere die Regel
+ *      Prosa — sie sieht nur gut aus, wenn sie auch rot werden kann.
+ *   3. An der MODULGRENZE hat sich das Verhalten nicht verschoben: `digest` erzeugt
+ *      exakt die unabhaengig nachgerechneten IDs, und der Envelope-Gate-Ausgang ist
+ *      der gemessene (sauber -> keine Beanstandung; verfaelschte event_id/payload_ref
+ *      -> genau DIGEST_MISMATCH:*). Dieser Teil braucht node_modules (Schemastery) und
+ *      wird ohne SICHTBAR uebersprungen, wie die uebrigen DSH-abhaengigen Tests.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

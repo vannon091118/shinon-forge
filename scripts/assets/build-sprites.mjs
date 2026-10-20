@@ -7,7 +7,22 @@
  * transparent), keine fremden Bilder — also keine Bildrechte-Frage. Dieses
  * Skript wandelt sie in SVG um (ein Rechteck je Pixel, gleiche Pixel einer
  * Zeile zusammengefasst) und PRUEFT dabei das Format: genau 32 Zeilen zu je
- * → Kanon: docs/COMMENT-KANON.md#k-4ae8e5d285a2
+ * 32 Zeichen, nur Palettenzeichen, hoechstens fuenf Farben je Sprite.
+ *
+ * Aufruf:
+ *   node scripts/assets/build-sprites.mjs [--check] [--embed]
+ * Ohne Flag schreibt es `packages/codingmon/assets/sprites/*.svg` neben die
+ * Gitter; mit `--check` prueft es nur; mit `--embed` schreibt es die
+ * eingebetteten Spiegel in `packages/codingmon/client.js` neu (das Bundle ist
+ * selbststaendig und kann keine Datei aus `assets/` laden). Exit 1 bei
+ * Verletzung. Der Gate-Test (`packages/codingmon/test/sprites.test.mjs`)
+ * nutzt denselben Vertrag: jede Spezies hat Vorder- und Rueckseite, jedes SVG
+ * ist gueltig, jede Farbe stammt aus der Palette, die Einbettung ist deckungsgleich.
+ *
+ * STILHINWEIS (fuer kuenftige Aenderungen): Diese Datei nutzt bewusst nur
+ * `indexOf`/`slice`/`endsWith` und `String.fromCharCode(10)` statt
+ * Escape-Sequenzen — die Blocksuche ist literale Zeilensuche und kann nicht an
+ * Escapes scheitern.
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';

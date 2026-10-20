@@ -6,7 +6,10 @@
  *      `apply`, und das aktive Profil aktiviert es. Ein Persona-Bundle, das
  *      niemand mountet, ist toter Text.
  *   2. Zustandsvertrag (assets/persona-state.json): Baseline, die neun
- * → Kanon: docs/COMMENT-KANON.md#k-bebd10ff7f1a
+ *      Event-Übergänge, und für jeden erreichbaren Mood eine Stimme. Ein Mood
+ *      ohne Voice wäre ein Zustand ohne Ausdruck.
+ *   3. Grenze: der Laufzeitcode beobachtet und rendert — er ruft kein Modell,
+ *      startet kein Tool, schreibt nichts. Statisch geprüft, kommentarblind.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

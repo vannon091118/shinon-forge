@@ -1,6 +1,8 @@
 import z from '@deepseek-ai/schemastery';
 import { existsSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
+import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, createFactsService } from './assets/facts-service.js';
+import { FACTS_FILE_NAME } from './assets/facts-store.js';
 import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
 import {
   CONTRACT,
@@ -29,7 +31,36 @@ import {
  * Geschmack, sondern gemessen: ein Worker, der DIESE Datei importiert, scheitert
  * im echten Host an `Cannot find package '@deepseek-ai/schemastery'` — der
  * Worker hat die Modulaufloesung des Hosts nicht. Der Kern laedt deshalb ohne
- * → Kanon: docs/COMMENT-KANON.md#k-04269fb71dcc
+ * Bare-Importe, und der Worker laedt den Kern.
+ *
+ * WAS DER INDEX IST: der persistente Projektindex aus Plan §9–§12 — files,
+ * symbols, edges, references, touches, chunks + FTS5, ausserhalb des Repos unter
+ * ~/.shinon/indexes/<project-hash>/index.sqlite.
+ *
+ * WAS ER ANBIETET: ZWEI Faehigkeiten, jede schmal und jede ueber `ctx.provide`.
+ *
+ *   1. `QUERY_SERVICE` (Plan §14/§17) — EIN Vertragsname und EINE Operation
+ *      (`resolveContext`). Das ist die Naht zum Prompt-Enhancer. Kein
+ *      Dateihandle, kein Schema, kein Lauf — wer mehr braucht, importiert den
+ *      Kern; wer einen Kontext braucht, fragt hier.
+ *   2. `STORE_SERVICE` (Zug 2) — zwei Operationen (`load`, `save`) auf einem
+ *      Namensraum. Das ist die Naht zum Scoring, und sie ist die Antwort auf
+ *      eine gemessene Luecke: der Index war reine Ableitung (Dateien, Symbole,
+ *      Kanten — aus dem Projekt wieder herstellbar), dem Scoring fehlte jeder
+ *      Ort fuer das, was NICHT herstellbar ist: Urteile, ihre Zuordnung und der
+ *      daraus gerechnete Stand. Bis dahin lebte das im Arbeitsspeicher eines
+ *      Hosts und war nach jedem Neustart weg.
+ *
+ * WARUM ALS DIENST UND NICHT ALS IMPORT: die Pakete dieses Repos referenzieren
+ * einander nicht. Enhancer und Scoring lesen ihre Faehigkeit optional ueber
+ * `ctx.get`; fehlt sie, ist MAX nur ueber eine Datei zu haben statt gar nicht —
+ * und das Scoring rechnet im Speicher weiter, statt zu verschwinden.
+ *
+ * WARUM ZWEI DIENSTE UND NICHT EINER MIT VIER OPERATIONEN: die schmale Form der
+ * Abfrage ist per Test festgenagelt (`contract` + `resolveContext`, genau diese
+ * beiden Schluessel). Sie zu erweitern hiesse, jedem Leser des Kontexts ein
+ * Schreib-Modul in die Hand zu geben. Zwei Namen, zwei Vertraege, zwei
+ * Berechtigungen — dasselbe Prinzip wie bei den Marken-Slots.
  */
 
 export * from './assets/index-core.js';
@@ -66,7 +97,20 @@ const validNamespace = (namespace) => typeof namespace === 'string' && namespace
  * „nichts da" und „nicht lesbar" die ganze Aussage ist:
  *
  *   load  { ok: true, state: null }   es gibt (noch) keinen Index — ehrliche
- * → Kanon: docs/COMMENT-KANON.md#k-c723d54e00a3
+ *                                     Leere. Nichts ist verloren, nichts ist
+ *                                     kaputt: hier war noch nie ein Stand.
+ *   load  { ok: true, state: {…} }    der Stand (records, memos, scorecard,
+ *                                     notes, broken).
+ *   load  { ok: false, error }        die Datei ist da, aber unbrauchbar. Ein
+ *                                     Fehler, kein stilles Nichts — der Aufrufer
+ *                                     entscheidet, ob er leer startet.
+ *   save  { ok: true, rows }          geschrieben (ein Aufruf, eine Transaktion).
+ *   save  { ok: false, error }        nicht geschrieben; der alte Stand steht.
+ *
+ * `save` legt die Datei AN, `load` nicht: schreiben ist unsere eigene Ablage
+ * (sie darf ihr Zuhause bauen), lesen waere sonst ein erfundener Index —
+ * dieselbe Regel wie bei der Abfrage. Ein Namensraum ist Pflicht: ohne ihn
+ * waere die Ablage ein namenloser Haufen, und niemand koennte sie wiederfinden.
  */
 export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }) {
   // Ohne eigenen Ledger-Pfad wird NICHT stillschweigend in die Indexdatei oder
@@ -105,8 +149,10 @@ export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }
      * Fehler, und die ehrliche Leere („keine Ablage") darf ihn nicht verdecken.
      *
      * EINMALIGE MIGRATION: hat der Ledger den Stand nicht, der INDEX aber schon
- * → Kanon: docs/COMMENT-KANON.md#k-4ecd728f7f18
- */
+     * (so stand es bis zur Trennung), wird er hier heruebergeholt — verlustfrei
+     * und in einer Transaktion. Danach meldet `reason` nichts mehr. Das ist
+     * keine stille Datenbewegung: `save` schreibt weiterhin nur in den Ledger.
+     */
     load(namespace) {
       if (!validNamespace(namespace)) return { ok: false, error: 'MISSING_NAMESPACE' };
       if (!hasLedger) return { ok: false, error: 'MISSING_LEDGER_FILE' };
@@ -159,9 +205,29 @@ export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }
  *
  *   null      es gibt (noch) keinen Index — eine ehrliche Leere. Ein leerer
  *             Index waere eine Behauptung: "das Projekt hat keine Dateien".
- * → Kanon: docs/COMMENT-KANON.md#k-460a91877e9e
+ *   Kontext   der vertragsgemaesse Kontext; die Budgetgrenze ist hart (§14).
+ *   wirft     der Index ist da, aber unbrauchbar (kaputte Datei). Ein Fehler,
+ *             kein stilles Nichts — der Aufrufer entscheidet, was er daraus macht.
+ *
+ * Die Abfrage ERZEUGT KEINEN Index: `openIndex` legt fehlende Dateien an, eine
+ * Suche darf das nicht. Deshalb steht davor `existsSync`.
+ *
+ * WARM (Welle 2, 2026-10-20): Ist der Index da, frischt die Abfrage ihre
+ * KANDIDATEN auf — je Kandidat ein `stat` gegen den Inode-Stempel, und nur eine
+ * geänderte oder neue Datei wird gelesen (`refreshIndex` im Kern). Kein Watcher,
+ * kein Vollscan je Turn; der Kontextvertrag bleibt bei sechs Schlüsseln, und der
+ * Bericht reist über `onRefresh` (Diagnose), nicht als siebter Schlüssel.
+ * Gemessen im Leitstand: 1 von 25 Dateien im Index, Kontext leer — daher dieser
+ * Pfad.
  */
-export function createQueryService({ indexFile, budgetTokens = DEFAULT_CONTEXT_BUDGET, workspaceRoot = '' }) {
+export function createQueryService({
+  indexFile,
+  budgetTokens = DEFAULT_CONTEXT_BUDGET,
+  workspaceRoot = '',
+  chunkLines = 40,
+  maxFileBytes = 262144,
+  trace = true,
+}) {
   return {
     contract: QUERY_CONTRACT,
     resolveContext(prompt, options = {}) {
@@ -178,7 +244,32 @@ export function createQueryService({ indexFile, budgetTokens = DEFAULT_CONTEXT_B
         // zweite Wahrheit ueber denselben Index waere eine Fehlerquelle.
         const root = indexMeta(db).root;
         if (typeof root !== 'string' || root === '') return null;
-        return resolveContext(db, { prompt, project: basename(root), budgetTokens: budget });
+        return resolveContext(db, {
+          prompt,
+          project: basename(root),
+          budgetTokens: budget,
+          // Die Wurzel kommt aus dem INDEX (oben geprueft), nicht vom Aufrufer:
+          // aufgefrischt wird genau der Baum, den dieser Index beschreibt.
+          root,
+          refresh: true,
+          chunkLines,
+          maxFileBytes,
+          onRefresh: (report) => {
+            if (!trace) return;
+            if (report?.error !== undefined) {
+              console.error(`[shinon-project-index] Auffrischung fehlgeschlagen (${report.error}) — Antwort kommt aus dem letzten Stand`);
+              return;
+            }
+            // Nur EINE Zeile, wenn sich etwas geaendert hat: eine Abfrage ohne
+            // Aenderung ist der Normalfall und gehoert nicht ins Log.
+            if (report.written === 0 && report.removed === 0) return;
+            console.log(
+              `[shinon-project-index] Abfrage warm: ${report.checked} geprueft, ${report.stamped} ueber Stempel, ` +
+              `${report.read} gelesen (${report.readBytes} B), ${report.written} neu (${report.added} davon neu im Index), ` +
+              `${report.removed} entfernt, ${report.touches} Kanten, ${report.ms} ms`,
+            );
+          },
+        });
       } finally {
         db.close();
       }
@@ -214,8 +305,14 @@ export const Config = z.object({
    *              beide, vergleicht er zusaetzlich den Inode-Stempel (Geraet,
    *              Inode, Groesse, mtime, ctime). Damit wird ein Inhalt, der bei
    *              GLEICHER Groesse geaendert und dessen mtime zurueckgesetzt wurde,
- * → Kanon: docs/COMMENT-KANON.md#k-03e5d719ce37
- */
+   *              erkannt, ohne dass eine unveraenderte Datei gelesen wird. Der
+   *              Preis sind Lesevorgaenge fuer verdaechtige Dateien; ein Signal
+   *              ohne Inhaltsaenderung (chmod) ist ein gezaehlter Fehlalarm.
+   *   'changed'  vertraut mtime + size. Benannte Luecke: derselbe Inhalt bei
+   *              gleicher Groesse und zurueckgesetzter mtime bleibt unbemerkt.
+   *   'all'      jede Datei lesen und sha256 pruefen; nimmt nichts an und kostet
+   *              ein vollstaendiges Lesen je Lauf.
+   */
   verify: z.union([z.const('stamp'), z.const('changed'), z.const('all')]).default('stamp'),
   /** Bericht nach dem Lauf. */
   trace: z.boolean().default(true),
@@ -278,7 +375,15 @@ function reportLine(report, stats, where) {
  * Deshalb laeuft er (a) nicht im Mount, sondern danach, und (b) im Worker statt
  * im Host. Ist der Worker nicht nutzbar, laeuft derselbe `runIndex` im Host und
  * die Ursache steht im Protokoll — ein stiller Wechsel waere ein Befund ohne Spur.
- * → Kanon: docs/COMMENT-KANON.md#k-86bcb8c92b8a
+ *
+ * Der Anlauf selbst laeuft NACH dem Mounten; die Abfrage-Faehigkeit wird aber
+ * schon hier bereitgestellt. Das ist kein Widerspruch: sie antwortet `null`,
+ * solange kein Index vorliegt, und benutzt denselben Dateipfad, den der Lauf
+ * schreibt. Damit gibt es kein Fenster, in dem ein Aufrufer nichts bekaeme.
+ *
+ * Der Secret-Schutz (Plan §13) ist nicht konfigurierbar: er ist keine Option,
+ * sondern eine Eigenschaft des Index. Was er nicht schuetzt, steht als Grenze im
+ * Kern — ein Detektor mit benannten Mustern ist kein Beweis.
  */
 export function apply(ctx, config) {
   // S1: DIE EINE Workspace-Identität — explizite Config > Env > cwd. Der
@@ -296,6 +401,9 @@ export function apply(ctx, config) {
     verify: config.verify,
   };
   const file = indexPath(options.indexRoot, options.root);
+  // Die Fakten liegen bewusst NICHT in der Indexdatei: eigener Lebenszyklus,
+  // eigene Fassung, kein gemeinsamer Rebuild (Probe: docs/probes/facts-store-entscheidung.json).
+  const factsFile = resolve(options.root, '.shinon', FACTS_FILE_NAME);
 
   // Die Naht zum Enhancer: genau eine Operation, sofort verfuegbar, ohne Index
   // ehrlich leer. Ob sie angeboten werden konnte, steht in DERSELBEN
@@ -303,11 +411,25 @@ export function apply(ctx, config) {
   // Zustand einmal, und ein Host ohne `provide` ist kein Fehler des Laufs.
   const canProvide = typeof ctx?.provide === 'function';
   const releaseQuery = canProvide
-    ? ctx.provide(QUERY_SERVICE, createQueryService({ indexFile: file, workspaceRoot: options.root }))
+    ? ctx.provide(QUERY_SERVICE, createQueryService({
+      indexFile: file,
+      workspaceRoot: options.root,
+      chunkLines: options.chunkLines,
+      maxFileBytes: options.maxFileBytes,
+      trace: config.trace,
+    }))
     : null;
   const releaseStore = canProvide
     ? ctx.provide(STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile, workspaceRoot: options.root }))
     : null;
+  // Die dritte, schmale Faehigkeit (Zug 3): der Prompter liest einen Snapshot,
+  // nie die Datenbank. Fehlt die Datei, ist der Dienst ehrlich leer.
+  const releaseFacts = canProvide
+    ? ctx.provide(FACTS_SNAPSHOT_SERVICE, createFactsService({ file: factsFile, root: options.root, trace: config.trace }))
+    : null;
+  const factsState = canProvide
+    ? `Fakten ${FACTS_SNAPSHOT_SERVICE} bereitgestellt (${FACTS_SNAPSHOT_CONTRACT}: ${factsFile})`
+    : `Fakten ${FACTS_SNAPSHOT_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
   const queryState = canProvide
     ? `Abfrage ${QUERY_SERVICE} bereitgestellt (${QUERY_CONTRACT})`
     : `Abfrage ${QUERY_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
@@ -356,6 +478,7 @@ export function apply(ctx, config) {
     console.log(`[shinon-project-index] Aktiviert — ${CONTRACT}, ${file}, Lauf nach dem Start (${config.worker ? 'Worker' : 'Host'}), Schutz an (Plan §13)`);
     console.log(`[shinon-project-index] ${queryState}`);
     console.log(`[shinon-project-index] ${storeState}`);
+    console.log(`[shinon-project-index] ${factsState}`);
   }
 
   // Ein noch nicht gestarteter Lauf wird gestoppt; ein laufender schreibt zu
@@ -364,5 +487,6 @@ export function apply(ctx, config) {
     clearImmediate(pending);
     if (typeof releaseQuery === 'function') releaseQuery();
     if (typeof releaseStore === 'function') releaseStore();
+    if (typeof releaseFacts === 'function') releaseFacts();
   };
 }

@@ -6,7 +6,8 @@
  * deterministisch, der Entscheidungsanteil trägt keinen Prompt-Text, und das
  * Modul nutzt kein Modell (statisch geprüft).
  *
- * → Kanon: docs/COMMENT-KANON.md#k-9ed5e7ce90f6
+ * Läuft mit `node --test`; kein Netz, kein Modell, kein node_modules nötig
+ * (das Modul hat keine Imports — dieselbe Regel wie note-core).
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

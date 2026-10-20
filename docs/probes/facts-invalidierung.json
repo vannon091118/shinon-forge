@@ -1,0 +1,31 @@
+{
+  "probe": "wissens-runtime/zug-2-extraktion-und-invalidierung",
+  "date": "2026-10-20",
+  "question": "Sind Extraktion und Invalidierung deterministisch, richtig begrenzt und schnell genug für eine Kaskade?",
+  "method": "200 abgeleitete Fakten an einem Zeiger, alle VALID, in einer Kette verkettet (jeder hängt am vorigen). Dann applySourceChange mit geändertem Hash. Zusätzlich: zweimal dieselbe Extraktion und zweimal dieselbe Kaskade verglichen. Vor und nach dem Bündeln der Kaskade in eine Transaktion gemessen.",
+  "measurement": {
+    "facts": 200,
+    "deps": 199,
+    "extraction_deterministic": true,
+    "extraction_hash_stable": true,
+    "closure_deterministic": true,
+    "closure_size": 200,
+    "stale_marked": 200,
+    "skipped": 0,
+    "cascade_ms_before_batching": 208.01,
+    "cascade_ms_after_batching": 10.2,
+    "insert_and_verify_ms": 1129.17,
+    "observation": "Je Zeile eine eigene Transaktion kostet ein fsync pro Fakt; die gebündelte Kaskade braucht für dieselben 200 Fakten rund ein Zwanzigstel der Zeit. Die Prüfungen des Lebenszyklus laufen in beiden Fällen über canTransition aus dem Kern."
+  },
+  "limits": [
+    "Ein Lauf je Zahl, keine Serie: die Dauerzahlen sind Größenordnungen, keine Verteilungen.",
+    "Gemessen mit einer Kette (maximale Tiefe). Ein breiter Graph verteilt die Kaskade auf mehr Stufen; die Anzahl bleibt gleich, die Zahl der Stufen steigt.",
+    "Der Einfügepfad (1129 ms für 200 Fakten mit je drei Übergängen) ist nicht optimiert; er fällt nur bei der ersten Aufnahme einer Quelle an."
+  ],
+  "artifacts": {
+    "extractors": "packages/project-index/assets/facts-extract.js",
+    "invalidation": "packages/project-index/assets/facts-invalidate.js",
+    "store": "packages/project-index/assets/facts-store.js",
+    "tests": "packages/project-index/test/facts-pipeline.test.mjs"
+  }
+}

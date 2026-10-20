@@ -7,7 +7,58 @@
  * während der Auftrag die Zahl EINES Turns verlangt. Beide Zahlen sind da, sie
  * kommen aus zwei benachbarten Wegen der gelieferten Fassung:
  *
- * → Kanon: docs/COMMENT-KANON.md#k-708181dd6305
+ *   TURN    — die dauerhaften Ereignisse des Turns (`turn/start` … `turn/end`) im
+ *             Ereignisfenster der Sitzung: `binding.eventSource`, ein
+ *             `SessionEventSource` mit den Einträgen
+ *             `{ type: 'event', event }` (dauerhaft) bzw.
+ *             `{ type: 'transient', event }` (client-only Live-Chunk). Genau diese
+ *             Einträge faltet DSHs Chat-Bundle (die Zahl seiner Turn-Zeile); die
+ *             Regel selbst ist als Region bytegleich mit dem Besitzer —
+ *             verglichen mit DSHs eigener Funktion in `token-usage-vendor.test.mjs`.
+ *   SITZUNG — die Sitzungs-Projektion `tokenUsage`, im Browser über
+ *             `binding.session.projections.faceOf(key)` gelesen. Dieser Ausdruck
+ *             IST der Weg, den `dsh-client-ui-session` als
+ *             `keyedHooks: { projection: (key) => binding.session.projections.faceOf(key) }`
+ *             anbietet (gemessen an der gelieferten Fassung).
+ *   WELCHE  — die Vorgabe-Bindung des Renderers: `ctx.get?.('uiSession')` →
+ *             `adapter.current` (eine Quelle mit `getSnapshot`), deren Sitzungs-id
+ *             über `ctx.get?.('sessions')?.binding?.(id)` zur Bindung führt.
+ *
+ * Geprüft wird das ECHTE Bundle in einem `vm`-Kontext mit den echten Formen dieser
+ * drei Wege; der beim Mounten gerenderte Wert wird gegen den Besitzer gestellt, und
+ * das Abo wird über einen Sitzungswechsel gefahren (anhängen, ablösen, aufräumen).
+ *
+ * Was der Test NICHT beweist (ehrlich): React und die Uhren sind Attrappen, und
+ * dass der echte Client die Zahl LIVE nachzieht, zeigt erst ein lebender Boot.
+ * GEMESSEN (2026-10-12, `DSH_HOME=$PWD dsh --profile shinon --no-open --port 3099`,
+ * echter Modell-Turn „Antworte mit genau einem Wort: drei" auf einer Sitzung mit
+ * drei Turns) — Panel gegen DSHs eigene Offenlegung DESSELBEN Turns:
+ *
+ *   Panel (breit)  `📊 18.6K tok · 66 % aus Cache`
+ *   Panel (Titel)  `Turn 3: 18.615 insgesamt · 18.612 Prompt (12.288 aus dem Cache,
+ *                   6.324 neue Eingabe) · 3 Ausgabe · agnes/agnes-3.0-flash ·
+ *                   Sitzung: 55.507 insgesamt · 36.864 aus dem Cache · 18.634 neue Eingabe · 9 Ausgabe`
+ *   DSH Zeile      `Usage 18.6K tok`   (Turn 3)
+ *   DSH Dialog     `18,615 tok · agnes/agnes-3.0-flash · Cache hit 66% ·
+ *                   Uncached input 6,324 tok · Cached input 12,288 tok · Output 3 tok`
+ *   DSH Fußpille   `55.5K tok·Cache hit 66%`   (= die Sitzung im Titel)
+ *
+ * Feld für Feld gleich; die Sitzungszeile ist als solche benannt und wird nicht für
+ * die Turn-Zahl gehalten.
+ *
+ * ZWEITE MESSUNG, ohne Browser — die aufgezeichnete Sitzung selbst zurückgespielt
+ * (`sessions/<workspace>/session-<id>/session.v4.jsonl.zstd`, Turn 3):
+ *
+ *   zstd -dc <log> > /tmp/session.jsonl   # dann die Ereignisse als
+ *   { type: 'event', event } in `turnSliceOf` und beide Faltungen darauf anwenden
+ *
+ *   meine Faltung == DSH Faltung == { uncachedInputTokens: 6324, outputTokens: 3,
+ *                                     totalTokens: 18615, cacheReadTokens: 12288,
+ *                                     routes: [agnes/agnes-3.0-flash] }
+ *
+ * Die echten Ereignisse tragen genau die Felder, die gelesen werden (`turn/start`:
+ * `turn`; `step/start`: `turn, step`; `assistant/message`: `turn, step, message,
+ * stream, usage`; `turn/end`: `turn, reason`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -6,7 +6,13 @@
  * (`zu spitz`, `zu breit`, `doppelt`) stehen in `note-core.js#reviewNotes` und
  * werden vom Host auf die Zettel-HÜLLE des Vorschlags angewendet; was HIER
  * steht, ist nur baustein-spezifisch: Form des Blocks, Duplikat gegen AKTIVE
- * → Kanon: docs/COMMENT-KANON.md#k-b2be43d3772c
+ * Bausteine (die keine Zettel sind) und das Zusammenführen mit der Registry.
+ *
+ * Ein Vorschlag ist eine Zettel-Hülle mit Block-Kern: { thema, bei, immer,
+ * weil, beleg, block: { id, quelle, lage, modus, budgetTokens, ausloeser } }.
+ * Die Hülle prüft der Veredler wie jeden Zettel (Form via `parseNote`, die drei
+ * Prüfungen via `reviewNotes` — der Host ruft beides auf); der Kern wird hier
+ * geprüft. Nur was beides besteht, wird aktiv.
  */
 
 /** Schmaler Dienst: ein Aufruf `propose`, fail-closed mit Befundliste. */

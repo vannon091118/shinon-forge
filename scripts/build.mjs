@@ -7,12 +7,19 @@
  *   2. Manifest-Validierung  Exports, DSH-Bundle-/Client-Metadaten
  *   3. Ressourcen            jede Manifest-/Config-Referenz existiert und parst
  *   4. Patch-Validierung     YAML-Schema der Loader-Patches (Felder, Typen, required)
- * → Kanon: docs/COMMENT-KANON.md#k-fa327989c395
+ *   5. Namensvertrag         package.json ↔ Patch ↔ ModuleLoader-id
+ *   6. Komposition           Profil-Bundles, doppelte ids, Paketgraph
+ *   7. Artefakte             dist/ inkl. jeder referenzierten Ressource
+ *
+ * Läuft ohne node_modules - nur node:-Module und der YAML-Parser des DSH-Stacks.
  */
 import { createHash } from 'crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
 import { join, relative } from 'path';
 import * as repo from './lib/repo.mjs';
+import { diaryIssues } from './lib/diary.mjs';
+import { canonIssues } from './lib/canon.mjs';
+import { structureIssues } from './lib/structure.mjs';
 
 const DIST = join(repo.ROOT, 'dist');
 
@@ -56,6 +63,15 @@ for (const hit of repo.legacyHits(packages)) problems.push(`Legacy-Referenz: ${h
 for (const issue of repo.pnpmIssues()) problems.push(`pnpm-Reste: ${issue}`);
 // Zwillings-Regeln (eine Quelle, ein Spiegel): Drift bricht den Build, nicht erst den Betrieb.
 for (const issue of repo.twinIssues()) problems.push(`Quell-Zwillinge: ${issue}`);
+// Host-Naht-Kern: die sechs Host↔Host-Regeln stehen EINMAL (@shinon/seams) —
+// eine zurueckgekehrte Kopie ohne Marker faengt nur dieser Schritt.
+for (const issue of repo.hostMirrorIssues()) problems.push(`Host-Spiegel: ${issue}`);
+// Dev-Tagebuch: die erzaehlte Timeline muss verankert bleiben — jeder Tag, jeder SHA,
+// jeder Belegpfad. Ohne git (Tarball, Isolat) meldet der Schritt nichts.
+for (const issue of diaryIssues()) problems.push(`Tagebuch: ${issue}`);
+// Kanon: ein Name, eine Schreibweise, eine Definition — Globals, Vertraege, Dienste.
+for (const issue of canonIssues()) problems.push(`Kanon: ${issue}`);
+for (const issue of structureIssues()) problems.push(`Struktur: ${issue}`);
 // Generierte Idiome: dieselbe Regel für die Plugin-Bausteine — die Ableitung in den
 // Paketen muss zeichengenau zu scripts/lib/plugin-idioms.mjs passen.
 for (const half of ['index.js', 'client.js']) {

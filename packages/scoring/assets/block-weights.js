@@ -6,7 +6,16 @@
  * Der Host (`index.js`) besitzt den Zustand, dieser Kern die Rechnung.
  *
  * WAS HIER STEHT: aus den vorhandenen Signalen Erfolgszähler je Baustein.
- * → Kanon: docs/COMMENT-KANON.md#k-dbfe85cfd222
+ * Urteil (copy/selffix), Turn-Ende (accept/dismiss) und Widerruf (retract)
+ * tragen Polarität; die Sitzungsbemerkung (note) hat keinen Pol und wird
+ * beobachtet, aber nie gewertet — genau wie in der Signaltabelle.
+ * WAS HIER NICHT STEHT: kein Modell, keine Uhr, kein Dateisystem. Unbekannte
+ * Signale und unbekannte Bausteine ändern nichts (fail-closed).
+ *
+ * DIE EINE REGEL (Phase 3): das Gewicht ordnet nur INNERHALB der
+ * Haystack-Relevanz — es ersetzt sie nie. Der Selektor sortiert nach
+ * (Pflicht, Treffer, Gewicht, id); ein höherer Treffer schlägt jedes Gewicht.
+ * Lernen ordnet, rät nicht.
  */
 
 /** Die vierte Naht (Phase 3): schmaler Dienst, eine Operation `read`. */

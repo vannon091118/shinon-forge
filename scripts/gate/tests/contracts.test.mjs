@@ -46,6 +46,7 @@ test('contracts: leere rules sind ein Problem', () => {
   assert.ok(contractIssues({ name: 'X', status: 'STUB', rules: [] }, 'x.json').length > 0);
 });
 
+
 const goodProbe = {
   id: 'p1', claim: 'etwas gilt', targets: ['a.js'], expect: 'exit 0',
   result: 'BESTAETIGT', verdict: 'WRITE',
@@ -77,7 +78,7 @@ test('probe-twin: Vokabular wird erzwungen', () => {
 });
 
 test('probe-twin: der Nachtrag braucht Datum, Geltungsbereich und Nachmessung', () => {
-  // Das Feld ersetzt das stille Umschreiben eines Belegtextes (docs/INDEX.md §2).
+  // Das Feld ersetzt das stille Umschreiben eines Belegtextes (AGENTS.md).
   const good = { ...goodProbe, nachtrag: { date: '2026-10-10', scope: 'Geometrie', note: 'neu gezeichnet' } };
   assert.deepEqual(probeIssues(good, 'p.json'), []);
   assert.ok(probeIssues({ ...goodProbe, nachtrag: '2026-10-10, irgendwas' }, 'p.json')[0].includes('Objekt'), 'ein bloßer Text ist keine standardisierte Nachmessung');

@@ -7,7 +7,22 @@
  * `node:path` importiert. Der ReferenceError fiel in das try/catch des Blocks
  * und wurde zu einer Warnung:
  *
- * → Kanon: docs/COMMENT-KANON.md#k-97fdc6865b4a
+ *   [shinon-persona] Projekt-Kontext nicht lesbar (isAbsolute is not defined)
+ *
+ * Die Persona startete also OHNE den Projekt-Kontext — in JEDEM Lauf, weil das
+ * Profil `projectContextPath: .shinon/project-context.md` setzt und damit genau
+ * den relativen Zweig nimmt. Der Fehler war nur deswegen leise, weil eine
+ * fehlende Datei und ein kaputter Import dieselbe Warnung ergaben.
+ *
+ * WARUM HIER UND NICHT AM FAKE-HOST: `persona-state.test.mjs` prüft das
+ * Paketverhalten ohne node_modules und sieht nur die Abschnittsliste. DIESER
+ * Test hängt dasselbe Bundle an den ECHTEN Dienst
+ * `@deepseek-ai/dsh-system-prompt` aus der gepinnten Installation und liest den
+ * zusammengebauten Prompt über dessen öffentliche Schnittstelle
+ * (`assemble()` + `renderPrompt()`). Erst damit ist „der Inhalt landet im
+ * System-Prompt" gemessen statt behauptet.
+ *
+ * Läuft mit `node --test`; braucht `dsh` im PATH (wie prompter-contract).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +32,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/persona/', import.meta.url));
 /** Die Repo-Wurzel — der eine erlaubte Persona-Scope (die Persona spricht nur benannt). */
@@ -31,6 +47,7 @@ async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-persona-prompt-'));
   const dir = join(work, 'pkg');
   cpSync(PACKAGE_DIR, dir, { recursive: true });
+  provideSeamCore(dir);
   const shim = join(dir, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(
@@ -72,9 +89,11 @@ const contextFixture = (name, value) => {
  * Root. Nur die abhängigen Dienste (Events, Scoring) fehlen — die sind
  * optional und ändern an diesem Abschnitt nichts.
  */
-async function systemPromptWith(projectContextPath, overrides = {}, { sessionCwd } = {}) {
+async function systemPromptWith(projectContextPath, overrides = {}, { sessionCwd, prepare } = {}) {
   const ctx = new Context();
   await ctx.plugin(SystemPrompt, {});
+  // Eine Ablage VOR dem Bundle: der echte Context muss sie ueber `get` liefern.
+  if (typeof prepare === 'function') prepare(ctx);
   await quiet(() => ctx.plugin(bundle, {
     projectContextPath,
     workspaceRoot: REPO_ROOT,
@@ -96,6 +115,41 @@ async function systemPromptWith(projectContextPath, overrides = {}, { sessionCwd
   const withText = assembly.sections.filter((section) => String(section.text).trim() !== '');
   return { prompt, sections: assembly.sections.map((section) => section.name), withText };
 }
+
+test('Selbstmodell: belegte Spuren stehen im ECHTEN System-Prompt — ohne Ablage bleibt der Abschnitt leer', async () => {
+  // Der Weg, den der Nutzer sieht: Ablage -> Persona -> echter
+  // System-Prompt-Dienst -> gerenderter Prompt. Eine registrierte Sektion ohne
+  // Text waere nur die Haelfte; hier steht der Satz mit Zahl und Grenze.
+  const model = {
+    contract: 'shinon.self-model/v1',
+    version: 1,
+    runs: 4,
+    accepted: 3,
+    rejected: 1,
+    unavailable: 0,
+    errors: 0,
+    reasons: { 'zu breit': 3 },
+    classes: { auftrag: 4 },
+    questions: { 'welcher Workspace?': 2 },
+    firstSeen: '2026-10-18T20:00:00.000Z',
+    lastSeen: '2026-10-18T21:00:00.000Z',
+  };
+  const { prompt } = await systemPromptWith('', {}, {
+    sessionCwd: REPO_ROOT,
+    prepare: (ctx) => ctx.provide(bundle.INDEX_STORE_SERVICE, {
+      contract: bundle.INDEX_STORE_CONTRACT,
+      load: () => ({ ok: true, state: { memos: [{ id: bundle.SELF_MODEL_MEMO_ID, model }] } }),
+      save: () => ({ ok: true, rows: 1 }),
+    }),
+  });
+  assert.match(prompt, /Läufe: 4 \(3 angenommen, 1 verworfen/);
+  assert.match(prompt, /Wiederkehrende Grenze: zu breit \(3×\)/);
+  assert.match(prompt, /Offene Frage \(2×\): welcher Workspace\?/);
+
+  // Gegenprobe: dieselbe Lage ohne Ablage — kein erfundener Satz.
+  const ohne = await systemPromptWith('', {}, { sessionCwd: REPO_ROOT });
+  assert.equal(ohne.prompt.includes('Selbstmodell'), false, 'ohne Beleg kein Selbstmodell im Prompt');
+});
 
 test('Projekt-Kontext: der echte System-Prompt-Dienst traegt den Dateiinhalt — auch bei RELATIVEM Pfad', async () => {
   const file = contextFixture('relativ.md', `# Kontext\n${CONTEXT_MARK} gilt nur im Shinon-Projekt\n`);
@@ -167,9 +221,103 @@ test('Projekt-Kontext: fehlende, leere oder nicht konfigurierte Datei laesst den
     ['nicht konfiguriert', ''],
   ];
   for (const [name, path] of cases) {
-    const { prompt, sections } = await systemPromptWith(path);
-    assert.equal(sections.includes('shinon:project-context'), false, `${name}: kein Abschnitt`);
+    const { prompt, withText } = await systemPromptWith(path);
+    // Der Abschnitt ist ein Getter (Sitzungs-Scope): registriert, aber ohne Text.
+    assert.equal(withText.some((section) => section.name === 'shinon:project-context'), false, `${name}: kein Text`);
     assert.equal(prompt.includes(CONTEXT_MARK), false, `${name}: kein Kontext im Prompt`);
     assert.ok(prompt.includes(IDENTITY_MARK), `${name}: die Persona bleibt`);
   }
+});
+
+test('Projektscope: OHNE deklarierten Root entscheidet die Sitzung — nicht der Boot', async () => {
+  // Der gemessene Ausfall 2026-10-18: das Profil setzt keinen `workspaceRoot`,
+  // also brach der Mount ab und die Persona stand in keinem einzigen Prompt.
+  // Jetzt gilt: Sitzung im Shinon-Repo → Persona; Sitzung fremd → nichts.
+  const eigen = await systemPromptWith('', { workspaceRoot: '' }, { sessionCwd: REPO_ROOT });
+  assert.ok(eigen.prompt.includes(IDENTITY_MARK), 'Sitzung im Repo bekommt die Identity');
+
+  const fremd = mkdtempSync(join(tmpdir(), 'shinon-prompt-ohne-root-'));
+  writeFileSync(join(fremd, 'package.json'), JSON.stringify({ name: 'fremdes-projekt' }));
+  const other = await systemPromptWith('', { workspaceRoot: '' }, { sessionCwd: fremd });
+  assert.equal(other.prompt.includes(IDENTITY_MARK), false, 'fremde Sitzung bleibt stumm');
+  assert.deepEqual(
+    other.withText.filter((section) => section.name.startsWith('shinon:')).map((section) => section.name),
+    [],
+    'kein Shinon-Text in fremder Sitzung',
+  );
+});
+
+test('Langzeitgedächtnis: Erinnerung und angenommene Selbstauflage stehen im ECHTEN System-Prompt', async () => {
+  // Der Beweis, den die Anfrage verlangt: nicht „die Persona haette Zugriff",
+  // sondern der gerenderte Prompt traegt Identitaet, Erinnerung und Auflage.
+  const memory = {
+    contract: 'shinon.persona-memory/v1',
+    version: 1,
+    seq: 4,
+    firstSeen: '2026-10-18T20:00:00.000Z',
+    lastSeen: '2026-10-19T02:00:00.000Z',
+    entries: [
+      {
+        id: 'limit|global|prompter:nojson',
+        kind: 'limit',
+        scope: 'global',
+        subject: 'prompter:nojson',
+        detail: 'NO_JSON',
+        evidence: 3,
+        strength: 3,
+        firstSeen: '2026-10-18T20:00:00.000Z',
+        lastSeen: '2026-10-19T02:00:00.000Z',
+        seq: 3,
+      },
+      {
+        id: 'preference|global|korrektur:kurzer',
+        kind: 'preference',
+        scope: 'global',
+        subject: 'korrektur:kurzer',
+        detail: 'nicht so lang',
+        evidence: 2,
+        strength: 2,
+        firstSeen: '2026-10-18T20:00:00.000Z',
+        lastSeen: '2026-10-19T02:00:00.000Z',
+        seq: 4,
+      },
+    ],
+    proposals: [
+      {
+        id: 'p:limit|global|prompter:nojson',
+        kind: 'commitment',
+        claim: 'Bei "prompter:nojson" zuerst die Ursache prüfen, bevor der nächste Lauf startet.',
+        evidence: 3,
+        status: 'accepted',
+        createdAt: '2026-10-19T01:00:00.000Z',
+        decidedAt: '2026-10-19T02:00:00.000Z',
+        source: 'limit|global|prompter:nojson',
+      },
+    ],
+  };
+
+  const { prompt, sections } = await systemPromptWith('', {}, {
+    sessionCwd: REPO_ROOT,
+    prepare: (ctx) => ctx.provide(bundle.INDEX_STORE_SERVICE, {
+      contract: bundle.INDEX_STORE_CONTRACT,
+      load: (namespace) => ({
+        ok: true,
+        state: { memos: namespace === bundle.MEMORY_NAMESPACE ? [{ id: bundle.MEMORY_MEMO_ID, memory }] : [] },
+      }),
+      save: () => ({ ok: true, rows: 1 }),
+    }),
+  });
+
+  assert.ok(sections.includes('shinon:identity'), 'Identitaet fehlt');
+  assert.ok(sections.includes('shinon:memory'), 'Gedaechtnis-Abschnitt fehlt');
+  assert.ok(sections.includes('shinon:commitments'), 'Selbstauflagen-Abschnitt fehlt');
+  assert.ok(prompt.includes(IDENTITY_MARK), 'Identitaet steht nicht im Prompt');
+  assert.match(prompt, /## Erinnerungen \(belegt, nicht behauptet\)/);
+  assert.match(prompt, /Grenze: prompter:nojson \(3×\) — NO_JSON/);
+  assert.match(prompt, /Korrektur: korrektur:kurzer \(2×\) — nicht so lang/);
+  assert.match(prompt, /## Selbstauflagen \(geprüft und angenommen\)/);
+  assert.ok(
+    prompt.indexOf('## Erinnerungen') < prompt.indexOf('## Selbstauflagen'),
+    'Erlebnisse stehen vor den daraus abgeleiteten Auflagen',
+  );
 });

@@ -1,0 +1,49 @@
+{
+  "probe": "wissens-runtime/zug-1-speicherentscheidung",
+  "date": "2026-10-20",
+  "question": "Fakten in dieselbe SQLite wie der Projektindex oder in eine eigene Faktendatei?",
+  "method": "Beide Varianten in einem temporären Verzeichnis gebaut und gemessen: (A) ein Fakten-Table in der Indexdatei, eine Indexzeile, dann meta.schema_version auf 999 gesetzt und openIndex erneut geöffnet; (B) eigene facts.sqlite über openFacts, ein Fakt eingefügt und zurückgelesen. Zeilen, Dateigröße und Dauer gezählt; der Quelltext von openIndex auf die Löschliste geprüft.",
+  "measurement": {
+    "index": {
+      "schema_version": 2,
+      "primary_tables": 6,
+      "drop_list_on_version_mismatch": ["files", "symbols", "edges", "references", "touches", "chunks"],
+      "runs_vacuum_on_rebuild": true,
+      "version_key": "meta.schema_version"
+    },
+    "variant_a_same_file": {
+      "files_rows_before": 1,
+      "files_rows_after": 0,
+      "facts_rows_before": 1,
+      "facts_rows_after": 1,
+      "file_bytes_before": 106496,
+      "file_bytes_after": 106496,
+      "duration_ms": 29.1,
+      "observation": "Die Faktzeile überlebt nur, weil `facts` nicht in PRIMARY_TABLES steht. Jeder Index-Versionssprung löscht die sechs Index-Tabellen und läuft danach `vacuum` über dieselbe Datei, in der die Fakten liegen."
+    },
+    "variant_b_own_file": {
+      "facts_version": 2,
+      "fact_kept_after_reopen": true,
+      "duration_ms": 5.87,
+      "version_key": "pragma user_version",
+      "observation": "Eigene Datei, eigene Fassung, eigener Migrationspfad; kein gemeinsamer Rebuild und kein gemeinsames `vacuum`."
+    }
+  },
+  "decision": "Eigene Datei (facts.sqlite) mit eigener Versionsleiter (FACTS_VERSION über PRAGMA user_version) und additiven Migrationsschritten.",
+  "reasons": [
+    "In Variante A hängt der Erhalt der Fakten allein daran, dass niemand `facts` in PRIMARY_TABLES aufnimmt. Diese Kopplung ist eine Zeile entfernt und wäre ein stiller Datenverlust.",
+    "Der Index-Rebuild läuft `vacuum` über die gesamte Datei; mit Fakten darin werden bei jedem Schema-Sprung auch die geurteilten Aussagen neu geschrieben.",
+    "Zwei Lebenszyklen (abgeleiteter Index, geurteiltes Wissen) brauchen zwei Versionsleitern. Eine gemeinsame Datei hätte zwei Schlüssel in einer Datei und keinen getrennten Migrationsschritt.",
+    "Getrennte Dateien trennen auch die Sperren: ein laufender Index-Rebuild blockiert keine Fakten-Schreibvorgänge."
+  ],
+  "limits": [
+    "Gemessen wurde auf einer leeren Indexdatei (6 Index-Tabellen, 1 Zeile). Die Dauerzahlen sind Einzelmessungen in einem temporären Verzeichnis, keine Serie.",
+    "Nicht gemessen: gleichzeitige Schreiber auf Index und Fakten unter Last; die Aussage zur Sperre folgt aus der Trennung der Dateien, nicht aus einem Nebenläufigkeitstest."
+  ],
+  "artifacts": {
+    "core": "packages/project-index/assets/facts-core.js",
+    "store": "packages/project-index/assets/facts-store.js",
+    "tests": "packages/project-index/test/facts.test.mjs",
+    "contract": "docs/contracts/facts.json"
+  }
+}

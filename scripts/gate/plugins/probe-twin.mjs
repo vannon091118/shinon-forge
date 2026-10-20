@@ -6,7 +6,16 @@
  *     sie Ziele, sind IDs eindeutig? Er urteilt NICHT über Wahrheit.
  *   - Der SEMANTIK-Executor (Twin) führt aus und liefert Evidenz.
  *   - Das Gate entscheidet aus tatsächlichen Ergebnissen, nie aus Prosa.
- * → Kanon: docs/COMMENT-KANON.md#k-c577bc271c7d
+ *
+ * Dieses Gate ist der Validator: es prüft die Probe-Definitionen in
+ * docs/probes/*.json strukturell. Es führt nichts aus (kein Netz, kein
+ * Modell) — Ausführung ist der Twin, und der gehört nicht in ein Gate.
+ *
+ * Vokabular (Falsify_Me): BESTAETIGT | WIDERSPRUCH | UNKLAR
+ * Verdicts:                 PLAN | RESEARCH | ASK | WRITE
+ *
+ * Anti-Vakuum: eine Probe ohne Ziel oder ohne erwartetes Ergebnis ist keine
+ * Probe. „Wiederholung ist kein Beweis" — eine leere Probe bestätigt nichts.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,11 +29,13 @@ export const VERDICTS = ['PLAN', 'RESEARCH', 'ASK', 'WRITE'];
  * `nachtrag` — die standardisierte Nachmessung.
  *
  * Warum es das Feld gibt und warum es eine FORM hat: eine Probe wird nicht
- * nachträglich aktuell gemacht (`docs/INDEX.md` §2), aber eine Aussage kann durch
+ * nachträglich aktuell gemacht (ein Beleg wird nicht umgeschrieben), aber eine Aussage kann durch
  * eine spätere Messung teilweise überholt sein. Statt den Belegtext still zu
  * überschreiben, trägt die Probe einen Nachtrag mit DATUM und GELTUNGSBEREICH —
  * maschinenlesbar, damit er nicht zur Prosa wird, die niemand prüft.
- * → Kanon: docs/COMMENT-KANON.md#k-4a72578c6500
+ *
+ * @param {unknown} nachtrag
+ * @param {string} file
  */
 export function nachtragIssues(nachtrag, file) {
   const issues = [];

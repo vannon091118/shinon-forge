@@ -7,7 +7,20 @@
  * abonniert. Die Engine rechnete, der Composite ging ins Leere, und kein Test
  * konnte das sehen — die Paket-Tests prüfen die Mathematik, nicht die
  * Verdrahtung. Diese Datei prüft die Verdrahtung.
- * → Kanon: docs/COMMENT-KANON.md#k-8ac8d942847b
+ *
+ * Vier Ebenen:
+ *   1. Der Vertrag: die Ableitung ist vollständig und jeder Mood-Ereignistyp
+ *      existiert im Spine (ein Takt auf ein Ereignis, das es nicht gibt, klingt nie).
+ *   2. Die Naht als DATEN: Kanalname und Vertragsname sind auf beiden Seiten
+ *      LITERALE (kein Paket importiert das andere) — gepinnt über `twinIssues`
+ *      und gegen das echte Bundle. Drift wäre hier STILL.
+ *   3. `renderNarrative` ist rein: voller Composite → Abschnitt, fehlender → `null`.
+ *      Kein leerer Abschnitt, keine Behauptung.
+ *   4. Der echte Bundle-Pfad: das Persona-Bundle an einen Fake-Host gehängt, der
+ *      nur `on`/`inject`/`get` kennt, ein Composite auf den Kanal geschickt — der
+ *      Abschnitt erscheint, der Persona-Zustand bleibt unberührt (Vorrang!).
+ *
+ * Läuft mit `node --test` — kein DSH, kein node_modules (Schemastery-Stub).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +30,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as repo from '../../lib/repo.mjs';
 import { EVENT_TYPES as SPINE_EVENTS } from '../plugins/events-spine.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 import {
   COMPOSITE_FIELDS,
   CONSUMERS,
@@ -43,6 +57,7 @@ const prompterSource = readFileSync(join(ROOT, 'packages/prompter/index.js'), 'u
 async function loadBundle(dir, prefix) {
   const work = mkdtempSync(join(tmpdir(), prefix));
   cpSync(join(ROOT, 'packages', dir), join(work, 'pkg'), { recursive: true });
+  provideSeamCore(work);
   const stub = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(stub, { recursive: true });
   writeFileSync(join(stub, 'package.json'), JSON.stringify({ name: '@deepseek-ai/schemastery', version: '0.0.0-test-stub', type: 'module', exports: { '.': './index.js' } }));
@@ -251,18 +266,20 @@ test('narrative: die Evidenzlevel des Gates sind die des Kerns', () => {
   assert.deepEqual([...narrative.EVIDENCE_LEVELS], EVIDENCE_LEVELS);
 });
 
-test('narrative: Kanal und Vertragsname stehen als Literal im Abnehmer (kein Import über Paketgrenzen)', () => {
-  assert.ok(personaSource.includes(`'${narrative.STATE_CHANNEL}'`), `der Abnehmer trägt '${narrative.STATE_CHANNEL}' nicht`);
-  assert.ok(personaSource.includes(`'${narrative.STATE_CONTRACT}'`), `der Abnehmer trägt '${narrative.STATE_CONTRACT}' nicht`);
+test('narrative: der Abnehmer importiert die Namen aus dem Naht-Kern (kein Literal mehr)', () => {
+  assert.match(personaSource, /NARRATIVE_STATE_CHANNEL,[\s\S]{0,200}from '@shinon\/seams\/core'/, 'die Persona importiert die Namen nicht');
+  assert.match(personaSource, /NARRATIVE_STATE_CONTRACT/, 'der Vertragsname kommt nicht aus dem Kern');
+  // Das Literal ist die Kopie, die der Umbau beseitigt hat — es darf nicht zurück.
+  assert.ok(!personaSource.includes(`'${narrative.STATE_CHANNEL}'`), `der Abnehmer trägt '${narrative.STATE_CHANNEL}' wieder als Literal`);
+  assert.ok(!personaSource.includes(`'${narrative.STATE_CONTRACT}'`), `der Abnehmer trägt '${narrative.STATE_CONTRACT}' wieder als Literal`);
 });
 
-test('narrative: das Zwillings-Gate kennt die Naht (keine stille Drift)', () => {
+test('narrative: die Naht ist keine Zwillings-Regel mehr, sondern ein Kern', () => {
   const twin = repo.SOURCE_TWINS.find((entry) => entry.owner === 'packages/narrative/index.js');
-  assert.ok(twin, 'die Naht Narrative -> Persona ist nicht als Zwilling deklariert');
-  assert.equal(twin.kind, 'literals');
-  assert.equal(twin.mirror, 'packages/persona/index.js');
-  assert.deepEqual(twin.values.map((value) => value.export).sort(), ['STATE_CHANNEL', 'STATE_CONTRACT']);
+  assert.equal(twin, undefined, 'die Naht Narrative -> Persona steht wieder als Kopie in SOURCE_TWINS');
+  assert.ok(repo.SOURCE_TWINS.every((entry) => entry.mirror.endsWith('client.js')), 'SOURCE_TWINS hält nur Client-Spiegel');
   assert.deepEqual(repo.twinIssues(), []);
+  assert.deepEqual(repo.hostMirrorIssues(), []);
 });
 
 test('narrative: BEIDE Abnehmer sind vollständig verdrahtet', () => {
@@ -273,12 +290,12 @@ test('narrative: BEIDE Abnehmer sind vollständig verdrahtet', () => {
   }
 });
 
-test('narrative: ein Abnehmer ohne Kanal-Literal wird gemeldet (Mutationsprobe)', () => {
+test('narrative: ein Abnehmer ohne den Kern-Import wird gemeldet (Mutationsprobe)', () => {
   for (const consumer of CONSUMERS) {
     const input = consumerInput(consumer);
-    const broken = { main: input.sources.main.replaceAll(`'${STATE_CHANNEL}'`, "'falscher/kanal'"), evidence: input.sources.evidence };
+    const broken = { main: input.sources.main.replace(/from '@shinon\/seams\/core'/g, "from './nichts.js'"), evidence: input.sources.evidence };
     const issues = consumerIssues(input.consumer, broken, input.stateContract);
-    assert.ok(issues.some((issue) => issue.includes('nicht als Literal')), `${consumer.dir}: ${issues.join('\n')}`);
+    assert.ok(issues.some((issue) => issue.includes('importiert NARRATIVE_STATE_CHANNEL nicht')), `${consumer.dir}: ${issues.join('\n')}`);
   }
 });
 
@@ -300,42 +317,29 @@ test('narrative: ein Abnehmer ohne narrative-Block im Vertrag wird gemeldet', ()
 
 // ── 2b. Der zweite Abnehmer: der Veredler (MAX) ─────────────────────────────
 
-test('narrative: der Veredler trägt Kanal und Vertragsname als Literal (Zwilling)', () => {
-  assert.ok(prompterSource.includes(`'${STATE_CHANNEL}'`), 'der Kanalname fehlt im Veredler');
-  assert.ok(prompterSource.includes(`'${narrative.STATE_CONTRACT}'`), 'der Vertragsname fehlt im Veredler');
-  const twin = repo.SOURCE_TWINS.find((entry) => entry.mirror === 'packages/prompter/index.js' && entry.owner === 'packages/narrative/index.js');
-  assert.ok(twin, 'der Veredler ist nicht als Zwilling der Narrative-Naht deklariert');
-  assert.deepEqual(twin.values.map((value) => value.export).sort(), ['STATE_CHANNEL', 'STATE_CONTRACT']);
+test('narrative: der Veredler importiert Kanal und Vertragsname aus dem Naht-Kern', () => {
+  assert.match(prompterSource, /from '@shinon\/seams\/core'/, 'der Veredler importiert den Kern nicht');
+  assert.match(prompterSource, /const NARRATIVE_CHANNEL = NARRATIVE_STATE_CHANNEL;/, 'der Kanal wird nicht aus dem Kern gebunden');
+  assert.match(prompterSource, /const NARRATIVE_CONTRACT = NARRATIVE_STATE_CONTRACT;/, 'der Vertrag wird nicht aus dem Kern gebunden');
+  assert.ok(!prompterSource.includes(`'${STATE_CHANNEL}'`), 'der Kanalname steht wieder als Literal im Veredler');
+  assert.ok(!prompterSource.includes(`'${narrative.STATE_CONTRACT}'`), 'der Vertragsname steht wieder als Literal im Veredler');
 });
 
-test('narrative: der Zwilling liest das ganze Prompter-Paket — ein Modulschnitt ist keine Drift', () => {
-  const twin = repo.SOURCE_TWINS.find((entry) => entry.owner === 'packages/narrative/index.js' && entry.mirror === 'packages/prompter/index.js');
-  assert.equal(twin?.mirrorScope, 'package', 'der Veredler ist modular — der Zwilling muss index.js UND assets/*.js lesen');
+test('narrative: ein Literal im Abnehmer wird wieder zum Befund (Mutationsprobe)', () => {
+  // Die Prüfung ist umgedreht: Import ist die Zusage, Literal ist der Befund.
+  const consumer = CONSUMERS.find((entry) => entry.dir === 'persona');
+  const input = consumerInput(consumer);
+  const broken = {
+    main: `${input.sources.main}\nexport const NARRATIVE_CHANNEL = '${STATE_CHANNEL}';\n`,
+    evidence: input.sources.evidence,
+  };
+  const issues = consumerIssues(input.consumer, broken, input.stateContract);
+  assert.ok(issues.some((issue) => issue.includes('wieder als Literal')), issues.join('\n'));
 
-  // Miniatur-Baum: der Besitzer liefert die Namen, der Spiegel trägt sie NICHT
-  // in seiner Komposition, sondern in einem `assets/`-Kern. Vorher war das rot,
-  // obwohl keine Drift existierte — genau die Falle, die dieser Test schließt.
-  const root = mkdtempSync(join(tmpdir(), 'shinon-twin-'));
-  try {
-    mkdirSync(join(root, 'packages', 'narrative'), { recursive: true });
-    mkdirSync(join(root, 'packages', 'prompter', 'assets'), { recursive: true });
-    writeFileSync(
-      join(root, 'packages', 'narrative', 'index.js'),
-      `export const STATE_CHANNEL = '${STATE_CHANNEL}';\nexport const STATE_CONTRACT = '${NARRATIVE_CONTRACT_ID}';\n`,
-    );
-    writeFileSync(join(root, 'packages', 'prompter', 'index.js'), 'export const composition = true;\n');
-    const asset = join(root, 'packages', 'prompter', 'assets', 'narrative-seam.js');
-    writeFileSync(asset, `const NARRATIVE_CHANNEL = '${STATE_CHANNEL}';\nconst NARRATIVE_CONTRACT = '${NARRATIVE_CONTRACT_ID}';\n`);
-    assert.deepEqual(repo.twinIssues(root, [twin]), [], 'die Literale im assets-Kern gelten');
-    assert.equal(repo.twinIssues(root, [{ ...twin, mirrorScope: 'file' }]).length, 2, 'ohne package-Scope bleibt die enge Prüfung');
-
-    writeFileSync(asset, 'export const moved = true;\n');
-    const issues = repo.twinIssues(root, [twin]);
-    assert.equal(issues.length, 2, issues.join('\n'));
-    assert.ok(issues.every((issue) => issue.includes('spiegelt')), issues.join('\n'));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
+  // Und ohne den Import ist der Abnehmer nicht verdrahtet.
+  const withoutImport = { main: input.sources.main.replace(/from '@shinon\/seams\/core'/, "from './nichts.js'"), evidence: input.sources.evidence };
+  const missing = consumerIssues(input.consumer, withoutImport, input.stateContract);
+  assert.ok(missing.some((issue) => issue.includes('importiert NARRATIVE_STATE_CHANNEL nicht')), missing.join('\n'));
 });
 
 test('narrative: renderStand macht aus dem Composite ein <narrative>-Element — aus nichts nichts', () => {

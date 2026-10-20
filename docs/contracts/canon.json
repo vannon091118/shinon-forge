@@ -1,0 +1,127 @@
+{
+  "contract": "shinon.canon/v1",
+  "name": "Kanon — ein Name, eine Schreibweise, eine Definition",
+  "status": "IMPLEMENTED",
+  "stand": "2026-10-20",
+  "rules": [
+    {
+      "positive": "Jeder registrierte Name steht in seiner Definitionsdatei wortgleich; `canonIssues()` ist leer und das statische Gate zählt den Schritt als bestanden.",
+      "forbidden": "Eine zweite Schreibweise eines registrierten Namens, ein Browser-Global `__shinon*` ohne Registry-Zeile und ein Vertrags-Literal außerhalb der drei Formen.",
+      "fallback": "Fehlt die Registry oder parst sie nicht, endet der Schritt mit einem Befund — kein stiller Erfolg, keine geratene Ersatzform.",
+      "error": "`canonIssues()` liefert je Befund Datei und Namen; das Gate färbt ihn als Fehler und endet Exit 1.",
+      "trace": "Jede Registry-Zeile nennt `art`, `kanonisch` und `definiert_in`; der Befund nennt die Datei, in der die Abweichung steht.",
+      "replay": "`node --test scripts/gate/tests/canon.test.mjs` fährt acht Fälle: den echten Baum, die Registry-Form und fünf Mutationen.",
+      "invariant": "Ein Name ist genau einmal definiert; jede andere Stelle benutzt ihn wortgleich, nie in einer Variante."
+    }
+  ],
+  "regel": "Jede Sache hat EINEN Namen und EINE Schreibweise. Verträge: `shinon.<bereich>/<sache>-v<N>`; ist die Sache der Bereich selbst, `shinon.<bereich>/v<N>`; ein Zustandsmarker trägt keine Version (`shinon.<bereich>/unloaded`). Browser-Globals sind camelCase (`__shinon<Bereich><Sache>`) — eine Client-Hälfte kann den Host nicht importieren, deshalb trägt jede das Literal, und dieser Schritt pinnt es.",
+  "formen": {
+    "vertrag": [
+      "^shinon\\.[a-z0-9-]+/[a-z0-9-]+-v[0-9]+$",
+      "^shinon\\.[a-z0-9-]+/v[0-9]+$",
+      "^shinon\\.[a-z0-9-]+/unloaded$"
+    ],
+    "global": "^__shinon[A-Za-z0-9]+$"
+  },
+  "namen": [
+    {
+      "art": "global",
+      "kanonisch": "__shinonPlugins",
+      "definiert_in": "packages/core/client.js",
+      "verboten": [],
+      "hinweis": "Map der geladenen Client-Hälften (id → Eintrag)."
+    },
+    {
+      "art": "global",
+      "kanonisch": "__shinonPluginCatalog",
+      "definiert_in": "packages/key-router/client.js",
+      "verboten": ["__shinon_plugins"],
+      "hinweis": "Objekt-Tabelle der Panels (id → Label/Rolle), geschrieben von Key-Router, Traceability und Popup."
+    },
+    {
+      "art": "global",
+      "kanonisch": "__shinonPrompterTrace",
+      "definiert_in": "packages/prompter/index.js",
+      "verboten": ["__SHINON_PROMPTER_TRACE__"]
+    },
+    {
+      "art": "global",
+      "kanonisch": "__shinonPersonaState",
+      "definiert_in": "packages/persona/index.js",
+      "verboten": []
+    },
+    {
+      "art": "global",
+      "kanonisch": "__shinonPersonaReview",
+      "definiert_in": "packages/persona/index.js",
+      "verboten": []
+    },
+    {
+      "art": "global",
+      "kanonisch": "__shinonTaskRouter",
+      "definiert_in": "packages/task-router/client.js",
+      "verboten": ["__shinon_task_router"]
+    },
+    {
+      "art": "vertrag",
+      "kanonisch": "shinon.workspace/v1",
+      "definiert_in": "packages/seams/assets/seams.js",
+      "verboten": ["shinon.workspace/identitaet-v1"]
+    },
+    {
+      "art": "vertrag",
+      "kanonisch": "shinon.scoring/ledger-v1",
+      "definiert_in": "packages/scoring/index.js",
+      "verboten": ["shinon.scoring/ledger/v1"]
+    },
+    {
+      "art": "vertrag",
+      "kanonisch": "shinon.persona-state/unloaded",
+      "definiert_in": "packages/persona/index.js",
+      "verboten": []
+    },
+    {
+      "art": "vertrag",
+      "kanonisch": "shinon.codingmon/store-v1",
+      "definiert_in": "packages/codingmon/index.js",
+      "verboten": ["shinon.codingmon/store/v1"]
+    },
+    {
+      "art": "vertrag",
+      "kanonisch": "shinon.prompter/one-shot-journal-v1",
+      "definiert_in": "packages/prompter/assets/enhancer.js",
+      "verboten": ["shinon.prompter/one-shot-journal/v1"]
+    },
+    {
+      "art": "dienst",
+      "kanonisch": "shinon_codingmon_store",
+      "definiert_in": "packages/codingmon/index.js",
+      "verboten": []
+    },
+    {
+      "art": "begriff",
+      "kanonisch": "Shinon Task Manager",
+      "definiert_in": "packages/task-router/index.js",
+      "verboten": ["Task-Manager", "TaskManager"]
+    },
+    {
+      "art": "begriff",
+      "kanonisch": "Task-Gruppe",
+      "definiert_in": "packages/task-router/index.js",
+      "verboten": ["Taskgruppe", "Task Group"]
+    },
+    {
+      "art": "begriff",
+      "kanonisch": "Persona",
+      "definiert_in": "packages/persona/index.js",
+      "verboten": ["Personas"]
+    },
+    {
+      "art": "begriff",
+      "kanonisch": "Begleiter",
+      "definiert_in": "packages/prompter/assets/capabilities.json",
+      "verboten": ["Companion"],
+      "hinweis": "UI-Wort für das Pet; im Code heißt die Entität `pet`/`codingmon`."
+    }
+  ]
+}

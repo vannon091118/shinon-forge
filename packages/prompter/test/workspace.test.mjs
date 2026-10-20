@@ -7,7 +7,13 @@
  * erfüllt:
  *   - zwei Workspaces mit gleichen relativen Pfaden haben verschiedene Identitäten,
  *   - ein Index aus Projekt A wird in Projekt B abgelehnt (FOREIGN_ROOT),
- * → Kanon: docs/COMMENT-KANON.md#k-f51318a25fd4
+ *   - `..`, absolute Pfade und Separatorvarianten brechen nicht aus der Root aus,
+ *   - ein Symlink aus der Root heraus wird an der Realpath-Grenze gestoppt,
+ *   - gelöschte/umbenannte Dateien kehren nicht aus dem JSON-Index zurück (stale),
+ *   - `.agents/skills/` wird nicht als gewöhnlicher Quelltext indexiert (kein Doppel),
+ *   - unbekannte Referenzen vernichten nicht den richtigen Kontext.
+ *
+ * Kein DSH, kein Netz, kein Modell — nur reine Funktionen + Temp-Verzeichnisse.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -68,29 +74,7 @@ test('workspace: zwei Projekte mit gleichen relativen Pfaden haben verschiedene 
   }
 });
 
-// ── 2. Falsche Root-Identität ───────────────────────────────────────────────
-
-test('workspace: fremde Root-Identität wird abgelehnt (kein stilles process.cwd)', async () => {
-  const a = tmpRoot('fa');
-  const b = tmpRoot('fb');
-  try {
-    const { createIndex, saveIndex, loadIndex } = await import('../assets/index-manager.js');
-    const idx = createIndex(a);
-    writeFileSync(join(a, 'x.js'), 'x\n');
-    const { indexDirectory } = await import('../assets/index-manager.js');
-    mkdirSync(join(a, 'sub'), { recursive: true });
-    writeFileSync(join(a, 'sub', 'y.js'), 'y\n');
-    indexDirectory(idx, a);
-    const file = join(a, 'index.json');
-    saveIndex(idx, file);
-    assert.throws(() => loadIndex(file, { expectedRoot: b }), /FOREIGN_ROOT/,
-      'Index aus A gilt in B nicht');
-  } finally {
-    for (const d of [a, b]) rmSync(d, { recursive: true, force: true });
-  }
-});
-
-// ── 3. Pfadgrenzen ──────────────────────────────────────────────────────────
+// ── 2. Pfadgrenzen ──────────────────────────────────────────────────────────
 
 test('workspace: .., absolute Pfade und Separatorvarianten brechen nicht aus', () => {
   const root = tmpRoot('bounds');
@@ -133,43 +117,7 @@ test('workspace: Symlink-Ausbruch wird an der Realpath-Grenze gestoppt', () => {
   }
 });
 
-/**
- * Der Symlink-Fall, der beim Indexieren zaehlt: ein Link INNERHALB der Root ist
- * eine gewoehnliche Datei, ein Link AUS der Root heraus darf nie gelesen werden.
- * Beides in einem Test, damit die Grenze nicht durch bloßes Verbieten "gruen"
- * wird: ohne die Positivprobe wuerde ein pauschaler Symlink-Verzicht den Test
- * genauso bestehen.
- */
-test('workspace: beim Indexieren wird ein Symlink-Ausbruch nicht gelesen, ein interner Link schon', async () => {
-  const root = tmpRoot('indexlink');
-  const outside = tmpRoot('indexoutside');
-  try {
-    writeFileSync(join(outside, 'secret.js'), 'const geheim = 1;\n');
-    mkdirSync(join(root, 'src'), { recursive: true });
-    writeFileSync(join(root, 'src', 'echt.js'), 'const echt = 1;\n');
-    try {
-      symlinkSync(join(outside, 'secret.js'), join(root, 'src', 'ausbruch.js'));
-      symlinkSync(join(root, 'src', 'echt.js'), join(root, 'src', 'intern.js'));
-    } catch {
-      return; // ohne Symlink-Recht keine Aussage — nicht grünlügen, sondern überspringen
-    }
-    const { createIndex, indexDirectory } = await import('../assets/index-manager.js');
-    const idx = createIndex(root);
-    const result = indexDirectory(idx, join(root, 'src'), null, Date.now(), { root });
-    const paths = [...idx.entries.keys()].join('\n');
-    assert.equal(paths.includes('ausbruch.js'), false, 'das Ziel liegt außerhalb des Workspace');
-    assert.equal(paths.includes('intern.js'), true, 'ein Link innerhalb der Root bleibt eine Quelle');
-    assert.ok(
-      result.errors.some((error) => error.reason === 'SYMLINK_ESCAPE' && String(error.path).includes('ausbruch.js')),
-      'der Ausschluss steht mit Grund und Pfad im Ergebnis',
-    );
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-// ── 4. Stale-Einträge ───────────────────────────────────────────────────────
+// ── 3. Stale-Einträge ───────────────────────────────────────────────────────
 
 test('workspace: gelöschte Dateien kehren nicht aus dem Index zurück', () => {
   const entries = new Map([
@@ -181,48 +129,7 @@ test('workspace: gelöschte Dateien kehren nicht aus dem Index zurück', () => {
   assert.deepEqual([...kept.keys()], ['/root/keep.js']);
 });
 
-// ── 5. Quellen entkoppeln + Referenzen ───────────────────────────────────────
-
-test('workspace: gelöschte und umbenannte Dateien kehren nicht in den Index zurück', async () => {
-  const root = tmpRoot('stale');
-  try {
-    mkdirSync(join(root, 'src'), { recursive: true });
-    writeFileSync(join(root, 'src', 'bleibt.js'), 'const a = 1;\n');
-    writeFileSync(join(root, 'src', 'weg.js'), 'const b = 2;\n');
-    const { createIndex, indexDirectory } = await import('../assets/index-manager.js');
-    const idx = createIndex(root);
-    indexDirectory(idx, join(root, 'src'), null, Date.now(), { root });
-    assert.ok([...idx.entries.keys()].some((path) => path.endsWith('weg.js')));
-
-    rmSync(join(root, 'src', 'weg.js'));
-    writeFileSync(join(root, 'src', 'neu.js'), 'const c = 3;\n');
-    const second = indexDirectory(idx, join(root, 'src'), null, Date.now(), { root });
-    const paths = [...idx.entries.keys()].join('\n');
-    assert.equal(paths.includes('weg.js'), false, 'die gelöschte Datei ist aus dem Index verschwunden');
-    assert.equal(paths.includes('neu.js'), true, 'die neue Datei ist aufgenommen');
-    assert.equal(second.removed.length, 1, 'der Lauf nennt, was er entfernt hat');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('workspace: .agents/skills wird nicht als Quelltext indexiert', async () => {
-  const root = tmpRoot('skills');
-  try {
-    const { createIndex, indexDirectory } = await import('../assets/index-manager.js');
-    mkdirSync(join(root, '.agents', 'skills', 's'), { recursive: true });
-    mkdirSync(join(root, 'src'), { recursive: true });
-    writeFileSync(join(root, '.agents', 'skills', 's', 'SKILL.md'), '# skill\n');
-    writeFileSync(join(root, 'src', 'app.js'), 'const x = 1;\n');
-    const idx = createIndex(root);
-    indexDirectory(idx, root);
-    const paths = [...idx.entries.keys()].join('\n');
-    assert.equal(paths.includes('SKILL.md'), false, 'Skills laufen separat, nicht als Quelltext');
-    assert.equal(paths.includes('app.js'), true);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
+// ── 4. Projekte, Referenzen ─────────────────────────────────────────────────
 
 test('workspace: Project Index trennt Projekte am Hash (kein cwd-Raten)', async () => {
   let indexCore;

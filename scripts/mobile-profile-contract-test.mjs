@@ -4,6 +4,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { modelRouteIssues } from './lib/model-route.mjs';
+
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const readJson = (path) => JSON.parse(readFileSync(join(root, path), 'utf8'));
 const read = (path) => readFileSync(join(root, path), 'utf8');
@@ -27,7 +29,11 @@ for (const name of profile.dsh.profile.bundles) {
 }
 const patch = read('profiles/mobile/cordis.patch.yml');
 assert.match(patch, /apiKeyEnv: AGNES_API_KEY/);
-assert.match(patch, /provider: agnes[\s\S]*model: agnes-2\.5-flash/);
+// Die Route ist eine FORM, kein Modell-Literal: der Provider muss im eigenen
+// Katalog stehen und das Modell in dessen Liste. Welches Modell gewaehlt ist,
+// entscheidet das Profil — Agnes ist die empfohlene kostenlose Route der Doku.
+const routeIssues = modelRouteIssues(patch);
+assert.deepEqual(routeIssues, [], `model route: ${routeIssues.join(', ')}`);
 assert.doesNotMatch(patch, /(?:sk-[A-Za-z0-9]{16,}|api[_-]?key\s*:\s*['"][^'"]{12,})/i, 'secret-like value in profile');
 assert.match(read('packages/mobile/client.js'), /viewport-fit=cover/);
 assert.doesNotMatch(read('packages/mobile/client.js'), /user-scalable\s*=\s*no/i, 'must not disable user zoom');

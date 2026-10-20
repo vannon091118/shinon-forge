@@ -7,29 +7,48 @@
  *          `.env`-Chmod, Route aus dem effektiven Profil-Dump.
  *   boot   Startet den Host im Hintergrund (Port 3099, --no-open), Protokoll
  *          unter logDir()/s6/, Prozessdaten als JSON daneben.
- * → Kanon: docs/COMMENT-KANON.md#k-1a92de5cb5a8
+ *   stop   SIGTERM an den gelogten Host — das Host-Ende des Protokolls.
+ *
+ * Der Turn selbst (Urteil, Widerruf) geht über die echtes UI — der Weg aus
+ * docs/probes/store-cost.json (#4): 'Good response' → 'Task result' →
+ * 'Submit', Widerruf 'Remove rating'. Das Runbook führt ihn.
+ *
+ * Der Schlüssel: `.env` im Repo-Root, chmod 600 — nie committen, nie ausgeben,
+ * nie in eine Antwort kopieren. Hier wird nur der NAME geprüft; der Wert
+ * verlässt diese Maschine nicht.
+ *
+ * WELCHER Name, entscheidet die ROUTE, nicht dieses Skript: `agent-default-model`
+ * ist ein live-Feld (die UI schreibt es über den `config-editor` in die
+ * Profil-Ebene), deshalb stand hier bis 2026-10-20 `AGNES_API_KEY` fest — und der
+ * Preflight meldete den Schlüssel „bereit", obwohl die gewählte Route
+ * `PROMPTER_API_KEY` liest, oder verweigerte den Start mit dem falschen Rat.
+ * Der Name kommt jetzt aus dem Dump selbst: Provider der Route → dessen
+ * `apiKeyEnv` im `llm-pi-ai`-Block (`scripts/lib/model-route.mjs`, derselbe
+ * Leser, den der Gate-Test benutzt).
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { dshBinary, goodNode } from './lib/dsh.mjs';
+import { dshBinary } from './lib/dsh.mjs';
+import { chosenRoute } from './lib/model-route.mjs';
 import { dshHome, logDir, pathWith } from './lib/paths.mjs';
 
 const PORT = 3099;
-const KEY_NAME = 'AGNES_API_KEY';
+/** Letzter Ausweg, wenn der Dump keine Route nennt — dann ist der Start ohnehin rot. */
+const KEY_NAME_FALLBACK = 'AGNES_API_KEY';
 const die = (message, code = 2) => {
   console.error(`s6-turn: ${message}`);
   process.exit(code);
 };
 
 /** Schlüsselquelle presence-only — Namen lesen, Werte nie. */
-function keySource() {
-  if (process.env[KEY_NAME]) return 'Umgebung';
+function keySource(keyName) {
+  if (process.env[keyName]) return 'Umgebung';
   const file = join(process.cwd(), '.env');
   if (!existsSync(file)) return null;
   const names = readFileSync(file, 'utf8').split('\n')
     .map((line) => (line.split('=')[0] ?? '').trim())
-    .filter((name) => name === KEY_NAME);
+    .filter((name) => name === keyName);
   return names.length > 0 ? '.env' : null;
 }
 
@@ -40,17 +59,16 @@ function envFileMode() {
 }
 
 const effectiveEnv = () => pathWith([join(process.cwd(), 'node_modules', '.bin')], process.env);
-const namedRoute = (dump) => {
-  const lines = dump.split('\n').map((line) => line.trimEnd());
-  const cut = (match) => (match !== null && match.length > 1 ? match[1] : null);
-  let provider = null, model = null;
-  for (const line of lines) {
-    let hit;
-    if (provider === null && (hit = line.match(/^\s*provider:\s*(\S+)/))) provider = cut(hit);
-    if (model === null && (hit = line.match(/^\s*model:\s*(\S+)/))) model = cut(hit);
-  }
-  return provider !== null && model !== null ? `${provider}/${model}` : 'UNGEPRÜFT (keine Zeilen provider/model im Dump)';
-};
+
+/**
+ * Route UND Schlüsselname aus dem Dump — beides aus DEMSELBEN Eintrag.
+ *
+ * Der frühere Leser nahm die ERSTE `provider:`/`model:`-Zeile der Datei; das
+ * war nur zufällig die richtige, solange `agent-default-model` als erster
+ * Eintrag mit diesen Feldern stand. `chosenRoute` liest den Eintrag namentlich
+ * und liefert den Provider-Katalog daneben, also auch `apiKeyEnv`.
+ */
+const routeFromDump = (dump) => chosenRoute(dump);
 
 function readDump() {
   const pair = dshBinary();
@@ -71,20 +89,28 @@ function check() {
   lines.push(`node ${process.versions.node} ${major >= 22 ? '≥ 22' : 'ZU ALT (≥22 nötig)'}`);
   lines.push(pair === null ? 'dshBinary: null — kein Repo-Installat und kein Vendor-Binärpfad' : `dshBinary: ${pair[1]} (Node ${pair[0] === process.execPath ? 'läuft' : 'gefundenes Node'})`);
   lines.push(`dshHome: ${dshHome()}`);
-  lines.push(`key: ${KEY_NAME}${keySource() === null ? ' FEHLEND (Umgebung und ./.env)' : ` bereit über ${keySource()}`}`);
   const mode = envFileMode();
-  lines.push(`.env-Modus: ${mode === null ? 'kein .env vorhanden' : mode}${mode !== null && mode !== '600' ? ' — SOLL 600 sein (Repo-Regel)' : ''}`);
   const dump = readDump();
+  const chosen = dump === null ? null : routeFromDump(dump);
+  // Der Name kommt aus der ROUTE: eine feste Variable neben einer wählbaren
+  // Route ist ein Preflight, der die falsche Frage beantwortet.
+  const keyName = chosen !== null && chosen.apiKeyEnv !== '' ? chosen.apiKeyEnv : KEY_NAME_FALLBACK;
+  lines.push(`key: ${keyName}${keySource(keyName) === null ? ' FEHLEND (Umgebung und ./.env)' : ` bereit über ${keySource(keyName)}`}`);
+  lines.push(`.env-Modus: ${mode === null ? 'kein .env vorhanden' : mode}${mode !== null && mode !== '600' ? ' — SOLL 600 sein (Repo-Regel)' : ''}`);
   lines.push(`dump-config: ${dump === null ? 'FEHLGESCHLAGEN' : 'gelesen'}`);
-  lines.push(`route: ${dump === null ? 'UNGEPRÜFT' : namedRoute(dump)}`);
+  lines.push(`route: ${chosen === null ? 'UNGEPRÜFT' : `${chosen.provider}/${chosen.model}`}`);
   for (const line of lines) console.log(`  ${line}`);
   const okMode = mode === null || mode === '600';
   if (pair === null || major < 22 || !okMode || dump === null) {
     console.error('s6-turn: Preflight rot/ungeprüft — EXIT 2, kein Start vor Replikatur.');
     process.exit(2);
   }
-  if (keySource() === null) {
-    console.error(`s6-turn: Der Start traf den Schlüssel nicht — vor dem Turn: ${KEY_NAME} in .env (chmod 600) eintragen, ohne den Wert irgendwo auszugeben.`);
+  if (chosen.provider === '' || chosen.model === '' || chosen.apiKeyEnv === '') {
+    console.error('s6-turn: Die Route im Dump ist unvollständig (provider/model/apiKeyEnv) — Preflight rot, kein Start.');
+    process.exit(2);
+  }
+  if (keySource(keyName) === null) {
+    console.error(`s6-turn: Der Start traf den Schlüssel nicht — die Route ${chosen.provider}/${chosen.model} liest ${keyName}; vor dem Turn ${keyName} in .env (chmod 600) eintragen, ohne den Wert irgendwo auszugeben.`);
     process.exit(1);
   }
   console.log('s6-turn: Preflight grün — boot ist bereit.');

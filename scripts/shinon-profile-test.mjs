@@ -2,10 +2,16 @@
 /**
  * shinon-profile-test.mjs - Exit Gate fuer das bootfaehige Profil (Block 2)
  *
- * Laedt das aktive Profil wie DSH: `DSH_HOME=<geseedetes Home> dsh --profile
- * <name> --dump-config`. Das Home ist TEMPORAER und aus dem Baum geseedet —
- * dieselbe Form, die der Starter anlegt (`scripts/lib/dsh-home.mjs`).
- * → Kanon: docs/COMMENT-KANON.md#k-049acec77c27
+ * Laedt das aktive Profil genau so, wie DSH es laedt:
+ *
+ *   DSH_HOME=<Repo-Root> dsh --profile <name> --dump-config
+ *
+ * Das Repo-Root ist ein gueltiges DSH_HOME, weil es profiles/ enthaelt; damit
+ * ist der Lauf reproduzierbar, ohne etwas nach ~/.dsh zu installieren.
+ *
+ * Rot, solange profiles/<name> kein DSH-Profil ist (kein package.json ->
+ * "profile does not exist"), gruen, sobald DSH das Profil aufloest und jeden
+ * Bundle-Layer listet. Eingebunden in `npm test`.
  */
 import { execFileSync } from 'child_process';
 import { existsSync } from 'fs';
@@ -88,6 +94,51 @@ if (dump !== null) {
     assert(missing.length === 0, `fehlende Eintraege: ${missing.map((entry) => entry.id).join(', ')}`);
   });
 }
+
+// Der Boot oben sagt, dass das Profil AUFLÖST. Hier wird einmal WIRKLICH geladen,
+// und zwar über den Pfad, den ein Bundel nimmt: `profiles/<name>/node_modules`
+// vor dem Root-`node_modules` (Pitfall: ein Link woandershin beschattet das
+// Paket, der Boot stirbt dann erst tief im Protocol). Der Prozess läuft mit dem
+// Profil-Verzeichnis als cwd, damit die Auflösung genau diesen Weg geht; das
+// Prompter-Bundel zieht seine drei neuen Module relativ und `@shinon/seams/core`
+// aus dem Root-`node_modules`. Kein Modellaufruf, nur Laden.
+check('laedt die Prompter-Module und @shinon/seams/core ueber die Profil-Links', () => {
+  const probe = `
+    import { realpathSync } from 'node:fs';
+    import { createRequire } from 'node:module';
+    import { dirname, join } from 'node:path';
+    import { pathToFileURL } from 'node:url';
+    const require = createRequire(join(process.cwd(), 'package.json'));
+    const entry = realpathSync(require.resolve('@shinon/prompter'));
+    const dir = dirname(entry);
+    const bundle = await import(pathToFileURL(entry).href);
+    const split = {};
+    for (const name of ['pre-step.js', 'runtime-state.js', 'trace-report.js']) {
+      split[name] = Object.keys(await import(pathToFileURL(join(dir, 'assets', name)).href)).length;
+    }
+    const core = realpathSync(createRequire(join(dir, 'package.json')).resolve('@shinon/seams/core'));
+    const seams = await import(pathToFileURL(core).href);
+    const probeResult = seams.resolveWorkspaceRoot({ configRoot: '/tmp/probe-root', env: { SHINON_WORKSPACE_ROOT: '/tmp/probe-env' }, cwd: '/tmp/probe-cwd' });
+    process.stdout.write(JSON.stringify({ entry, exports: Object.keys(bundle).length, split, contract: seams.WORKSPACE_CONTRACT, root: probeResult.root, source: probeResult.source }));
+  `;
+  let out;
+  try {
+    out = execFileSync(process.execPath, ['--input-type=module', '-e', probe], {
+      cwd: profile.dir,
+      encoding: 'utf8',
+      timeout: 120000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (e) {
+    throw new Error(String(e.stderr ?? e.message).trim().split('\n').pop() || 'Laden fehlgeschlagen');
+  }
+  const result = JSON.parse(out);
+  assert(result.entry.endsWith(join('packages', 'prompter', 'index.js')), `Prompter aufgeloest nach ${result.entry}`);
+  assert(result.exports > 0, 'Prompter exportiert nichts');
+  for (const [name, count] of Object.entries(result.split)) assert(count > 0, `${name} exportiert nichts`);
+  assert(result.contract === 'shinon.workspace/v1', `falscher Vertrag: ${result.contract}`);
+  assert(result.root === '/tmp/probe-root' && result.source === 'config', `Identitaet falsch: ${result.root} (${result.source})`);
+});
 
 rmSync(seededHome, { recursive: true, force: true });
 

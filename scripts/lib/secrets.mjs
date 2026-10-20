@@ -6,7 +6,8 @@
  * beides: die Dateien gehen in EINE Datei mit Modus 0600, die Wiederherstellung
  * setzt sie zurück, ohne je einen vorhandenen Wert zu überschreiben.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-6853494eb81f
+ * Ein Tresor nennt nur DATEINAMEN und Bytes, nie Werte. Ein Bericht über den
+ * Tresor ist damit teilbar; der Inhalt ist es nicht.
  */
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

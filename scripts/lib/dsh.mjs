@@ -6,7 +6,28 @@
  * `desktop-launcher.mjs` und `dsh-profile-test.mjs` lösen weiter über
  * `findOnPath` (yaml.mjs) auf; ihre Migration auf `dshBinary()` ist der
  * offene Kandidat S10 (braucht einen Boot ohne Browser-Nebenwirkung als Beleg).
- * → Kanon: docs/COMMENT-KANON.md#k-17796b6922a8
+ * Die Gate-Tests nutzen `dshRoot` aus yaml.mjs (eigene Funktion gleichen
+ * Namens, nur PATH-basiert) — dieses Modul ändert ihr Verhalten nicht.
+ *
+ * Auflösungsreihenfolge (lokal vor global, deterministisch):
+ *   a) Repo-node_modules: `<Root>/node_modules/@deepseek-ai/dsh` — `npm install`
+ *      (Root) legt den gepinnten DSH hier ab; der Starter besteht aus
+ *      Repo + installiertem node_modules, kein `npm install -g` nötig.
+ *   b) Vendor-Verzeichnis: `starter/vendor/@deepseek-ai/dsh` — falls ein
+ *      Distributions-Schritt jemals DSH hier ablegt (Stand: keine 518 MB im
+ *      Git, die Datei ist dokumentiert, nicht gevendert).
+ *   c) PATH-Fallback: wie vorher — findOnPath('dsh') (yaml.mjs), damit
+ *      bestehende globale Installationen weiterlaufen.
+ *   d) Installations-Prefixe (nur wenn a–c fehlen): `npm install -g` legt den
+ *      `dsh`-Shim unter `<prefix>/bin/` ab, ohne dass `<prefix>/bin` im PATH
+ *      stehen muss. Die Prefixe werden aus den `node`-Binaries abgeleitet, die
+ *      auf dem PATH liegen (`nodePrefixes()`) — keine Versionsnummer und kein
+ *      Heimpfad steht hier fest; wer DSH anderswo installiert, nutzt a–c oder
+ *      legt den Shim auf den PATH.
+ *
+ * Die Node-Laufzeit selbst kommt aus `runtime.mjs` (verifiziert: Version gegen
+ * `engines.node` UND `node:sqlite`-Rauchtest). Dieses Modul entscheidet nur,
+ * WO dsh liegt — nicht, welcher Node es startet.
  */
 import { existsSync, readdirSync, realpathSync } from 'node:fs';
 import { delimiter, dirname, join, sep } from 'node:path';

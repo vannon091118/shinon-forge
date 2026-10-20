@@ -5,6 +5,9 @@ description: Cordis-Architektur in Shinon Forge ausreizen - Services, inject/pro
 
 # Cordis-Architektur ausreizen
 
+> **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
+
 Cordis schenkt Startreihenfolge, Teardown und Konfiguration — wenn man die
 Mechanismen nutzt. Regeln gelten für jedes `packages/<dir>/index.js`.
 
@@ -99,7 +102,7 @@ Mechanismen nutzt. Regeln gelten für jedes `packages/<dir>/index.js`.
 - **Schemastery 3.18.4 hat kein `z.enum`** — Enums als
   `z.union([z.const('a'), z.const('b')])`.
 - Patch-Werte werden **strukturell** geprüft, nicht gegen das Paket-Schema
-  (`docs/ARCHITECTURE.md` §8) — Schema-Drift findet das Gate nicht. Wer Config-Schema
+  (`AGENTS.md`, Abschnitt Conventions) — Schema-Drift findet das Gate nicht. Wer Config-Schema
   ändert, prüft die Patch-Werte selbst gegen das neue Schema.
 - Profil-Ebene dupliziert keine Bundle-Werte; sie überschreibt nur, was abweicht.
 

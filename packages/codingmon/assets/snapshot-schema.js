@@ -1,6 +1,10 @@
 /**
- * One client -> host snapshot contract. Version 2 remains readable for migration;
- * version 3 requires the complete breeding roster and egg ledger.
+ * WAS HIER NICHT STEHT: keine Grenze nach zeitlicher Gueltigkeit, kein BigInt,
+ * keine Deutung. Unbekannte Felder fallen weg (Zod-Objekt ohne `.passthrough`)
+ * — wer mehr schickt als der Vertrag nennt, schickt es ins Leere.
+ *
+ * FASSUNGEN: EIN Client->Host-Vertrag. Fassung 2 bleibt lesbar (Migration),
+ * Fassung 3 verlangt den vollstaendigen Zucht-Roster und das Ei-Ledger.
  */
 import { z } from 'zod';
 

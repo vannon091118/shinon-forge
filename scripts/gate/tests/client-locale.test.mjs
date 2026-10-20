@@ -7,7 +7,21 @@
  * Oberfläche schon einmal gekostet — ein direkter Dienstzugriff (`ctx.locale`,
  * `ctx[name]`) am Cordis-Proxy wirft ohne `inject`
  * ('cannot get property "locale" without inject'), und die Fallback-Texte der
- * → Kanon: docs/COMMENT-KANON.md#k-481e2ce4aee7
+ * Hälften waren neben dem Wörterbuch von @shinon/locale-de eine zweite Wahrheit.
+ * Beides ist statisch prüfbar, also wird es geprüft statt erinnert:
+ *
+ *   1. `ctx.locale` darf NUR in `@shinon/locale-de` stehen (der Besitzerin des
+ *      Namensraums); jede andere Hälfte liest `ctx.get?.('locale')`.
+ *   2. `ctx[<name>]` (Klammerzugriff auf einen Dienst) kommt in keiner
+ *      Client-Hälfte vor — das ist derselbe direkte Zugriff in anderer Schreibweise.
+ *   3. Jeder Fallback-Schlüssel der generierten Bausteine existiert als Schlüssel
+ *      im `shinon`-Wörterbuch von `locale-de` — keine Texte ohne Besitzer.
+ *
+ * Geprüft wird CODE (Kommentare und String-Inhalte zählen nicht, siehe
+ * scripts/lib/source-scan.mjs): die Blöcke ERKLÄREN den Fehler, den sie vermeiden.
+ *
+ * Läuft mit `node --test` (CI: .github/workflows/commit-guard.yml), in der
+ * Gate-Suite `npm run gate:test`. Kein Netz, kein node_modules.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

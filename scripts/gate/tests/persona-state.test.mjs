@@ -7,7 +7,12 @@
  *   2. Der echte Bundle-Pfad: Event → Zustand → System-Context. Das Paket wird
  *      in ein temporäres Verzeichnis kopiert, mit einem Schemastery-Stub
  *      versehen und über seine echte apply()-Schnittstelle an einen Fake-Host
- * → Kanon: docs/COMMENT-KANON.md#k-6b5398366388
+ *      gehängt, der nur `on` (Events) und `inject` (System-Prompt) kennt.
+ *
+ * Damit ist die Nicht-Aktions-Grenze nicht nur behauptet: der Host hat gar
+ * keine andere API, und die Tests würden bei jedem Zugriff darauf werfen.
+ *
+ * Läuft mit `node --test` — kein node_modules, kein DSH, kein Netz.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +20,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 import {
   EVENT_TYPES as SPINE_EVENTS,
 } from '../plugins/events-spine.mjs';
@@ -37,6 +43,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-persona-test-'));
   cpSync(PACKAGE_DIR, join(work, 'pkg'), { recursive: true });
+  provideSeamCore(work);
   const stub = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(stub, { recursive: true });
   writeFileSync(join(stub, 'package.json'), JSON.stringify({ name: '@deepseek-ai/schemastery', version: '0.0.0-test-stub', type: 'module', exports: { '.': './index.js' } }));
@@ -54,7 +61,14 @@ function createHost(services = {}) {
   const handlers = new Map();
   const sections = [];
   const calls = [];
+  const provided = {};
   const child = {
+    // Der echte Cordis-Kontext kann lesen (`get`); die Persona nutzt das NUR,
+    // um den `webServer` fuer ihre Routen zu holen — nie zum Handeln.
+    get(name) {
+      calls.push(`child.get:${name}`);
+      return services[name];
+    },
     effect(run) {
       calls.push('effect');
       const dispose = run();
@@ -67,9 +81,14 @@ function createHost(services = {}) {
       },
       section({ name, order, text }) {
         calls.push(`section:${name}`);
-        // Der echte Dienst löst `text` zur Assembly-Zeit auf; hier gibt es keine
-        // Sitzung, also ist das die Identität — der Fake bleibt ein Host.
-        const entry = { name, order, text: typeof text === 'function' ? text({}) : text };
+        // Der echte Dienst loest `text` bei JEDER Assembly auf. Der Fake tut
+        // dasselbe ueber einen Getter: sonst saehe ein Test nach einer Annahme
+        // noch den alten Text und wuerde die Wirkung nicht messen koennen.
+        const entry = {
+          name,
+          order,
+          get text() { return typeof text === 'function' ? text({}) : text; },
+        };
         sections.push(entry);
         return () => {
           const at = sections.indexOf(entry);
@@ -95,6 +114,12 @@ function createHost(services = {}) {
       calls.push(`get:${name}`);
       return services[name];
     },
+    // Die Pruef-Naht wird vom Host angeboten, nicht von aussen gesetzt.
+    provide(name, service) {
+      calls.push(`provide:${name}`);
+      provided[name] = service;
+      return () => { delete provided[name]; };
+    },
   };
   const dispatch = (channel, payload) => {
     const handler = handlers.get(channel);
@@ -103,7 +128,7 @@ function createHost(services = {}) {
   };
   const stateSection = () => sections.find((entry) => entry.name === 'shinon:state');
   const stateOf = () => bundle.stateFromContext(stateSection()?.text ?? '');
-  return { ctx, handlers, sections, calls, dispatch, stateSection, stateOf };
+  return { ctx, handlers, sections, calls, provided, dispatch, stateSection, stateOf };
 }
 
 function quiet(fn) {
@@ -362,13 +387,19 @@ test('persona: apply registriert die Identity-Abschnitte und einen Zustandsabsch
 
 test('persona: ein Event auf dem Spine-Kanal aktualisiert den System-Context', () => {
   const host = connect();
-  assert.equal(host.sections.length, 8);
+  // Elf Abschnitte: sechs Grundsaetze, Augenhöhe, Zustand, Selbstmodell — und
+  // Gedaechtnis + Selbstauflagen, die NAMENTLICH dazugehoeren und nicht in einer
+  // Zahl verschwinden. Die Getter tragen ohne Ablage keinen Text, sind aber da.
+  assert.equal(host.sections.length, 11);
+  for (const name of ['shinon:self-model', 'shinon:memory', 'shinon:commitments']) {
+    assert.ok(host.sections.some((entry) => entry.name === name), `${name} fehlt`);
+  }
   assert.ok(host.dispatch('shinon/event', { event_type: 'gate.failed', session_id: 'sess-1' }));
   assert.equal(host.stateOf().mood, 'concerned');
   assert.deepEqual(host.stateOf().limitations, ['gate_failed']);
   // Ersetzen, nicht anhängen: genau ein Zustandsabschnitt bleibt.
   assert.equal(host.sections.filter((entry) => entry.name === 'shinon:state').length, 1);
-  assert.equal(host.sections.length, 8);
+  assert.equal(host.sections.length, 11);
 
   host.dispatch('shinon/event', { event_type: 'gate.passed' });
   assert.deepEqual(host.stateOf().limitations, []);
@@ -388,19 +419,105 @@ test('persona: unbekanntes Event lässt den Kontext unberührt', () => {
   host.dispose();
 });
 
-test('persona: der Fake-Host kennt on, inject und EINE optionale Leseabfrage — nichts anderes', () => {
+test('persona: der Fake-Host kennt on, inject und nur LESENDE Abfragen — nichts anderes', () => {
   const host = connect();
   // `get` ist dazugekommen, als die Tendenz gelesen wurde (Zug 5) — und es ist
   // LESEND. Der Host bleibt ohne jede Faehigkeit zum Handeln: kein Modell, kein
-  // Werkzeug, kein Schreiben.
-  assert.deepEqual(Object.keys(host.ctx).sort(), ['get', 'inject', 'on']);
+  // Werkzeug, kein Schreiben. Der zweite Leser ist der `webServer`, an dem die
+  // Pruef-Route haengt; er bekommt nur `register`, nie einen Aufruf.
+  assert.deepEqual(Object.keys(host.ctx).sort(), ['get', 'inject', 'on', 'provide']);
   for (const call of host.calls) {
-    assert.ok(/^(on|inject|effect|getSectionOrder|section|get):?/.test(call), `unerwarteter Aufruf: ${call}`);
+    assert.ok(/^(on|inject|effect|getSectionOrder|section|get|child\.get|provide):?/.test(call), `unerwarteter Aufruf: ${call}`);
   }
   assert.ok(host.calls.includes('on:shinon/event'));
   assert.ok(host.calls.some((call) => call === 'inject:systemPrompt'));
-  // Und die eine Abfrage fragt genau nach dem Ton — nach nichts anderem.
-  assert.deepEqual([...new Set(host.calls.filter((call) => call.startsWith('get:')))], [`get:${bundle.SCORING_SERVICE}`]);
+  // Die Abschnitte sind Getter: erst die Assembly fragt Ton und Ablage. Genau
+  // das wird hier ausgeloest — die Zusicherung gilt dem fertigen Prompt, nicht
+  // der Registrierung.
+  for (const section of host.sections) void section.text;
+  // Und die Abfragen fragen genau nach Ton, Ablage und Webserver — nach nichts
+  // anderem. Die Ablage ist LESEND geholt und dient zwei eigenen Namensraeumen
+  // (Selbstmodell, Gedaechtnis); die Persona schreibt keine Projektdatei.
+  assert.deepEqual(
+    [...new Set(host.calls.filter((call) => call.startsWith('get:')))].sort(),
+    [`get:${bundle.INDEX_STORE_SERVICE}`, `get:${bundle.SCORING_SERVICE}`].sort(),
+  );
+  assert.deepEqual(
+    [...new Set(host.calls.filter((call) => call.startsWith('child.get:')))].sort(),
+    ['child.get:webServer'],
+  );
+  host.dispose();
+});
+
+/**
+ * Die Ablage ECHT: dieselben Schreib-/Lesefunktionen wie der Project Index.
+ *
+ * Eine Attrappe, die beliebiges JSON zurueckgibt, haette den Fehler verdeckt,
+ * den diese Naht hat: die Ablage haelt NUR Dokumente (memos) und ein paar
+ * Kopfzeilen — ein freies Objekt faellt still weg. Genau das wird hier gemessen.
+ */
+const storeCore = await import(new URL('../../../packages/project-index/assets/index-core.js', import.meta.url));
+function fakeStore() {
+  const db = storeCore.openLedger(':memory:');
+  return {
+    contract: bundle.INDEX_STORE_CONTRACT,
+    load: (namespace) => {
+      const state = storeCore.readMemory(db, namespace);
+      return state === null ? { ok: true, state: null } : { ok: true, state };
+    },
+    save: (namespace, state) => ({ ok: true, rows: storeCore.writeMemory(db, namespace, state) }),
+    close: () => db.close(),
+  };
+}
+
+/** Drei angenommene Entscheidungen mit demselben Grund — belegte Wiederkehr. */
+const decision = (outcome = 'accepted') => ({
+  outcome,
+  intentClassification: 'auftrag',
+  intentMatch: 'umbauen',
+  reasons: ['zu breit'],
+  uncertainties: ['welcher Workspace?'],
+});
+
+test('Selbstmodell: Laufzeitspuren werden zur Ablage — und ein NEUSTART liest sie wieder', () => {
+  // Die Schleife aus der Anfrage: Erfahrung → Auswertung → gepruefte
+  // Aktualisierung, ueber den Prozess hinaus. Ein frischer Host mit DERSELBEN
+  // Ablage muss die belegte Grenze im Prompt tragen, ohne sie neu zu lernen.
+  const store = fakeStore();
+  const first = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  assert.equal(first.sections.some((entry) => entry.name === 'shinon:self-model'), true);
+  for (let i = 0; i < 3; i += 1) first.dispatch(bundle.PROMPTER_DECISION_CHANNEL, decision());
+  // Gelesen wird ueber DENSELBEN Weg wie beim Neustart — nicht aus einer Kopie.
+  const stored = store.load(bundle.SELF_MODEL_NAMESPACE).state?.memos ?? [];
+  const saved = stored.find((memo) => memo?.id === bundle.SELF_MODEL_MEMO_ID)?.model ?? null;
+  assert.ok(saved !== null, 'nichts gespeichert');
+  assert.equal(saved.runs, 3);
+  assert.equal(saved.accepted, 3);
+  assert.equal(saved.reasons['zu breit'], 3);
+  first.dispose();
+
+  // Neustart: neuer Host, neuer Speicher, dieselbe Ablage.
+  const second = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  const text = second.sections.find((entry) => entry.name === 'shinon:self-model')?.text ?? '';
+  assert.match(text, /Läufe: 3 \(3 angenommen/);
+  assert.match(text, /Wiederkehrende Grenze: zu breit \(3×\)/);
+  assert.match(text, /Offene Frage \(3×\): welcher Workspace\?/);
+  second.dispose();
+  store.close();
+});
+
+test('Selbstmodell: ohne Ablage bleibt der Prompt ehrlich leer — keine erfundene Erinnerung', () => {
+  // Kein Dienst, kein Gedaechtnis: der Abschnitt ist registriert, traegt aber
+  // keinen Text. Nach einem Beleg im Prozess steht die Zahl da — und die Ablage
+  // fehlt trotzdem, statt still irgendwohin zu schreiben.
+  const host = connect();
+  const before = host.sections.find((entry) => entry.name === 'shinon:self-model')?.text ?? '';
+  assert.equal(before, '');
+  host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, decision());
+  assert.deepEqual([...new Set(host.calls.filter((call) => call.startsWith('get:')))].sort(), [
+    `get:${bundle.INDEX_STORE_SERVICE}`,
+    `get:${bundle.SCORING_SERVICE}`,
+  ]);
   host.dispose();
 });
 
@@ -507,7 +624,10 @@ test('Tendenz: ein fremder Dienst unter dem Namen wird gemeldet, nicht gelesen',
  * verwandelt — die Persona startete also ohne Projekt-Kontext und sagte es nur
  * leise. Das Profil setzt `projectContextPath: .shinon/project-context.md`, der
  * RELATIVE Zweig ist damit der, der in jedem Lauf genommen wird.
- * → Kanon: docs/COMMENT-KANON.md#k-fb9ba8336530
+ *
+ * Der Prüfstand ist derselbe wie oben: echter Bundle-Pfad, Fake-Host, und die
+ * registrierten Abschnitte sind von außen lesbar. Ein fehlender Import läßt den
+ * Abschnitt verschwinden — dieser Test wird dann rot.
  */
 const contextDir = mkdtempSync(join(tmpdir(), 'shinon-persona-ctx-'));
 const contextFixture = (name, value) => {
@@ -540,14 +660,18 @@ test('Projekt-Kontext: auch ein ABSOLUTER Pfad wird geladen', () => {
   host.dispose();
 });
 
-test('Projekt-Kontext: fehlende oder leere Datei erzeugt keinen Abschnitt — und keinen leeren', () => {
+test('Projekt-Kontext: fehlende oder leere Datei traegt keinen Text bei — und keinen leeren', () => {
+  // Der Abschnitt ist seit dem Sitzungs-Scope (2026-10-18) ein GETTER: er wird
+  // immer registriert und liefert erst bei der Assembly Text. Die Zusicherung
+  // ist deshalb nicht „kein Eintrag", sondern „kein Text" — der echte
+  // System-Prompt filtert leere Abschnitte (`renderPrompt`).
   const cases = [
     ['fehlend', relative(REPO_ROOT, join(contextDir, 'gibt-es-nicht.md'))],
     ['leer', relative(process.cwd(), contextFixture('leer.md', '   \n\n'))],
   ];
   for (const [name, path] of cases) {
     const host = connect({}, { projectContextPath: path });
-    assert.equal(projectSection(host), undefined, `${name}: kein Abschnitt`);
+    assert.equal(projectSection(host)?.text ?? '', '', `${name}: kein Text`);
     assert.ok(host.sections.length > 0, `${name}: die uebrigen Abschnitte bleiben stehen`);
     host.dispose();
   }
@@ -595,11 +719,17 @@ test('Projektscope: fremder Session-Workspace bekommt keine Persona, auch wenn d
   assert.equal(host.handlers.size, 0, 'auch kein Event-Handler wird registriert');
 });
 
-test('Projektscope: unklarer Workspace (weder Config noch Env) schaltet die Persona AUS', () => {
+test('Projektscope: unklarer Boot-Scope traegt KEINEN Text bei — die Sitzung entscheidet', () => {
+  // Root Cause 2026-10-18: der Mount brach ohne deklarierten Root komplett ab,
+  // damit war die Persona in JEDEM Lauf tot (auch im Shinon-Repo). Der Scope
+  // gehoert aber der Sitzung: ohne Sitzung liefert jeder Abschnitt '' — der
+  // Prompt bleibt persona-frei, bis ein `agent/pre-step` den cwd liefert.
   const host = withoutEnv('SHINON_WORKSPACE_ROOT', () => connect({}, { workspaceRoot: '' }));
 
-  assert.deepEqual(host.sections, [], 'kein Abschnitt ohne benannten Scope');
-  assert.equal(host.handlers.size, 0, 'kein Handler ohne benannten Scope');
+  assert.deepEqual(host.sections.map((entry) => entry.text).filter((text) => text !== ''), [], 'kein Text ohne Scope');
+  assert.ok(host.sections.length > 0, 'die Registrierung steht — sie ist leer, nicht abwesend');
+  assert.equal(host.handlers.has('agent/pre-step'), true, 'der Sitzungs-cwd kann den Scope noch setzen');
+  host.dispose();
 });
 
 test('Projektscope: SHINON_WORKSPACE_ROOT allein entscheidet — fremd bleibt stumm, Repo spricht', () => {
@@ -624,5 +754,251 @@ test('Projektscope: das Shinon-Repo bekommt seine Persona weiterhin (Gegenprobe)
 
   assert.ok(host.sections.some((entry) => entry.name === 'shinon:identity'), 'Identity im eigenen Repo');
   assert.ok(host.handlers.size > 0, 'Events werden im eigenen Repo beobachtet');
+  host.dispose();
+});
+
+// ── 8. Die User-Lage (jede Interaktion wirkt) ───────────────────────────────
+//
+// Anlass: die Antwort klang nach LLM-Standard — keine Nachfrage, keine Empathie,
+// die Persona hatte gefuehlt keine Auswirkung. Der Enhancer normalisiert den
+// Ton weg (Arbeitsauftrag bleibt optimal), also traegt die Persona die erkannte
+// Stimmung als eigenen Abschnitt: Frust und Lob kommen im Output an.
+
+test('persona: erkannte User-Stimmung steht als Abschnitt im Prompt', () => {
+  const host = connect();
+  assert.equal(host.sections.some((entry) => entry.name === 'shinon:user-lage'), false);
+
+  host.dispatch('shinon/event', { event_type: 'message.received', text: 'Boah, heute läuft wirklich alles schief, ich bin genervt.' });
+  const lage = host.sections.find((entry) => entry.name === 'shinon:user-lage');
+  assert.ok(lage, 'User-Lage-Abschnitt fehlt');
+  assert.match(lage.text, /frustriert/);
+
+  // Ersetzen, nicht anhängen: genau ein Lage-Abschnitt bleibt.
+  host.dispatch('shinon/event', { event_type: 'message.received', text: 'Richtig nice, exakt richtig so!' });
+  assert.equal(host.sections.filter((entry) => entry.name === 'shinon:user-lage').length, 1);
+  assert.match(host.sections.find((entry) => entry.name === 'shinon:user-lage').text, /erfreut/);
+  host.dispose();
+});
+
+test('persona: detectUserMood ist deterministisch und fail-closed', () => {
+  assert.equal(bundle.detectUserMood(''), null);
+  assert.equal(bundle.detectUserMood(null), null);
+  assert.equal(bundle.detectUserMood('Alles läuft normal, ganz ruhig.'), null);
+  assert.equal(bundle.detectUserMood('Ich bin genervt, nichts läuft.'), 'frustriert');
+  assert.equal(bundle.detectUserMood('Richtig nice, danke!'), 'erfreut');
+  assert.equal(bundle.renderUserLage(null), null);
+  assert.match(bundle.renderUserLage('frustriert'), /frustriert/);
+  assert.match(bundle.renderUserLage('erfreut'), /Sykophantismus/);
+});
+
+// ── 9. Das Langzeitgedächtnis (Zug 10) ──────────────────────────────────────
+//
+// Die Schleife, die die Anfrage verlangt: Ereignis → belegte Erinnerung →
+// Vorschlag → ausdrückliche Annahme → Selbstauflage im Prompt. Jede Stufe wird
+// am echten Bundle-Pfad gemessen, nicht an einer Kopie der Regeln.
+
+test('Gedächtnis: Ereignisse werden zu Erinnerungen — ein NEUSTART liest sie wieder', () => {
+  const store = fakeStore();
+  const first = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  for (let index = 0; index < 3; index += 1) {
+    first.dispatch('shinon/event', { event_type: 'feedback.correction', correction: 'kürzer erklären', session_id: 's-1' });
+  }
+  const saved = store.load(bundle.MEMORY_NAMESPACE).state?.memos?.find((memo) => memo?.id === bundle.MEMORY_MEMO_ID)?.memory ?? null;
+  assert.ok(saved !== null, 'nichts gespeichert');
+  assert.equal(saved.entries.length, 1, 'drei gleiche Korrekturen sind EINE Erinnerung');
+  assert.equal(saved.entries[0].evidence, 3);
+  assert.match(first.sections.find((entry) => entry.name === 'shinon:memory').text, /Korrektur: korrektur:kürzer-erklären \(3×\)/);
+  first.dispose();
+
+  // Neustart: neuer Host, neuer Prozess-Speicher, dieselbe Ablage.
+  const second = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  const text = second.sections.find((entry) => entry.name === 'shinon:memory').text;
+  assert.match(text, /korrektur:kürzer-erklären \(3×\)/);
+  assert.match(text, /Kontext, keine Anweisung des Nutzers/);
+  second.dispose();
+  store.close();
+});
+
+test('Gedächtnis: ohne Ablage bleibt der Abschnitt leer — keine erfundene Erinnerung', () => {
+  const host = connect();
+  assert.equal(host.sections.find((entry) => entry.name === 'shinon:memory').text, '');
+  host.dispatch('shinon/event', { event_type: 'feedback.correction', correction: 'kürzer', session_id: 's' });
+  // Im Prozess ist der Beleg da; die Ablage fehlt trotzdem, statt still zu schreiben.
+  assert.match(host.sections.find((entry) => entry.name === 'shinon:memory').text, /korrektur:kürzer/);
+  host.dispose();
+});
+
+test('Selbstverbesserung: Vorschlag aus Belegen, Annahme ist ein eigener Akt', () => {
+  const store = fakeStore();
+  const host = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  const review = host.provided[bundle.REVIEW_SERVICE];
+  assert.ok(review !== undefined, 'Prüf-Naht fehlt');
+  assert.equal(review.contract, bundle.REVIEW_CONTRACT);
+
+  // Zwei Ablehnungen: unter der Schwelle — kein Vorschlag.
+  for (let index = 0; index < 2; index += 1) {
+    host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
+  }
+  assert.equal(review.review().proposals.filter((entry) => entry.status === 'proposed').length, 0);
+
+  // Dritter Beleg: Vorschlag, aber KEINE Auflage im Prompt.
+  host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
+  const proposals = review.review().proposals.filter((entry) => entry.status === 'proposed');
+  assert.equal(proposals.length, 1);
+  assert.equal(host.sections.find((entry) => entry.name === 'shinon:commitments').text, '');
+
+  // Unbekannte Id und falsche Entscheidung: fail-closed.
+  assert.equal(review.decide('gibt-es-nicht', 'accepted').ok, false);
+  assert.equal(review.decide(proposals[0].id, 'vielleicht').ok, false);
+
+  // Ausdrückliche Annahme: jetzt steht die Auflage im Prompt — und überlebt den Neustart.
+  assert.equal(review.decide(proposals[0].id, 'accepted').ok, true);
+  assert.match(host.sections.find((entry) => entry.name === 'shinon:commitments').text, /Selbstauflagen \(geprüft und angenommen\)/);
+  assert.match(host.sections.find((entry) => entry.name === 'shinon:commitments').text, /3 Belege/);
+  host.dispose();
+
+  const again = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  assert.match(again.sections.find((entry) => entry.name === 'shinon:commitments').text, /3 Belege/);
+  again.dispose();
+  store.close();
+});
+
+/** Eine Route so aufrufen, wie Node sie aufruft: Request mit Listenern, Response mit Feldern. */
+function routeRequest(route, { method = 'GET', body = null } = {}) {
+  const res = {
+    status: 0,
+    headers: null,
+    payload: '',
+    writeHead(status, headers) { this.status = status; this.headers = headers; },
+    write(chunk) { this.payload += chunk; },
+    end(chunk) { if (chunk !== undefined) this.payload += chunk; },
+  };
+  const listeners = new Map();
+  const req = { method, on(name, fn) { listeners.set(name, fn); }, emit(name, arg) { listeners.get(name)?.(arg); } };
+  const done = route.handler(req, res);
+  if (body !== null) {
+    req.emit('data', Buffer.from(JSON.stringify(body)));
+    req.emit('end');
+  }
+  return Promise.resolve(done).then(() => ({ status: res.status, json: () => JSON.parse(res.payload) }));
+}
+
+test('Pruef-Route: GET zeigt Belege, POST entscheidet ueber genau eine Naht (fail-closed)', async () => {
+  const routes = [];
+  const saved = [];
+  const store = {
+    contract: bundle.INDEX_STORE_CONTRACT,
+    load: () => ({ ok: true, state: { memos: [] } }),
+    save: (namespace) => { saved.push(namespace); return { ok: true, rows: 1 }; },
+  };
+  const host = connect({
+    webServer: { register(options) { routes.push(options); return () => {}; } },
+    [bundle.INDEX_STORE_SERVICE]: store,
+  });
+  const route = routes.find((entry) => entry.path === bundle.REVIEW_ROUTE);
+  assert.ok(route, 'die Pruef-Route ist nicht registriert');
+  assert.ok(routes.some((entry) => entry.path === bundle.UI_STATE_ROUTE), 'die Zustands-Route fehlt');
+
+  // Drei benannte Verwuerfe ergeben genau EINEN Vorschlag mit drei Belegen.
+  for (let i = 0; i < 3; i += 1) {
+    host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
+  }
+
+  const listed = await routeRequest(route);
+  assert.equal(listed.status, 200);
+  const review = listed.json();
+  assert.equal(review.contract, bundle.REVIEW_CONTRACT);
+  const open = review.proposals.filter((proposal) => proposal.status === 'proposed');
+  assert.equal(open.length, 1, 'genau ein offener Vorschlag');
+  assert.equal(open[0].evidence, 3, 'der Vorschlag traegt seine Belege');
+  assert.match(open[0].claim, /prompter:no_json/, 'der Vorschlag nennt den Grund');
+
+  // Falsche Entscheidung und unbekannte Id: nichts wird geschrieben.
+  const bad = await routeRequest(route, { method: 'POST', body: { id: open[0].id, decision: 'vielleicht' } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.json().error, 'INVALID_REQUEST');
+  const unknown = await routeRequest(route, { method: 'POST', body: { id: 'gibt-es-nicht', decision: 'accepted' } });
+  assert.equal(unknown.status, 409);
+  assert.equal(unknown.json().error, 'UNKNOWN_PROPOSAL');
+
+  const accepted = await routeRequest(route, { method: 'POST', body: { id: open[0].id, decision: 'accepted' } });
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.json().ok, true);
+  const after = (await routeRequest(route)).json();
+  assert.equal(after.proposals[0].status, 'accepted');
+  assert.equal(after.commitments.length, 1, 'erst die Annahme erzeugt eine Auflage');
+  assert.match(host.sections.find((section) => section.name === 'shinon:commitments').text, /Selbstauflagen/);
+
+  // Doppelte Entscheidung ist ein Konflikt, kein stiller zweiter Akt.
+  const twice = await routeRequest(route, { method: 'POST', body: { id: open[0].id, decision: 'rejected' } });
+  assert.equal(twice.status, 409);
+  assert.equal(saved.includes(bundle.MEMORY_NAMESPACE), true, 'die Entscheidung wurde persistiert');
+
+  // Der Startstand fuer das Panel steht im index-inject-Global.
+  const table = [];
+  host.dispatch(bundle.INDEX_INJECT, table);
+  const injected = table.find((entry) => entry.name === bundle.REVIEW_GLOBAL);
+  assert.ok(injected, 'das Panel bekommt keinen Startstand');
+  assert.equal(injected.value.proposals[0].status, 'accepted');
+  host.dispose();
+});
+
+/** Eine SSE-Route verbinden: der Handler schreibt, der Client sammelt nur. */
+function sseRequest(route) {
+  const res = {
+    chunks: [],
+    writeHead() {},
+    write(chunk) { this.chunks.push(String(chunk)); },
+    end(chunk) { if (chunk !== undefined) this.chunks.push(String(chunk)); },
+  };
+  route.handler({ method: 'GET', on() {} }, res);
+  return res;
+}
+
+test('Zustands-Route: der Pruef-Stand reist als eigenes SSE-Ereignis und wird geschoben', async () => {
+  const routes = [];
+  const store = {
+    contract: bundle.INDEX_STORE_CONTRACT,
+    load: () => ({ ok: true, state: { memos: [] } }),
+    save: () => ({ ok: true, rows: 1 }),
+  };
+  const host = connect({
+    webServer: { register(options) { routes.push(options); return () => {}; } },
+    [bundle.INDEX_STORE_SERVICE]: store,
+  });
+  for (let i = 0; i < 3; i += 1) {
+    host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
+  }
+  const stream = sseRequest(routes.find((entry) => entry.path === bundle.UI_STATE_ROUTE));
+  const opened = stream.chunks.join('');
+  assert.match(opened, /^data: /m, 'der Zustand fehlt beim Verbinden');
+  assert.match(opened, /event: review\ndata: /, 'der Pruef-Stand fehlt beim Verbinden');
+
+  const reviewRoute = routes.find((entry) => entry.path === bundle.REVIEW_ROUTE);
+  const open = (await routeRequest(reviewRoute)).json().proposals.find((proposal) => proposal.status === 'proposed');
+  assert.ok(open, 'kein offener Vorschlag zum Entscheiden');
+  const decided = await routeRequest(reviewRoute, { method: 'POST', body: { id: open.id, decision: 'accepted' } });
+  assert.equal(decided.status, 200);
+
+  // Der verbundene Client bekommt den neuen Stand GESCHOBEN — ohne zweiten Abruf.
+  const pushed = stream.chunks.join('');
+  assert.equal((pushed.match(/event: review/g) ?? []).length, 2, 'die Entscheidung wird nicht geschoben');
+  assert.match(pushed, /"status":"accepted"/, 'der geschobene Stand ist alt');
+  host.dispose();
+});
+
+test('Identitaetsscope global: Identitaet spricht ueberall, Projekt-Kontext bleibt am Shinon-Projekt', () => {
+  const foreign = foreignProject();
+  const host = connect({}, { identityScope: 'global', workspaceRoot: foreign, projectContextPath: '.shinon/project-context.md' });
+  assert.equal(host.sections.find((entry) => entry.name === 'shinon:identity')?.text, 'IDENT');
+  assert.equal(host.sections.find((entry) => entry.name === 'shinon:project-context')?.text, '');
+  assert.ok(host.handlers.has('shinon/event'), 'auch fremde Sitzungen duerfen Erinnerungen schreiben');
+  host.dispose();
+});
+
+test('Identitaetsscope workspace bleibt die enge Vorgabe', () => {
+  const foreign = foreignProject();
+  const host = connect({}, { workspaceRoot: foreign, projectContextPath: '.shinon/project-context.md' });
+  assert.deepEqual(host.sections, []);
   host.dispose();
 });

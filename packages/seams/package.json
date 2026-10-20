@@ -1,0 +1,40 @@
+{
+  "name": "@shinon/seams",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./core": "./assets/seams.js"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "3.18.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    },
+    "inactive": true
+  },
+  "meta": {
+    "title": {
+      "en": "Shinon Forge - Seams",
+      "de": "Shinon Forge - Naehte"
+    },
+    "description": {
+      "en": "The one host-side seam core: digests, workspace identity, human message, seam names",
+      "de": "Der eine Host-Naht-Kern: Digests, Workspace-Identitaet, menschliche Nachricht, Naht-Namen"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
+  }
+}

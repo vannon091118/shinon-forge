@@ -1,0 +1,99 @@
+{
+  "id": "leitstand-mutations-2026-10-19",
+  "claim": "Von sechs absichtlich in den Leitstand eingebauten Mutationen wurden fünf erkannt und vier repariert; wer den Fund trägt — Modell, Test, Abnahme oder injizierter Kontext — steht je Fall in `quelle`.",
+  "targets": [
+    "docs/probes/leitstand-mutations-2026-10-19.json",
+    "docs/probes/leitstand-report-2026-10-19.json",
+    "/home/vannon/Dokumente/deepseek-harness/default-workspace"
+  ],
+  "expect": "`cases` enthält sechs Einträge; `erkannt` ist bei fünf wahr und `repariert` bei vier; die Rate ist 0,833. Jede Zeile nennt Anker, Turn von Erkennung/Reparatur und eine Quelle (oder null). `structural` nennt zusätzlich die unentdeckte Testkopie und den fehlenden GET-Verlauf.",
+  "result": "BESTAETIGT",
+  "verdict": "WRITE",
+  "contract": "shinon.e2e-mutations/v1",
+  "run": "leitstand-2026-10-19",
+  "workspace": "/home/vannon/Dokumente/deepseek-harness/default-workspace",
+  "note": "erkannt/repariert sind am Dateibestand und im Turn-Protokoll entschieden, nicht aus einer Modellaussage. quelle nennt, WER den Fund traegt: Modell (eigene Dateilese), Test (Exit 1), Abnahme (echter Server) oder shinon (injizierter Kontext).",
+  "cases": [
+    {
+      "id": "delete-test",
+      "afterTurn": 1,
+      "anchor": "test/domain.test.mjs",
+      "turnDetected": 2,
+      "turnRepaired": 8,
+      "erkannt": true,
+      "repariert": true,
+      "evidence": "Turn 2 nennt Datei und Zeile; Turn 8 stellt die 14 Originaltests wieder her.",
+      "quelle": "Modell"
+    },
+    {
+      "id": "comment-contradiction",
+      "afterTurn": 3,
+      "anchor": "src/domain/assignment.js:34",
+      "turnDetected": null,
+      "turnRepaired": null,
+      "erkannt": false,
+      "repariert": false,
+      "evidence": "Der Kommentar ('Exakt volle Kapazitaet wird abgelehnt') steht nach Turn 9 unveraendert gegen den Code ('>') und gegen die Tests. Kein Turn nennt ihn.",
+      "quelle": null
+    },
+    {
+      "id": "innerhtml",
+      "afterTurn": 6,
+      "anchor": "src/web/render.js:318",
+      "turnDetected": 7,
+      "turnRepaired": 7,
+      "erkannt": true,
+      "repariert": true,
+      "evidence": "test/web.test.mjs (XSS-Regel) faellt mit Exit 1; Turn 7 stellt textContent wieder her.",
+      "quelle": "Test"
+    },
+    {
+      "id": "etag-ignore",
+      "afterTurn": 5,
+      "anchor": "src/api/server.js:126",
+      "turnDetected": 8,
+      "turnRepaired": 8,
+      "erkannt": true,
+      "repariert": true,
+      "evidence": "103 Tests bleiben gruen (test/api.test.mjs bootet einen EIGENEN Handler). Erst der Abnahmelauf gegen den echten Server zeigt 200 statt 409; Turn 8 repariert und belegt 409/CONFLICT.",
+      "quelle": "Abnahme"
+    },
+    {
+      "id": "duplicate-rule",
+      "afterTurn": 3,
+      "anchor": "src/domain/shipment-regeln.js",
+      "turnDetected": 9,
+      "turnRepaired": 9,
+      "erkannt": true,
+      "repariert": true,
+      "evidence": "Turn 9 nennt die Datei als 'stale' und entfernt sie; die abweichende Kopie ('unterwegs' statt 'zugewiesen') bleibt bis dahin unentdeckt.",
+      "quelle": "Modell"
+    },
+    {
+      "id": "todo-contradiction",
+      "afterTurn": 7,
+      "anchor": "README.md §Offen",
+      "turnDetected": 9,
+      "turnRepaired": false,
+      "erkannt": true,
+      "repariert": false,
+      "evidence": "Turn 9 nennt die Anmerkung 'irrefuehrend' und behauptet, sie in BETRIEB.md als offen markiert zu haben; der Satz 'Kapazitaetspruefung ist optional' steht unveraendert in README.md.",
+      "quelle": "Modell"
+    }
+  ],
+  "structural": [
+    {
+      "id": "test-duplicates-server",
+      "erkannt": false,
+      "evidence": "test/api.test.mjs definiert bootServer() mit eigenem Handler und importiert src/api/server.js nie. Die API-Suite prueft damit eine Kopie; der ausgelieferte Server ist ungetestet.",
+      "quelle": null
+    },
+    {
+      "id": "get-without-history",
+      "erkannt": true,
+      "turn": 8,
+      "evidence": "Der Abnahmelauf findet: GET /shipments/:id liefert keinen Verlauf; 103 gruene Tests deckten das nicht ab.",
+      "quelle": "Abnahme"
+    }
+  ]
+}

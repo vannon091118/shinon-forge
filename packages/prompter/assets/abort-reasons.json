@@ -1,0 +1,44 @@
+{
+  "contract": "shinon.abort-reasons/v1",
+  "note": "Ein neuer Abbruchgrund ist ein EINTRAG hier — Klassifikation, Zaehler, Quote und Anzeige lesen die Daten, kein Client kennt einen Grund beim Namen. Die Reihenfolge entscheidet: der erste passende Eintrag gewinnt (Timeout vor 'kein JSON', weil ein abgebrochener Stream ebenfalls NO_JSON traegt).",
+  "reasons": [
+    {
+      "id": "TIMEOUT",
+      "label": "Timeout",
+      "match": {
+        "reasonPrefixAny": ["LLM_FAILED:TimeoutError", "LLM_FAILED:AbortError"],
+        "failureHas": ["aborted", "timeout", "timed out"]
+      }
+    },
+    {
+      "id": "LEERER_STREAM",
+      "label": "Leerer Stream",
+      "match": { "reasonsAny": ["EMPTY_STREAM", "NO_TEXT"] }
+    },
+    {
+      "id": "UNGUELTIGES_JSON",
+      "label": "Ungültiges JSON",
+      "match": { "reasonsAny": ["INVALID_JSON", "MALFORMED_JSON"] }
+    },
+    {
+      "id": "KEIN_JSON",
+      "label": "Keine JSON-Antwort",
+      "match": { "reasonsAny": ["NO_JSON"] }
+    },
+    {
+      "id": "SALVAGE",
+      "label": "Prosa gerettet",
+      "match": { "salvage": true }
+    },
+    {
+      "id": "FEHLENDE_ROUTE",
+      "label": "Keine Route",
+      "match": { "reasonsAny": ["NO_ROUTE", "NO_LLM_SERVICE"] }
+    },
+    {
+      "id": "ABGEBROCHEN",
+      "label": "Abgebrochen",
+      "match": { "reasonPrefixAny": ["LLM_FAILED:", "INTERNAL_ERROR:", "ABORTED", "ABORT"] }
+    }
+  ]
+}

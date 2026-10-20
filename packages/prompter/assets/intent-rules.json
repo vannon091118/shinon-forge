@@ -1,48 +1,1784 @@
 {
   "contract": "shinon.intent-rules/v1",
-  "note": "Intent-Patterns des Prompter. Ein Trigger ist eine HANDLUNGSPHRASE (imperativ), kein Themenwort: 'schreib tests' erweitert, 'test' allein nicht. Eine Frage ('warum ist der test broken?') wird klassifiziert, aber nie erweitert — der Agent soll antworten, nicht eine Aufgabe erfinden. Die Liste ist DATEN, nicht Inspiration.",
+  "note": "Intent-Patterns des Prompter, Fassung 3. Ein Trigger ist eine HANDLUNGSPHRASE (imperativ), kein Themenwort: 'schreib tests' erweitert, 'test' allein nicht. Eine Frage ('warum ist der test broken?') wird klassifiziert, aber nie erweitert — der Agent soll antworten, nicht eine Aufgabe erfinden. Fassung 3: der Pool ist granular (jede Klasse mehrfach, ueber 80 Muster), und das Intent-Gedaechtnis fuehrt ein GELERNTES LEXIKON (Begriff → Klasse, ueber alle Laeufe); `semanticSupport` macht daraus einen dynamischen Gewichtsanteil JE TEXT. Merkmale, Marker und Lexikon erzeugen NIE einen Treffer allein — ohne Phrase bleibt es UNDEFINED. Die Liste ist DATEN, nicht Inspiration.",
   "patterns": [
     {
-      "id": "update-docs",
-      "label": "Dokumentation aktualisieren",
-      "trigger": ["aktualisier die doku", "aktualisier doku", "doku aktualisieren", "docs update", "update docs"],
-      "classification": "TRANSFORM",
-      "expansion": "Aktualisiere die vorhandene Dokumentation. Ziel: aktuelle API, Geänderungen seit letztem Release, neue Funktionen. Keine neuen Abschnitte — nur bestehende erweitern und korrigieren."
+      "id": "chat",
+      "label": "Smalltalk",
+      "trigger": [
+        "hallo",
+        "hi",
+        "guten morgen",
+        "guten tag",
+        "danke",
+        "vielen dank",
+        "wie geht",
+        "bis spaeter",
+        "bis später"
+      ],
+      "classification": "CHAT",
+      "expansion": ""
     },
     {
-      "id": "documentation",
-      "label": "Dokumentation erstellen",
-      "trigger": ["schreib doku", "schreibe doku", "doku schreiben", "erstelle dokumentation", "dokumentation erstellen", "write docs", "write documentation", "create documentation"],
-      "classification": "MULTI_STEP_TASK",
-      "expansion": "Erstelle eine Dokumentation für dieses Projekt. Zielgruppe: Entwickler. Umfang: Übersichtsseite, API-Beschreibung, Installationsanleitung. Format: Markdown. Beziehe dich auf existierenden Code und Verträge."
+      "id": "chat-ack",
+      "label": "Zustimmung",
+      "trigger": [
+        "passt so",
+        "passt gut",
+        "gut so",
+        "genau so",
+        "weiter so",
+        "alles klar",
+        "in ordnung"
+      ],
+      "classification": "CHAT",
+      "expansion": ""
     },
     {
-      "id": "tests",
-      "label": "Tests schreiben",
-      "trigger": ["schreib tests", "schreibe tests", "tests schreiben", "test schreiben", "schreib einen test", "write tests", "add tests"],
-      "classification": "MULTI_STEP_TASK",
-      "expansion": "Schreibe Tests für das aktuelle Feature oder den aktuellen Code. Fokus: Unit-Tests und Integrationstests. Decke Edge Cases ab. Bezug: bestehende Testdateien im Projekt."
+      "id": "chat-thanks",
+      "label": "Dank",
+      "trigger": [
+        "danke dir",
+        "danke schoen",
+        "danke schön",
+        "thx",
+        "merci",
+        "vielen lieben dank"
+      ],
+      "classification": "CHAT",
+      "expansion": ""
     },
     {
-      "id": "bugfix",
-      "label": "Bugfix",
-      "trigger": ["fix den bug", "fixe den bug", "behebe den fehler", "repariere den fehler", "reparier den fehler", "fix the bug", "fix the error"],
-      "classification": "MULTI_STEP_TASK",
-      "expansion": "Repariere den fehlerhaften Code. Reproduziere das Problem zuerst, identifiziere die Ursache, behebe sie, verifiziere mit Tests. Bezug: existierende Fehlerberichte und Tests."
-    },
-    {
-      "id": "refactor",
-      "label": "Refaktorieren",
-      "trigger": ["refaktorier", "refaktoriere", "refactor", "räum auf", "aufräumen", "clean up"],
-      "classification": "TRANSFORM",
-      "expansion": "Refaktorisiere den vorhandenen Code: bessere Struktur, klare Trennung, weniger Duplikation. Erhalt das Verhalten. Keine neuen Features. Bezug: bestehende Architektur und Verträge."
+      "id": "chat-farewell",
+      "label": "Verabschiedung",
+      "trigger": [
+        "bis dann",
+        "bis morgen",
+        "bis naechste woche",
+        "ciao",
+        "tschuss",
+        "tschüss",
+        "gute nacht"
+      ],
+      "classification": "CHAT",
+      "expansion": ""
     },
     {
       "id": "read-code",
       "label": "Code verstehen / erklären",
-      "trigger": ["erklär mir", "erkläre mir", "erklär das", "code verstehen", "wie funktioniert", "was macht", "explain"],
+      "trigger": [
+        "erklär mir",
+        "erkläre mir",
+        "erklär das",
+        "erkläre das",
+        "code verstehen",
+        "wie funktioniert",
+        "was macht",
+        "explain"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "semantik": [
+        "code",
+        "datei",
+        "funktion",
+        "klasse",
+        "modul"
+      ]
+    },
+    {
+      "id": "how-works",
+      "label": "Ablauf verstehen",
+      "trigger": [
+        "wie funktioniert",
+        "wie funktionieren",
+        "wie laeuft",
+        "wie läuft",
+        "how does",
+        "how do"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage",
+        "code"
+      ],
+      "semantik": [
+        "ablauf",
+        "fluss",
+        "schritt",
+        "prozess"
+      ]
+    },
+    {
+      "id": "what-is",
+      "label": "Begriff nachschlagen",
+      "trigger": [
+        "was ist",
+        "was sind",
+        "was bedeutet",
+        "what is",
+        "what are"
+      ],
       "classification": "LOOKUP",
       "expansion": ""
+    },
+    {
+      "id": "where-is",
+      "label": "Stelle finden",
+      "trigger": [
+        "wo ist",
+        "wo liegt",
+        "wo steht",
+        "where is",
+        "where are"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "pfad",
+        "frage"
+      ]
+    },
+    {
+      "id": "show-status",
+      "label": "Stand zeigen",
+      "trigger": [
+        "zeig mir",
+        "zeige mir",
+        "status von",
+        "wie ist der stand",
+        "wo stehen wir",
+        "zeig den stand"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ]
+    },
+    {
+      "id": "explain-diff",
+      "label": "Änderung erklären",
+      "trigger": [
+        "was hat sich geaendert",
+        "was hat sich geändert",
+        "was ist neu",
+        "erklär den diff",
+        "erkläre den unterschied"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ]
+    },
+    {
+      "id": "list-files",
+      "label": "Struktur zeigen",
+      "trigger": [
+        "welche dateien",
+        "liste die dateien",
+        "zeig die struktur",
+        "projektstruktur",
+        "list files"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "pfad"
+      ]
+    },
+    {
+      "id": "compare-options",
+      "label": "Optionen vergleichen",
+      "trigger": [
+        "vergleiche",
+        "vergleich zwischen",
+        "was ist besser",
+        "compare"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ]
+    },
+    {
+      "id": "update-docs",
+      "label": "Dokumentation aktualisieren",
+      "trigger": [
+        "aktualisier die doku",
+        "aktualisier doku",
+        "doku aktualisieren",
+        "docs update",
+        "update docs"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Aktualisiere die vorhandene Dokumentation. Ziel: aktuelle API, Änderungen seit letztem Release, neue Funktionen. Keine neuen Abschnitte — nur bestehende erweitern und korrigieren.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "doku",
+        "dokumentation",
+        "readme"
+      ]
+    },
+    {
+      "id": "documentation",
+      "label": "Dokumentation erstellen",
+      "trigger": [
+        "schreib doku",
+        "schreibe doku",
+        "doku schreiben",
+        "erstelle dokumentation",
+        "dokumentation erstellen",
+        "write docs",
+        "write documentation",
+        "create documentation"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Erstelle eine Dokumentation für dieses Projekt. Zielgruppe: Entwickler. Umfang: Übersichtsseite, API-Beschreibung, Installationsanleitung. Format: Markdown. Beziehe dich auf existierenden Code und Verträge.",
+      "signale": [
+        "imperativ",
+        "mehrschritt"
+      ],
+      "semantik": [
+        "doku",
+        "dokumentation",
+        "anleitung"
+      ]
+    },
+    {
+      "id": "tests",
+      "label": "Tests schreiben",
+      "trigger": [
+        "schreib tests",
+        "schreibe tests",
+        "tests schreiben",
+        "test schreiben",
+        "schreib einen test",
+        "schreibe einen test",
+        "write tests",
+        "add tests"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Schreibe Tests für das aktuelle Feature oder den aktuellen Code. Fokus: Unit-Tests und Integrationstests. Decke Edge Cases ab. Bezug: bestehende Testdateien im Projekt.",
+      "staerke": 1.2,
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "tests",
+        "test",
+        "abdeckung",
+        "assert"
+      ]
+    },
+    {
+      "id": "coverage",
+      "label": "Testabdeckung",
+      "trigger": [
+        "testabdeckung",
+        "coverage erhoehen",
+        "coverage erhöhen",
+        "abdeckung messen",
+        "coverage"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Messe die Testabdeckung und schließe die größten Lücken mit echten Tests. Kein Test, der nur die Zeile berührt.",
+      "semantik": [
+        "tests",
+        "abdeckung",
+        "coverage"
+      ]
+    },
+    {
+      "id": "bugfix",
+      "label": "Bugfix",
+      "trigger": [
+        "fix den bug",
+        "fixe den bug",
+        "behebe den fehler",
+        "repariere den fehler",
+        "reparier den fehler",
+        "fix the bug",
+        "fix the error"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Repariere den fehlerhaften Code. Reproduziere das Problem zuerst, identifiziere die Ursache, behebe sie, verifiziere mit Tests. Bezug: existierende Fehlerberichte und Tests.",
+      "staerke": 1.2,
+      "signale": [
+        "imperativ",
+        "pfad"
+      ],
+      "semantik": [
+        "fehler",
+        "bug",
+        "test",
+        "reproduzier"
+      ]
+    },
+    {
+      "id": "refactor",
+      "label": "Refaktorieren",
+      "trigger": [
+        "refaktorier",
+        "refaktoriere",
+        "refactor",
+        "räum auf",
+        "raeum auf",
+        "aufräumen",
+        "aufraeumen",
+        "clean up"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Refaktorisiere den vorhandenen Code: bessere Struktur, klare Trennung, weniger Duplikation. Erhalt das Verhalten. Keine neuen Features. Bezug: bestehende Architektur und Verträge.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "struktur",
+        "duplikat",
+        "modul",
+        "code"
+      ]
+    },
+    {
+      "id": "rename",
+      "label": "Umbenennen",
+      "trigger": [
+        "benenne um",
+        "umbenennen",
+        "rename to",
+        "rename"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Benenne die betroffenen Stellen konsistent um — Definition, Aufrufer, Tests, Dokumentation. Kein Verhalten ändern.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "name",
+        "umbenennen"
+      ]
+    },
+    {
+      "id": "format",
+      "label": "Formatieren",
+      "trigger": [
+        "formatiere",
+        "formatier",
+        "formatieren",
+        "lint fix",
+        "linten",
+        "prettier laufen"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Formatiere den betroffenen Code nach der Projektkonvention. Keine inhaltlichen Änderungen.",
+      "signale": [
+        "imperativ"
+      ]
+    },
+    {
+      "id": "simplify",
+      "label": "Vereinfachen",
+      "trigger": [
+        "vereinfache",
+        "vereinfachen",
+        "mach das einfacher",
+        "simplify"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Vereinfache die betroffene Stelle: weniger Verzweigungen, klarere Namen, ein Zweck pro Funktion. Verhalten bleibt gleich.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "einfach",
+        "klar",
+        "struktur"
+      ]
+    },
+    {
+      "id": "extract",
+      "label": "Auslagern",
+      "trigger": [
+        "extrahiere",
+        "ziehe das raus",
+        "in eine eigene funktion",
+        "auslagern",
+        "extract"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Ziehe den betroffenen Teil in eine eigene Einheit (Funktion, Modul) mit klarem Vertrag. Aufrufer anpassen, Verhalten erhalten.",
+      "signale": [
+        "imperativ",
+        "code"
+      ]
+    },
+    {
+      "id": "move",
+      "label": "Verschieben",
+      "trigger": [
+        "verschiebe",
+        "verschieben nach",
+        "move to",
+        "nach vorne ziehen"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Verschiebe die betroffene Stelle an den neuen Ort und ziehe alle Referenzen nach. Kein Verhalten ändern.",
+      "signale": [
+        "imperativ",
+        "pfad"
+      ]
+    },
+    {
+      "id": "update-config",
+      "label": "Konfiguration anpassen",
+      "trigger": [
+        "aktualisiere die config",
+        "config anpassen",
+        "einstellungen aendern",
+        "einstellungen ändern",
+        "config aendern",
+        "config ändern"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Passe die Konfiguration an der einen Stelle an, die sie besitzt. Wirksame Werte gehören ins Profil, nicht in den Code.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "config",
+        "konfiguration",
+        "profil"
+      ]
+    },
+    {
+      "id": "translate",
+      "label": "Übersetzen",
+      "trigger": [
+        "uebersetze",
+        "übersetze",
+        "translate",
+        "auf englisch uebersetzen",
+        "auf englisch übersetzen"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Übersetze die betroffenen Texte, ohne Bedeutung oder Ton zu verändern. Fachbegriffe bleiben konsistent.",
+      "signale": [
+        "imperativ"
+      ]
+    },
+    {
+      "id": "feature",
+      "label": "Feature bauen",
+      "trigger": [
+        "bau ein",
+        "baue ein",
+        "implementiere eine",
+        "implementiere ein",
+        "fuege ein feature",
+        "füge ein feature",
+        "neues feature",
+        "add a feature"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Setze das Feature vollständig um: Schnittstelle, Implementierung, Tests, Dokumentation. Erst lesen, was da ist, dann bauen.",
+      "signale": [
+        "imperativ",
+        "mehrschritt"
+      ],
+      "semantik": [
+        "feature",
+        "funktion",
+        "bau"
+      ]
+    },
+    {
+      "id": "build-ui",
+      "label": "Oberfläche bauen",
+      "trigger": [
+        "bau eine ui",
+        "baue eine ui",
+        "bau die oberflaeche",
+        "baue die oberfläche",
+        "layout bauen",
+        "screen bauen",
+        "oberflaeche bauen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue die Oberfläche: Struktur, Zustände, Fehlerfälle. Halte die bestehende Gestaltung ein und prüfe sie im Browser.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "ui",
+        "oberflaeche",
+        "layout",
+        "screen",
+        "html"
+      ]
+    },
+    {
+      "id": "build-game",
+      "label": "Spiel bauen",
+      "trigger": [
+        "bau ein spiel",
+        "baue ein spiel",
+        "bau ein browser-spiel",
+        "baue ein browser-spiel",
+        "web-spiel",
+        "webspiel",
+        "game bauen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue das Spiel als lauffähige Einheit: Regeln, Zustand, Eingabe, Anzeige. Prüfe es danach wirklich im Browser.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "spiel",
+        "game",
+        "browser",
+        "html"
+      ]
+    },
+    {
+      "id": "integrate-api",
+      "label": "API anbinden",
+      "trigger": [
+        "integriere die api",
+        "api integrieren",
+        "binde die api an",
+        "anbindung bauen",
+        "integrate the api"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Binde die API an: Client, Fehlerfälle, Zeitlimits, Tests gegen die echte Form. Keine erfundenen Felder.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "api",
+        "client",
+        "endpunkt",
+        "request"
+      ]
+    },
+    {
+      "id": "migrate",
+      "label": "Migrieren",
+      "trigger": [
+        "migriere",
+        "migration schreiben",
+        "portiere",
+        "umstellen auf",
+        "migrate"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Migriere schrittweise: alte Form lesen, neue schreiben, beide prüfen. Ein Zwischenstand, der nichts bricht.",
+      "signale": [
+        "imperativ",
+        "mehrschritt"
+      ],
+      "semantik": [
+        "migration",
+        "umstellung",
+        "version"
+      ]
+    },
+    {
+      "id": "review",
+      "label": "Code prüfen",
+      "trigger": [
+        "review den code",
+        "code review",
+        "pruefe den code",
+        "prüfe den code",
+        "durchleuchte",
+        "audit"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Prüfe den Code gegen die Projektregeln: Verträge, Tests, Fehlerpfade, tote Pfade. Befunde mit Fundstelle, keine Geschmacksurteile.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "review",
+        "pruefung",
+        "vertrag",
+        "test"
+      ]
+    },
+    {
+      "id": "setup-ci",
+      "label": "CI einrichten",
+      "trigger": [
+        "richte ci ein",
+        "ci einrichten",
+        "pipeline bauen",
+        "github actions",
+        "workflow bauen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Richte die CI ein: gleiche Befehle wie lokal, klare Fehlschläge, kein Skip als Grün.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "ci",
+        "pipeline",
+        "workflow",
+        "actions"
+      ]
+    },
+    {
+      "id": "benchmark",
+      "label": "Messen",
+      "trigger": [
+        "benchmarke",
+        "benchmark laufen",
+        "messe die performance",
+        "performance messen",
+        "profiling"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Miss die Leistung mit einem reproduzierbaren Lauf: gleiche Eingabe, gleiche Umgebung, Zahl vorher und nachher.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "performance",
+        "laufzeit",
+        "messung",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "deploy",
+      "label": "Ausliefern",
+      "trigger": [
+        "deploye",
+        "deployen",
+        "ausrollen",
+        "release bauen",
+        "veroeffentliche",
+        "veröffentliche"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Bereite die Auslieferung vor: Tests grün, Version gesetzt, Rollback benannt. Erst dann ausliefern.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "release",
+        "deploy",
+        "version"
+      ]
+    },
+    {
+      "id": "security-audit",
+      "label": "Sicherheit prüfen",
+      "trigger": [
+        "pruefe die sicherheit",
+        "prüfe die sicherheit",
+        "sicherheitspruefung",
+        "security audit",
+        "schwachstellen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Prüfe die Sicherheit: Eingaben, Rechte, Geheimnisse, Abhängigkeiten. Jeder Befund mit Fundstelle und Wirkung.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "sicherheit",
+        "rechte",
+        "secret",
+        "abhaengigkeit"
+      ]
+    },
+    {
+      "id": "plan-work",
+      "label": "Plan schreiben",
+      "trigger": [
+        "plane das",
+        "plan schreiben",
+        "roadmap",
+        "definiere ein ziel",
+        "ziel definieren"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Schreibe den Plan: Ziel, Nicht-Ziele, Schritte, Prüfungen. Kein Schritt ohne Beleg, wann er fertig ist.",
+      "signale": [
+        "imperativ",
+        "mehrschritt"
+      ],
+      "semantik": [
+        "plan",
+        "ziel",
+        "roadmap",
+        "schritt"
+      ]
+    },
+    {
+      "id": "architecture-change",
+      "label": "Architektur umbauen",
+      "trigger": [
+        "architektur umbauen",
+        "umbau planen",
+        "refactoring planen",
+        "struktur umbauen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Plane den Umbau: betroffene Verträge, Reihenfolge, Rückweg. Klassen benennen (SAFE / BEHAVIOR / BREAKING) vor der ersten Änderung.",
+      "signale": [
+        "imperativ",
+        "mehrschritt",
+        "code"
+      ],
+      "semantik": [
+        "architektur",
+        "vertrag",
+        "umbau",
+        "struktur"
+      ]
+    },
+    {
+      "id": "long-running-goal",
+      "label": "Langfristiges Ziel",
+      "trigger": [
+        "ueber mehrere tage",
+        "über mehrere tage",
+        "ueber wochen",
+        "über wochen",
+        "langfristig",
+        "auf dauer",
+        "jede nacht",
+        "bis es fertig ist"
+      ],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": "",
+      "staerke": 1.2,
+      "signale": [
+        "ziel"
+      ],
+      "semantik": [
+        "ziel",
+        "dauer",
+        "wochen",
+        "tage"
+      ]
+    },
+    {
+      "id": "recurring",
+      "label": "Wiederkehrende Aufgabe",
+      "trigger": [
+        "jeden tag",
+        "jede woche",
+        "regelmaessig",
+        "regelmäßig",
+        "immer wieder",
+        "alle stunden"
+      ],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": "",
+      "signale": [
+        "ziel"
+      ],
+      "semantik": [
+        "taeglich",
+        "wieder",
+        "regel"
+      ]
+    },
+    {
+      "id": "continuous-improvement",
+      "label": "Laufend verbessern",
+      "trigger": [
+        "laufend verbessern",
+        "kontinuierlich",
+        "auf dauer verbessern",
+        "iterativ",
+        "iterationen"
+      ],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": "",
+      "signale": [
+        "ziel",
+        "mehrschritt"
+      ],
+      "semantik": [
+        "verbessern",
+        "iteration",
+        "laufend"
+      ]
+    },
+    {
+      "id": "chat-ok",
+      "label": "Kurz bestätigt",
+      "trigger": [
+        "okay",
+        "ok",
+        "verstanden",
+        "kapiert",
+        "alles gut"
+      ],
+      "classification": "CHAT",
+      "expansion": ""
+    },
+    {
+      "id": "chat-laugh",
+      "label": "Heiterkeit",
+      "trigger": [
+        "haha",
+        "hihi",
+        "lol",
+        "zum lachen"
+      ],
+      "classification": "CHAT",
+      "expansion": ""
+    },
+    {
+      "id": "chat-sorry",
+      "label": "Entschuldigung",
+      "trigger": [
+        "sorry",
+        "mein fehler",
+        "entschuldigung",
+        "entschuldige"
+      ],
+      "classification": "CHAT",
+      "expansion": ""
+    },
+    {
+      "id": "chat-present",
+      "label": "Anwesenheit prüfen",
+      "trigger": [
+        "bist du da",
+        "noch da",
+        "bist du wach"
+      ],
+      "classification": "CHAT",
+      "expansion": ""
+    },
+    {
+      "id": "chat-mood",
+      "label": "Befinden",
+      "trigger": [
+        "mir geht es gut",
+        "schlechter tag",
+        "anstrengend heute"
+      ],
+      "classification": "CHAT",
+      "expansion": ""
+    },
+    {
+      "id": "lookup-cause",
+      "label": "Ursache suchen",
+      "trigger": [
+        "woher kommt",
+        "was bedeutet der fehler",
+        "wodurch entsteht"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ],
+      "semantik": [
+        "fehler",
+        "ursache",
+        "grund"
+      ]
+    },
+    {
+      "id": "lookup-content",
+      "label": "Dateiinhalt zeigen",
+      "trigger": [
+        "zeig die datei",
+        "inhalt von",
+        "was steht in",
+        "zeig den inhalt"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "semantik": [
+        "datei",
+        "inhalt",
+        "zeile"
+      ]
+    },
+    {
+      "id": "lookup-tests",
+      "label": "Teststand lesen",
+      "trigger": [
+        "sind die tests gruen",
+        "laufen die tests",
+        "teststatus"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ],
+      "semantik": [
+        "tests",
+        "status",
+        "gruen"
+      ]
+    },
+    {
+      "id": "lookup-history",
+      "label": "Historie lesen",
+      "trigger": [
+        "letzte commits",
+        "git log",
+        "was war zuletzt",
+        "historie von"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "semantik": [
+        "commits",
+        "historie",
+        "zuletzt"
+      ]
+    },
+    {
+      "id": "lookup-deps",
+      "label": "Abhängigkeiten lesen",
+      "trigger": [
+        "welche abhaengigkeiten",
+        "welche dependencies",
+        "wovon haengt"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "semantik": [
+        "abhaengigkeit",
+        "dependency",
+        "paket"
+      ]
+    },
+    {
+      "id": "lookup-docs",
+      "label": "Dokumentation finden",
+      "trigger": [
+        "wo ist das dokumentiert",
+        "gibt es doku",
+        "welche doku"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ],
+      "semantik": [
+        "doku",
+        "dokumentation",
+        "anleitung"
+      ]
+    },
+    {
+      "id": "lookup-usage",
+      "label": "Benutzung verstehen",
+      "trigger": [
+        "wie benutze ich",
+        "wie nutze ich",
+        "wie rufe ich"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ],
+      "semantik": [
+        "benutzen",
+        "aufruf",
+        "beispiel"
+      ]
+    },
+    {
+      "id": "lookup-summary",
+      "label": "Zusammenfassen",
+      "trigger": [
+        "fass zusammen",
+        "zusammenfassung von",
+        "kurzfassung"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "semantik": [
+        "zusammenfassung",
+        "kurz",
+        "ueberblick"
+      ]
+    },
+    {
+      "id": "lookup-owner",
+      "label": "Zuständigkeit klären",
+      "trigger": [
+        "wer ist zustaendig",
+        "wer hat das gebaut",
+        "wer besitzt"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ],
+      "semantik": [
+        "zustaendig",
+        "besitzer",
+        "owner"
+      ]
+    },
+    {
+      "id": "lookup-contract",
+      "label": "Vertrag nachlesen",
+      "trigger": [
+        "welcher vertrag",
+        "welches schema",
+        "welche schnittstelle"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ],
+      "semantik": [
+        "vertrag",
+        "schema",
+        "schnittstelle"
+      ]
+    },
+    {
+      "id": "delete-code",
+      "label": "Löschen",
+      "trigger": [
+        "loesche",
+        "lösche",
+        "entferne",
+        "delete the"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Entferne die betroffene Stelle vollständig: Definition, Aufrufer, Tests, Dokumentation. Keine verwaisten Referenzen zurücklassen.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "loeschen",
+        "entfernen",
+        "toter"
+      ]
+    },
+    {
+      "id": "comment-code",
+      "label": "Code kommentieren",
+      "trigger": [
+        "kommentiere",
+        "kommentar hinzufuegen",
+        "dokumentiere im code"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Ergänze knappe Kommentare für das WARUM, nicht für das WAS. Kein Block über zehn Zeilen; der Rest gehört in die Kanon-Ablage.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "kommentar",
+        "warum",
+        "code"
+      ]
+    },
+    {
+      "id": "add-types",
+      "label": "Typen ergänzen",
+      "trigger": [
+        "typisiere",
+        "typen hinzufuegen",
+        "add types",
+        "typing einbauen"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Ergänze Typen für die betroffene Schnittstelle. Kein `any` als Abkürzung, keine erfundenen Felder.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "typen",
+        "typing",
+        "schema"
+      ]
+    },
+    {
+      "id": "error-handling",
+      "label": "Fehlerbehandlung einbauen",
+      "trigger": [
+        "fehlerbehandlung",
+        "try catch",
+        "error handling"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Behandle die Fehlerfälle an der Stelle, die den Fehler versteht: benannter Grund, fail-closed, kein stilles Schlucken.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "fehler",
+        "behandlung",
+        "catch"
+      ]
+    },
+    {
+      "id": "constants",
+      "label": "Konstanten auslagern",
+      "trigger": [
+        "hardcode",
+        "magic numbers",
+        "konstanten auslagern"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Ziehe die festen Werte in benannte Konstanten mit Grund. Kein Verhalten ändern.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "konstante",
+        "wert",
+        "hardcode"
+      ]
+    },
+    {
+      "id": "split-file",
+      "label": "Datei aufteilen",
+      "trigger": [
+        "splitte die datei",
+        "teile die datei",
+        "aufteilen in module"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Teile die Datei entlang ihrer Verantwortungen. Jedes neue Modul hat einen klaren Zweck und bleibt testbar.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "aufteilen",
+        "modul",
+        "datei"
+      ]
+    },
+    {
+      "id": "sort-order",
+      "label": "Reihenfolge ordnen",
+      "trigger": [
+        "sortiere",
+        "alphabetisch sortieren",
+        "imports ordnen"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Bringe die betroffene Liste in die Projektordnung. Keine inhaltlichen Änderungen.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "sortieren",
+        "ordnung",
+        "imports"
+      ]
+    },
+    {
+      "id": "trim-code",
+      "label": "Kürzen",
+      "trigger": [
+        "kuerze",
+        "kürze",
+        "straffe",
+        "mach das kuerzer"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Kürze die betroffene Stelle auf das, was sie leistet. Kein Verhalten verlieren.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "kuerzen",
+        "knapp",
+        "straffen"
+      ]
+    },
+    {
+      "id": "rewrite",
+      "label": "Neu schreiben",
+      "trigger": [
+        "schreib neu",
+        "neu schreiben",
+        "rewrite"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Schreibe die betroffene Stelle neu — gleiche Außenfläche, klarerer Innenweg. Vorher und nachher prüfen.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "neu",
+        "schreiben",
+        "rewrite"
+      ]
+    },
+    {
+      "id": "convert",
+      "label": "Umwandeln",
+      "trigger": [
+        "wandle um",
+        "konvertiere",
+        "convert to"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Wandle die Form um und prüfe beide Seiten: alte Quelle, neue Form, gleiches Ergebnis.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "umwandeln",
+        "konvertieren",
+        "form"
+      ]
+    },
+    {
+      "id": "bump-version",
+      "label": "Version anheben",
+      "trigger": [
+        "version erhoehen",
+        "version erhöhen",
+        "version anheben",
+        "bump version"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Hebe die Version an der einen Stelle an, die sie besitzt, und ziehe Lock, Manifest und Prüfer nach.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "version",
+        "bump",
+        "release"
+      ]
+    },
+    {
+      "id": "inline-code",
+      "label": "Zusammenführen",
+      "trigger": [
+        "inline",
+        "fuege zusammen",
+        "führe zusammen"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Führe die auseinandergezogene Stelle wieder zusammen, wenn die Trennung keinen Zweck mehr hat. Verhalten bleibt gleich.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "zusammen",
+        "inline",
+        "vereinen"
+      ]
+    },
+    {
+      "id": "comment-trim",
+      "label": "Kommentare kürzen",
+      "trigger": [
+        "kommentare kuerzen",
+        "kommentare kürzen",
+        "kommentar-blat"
+      ],
+      "classification": "TRANSFORM",
+      "expansion": "Kürze die Kommentar-Blöcke auf Warum plus Wegweiser. Den Überhang in die Kanon-Ablage, mit Zeiger zurück.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "kommentar",
+        "kuerzen",
+        "kanon"
+      ]
+    },
+    {
+      "id": "debug",
+      "label": "Fehler eingrenzen",
+      "trigger": [
+        "debugge",
+        "finde den fehler",
+        "reproduziere den fehler",
+        "spure den fehler"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Grenze den Fehler ein: reproduzieren, Eingabe verkleinern, Ursache benennen, dann beheben. Erst der Beweis, dann die Änderung.",
+      "staerke": 1.2,
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "fehler",
+        "reproduzieren",
+        "debug"
+      ]
+    },
+    {
+      "id": "speed",
+      "label": "Schneller machen",
+      "trigger": [
+        "mach schneller",
+        "beschleunige",
+        "optimiere die performance"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Miss zuerst, dann ändere: gleiche Eingabe, gleiche Umgebung, Zahl vorher und nachher. Ohne Messung kein „schneller“.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "schneller",
+        "performance",
+        "messung"
+      ]
+    },
+    {
+      "id": "database",
+      "label": "Datenbank einrichten",
+      "trigger": [
+        "datenbank einrichten",
+        "schema anlegen",
+        "db anbinden"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Richte die Datenbank ein: Schema, Migration, Zugriff über gebundene Parameter. Erst lokal prüfen, dann anbinden.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "datenbank",
+        "schema",
+        "migration"
+      ]
+    },
+    {
+      "id": "auth",
+      "label": "Anmeldung bauen",
+      "trigger": [
+        "login einbauen",
+        "auth anbinden",
+        "anmeldung bauen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue die Anmeldung: geschützte Routen, Sitzung, Abmeldung. Prüfe zwei Konten gegeneinander, nicht nur ein glückliches.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "login",
+        "auth",
+        "sitzung"
+      ]
+    },
+    {
+      "id": "mail",
+      "label": "Benachrichtigung senden",
+      "trigger": [
+        "mail versenden",
+        "email senden",
+        "benachrichtigung schicken"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Binde den Versand an: Absender, Fehlerfälle, Wiederholung. Schlüssel bleiben in der Umgebung, nie im Baum.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "mail",
+        "email",
+        "benachrichtigung"
+      ]
+    },
+    {
+      "id": "search-feature",
+      "label": "Suche einbauen",
+      "trigger": [
+        "suche einbauen",
+        "volltextsuche",
+        "filter einbauen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue die Suche: Eingabe, Index, Treffer, leeres Ergebnis. Prüfe Umlaute und Teiltreffer, nicht nur den Idealfall.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "suche",
+        "filter",
+        "treffer"
+      ]
+    },
+    {
+      "id": "cache",
+      "label": "Zwischenspeicher einbauen",
+      "trigger": [
+        "cache einbauen",
+        "caching",
+        "zwischenspeicher"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue den Zwischenspeicher mit benanntem Schlüssel und klarer Verwerfung. Miss die Wirkung, nicht die Absicht.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "cache",
+        "zwischenspeicher",
+        "treffer"
+      ]
+    },
+    {
+      "id": "background-job",
+      "label": "Hintergrundjob bauen",
+      "trigger": [
+        "queue einbauen",
+        "worker bauen",
+        "hintergrundjob"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue den Job idempotent: Wiederholung darf nichts doppelt tun. Neustart ist der Normalfall, nicht der Ausnahmefall.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "queue",
+        "worker",
+        "job"
+      ]
+    },
+    {
+      "id": "script",
+      "label": "Skript schreiben",
+      "trigger": [
+        "skript schreiben",
+        "script schreiben",
+        "ein skript bauen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Schreibe das Skript als kleines Werkzeug: eine Aufgabe, klare Ausgabe, echter Exit-Code.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "skript",
+        "script",
+        "werkzeug"
+      ]
+    },
+    {
+      "id": "cli",
+      "label": "Kommandozeile bauen",
+      "trigger": [
+        "cli bauen",
+        "kommandozeile bauen",
+        "terminal-tool"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue die Kommandozeile: Befehle, Optionen, Hilfe, Exit-Codes. Ein Befehl tut eine Sache.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "cli",
+        "kommandozeile",
+        "befehl"
+      ]
+    },
+    {
+      "id": "parser",
+      "label": "Parser schreiben",
+      "trigger": [
+        "parser schreiben",
+        "parse die datei",
+        "einlesen und auswerten"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Schreibe den Parser gegen echte Beispiele: gültig, kaputt, leer. Jeder Fehlerfall nennt seine Stelle.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "parser",
+        "einlesen",
+        "format"
+      ]
+    },
+    {
+      "id": "plugin",
+      "label": "Plugin bauen",
+      "trigger": [
+        "plugin bauen",
+        "erweitere das plugin",
+        "neues plugin"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue das Plugin als eigenes Paket: Manifest, Patch, Host- und Client-Hälfte, Tests. Die Namensregel gilt in allen vier Stellen.",
+      "signale": [
+        "imperativ",
+        "code"
+      ],
+      "semantik": [
+        "plugin",
+        "paket",
+        "manifest"
+      ]
+    },
+    {
+      "id": "fix-tests",
+      "label": "Tests reparieren",
+      "trigger": [
+        "repariere die tests",
+        "tests gruen machen",
+        "tests fixen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Repariere die Ursache, nicht die Behauptung. Eine gelockerte Zusicherung ist kein grüner Test.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "tests",
+        "gruen",
+        "ursache"
+      ]
+    },
+    {
+      "id": "api-docs",
+      "label": "API beschreiben",
+      "trigger": [
+        "api dokumentieren",
+        "endpunkte beschreiben"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Beschreibe die API aus dem laufenden Vertrag: Pfad, Eingabe, Ausgabe, Fehler. Keine erfundenen Felder.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "api",
+        "endpunkt",
+        "vertrag"
+      ]
+    },
+    {
+      "id": "data-import",
+      "label": "Daten importieren",
+      "trigger": [
+        "daten importieren",
+        "csv einlesen",
+        "import bauen"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue den Import: Format prüfen, Fehlerzeilen melden, nichts halb schreiben.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "import",
+        "daten",
+        "csv"
+      ]
+    },
+    {
+      "id": "data-export",
+      "label": "Daten exportieren",
+      "trigger": [
+        "export bauen",
+        "daten exportieren",
+        "download anbieten"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Baue den Export: stabile Spalten, benannte Form, geprüfte Datei.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "export",
+        "download",
+        "datei"
+      ]
+    },
+    {
+      "id": "watch",
+      "label": "Beobachten",
+      "trigger": [
+        "beobachte",
+        "ueberwache",
+        "monitoring einrichten"
+      ],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": "",
+      "signale": [
+        "ziel"
+      ],
+      "semantik": [
+        "beobachten",
+        "monitoring",
+        "alarm"
+      ]
+    },
+    {
+      "id": "learn-loop",
+      "label": "Aus Fehlern lernen",
+      "trigger": [
+        "lerne aus",
+        "aus den fehlern lernen",
+        "jeden lauf verbessern"
+      ],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": "",
+      "signale": [
+        "ziel"
+      ],
+      "semantik": [
+        "lernen",
+        "fehler",
+        "lauf"
+      ]
+    },
+    {
+      "id": "nightly",
+      "label": "Nachts laufen",
+      "trigger": [
+        "nachts laufen",
+        "cron einrichten",
+        "jede stunde"
+      ],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": "",
+      "signale": [
+        "ziel"
+      ],
+      "semantik": [
+        "nachts",
+        "cron",
+        "stunde"
+      ]
+    },
+    {
+      "id": "milestones",
+      "label": "In Etappen",
+      "trigger": [
+        "in etappen",
+        "etappenweise",
+        "ueber mehrere schritte"
+      ],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": "",
+      "signale": [
+        "ziel",
+        "mehrschritt"
+      ],
+      "semantik": [
+        "etappe",
+        "schritte",
+        "abschnitt"
+      ]
+    },
+    {
+      "id": "until-done",
+      "label": "Bis es sitzt",
+      "trigger": [
+        "so lange bis",
+        "bis es passt",
+        "bis es perfekt"
+      ],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": "",
+      "signale": [
+        "ziel"
+      ],
+      "semantik": [
+        "solange",
+        "fertig",
+        "perfekt"
+      ]
+    },
+    {
+      "id": "self-improve",
+      "label": "Selbst verbessern",
+      "trigger": [
+        "selbst verbessern",
+        "waechst mit",
+        "mit jedem turn besser"
+      ],
+      "classification": "LONG_RUNNING_GOAL",
+      "expansion": "",
+      "signale": [
+        "ziel"
+      ],
+      "semantik": [
+        "selbst",
+        "verbessern",
+        "waechst"
+      ]
+    },
+    {
+      "id": "verify-claim",
+      "label": "Behauptung prüfen",
+      "trigger": [
+        "pruefe ob",
+        "prüfe ob",
+        "stimmt es dass",
+        "verify that"
+      ],
+      "classification": "MULTI_STEP_TASK",
+      "expansion": "Prüfe die Behauptung am echten Artefakt: Befehl, Ausgabe, Exit-Code. Ein grüner Build beweist kein Verhalten.",
+      "signale": [
+        "imperativ"
+      ],
+      "semantik": [
+        "pruefen",
+        "beleg",
+        "ausgabe"
+      ]
+    },
+    {
+      "id": "explain-tradeoff",
+      "label": "Abwägung erklären",
+      "trigger": [
+        "wäge ab",
+        "waage ab",
+        "trade-off",
+        "was spricht dafuer"
+      ],
+      "classification": "LOOKUP",
+      "expansion": "",
+      "signale": [
+        "frage"
+      ],
+      "semantik": [
+        "abwaegung",
+        "tradeoff",
+        "entscheidung"
+      ]
     }
   ]
 }

@@ -7,10 +7,20 @@
  *                       Gate + lokale Slices, Sekunden). Der volle Lauf gehört
  *                       in CI (`test:full`) — wer hier die Kette verlängert,
  *                       zahlt sie bei jedem Commit. Fail-closed: rot bleibt draußen.
- * → Kanon: docs/COMMENT-KANON.md#k-166493229b9e
+ *   prepare-commit-msg  tauscht verbotene Footer gegen den Vannon-Trailer
+ *                       (lokal ist Reparatur erlaubt — sonst wäre jeder
+ *                       Agent-Commit Handarbeit).
+ *   commit-msg          prüft fail-closed. Ohne Trailer kein Commit.
+ *
+ * Kein Husky, keine Dependency: die Hooks liegen in .githooks/ und werden über
+ * `core.hooksPath` aktiviert. Das ist eine repo-lokale Einstellung — pro Klon
+ * einmal `npm run hooks:install`.
+ *
+ * Idempotent: erneutes Ausführen überschreibt nur die eigenen Dateien.
+ * Fremde Hook-Pfade werden nicht überschrieben, außer mit --force.
  */
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { VANNON_TRAILER } from './lib/commit-text.mjs';
 
@@ -20,8 +30,11 @@ const force = process.argv.includes('--force');
 const HOOKS = {
   'pre-commit': `#!/usr/bin/env sh
 # Shinon pre-commit — die schnelle lokale Linie (Sekunden, nicht Minuten).
-# Der volle Lauf (test:full) gehoert in CI; hier laeuft nur npm test.
+# §1 der ZAHLEN ist generiert: er muss VOR dem Commit stimmen (kein Direct-Write,
+# nur die Pruefung). §2 bleibt ein datierter Messwert und wird hier nicht
+# angefasst. Der volle Lauf (test:full) gehoert in CI.
 set -e
+npm run zahlen:check
 npm test
 `,
   'prepare-commit-msg': `#!/usr/bin/env sh

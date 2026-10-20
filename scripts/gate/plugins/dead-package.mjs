@@ -6,7 +6,8 @@
  *
  * Warum nicht als zentrale Liste im Gate (bis 2026-10-11 `KNOWN_INACTIVE`):
  * mit vielen Paketen hieße das, für jedes neue Paket dieses Gate-File
- * → Kanon: docs/COMMENT-KANON.md#k-9a8e9aad014b
+ * anzufassen — gemessen an 39 Paketen fünf Befunde, bis die Liste wuchs. Die
+ * Erklärung gehört dem Paket (ein Besitzer), das Gate liest sie nur.
  */
 export const id = 'dead-package';
 

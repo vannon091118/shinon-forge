@@ -16,7 +16,11 @@ import { basename, join } from 'path';
 import * as repo from './lib/repo.mjs';
 
 const WORK = mkdtempSync(join(tmpdir(), 'shinon-validate-'));
-const SOURCES = ['scripts', 'packages', 'profiles', 'package.json'];
+// `docs` gehoert in die Kopie: seit 2026-10-20 liegen dort zwei Registries, die
+// das statische Gate liest (`contracts/canon.json`, `contracts/structure.json`).
+// Ohne sie waere die unveraenderte Kopie rot, obwohl am Baum nichts falsch ist —
+// das Fixture pruefte dann seine eigene Luecke statt die Regel.
+const SOURCES = ['scripts', 'packages', 'profiles', 'docs', 'package.json'];
 const SKIP = new Set(['node_modules', 'dist', '.git']);
 
 const write = (root, rel, text) => writeFileSync(join(root, rel), text);

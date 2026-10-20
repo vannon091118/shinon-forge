@@ -1,0 +1,228 @@
+name: runtime-release
+
+on:
+  # Kein Push-Trigger: Ein Lauf erzeugt ein Tag, ein Release und einen Commit im
+  # Schwesterrepo. Das darf nur auf ausdrücklichen Start geschehen (Befund B2).
+  workflow_dispatch:
+    inputs:
+      skip_release:
+        description: "Release + Bump überspringen (nur Build-Test)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  mobile-gate:
+    name: "Fail-closed: mobile-Profil + DSH-Versionen"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+
+      # Reihenfolge: mobile-profile-contract-test.mjs ist rein statisch
+      # (Manifest + Struktur), check-dsh-versions.mjs braucht node_modules
+      # (die @deepseek-ai/*-Manifeste im Vendor + Lock), dsh-Pakete erst.
+      - name: Mobile-Profil-Contract (statisch, fail-closed)
+        run: node scripts/mobile-profile-contract-test.mjs
+      - name: Abhängigkeiten installieren (lockfile-treu)
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: DSH-Versionen (lockfile + Vendor + Manifest, fail-closed)
+        run: node scripts/check-dsh-versions.mjs
+      - name: Profil mobile auflösen (dsh-Boot, fail-closed)
+        run: node scripts/shinon-profile-test.mjs --profile mobile
+
+  build-runtime:
+    name: "Runtime-Tarball (proot + shinon-forge + node_modules)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: mobile-gate
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+
+      - name: "Forge-PIN festlegen"
+        id: pin
+        run: |
+          set -euo pipefail
+          PIN="$(git rev-parse HEAD)"
+          SHORT="$(echo "$PIN" | cut -c1-7)"
+          echo "forge_pin=$PIN" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT" >> "$GITHUB_OUTPUT"
+          echo "Runtime-Tag: runtime-$SHORT"
+
+      # ── 0) Mobile-Gate: Profil-Contract + DSH-Versionen (fail-closed) ──
+      # Vor dem Build: das mobile-Profil muss statisch ok sein.
+      # check-dsh-versions.mjs braucht node_modules → läuft im
+      # gepinnte-Step nach npm ci (wo dsh im PATH ist).
+      # Hier: nur der statische Contract-Test (Manifest + Struktur).
+      - name: "Fail-closed-Gate: mobile-Profil-Contract (statisch)"
+        run: |
+          set -euo pipefail
+          echo "Gate: Mobile-Profil-Contract (statisch: manifest + Struktur)"
+          node scripts/mobile-profile-contract-test.mjs
+          echo "Gate: PASS (statisch; DSH-Versionen + Profil-Boot laufen post-npm-ci)"
+
+      - name: "proot-Debian-Rootfs anlegen (glibc, ARM64)"
+        run: |
+          set -euo pipefail
+          ROOTFS_DIR="rootfs-arm64"
+          mkdir -p "$ROOTFS_DIR"/{bin,lib,usr/lib,etc,node}
+
+          NODE_VERSION="22.19.0"
+          curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-arm64.tar.xz" \
+            -o /tmp/node-arm64.tar.xz
+          tar -xJf /tmp/node-arm64.tar.xz -C "$ROOTFS_DIR/node" --strip-components=1
+          chmod +x "$ROOTFS_DIR/node/bin/node"
+          echo "Node-ARM64-Binary: $(ls -lh $ROOTFS_DIR/node/bin/node | cut -f5)"
+
+      - name: "gepinnte shinon-forge + node_modules (deterministisch)"
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          # dsh aus node_modules/.bin in den systemweiten PATH legen,
+          # damit shinon-profile-test.mjs (DSH-Boot) die CLI findet.
+          export PATH="$PWD/node_modules/.bin:$PATH"
+
+          # Fail-closed-Gate (post-npm-ci): DSH-Versionen + Profil-Boot
+          # — jetzt mit node_modules vorhanden. Scheitert hier = kein
+          # Runtime-Release (B-1/B-5, DEC-011).
+          echo "Gate: DSH-Versionen (lockfile + Vendor + Manifest, fail-closed)"
+          node scripts/check-dsh-versions.mjs
+
+          echo "DSH: $(dsh --version 2>&1)"
+          node scripts/shinon-profile-test.mjs --profile mobile
+          echo "mobile-Profil-Boot: OK"
+
+      - name: "Runtime-Verzeichnis anlegen (rootfs + forge + node_modules)"
+        run: |
+          set -euo pipefail
+          rm -rf runtime-arm64
+          mkdir -p runtime-arm64
+
+          cp -r rootfs-arm64/* runtime-arm64/
+          mkdir -p runtime-arm64/shinon-forge
+
+          tar --exclude='.git' --exclude='node_modules/.cache' --exclude='runtime-arm64' --exclude='rootfs-arm64' -cf - . | \
+            (cd runtime-arm64/shinon-forge && tar xf -)
+
+          echo "${{ steps.pin.outputs.forge_pin }}" > runtime-arm64/.shinon-forge-pin
+          echo "${{ steps.pin.outputs.short_sha }}" > runtime-arm64/.shinon-runtime-short
+          echo "Runtime-Verzeichnis: $(du -sh runtime-arm64 | cut -f1)"
+
+      - name: "Runtime-Tarball (zstd) + SHA256 (deterministisch)"
+        run: |
+          set -euo pipefail
+          command -v zstd >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq zstd; }
+
+          (cd runtime-arm64 && \
+            tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@0" \
+                -cf - . | zstd -19 > ../shinon-runtime-arm64.tar.zst)
+          rm -rf runtime-arm64 rootfs-arm64
+
+          SHA256="$(sha256sum shinon-runtime-arm64.tar.zst | cut -d' ' -f1)"
+          echo "$SHA256  shinon-runtime-arm64.tar.zst" > shinon-runtime-arm64.tar.zst.sha256
+          echo "RUNTIME_SHA256=$SHA256" >> "$GITHUB_ENV"
+          echo "SHA256: $SHA256"
+          ls -lh shinon-runtime-arm64.tar.zst
+
+      - name: Artefakte ablegen
+        uses: actions/upload-artifact@v4
+        with:
+          name: shinon-runtime-arm64-${{ steps.pin.outputs.short_sha }}
+          path: |
+            shinon-runtime-arm64.tar.zst
+            shinon-runtime-arm64.tar.zst.sha256
+          if-no-files-found: error
+
+      - name: "Release mit Runtime-Artefakt (auto: runtime-<sha7>)"
+        if: inputs.skip_release != 'true' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="runtime-${{ steps.pin.outputs.short_sha }}"
+          SHA="${RUNTIME_SHA256}"
+
+          NOTES_FILE="RELEASE_RUNTIME.md"
+          cat > "$NOTES_FILE" <<EOF
+          # Shinon Runtime $TAG (forge ${{ steps.pin.outputs.short_sha }})
+
+          SHA256 für Shinon_Agent/SetupActivity.kt:
+          const val RUNTIME_SHA256 = "$SHA"
+
+          URL:
+          https://github.com/vannon091118/shinon-forge/releases/download/$TAG/shinon-runtime-arm64.tar.zst
+          EOF
+
+          gh release create "$TAG" \
+            shinon-runtime-arm64.tar.zst \
+            shinon-runtime-arm64.tar.zst.sha256 \
+            --title "Shinon Runtime $TAG" \
+            --notes-file "$NOTES_FILE" \
+            --draft=false
+          echo "Release $TAG: $(gh release view "$TAG" --json url -q .url)"
+
+      - name: "SHA-Bump an Shinon_Agent (auto-Trigger der Agent-CI)"
+        if: inputs.skip_release != 'true' && github.event_name == 'push'
+        env:
+          AGENT_TOKEN: ${{ secrets.SHINON_AGENT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AGENT_TOKEN" ]; then
+            echo "::warning::SHINON_AGENT_TOKEN fehlt — kein Auto-Bump."
+            echo "Manueller Fallback: Shinon_Agent SetupActivity.kt eintragen:"
+            echo "  SHINON_FORGE_PIN=\"${{ steps.pin.outputs.forge_pin }}\""
+            echo "  RUNTIME_SHA256=\"${RUNTIME_SHA256}\""
+            echo "  RUNTIME_TARBALL_URL=.../runtime-${{ steps.pin.outputs.short_sha }}/shinon-runtime-arm64.tar.zst"
+            exit 0
+          fi
+
+          SHA="${RUNTIME_SHA256}"
+          TAG="runtime-${{ steps.pin.outputs.short_sha }}"
+          FORGE_PIN="${{ steps.pin.outputs.forge_pin }}"
+          SHORT="${{ steps.pin.outputs.short_sha }}"
+
+          SETUP_FILE="app/src/main/java/com/vannon/shinon/SetupActivity.kt"
+
+          SETUP_JSON="$(curl -fsSL -H "Authorization: token $AGENT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/vannon091118/Shinon_Agent/contents/$SETUP_FILE" \
+            -o /tmp/setup.json -w '%{http_code}')"
+          if [ "$SETUP_JSON" != "200" ]; then
+            echo "::warning::SetupActivity.kt nicht erreichbar (HTTP $SETUP_JSON) — Bump übersprungen"
+            exit 0
+          fi
+          CURRENT_SHA="$(node -p "JSON.parse(require('fs').readFileSync('/tmp/setup.json','utf8')).sha")"
+          CURRENT_CONTENT="$(node -p "JSON.parse(require('fs').readFileSync('/tmp/setup.json','utf8')).content")"
+
+          NEW_CONTENT="$(echo "$CURRENT_CONTENT" | base64 -d \
+            | sed -E "s/const val SHINON_FORGE_PIN = \"[0-9a-f]+\"/const val SHINON_FORGE_PIN = \"$FORGE_PIN\"/" \
+            | sed -E "s#shinon-forge/releases/download/runtime-[0-9a-f]+/shinon-runtime-arm64.tar.zst#shinon-forge/releases/download/$TAG/shinon-runtime-arm64.tar.zst#g" \
+            | sed -E "s/const val RUNTIME_SHA256 = \"([0-9a-f]+|AUSGEWICHSEN[^\"]*)\"/const val RUNTIME_SHA256 = \"$SHA\"/" \
+            | base64 -w0)"
+
+          curl -fsSL -X PUT \
+            -H "Authorization: token $AGENT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/vannon091118/Shinon_Agent/contents/$SETUP_FILE" \
+            -d "$(node -p "JSON.stringify({message:'bump: Runtime-Pin → $SHORT (auto, shinon-forge $FORGE_PIN)', content:'$NEW_CONTENT', sha:'$CURRENT_SHA'})")" \
+            > /tmp/bump-response.json
+
+          BUMP_OK="$(node -p "JSON.parse(require('fs').readFileSync('/tmp/bump-response.json','utf8')).content?.sha || 'FAILED'")"
+          if [ "$BUMP_OK" != "FAILED" ]; then
+            echo "Bump erfolgreich: SetupActivity.kt → $SHORT"
+          else
+            echo "::warning::Bump-Push fehlgeschlagen — manuell eintragen"
+            cat /tmp/bump-response.json
+          fi

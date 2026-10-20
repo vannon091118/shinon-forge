@@ -7,7 +7,22 @@
  * Dateisystem), `scoring-signals.test.mjs` faehrt beide Haelften an einem Bus
  * (dessen Host hat aber kein `ctx.get`, also keine Ablage). Hier haengen DREI
  * echte Bundles an einem Host — Events-Spine, Project-Index, Scoring — und
- * → Kanon: docs/COMMENT-KANON.md#k-36e6754562b7
+ * gemessen wird, was sonst nur behauptet waere:
+ *
+ *   Signal werten -> der Wert steht in der SQLite des Index -> Host neu
+ *   aufsetzen -> der Stand ist wieder da. Der Widerruf wirkt auch nach dem
+ *   Neustart, spaete Kritik trifft dieselbe frueher bewertete Antwort (derselbe
+ *   Betreff, ersetzt statt gestapelt), eine beendete Sitzung wird sauber
+ *   abgeschlossen, ein KAPUTTER Index ergibt einen leeren, aber laufenden Start
+ *   — und die Abfrage-Faehigkeit des Index bleibt unberuehrt.
+ *
+ * Die zwei Nahten sind als Daten gepinnt (Dienstname, Vertragsname, Namensraum):
+ * kein Paket liest das andere, also muss ein Test von aussen nachsehen.
+ *
+ * Laeuft mit `node --test` — die Pakete werden in ein temporaeres Verzeichnis
+ * kopiert und mit dem ECHTEN Schemastery der DSH-Installation geladen (die
+ * einzige peer-Dependency, die hier nicht im Paket liegt). Damit braucht dieser
+ * Test `dsh` im PATH, wie `context-wiring.test.mjs` daneben.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +32,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const PACKAGES = ['events', 'scoring', 'project-index'];
 const ROOT = new URL('../../../', import.meta.url);
@@ -32,6 +48,7 @@ async function loadBundles() {
   const require = createRequire(join(root, 'package.json'));
   const work = mkdtempSync(join(tmpdir(), 'shinon-memory-test-'));
   for (const name of PACKAGES) cpSync(new URL(`packages/${name}/`, ROOT), join(work, name), { recursive: true });
+  provideSeamCore(work);
   const shim = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(
@@ -198,7 +215,7 @@ test('memory: die Ablage ist eine zweite, schmale Faehigkeit — die Abfrage ble
   // die Ablage kommen vom Index, der Ton (Zug 5) und die Gewichte (Phase 3)
   // vom Scoring. Die vierte ist angefragtes Verhalten (Gewichte für die
   // Baustein-Auswahl), keine Beigabe — siehe context-wiring (vierte Naht).
-  assert.deepEqual([...api.host.services.keys()].sort(), ['shinon_block_weights', 'shinon_index_query', 'shinon_index_store', 'shinon_scoring_state']);
+  assert.deepEqual([...api.host.services.keys()].sort(), ['shinon_block_weights', 'shinon_facts_snapshot', 'shinon_index_query', 'shinon_index_store', 'shinon_scoring_state']);
   const query = api.host.services.get(index.QUERY_SERVICE);
   assert.deepEqual(Object.keys(query).sort(), ['contract', 'resolveContext'], 'die Abfrage bleibt eine Operation');
   assert.equal(query.contract, index.QUERY_CONTRACT);

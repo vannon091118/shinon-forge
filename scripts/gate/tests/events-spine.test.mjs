@@ -7,7 +7,10 @@
  *   2. Replay des ECHTEN Bundles: das Paket wird in ein temporäres Verzeichnis
  *      kopiert, mit einem Schemastery-Stub versehen (die einzige peer-Dependency,
  *      die hier nicht installiert ist) und über seine echte apply()-Schnittstelle
- * → Kanon: docs/COMMENT-KANON.md#k-42c3fadcad85
+ *      gefahren. Die Fixture ist das Orakel: derselbe Event-Pfad muss dieselben
+ *      Envelopes ergeben.
+ *
+ * Läuft mit `node --test` — kein node_modules, kein DSH, kein Netz.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +18,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 import {
   ENVELOPE_FIELDS,
   EVENT_TYPES,
@@ -36,6 +40,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-events-test-'));
   cpSync(PACKAGE_DIR, join(work, 'pkg'), { recursive: true });
+  provideSeamCore(work);
   const stub = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(stub, { recursive: true });
   writeFileSync(join(stub, 'package.json'), JSON.stringify({ name: '@deepseek-ai/schemastery', version: '0.0.0-test-stub', type: 'module', exports: { '.': './index.js' } }));

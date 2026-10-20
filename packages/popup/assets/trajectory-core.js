@@ -6,7 +6,41 @@
  * `@shinon/narrative` (narrative-core.js) und `@shinon/prompter` (note-core.js).
  *
  * WARUM DIE FALTUNG IN EINER MARKIERTEN REGION STEHT: die Client-Hälfte kann
- * → Kanon: docs/COMMENT-KANON.md#k-3573fb010fc1
+ * diese Datei NICHT importieren (ein Client-Bundle ist eigenständig; es zieht
+ * React per `require`, nicht per `import`). Sie trägt denselben Text deshalb als
+ * bytegleiche Kopie — dieselbe Bauform wie die Turn-Faltung der Token-Anzeige
+ * (`zwilling:token-turn`). Die Region markiert genau den geteilten Text; die
+ * `export`-Zeile darunter gehört nur dieser Datei, denn `export` wäre im
+ * Funktionsrumpf eines Client-Bundles ein Syntaxfehler.
+ *
+ * WARUM ES DIESEN KERN GIBT — der gemessene Befund: `@shinon/popup` hieß
+ * „Trajectory-Overlay" und hatte KEINEN Renderer. Der Host emittierte Einträge
+ * auf `shinon/trajectory`, und die Client-Hälfte sagte in ihrem eigenen Kopf,
+ * dass sie sie nicht rendert. Ein Overlay, das nichts anzeigt, ist von einem
+ * kaputten nicht zu unterscheiden.
+ *
+ * DER DATENWEG, und warum er nicht über den Host läuft: ein Out-of-Tree-Bundle
+ * kann keinen Host-Endpunkt registrieren (die Remote-Beiträge der Browser-Hälfte
+ * kommen aus einer kompilierten Liste in `@deepseek-ai/dsh-api-remotes`), und die
+ * Connection-Naht ist reines Anfrage/Antwort (`rpc.call`) ohne Abo. Was der
+ * Client DAGEGEN lesen kann, ist die Sitzung selbst — genau der Weg, den
+ * `@shinon/token-usage` schon geht:
+ *
+ *   ctx.get('uiSession')?.adapter?.current?.getSnapshot()   → welche Sitzung
+ *   ctx.get('sessions')?.binding(id)                        → deren Bindung
+ *   …binding.eventSource.getSnapshot().entries              → das Ereignisfenster
+ *   …binding.eventSource.subscribe(fn)                       → jede Änderung
+ *
+ * DIE FELDPFADE SIND GEMESSEN, nicht geraten — sie stehen im Vertrag der
+ * installierten DSH-Fassung (`@deepseek-ai/dsh-session/lib/types/types.d.ts`):
+ *
+ *   'tool/call'    { turn, step, callId, name, arguments }
+ *   'tool/result'  { turn, step, message, … }   → callId unter message.source.callId
+ *   'turn/start'   { turn }        'turn/end'   { turn }
+ *   'step/start'   { turn, step }
+ *
+ * Die Ereignisse liegen im Fenster als `{ type: 'event', event }` — dieselbe
+ * Form, die `@shinon/token-usage` faltet (`entry.type === 'event'`).
  */
 
 /** Vertragsname der Anzeige (Daten, nicht Code). */
@@ -31,6 +65,59 @@ function eventsOf(entries) {
 }
 
 /**
+ * Die ABBRUCHQUOTE aus den Prompter-Entscheidungen falten.
+ *
+ * Dieselben Einträge, die das Prompter-Panel liest (Fensterspiegel), werden hier
+ * gezählt: `abort` trägt den klassifizierten Grund, `abort_counts` den Zähler
+ * je Grund. KEIN Grund wird hier beim Namen genannt — ein neuer Grund ist ein
+ * Dateneintrag in `packages/prompter/assets/abort-reasons.json`, und diese
+ * Faltung liest nur `abort.id`/`abort.label`. Genau deshalb braucht ein neuer
+ * Grund keine Client-Änderung.
+ *
+ * `top` ist der häufigste Grund; bei Gleichstand gewinnt der zuerst gesehene —
+ * deterministisch, weil die Einträge in Puffer-Reihenfolge (neuester zuerst)
+ * ankommen und die Schleife stabil ist.
+ */
+function foldAborts(entries) {
+  const counts = {};
+  const ranks = {};
+  const labels = {};
+  let turns = 0;
+  let aborts = 0;
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    if (!isRecord(entry) || typeof entry.outcome !== 'string') continue;
+    turns += 1;
+    const abort = isRecord(entry.abort) && typeof entry.abort.id === 'string' ? entry.abort : null;
+    if (abort === null) continue;
+    aborts += 1;
+    counts[abort.id] = (counts[abort.id] ?? 0) + 1;
+    // `rank` reist im Datensatz (Position in `abort-reasons.json`); ohne ihn
+    // gäbe es hier eine zweite Rangfolge unter demselben Namen.
+    if (Number.isInteger(abort.rank)) ranks[abort.id] = abort.rank;
+    if (typeof abort.label === 'string' && abort.label !== '') labels[abort.id] = abort.label;
+  }
+  // Häufigster Grund; bei Gleichstand der kleinere `rank`, danach die ID. Die
+  // Eingabereihenfolge entscheidet nie.
+  let top = null;
+  for (const id of Object.keys(counts)) {
+    if (top === null) { top = id; continue; }
+    if (counts[id] !== counts[top]) { if (counts[id] > counts[top]) top = id; continue; }
+    const rankA = Number.isInteger(ranks[id]) ? ranks[id] : Number.MAX_SAFE_INTEGER;
+    const rankB = Number.isInteger(ranks[top]) ? ranks[top] : Number.MAX_SAFE_INTEGER;
+    if (rankA !== rankB) { if (rankA < rankB) top = id; continue; }
+    if (id < top) top = id;
+  }
+  return {
+    turns,
+    aborts,
+    quote: turns === 0 ? 0 : aborts / turns,
+    top,
+    topLabel: top === null ? null : (labels[top] ?? top),
+    counts,
+  };
+}
+
+/**
  * Den Fortschritt aus dem Ereignisfenster falten — deterministisch, ohne Uhr.
  *
  * Die Lesart ist eine Momentaufnahme des FENSTERS: das Fenster ist
@@ -38,9 +125,17 @@ function eventsOf(entries) {
  * letzten Abschnitt der Sitzung. Ein neues `turn/start` setzt sie zurück, ein
  * `turn/end` schließt sie ab — die Anzeige ist damit „läuft" oder „bereit", und
  * beides ist aus den Ereignissen ablesbar statt behauptet.
- * → Kanon: docs/COMMENT-KANON.md#k-84b84a002cbc
+ *
+ * Ohne `callId` ist ein Aufruf nicht zuordenbar. Er zählt trotzdem als OFFEN —
+ * fail-closed: es gibt keine Evidenz, dass er fertig ist, und „geschlossen" wäre
+ * eine Behauptung. Sein synthetischer Schlüssel kann von keinem `tool/result`
+ * getroffen werden (die tragen echte callIds), also bleibt er es auch.
+ *
+ * @param entries - Einträge des Sitzungsfensters (`binding.eventSource…entries`).
+ * @param limit - wie viele Werkzeugnamen behalten werden.
+ * @param aborts - Prompter-Entscheidungen (Fensterspiegel); leer = keine Quote.
  */
-function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT) {
+function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT, aborts = []) {
   const open = new Map();
   const tools = [];
   let turn = null;
@@ -97,6 +192,7 @@ function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT) {
     running: named.length > 0 ? named[named.length - 1] : null,
     tools: [...tools],
     active: turn !== null,
+    aborts: foldAborts(aborts),
   };
 }
 
@@ -124,4 +220,4 @@ function progressReading(reading) {
 }
 // #endregion zwilling:popup-trajectory
 
-export { ENTRY_KIND, TOOL_HISTORY_LIMIT, eventsOf, foldTrajectory, progressReading };
+export { ENTRY_KIND, TOOL_HISTORY_LIMIT, eventsOf, foldAborts, foldTrajectory, progressReading };

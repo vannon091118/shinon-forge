@@ -7,9 +7,33 @@
  * Gate-Tests, Distributionstest, Build) hatte drei Stellen, an denen ein NEUES
  * Plugin Pflege in einer ZENTRALEN Handliste verlangte — `host-half`/`client-half`
  * (Idiom-Regionen), `dead-package` (`KNOWN_INACTIVE`), `doctor`
- * → Kanon: docs/COMMENT-KANON.md#k-0f65fa71eb2c
+ * (`EXPECTED_VERSIONS`), dazu der lineare Distributionstest. Gemessen am
+ * 2026-10-11 mit 20 zusätzlichen Paketen (39 statt 19): 60 Befunde in
+ * `host-half`/`client-half`, 5 in `dead-package`, plus ein Gate-Test. Jede dieser
+ * Stellen ist seither beseitigt; dieses Skript ist der Lauf, der das belegt — und
+ * der es beim nächsten Umbau wieder belegt.
+ *
+ * Wie gemessen wird: eine KOPIE des Baums in ein temporäres Verzeichnis, darin N
+ * zusätzliche Plugin-Pakete — genau so, wie es ein Plugin-Autor täte. Ein Klon
+ * bekommt einen eigenen Namen (Ordnername, Manifest, Patch, ModuleLoader-id), eigene
+ * Idiom-Werte in seiner Startmarke und erklärt sich im eigenen Manifest als bewusst
+ * zurückgestellt (`"dsh": { "inactive": true }`). Danach laufen die Stufen der
+ * Kette über diese Kopie; der echte Baum wird dabei nie angefasst.
+ *
+ * Was der Lauf misst: dass ein neues Paket KEINEN Eingriff außerhalb seines eigenen
+ * Ordners braucht, um die Ketten grün zu halten (`npm run idioms` schreibt den
+ * generierten Block aus der Erklärung im Paket). Was er NICHT misst: ein neues
+ * Paket, das ins PROFIL soll — das ist bewusst Handarbeit (Patch + Profil-Manifest,
+ * siehe `AGENTS.md`, Abschnitt Conventions) und braucht ein Install.
+ *
+ * Aufruf:
+ *   node scripts/scale-check.mjs [--plugins N] [--keep] [--json <pfad>]
+ *
+ * `--keep` behält das temporäre Verzeichnis (Debugging); `--json` schreibt die
+ * Messung als JSON weg. Teil von `npm test` ist dieser Lauf NICHT: er kopiert den
+ * Baum, installiert Tarballs und dauert rund anderthalb Minuten.
  */
-import { execFileSync, spawnSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { delimiter, join } from 'path';

@@ -1,7 +1,7 @@
 # Shinon Forge
 
-> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-17
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-20 (aktualisiert: neue Skripte ergänzt, Inhalt sonst unverändert)
+> **Einstieg:** diese Datei · **Geschichte:** `docs/TAGEBUCH.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 An independent fork of the DeepSeek Harness (DSH). It ships the `@shinon/*` Cordis
 plugin bundles under `packages/`, enabled by the canonical profile `profiles/shinon`
@@ -28,10 +28,34 @@ remote, so there is deliberately no sync script.
    --stdin`). Der lokale Hook tauscht nur Footer; die Wort-Regel repariert
    niemand.
 
+## Kanon — ein Name, eine Schreibweise, eine Definition
+
+Die Tabelle ist kurz, weil `canonIssues()` sie bei jedem statischen Gate und jedem Build
+prüft (`docs/contracts/canon.json` ist die Registry). Eine zweite Schreibweise, ein
+Browser-Global ohne Registry-Zeile und ein Vertrags-Literal außerhalb der drei Formen
+sind rot.
+
+| Begriff | Schreibweise | wo definiert |
+|---|---|---|
+| Plugin-Registry (Browser) | `__shinonPlugins` (Map) | Literal je Client-Hälfte; `packages/core/client.js` |
+| Panel-Tabelle (Browser) | `__shinonPluginCatalog` (Objekt) | `packages/key-router/client.js` |
+| Prompter-Trace | `__shinonPrompterTrace` | `packages/prompter/index.js` (`TRACE_GLOBAL`) |
+| Persona-Zustand | `__shinonPersonaState`, `__shinonPersonaReview` | `packages/persona/index.js` |
+| Task-Router-Zustand | `__shinonTaskRouter` | `packages/task-router/client.js` |
+| Vertrag mit Sache | `shinon.<bereich>/<sache>-v<N>` | z. B. `packages/codingmon/index.js` (`store-v1`) |
+| Vertrag, Sache = Bereich | `shinon.<bereich>/v<N>` | `packages/seams/assets/seams.js` (`workspace/v1`) |
+| Zustandsmarker | `shinon.<bereich>/unloaded` | `packages/persona/index.js` |
+| Dienst | `shinon_<bereich>_<sache>` | `packages/codingmon/index.js` (`shinon_codingmon_store`) |
+| Produktname des Routers | `Shinon Task Manager` | `packages/task-router/index.js` |
+| Eine Runde mit ihrem Goal | `Task-Gruppe` | `packages/task-router/index.js` |
+| Identitätsschicht | `Persona` | `packages/persona/index.js` |
+| Pet im UI | `Begleiter` (Code: `pet`/`codingmon`) | `packages/prompter/assets/capabilities.json` |
+
 ## Dev environment
-- Node and npm must be on PATH — **npm ist die einzige Paketquelle** (PLAN.md Schritt
-  3.5/A1: `packageManager`, `pnpm-workspace.yaml` und die pnpm-Aufrufe sind raus). Die
-  deklarierten Werte und ihre Prüfbefehle: `docs/ZAHLEN.md` §1.
+- Node and npm must be on PATH — **npm ist die einzige Paketquelle**
+  (`packageManager`, `pnpm-workspace.yaml` und die pnpm-Aufrufe sind raus;
+  Beleg: `docs/TAGEBUCH.md`, Kapitel 2026-10-11). Die deklarierten Werte und ihre Prüfbefehle:
+  `docs/ZAHLEN.md` §1.
 - pnpm wird vom Repo **nicht** mehr aufgerufen. Zwei Ausnahmen, die bleiben und die man
   kennen muss, weil sie fremder Code sind: `dsh plugin add` (der Upstream-Plugin-Manager)
   spricht weiter pnpm und legt bei Bedarf selbst ein `pnpm-workspace.yaml` im Profil an
@@ -58,10 +82,13 @@ remote, so there is deliberately no sync script.
   Ein fremder Link im Home wird gemeldet und nie überschrieben, wie bei `profile:links`.
 - Der Arbeits-Schlüssel für echte Modell-Turns liegt in `.env` im Repo-Root (gitignoriert,
   `chmod 600`) — **nie committen, nie ausgeben, nie in eine Antwort kopieren.** `dsh` lädt
-  die Datei beim Start selbst; das geseedete Home verlinkt sie, es ist dieselbe Datei. Die
-  **konfigurierte** Route ist `agnes/agnes-2.5-flash` (`apiKeyEnv: AGNES_API_KEY` im Profil)
-  — gemessen mit `node_modules/.bin/dsh --profile shinon --dump-config`; welche Route ein
-  konkreter Lauf hatte, steht im Messheader des Laufs, nicht hier. Wer einen e2e-Lauf braucht, nimmt sie; **„kein Schlüssel" ist kein Grund mehr,
+  die Datei beim Start selbst; das geseedete Home verlinkt sie, es ist dieselbe Datei.
+  **Welche Route der Default hat, wählt der Nutzer** — `agent-default-model` ist ein
+  live-Feld, die Modellwahl in der UI schreibt sie über den `config-editor` in die
+  Profil-Ebene; harte Prüfung ist die FORM (`scripts/lib/model-route.mjs`: Provider im
+  selben Patch definiert, Modell in seinem Katalog, `apiKeyEnv` nicht leer), nie ein
+  Modellname. Die zuletzt gemessene Konfiguration und welche Route ein konkreter Lauf
+  hatte, stehen in `docs/ZAHLEN.md` §2 bzw. im Messheader des Laufs, nicht hier. Wer einen e2e-Lauf braucht, nimmt sie; **„kein Schlüssel" ist kein Grund mehr,
   eine Messung zu verschieben** — der erste Durchlauf (echter Boot, echtes Urteil, Widerruf,
   Host-Ende, Neustart) steht in `docs/ZAHLEN.md` §2, die Belege in
   `docs/probes/store-cost.json`.
@@ -90,7 +117,9 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   `test:*`-Skripte gehen durch den Wrapper. Dieselben Tests laufen in
   `.github/workflows/commit-guard.yml` auf jedem Push/PR.
 - `node scripts/shinon-test.mjs` → static gate: manifest, name contract, `index.js`,
-  `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution (exit 0/1).
+  `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution, source twins,
+  host-seam core, dev diary, canon and structure (exit 0/1; the counted steps live in
+  `docs/ZAHLEN.md` §2).
 - `node scripts/pack-test.mjs` → per-package distribution test: `npm pack` → unpack →
   isolated `npm install` → load. Optional `--keep` retains `/tmp` work dirs for debugging.
 - `npm run install:user` → user install tool (`scripts/install-user.mjs`):
@@ -116,14 +145,36 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `node --test scripts/gate/tests/codingmon-store.test.mjs` → the durable pet store
   against the real DSH storage family in a real Cordis context (needs `dsh` on PATH and
   the bundled packages resolvable; skips visibly otherwise). Runs inside `gate:test`.
+- `npm run check:dsh-versions` → `node scripts/check-dsh-versions.mjs`: der EINE
+  Versionsprüfer. Er liest `scripts/dsh-target-versions.json` (die einzige Sollquelle)
+  und prüft Root- und Workspace-Manifeste, alle Lock-Einträge (auch verschachtelte),
+  `vendor/dsh/MANIFEST.json`, Installat, `dsh --version` und ob ein Skript die Fassung
+  als zweites Literal führt. Exit 0 nur, wenn alles dieselbe Fassung nennt; jeder Befund
+  nennt Soll, Ist und Fundstelle. Dieselbe Implementierung nutzen CI und `dsh-update`.
+- `node scripts/vendor-dsh.mjs` → erneuert `vendor/dsh/` aus der Sollquelle (Registry-
+  Tarball, Integrität gegen das Lock, `MANIFEST.json` mit sha256 je Datei). Nicht von Hand
+  kopieren: der Prüfer oben vergleicht danach Fassung und Integrität.
 - `npm run build` → `node scripts/build.mjs`: re-validates everything, then wipes and
   regenerates `dist/` (`manifest.json`, `profile.json`, `dist/packages/*`).
+
+- `npm run deb` / `npm run win` → the packaging path: ONE payload, TWO shells.
+  `scripts/lib/payload.mjs` builds the payload (code, production dependencies
+  from the lockfile, the BUNDLED Node runtime, relative bundle links, the
+  starters); `scripts/lib/huelle.mjs` owns the shell texts (Debian
+  `control`/`postinst`/menu entry/PATH starter, Windows `install.ps1`/
+  `uninstall.ps1`). Rules that are not negotiable: the package carries its
+  runtime (no `Depends: nodejs` — that is what broke Mint), the `postinst`
+  installs NOTHING (no `npm ci`, no network), and the Windows archive is built
+  on a WINDOWS host (on Linux it would carry Linux binaries and look fine
+  until it fails on someone else's machine — the script refuses).
+  The BUILD runs in the CI (`.github/workflows/package-build.yml`), not on the
+  developer machine; the gate test is `scripts/gate/tests/packaging.test.mjs`.
 - `npm run scale:check` → `node scripts/scale-check.mjs`: the scaling proof — copies the
   tree to `/tmp`, adds N clone plugins (`--plugins N`, default 20, `--keep`, `--json`)
   and runs idioms → static gate → `gate --full` → gate tests → distribution test → build
   over the copy. The repo tree is never touched; needs Node ≥ 22. Not part of `npm test`
   (it copies the tree and takes about a minute and a half); numbers in `docs/ZAHLEN.md`
-  §2, method in `docs/archive/SKALIERUNG_2026-10-11.md`.
+  §2, the method stands in its own header comment.
 - `npm run branding` → the effect measurement for the branding layer in a real Chromium
   (`scripts/branding-check.mjs`, needs a built `dist/` and a browser binary; `--browser
   <path>` or `SHINON_CHROME`). It is NOT one of the gate plugins — the gate engine runs it
@@ -144,12 +195,10 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `npm run update` → `node scripts/dsh-update.mjs` (upstream DSH refresh; see Pitfalls).
 
 ## Conventions
-- Comments are capped at **10 LOC per block** (`scripts/comment-limit.mjs`, Gate-Plugin
-  `comment-canon`, runs locally in the pre-commit hook). Anything longer moves to
-  `docs/COMMENT-KANON.md` and the block keeps a pointer
-  `→ Kanon: docs/COMMENT-KANON.md#k-<hash>`; the anchor is a content hash so word-identical
-  twin regions receive the same pointer and stay byte-equal. Never edit `#region` /
-  `#endregion` or `shinon:dsh-idiom` marker lines — they are fences, not prose.
+- Comments live with the code they explain — there is **no length cap** and no
+  external comment archive. A long "why" block stays where the reader needs it.
+  Never edit `#region` / `#endregion` or `shinon:dsh-idiom` marker lines — they
+  are fences, not prose.
 - A package is identified by its folder: `packages/<dir>/`. All names derive from it and
   must agree in four places — this is the enforced "name contract":
   - `packages/<dir>/package.json` `name` → `@shinon/<dir>`
@@ -157,16 +206,16 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   - `packages/<dir>/cordis.patch.yml` `name` → `@shinon/<dir>`
   - `packages/<dir>/client.js` `__ModuleLoader__.load({ id })` → `@shinon/<dir>`
   - `profiles/<name>/cordis.patch.yml` `id`/`name` → same as the package patch.
-- The shape of a package — which files and folders it may contain — is owned by
-  `docs/ARCHITECTURE.md` §2. **One** statement, matching the measured tree: the four role
+- The shape of a package — which files and folders it may contain — is owned by THIS
+  section. **One** statement, matching the measured tree: the four role
   files are mandatory (`index.js` host half with Schemastery `Config` + `apply(ctx,
   config)`, `client.js` UI half with `__ModuleLoader__.load` + slots/styles/locale,
   `cordis.patch.yml` with a single `insert` entry, `package.json` manifest); allowed extras
   are `assets/` (runtime helpers, shipped into `dist/`), `test/` (package-local tests, not
   shipped), `fixtures/` (frozen test inputs), a package `README.md` and a resource that
   manifest or patch really reference (`packages/openapi/openapi.yaml`). No runtime logic in
-  `package.json`; no config schema in `client.js`. Do not restate this rule here and do not
-  invent a sixth exception. Pure mechanics belong in an `assets/` core WITHOUT bare imports
+  `package.json`; no config schema in `client.js`. Do not invent a sixth exception.
+  Pure mechanics belong in an `assets/` core WITHOUT bare imports
   (project-index: the worker; codingmon: `packages/codingmon/assets/mechanik.js`): only then
   can their unit tests run in CI, which has no `node_modules`. `index.js` re-exports that
   core, so the public names stay the same.
@@ -201,13 +250,39 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   carry the preparation version — the version rule is derived from that same field, so
   nothing outside its own folder has to be edited (one exception, named because it is
   real: a menu label needs one line in `packages/locale-de/client.js`, the owner of the
-  texts). Recipe and the measured cost per new plugin: `docs/ARCHITECTURE.md` §2.1.
+  texts). Recipe: this section; the measured cost per new plugin: `npm run scale:check`.
 - The declared Schemastery version (`docs/ZAHLEN.md` §1) has no `z.enum` — model enums as
   `z.union([z.const('a'), z.const('b')])`.
-- If a contract changes, edit it in `scripts/lib/repo.mjs` (the shared source) — never in
-  `scripts/shinon-test.mjs` or `build.mjs` directly.
+- If a contract changes, edit it in its OWNER under `scripts/lib/` — `repo.mjs` (shape,
+  naming, profile), `canon.mjs` (names), `diary.mjs` (history), `structure.mjs` (classes,
+  limits), `model-route.mjs` (route form) — never in `scripts/shinon-test.mjs` or
+  `build.mjs` directly. Each owner carries its registry in `docs/contracts/`.
+- **Structure: one class per file, one owner per concern.** Every code file under
+  `packages/`, `scripts/` and `bin/` belongs to exactly one class in
+  `docs/contracts/structure.json` (host entry, client half, core, test, gate plugin,
+  script). A class limit is derived from a measurement (3 × median, rounded), never
+  guessed; a file above its limit is named in `bestand` and may only shrink, and a
+  client half carries no `Config`, a host entry carries `apply`, a gate plugin carries
+  `check`. Growing past the limit without an entry, or writing a file no class owns, is
+  a gate finding (`structureIssues`, `npm run build` runs it too). Split by OWNERSHIP
+  when a file carries two: a name table belongs with the seam it names, not with the
+  renderer that repeats it. Counts: `docs/ZAHLEN.md` §1.2.
+  The worked example is `packages/prompter` (2026-10-20): `index.js` keeps the public
+  names, `Config`/`inject`/`apply` and the registrations; the run is
+  `assets/pre-step.js`, the state `assets/runtime-state.js`, the trace output
+  `assets/trace-report.js`. Two rules follow from it: an entry file never reads a
+  file or builds the state object (only the state owner does), and the imported
+  surface stays name-for-name identical — `scripts/gate/tests/prompter-split.test.mjs`
+  pins all 99 names, forbids the modules importing `index.js`, and fails on a single
+  lost export. Precondition for the next one: a single `runtime`-like owner already
+  exists; a host entry that holds its state in a dozen closure `let`s must get that
+  owner first (`packages/persona/index.js` is the open case, 18 bindings).
 - Client-internal slot ids follow `<name>-<purpose>` (e.g. `shinon-core-brand`,
-  `shinon-info-banner`). Packages don't reference each other; shared logic goes in
+  `shinon-info-banner`). Packages don't reference each other — with ONE exception:
+  `@shinon/seams` (`packages/seams/assets/seams.js`) is the import-free host seam
+  core and may be imported (`@shinon/seams/core`) by any host half. It exists
+  because six host↔host rules were duplicates until 2026-10-20; a copy that comes
+  back is a gate finding (`hostMirrorIssues`). Shared TOOLING still goes in
   `scripts/lib/`.
 - A Client -> Host seam keeps its names in ONE place: `packages/codingmon/assets/uebergabe.js`
   (package, service key, wire namespace, method, endpoint, field list). `index.js` re-exports
@@ -215,17 +290,18 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   self-contained (it pulls React through `require`, not `import`). So the bundle carries the
   names as LITERALS and `packages/codingmon/test/uebergabe.test.mjs` compares both sides
   character by character. Never let a literal drift; extend that assertion instead.
-- Workspace identity has ONE source (`packages/prompter/assets/workspace.js`, contract
+- Workspace identity has ONE definition (`packages/seams/assets/seams.js`, contract
   `shinon.workspace/v1`): explicit `workspaceRoot` > `SHINON_WORKSPACE_ROOT` > `cwd`.
-  Der Project Index führt dieselbe Datei als **bytegleichen Spiegel**
-  (`packages/project-index/assets/workspace.js`, Region `zwilling:workspace-identitaet`,
-  geprüft von `SOURCE_TWINS` in Gate und Build): nie eine Seite allein ändern.
-  `process.cwd()` never silently decides the project. Persisted runtime indexes carry
+  `packages/prompter/assets/workspace.js` und `packages/project-index/assets/workspace.js`
+  re-export that core; the byte-equal mirror and its `zwilling:workspace-identitaet`
+  region are gone (2026-10-20) — wer die Regel hier ändert, ändert sie für beide.
+  `process.cwd()` never silently decides the project. Persisted indexes carry
   `root`/`rootId`; a foreign root is rejected (`FOREIGN_ROOT`) and rebuilt, stale
-  entries are reconciled, `..`/absolute/separator escapes and symlink breakouts are
-  refused, and `.agents/` is never indexed as ordinary source (skills run separately).
-  Every decision record carries workspace, source, paths and budget — never prompt
-  text or key values. Tests: `packages/prompter/test/workspace.test.mjs`.
+  entries are reconciled, `..`/absolute/separator escapes are refused, symlinks are
+  never followed out of the root, and `.agents/` is never indexed as ordinary source
+  (skills run separately). Every decision record carries workspace, source, paths and
+  budget — never prompt text or key values. Tests: `packages/prompter/test/workspace.test.mjs`
+  (the identity) and `scripts/gate/tests/project-index.test.mjs` (the one index).
 - Prompt building blocks are DATA (`packages/prompter/assets/blocks.json`, contract
   `shinon.blocks/v1`): each block carries its trigger (haystack markers, intent class,
   scoring stance, self-question markers), a token budget and a placement
@@ -253,12 +329,25 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   classified but **never** expanded — otherwise the agent answers its own invented
   task instead of the question. `matchIntent` matches whole phrases (Unicode word
   boundaries) and returns an empty `expansion` for every question.
-  The runtime index (`packages/prompter/assets/index-manager.js`) has TWO hard
-  budgets, both DATA (`MAX_FILE_CHARS = 262144` — the twin of the project
-  index byte limit — and `MAX_INDEX_CHARS = 8388608`): anything over them is
-  NOT indexed, and every exclusion stands in the result with a reason
-  (`ZU_GROSS` or `BUDGET_ERSCHOEPFT`) that the mount log names file by file —
-  a silent cut would be an index lying about its coverage.
+  The prompter carries **no index of its own** (2026-10-18): MAX asks the Project
+  Index (`shinon_index_query`), the single index of the tree. Its one hard budget
+  is the byte limit (`maxFileBytes = 262144`): anything over it is NOT indexed and
+  stands in the report with the reason `ZU_GROSS` — a silent cut would be an index
+  lying about its coverage. Before/after numbers: `docs/probes/index-konsolidierung.json`.
+
+## Neue / ergänzte Befehle (seit 2026-10-17)
+- `npm run notes:check` (`scripts/notes-check.mjs`) — Notizen-Integrität prüfen.
+- `npm run dev:web` / `npm run dev:mobile` — Profil-Starts mit festen Ports/URLs.
+- `npm run test:mobile-profile` / `npm run dev:web` — Mobile-Profil-Kontrakt (`profiles/mobile`).
+- `npm run test:codingmon` (bereits genannt), zusätzlich: `test:scoring`, `test:token`, `test:prompter`, `test:narrative`, `test:popup`, `test:key-router`, `test:traceability`, `test:hook`, `test:facts` (Faktenkern, Pipeline, Snapshot, Reconciliation, Dienst), `test:claims` (Claim-Lebenszyklus der Persona) — Paket-eigene Slicen; alle über `scripts/run-with-node.mjs`.
+- `npm run s6:check` / `s6:boot` / `s6:stop` — Turn-Zyklus (S6) Steuerung (`scripts/s6-turn.mjs`).
+- `npm run perf:baseline` (`scripts/perf-baseline.mjs`), `index:warm` / `index:cold-cost` / `index:match-eq` — Index-Leistungsnachweise.
+- `npm run desktop:launcher` / `desktop:launcher:uninstall` — Desktop-Installer (`scripts/desktop-launcher.mjs`).
+- `npm run uninstall:user` — Nutzer-Deinstall (`scripts/install-user.mjs uninstall`).
+- `npm run verify:panel` (`scripts/panel-check.mjs`) — Panel-Prüfung (braucht laufenden Host + Token).
+- `npm run typecheck` — Gate-Engine `--only typescript` (derzeit `NOT_APPLICABLE`, keine First-Party-TS-Datei).
+- `npm run stages` (`scripts/stages.mjs`) — Stufe-Übersicht.
+Alle Skripte laufen über `scripts/run-with-node.mjs` (verifizierter Node ≥ 22, `node_modules/.bin` vor PATH); ein nacktes `node --test …` bleibt der ungeschützte Weg. Keine erfundenen Aufrufe — alle stammen aus `package.json`.
 
 ## Pitfalls
 - Ein Profil-Bündel löst über `profiles/<name>/node_modules` auf — **vor** dem Root-`node_modules`.
@@ -287,10 +376,14 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   a  placeholder: it reads the real `workspaces`/`sessions` services (evidence:
   `docs/probes/workspace-list.json`). The `dead-package` gate flags any package missing from
   the profile.
-- The Project Index offers **two** narrow capabilities, each with its own contract name:
-  `shinon_index_query` (`resolveContext`, Plan §14/§17 — the MAX context) and
+- The Project Index offers **three** narrow capabilities, each with its own contract name:
+  `shinon_index_query` (`resolveContext`, Plan §14/§17 — the MAX context),
   `shinon_index_store` (`load`/`save` on one namespace, `shinon.project-index/store-v1` — the
-  Scoring's durable memory, Zug 2). Never widen the first one: the context seam is pinned by
+  Scoring's durable memory, Zug 2) and `shinon_facts_snapshot` (`snapshot`, read-only, contract
+  `shinon.facts/snapshot-v1` — der Wissensblock des Prompters, Wissens-Runtime Zug 3: nur
+  `VALID` kommt hinein, das Budget bricht mit `BUDGET_UEBERSCHRITTEN` samt Soll und Ist ab
+  und kürzt nie still, eine fehlende Faktendatei ergibt `null` statt eines erfundenen
+  Blocks). Never widen the first one: the context seam is pinned by
   test to exactly `['contract', 'resolveContext']`, so a *second* narrow service is the
   answer, never a bigger one. The `memory` table is the only part of the index that is **not**
   derived from the project (judgements, their subject, the computed scorecard), so a
@@ -300,13 +393,17 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   `scripts/gate/tests/context-wiring.test.mjs` (names) and
   `scripts/gate/tests/scoring-memory.test.mjs` (behaviour: signal → value → restart →
   retraction → late criticism → corrupt index).
-- Documentation: every Markdown file carries a status block, and hard numbers (packages,
-  layers, test counts, versions) have exactly **one** owner. Read `docs/INDEX.md` §2 and
-  `docs/ZAHLEN.md` before writing a number into any document — nothing in the gate
-  checks documentation drift. The inventory block in `docs/ZAHLEN.md` §1 is generated
-  (`npm run zahlen:sync`, checked with `npm run zahlen:check`); the run table in §2 is
-  measured per pass. History, causes and before/after numbers belong in the commit
-  message or `docs/archive/` (the one history folder) — not in a table cell.
+- Documentation: `docs/` carries the operating documents and the map that says who
+  is responsible for what (`docs/INDEX.md`): history in `docs/TAGEBUCH.md`, numbers in
+  `docs/ZAHLEN.md`, open work in `docs/ROADMAP.md`, enforcement in
+  `docs/COMMIT-REGELN.md` — plus `contracts/` and `probes/`. The bulk of the prose was
+  cut on 2026-10-20; what it said lives in the diary, anchored to commits. History
+  belongs in `docs/TAGEBUCH.md`, never in a new file; a new document belongs in `docs/`
+  **and** in the map `docs/INDEX.md`. Hard numbers (packages, layers, test counts,
+  versions) have exactly **one** owner: `docs/ZAHLEN.md` — read it before writing a
+  number anywhere.
+  `npm run zahlen:check` covers the generated inventory block; the run table in §2 is
+  measured per pass.
 - A Client -> Host endpoint needs someone to SELECT it. Host-side `./typert` discovery exists
   (`dsh-typert-loader`), but the browser client mounts its Remote contributions from a
   hardcoded COMPILED list in `@deepseek-ai/dsh-api-remotes` (25 entries, `$mount`), so an

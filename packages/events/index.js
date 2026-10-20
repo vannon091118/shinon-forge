@@ -1,6 +1,7 @@
 import z from '@deepseek-ai/schemastery';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+// Die Digest-Regel hat EINE Definition: `@shinon/seams` (Host-Naht-Kern).
+import { digest } from '@shinon/seams/core';
 
 /**
  * @shinon/events — Wave 2: Shinon Hook/Event Spine.
@@ -10,7 +11,29 @@ import { readFileSync } from 'node:fs';
  *   DSH-Signal → Normalisierung → Contract-Gate → Emission
  *                    │                 │
  *                    │                 └─ ungültig ⇒ VERWERFEN (fail-closed für das Event)
- * → Kanon: docs/COMMENT-KANON.md#k-5029c455e3a2
+ *                    └─ niemals eine Aktion, niemals ein Schreibzugriff, niemals ein Modell
+ *
+ * Zwei Fail-Richtungen, bewusst getrennt (DOKI-Prinzip):
+ *   - fail-closed für das EVENT: ein Event, das den Contract verletzt, wird nie emittiert.
+ *   - fail-open für den HOST: die Beobachtung darf den beobachteten Prozess nie blockieren
+ *     (kein Throw aus einem Handler heraus, kein Absturz bei fehlendem Signal).
+ *
+ * Der Spine ist ein Durchleiter, keine Autorität (`authority: NONE` im Vertrag).
+ * Er darf keinen State setzen, keine Datei schreiben, kein Netz und kein Modell aufrufen.
+ * Das Gate prüft genau diese Grenze statisch (scripts/gate/plugins/events-spine.mjs).
+ *
+ * Drei Ausgänge, bewusst getrennt:
+ *   EMITTIERT  — der Typ steht in der typeMap (oder auf einem shinon/*-Signal).
+ *   IGNORIERT  — der Typ steht in carrier.ignoredTypes: bekannt, bewusst nicht
+ *                modelliert. Kein Ereignis, kein onDrop, keine Warnung; gezählt
+ *                in stats.ignored/ignoredTypes. DSH emittiert Dutzende Typen
+ *                (approval/*, compaction/*, ptc-dispatch/*, …), die niemand
+ *                abbilden will — als UNKNOWN_SIGNAL würden sie das Log fluten.
+ *   VERWORFEN  — alles andere: unbekannt oder vertragsbrüchig, fail-closed.
+ * Ein NEUER DSH-Typ ist nicht ignoriert und warnt deshalb weiter.
+ *
+ * Der Vertrag selbst liegt als Daten in ./assets/event-spine.json — nicht im Code.
+ * Ein neuer Event-Typ ist damit zuerst eine Datenänderung, kein Code-Umbau.
  */
 
 /** Fallback, falls der Vertrag nicht geladen werden kann; wird nie emittiert. */
@@ -26,23 +49,11 @@ export function canonicalJson(value) {
   return JSON.stringify(value ?? null);
 }
 
-// #region zwilling:sha256-digest — Besitzer: packages/events/index.js
 /**
- * Erste `length` Hex-Zeichen von sha256(text).
- *
- * `text` ist ein String und `length` ist PFLICHT: eine vergessene Laenge ergaebe
- * still einen 64-stelligen Wert statt eines kurzen ids. Kein Aufrufer ratet sie
- * — beide Seiten nennen sie ausdruecklich.
- */
-function digest(text, length) {
-  return createHash('sha256').update(text).digest('hex').slice(0, length);
-}
-// #endregion zwilling:sha256-digest
-
-/**
- * `digest` bleibt oeffentlich (der Name aendert sich nicht); der Text der Regel
- * steht als Zwilling in `@shinon/hook` — die Byte-Gleichheit prueft
- * `scripts/lib/repo.mjs` (SOURCE_TWINS) im Gate und im Build.
+ * `digest` bleibt oeffentlich und behaelt seinen Namen — die Definition steht
+ * aber nur noch in `@shinon/seams` (`assets/seams.js`). Vorher lag hier eine
+ * Kopie, die `SOURCE_TWINS` bytegleich zu `@shinon/hook` hielt; ein Gate-Schritt
+ * (`hostMirrorIssues`) macht eine zurueckkehrende Kopie heute rot.
  */
 export { digest };
 

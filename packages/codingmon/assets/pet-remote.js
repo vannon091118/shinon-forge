@@ -6,12 +6,35 @@
  * Baum je `write` gerufen, und der Spiegel meldete folgerichtig „noch kein
  * Stand". Diese Datei ist der Empfaenger. Sie ist die Host-Seite des
  * Typert-RPC von DSH (api-gateway): ein Cordis-Dienst mit ZWEI als Remote
- * → Kanon: docs/COMMENT-KANON.md#k-6ba3af2466b5
+ * gekennzeichneten Methoden (`writeSnapshot` nimmt an, `readActivity` nennt den
+ * Aktivitaetsstand), von denen der Client einen generierten Beitrag mountet
+ * und sie ueber den gemeinsamen Carrier ruft.
+ *
+ * WARUM SRC UND NICHT EIN GENERIERTES HOST-MANIFEST: das Gateway loest einen
+ * Endpunkt zuerst aus `ctx.typert.local` (strenge, GENERIERTE Definition) und
+ * sonst aus dem Dienst selbst auf („SRC": Name, Parameterliste und
+ * `typertRemote`-Bindung des Dienstes). Die zweite Form ist die ehrliche fuer
+ * dieses Paket: die strict-Datei ist ein Erzeugnis von
+ * `@deepseek-ai/dsh-typert-generator`, den dieses Paket nicht mitbringt, und
+ * eine von Hand nachgebaute „generierte" Datei waere eine Fiktion mit
+ * Dateinamen. SRC verlangt dafuer weniger: oeffentliche Methode mit einfachen
+ * ParameterNamen (das Gateway liest sie aus der Signatur — deshalb steht
+ * `writeSnapshot(snapshot)` genau so da und mit einem Parameter, nicht mit
+ * einem Objekt), JSON-sichere Werte, und die Bindung aus `TypertRemoteService`.
+ * Was SRC NICHT tut, ist den Inhalt pruefen — deshalb prueft der SPIEGEL
+ * (`pet-store.js` parst, BEVOR er ein Medium anfasst). GENAU EINE Grenze: eine
+ * zweite Pruefung desselben Schemas hier waere eine zweite Wahrheit, und im
+ * Test nicht auseinanderzuhalten, weil beide dieselbe Meldung erzeugen.
+ *
+ * WAS HIER NICHT STEHT: kein Timer, kein Netz, kein Modell, und keine zweite
+ * Ablage. Die Methode nimmt einen Stand an, prueft ihn, gibt ihn an den Spiegel
+ * weiter und quittiert ihn.
  */
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { levelFor } from './mechanik.js';
 import { ActivitySchema, SnapshotAckSchema, SnapshotSchema } from './snapshot-schema.js';
 import {
+  ACTIVITY_TYPE, REMOTE_CONTRIBUTION, SNAPSHOT_ACK_TYPE, SNAPSHOT_TYPE,
   UEBERGABE_ACTIVITY_ENDPOINT, UEBERGABE_ACTIVITY_METHOD, UEBERGABE_ENDPOINT, UEBERGABE_METHOD,
   UEBERGABE_NAMESPACE, UEBERGABE_PACKAGE, UEBERGABE_PARAMETER, UEBERGABE_SERVICE,
 } from './uebergabe.js';
@@ -24,7 +47,14 @@ import {
  * Standard-Methodendekoratoren: sie bekommt den Methodenwert und einen
  * Dekoratorkontext und traegt die Kennzeichnung ueber dessen `addInitializer`
  * in die Prototyp-Tabelle ein (die kompilierte DSH-Fassung desselben Aufrufs
- * → Kanon: docs/COMMENT-KANON.md#k-2b8e8cc83d2f
+ * steht in jedem `lib/types/index.js` der DSH-Pakete). Ein ESM-Modul ohne
+ * Compiler hat keinen solchen Kontext — also stellt der Aufruf unten genau den
+ * Vertrag her, den die Spezifikation vorsieht: ein Empfaengerobjekt, dessen
+ * Prototyp die Klasse ist, an dem der Initialisierer laeuft. Mehr braucht die
+ * Kennzeichnung nicht; sie ist idempotent und haengt am Prototyp, nicht an
+ * einer Instanz.
+ * @param {object} prototype - Prototyp der Dienstklasse.
+ * @param {string} method - Name der oeffentlichen Methode.
  */
 function markRemote(prototype, method) {
   const receiver = Object.create(prototype);
@@ -115,51 +145,25 @@ export function mountPetRemote(ctx, store, activity) {
  * lehnt einen Beitrag mit einem Codec ohne strict VOR dem Mounten ab
  * („Client-supplied fields without strict generated codecs fail before methods
  * become callable"). Die Fabrik wird auf der Client-Seite nicht ausgefuehrt —
- * → Kanon: docs/COMMENT-KANON.md#k-4753c134ca3d
+ * der Client schickt die Werte, der Host prueft sie.
+ * @returns {object} Beitrag aus Paketname und einem Endpunkt.
  */
 export function petRemoteContribution() {
+  // Die FORM kommt aus `uebergabe.js` (eine Quelle), die Fabriken kommen hier
+  // dazu: das Gateway loest die strenge Definition auf dem Host auf, und nur
+  // dort wird `create` je gerufen.
+  const factories = new Map([
+    [SNAPSHOT_TYPE, () => SnapshotSchema],
+    [SNAPSHOT_ACK_TYPE, () => SnapshotAckSchema],
+    [ACTIVITY_TYPE, () => ActivitySchema],
+  ]);
+  const withFactory = (codec) => ({ ...codec, create: factories.get(codec.typeSymbol) });
   return {
-    package: UEBERGABE_PACKAGE,
-    descriptors: [
-      {
-        id: `${UEBERGABE_PACKAGE}#${UEBERGABE_ENDPOINT}`,
-        service: UEBERGABE_SERVICE,
-        namespace: UEBERGABE_NAMESPACE,
-        method: UEBERGABE_METHOD,
-        invocation: { kind: 'direct' },
-        parameters: [
-          {
-            name: UEBERGABE_PARAMETER,
-            wire: UEBERGABE_PARAMETER,
-            source: 'json',
-            codec: {
-              mode: 'strict',
-              typeSymbol: `${UEBERGABE_PACKAGE}#Snapshot`,
-              create: () => SnapshotSchema,
-            },
-          },
-        ],
-        result: {
-          mode: 'strict',
-          typeSymbol: `${UEBERGABE_PACKAGE}#SnapshotAck`,
-          create: () => SnapshotAckSchema,
-        },
-        sourceLocation: { file: 'packages/codingmon/assets/pet-remote.js', line: 1, column: 1 },
-      },
-      {
-        id: `${UEBERGABE_PACKAGE}#${UEBERGABE_ACTIVITY_ENDPOINT}`,
-        service: UEBERGABE_SERVICE,
-        namespace: UEBERGABE_NAMESPACE,
-        method: UEBERGABE_ACTIVITY_METHOD,
-        invocation: { kind: 'direct' },
-        parameters: [],
-        result: {
-          mode: 'strict',
-          typeSymbol: `${UEBERGABE_PACKAGE}#Activity`,
-          create: () => ActivitySchema,
-        },
-        sourceLocation: { file: 'packages/codingmon/assets/pet-remote.js', line: 1, column: 1 },
-      },
-    ],
+    package: REMOTE_CONTRIBUTION.package,
+    descriptors: REMOTE_CONTRIBUTION.descriptors.map((descriptor) => ({
+      ...descriptor,
+      parameters: descriptor.parameters.map((parameter) => ({ ...parameter, codec: withFactory(parameter.codec) })),
+      result: withFactory(descriptor.result),
+    })),
   };
 }

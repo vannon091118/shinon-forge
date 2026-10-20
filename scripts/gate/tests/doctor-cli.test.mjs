@@ -7,7 +7,19 @@
  * Das statische Gate (`scripts/gate/plugins/doctor.mjs`) prüft nur
  * Repo-Konsistenz, keine Laufzeit-Gesundheit. PLAN.md §9.1 S4 verlangt den
  * Laufzeit-Unterbefehl mit drei Eigenschaften, und genau die drei prüft diese
- * → Kanon: docs/COMMENT-KANON.md#k-da88cab557ba
+ * Datei — wie ein Messgerät, das zwischen gebautem Code und belegter Zusage
+ * unterscheidet, statt eine Absicht grün zu färben:
+ *
+ *   1. EIGENER Unterbefehl: `node bin/shinon.mjs doctor --json` liefert den
+ *      Doctor-Bericht (kein DSH-Start, kein fremder Exit-Code).
+ *   2. READ-ONLY: ein Lauf ändert den Arbeitsbaum nicht
+ *      (`git status --porcelain` vorher/nachher gleich) und die Quelle
+ *      enthält keinen Schreibaufruf.
+ *   3. STABILE Codes + PRESENCE-ONLY: Exit ∈ {0,1,2}, JSON-`exitCode` gleich
+ *      Prozess-Exit, `status`↔`exitCode` deckungsgleich — und ein gesetzter
+ *      Fake-Schlüssel erscheint weder in stdout noch stderr (nur `true`).
+ *
+ * Kein Netz, kein Modell, kein DSH-Boot: der Doctor fragt nur `--version` ab.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

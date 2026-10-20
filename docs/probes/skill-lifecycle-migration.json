@@ -1,0 +1,32 @@
+{
+  "contract": "shinon.skill-migration-probe/v1",
+  "claim": "Zwei JSON-Zettel werden in bestehende SKILL.md konsolidiert. ERGEBNIS-EHRLICHKEIT: die automatische Dublettenpruefung des Kerns findet fuer keinen der beiden Zettel eine Dublette (checkVerdict candidate, BELEG_ZU_DUENN). Die Zielwahl ist daher eine MANUELLE Entscheidung des Menschen/Agenten und ist hier so dokumentiert; die Konsolidierung selbst ist idempotent (zweiter Lauf aendert nichts).",
+  "migrations": [
+    {
+      "source": "generated-skills/gate-datei-whitelist.json",
+      "sourceSha256": "bc5e50d27fa0c5b039f64a2a5e7931ab662c46a5ccafdb233b8a9d6477aafb05",
+      "target": ".agents/skills/shinon-dev-workflow/SKILL.md",
+      "checkVerdict": "candidate",
+      "checkReason": "BELEG_ZU_DUENN",
+      "checkTarget": null,
+      "fingerprint": "ad741e37",
+      "targetSha256Before": "964575510b942fdb66724962fbcd77a05c79b3c99bcdc012a62222a0f0c0ec97",
+      "targetSha256After": "a26ba7eab8187291290de335568051c9b764c59f5bf11580b4fcb845e124aadd",
+      "belegLine": "- zettel · legacy-json · docs/probes/skill-lifecycle-migration/gate-datei-whitelist.json",
+      "idempotent": true
+    },
+    {
+      "source": "generated-skills/konzept-toter-mechanismus.json",
+      "sourceSha256": "876877316460318fcd57027970ce5a5951157781d41e6e01801ac04990cf187a",
+      "target": ".agents/skills/shinon-bug-muster/SKILL.md",
+      "checkVerdict": "candidate",
+      "checkReason": "BELEG_ZU_DUENN",
+      "checkTarget": null,
+      "fingerprint": "134f9799",
+      "targetSha256Before": "14663c82e95be75ab3b6897e09be78ec434b423ee9dff050698adb2f38dcc482",
+      "targetSha256After": "5fdddc6542c8a4c74966631085e9e53bfef2db4275360ba99e227c0c4862edf1",
+      "belegLine": "- zettel · legacy-json · docs/probes/skill-lifecycle-migration/konzept-toter-mechanismus.json",
+      "idempotent": true
+    }
+  ]
+}

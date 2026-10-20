@@ -1,5 +1,8 @@
 #!/usr/bin/env sh
 # Shinon pre-commit — die schnelle lokale Linie (Sekunden, nicht Minuten).
-# Der volle Lauf (test:full) gehoert in CI; hier laeuft nur npm test.
+# §1 der ZAHLEN ist generiert: er muss VOR dem Commit stimmen (kein Direct-Write,
+# nur die Pruefung). §2 bleibt ein datierter Messwert und wird hier nicht
+# angefasst. Der volle Lauf (test:full) gehoert in CI.
 set -e
+npm run zahlen:check
 npm test

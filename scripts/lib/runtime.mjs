@@ -6,7 +6,19 @@
  * erlaubt) und Node 22.0–22.18 ebenso (obwohl `^22.19.0` erst ab 22.19 gilt) —
  * und `node:sqlite` fehlt in zu alten Fassungen ganz, sodass der Fehler nicht
  * hier, sondern tief im Index auftrat. Außerdem standen zwei Heimpfade fest im
- * → Kanon: docs/COMMENT-KANON.md#k-9ab80e0ce68b
+ * Code (`~/.local/opt/node-v22.23.3-…`, `~/.nvm/…/v24.21.0`): auf einem anderen
+ * Rechner ist das keine Auflösung, sondern eine Behauptung.
+ *
+ * DIE RANGE IST EINE QUELLE: `engines.node` im Root-Manifest. Dieses Modul
+ * liest sie und schreibt keine zweite Liste — wer die unterstützte Fassung
+ * ändert, ändert sie dort. Die exakte Fassung, mit der dieses Repo gemessen ist,
+ * steht weiterhin in der Zahlendatei (`docs/ZAHLEN.md` §1) und NICHT als zweite
+ * Konstante im Code.
+ *
+ * Ein Kandidat gilt nur, wenn er ZWEI Proben besteht:
+ *   1. `--version` passt zur Range (nicht nur die Hauptversion),
+ *   2. der `node:sqlite`-Rauchtest: DatabaseSync(':memory:'), `select 1`, close.
+ * Netz und Modellschlüssel sind dafür nicht nötig.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -82,6 +94,55 @@ export function satisfiesRange(version, range) {
     const terms = alternative.trim().split(/\s+/).filter((term) => term !== '');
     return terms.length > 0 && terms.every((term) => matchesOne(triple, term));
   });
+}
+
+/**
+ * Die UNTERGRENZE einer Range — die Fassung, die ein mitgeliefertes Node sein
+ * MUSS, damit es in der Range liegt.
+ *
+ * Warum das hier steht und nicht als Zahl im Manifest: `engines.node` ist die
+ * eine Quelle der unterstuetzten Fassung. Ein mitgeliefertes Node (im .deb, im
+ * Windows-Archiv) muss in diese Range passen, sonst startet der Forge nicht
+ * und der Fehler erscheint nicht beim Installieren, sondern beim ersten
+ * Klick. Die Untergrenze ist damit die EINZIGE Fassung, die die Range selbst
+ * nennt — `22.19.0` fuer `^22.19.0 || >=24.0.0`.
+ *
+ * Fail-closed: ein Ausdruck, den diese Rechnung nicht versteht, ist ein
+ * Fehler und keine geratene Fassung. Das Ergebnis wird gegengeprueft (es
+ * muss die Range erfuellen), sonst stimmt die Rechnung nicht.
+ * @param {string} range die Range aus `engines.node`
+ * @returns {string} die Fassung, z.B. `22.19.0`
+ */
+export function floorVersion(range) {
+  const alternatives = String(range)
+    .split('||')
+    .map((part) => part.trim().split(/\s+/).filter((term) => term !== ''))
+    .filter((terms) => terms.length > 0);
+  if (alternatives.length === 0) {
+    throw new Error(`floorVersion: die Range "${range}" nennt keine Alternative`);
+  }
+  const floors = alternatives.map((terms) => {
+    let floor = [0, 0, 0];
+    for (const term of terms) {
+      const match = /^(\^|~|>=|<=|>|<|=)?\s*v?(\d+)\.(\d+)\.(\d+)$/.exec(term.trim());
+      if (match === null) {
+        throw new Error(`floorVersion: Ausdruck "${term}" in der Range "${range}" ist nicht lesbar — Abbruch statt Raten`);
+      }
+      const [, operator = '=', major, minor, patch] = match;
+      const value = [Number(major), Number(minor), Number(patch)];
+      // ">X.Y.Z" heisst: mindestens X.Y.(Z+1). "<" und "<=" nennen keine
+      // Untergrenze, lassen die Alternative aber nach unten offen.
+      if (operator === '>') value[2] += 1;
+      if (compare(value, floor) > 0) floor = value;
+    }
+    return floor;
+  });
+  const lowest = floors.reduce((left, right) => (compare(right, left) < 0 ? right : left));
+  const version = lowest.join('.');
+  if (!satisfiesRange(version, range)) {
+    throw new Error(`floorVersion: die Untergrenze ${version} erfuellt die Range "${range}" nicht — Abbruch`);
+  }
+  return version;
 }
 
 /**

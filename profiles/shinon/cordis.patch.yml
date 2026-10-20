@@ -69,16 +69,24 @@
 # das Secret kommt aus der Umgebung (SHINON_API_KEY), nie aus dieser Datei.
 # Ohne gesetzte Variable bleibt die Route konfiguriert-aber-schlüssellos.
 #
-# WICHTIG: `agent-default-model` MUSS auf eine Route mit Key zeigen. Die
-# deepseek-official-Route (dsh-llm-deepseek) ist gemountet, hat aber ohne
-# DEEPSEEK_API_KEY keinen Schlüssel → MISSING_CREDENTIAL. Deshalb zeigt der
-# Default auf die Route, die die Entscheidung A8 festgelegt hat:
-# agnes/agnes-2.5-flash (apiKeyEnv AGNES_API_KEY, api openai-completions, baseURL
-# unten in der llm-pi-ai-Route). Die Modellwahl in der UI darf ihn überschreiben,
-# aber der Startzustand muss funktionieren.
+# WER DIE ROUTE WÄHLT: DER NUTZER. `agent-default-model` ist ein live-Feld
+# (`dsh-agent-default-model`), die Modellwahl in der UI schreibt sie über den
+# gemounteten `config-editor` (`saveSelection`) in GENAU DIESE Datei. Der Wert
+# unten ist deshalb der zuletzt gespeicherte Stand und keine Vorgabe des Repos:
+# nach einem Wechsel in der UI steht hier eine andere Route, und das ist die
+# Zusage, kein Fehler. Gemessen 2026-10-20: `provider: prompter`,
+# `model: agnes-2.5-flash` — beide Provider zeigen auf den Agnes-Host,
+# `prompter` liest `PROMPTER_API_KEY`, `agnes` liest `AGNES_API_KEY`.
 #
-# Diese Zeile und der Kommentar oben nennen DIESELBE Route (C8); wer sie ändert,
-# ändert beide — sonst widersprechen sich Kommentar und Config.
+# WAS GEPRÜFT WIRD, IST DIE FORM, NICHT DER NAME
+# (`scripts/lib/model-route.mjs`, `scripts/gate/tests/model-route.test.mjs`):
+# der Provider muss in diesem Patch definiert sein, das Modell in seinem
+# Katalog stehen, und `apiKeyEnv` muss einen Namen nennen (nie einen Wert).
+# Ein Modell-Literal im Test wäre beim nächsten Wechsel rot und würde die Zahl
+# ändern statt die Frage. Hart bleibt nur: eine Route OHNE Schlüssel ist
+# MISSING_CREDENTIAL — die deepseek-official-Route (dsh-llm-deepseek) ist
+# gemountet, hat aber ohne DEEPSEEK_API_KEY keinen. Wer hier eine Route ohne
+# gesetzte Variable einträgt, nimmt genau das in Kauf.
 - id: llm-pi-ai
   name: '@deepseek-ai/dsh-llm-pi-ai'
   config:
@@ -108,13 +116,13 @@
         apiKeyEnv: HUGGINGFACE_API_KEY
         displayName: Shinon Forge
       agnes:
-        displayName: Shinon Forge Agnes
+        displayName: Shinon Forge
         apiKeyEnv: AGNES_API_KEY
         api: openai-completions
         baseURL: https://apihub.agnes-ai.com/v1
         models:
           - id: agnes-2.5-flash
-            name: Agnes 2.5 Flash
+            name: Shinon 2.5 Flash
           - id: agnes-2.5-pro-alpha
             name: agnes-2.5-pro-alpha
           - id: agnes-video-2.5-flash
@@ -135,32 +143,44 @@
             name: agnes-2.5-pro-beta
           - id: agnes-image-2.5-flash
             name: agnes-image-2.5-flash
-      # EIGENE Route für den Prompter-One-Shot (Phase 5): separater
-      # Schlüssel, getrennte Abrechnung, derselbe Host. Die models-Liste trägt
-      # bewusst nur das konfigurierte One-Shot-Modell — wer den Prompter auf ein
-      # anderes Modell stellt, erweitert DIESE Liste, nicht `agnes`. Der
-      # Schlüssel ist PROMPTER_API_KEY; fehlt er, faellt der Host auf
-      # `agnes` zurück (providerFallback in der Prompter-Config unten), statt
-      # den Enhancer totzustellen — das ist HOST-Logik, kein !!js in dieser
-      # Datei (der Gate-Parse läuft ueber js-yaml und kennt !!js nicht).
+          - id: agnes-3.0-pro
+            name: agnes-3.0-pro
       prompter:
-        displayName: Shinon Forge Prompter
+        displayName: Shinon Forge
         apiKeyEnv: PROMPTER_API_KEY
         api: openai-completions
         baseURL: https://apihub.agnes-ai.com/v1
         models:
           - id: agnes-2.5-flash
-            name: Agnes 2.5 Flash
+            name: Shinon 2.5 Flash
+          - id: agnes-2.5-pro-alpha
+            name: agnes-2.5-pro-alpha
+          - id: agnes-video-2.5-flash
+            name: agnes-video-2.5-flash
+          - id: agnes-3.0-flash
+            name: agnes-3.0-flash
+          - id: agnes-image-2.1-flash
+            name: agnes-image-2.1-flash
+          - id: agnes-video-2.5
+            name: agnes-video-2.5
+          - id: agnes-image-2.0-flash
+            name: agnes-image-2.0-flash
+          - id: agnes-3.0-pro
+            name: agnes-3.0-pro
+          - id: agnes-2.5-pro-beta
+            name: agnes-2.5-pro-beta
+          - id: agnes-image-2.5-flash
+            name: agnes-image-2.5-flash
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
-    provider: agnes
+    provider: prompter
     model: agnes-2.5-flash
 - id: agent-preset-registry
   name: "@deepseek-ai/dsh-agent-preset-registry"
   config:
     default: standard
-    selectedDefault: cordis
+    selectedDefault: standard
 - id: ui-chat
   name: "@deepseek-ai/dsh-client-ui-chat"
   config:
@@ -202,11 +222,15 @@
     freezeThreshold: 20
     relationshipWindow: 20
 
-# Persona (Zug 1-5): Nur im Shinon-Projekt aktiv — der Check sitzt in apply().
-# Projekt-Kontext wird aus .shinon/project-context.md geladen (falls vorhanden).
-# Leer bleibt = kein Projektkontext (fail-open).
+# Persona (Zug 1-8): Die IDENTITAET spricht in jeder Sitzung dieses Deployments
+# (`identityScope: global`) und wird beim Boot nicht neu geschrieben. Projekt-
+# Kontext, projektspezifische Erinnerungen und der Selbstmodell-Stand bleiben
+# am Workspace; das Langzeitgedaechtnis liegt in der Ablage des Project Index
+# (shinon.persona-memory/v1), nie in Projektdateien. `workspace` waere die alte,
+# engere Vorgabe — hier ist die weitere bewusst gewaehlt.
 - id: shinon-persona
   config:
+    identityScope: global
     projectContextPath: .shinon/project-context.md
 
 # Prompter (Zug 6) — das Bindeglied. Er ist der EINE Punkt im Schritt, an dem
@@ -246,10 +270,15 @@
     # (PROMPTER_API_KEY, `prompter`-Block in llm-pi-ai oben). Fehlt die
     # Variable, faellt der Host beim Mounten auf `agnes` zurück — der Enhancer
     # bleibt damit lauffähig, auch ohne eigenen Schlüssel. Die Haupt-Route
-    # (`agent-default-model`) bleibt unberührt bei agnes.
+    # (`agent-default-model`) schreibt dieses Paket NIE: sie ist die Wahl des
+    # Nutzers (Config-Editor), und der Enhancer liest sie nicht einmal.
     provider: prompter
     model: agnes-2.5-flash
     providerKeyEnv: PROMPTER_API_KEY
+    # Skill-Lebenszyklus (Zug 7): Korrekturen und abgeschlossene Zuege erzeugen
+    # Kandidaten; veroeffentlicht wird nach .agents/skills, dem Root, den DSH nativ
+    # entdeckt. Der Vorgabewert im Paket ist AUS; die Entscheidung steht hier.
+    skillLifecycle: true
     providerFallback: agnes
     modelFallback: agnes-2.5-flash
     skillsPath: .agents/skills
@@ -260,13 +289,15 @@
     trace: true
     # Gelernte Bausteine (Phase 4): Projekt-Ablage über der Paket-Registry.
     blocksLearnedPath: .shinon/blocks.learned.json
-    # Runtime-Index (Zug 7): eigenhaend verwaltet, hash-basiert, JSON-persistiert.
-    autoIndex: true
-    indexSourcePath: .
-    indexStoragePath: .shinon/prompter-index.json
-    indexMaxFiles: 20
+    # Der MAX-Kontext kommt aus dem Project Index (Dienst shinon_index_query).
+    # Einen zweiten, eigenen Index gibt es nicht mehr.
     # Intent-Patterns (Zug 8): Trigger → Full-Task-Expansion, default im Paket.
+    # Fassung 2: 40 granulare Patterns + Merkmale (mehrschritt/ziel/pfad/code).
     intentPatternsPath: ./assets/intent-rules.json
+    # Intent-Gedächtnis: Zählung über ALLE Läufe (Treffer, Klassen, Merkmale,
+    # Laufzeit, Folge-Rückmeldung) und daraus der gelernte Gewichtsfaktor je
+    # Pattern. Relativ zum WORKSPACE — Projektwissen, kein Tarball-Inhalt.
+    intentMemoryPath: .shinon/intent-memory.json
 
 # Popup (Zug 6): das Fortschritts-Overlay ueber dem Eingabefeld.
 #

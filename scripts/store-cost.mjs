@@ -7,11 +7,44 @@
  * Signal = ein Schreiben. Kostet das bei N Signalen so viel, dass
  * inkrementelles Anhängen nötig ist — oder ist das Neuschreiben billig genug?
  *
- * → Kanon: docs/COMMENT-KANON.md#k-9c67ba15d7e7
+ * WAS HIER ECHT IST: der Dienst (`createStoreService` aus
+ * `packages/project-index/index.js`), das Schema (`openIndex`), die SQLite
+ * (`node:sqlite`, dieselbe Datei wie im Boot), der Sammler
+ * (`createSignalCollector` aus `packages/scoring/assets/scoring-core.js`) mit
+ * seinen echten Verträgen und der ECHTEN Signaltabelle, und die Ereignisform
+ * der Tests (`feedback.rated`). Was NICHT echt ist: die Signale selbst
+ * (erzeugt statt beobachtet), der Ort (temporäre Datei statt
+ * `~/.shinon/indexes/<hash>/index.sqlite`) und der Host (kein Browser). Die
+ * Frage ist eine Frage nach Millisekunden je Schreiben — dafür ist der Ort
+ * gleichgültig, die Zahl der Zeilen nicht.
+ *
+ * FÜNF MESSUNGEN, weil eine allein die Frage nicht beantwortet:
+ *
+ *   1. `zeilen`     — `writeMemory` allein bei N Zeilen: wächst der Preis mit
+ *                     der Zeilenzahl? (Der Kern der Frage nach dem Anhängen.)
+ *   2. `zerlegung`  — WO die Zeit EINES Schreibens hingeht: Öffnen, Schreiben,
+ *                     Schließen — und innerhalb des Öffnens die Metaschreibungen.
+ *                     Eine Zahl ohne diese Zerlegung sagt nicht, was zu ändern wäre.
+ *   3. `verlauf`    — N Schreiben hintereinander, jedes mit einer Zeile mehr:
+ *                     das ist, was eine Sitzung tatsächlich tut.
+ *   4. `anhaengen`  — dieselbe Folge mit reiner Anhängung (Vergleich, kein
+ *                     Produktpfad): eine Zeile einfügen statt alle. Der Abstand
+ *                     zu 3. IST die Antwort auf die gestellte Frage.
+ *   5. `ganzkette`  — echter Sammler + echter Dienst gegen reinen Speicher:
+ *                     trennt die Kosten der Ablage von der Rechnung des Kerns
+ *                     (`scorecard()` = voller Replay bei JEDEM Signal).
+ *
+ * DIE ZAHLEN SIND ORTSGEBUNDEN: was ein Commit auf DIESEM Rechner kostet, gilt
+ * auf diesem Rechner (fsync). Übertragbar ist das Verhältnis von festen Kosten
+ * je Aufruf zu wachsenden Kosten je Zeile — nicht die Millisekunde.
+ *
+ * Aufruf:  node scripts/store-cost.mjs [--signals 10,100] [--rows 10,100,1000]
+ *                                     [--chain 100,500] [--json] [--keep]
+ * Exit:    0 = gemessen · 1 = Aufbau gescheitert (Node zu alt, kein SQLite)
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { DatabaseSync } from 'node:sqlite';
 import { createStoreService } from '../packages/project-index/index.js';
@@ -120,7 +153,11 @@ const timed = (fn) => {
  * echte Länge (inklusive `detail`), echte Streuung.
  *
  * WARUM NUR EINMAL UND BEGRENZT: der Sammler rechnet bei jedem Signal
- * → Kanon: docs/COMMENT-KANON.md#k-117cde3eba59
+ * `scorecard()` — einen vollen Replay über ALLE bisherigen Zeilen. Eine Reihe
+ * von 20.000 Signalen durch ihn zu schicken wäre 20.000 × 20.000 Schritte,
+ * also Stunden, und würde die Zeilenmessung an einer Stelle messen, um die es
+ * ihr nicht geht. Deshalb: die Form kommt aus einem echten Lauf, und für große
+ * N wird sie fortgeschrieben. Genau diese Quadratik steht in Messung 5.
  */
 const TEMPLATE_RUN = 200;
 let TEMPLATE = null;
@@ -166,7 +203,15 @@ function measureRows(max) {
  * Nachbildung ist kontrolliert: sie ruft dieselben Anweisungen in derselben
  * Reihenfolge (`SCHEMA` und die Fassungskonstanten sind importiert, nicht
  * abgeschrieben), sie läuft auf einer EIGENEN Datei, und der Bericht stellt
- * → Kanon: docs/COMMENT-KANON.md#k-ca4c5f7415a7
+ * ihre Summe NEBEN den echten `openIndex`. Weichen beide ab, ist diese
+ * Zerlegung veraltet — dann gilt der echte Wert und die Zerlegung ist zu
+ * reparieren. Sie ist ein Messmittel, kein zweiter Codepfad im Produkt.
+ *
+ * GEMESSEN und deshalb korrigiert: ein erster Nachbau schrieb die Metawerte als
+ * `'1'`. Der nächste ECHTE `openIndex` sah damit eine fremde Fassung, verwarf
+ * die Tabellen und zog die Datei mit `vacuum` neu zusammen — 1212 ms statt ~300.
+ * Die Nachbildung schreibt jetzt dieselben Werte wie das Original; deshalb
+ * bleibt der Neuaufbau aus, und die Zahl ist wieder die des Alltags.
  */
 function replicatedOpen(file, steps) {
   steps.push({ label: 'darin: new DatabaseSync', ms: timed(() => new DatabaseSync(file)).ms });

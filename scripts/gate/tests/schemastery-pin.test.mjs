@@ -6,13 +6,34 @@
  * Deklarationen `~3.18.5-alpha.1`. Die beiden Bereiche sind DISJUNKT — `~3.18.4`
  * akzeptiert keine Vorabfassung von 3.18.5, `~3.18.5-alpha.1` beginnt oberhalb von
  * 3.18.4 —, also durfte npm nicht hoisten: gemessen standen 1× `3.18.4` und 113×
- * → Kanon: docs/COMMENT-KANON.md#k-8e620b2f3713
+ * `3.18.5-alpha.1` als eigene Verzeichnisse im Baum (114 Kopien, die jedes `npm ci`
+ * erneut auspackt). Wer die Root-Range auf die des Harness zieht, bekommt eine
+ * Fassung; das ist keine Installationskunst, sondern die Folge daraus, dass die
+ * Bereiche sich dann decken.
+ *
+ * Gepinnt wird (fail-closed, ohne Netz, ohne `node_modules`):
+ *   1. Root und JEDES Paket deklarieren dieselbe Range — in `peerDependencies`
+ *      UND `devDependencies` (die Host-Shared-Regel aus `SHARED_DEPS`, hier auf
+ *      die Fassung angewendet; `repo.mjs` prüft bisher nur die Anwesenheit),
+ *   2. die Range ist die des gepinnten Harness (aus dem Lock, nicht aus dem
+ *      installierten Verzeichnis),
+ *   3. das Lock fordert diese Range überall und trägt GENAU EINEN Eintrag, auf
+ *      oberster Ebene — keine verschachtelte Zweitfassung, die beim nächsten
+ *      `npm ci` wieder entsteht,
+ *   4. dieser Eintrag zeigt auf den Tarball seiner eigenen Fassung.
+ *
+ * Was hier NICHT geprüft wird: das installierte Verzeichnis. Es ist nicht Teil des
+ * Baums (CI prüft ohne `node_modules`), und ein Test, der dann sichtbar
+ * überspringt, verletzt die Zusage „kein Skip". Die installierte Seite ist eine
+ * Messung, kein Test: `find node_modules -type d -name schemastery` nennt genau
+ * einen Pfad, `npm ls @deepseek-ai/schemastery --all` sagt überall `deduped`.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { loadMatrix, satisfiesRange } from '../../lib/dsh-versions.mjs';
 
 const REPO = fileURLToPath(new URL('../../..', import.meta.url));
 const DEP = '@deepseek-ai/schemastery';
@@ -21,7 +42,7 @@ const literal = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const root = readJson('package.json');
 const lock = readJson('package-lock.json');
-const range = root.dependencies?.[DEP];
+const target = loadMatrix(REPO).targets[DEP];
 
 /** Alle Paketmanifeste aus dem `workspaces`-Feld — keine zweite Pfadliste. */
 function manifestPaths() {
@@ -40,37 +61,29 @@ function manifestPaths() {
   return found.sort();
 }
 
-test('schemastery-pin: Root und jedes Paket deklarieren dieselbe Range', () => {
-  assert.equal(typeof range, 'string', `package.json dependencies["${DEP}"] fehlt`);
+test('schemastery-pin: der Root deklariert die Sollfassung exakt', () => {
+  const declared = root.dependencies?.[DEP];
+  assert.equal(typeof declared, 'string', `package.json dependencies["${DEP}"] fehlt`);
+  assert.equal(declared, target, `Root nennt ${declared}; die Sollquelle verlangt exakt ${target}`);
+});
 
+test('schemastery-pin: jedes Paket nennt sie exakt und als Peer-Bereich, der sie einschließt', () => {
   const paths = manifestPaths();
   assert.ok(paths.length > 0, 'kein Paketmanifest gefunden — der Test hätte nichts geprüft');
 
   const wrong = [];
   for (const rel of paths) {
     const manifest = readJson(rel);
-    for (const field of ['peerDependencies', 'devDependencies']) {
-      const declared = manifest[field]?.[DEP];
-      if (declared === undefined) wrong.push(`${rel} ${field}: fehlt`);
-      else if (declared !== range) wrong.push(`${rel} ${field}: ${declared} statt ${range}`);
-    }
+    const dev = manifest.devDependencies?.[DEP];
+    const peer = manifest.peerDependencies?.[DEP];
+    if (dev !== target) wrong.push(`${rel} devDependencies: ${dev ?? 'fehlt'} statt ${target}`);
+    if (peer === undefined) wrong.push(`${rel} peerDependencies: fehlt`);
+    else if (!satisfiesRange(peer, target)) wrong.push(`${rel} peerDependencies: ${peer} schließt ${target} nicht ein`);
   }
-  assert.deepEqual(wrong, [], 'ein Manifest deklariert eine andere schemastery-Fassung — dann gibt es wieder zwei Wahrheiten');
+  assert.deepEqual(wrong, [], 'ein Manifest weicht von der Sollfassung ab — dann gibt es wieder zwei Wahrheiten');
 });
 
-test('schemastery-pin: die Range ist die des gepinnten Harness', () => {
-  const harness = lock.packages?.['node_modules/@deepseek-ai/dsh'];
-  assert.ok(harness, 'package-lock.json hat keinen Eintrag node_modules/@deepseek-ai/dsh');
-  const wanted = harness.dependencies?.[DEP];
-  assert.equal(typeof wanted, 'string', `der gepinnte Harness nennt ${DEP} nicht — die Ableitung wäre geraten`);
-  assert.equal(
-    range,
-    wanted,
-    `Root (${range}) und Harness (${wanted}) fordern disjunkte Bereiche: das erzeugt genau die 113 Zweitkopien wieder`,
-  );
-});
-
-test('schemastery-pin: das Lock trägt genau einen Eintrag, oben und ohne Zweitfassung', () => {
+test('schemastery-pin: das Lock trägt genau eine Kopie in der Sollfassung', () => {
   const entries = Object.entries(lock.packages ?? {}).filter(([path]) => path.endsWith(`node_modules/${DEP}`));
   assert.deepEqual(
     entries.map(([path]) => path),
@@ -79,21 +92,21 @@ test('schemastery-pin: das Lock trägt genau einen Eintrag, oben und ohne Zweitf
   );
 
   const [[, entry]] = entries;
-  assert.match(String(entry.version ?? ''), /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/, `keine gültige Fassung im Lock: ${entry.version}`);
+  assert.equal(entry.version, target, `das Lock löst ${entry.version} auf, die Sollquelle verlangt ${target}`);
   assert.match(
     String(entry.resolved ?? ''),
     new RegExp(`/@deepseek-ai/schemastery/-/schemastery-${literal(entry.version)}\\.tgz$`),
     `der Lock-Eintrag zeigt nicht auf den Tarball seiner Fassung: ${entry.resolved}`,
   );
 
-  // Jede Anforderung im Baum muss dieselbe Range nennen — sonst entsteht die
-  // nächste Kopie beim übernächsten `npm ci`, ohne dass dieser Lauf sie sieht.
+  // Jede Anforderung im Baum muss die Sollfassung einschließen — sonst entsteht
+  // die nächste Kopie beim übernächsten `npm ci`, ohne dass dieser Lauf sie sieht.
   let claims = 0;
   for (const [path, manifest] of Object.entries(lock.packages ?? {})) {
     const wanted = manifest.dependencies?.[DEP];
     if (wanted === undefined) continue;
     claims += 1;
-    if (wanted !== range) assert.fail(`${path} fordert ${wanted}, deklariert ist ${range}`);
+    if (!satisfiesRange(wanted, target)) assert.fail(`${path} fordert ${wanted} — die Sollfassung ${target} passt nicht hinein`);
   }
   assert.ok(claims > 100, `nur ${claims} Anforderungen gefunden — der Baum wurde nicht wirklich geprüft`);
 });

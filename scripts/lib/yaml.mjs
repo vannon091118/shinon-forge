@@ -55,7 +55,10 @@ function harnessFiles(dir) {
  * Agent-Loop, ohne den Großteil des Harness). Ein Scan „über den ganzen Harness"
  * würde damit den falschen Baum zählen: die Aussage wäre über 18 Pakete statt
  * über 250+. Der vollständige Satz liegt bei einer lokalen Installation NEBEN
- * → Kanon: docs/COMMENT-KANON.md#k-8a635cc59a4d
+ * dem Paket, bei einer globalen kann er auch darin liegen.
+ *
+ * Deshalb werden die Kandidaten (im Paket und in den Ebenen darüber) verglichen
+ * und der vollständigste genommen — layoutunabhängig, deterministisch.
  */
 export function dshHarnessDir(path) {
   const app = dshRoot(path);

@@ -3,12 +3,12 @@
  *
  * Alle Schemastery-Schemas des Pakets: Ergebnis je Modus, MAX-Kontext, Hook-Config.
  * Schemastery ist peerDependency dieses Pakets und wird hier direkt benutzt —
- * importfrei bleiben die reinen Kerne (`note-core.js`, `index-manager.js`), nicht
- * die Vertragsformen.
+ * importfrei bleiben die reinen Kerne (`note-core.js`), nicht die Vertragsformen.
  */
 import z from '@deepseek-ai/schemastery';
 import { INDEX_BUDGET_TOKENS, MODES, NOTES_DIR_DEFAULT, SKILLS_DIR_DEFAULT } from './mode-core.js';
 import { LEARNED_DEFAULT_PATH } from './block-review.js';
+import { SALVAGE_NAMESPACE } from './salvage-store.js';
 
 /**
  * Der Resultatvertrag (Plan §7), je Modus.
@@ -18,7 +18,19 @@ import { LEARNED_DEFAULT_PATH } from './block-review.js';
  * wird still mit `[]` gefüllt (gemessen an 3.18.4). Ohne `required()` würde ein
  * Modell, das `addedRequirements` einfach weglässt, als "nichts hinzugefügt"
  * durchgehen — die Lücke sähe genau wie Compliance aus. Mit `required()` ist ein
- * → Kanon: docs/COMMENT-KANON.md#k-941496eaef11
+ * fehlendes Feld ein Schemafehler und führt zum Roh-Prompt.
+ *
+ * Für `references` gilt genau das NUR in MAX. Das Feld gehört zum MAX-Auftrag
+ * (`references.code`) und wird nur dort gelesen: `acceptance()` prüft jede
+ * Referenz gegen den gelieferten Kontext. In MIN und MID bedeutet ein fehlendes
+ * Feld nichts, und ein Pflichtfeld kostet dort eine sonst einwandfreie Antwort —
+ * gemessen am 2026-10-08: `SCHEMA_INVALID:$.references missing required value`
+ * bei `mode=MIN`, der Roh-Prompt galt. Deshalb ist die Pflicht an den Modus
+ * gebunden, in dem der Wert konsumiert wird. Was bleibt: ein ANWESENDES, aber
+ * falsches Feld (etwa `null`) wird in jedem Modus abgelehnt.
+ *
+ * `intentClassification` ist keine Empfehlung an das Modell, sondern Daten: nur
+ * diese fünf Werte passieren. Eine unbekannte Klasse wird verworfen.
  */
 export function resultSchema(mode) {
   return z.object({
@@ -36,13 +48,9 @@ export function resultSchema(mode) {
     // diese Luecke schliesst `required()` (siehe der Kommentar ueber dem Schema).
     uncertainties: z.array(z.string()).default([]),
     references: mode === 'MAX' ? z.array(z.string()).required() : z.array(z.string()).default([]),
-    intentClassification: z.union([
-      z.const('CHAT'),
-      z.const('LOOKUP'),
-      z.const('TRANSFORM'),
-      z.const('MULTI_STEP_TASK'),
-      z.const('LONG_RUNNING_GOAL'),
-    ]).required(),
+    // KEIN `intentClassification`: die Klasse ist Runtime-Eigentum
+    // (`assets/intent-resolver.js`) und darf nicht aus einer Modellantwort
+    // kommen — sonst entschiede das Modell ueber das Routing.
   });
 }
 
@@ -81,7 +89,13 @@ export const ContextSchema = z.object({
  * wird gemeldet (`NO_ROUTE`), nicht stillschweigend als Erfolg verbucht.
  *
  * `contextPath` ist der definierte Kontext-Input fuer MAX: eine JSON-Datei in der
- * → Kanon: docs/COMMENT-KANON.md#k-8b2fcb37ec27
+ * Form von `ContextSchema`, relativ zum Paket aufgeloest. Leer heisst nicht mehr
+ * „MAX gibt es nicht": dann wird der Project Index gefragt (`INDEX_SERVICE`),
+ * und MAX gilt, wenn eine der beiden Quellen einen Kontext liefert. Der
+ * Entscheidungsdatensatz nennt, WELCHE (`context_source`). Eine konfigurierte,
+ * aber kaputte Datei sperrt MAX dagegen weiterhin (`CONTEXT_INVALID`) — eine
+ * ausdrueckliche Angabe, die nicht stimmt, darf nicht stillschweigend auf eine
+ * andere Quelle ausweichen.
  */
 export const Config = z.object({
   /** DSH-Event-Namen, auf die sich der Enhancer registriert. */
@@ -116,8 +130,8 @@ export const Config = z.object({
   /**
    * Aktiver Workspace (S1) — DIE EINE Quelle der Projektidentität.
    * Leer = Env `SHINON_WORKSPACE_ROOT`, sonst `process.cwd()`. Wer hier einen
-   * Pfad nennt, bindet Prompter, Runtime-Index, Skills und Zettel an genau
-   * diesen Ordner; ein Index mit fremder Root-Bindung wird abgelehnt.
+   * Pfad nennt, bindet Prompter, Skills und Zettel an genau diesen Ordner;
+   * der Project Index bindet seine Datei an dieselbe Root.
    */
   workspaceRoot: z.string().default(''),
   /** Kontext-Quelle fuer MAX (leer = kein Kontext, MAX wird abgelehnt). */
@@ -139,6 +153,14 @@ export const Config = z.object({
    */
   skillsPath: z.string().default(SKILLS_DIR_DEFAULT),
   /**
+   * Skill-Lebenszyklus (Zug 7): Kandidaten aus Korrekturen und abgeschlossenen
+   * Zuegen. Der Vorgabewert ist AUS: die Defaults rufen nichts auf. Wirksam wird
+   * er im Profil (`profiles/shinon/cordis.patch.yml`), wo die Entscheidungen leben.
+   */
+  skillLifecycle: z.boolean().default(false),
+  /** Kanal, auf dem der Host die Session-Ereignisse hoert (wie beim Scoring). */
+  eventsChannel: z.string().default('shinon/event'),
+  /**
    * Budget des Index-Kontexts. Der Enhancer deckelt selbst — der Wert aus dem
    * Profil gilt, das Paket hat nur einen Vorgabewert.
    */
@@ -151,37 +173,49 @@ export const Config = z.object({
   maxTokens: z.number().default(1200),
   /** Deterministisch: derselbe Prompt soll denselben Vorschlag ergeben. */
   temperature: z.number().default(0),
-  /** Harte Obergrenze des One-Shots. Danach gilt der Roh-Prompt. */
+  /** Harte Obergrenze des One-Shots. Danach gilt der Roh-Prompt. 0 = kein Deckel. */
   timeoutMs: z.number().default(15000),
+  /**
+   * Der One-Shot laeuft fuer JEDEN Schritt — auch fuer eine Frage oder ein
+   * "hallo". Vorgabe ist `true` (Nutzerentscheidung 2026-10-19: der Veredler
+   * soll in der Regel immer aktiv sein). `false` stellt den alten Kurzweg
+   * wieder her: klare CHAT-/LOOKUP-Turns gehen ohne Modellaufruf durch.
+   */
+  alwaysEnhance: z.boolean().default(true),
+  /**
+   * Probe-Journal der VERWORFENEN One-Shot-Antworten (JSONL), relativ zum
+   * WORKSPACE. Leer = kein Journal (dann bleibt nur die stderr-Zeile).
+   *
+   * Der Zweck ist die Messung der Prosa-Rettung gegen echte Enhancer-Antworten
+   * statt gegen fremde Assistenten-Antworten. Das Journal enthaelt den
+   * Nutzertext und die Antwort im Klartext und gehoert deshalb dem Projekt:
+   * es liegt unter `.shinon/`, wird nicht ausgeliefert und ist gitignoriert.
+   */
+  probeJournalPath: z.string().default('.shinon/one-shot-journal.jsonl'),
   /** Entscheidungen auf `DECISION_CHANNEL` emittieren. */
   trace: z.boolean().default(true),
-  /**
-   * Runtime-Index aktivieren: der Prompter pflegt SEINEN EIGENEN Index
-   * (hash-basiert, JSON-persistiert) statt sich auf den Project Index zu
-   * verlassen. MAX nutzt ihn als Kontextquelle, wenn der Project Index nicht
-   * verfuegbar ist.
-   */
-  autoIndex: z.boolean().default(false),
-  /**
-   * Verzeichnis, das bei aktiviertem `autoIndex` indiziert wird (relativ zum
-   * ARBEITSVERZEICHNIS). Leer = kein Auto-Index.
-   */
-  indexSourcePath: z.string().default(''),
-  /**
-   * Pfad der Runtime-Index-Datei (relativ zum ARBEITSVERZEICHNIS). Leer =
-   * kein Persistenz, Index lebt nur solange die Sitzung.
-   */
-  indexStoragePath: z.string().default(''),
-  /**
-   * Maximal dateien im Runtime-Index-Kontext. Verhindert explosionsartige
-   * Kontextblöcke bei breiten Suchbegriffen.
-   */
-  indexMaxFiles: z.number().default(20),
   /**
    * Intent-Patterns-Datei (relativ zum Paket). Enthält Trigger → Expansion.
    * Leer = keine Intent-Erweiterung.
    */
   intentPatternsPath: z.string().default('./assets/intent-rules.json'),
+  /**
+   * Ablage des Intent-Gedächtnisses (relativ zum WORKSPACE, nicht zum Host-CWD).
+   * Leer = kein Gedächtnis: dann bleibt jede Gewichtung bei 1, und kein Turn
+   * schreibt eine Datei. Die Zählung über alle Läufe ist Projektwissen und
+   * gehört deshalb zum Projekt, nicht in den Tarball.
+   */
+  intentMemoryPath: z.string().default('.shinon/intent-memory.json'),
+  /**
+   * Namensraum des dauerhaften SALVAGED_PROSE-Zaehlers in der Ablage
+   * (`shinon_index_store`). Leer = keine Persistenz; dann zaehlt der Prompter
+   * nur im Prozess (das Verhalten vor 2026-10-19).
+   *
+   * Der Zaehler gehoert zum LAUF (Sitzung), nicht zum Workspace — deshalb ein
+   * eigener Namensraum und keine Projektdatei; die Ablage ist ohnehin der eine
+   * dauerhafte Ort, den dieses Profil schon fuer Scoring und Persona nutzt.
+   */
+  salvageNamespace: z.string().default(SALVAGE_NAMESPACE),
   /**
    * Ablage gelernter Bausteine (Phase 4), relativ zum ARBEITSVERZEICHNIS.
    *

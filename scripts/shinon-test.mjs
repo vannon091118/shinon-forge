@@ -7,11 +7,15 @@
  * scripts/lib/repo.mjs - derselben Quelle, die auch scripts/build.mjs nutzt,
  * damit Gate und Build nicht auseinanderdriften.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-6cd6adc0ab9c
+ * Pro Paket: package.json + Ressourcen, Namensvertrag, index.js, client.js,
+ * cordis.patch.yml (YAML-Schema). Dazu: Legacy-Guard und Profil-Komposition.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
+import { diaryHistory, diaryIssues } from './lib/diary.mjs';
+import { canonIssues } from './lib/canon.mjs';
+import { structureIssues } from './lib/structure.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -105,6 +109,31 @@ if (!schemastery) {
 
 console.log('\n🔗 Quell-Zwillinge:');
 checkIssues('eine Quelle, ein Spiegel — keine Drift', () => repo.twinIssues());
+// Der Riegel gegen die Rueckkehr: die sechs Host↔Host-Naehte stehen seit
+// 2026-10-20 EINMAL (`@shinon/seams`). Eine Kopie ohne Marker waere fuer
+// `twinIssues` unsichtbar — dieser Schritt prueft, dass sie nirgends sonst steht.
+console.log('\n🧵 Host-Naht-Kern:');
+checkIssues('sechs Naehte einmal definiert, keine Host-Spiegel', () => repo.hostMirrorIssues());
+
+// Das Dev-Tagebuch haelt die Geschichte, aber keine Behauptung: jedes Kapitel
+// haengt an einem Commit-Bereich und an einem Pfad, den es heute noch gibt.
+// Ohne git (Fixture, Isolat) ist das ein sichtbarer Skip, kein stilles Gruen.
+console.log('\n📓 Dev-Tagebuch:');
+const diary = diaryHistory();
+if (diary.skip) {
+  console.log(`  ⏭️  ${diary.skip} — Anker nicht pruefbar`);
+} else {
+  checkIssues('jedes Kapitel haengt an Commit und Pfad', () => diaryIssues());
+}
+
+// Der Kanon: ein Name, eine Schreibweise, eine Definition — Globals, Vertraege,
+// Dienste und Begriffe stehen in `docs/contracts/canon.json`.
+console.log('\n📖 Kanon:');
+checkIssues('ein Name, eine Schreibweise, eine Definition', () => canonIssues());
+
+// Struktur: Klassen, Grenzen, Eigentum — was waechst, waechst nicht heimlich.
+console.log('\n🧱 Struktur:');
+checkIssues('jede Datei hat eine Klasse, keine ueberschreitet ihre Grenze', () => structureIssues());
 
 console.log('\n🧩 Generierte Idiome:');
 checkIssues('eine Quelle, generierte Blöcke — kein Drift', () => [

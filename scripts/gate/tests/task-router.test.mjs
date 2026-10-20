@@ -7,7 +7,27 @@
  * schiefgehen koennen, werden getrennt geprueft:
  *
  *   1. DAS VOKABULAR. Der Router und der Enhancer fuehren dieselbe Liste. Kein
- * → Kanon: docs/COMMENT-KANON.md#k-687e05f7f81b
+ *      Paket importiert das andere; die Uebereinstimmung wird hier von AUSSEN
+ *      gepinnt. Zwei Listen, die auseinanderlaufen, waeren ein stiller Fehler:
+ *      der Router wuerde jede Klasse des Enhancers als unbekannt verwerfen.
+ *   2. DIE POLICY. Die Tabelle aus §16 (CHAT/LOOKUP/TRANSFORM linear,
+ *      MULTI_STEP_TASK/LONG_RUNNING_GOAL Kandidat) ist eine ZAHLENTABELLE plus
+ *      Schwelle, und die Entscheidung ist eine reine Funktion. Damit ist sie
+ *      ohne Modell, ohne Netz und ohne Zustand nachpruefbar.
+ *
+ * Drei Ebenen, bewusst getrennt:
+ *   a. Die Daten: Vokabular, Gewichte, Schwelle — und ihre Uebereinstimmung
+ *      zwischen beiden Paketen.
+ *   b. Die Entscheidung als reine Funktion: die Verhaltenstabelle aus §16, die
+ *      Schwelle als POLICY (heben und senken aendert das Ergebnis, ohne Code
+ *      anzufassen) und die Fail-closed-Faelle (kein Etikett -> kein Kandidat).
+ *   c. Der ECHTE Durchlauf: beide Bundles haengen an EINEM echten
+ *      Cordis-Context, gefahren wird der echte Waterfall `agent/pre-step`, der
+ *      Enhancer emittiert seinen validierten Datensatz auf dem echten Bus, und
+ *      der Router entscheidet daraus. Der Modell-Provider ist zwangslaeufig eine
+ *      Attrappe (extern, braucht Zugangsdaten); alles andere ist echt.
+ *
+ * Kein Netz, kein Modell, kein node_modules im Repo.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +37,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const PACKAGES = ['prompter', 'task-router'];
 const ROOT = new URL('../../../', import.meta.url);
@@ -34,6 +55,7 @@ async function loadBundles() {
   for (const name of PACKAGES) {
     cpSync(new URL(`packages/${name}/`, ROOT), join(work, name), { recursive: true });
   }
+  provideSeamCore(work);
   const shim = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(
@@ -207,6 +229,9 @@ test('Fail-closed: ohne gueltiges Etikett gibt es keinen Kandidaten', () => {
     { name: 'leere Klasse', value: { ...record, intentClassification: '' }, reason: 'NO_CLASSIFICATION' },
     { name: 'Klasse kein String', value: { ...record, intentClassification: 7 }, reason: 'NO_CLASSIFICATION' },
     { name: 'erfundene Klasse', value: { ...record, intentClassification: 'VIBE' }, reason: 'UNKNOWN_CLASS:VIBE' },
+    // Die Enthaltung des Resolvers ist KEINE Klasse: sie wird benannt, nie
+    // als Kandidat gelesen — auch dann nicht, wenn jemand sie einschmuggelt.
+    { name: 'ausdrueckliche Enthaltung', value: { ...record, intentClassification: 'UNDEFINED' }, reason: 'INTENT_UNDEFINED' },
   ];
   for (const { name, value, reason } of cases) {
     const decision = router.decide(value, {});
@@ -267,7 +292,6 @@ const result = (over = {}) => JSON.stringify({
   removedRequirements: [],
   uncertainties: [],
   references: [],
-  intentClassification: 'TRANSFORM',
   ...over,
 });
 
@@ -301,7 +325,10 @@ function chain({ prompterConfig = {}, routerConfig = {}, llm, goals, routerFirst
   };
 }
 
-const RAW = 'bitte baue die zwoelf neuen module und teste sie danach gruendlich';
+// MULTI_STEP_TASK ueber das BESTEHENDE Pattern `tests` — kein neuer Trigger.
+const RAW = 'schreib tests fuer die kette und pruefe sie danach';
+/** TRANSFORM ueber `refactor`: Gewicht 0, also unter der Schwelle. */
+const TRANSFORM_RAW = 'refaktoriere den prompter gruendlich';
 
 /**
  * Eine Attrappe des ECHTEN Goal-Dienstes: genau die Methoden, die der Router
@@ -333,8 +360,11 @@ function fakeGoals({ current = undefined, fail = null } = {}) {
   };
 }
 
-test('Kette: die validierte Klassifikation des Enhancers entscheidet den Router', async () => {
-  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+test('Kette: die Runtime-Klasse entscheidet den Router — nicht das Modell', async () => {
+  // Das Modell BEHAUPTET hier CHAT; der Text ist ein Mehrschritt-Auftrag. Der
+  // Resolver des Prompters klassifiziert vor dem One-Shot, also steht im
+  // Datensatz MULTI_STEP_TASK — und der Router entscheidet darauf.
+  const llm = fakeLlm(result({ intentClassification: 'CHAT' }));
   const { ctx, decisions, prompterRecords, prompterDispose, routerDispose } = chain({ llm });
   const claimed = [userMessage(RAW)];
 
@@ -362,32 +392,33 @@ test('Kette: die validierte Klassifikation des Enhancers entscheidet den Router'
 
 test('Kette: linear bleibt linear, und ohne Route gibt es gar keinen Kandidaten', async () => {
   // TRANSFORM -> linearer Turn, obwohl der Enhancer gelaufen ist.
-  const llm = fakeLlm(result({ intentClassification: 'TRANSFORM' }));
+  const llm = fakeLlm(result());
   const first = chain({ llm });
-  await first.ctx.waterfall(prompter.PRE_STEP_EVENT, stepPayload([userMessage(RAW)]), loopDefault([userMessage(RAW)]));
+  await first.ctx.waterfall(prompter.PRE_STEP_EVENT, stepPayload([userMessage(TRANSFORM_RAW)]), loopDefault([userMessage(TRANSFORM_RAW)]));
   assert.equal(first.decisions.length, 1);
   assert.equal(first.decisions[0].outcome, 'linear');
   assert.equal(first.decisions[0].reason, 'BELOW_THRESHOLD:0<2');
   first.prompterDispose();
   first.routerDispose();
 
-  // Ohne Modellroute laeuft der Enhancer nicht (NO_ROUTE) — dann gibt es keine
-  // Klassifikation, und der Router erfindet keine: KEIN Goal-Workflow.
+  // Ohne Modellroute laeuft der Enhancer nicht (NO_ROUTE) — die KLASSE steht
+  // trotzdem: sie kommt aus dem Resolver, nicht aus der Modellantwort. Der
+  // Router entscheidet also auch ohne einen einzigen Modellaufruf.
   const idle = fakeLlm(result());
   const second = chain({ prompterConfig: { provider: '', model: '' }, llm: idle });
   await second.ctx.waterfall(prompter.PRE_STEP_EVENT, stepPayload([userMessage(RAW)]), loopDefault([userMessage(RAW)]));
   assert.equal(idle.calls.length, 0, 'ohne Route kein Aufruf');
   assert.equal(second.prompterRecords.length, 1);
-  assert.equal(second.prompterRecords[0].intentClassification, null, 'keine Klassifikation ohne Ergebnis');
+  assert.equal(second.prompterRecords[0].intentClassification, 'MULTI_STEP_TASK', 'die Klasse haengt nicht am Modell');
   assert.equal(second.decisions.length, 1);
-  assert.equal(second.decisions[0].outcome, 'linear');
-  assert.equal(second.decisions[0].reason, 'NO_CLASSIFICATION', 'das Etikett fehlt — also kein Kandidat, ohne zu raten');
+  assert.equal(second.decisions[0].outcome, 'goal', 'der Kandidat steht auch ohne One-Shot');
+  assert.equal(second.decisions[0].activation, 'ACTIVATION_DISABLED', 'Kandidat ja, Goal nein — der Schalter fehlt');
   second.prompterDispose();
   second.routerDispose();
 });
 
 test('Kette: die Schwelle aus der Konfiguration wirkt bis in den Datensatz', async () => {
-  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const llm = fakeLlm(result());
   const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, routerConfig: { threshold: 3 } });
   const claimed = [userMessage(RAW)];
 
@@ -470,7 +501,7 @@ test('Der Listener kann den Schritt nicht mitreissen: jede Form von Unsinn ist e
 });
 
 test('Laden: nach dispose entscheidet nichts mehr', async () => {
-  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const llm = fakeLlm(result());
   const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm });
   routerDispose();
   const claimed = [userMessage(RAW)];
@@ -519,7 +550,7 @@ test('§17: der eigene Code enthaelt keinen Goal-Mechanismus, und die aufgerufen
 });
 
 test('§17: ein Kandidat wird zu einem echten Goal — mit der rohen Absicht und Shinons Runde', async () => {
-  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const llm = fakeLlm(result());
   const goals = fakeGoals();
   const { ctx, decisions, prompterRecords, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true } });
   const payload = stepPayload([userMessage(RAW)]);
@@ -544,7 +575,7 @@ test('§17: ein Kandidat wird zu einem echten Goal — mit der rohen Absicht und
 });
 
 test('§17: eine vorhandene Absicht wird NIE automatisch ueberschrieben', async () => {
-  const llm = fakeLlm(result({ intentClassification: 'LONG_RUNNING_GOAL' }));
+  const llm = fakeLlm(result());
   const goals = fakeGoals({ current: { id: 'mensch-1', revision: 7, phase: 'paused' } });
   const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true } });
   const payload = stepPayload([userMessage(RAW)]);
@@ -570,7 +601,7 @@ test('§17: ohne Dienst, ohne Schalter oder ohne lebenden Agenten entsteht kein 
     { name: 'DSH lehnt ab', goals: fakeGoals({ fail: 'create' }), routerConfig: { activate: true }, activation: 'GOAL_ERROR:GOAL_ALREADY_EXISTS', creates: 1 },
   ];
   for (const { name, goals, routerConfig, activation, creates } of cases) {
-    const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+    const llm = fakeLlm(result());
     const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig });
     const payload = stepPayload([userMessage(RAW)]);
 
@@ -587,7 +618,7 @@ test('§17: ohne Dienst, ohne Schalter oder ohne lebenden Agenten entsteht kein 
   }
 
   // Ohne vorgemerkten Schritt ist die Zuordnung nicht geraten: kein Goal.
-  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const llm = fakeLlm(result());
   const goals = fakeGoals();
   const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true } });
   ctx.emit(prompter.DECISION_CHANNEL, { contract: prompter.CONTRACT, session_id: 'unbekannt', intentClassification: 'MULTI_STEP_TASK', rawLength: 128 });
@@ -603,7 +634,7 @@ test('§17: die Zuordnung haengt nicht an der Registrierungsreihenfolge', async 
   // Eigenschaft wird gemessen, statt sie anzunehmen — mit umgedrehter
   // Reihenfolge der beiden Bundles.
   for (const routerFirst of [false, true]) {
-    const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+    const llm = fakeLlm(result());
     const goals = fakeGoals();
     const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true }, routerFirst });
     const payload = stepPayload([userMessage(RAW)]);
@@ -618,12 +649,12 @@ test('§17: die Zuordnung haengt nicht an der Registrierungsreihenfolge', async 
 });
 
 test('§17: ohne Sitzung im Datensatz wird nicht geraten', async () => {
-  const linear = fakeLlm(result({ intentClassification: 'TRANSFORM' }));
+  const linear = fakeLlm(result());
 
   // Kontrolle: genau EINE Vormerkung — die Zuordnung ist eindeutig, also wird
   // ein Datensatz ohne session_id angenommen.
   const single = chain({ llm: linear, goals: fakeGoals(), routerConfig: { activate: true } });
-  const one = stepPayload([userMessage(RAW)]);
+  const one = stepPayload([userMessage(TRANSFORM_RAW)]);
   await single.ctx.waterfall(prompter.PRE_STEP_EVENT, one, loopDefault(one.messages));
   single.ctx.emit(prompter.DECISION_CHANNEL, { contract: prompter.CONTRACT, intentClassification: 'MULTI_STEP_TASK', rawLength: 128 });
   assert.equal(single.decisions[1].activation, 'ACTIVATED', 'eine eindeutige Vormerkung genuegt');
@@ -634,8 +665,8 @@ test('§17: ohne Sitzung im Datensatz wird nicht geraten', async () => {
   // geraten — und ein geratenes Goal ist schlimmer als keines.
   const goals = fakeGoals();
   const many = chain({ llm: linear, goals, routerConfig: { activate: true } });
-  const first = stepPayload([userMessage(RAW)]);
-  const second = { ...stepPayload([userMessage(RAW)]), agent: { session: { id: 'sess-2' } } };
+  const first = stepPayload([userMessage(TRANSFORM_RAW)]);
+  const second = { ...stepPayload([userMessage(TRANSFORM_RAW)]), agent: { session: { id: 'sess-2' } } };
   await many.ctx.waterfall(prompter.PRE_STEP_EVENT, first, loopDefault(first.messages));
   await many.ctx.waterfall(prompter.PRE_STEP_EVENT, second, loopDefault(second.messages));
   many.ctx.emit(prompter.DECISION_CHANNEL, { contract: prompter.CONTRACT, intentClassification: 'MULTI_STEP_TASK', rawLength: 128 });
@@ -653,7 +684,7 @@ test('§17: der Dienst darf SPAETER kommen — wie im echten Boot', async () => 
   // (gemessen: der Sichtbarkeitscheck beim Mounten meldete "nicht sichtbar",
   // obwohl die Domaene aktiv ist). Deshalb wird der Dienst JE ENTSCHEIDUNG
   // gesucht — dieser Test faehrt genau diese Reihenfolge.
-  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const llm = fakeLlm(result());
   const goals = fakeGoals();
   const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, routerConfig: { activate: true } });
   // Erst hier — nach dem Mounten beider Bundles.
@@ -669,7 +700,7 @@ test('§17: der Dienst darf SPAETER kommen — wie im echten Boot', async () => 
 });
 
 test('§17: die Absicht ist die MENSCHLICHE Nachricht, und eine tote Sitzung ist keine Quelle', async () => {
-  const llm = fakeLlm(result({ intentClassification: 'MULTI_STEP_TASK' }));
+  const llm = fakeLlm(result());
   const goals = fakeGoals();
   const { ctx, decisions, prompterDispose, routerDispose } = chain({ llm, goals, routerConfig: { activate: true } });
   // Gemischter Batch wie im echten Betrieb: Harness-Kontext davor und dahinter.

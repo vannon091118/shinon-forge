@@ -5,7 +5,7 @@
     "targets": [
       "scripts/perf-baseline.mjs",
       "scripts/lib/perf-stats.mjs",
-      "docs/audit/PERF-BASELINE-2026-10-17.md"
+      "docs/probes/perf-baseline.json"
     ],
     "expect": "Je Fall dieselbe Operation auf identischer Fixture, P50/P95 über ≥ 25 Läufe (index-cold 7, weil jeder Lauf ~20 MB schreibt), und ein Fingerabdruck je Stichprobe, der beweist, dass alle Läufe dasselbe Ergebnis hatten.",
     "result": "BESTAETIGT",
@@ -410,12 +410,12 @@
     "targets": [
       "packages/project-index/assets/index-core.js",
       "scripts/gate/tests/project-index.test.mjs",
-      "docs/audit/PERF-BASELINE-2026-10-17.md"
+      "docs/probes/perf-baseline.json"
     ],
     "expect": "Wenn die sieben Commits den Preis tragen, muss dieselbe Arbeit in EINER Transaktion deutlich billiger sein — gleiche Zeilenzahl, dieselben Pragmas, abwechselnd in derselben Schleife gemessen —, und der Öffnen-Preis muss danach fallen.",
     "result": "BESTAETIGT",
     "verdict": "WRITE",
-    "evidence": "GEMESSEN, 1fd90f9c85b247d41e6299ca3c9f251a759e556f (main, schmutzig), Node 22.23.3, 6× AMD FX(tm)-6300 Six-Core Processor, Last 3.47 / 3.96 / 4.19. index-open P50 167.243 ms auf vorhandener Datei; sieben Meta-Zeilen einzeln P50 409.57 ms (min 359.48, max 668.983, n=5) gegen 58.468 ms in einer Transaktion (n=5), also ~351 ms Unterschied je Öffnen. Der Vorher-Lauf derselben Fixture (index-open P50 912,2 ms) steht in docs/audit/PERF-BASELINE-2026-10-17.md; Last und Maschine sind zwischen beiden Läufen nicht gleich, der kontrollierte Teil ist die gepaarte Diagnose.",
+    "evidence": "GEMESSEN, 1fd90f9c85b247d41e6299ca3c9f251a759e556f (main, schmutzig), Node 22.23.3, 6× AMD FX(tm)-6300 Six-Core Processor, Last 3.47 / 3.96 / 4.19. index-open P50 167.243 ms auf vorhandener Datei; sieben Meta-Zeilen einzeln P50 409.57 ms (min 359.48, max 668.983, n=5) gegen 58.468 ms in einer Transaktion (n=5), also ~351 ms Unterschied je Öffnen. Der Vorher-Lauf derselben Fixture (index-open P50 912,2 ms) steht in docs/probes/perf-baseline.json; Last und Maschine sind zwischen beiden Läufen nicht gleich, der kontrollierte Teil ist die gepaarte Diagnose.",
     "evidence_note": "Nur Dauern und Zeilenzahlen; kein Tabelleninhalt, kein Schlüssel.",
     "change": "UMGESETZT: openIndex schreibt seine sieben Meta-Zeilen über setMetaMany in EINER Transaktion (packages/project-index/assets/index-core.js); gepinnt von scripts/gate/tests/project-index.test.mjs (alle sieben Schlüssel da, kein einzelner setMeta-Commit im Öffnen).",
     "measurements": {

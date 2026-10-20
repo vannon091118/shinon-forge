@@ -6,7 +6,8 @@
  *
  * Seit 2026-10-17 leitet der Kern NICHTS aus einem Hash ab: Mood, Thema und
  * Beziehungsstufe kommen aus benannten Regeln (`rules` im Vertrag), jeder
- * → Kanon: docs/COMMENT-KANON.md#k-a26b3e47ea18
+ * Übergang trägt Event-ID, Grund und Evidenzlevel. Unbekannte Events ändern
+ * kein semantisches Feld — sie stehen in der Chronik, sonst nichts.
  */
 
 /** Die Evidenzlevel, die ein Übergang nennen darf. */
@@ -122,6 +123,28 @@ export function deriveComposite(contract, prevComposite, event) {
       ? { primary: String(eventType).split('.')[0], secondary: moodResult.mood }
       : (prevComposite?.domain_resonance ?? { primary: 'none', secondary: 'idle' }),
   };
+}
+
+/**
+ * Einen gespeicherten Zustand pruefen — Form, nicht Meinung.
+ *
+ * Fremder Vertrag oder kaputte Huelle: `state: null` und ein benannter Grund.
+ * Der Aufrufer faellt dann auf den leeren Anfang zurueck, statt einen
+ * halbgueltigen Verlauf fortzuschreiben.
+ */
+export function validateNarrativeState(raw, contractName = null) {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return { state: null, reason: 'NOT_AN_OBJECT' };
+  if (contractName !== null && raw.contract !== contractName) return { state: null, reason: 'FOREIGN_CONTRACT' };
+  const state = raw.state;
+  if (
+    state === null || typeof state !== 'object' || Array.isArray(state) ||
+    state.composite === null || typeof state.composite !== 'object' ||
+    !Array.isArray(state.chronicle) || !Array.isArray(state.arcs) ||
+    state.relationships === null || typeof state.relationships !== 'object'
+  ) {
+    return { state: null, reason: 'BAD_SHAPE' };
+  }
+  return { state, reason: null };
 }
 
 /** Der leere Anfangszustand: kein Ereignis, kein Arc, kein Paar. */

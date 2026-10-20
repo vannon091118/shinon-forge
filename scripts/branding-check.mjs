@@ -7,7 +7,27 @@
  * Browser GEWINNEN. Genau das ist die offene Frage: Shinons Overrides treffen gehashte
  * Vendor-Klassen (`EvIC1a_runningWhaleAnimated`, `hHd-Xa_railMark`, `pXSMma_fishHitbox`),
  * und das gelieferte CSS-Modul steht je nach Ladereihenfolge VOR oder NACH unserem
- * → Kanon: docs/COMMENT-KANON.md#k-52a5373a3255
+ * Style-Tag. Ein Test, der nur unseren eigenen Text liest, kann das nicht entscheiden.
+ *
+ * Aufbau: das Skript zieht die CSS-Bloecke der gelieferten Bundles
+ * (`node_modules/@deepseek-ai/<pkg>/lib/client.js` — dieselben Strings, die der Browser
+ * bekommt, inklusive der Wal-APNG-Maske), baut damit und mit dem AUSGELIEFERTEN
+ * `dist/packages/core/client.js` eine eigenstaendige Seite, haengt das Vendor-CSS
+ * ABSICHTLICH ZWEIMAL ein (einmal vor, einmal nach unseren Styles — der unguenstigste
+ * Fall fuer die Quellreihenfolge) und misst im echten Chromium:
+ *
+ *   1. Spezifitaet/Quellreihenfolge: computed `mask`, `background`, `animation` der
+ *      Laufanzeige, `display` des gelieferten Wal-SVGs.
+ *   2. Sichtbarkeit des Hintergrunds: dekodiert das WebP, deckt es den Rahmen, ist es
+ *      dezent und click-through, erreicht ein Klick die UI darunter?
+ *   3. Die drei Marken-Stellen: Zeichen sichtbar, Groesse aus dem Slot, Fallback weg.
+ *   4. Paintbarkeit: laden die beiden Data-URIs (Maske, Persona) als Bild?
+ *
+ * Exit 0 = jede Zusage gemessen und erfuellt; Exit 1 = mindestens eine Messung widerlegt
+ * sie (gemessene Werte im Klartext). Laeuft ohne Install und ohne Server: `--dump-dom`
+ * liefert die Seite nach dem Skriptlauf zurueck.
+ *
+ * Nutzung: node scripts/branding-check.mjs [--keep] [--browser <pfad>]
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';

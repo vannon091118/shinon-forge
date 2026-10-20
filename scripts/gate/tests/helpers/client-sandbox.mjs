@@ -6,7 +6,13 @@
  * und `scripts/gate/tests/markers.test.mjs` prüfen BEIDE das echte Bundle in einem
  * `vm`-Kontext (der eine die Aktivierung, der andere die wirksamen Grenzen aus der
  * Seite). Zwei Kopien derselben Attrappe würden driften und genau den Fehler
- * → Kanon: docs/COMMENT-KANON.md#k-5e9bc74b18ed
+ * wiederholen, den die Tests finden sollen. Diese Datei ist KEIN Test (sie liegt
+ * nicht im Glob `scripts/gate/tests/*.test.mjs`) und läuft in CI ohne node_modules.
+ *
+ * Sie liefert eine Fläche, die bewusst nur das trägt, was die Hälften anfassen:
+ * `document`, `localStorage`/`sessionStorage` (dieselbe Attrappe — ein zweiter
+ * Speicher fällt im Vertragstest auf), eine Uhr ohne echte Timer, `CSS.escape`,
+ * `matchMedia` und den `require`-Vertrag des Loaders (`react` oder Befund).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

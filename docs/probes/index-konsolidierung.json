@@ -1,0 +1,63 @@
+{
+  "id": "index-konsolidierung",
+  "claim": "Der Prompter fuehrt keinen zweiten Index mehr: MAX fragt den Project Index. Gemessen vor/nach der Konsolidierung am 2026-10-18 auf DIESEM Baum (535 Projektdateien, Node v22.23.3).",
+  "targets": [
+    "packages/prompter/assets/index-manager.js",
+    "packages/prompter/index.js",
+    "packages/prompter/assets/schema.js",
+    "profiles/shinon/cordis.patch.yml",
+    ".shinon/prompter-index.json"
+  ],
+  "expect": "Vorher: 11 609 280 Bytes JSON-Zustand, 210,8 ms Laden je Boot, 223 ms Vollauf ueber den Baum, 42,88 ms Abfrage. Nachher: kein eigener Index; der Project Index (446 Dateien, 22 142 976 Bytes SQLite) antwortet mit 167,15 ms Median, der Mount kostet 7,4 ms.",
+  "result": "BESTAETIGT",
+  "verdict": "WRITE",
+  "measured": {
+    "date": "2026-10-18",
+    "method": "node /tmp/index-cost.mjs und node /tmp/runtime-index-cost.mjs gegen den Arbeitsbaum; jede Zeit ein Median aus 3 (Mount/Abfrage) bzw. 5 (resolveContext) Laeufen; der Project Index wurde vor der Messung frisch in ein temporaeres Indexverzeichnis gebaut (runIndex ueber apply, worker:false).",
+    "before": {
+      "runtimeIndex": {
+        "contract": "shinon.prompter/runtime-index/v1",
+        "bytes": 11609280,
+        "entries": 473,
+        "loadMsMedian": 210.8,
+        "rebuildMsMedian": 223,
+        "getContextMsMedian": 42.88,
+        "prompterMountMs": 210.9,
+        "prompterMountRssDeltaMb": 58,
+        "turnMsMedian": 69.26,
+        "contextChars": 27984,
+        "contextSource": "runtime"
+      }
+    },
+    "after": {
+      "runtimeIndex": null,
+      "projectIndex": {
+        "files": 446,
+        "bytes": 22142976,
+        "symbols": 3534,
+        "edges": 1098,
+        "references": 69373,
+        "chunks": 2163,
+        "buildMs": 142970,
+        "prompterMountMs": 7.4,
+        "turnMsMedian": 225.09,
+        "contextChars": 29011,
+        "resolveMsMedian": 167.15,
+        "contextSource": "index"
+      }
+    },
+    "delta": {
+      "persistedStateBytes": -11609280,
+      "bootLoadMs": -203.5,
+      "bootRssMb": -55.6,
+      "secondIndexBuildMs": -223,
+      "perTurnMs": 155.83,
+      "note": "Der Turn wird teurer (42,88 -> 167,15 ms je MAX-Schritt), weil der Project Index Symbole, Kanten und Referenzen mitliefert, die der JSON-Index nie hatte. Der Project-Index-Bau (142,97 s) faellt in beiden Welten an — er ist nicht der Preis der Konsolidierung, sondern der eine Index, den es schon gab."
+    },
+    "limits": [
+      "Die 142,97 s Bauzeit sind eine Maschinenzahl dieser VM (kalter Lauf ueber den vollen Baum, ohne Worker); der versionierte Startscan in docs/probes/project-index-startscan.json misst denselben Lauf mit 2,6 s auf 353 Dateien und bleibt fuer Groessenordnungen die bessere Referenz.",
+      "Der Project Index laeuft beim Mount im Hintergrund; waehrend des Baus ist der MAX-Kontext leer, danach gefuellt. Das ist die bestehende Zusage des Hosts, nicht neu.",
+      "Die Abfragezeiten sind Medianwerte einer warmen Datenbank in-process; ein echter Modell-Turn wurde in diesem Durchgang nicht gefahren."
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 # Shinon — Kurzidee
 
 > **Status:** current — Kurzfassung der Produktidee; der Roh-Export ist archiviert. **Stand:** 2026-10-13
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Shinon ist eine eigenständige, überprüfbare Agenten- und Plugin-Schicht auf DSH.
 DSH liefert Harness, Laufzeit und UI; Shinon ergänzt Produktprofil, Plugins,
@@ -18,4 +18,5 @@ Drei Designprinzipien:
 - **Grenzen vor Aktion:** Plugins handeln nur innerhalb benannter Verträge und Freigaben.
 - **Eine Quelle, prüfbare Nähte:** Zustand und Verantwortlichkeit haben klare Eigentümer; Gates pinnen Übergänge.
 
-Der vollständige Roh-Export liegt in [`docs/archive/IDEA-raw-export.md`](docs/archive/IDEA-raw-export.md).
+Der vollständige Roh-Export ist mit dem Doku-Schnitt vom 2026-10-20 aus dem Baum gefallen;
+sein Wortlaut steht in der Historie (`git show 6fbe41d:docs/archive/IDEA-raw-export.md`).

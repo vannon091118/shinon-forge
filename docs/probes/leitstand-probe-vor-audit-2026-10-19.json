@@ -1,0 +1,80 @@
+{
+  "id": "leitstand-probe-vor-audit-2026-10-19",
+  "claim": "Der Probe VOR dem Audit findet 17 Dateien im Leitstand und 66 Bewertungen aus 22 Sitzungen; das Workspace-Feld der Ablage fehlt auch dort.",
+  "targets": [
+    "docs/probes/leitstand-probe-vor-audit-2026-10-19.json",
+    "docs/probes/leitstand-probe-final-2026-10-19.json",
+    "packages/project-index/index.js"
+  ],
+  "expect": "`files` listet 17 Pfade (ohne README.md, ADRs, BETRIEB.md, src/web und shipment-regeln.js); `index.files` ist 1; `ledger` nennt 91 Zeilen, 66 Bewertungen, 25 Zusammenfassungen, 22 Sitzungen, 0 Waisen und `workspaceField: false`; `trace.skipped` nennt den fehlenden `--trace-url`.",
+  "result": "BESTAETIGT",
+  "verdict": "RESEARCH",
+  "at": "2026-10-18T23:31:57.107Z",
+  "workspace": "/home/vannon/Dokumente/deepseek-harness/default-workspace",
+  "prompt": "Welche Dateien regeln die Zustandsmaschine und die Kapazitaet?",
+  "files": [
+    "BRIEF.md",
+    "PLAN.md",
+    "package.json",
+    "src/api/server.js",
+    "src/data/leitstand.db",
+    "src/domain/assignment.js",
+    "src/domain/shipment-regeln.js",
+    "src/domain/shipment.js",
+    "src/domain/vehicle.js",
+    "src/store/database.js",
+    "src/store/migrations/001_initial.sql",
+    "src/store/repositories.js",
+    "test/api.test.mjs",
+    "test/assignment.test.mjs",
+    "test/domain.test.mjs",
+    "test/store.test.mjs",
+    "test/vehicle.test.mjs"
+  ],
+  "index": {
+    "found": true,
+    "file": "/home/vannon/.cache/shinon/indexes/c21665be886c7421/index.sqlite",
+    "rootId": "c21665be886c7421",
+    "updatedAtMs": 1792364912613,
+    "schemaVersion": 2,
+    "files": 1,
+    "symbols": 6,
+    "chunks": 2,
+    "memoryRows": 0,
+    "indexedPaths": [
+      "BRIEF.md"
+    ],
+    "query": {
+      "files": [],
+      "symbols": 0,
+      "tokens": null
+    }
+  },
+  "ledger": {
+    "file": "/home/vannon/.local/share/shinon/ledger.sqlite",
+    "rows": 91,
+    "scores": 66,
+    "summaries": 25,
+    "sessions": 22,
+    "orphanSessions": 0,
+    "workspaceField": false,
+    "signals": {
+      "accept": 59,
+      "rephrase": 5,
+      "dismiss": 2
+    },
+    "byNamespace": [
+      {
+        "namespace": "shinon.persona-self/v1",
+        "rows": 2
+      },
+      {
+        "namespace": "shinon.scoring/ledger-v1",
+        "rows": 91
+      }
+    ]
+  },
+  "trace": {
+    "skipped": "kein --trace-url"
+  }
+}

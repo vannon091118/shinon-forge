@@ -7,7 +7,16 @@
  * Fähigkeit als eigenes Plugin, ausgewählt über den geänderten Dateipfad.
  *
  * Modi:
- * → Kanon: docs/COMMENT-KANON.md#k-6900c0cc6b3f
+ *   (default)   SLICE    — nur Gates mit passendem Slice im staged Diff
+ *   --local     LOCAL    — die kurze Menge aus policy.engine.local (Hooks)
+ *   --full      FULL     — alle Gates gegen den Stand vs. HEAD (CI)
+ *   --release   RELEASE  — wie --full, für den Release-Lauf
+ *   --branding  Zusatzstufe: die Wirkungs-Messung im echten Chromium
+ *               (scripts/branding-check.mjs) läuft mit. Ohne das Flag steht sie als
+ *               sichtbarer Skip mit Grund in der Ausgabe — sie braucht `dist/` und
+ *               ein Browser-Binary und ist deshalb kein Gate der schnellen Läufe.
+ *
+ * Läuft ohne node_modules — nur node:-Module und scripts/lib/repo.mjs.
  */
 import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';

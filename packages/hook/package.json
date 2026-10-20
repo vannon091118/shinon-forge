@@ -16,10 +16,16 @@
       "platform": "web"
     }
   },
+  "dependencies": {
+    "@shinon/seams": "1.0.0"
+  },
   "peerDependencies": {
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "3.18.5"
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
   }
 }

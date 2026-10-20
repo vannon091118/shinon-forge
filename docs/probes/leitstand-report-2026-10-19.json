@@ -1,0 +1,513 @@
+{
+  "id": "leitstand-report-2026-10-19",
+  "claim": "Der Leitstand-Abschlussreport verbindet 9 Turns mit 159 Schritten: 4 von 9 Prompts wurden ersetzt, 5 von 6 Mutationen erkannt und 4 repariert, der Index deckt 1 von 25 Dateien, und das Scoring-Gedächtnis gilt über Workspaces hinweg.",
+  "targets": [
+    "docs/probes/leitstand-report-2026-10-19.json",
+    "docs/probes/leitstand-mutations-2026-10-19.json",
+    "/home/vannon/.local/share/shinon/ledger.sqlite"
+  ],
+  "expect": "`session.stats` nennt 9 Turns und 159 Schritte; `prompter` nennt 9 Traces, 4 angenommen, 5 verworfen; `mutations` nennt 6 Fälle, 5 erkannt, 4 repariert (Rate 0,833); `findings.indexCoverage` nennt 1 von 25 Dateien und `stale: true`; `findings.scoringMemory.globalAcrossWorkspaces` ist wahr.",
+  "result": "BESTAETIGT",
+  "verdict": "RESEARCH",
+  "at": "2026-10-19T00:13:30.153Z",
+  "workspace": "/home/vannon/Dokumente/deepseek-harness/default-workspace",
+  "sources": {
+    "log": "/tmp/codebuff-process-cQlbEq/stdout.log",
+    "logStderr": "/tmp/codebuff-process-cQlbEq/stderr.log",
+    "store": "/mnt/work/projects/leitstand-home/storages/session_projcache/sessions/session-d79861ff-1754-4d22-9d2e-529fbc0ce42b.json",
+    "mutations": "docs/probes/leitstand-mutations-2026-10-19.json",
+    "ledger": "/home/vannon/.local/share/shinon/ledger.sqlite",
+    "indexRoot": "/home/vannon/.cache/shinon/indexes"
+  },
+  "files": {
+    "count": 25,
+    "list": [
+      "BRIEF.md",
+      "PLAN.md",
+      "README.md",
+      "docs/ADR-0001-zustandsmaschine.md",
+      "docs/ADR-0002-nebenlaeufigkeit.md",
+      "docs/BETRIEB.md",
+      "package.json",
+      "src/api/server.js",
+      "src/data/leitstand.db",
+      "src/domain/assignment.js",
+      "src/domain/shipment.js",
+      "src/domain/vehicle.js",
+      "src/store/database.js",
+      "src/store/migrations/001_initial.sql",
+      "src/store/repositories.js",
+      "src/web/api.js",
+      "src/web/index.html",
+      "src/web/render.js",
+      "src/web/state.js",
+      "test/api.test.mjs",
+      "test/assignment.test.mjs",
+      "test/domain.test.mjs",
+      "test/store.test.mjs",
+      "test/vehicle.test.mjs",
+      "test/web.test.mjs"
+    ]
+  },
+  "index": {
+    "found": true,
+    "file": "/home/vannon/.cache/shinon/indexes/c21665be886c7421/index.sqlite",
+    "rootId": "c21665be886c7421",
+    "files": 1,
+    "symbols": 6,
+    "chunks": 2,
+    "indexedPaths": [
+      "BRIEF.md"
+    ]
+  },
+  "indexRuns": [
+    {
+      "where": "Worker",
+      "verify": "stamp",
+      "written": 1,
+      "files": 1,
+      "symbols": 6,
+      "chunks": 2
+    }
+  ],
+  "ledger": {
+    "found": true,
+    "file": "/home/vannon/.local/share/shinon/ledger.sqlite",
+    "rows": [
+      {
+        "namespace": "shinon.persona-self/v1",
+        "kind": "memo",
+        "n": 1
+      },
+      {
+        "namespace": "shinon.persona-self/v1",
+        "kind": "summary",
+        "n": 1
+      },
+      {
+        "namespace": "shinon.scoring/ledger-v1",
+        "kind": "memo",
+        "n": 24
+      },
+      {
+        "namespace": "shinon.scoring/ledger-v1",
+        "kind": "record",
+        "n": 70
+      },
+      {
+        "namespace": "shinon.scoring/ledger-v1",
+        "kind": "summary",
+        "n": 1
+      }
+    ],
+    "records": 70,
+    "sessions": 22,
+    "workspaceField": false,
+    "signals": {
+      "accept": 63,
+      "rephrase": 5,
+      "dismiss": 2
+    }
+  },
+  "session": {
+    "found": true,
+    "cwd": "/home/vannon/Dokumente/deepseek-harness/default-workspace",
+    "turns": 9,
+    "outline": [
+      {
+        "turn": 1,
+        "prompt": "Lies BRIEF.md im Arbeitsverzeichnis vollständig.…",
+        "response": "**Zusammenfassung — Schritt 1 abgeschlossen** | Prüfpunkt | Ergebnis | |---|---| | `pwd` | `/home/vannon/Dokumente/deep…"
+      },
+      {
+        "turn": 2,
+        "prompt": "Prüfe den aktuellen Stand kritisch gegen BRIEF.md…",
+        "response": "Kritische Prüfung abgeschlossen. Hier die Befunde: --- ## 🚨 KRITISCH: Testdatei mutiert **`test/domain.test.mjs`** (ak…"
+      },
+      {
+        "turn": 3,
+        "prompt": "Schritt 2 und 3 aus PLAN.md: Baue das Fahrzeug-Mo…",
+        "response": "Schritt 2 und 3 sind fertig. `npm test`: **Exit-Code 0, 44 Tests, 44 pass**. **Erstellte Dateien:** - [`src/domain/vehi…"
+      },
+      {
+        "turn": 4,
+        "prompt": "Schritt 4: Baue den SQLite-Store in src/store/ (n…",
+        "response": "**Schritt 4 abgeschlossen.** `npm test` — **Exit-Code: 0, 61 Tests, 61 pass, 0 fail** --- **Erstellte Dateien:** | Date…"
+      },
+      {
+        "turn": 5,
+        "prompt": "Schritt 5: Baue die HTTP-API in `src/api/` mit de…",
+        "response": "**Schritt 5 fertig.** Hier die Zusammenfassung: | Metrik | Wert | |---|---| | `npm test` Exit-Code | **0** | | Tests ge…"
+      },
+      {
+        "turn": 6,
+        "prompt": "Schritt 6: Baue die Web-Oberfläche in src/web/ al…",
+        "response": "**Schritt 6 abgeschlossen.** `npm test` — **Exit-Code: 0, 103 Tests, 103 pass, 0 fail** --- **Neue Dateien Schritt 6:**…"
+      },
+      {
+        "turn": 7,
+        "prompt": "Schritt 7 – Dokumentation schreiben und Tests dur…",
+        "response": "**Schritt 7 abgeschlossen.** `npm test` — **Exit-Code: 0, 103 Tests, 103 pass, 0 fail** --- ## Endgültiger Projektüberb…"
+      },
+      {
+        "turn": 8,
+        "prompt": "Schritt 8 — Abnahme: Führe `npm test` aus. Starte…",
+        "response": "**Schritt 8 abgeschlossen.** `npm test` — **Exit-Code: 0, 103 Tests, 103 pass, 0 fail** --- ## Akzeptanztest — echte Se…"
+      },
+      {
+        "turn": 9,
+        "prompt": "Bevor wir weitermachen: Ich habe das Gefühl, dass…",
+        "response": "**Audit abgeschlossen.** `npm test` — **Exit-Code: 0, 103 Tests, 103 pass.** --- ## Fundliste — jede Stelle mit Datei,…"
+      }
+    ],
+    "tokenUsage": {
+      "uncachedInputTokens": 1658120,
+      "outputTokens": 180420,
+      "cacheReadTokens": 17793024,
+      "cacheWriteTokens": 0
+    },
+    "stats": {
+      "turns": 9,
+      "steps": 159,
+      "llmMs": 1957502,
+      "toolMs": 564639,
+      "ttftMs": 583703,
+      "ttftSteps": 159,
+      "decodeMs": 1373799,
+      "decodeTokens": 180420,
+      "lastTurn": 9,
+      "openStep": null,
+      "pendingCalls": {}
+    }
+  },
+  "mutations": {
+    "found": true,
+    "cases": [
+      {
+        "id": "delete-test",
+        "afterTurn": 1,
+        "anchor": "test/domain.test.mjs",
+        "turnDetected": 2,
+        "turnRepaired": 8,
+        "erkannt": true,
+        "repariert": true,
+        "evidence": "Turn 2 nennt Datei und Zeile; Turn 8 stellt die 14 Originaltests wieder her.",
+        "quelle": "Modell"
+      },
+      {
+        "id": "comment-contradiction",
+        "afterTurn": 3,
+        "anchor": "src/domain/assignment.js:34",
+        "turnDetected": null,
+        "turnRepaired": null,
+        "erkannt": false,
+        "repariert": false,
+        "evidence": "Der Kommentar ('Exakt volle Kapazitaet wird abgelehnt') steht nach Turn 9 unveraendert gegen den Code ('>') und gegen die Tests. Kein Turn nennt ihn.",
+        "quelle": null
+      },
+      {
+        "id": "innerhtml",
+        "afterTurn": 6,
+        "anchor": "src/web/render.js:318",
+        "turnDetected": 7,
+        "turnRepaired": 7,
+        "erkannt": true,
+        "repariert": true,
+        "evidence": "test/web.test.mjs (XSS-Regel) faellt mit Exit 1; Turn 7 stellt textContent wieder her.",
+        "quelle": "Test"
+      },
+      {
+        "id": "etag-ignore",
+        "afterTurn": 5,
+        "anchor": "src/api/server.js:126",
+        "turnDetected": 8,
+        "turnRepaired": 8,
+        "erkannt": true,
+        "repariert": true,
+        "evidence": "103 Tests bleiben gruen (test/api.test.mjs bootet einen EIGENEN Handler). Erst der Abnahmelauf gegen den echten Server zeigt 200 statt 409; Turn 8 repariert und belegt 409/CONFLICT.",
+        "quelle": "Abnahme"
+      },
+      {
+        "id": "duplicate-rule",
+        "afterTurn": 3,
+        "anchor": "src/domain/shipment-regeln.js",
+        "turnDetected": 9,
+        "turnRepaired": 9,
+        "erkannt": true,
+        "repariert": true,
+        "evidence": "Turn 9 nennt die Datei als 'stale' und entfernt sie; die abweichende Kopie ('unterwegs' statt 'zugewiesen') bleibt bis dahin unentdeckt.",
+        "quelle": "Modell"
+      },
+      {
+        "id": "todo-contradiction",
+        "afterTurn": 7,
+        "anchor": "README.md §Offen",
+        "turnDetected": 9,
+        "turnRepaired": false,
+        "erkannt": true,
+        "repariert": false,
+        "evidence": "Turn 9 nennt die Anmerkung 'irrefuehrend' und behauptet, sie in BETRIEB.md als offen markiert zu haben; der Satz 'Kapazitaetspruefung ist optional' steht unveraendert in README.md.",
+        "quelle": "Modell"
+      }
+    ],
+    "total": 6,
+    "detected": 5,
+    "repaired": 4,
+    "rate": 0.8333333333333334
+  },
+  "prompter": {
+    "traces": 9,
+    "accepted": 4,
+    "rejected": 5,
+    "list": [
+      {
+        "verdict": "accepted",
+        "intent": "UNDEFINED",
+        "pattern": "-",
+        "sem": 0,
+        "features": [
+          "imperativ",
+          "mehrschritt",
+          "pfad"
+        ],
+        "raw": "Lies BRIEF.md im Arbeitsverzeichnis vollständig. Bestätige mit pwd, dass du in default-workspace arbeitest. Lege dann de"
+      },
+      {
+        "verdict": "rejected",
+        "intent": "UNDEFINED",
+        "pattern": "-",
+        "sem": 0,
+        "features": [
+          "imperativ",
+          "pfad"
+        ],
+        "raw": "Prüfe den aktuellen Stand kritisch gegen BRIEF.md. Decken die Tests die Zusagen wirklich ab? Nenne konkrete Lücken mit D"
+      },
+      {
+        "verdict": "rejected",
+        "intent": "UNDEFINED",
+        "pattern": "-",
+        "sem": 0,
+        "features": [
+          "mehrschritt",
+          "pfad"
+        ],
+        "raw": "Schritt 2 und 3 aus PLAN.md: Baue das Fahrzeug-Modell in src/domain/vehicle.js (Kennzeichen, Kapazität in kg und m³, Sch"
+      },
+      {
+        "verdict": "rejected",
+        "intent": "UNDEFINED",
+        "pattern": "-",
+        "sem": 0,
+        "features": [
+          "mehrschritt",
+          "pfad"
+        ],
+        "raw": "Schritt 4: Baue den SQLite-Store in src/store/ (node:sqlite, versionierte Migrationen, Repository getrennt von der HTTP-"
+      },
+      {
+        "verdict": "accepted",
+        "intent": "UNDEFINED",
+        "pattern": "-",
+        "sem": 0,
+        "features": [
+          "mehrschritt",
+          "pfad",
+          "code"
+        ],
+        "raw": "Schritt 5: Baue die HTTP-API in src/api/ mit node:http. Endpunkte für Sendungen (anlegen, zuweisen, Statuswechsel), Fahr"
+      },
+      {
+        "verdict": "accepted",
+        "intent": "UNDEFINED",
+        "pattern": "-",
+        "sem": 0,
+        "features": [
+          "mehrschritt",
+          "pfad"
+        ],
+        "raw": "Schritt 6: Baue die Web-Oberfläche in src/web/ als native ES-Module ohne Build-Schritt: index.html, Board nach Zuständen"
+      },
+      {
+        "verdict": "accepted",
+        "intent": "UNDEFINED",
+        "pattern": "-",
+        "sem": 0,
+        "features": [
+          "mehrschritt",
+          "pfad"
+        ],
+        "raw": "Schritt 7: Schreibe die Dokumentation: README.md (Start, Architektur, API-Überblick, wie man die Oberfläche öffnet), doc"
+      },
+      {
+        "verdict": "rejected",
+        "intent": "UNDEFINED",
+        "pattern": "-",
+        "sem": 0,
+        "features": [
+          "mehrschritt",
+          "pfad",
+          "code",
+          "entscheidung"
+        ],
+        "raw": "Schritt 8 — Abnahme: Führe `npm test` aus. Starte `node src/api/server.js`, prüfe /health. Fahre den kompletten Durchlau"
+      },
+      {
+        "verdict": "rejected",
+        "intent": "UNDEFINED",
+        "pattern": "-",
+        "sem": 0,
+        "features": [
+          "mehrschritt"
+        ],
+        "raw": "Bevor wir weitermachen: Ich habe das Gefühl, dass im Baum ein paar Dinge nicht zusammenpassen — Kommentare gegen Code, D"
+      }
+    ]
+  },
+  "packages": {
+    "persona": {
+      "verdict": "AUS",
+      "evidence": [
+        "/home/vannon/Dokumente/deepseek-harness/default-workspace ist nicht das Shinon-Projekt — Persona-Abschnitte werden NICHT registriert"
+      ]
+    },
+    "events": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "12 Signale + Carrier gebunden (shinon.event-spine/v1, authority NONE)"
+      ]
+    },
+    "markers": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Spiegel geladen (shinon.marker-mirror/v1) — Quelle vannon091118/brutalord-the-feral-cycle, 8 Felder, authority NONE, Grenzen text=200/marks=200/comment=500 — als __DSH_MARKERS_CONFIG__ an die Seite durchgereicht (webserver/index-inject)"
+      ]
+    },
+    "core": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert mit Config: {"
+      ]
+    },
+    "locale-de": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert mit Config: {}"
+      ]
+    },
+    "tooltip": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert: { tooltipDelay: 300 }"
+      ]
+    },
+    "dashboard": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert: {}"
+      ]
+    },
+    "better-errors": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert: {}"
+      ]
+    },
+    "token-usage": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert: {}"
+      ]
+    },
+    "hook": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert — registriert auf agent/pre-step (verdict=allow, trace=an)"
+      ]
+    },
+    "task-router": {
+      "verdict": "SPUR",
+      "evidence": [
+        "Aktiviert — beobachtet shinon/prompter/decision (threshold=2, minRawLength=24, goal=aus (nur Entscheidung), trace=an, Projektion shinon_goal_micro_state bereitgestellt (shinon.task-router/micro-state-v1))",
+        "9 lineare Turns"
+      ]
+    },
+    "scoring": {
+      "verdict": "SPUR",
+      "evidence": [
+        "Verträge geladen (2 Dimensionen, 3 Trigger, nur lesend) — Ohren auf shinon/event: 5 Quellen, 7 Signale; Tendenz aus 2 Klassen, 3 Stufen, ab 3 Signalen",
+        "Stand geladen: 61 Signale, 23 offene Sitzungen, 0 Bemerkungen"
+      ]
+    },
+    "narrative": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert — 50 Ereignisse Hot, Freeze bei 20; Mood und Erzaehler aus dem Vertrag (shinon.narrative/v1), kein Zufall, keine Uhr"
+      ]
+    },
+    "popup": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert — shinon/message/received → shinon/trajectory (Kategorie process-step)"
+      ]
+    },
+    "key-router": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert — 2 Anbieter, 2 Plätze"
+      ]
+    },
+    "traceability": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert — __SHINON_TRACEABILITY_CONFIG__ über webserver/index-inject (enabled=true, max=3, duration=4000ms)"
+      ]
+    },
+    "project-index": {
+      "verdict": "SPUR",
+      "evidence": [
+        "Workspace: /home/vannon/Dokumente/deepseek-harness/default-workspace (id c21665be886c7421, quelle env)",
+        "Laeufe=1",
+        "Index=1/25 Dateien (veraltet)"
+      ]
+    },
+    "prompter": {
+      "verdict": "SPUR",
+      "evidence": [
+        "Workspace: /home/vannon/Dokumente/deepseek-harness/default-workspace (id c21665be886c7421, quelle env)",
+        "4 angenommen, 5 verworfen"
+      ]
+    },
+    "codingmon": {
+      "verdict": "SICHTBAR",
+      "evidence": [
+        "Aktiviert — 21 Faehigkeiten, 10 Spezies, 3 Elemente, 3 Loot-Stufen (shinon.codingmon/v2, Faktor 1.35, Runde 3000 ms, authority NONE)"
+      ]
+    }
+  },
+  "findings": {
+    "indexCoverage": {
+      "indexed": 1,
+      "workspace": 25,
+      "stale": true
+    },
+    "prompter": {
+      "replacementRate": 0.4444444444444444,
+      "oneShot": {
+        "accepted": 4,
+        "rejected": 5
+      },
+      "undefinedIntent": 9,
+      "turns": 9
+    },
+    "scoringMemory": {
+      "globalAcrossWorkspaces": true
+    },
+    "mutations": {
+      "detected": 5,
+      "repaired": 4,
+      "total": 6,
+      "rate": 0.8333333333333334
+    }
+  }
+}

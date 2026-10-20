@@ -6,7 +6,9 @@
  * stehen in commit-policy-file.mjs.
  *
  * Fail-closed in drei Richtungen: ein unbekannter Schlüssel, eine unbekannte
- * → Kanon: docs/COMMENT-KANON.md#k-2d8c5ca52d5c
+ * Version oder ein unbekanntes Preset ergibt Fehler — nie einen stillen Rückfall
+ * auf schwächere Regeln. Die Fußboden-Regeln (Signatur-Footer, co-authored-by)
+ * sind kein Preset-Feld und damit nicht abwählbar.
  */
 import { VANNON_TRAILER } from './commit-text.mjs';
 
@@ -23,7 +25,7 @@ export const FLOOR = Object.freeze({
 /** Erlaubte Trailer-IDs → der eine Text aus commit-text.mjs. */
 const TRAILERS = Object.freeze({ vannon: VANNON_TRAILER });
 
-const TOP_KEYS = ['contract', 'version', 'note', 'default', 'floor', 'presets'];
+const TOP_KEYS = ['contract', 'version', 'note', 'default', 'floor', 'presets', 'name', 'status', 'rules'];
 const PRESET_KEYS = ['basis', 'subject', 'trailer', 'words', 'repair'];
 
 export class PolicyError extends Error {
@@ -111,6 +113,32 @@ function presetIssues(name, preset) {
 }
 
 /**
+ * Die Propsa-Form (name, status, rules) pruefen — NUR die Form, nicht die Werte.
+ * Die Schluessel verlangt das contracts-Gate (Eignerentscheidung 2026-10-18);
+ * fuer die Policy-Aufloesung sind sie inert, ihre Werte-Disziplin prueft das
+ * Gate. Hier gilt: vorhanden heisst wohlgeformt — Pflicht sind sie nicht,
+ * damit fremde --policy-Dateien ohne Propsa-Form weiter lesen.
+ */
+function propsaFormIssues(policy) {
+  const issues = [];
+  const present = ['name', 'status', 'rules'].filter((key) => policy[key] !== undefined);
+  if (present.length === 0) return issues;
+  for (const key of ['name', 'status', 'rules']) {
+    if (policy[key] === undefined) issues.push(`Policy.${key}: fehlt — die Propsa-Form steht entweder ganz oder gar nicht`);
+  }
+  if (policy.name !== undefined && (typeof policy.name !== 'string' || policy.name.trim() === '')) {
+    issues.push('Policy.name: nicht-leerer String');
+  }
+  if (policy.status !== undefined && (typeof policy.status !== 'string' || policy.status.trim() === '')) {
+    issues.push('Policy.status: nicht-leerer String');
+  }
+  if (policy.rules !== undefined && (!Array.isArray(policy.rules) || policy.rules.length === 0)) {
+    issues.push('Policy.rules: nicht-leeres Array');
+  }
+  return issues;
+}
+
+/**
  * Den ganzen Policy-Vertrag prüfen. Ein leeres Array heißt: gültig.
  * @param {unknown} policy Der geparste JSON-Inhalt.
  * @returns {string[]} Alle Befunde, nie nur den ersten.
@@ -146,6 +174,7 @@ export function policyIssues(policy) {
     issues.push(`Policy.default: muss ein vorhandenes Preset nennen (gefunden ${JSON.stringify(policy.default)})`);
   }
   if (policy.note !== undefined && typeof policy.note !== 'string') issues.push('Policy.note: String');
+  issues.push(...propsaFormIssues(policy));
   return issues;
 }
 

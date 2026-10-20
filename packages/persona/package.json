@@ -8,11 +8,14 @@
     "./client": "./client.js",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
+  "dependencies": {
+    "@shinon/seams": "1.0.0"
+  },
   "peerDependencies": {
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "dsh": {
     "bundle": {
@@ -26,5 +29,8 @@
   "meta": {
     "title": "Shinon Forge - Persona",
     "description": "Shinon als Persona-Schicht im DSH-System-Prompt"
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
   }
 }

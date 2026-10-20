@@ -7,7 +7,37 @@
  * liegt danach dauerhaft auf einem Medium, das der Host besitzt. Gefahren wird
  * das nicht gegen Attrappen, sondern gegen die ECHTEN Bausteine der
  * installierten DSH-Fassung in EINEM Prozess:
- * → Kanon: docs/COMMENT-KANON.md#k-0b296a4baf7a
+ *
+ *   Client-Seite                        Host-Seite
+ *   ─────────────                       ───────────
+ *   echter Cordis-Root                  echter Cordis-Root
+ *   ctx.typert  (TypertRegistry)        ctx.typert  (TypertRegistry)
+ *   ctx.connection  <- installConnection ctx.connection (Carrier-Gegenstelle)
+ *   ctx.remote      <- api-gateway       ctx.typertGateway <- api-gateway
+ *   ctx.remote.$mount(Beitrag)           CodingmonRemote (unser Dienst)
+ *                                        pet-store -> storage-json -> Datei
+ *
+ * Das BINDEGLIED ist der IN-PROCESS-CARRIER: DSHs Client-Verbindung nimmt einen
+ * `transport.rpc` entgegen (`installConnection(ctx, { transport })`, im Browser
+ * ueber `globalThis.__DSH_TRANSPORT__`), und `ctx.connection.rpc.open` bzw.
+ * `call` ist genau der Weg, den das Gateway auf der Client-Seite bevorzugt
+ * („an in-process Connection carrier provides equivalent streams directly
+ * without opening [the WebSocket]"). Hier wird dieser Traeger gestellt: `call`
+ * reicht den Aufruf an den Interceptor weiter, den das ECHTE Gateway auf
+ * `/api` registriert hat. Kein WebSocket, kein Browser, kein HTTP.
+ *
+ * WAS DIESER TEST NICHT BEWEIST (ehrlich): es laeuft keine echte
+ * Browser-Assembly. Im AUSGELIEFERTEN Client waehlt eine kompilierte Liste in
+ * `@deepseek-ai/dsh-api-remotes` die Beitraege aus, und DIESES Paket steht nicht
+ * darauf — der Beitrag muss also erst von einer Client-Composition ausgewaehlt
+ * werden (eine Zeile dort, ausserhalb dieses Forks). Was hier bewiesen ist, ist
+ * die Naht selbst: der Beitrag ist mountbar, das Gateway nimmt ihn an, der Aufruf
+ * landet im Dienst, der Stand liegt danach validiert auf der Platte, und ein
+ * Vertragsbruch wird abgelehnt, ohne das Medium anzufassen.
+ *
+ * Lauf mit `node --test` (CI: .github/workflows/commit-guard.yml). Fehlt die
+ * DSH-Abhaengigkeit (kein node_modules, wie in CI), wird der Test SICHTBAR
+ * uebersprungen statt rot zu werden.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -54,6 +84,7 @@ try {
     json: await import(require.resolve('@deepseek-ai/dsh-storage-json')),
     domain: await import(require.resolve('@deepseek-ai/dsh-storage-domain')),
     registry: await import(require.resolve('@deepseek-ai/dsh-typert-registry')),
+    access: await import(require.resolve('@deepseek-ai/dsh-api-remote-access')),
     gatewayHost: await import(require.resolve('@deepseek-ai/dsh-api-gateway')),
     // Der Gateway-Client liegt daneben auch ungebundelt als ESM.
     gatewayClient: await import(inside('@deepseek-ai/dsh-api-gateway', 'lib/types/client/index.js')),
@@ -61,7 +92,9 @@ try {
   // Die Client-Haelfte der Verbindung gibt es NUR als Browser-Bundle (das Paket
   // liefert dazu nur `.d.ts`). Also laden wir sie so, wie der Browser sie laedt:
   // ueber `window.__ModuleLoader__.load({ id, factory })`.
-  dsh.connection = loadClientBundle(inside('@deepseek-ai/dsh-client-connection', 'lib/client.js'));
+  // Upstream nennt das Browser-Bündel seit der gepinnten Fassung `client.browser.js`
+  // (gemessen an 0.2.1-rc.2; `client.node.js` daneben ist die Node-Fassung).
+  dsh.connection = loadClientBundle(inside('@deepseek-ai/dsh-client-connection', 'lib/client.browser.js'));
 } catch (error) {
   missing.push(`DSH-Bausteine nicht aufloesbar (${String(error?.message ?? error).split('\n')[0]})`);
 }
@@ -124,7 +157,12 @@ async function until(predicate, tries = 400) {
  */
 function makeCarrier() {
   const channels = new Map();
-  const peer = { id: 'operator' };
+  // Der Peer der Gegenstelle: EIGENTUEMER des Hosts (`ownsHost`), mit
+  // lebendigem Signal. Das Gateway verlangt seit der gepinnten Fassung beides
+  // (gemessen an 0.2.1-rc.2: `assertPeerLive` liest `peer.signal`, die
+  // Aufrufpruefung `peer.principal.kind`; ohne sie stirbt jeder Ruf als
+  // `gateway/internal`). Ein In-Process-Carrier IST der Host — also `owner`.
+  const peer = { id: 'operator', signal: new AbortController().signal, principal: { kind: 'owner' } };
   return {
     events: eventsStream,
     transport: {
@@ -183,7 +221,10 @@ const EVENTS_ENDPOINT = '$events';
  * bleibt offen, bis der Client abbricht — das ist das Verhalten, das die
  * Dokumentation des Gateways dem In-Process-Carrier zuschreibt.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-2c76177d02de
+ * Was dieser Traeger NICHT kann: ausgewaehlte Anwendungsereignisse liefern. Die
+ * Ereignis-Auswahl gehoert api-remotes, das hier nicht montiert ist, und dieser
+ * Test fahrt einen unary-Aufruf.
+ * @param {AbortSignal} signal - Abbruch der Generation durch den Client.
  */
 async function* eventsStream(signal) {
   yield { type: 'ready', clientId: 'in-process', host: { home: tmpdir() } };
@@ -201,6 +242,11 @@ async function bootHost(medium) {
   await ctx.plugin(asPlugin(dsh.json), { root: medium });
   await ctx.plugin(asPlugin(dsh.domain), { backend: 'json' });
   await ctx.plugin(dsh.registry.TypertRegistry);
+  // Das Gateway verlangt seit der gepinnten Fassung `remoteAccess` als Dienst
+  // (`static inject = ["typert", "remoteAccess"]`, gemessen an 0.2.1-rc.2):
+  // ohne ihn startet es nicht — und Cordis wirft dabei nichts, der /api-Kanal
+  // bliebe nur still leer. Deshalb mountet der Test ihn hier explizit.
+  await ctx.plugin(dsh.access.RemoteAccessService);
   // Die Carrier-Gegenstelle als PLUGIN, nicht als `provide` auf der Wurzel: das
   // Gateway meldet seinen `/api`-Interceptor ueber `ctx.inject(['connection'], …)`
   // an, und Cordis feuert diesen Rueckruf nur fuer einen Dienst, der aus einem
@@ -384,7 +430,13 @@ test('Zusage: der Stand geht durch die Naht und liegt danach validiert auf der P
   // der Dienst reicht weiter, der Spiegel ergaenzt `storedAt` und prueft, und
   // die deklarierte Tabelle der Domain prueft beim Ablegen noch einmal. Eine
   // Probe, die eine dieser Pruefungen entfernt, bleibt deshalb gruen; das ist
-// → Kanon: docs/COMMENT-KANON.md#k-93b8c0ad1994
+  // Absicht und keine Luecke. Die Zusage des Vertrags selbst haelt
+  // `scripts/gate/tests/codingmon-store.test.mjs` fest.
+  // Grundlage ist ein WIRKLICH uebertragbarer Stand: der zuletzt angenommene
+  // Datensatz vom Medium. `window.__codingmon.state()` taugt dafuer NICHT — es
+  // fuehrt `damageTotal` als BigInt (das JSON nicht kennt), und ein Aufruf damit
+  // scheiterte schon an der Serialisierung. Genau so entsteht eine Zusage, die
+  // gruen ist, ohne etwas zu beweisen.
   const goed = readFileSync(storeFile, 'utf8');
   const broken = await namespace[uebergabe.UEBERGABE_METHOD]({ ...second, xp: 'viel' });
   assert.equal(broken.ok, false, 'ein Vertragsbruch kommt als Fehlerergebnis zurueck');

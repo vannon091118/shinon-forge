@@ -7,7 +7,17 @@
  * Wenn sie von Hand nachgezogen wird, ist sie nach dem nächsten Paket alt — und
  * eine veraltete Referenz ist wie ein Kompass, der noch auf den letzten Hafen
  * zeigt. Dieses Skript liest die Fakten aus dem Baum (Manifeste, Profil, Git-
- * → Kanon: docs/COMMENT-KANON.md#k-e2ed96e3da8c
+ * Index, dist, vendor) und schreibt NUR den markierten Block:
+ *
+ *   <!-- zahlen:bestand:start -->
+ *   … generierte Tabelle …
+ *   <!-- zahlen:bestand:end -->
+ *
+ * Alles außerhalb der Marker bleibt unberührt. `--check` schreibt nicht und
+ * endet mit Exit 1, wenn der Block vom Baum abweicht (für CI und Dry-Runs).
+ *
+ * Die Befehle in der Tabelle sind die Eigentümer der jeweiligen Zahl; wer eine
+ * Zeile ändert, ändert den Messweg hier — nicht die Zahl im Dokument.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -15,7 +25,6 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const FILE = join(ROOT, 'docs', 'ZAHLEN.md');
 const START = '<!-- zahlen:bestand:start -->';
 const END = '<!-- zahlen:bestand:end -->';
 

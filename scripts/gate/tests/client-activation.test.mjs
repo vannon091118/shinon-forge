@@ -7,7 +7,54 @@
  * alle übrigen Suiten grün waren. Der Grund lag nicht in der Logik, sondern im
  * Zugriff: die drei Hälften lesen `ctx.locale`, deklarieren aber `inject: ['slots']`.
  * Ein Cordis-Context ist ein PROXY; ein direkter Dienst-Zugriff ohne Deklaration
- * → Kanon: docs/COMMENT-KANON.md#k-6adb1972ed54
+ * wirft (`cannot get property "locale" without inject`) und kostet die ganze
+ * Aktivierung. Die bis dahin einzigen Client-Tests hängten die Bundles an ein
+ * PLATTES Attrappen-`ctx` an — ein flaches Objekt kann nicht werfen, also war der
+ * Fehler unsichtbar (Regel: „test the real entry path“).
+ *
+ * Zwei Wachen, absichtlich mit verschiedenem Geltungsbereich (der Vertrag, den sie
+ * prüfen, steht in der ausgelieferten Fassung: `dsh-cordis-client-runner/lib/client.js`
+ * — „`ctx.get(name)` performs optional lookup; direct `ctx.serviceName` access is
+ * gated by the fiber's `inject` declaration“):
+ *
+ *   1. STATIK (keine Abhängigkeiten, läuft auch in CI ohne Install): jede
+ *      `packages/<dir>/client.js` darf `ctx.<dienst>` nur lesen, wenn `<dienst>` in
+ *      ihrer `inject`-Liste steht oder eine dokumentierte Cordis-Fläche ist
+ *      (`ctx.effect` aus `fiber.d.ts`, `ctx.on`/`ctx.emit` aus `events.d.ts`, …).
+ *      Kommentare und Strings zählen nicht — der Scan läuft über `codeOnly`
+ *      (`scripts/lib/source-scan.mjs`). Geprüft werden **nur** die Client-Hälften:
+ *      die Host-Hälften lesen ihre Dienste in `ctx.inject([...], (ctx) => …)`-
+ *      Rückrufen, wo der verschachtelte Context seine eigene Deklaration hat —
+ *      ein statischer Scan kann das nicht verfolgen (gemessen: `key-router`,
+ *      `prompter`, `shinon-forge`, `narrative`, `codingmon` `index.js` wären
+ *      Fehlalarme), und der Host-Boot hat seine eigene Diagnose (`dsh-app-boot`).
+ *   2. DYNAMIK (braucht `node_modules`, sonst sichtbarer Skip): jedes Bundle wird in
+ *      einem vm-Kontext mit Browser-Attrappen geladen und über `ctx.plugin(...)` an
+ *      eine ECHTE Cordis-Wurzel gehängt, die `slots` und `locale` aus einer
+ *      Plugin-Fiber anbietet — dieselbe Komposition wie im Client. Zusage: `apply`
+ *      läuft, wirft nicht, und das Menü-Label kommt aus der Registry
+ *      (`@shinon/locale-de`s Wörterbuch), ohne Locale-Dienst aus der deutschen
+ *      Tabelle — beides ohne Wurf.
+ *
+ *   3. MARKE (statisch + dynamisch): drei sichtbare Regressionen, gemessen am
+ *      ausgelieferten Bundle statt am Augenschein. (a) Das Background-Branding
+ *      hing am Hero-Slot und lag damit INNEN in der 34px-Hitbox der Hero-Zeile —
+ *      `position:absolute; inset:0` deckte dort nur die Hitbox, das Fenster sah
+ *      nichts. Es gehört in `shell.overlay` (kind list, scope root), den der
+ *      ui-layout-`AppFrame` frame-weit rendert. (b) Die Laufanzeige („Arbeitet“)
+ *      trug DSHs Wal als CSS-Maske; Shinons Zeichen, seine Palette und seine
+ *      Bewegung müssen das ersetzen. (c) Die Marken-Slots der Sidebar und des
+ *      Hero sind Single-Slots MIT Fallback — gibt ein Besetzer auf, haengt dort
+ *      wieder DSHs Fisch. Deshalb genau EIN Besetzer je Slot, und das eigene
+ *      Zeichen ist aus Kurven gebaut, nicht aus Pixeln.
+ *
+ * Was der Test NICHT beweist (ehrlich): der Locale-Dienst ist eine Attrappe mit
+ * derselben Schnittstelle (`addLanguage`/`register`/`bind`), nicht der echte
+ * DSH-Dienst; ein voller `dsh --profile shinon`-Boot ist hier nicht möglich (die
+ * CLI ist nicht installiert). React, DOM und Uhr sind Attrappen. Die CSS-Regeln
+ * werden als Text geprueft — ob der Browser sie GENAU so anwendet, zeigt erst
+ * ein lebender Boot (Spezifitaet: Attribut + Klasse schlaegt die gelieferte
+ * Klassen-Regel; die Konvention steht hier als Zusage, nicht als Messung).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -452,6 +499,27 @@ test('prompter-client: das Kanal-Literal ist der Host-Kanal (kein Drift)', () =>
   assert.equal(match[1], HOST_PROMPTER_DECISION, 'Client-Kanal ≠ Host-Kanal: das Abo liefe ins Leere');
 });
 
+test('prompter: Fenster-Global und Live-Route heißen auf beiden Seiten gleich', () => {
+  // Der Client kann das Host-Modul nicht importieren (eigenes Bündel), also sind
+  // beide Namen Literale. Gemessen 2026-10-17: Host schrieb
+  // `__SHINON_PROMPTER_TRACE__`, das Panel las `__shinonPrompterTrace` — der
+  // Puffer war da und die Anzeige trotzdem leer. Dieser Test pinnt die Paare.
+  const host = readFileSync(fileURLToPath(new URL('packages/prompter/index.js', ROOT)), 'utf8');
+  const globalName = /export const TRACE_GLOBAL = '([^']+)'/.exec(host);
+  const endpoint = /export const TRACE_ENDPOINT = '([^']+)'/.exec(host);
+  assert.ok(globalName !== null, 'Host deklariert TRACE_GLOBAL nicht');
+  assert.ok(endpoint !== null, 'Host deklariert TRACE_ENDPOINT nicht');
+  const client = stripComments(sourceOf('prompter'));
+  assert.ok(
+    client.includes(`window.${globalName[1]}`),
+    `Client liest window.${globalName[1]} nicht — das Panel bliebe leer`,
+  );
+  assert.ok(
+    client.includes(`'${endpoint[1]}'`),
+    `Client fragt ${endpoint[1]} nicht ab — es gäbe keinen Live-Kanal`,
+  );
+});
+
 test('prompter-client: eine Kanal-Entscheidung landet im Fenster-Spiegel', () => {
   const { registration, sandbox } = loadBundle('prompter');
   const seen = {};
@@ -466,7 +534,17 @@ test('prompter-client: eine Kanal-Entscheidung landet im Fenster-Spiegel', () =>
   registration.factory(requireStub()).apply(fake);
   const handler = seen[HOST_PROMPTER_DECISION];
   assert.equal(typeof handler, 'function', 'kein Abo auf dem Host-Kanal — das Panel bliebe ewig leer');
-  handler({ outcome: 'rejected', mode: 'MAX', reasons: ['NO_JSON'], context_source: 'runtime', session_id: 's1' });
+  handler({
+    outcome: 'rejected',
+    mode: 'MAX',
+    reasons: ['NO_JSON'],
+    context_source: 'runtime',
+    session_id: 's1',
+    // Die Abbruchquote reist im Datensatz; das Panel liest sie aus dem Spiegel.
+    abort: { id: 'KEIN_JSON', label: 'Keine JSON-Antwort' },
+    abort_counts: { KEIN_JSON: 1 },
+    abort_quote: { contract: 'shinon.prompter/abort-v1', turns: 9, aborts: 5, quote: 5 / 9, top: 'KEIN_JSON', topLabel: 'Keine JSON-Antwort', counts: { KEIN_JSON: 3 } },
+  });
   const trace = sandbox.sandbox.__shinonPrompterTrace;
   assert.equal(Array.isArray(trace), true, 'kein Spiegel im Fenster');
   assert.equal(trace.length, 1);
@@ -474,4 +552,57 @@ test('prompter-client: eine Kanal-Entscheidung landet im Fenster-Spiegel', () =>
   assert.equal(trace[0].mode, 'MAX');
   assert.equal(trace[0].context_source, 'runtime');
   assert.deepEqual([...trace[0].reasons], ['NO_JSON']);
+  // Was das Panel BRAUCHT, muss den Kanal überstehen: die Zahlen und die zwei
+  // Gründe. Mehr Felder trägt der Spiegel nicht (der volle Datensatz bleibt auf
+  // dem Kanal) — ein Panel, das `counts` läse, läse dort nichts.
+  assert.deepEqual({ ...trace[0].abort_quote }, {
+    turns: 9, aborts: 5, quote: 5 / 9, top: 'KEIN_JSON', topLabel: 'Keine JSON-Antwort',
+  }, 'die Abbruchquote fällt auf dem Weg über den Kanal weg');
+});
+
+test('prompter-panel: Quote und häufigster Grund stehen in der Zeile', () => {
+  // Der Host schreibt den Fensterspiegel; hier steht er VOR dem Mounten (der
+  // geladene Stand, nicht der Live-Kanal). Gerendert wird das ausgelieferte
+  // Bundle — die Zahl im Text und der Grund im Tooltip.
+  const { registration, sandbox } = loadBundle('prompter');
+  sandbox.sandbox.__shinonPrompterTrace = [{
+    outcome: 'rejected',
+    mode: 'MAX',
+    intent: 'UNDEFINED',
+    context_source: 'runtime',
+    reasons: ['NO_JSON'],
+    abort: { id: 'KEIN_JSON', label: 'Keine JSON-Antwort' },
+    abort_counts: { KEIN_JSON: 1 },
+    abort_quote: { contract: 'shinon.prompter/abort-v1', turns: 9, aborts: 5, quote: 5 / 9, top: 'KEIN_JSON', topLabel: 'Keine JSON-Antwort', counts: { KEIN_JSON: 3 } },
+  }];
+  const captured = [];
+  const fake = {
+    slots: {
+      inject: (_key, callback) => { callback(); return () => {}; },
+      register: (options, component) => { captured.push({ options, component }); return () => {}; },
+    },
+    effect: () => () => {},
+    on: () => () => {},
+  };
+  // Ein React, das den Initialisierer von `useState` AUSFÜHRT — die Attrappe aus
+  // dem Helfer reicht sie durch, und dann wäre `trace` eine Funktion.
+  const react = {
+    createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
+    useState: (value) => [typeof value === 'function' ? value() : value, () => {}],
+    useEffect: () => {},
+    Fragment: Symbol('react.fragment'),
+  };
+  const requireWith = (specifier) => {
+    if (specifier === 'react') return react;
+    throw new Error(`unerwartetes require('${specifier}')`);
+  };
+  registration.factory(requireWith).apply(fake);
+  const panel = captured.find((item) => item.options.name === 'main');
+  assert.ok(panel !== undefined, 'das Panel registriert sich nicht im main-Slot');
+  const nodes = flatten(render(panel.component({})));
+  const text = nodes.map((element) => (Array.isArray(element.children) ? element.children.filter((child) => typeof child === 'string').join('') : '')).join(' ');
+  assert.match(text, /abbr=5\/9 56%/, 'die Quote steht nicht in der Zeile');
+  const quoted = nodes.find((element) => typeof element.props?.title === 'string' && element.props.title.includes('häufigster Grund'));
+  assert.ok(quoted !== undefined, 'der häufigste Grund hat keinen Tooltip');
+  assert.match(quoted.props.title, /5 von 9 Entscheidungen abgebrochen · häufigster Grund: Keine JSON-Antwort/);
 });

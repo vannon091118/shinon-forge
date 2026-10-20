@@ -7,7 +7,21 @@
  * (siehe SHARED_DEPS in scripts/lib/repo.mjs), grün, sobald alle Tarballs
  * im Isolat laden. Eingebunden in `npm test`.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-402f313d670a
+ * Eine Quelle: **npm**. Seit PLAN.md Schritt 3.5 ruft dieser Test kein pnpm
+ * mehr auf (A1); der Tarball entsteht über `npm pack`, das Isolat über
+ * `npm install`. Beide Wege sind gemessen gleichwertig: das Tarball heißt
+ * `shinon-<dir>-<version>.tgz` und entpackt nach `package/`.
+ *
+ * Warum die Pakete PARALLEL laufen (und zwar in einem begrenzten Pool): der
+ * Preis dieses Tests wächst linear mit der Zahl der Plugins — je Paket kostet
+ * ein eigener `npm pack` plus ein netzgebundenes, isoliertes `npm install`
+ * (gemessen 2026-10-11: 19 Pakete ≈ 22 s, also ≈ 1,2 s je Paket). Mit einem
+ * `@shinon`-Plugin mehr wird der Lauf sonst zum Flaschenhals des gesamten
+ * `npm test`. Jedes Paket arbeitet in einem eigenen Unterverzeichnis von WORK,
+ * die Reihenfolge der Ausgabe hängt trotzdem nicht vom Pool ab: die Ergebnisse
+ * werden gesammelt und danach in `repo.discover()`-Reihenfolge geschrieben.
+ *
+ * Option: --keep  Zwischenstände unter /tmp behalten (Debugging).
  */
 import { execFile } from 'child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
@@ -19,6 +33,31 @@ import { resolveRuntime } from './lib/runtime.mjs';
 import * as repo from './lib/repo.mjs';
 
 const WORK = mkdtempSync(join(tmpdir(), 'shinon-pack-'));
+/**
+ * Tarballs aus dem VORLAUF (dir → Pfad).
+ *
+ * Warum ein Vorlauf: seit 2026-10-20 hängen die Host-Hälften an einem
+ * gemeinsamen Kern (`@shinon/seams`, sechs ehemalige Host↔Host-Zwillinge).
+ * Eine deklarierte Abhängigkeit muss auch im ISOLAT liegen — sonst sucht
+ * `npm install` sie in der Registry, wo es sie nicht gibt. Also wird jedes
+ * Paket EINMAL gepackt, und jedes Isolat bekommt seine lokalen Abhängigkeiten
+ * als Tarball daneben. Damit bleibt die Zusage des Tests unverändert („ein
+ * Tarball lädt allein") und die neue Abhängigkeit wird gemessen statt
+ * angenommen.
+ */
+const tarballs = new Map();
+const tarballErrors = new Map();
+
+/** Lokale (`@shinon/*`) Abhängigkeiten eines Pakets — deklariert, nicht geraten. */
+const localDeps = (pkg) => {
+  const names = new Set();
+  for (const field of ['dependencies', 'peerDependencies']) {
+    for (const name of Object.keys(pkg.manifest?.[field] ?? {})) {
+      if (name.startsWith('@shinon/')) names.add(name);
+    }
+  }
+  return [...names].sort();
+};
 /** Immer im Tarball: die Runtime-Dateien plus jede referenzierte Ressource. */
 const shippedFiles = (pkg) => [
   'package.json',
@@ -66,23 +105,32 @@ async function step(steps, name, fn) {
   }
 }
 
-/** Die vier Stufen EINES Pakets — alle Zusagen unverändert, nur in einem Pool lauffähig. */
-async function checkPackage(pkg) {
+/** Der Vorlauf: jedes Paket EINMAL packen (die Isolate brauchen einander). */
+async function packPackage(pkg) {
   const packDir = join(WORK, 'work', pkg.dir);
   const tarballDir = join(WORK, 'tarballs', pkg.dir);
-  const unpackDir = join(WORK, 'unpacked', pkg.dir);
-  const consumerDir = join(WORK, 'consumer', pkg.dir);
-  const steps = [];
-  let tarball = null;
-
-  await step(steps, 'npm pack', async () => {
+  try {
     cpSync(pkg.base, packDir, { recursive: true });
     mkdirSync(tarballDir, { recursive: true });
     const packed = await run('npm', ['pack', '--pack-destination', tarballDir, ...NPM_FLAGS], packDir);
     if (!packed.ok) throw new Error(packed.detail);
     const name = readdirSync(tarballDir).find((file) => file.endsWith('.tgz'));
     if (!name) throw new Error(`kein Tarball in ${tarballDir}`);
-    tarball = join(tarballDir, name);
+    tarballs.set(pkg.dir, join(tarballDir, name));
+  } catch (error) {
+    tarballErrors.set(pkg.dir, error.message);
+  }
+}
+
+/** Die vier Stufen EINES Pakets — alle Zusagen unverändert, nur in einem Pool lauffähig. */
+async function checkPackage(pkg) {
+  const unpackDir = join(WORK, 'unpacked', pkg.dir);
+  const consumerDir = join(WORK, 'consumer', pkg.dir);
+  const steps = [];
+  const tarball = tarballs.get(pkg.dir) ?? null;
+
+  await step(steps, 'npm pack', async () => {
+    if (tarball === null) throw new Error(tarballErrors.get(pkg.dir) ?? 'kein Tarball (Vorlauf abgebrochen)');
   });
 
   await step(steps, 'entpacken + Shipped-Dateien', async () => {
@@ -99,7 +147,16 @@ async function checkPackage(pkg) {
     if (tarball === null) throw new Error('kein Tarball (npm pack ist fehlgeschlagen)');
     mkdirSync(consumerDir, { recursive: true });
     writeFileSync(join(consumerDir, 'package.json'), `${JSON.stringify({ name: `consumer-${pkg.dir}`, version: '1.0.0', private: true }, null, 2)}\n`);
-    const installed = await run('npm', ['install', tarball, ...NPM_FLAGS], consumerDir);
+    // Die lokalen Abhängigkeiten liegen als Tarball NEBEN dem eigenen — sonst
+    // ginge `npm install` für `@shinon/seams` in die Registry und der Test
+    // scheiterte an der Umgebung statt am Paket.
+    const deps = localDeps(pkg).map((name) => {
+      const dir = name.slice('@shinon/'.length);
+      const path = tarballs.get(dir);
+      if (path === undefined) throw new Error(`lokale Abhängigkeit ${name} hat keinen Tarball (${tarballErrors.get(dir) ?? 'nicht gepackt'})`);
+      return path;
+    });
+    const installed = await run('npm', ['install', tarball, ...deps, ...NPM_FLAGS], consumerDir);
     if (!installed.ok) throw new Error(installed.detail);
   });
 
@@ -138,6 +195,7 @@ if (packages.length === 0) {
 }
 
 const started = Date.now();
+await pool(packages, POOL, packPackage);
 const results = await pool(packages, POOL, checkPackage);
 
 for (const { dir, steps } of results) {

@@ -68,7 +68,11 @@ export function contextTokens(context) {
  * wie ein Mensch sie nennt (`packages/prompter/index.js`) — und die Referenz galt
  * als unbekannt, obwohl die Datei im Kontext stand. Das Protokoll meldete
  * "Unbekannte Referenzen ignoriert" für genau die Datei, ueber die der Prompt
- * → Kanon: docs/COMMENT-KANON.md#k-0be2944b10a1
+ * ging.
+ *
+ * Verlangt wird ein Treffer an einer VERZEICHNISGRENZE: der gelieferte Pfad
+ * endet auf `/<Referenz>`. Damit ist eine relative Schreibweise derselben Datei
+ * aufloesbar, ein erfundener Pfad bleibt es nicht.
  */
 export function isRelativeSpelling(reference, known) {
   if (typeof reference !== 'string' || reference === '' || reference.startsWith('/')) return false;
@@ -97,7 +101,8 @@ export const stringList = (value) => (Array.isArray(value) ? value : []);
  * ändern keine Anforderungen", und sie gilt auch für MAX: Kontext erweitert den
  * Blick, nicht den Auftrag. MAX kommt genau eine Regel hinzu: Referenzen muessen
  * im gelieferten Kontext aufloesbar sein — und nur MAX kennt das Feld ueberhaupt
- * → Kanon: docs/COMMENT-KANON.md#k-d0ccc39c6bab
+ * als Pflicht (siehe resultSchema). Wo es fehlt, ist die Regel gegenstandslos,
+ * nicht verletzt.
  */
 export function acceptance(result, options = {}) {
   // Diese Funktion IST die Fail-Richtung des Vertrags — sie darf selbst nicht werfen.
@@ -115,12 +120,17 @@ export function acceptance(result, options = {}) {
   if (needsContext && stringList(result.references).length > 0) {
     const unresolvable = resolveReferences(result.references, options.context ?? null);
     if (unresolvable.length > 0) {
-      // Unbekannte Referenzen protokollieren, aber Kontext trotzdem liefern:
-      // Der Prompt bleibt funktionsfähig — das Modell ignoriert unbekannte
-      // Referenzen von selbst. Komplettes Verwerfen (alte Logik) war zu
-      // aggressiv: eine einzelne unbekannte Referenz (z. B. Vertrag oder
-      // Mood-Text) hat den gesamten Kontext invalidiert.
-      console.warn(`[shinon-prompter] Unbekannte Referenzen ignoriert: ${unresolvable.join(', ')}`);
+      // Zwei Modi, eine Regel: im Standardweg wird protokolliert und der Kontext
+      // trotzdem geliefert (der Prompt bleibt funktionsfähig, das Modell ignoriert
+      // unbekannte Referenzen von selbst). Im WISSENSGEBUNDENEN Weg
+      // (`strictFacts`, Zug 4) ist eine unbekannte Referenz dagegen ein Grund:
+      // wer einen Faktenblock bekommt, darf sich nicht auf Quellen berufen, die
+      // in ihm nicht stehen.
+      if (options.strictFacts === true) {
+        for (const reference of unresolvable) reasons.push(`UNRESOLVED_REFERENCE:${reference}`);
+      } else {
+        console.warn(`[shinon-prompter] Unbekannte Referenzen ignoriert: ${unresolvable.join(', ')}`);
+      }
     }
   }
   return { accepted: reasons.length === 0, reasons };
@@ -135,7 +145,11 @@ export function acceptance(result, options = {}) {
  *
  *   replacePrompt   nur `accepted` ersetzt den Prompt-Text im Schritt
  *   missingMessage  der Grund, wenn die Nachricht nicht auffindbar war — der
- * → Kanon: docs/COMMENT-KANON.md#k-c9ae41353ef9
+ *                   Ausgang heisst dann `rejected`, weil der Roh-Prompt gilt
+ *
+ * Die Tabelle ist ein Vertrag: sie deckt jeden Ausgang ab, den enhance() und
+ * enhanceGuarded() erzeugen (geprueft im Abnahmetest), und sie ist die einzige
+ * Stelle, an der ein Ausgang eine Wirkung hat.
  */
 export const OUTCOME_EFFECTS = {
   accepted: { replacePrompt: true, missingMessage: ['MESSAGE_NOT_FOUND'] },

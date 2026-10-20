@@ -7,7 +7,8 @@
  *   node scripts/stages.mjs --strict   # auch G6..G8 müssen grün sein
  *
  * Jede Stufe hat ein echtes Erfolgskriterium und meldet grün oder rot mit Grund.
- * → Kanon: docs/COMMENT-KANON.md#k-026527b87839
+ * G4 fährt den Stack wirklich hoch (DSH_HOME=<Repo> dsh --profile shinon), alles
+ * andere prüft gegen diese laufende Instanz oder gegen die früheren Stufen.
  */
 import { execFileSync, spawn } from 'child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'fs';

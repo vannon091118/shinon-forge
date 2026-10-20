@@ -7,7 +7,19 @@
  * und die Ereignisse kommen in der Form, die DSH wirklich schreibt —
  * `session/event` mit `(session, event)` und `data`, wie im echten Log gemessen:
  *
- * → Kanon: docs/COMMENT-KANON.md#k-b3aa670f5723
+ *   user/message   data.source.kind = 'user'  (Mensch)  |  'agent-instructions'
+ *                                                    |  'runtime-context'  (Harness)
+ *   turn/end       data.reason.kind = completed | aborted | error
+ *   feedback/message-put     data.item = { messageId, rating }
+ *   feedback/message-delete  data = { sessionId, messageId }
+ *
+ * Damit ist belegbar, was sonst nur behauptet waere: die Ohren haengen am echten
+ * Kanal, Harness-Text zaehlt nicht, der Widerruf rechnet exakt zurueck, und ein
+ * unbekanntes Ereignis aendert nichts. Kein Browser, kein DSH, kein Schluessel.
+ *
+ * Laeuft mit `node --test` — die Pakete werden in ein temporaeres Verzeichnis
+ * kopiert und mit einem Schemastery-Stub versehen (die einzige peer-Dependency,
+ * die hier nicht installiert ist).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +27,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
@@ -28,6 +41,7 @@ async function loadBundles() {
   for (const name of ['events', 'scoring']) {
     cpSync(join(ROOT, 'packages', name), join(work, 'packages', name), { recursive: true });
   }
+  provideSeamCore(work);
   const events = await import(pathToFileURL(join(work, 'packages/events/index.js')).href);
   const scoring = await import(pathToFileURL(join(work, 'packages/scoring/index.js')).href);
   return { events, scoring };

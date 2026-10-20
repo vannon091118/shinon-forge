@@ -1,5 +1,8 @@
 # Shinon Projekt-Kontext
 
+> **Status:** current — projektspezifischer Kontext für Shinon; keine Zahlenquelle. · **Stand:** 2026-10-19
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
+
 Dieser Kontext gilt NUR im Shinon-Projekt. Er enthält interne Daten, die nicht
 in andere Projekte gehören.
 
@@ -13,7 +16,7 @@ in andere Projekte gehören.
 
 1. Alle Änderungen müssen die Tests bestehen lassen (`npm test`)
 2. Commit-Regeln beachten (Vannon-Trailer, keine AI-Footer)
-3. Neue Packages nur nach Dokumentation in docs/ARCHITECTURE.md
+3. Neue Packages nur nach Dokumentation in `AGENTS.md` (Conventions)
 4. Verträge dürfen nicht brechen — Gate-Tests prüfen das statisch
 
 ## Nicht hier rein

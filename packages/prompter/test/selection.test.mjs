@@ -7,7 +7,13 @@
  * unbekannte IDs und Budgetverletzungen fallen jeweils mit eigenem Grund
  * aus; leeres `selected` bleibt gueltig (der Fallback uebernimmt); Kandidaten,
  * die der Runtime gezeigt werden, tragen NIE Inhalt.
- * → Kanon: docs/COMMENT-KANON.md#k-d8a521ca0e5a
+ *
+ * Schlüsselzustände und die unveränderte Haupt-Route stehen bereits in
+ * `route-fallback.test.mjs` (Primärroute/Fallback ohne Schlüssel) und werden
+ * hier nicht doppelt abgebildet; die Unberührtheit des Haupt-Turns pinnt der
+ * Gate-Test `profile-config-override` (provider ≠ prompter).
+ *
+ * Läuft mit `node --test`; kein Netz, kein Modell, kein node_modules nötig.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

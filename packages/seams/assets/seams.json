@@ -1,0 +1,23 @@
+{
+  "name": "shinon.seams/v1",
+  "status": "current",
+  "note": "Inventar der Host↔Host-Nähte: was EINE Definition hat und deshalb in keiner anderen Host-Hälfte (index.js, assets/*.js) mehr stehen darf. Die Client-Hälften bleiben Kopien (Stufe 2, SOURCE_TWINS) — sie sind hier absichtlich nicht gelistet.",
+  "functions": [
+    "digest",
+    "lastHumanMessage",
+    "resolveWorkspaceRoot",
+    "fingerprintRoot",
+    "isInsideRoot",
+    "resolveInRoot",
+    "checkRealpathInside",
+    "reconcileEntries",
+    "toWorkspacePath"
+  ],
+  "literals": [
+    { "name": "NARRATIVE_STATE_CHANNEL", "value": "shinon/narrative/state" },
+    { "name": "NARRATIVE_STATE_CONTRACT", "value": "shinon.narrative/v1" },
+    { "name": "PROMPTER_DECISION_CHANNEL", "value": "shinon/prompter/decision" },
+    { "name": "WORKSPACE_CONTRACT", "value": "shinon.workspace/v1" },
+    { "name": "WORKSPACE_ENV", "value": "SHINON_WORKSPACE_ROOT" }
+  ]
+}

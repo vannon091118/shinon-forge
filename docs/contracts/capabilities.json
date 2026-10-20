@@ -1,0 +1,43 @@
+{
+  "name": "@shinon/prompter — Fähigkeitskarte (Frage → Paket, genau ein Eigentümer, Aufgabenbrief)",
+  "status": "IMPLEMENTED",
+  "note": "Der Kern steht in packages/prompter/assets/capability-map.js (importfrei), die Daten in packages/prompter/assets/capabilities.json, die Bindung in packages/prompter/index.js. Geprüft von packages/prompter/test/capability-map.test.mjs (Zuordnung, Gleichstand, Wortgrenzen, Brief) und scripts/gate/tests/capabilities.test.mjs (jedes Paket genau einmal genannt, jeder Beleg existiert, jede Naht steht wörtlich im Eigentümer). Die Spur pinnt packages/prompter/test/provenance-trace.test.mjs. Die Form prüft das Gate `contracts`.",
+  "rules": [
+    {
+      "positive": "Die Karte ordnet jede Frage genau einer Fähigkeit zu; eine Fähigkeit nennt genau einen Eigentümer (ein Paket-Slug), ihre Frage, ihre Begriffe, ihre Grenze und ihren Beleg. Dieselbe Frage und derselbe Begriff gehören genau einem Eintrag.",
+      "forbidden": "Eine Frage oder ein Begriff in zwei Einträgen, eine Eigentümerliste, ein Eintrag ohne notAnswers, ein Eintrag ohne Beleg, ein Begriff unter drei Zeichen oder ein Begriff, der nicht klein geschrieben ist.",
+      "fallback": "capabilityIssues nennt jeden Befund; die Karte wird dann NICHT halb benutzt: kein Aufgabenbrief, der Enhancer läuft weiter, und der Grund steht im Mount-Log.",
+      "error": "KARTE_UNGUELTIG (Befundliste), KARTE_UNLESBAR (Datei fehlt oder ist kein JSON)",
+      "trace": "Die Karte wird einmal beim Mounten geladen; `runtime.capabilityMap.reason` nennt den Zustand, und jeder Befund wird einzeln geloggt.",
+      "replay": "capabilityIssues und matchCapability sind rein: dieselbe Karte und derselbe Text ergeben dieselbe Antwort, unabhängig von der Reihenfolge der Einträge.",
+      "invariant": "Fragen sind nach trim+lowercase eindeutig; Begriffe sind kartenweit eindeutig; exactly one owner ist eine Zeichenkette, nie eine Liste."
+    },
+    {
+      "positive": "Jede Fähigkeit zeigt auf ein existierendes Paket und trägt ihre Naht wörtlich im eigenen Code; jeder Beleg ist ein relativer Dateipfad, der existiert.",
+      "forbidden": "Ein Eigentümer ohne Verzeichnis unter packages/, ein Paket ohne Fähigkeit, ein Beleg außerhalb des Baums, ein absoluter Pfad und eine Naht, die nur in der Karte steht.",
+      "fallback": "Der Gate-Test schlägt fehl (Exit 1) statt zu warnen: eine Karte, die ins Leere zeigt, ist keine Landkarte.",
+      "error": "CAPABILITY_OWNER_MISSING, CAPABILITY_SEAM_MISSING, CAPABILITY_EVIDENCE_MISSING",
+      "trace": "Der Gate-Test nennt Fähigkeit, Paket und fehlende Naht in der Meldung.",
+      "replay": "Der Test liest den Baum, nicht die Karte: er läuft bei jedem `gate:test` und braucht kein DSH.",
+      "invariant": "Jedes Verzeichnis unter packages/ ist mindestens einmal Eigentümer; jede Naht ist ein Literal im Eigentümer-Paket (ohne test/ und fixtures/)."
+    },
+    {
+      "positive": "Der Aufgabenbrief hat fünf Felder (Frage, Ort, Fähigkeit, Grenze, Beleg), eine harte Zeichengrenze (maxBriefChars, Vorgabe 700) und wird HINTER den veredelten Prompt gehängt, nicht in ihn hineingeschrieben.",
+      "forbidden": "Prosa, Dateiinhalt, Prompt-Text, ein geratener Eigentümer, ein gekürzter Brief und ein Preis- oder Zeichenbudget, das die Karte selbst nicht nennt.",
+      "fallback": "Über der Grenze wird der Brief verweigert (BRIEF_ZU_LANG) und der Grund im Datensatz genannt; der Prompt bleibt ohne Block. Kein Treffer heißt kein Brief, nicht ein beliebiger.",
+      "error": "KEIN_TREFFER, MEHRDEUTIG, BRIEF_ZU_LANG, KARTE_FEHLT, DIREKT, KEIN_ERSETZEN, NACHRICHT_FEHLT, KEIN_LAUF",
+      "trace": "`brief` nennt {contract, id, owner, chars}; `brief_reason` nennt den Grund, wenn kein Brief reist. Der Blocktext reist nicht mit dem Ereignis.",
+      "replay": "renderTaskBrief ist rein und deterministisch; taskBrief gibt bei fehlender Fähigkeit leere Felder statt erfundener.",
+      "invariant": "Der gerenderte Block ist höchstens maxBriefChars lang und enthält alle fünf Feldnamen; er beginnt mit <task_brief und endet mit </task_brief>."
+    },
+    {
+      "positive": "Der Brief ist abgeleitetes Wissen (DERIVED, Zeiger ist der Kartenvertrag) und erscheint genau dann in der Provenienz, wenn er im Prompt steht. Ein Gleichstand wird nicht entschieden.",
+      "forbidden": "Ein DERIVED-Eintrag ohne angehängten Brief, ein Brief als FACT oder PROPOSAL, eine alphabetische Auflösung von MEHRDEUTIG und ein Blocktext im Entscheidungsdatensatz.",
+      "fallback": "Ohne Brief bleibt die Provenienz ohne DERIVED-Eintrag; `brief: null` und `brief_reason` machen die Lücke sichtbar, und der Turn läuft weiter.",
+      "error": "MEHRDEUTIG (Kandidatenliste), KEIN_TREFFER",
+      "trace": "DECISION_CHANNEL trägt den vollen Datensatz; runtime.trace und window.__shinonPrompterTrace tragen dieselben zwei Felder brief und brief_reason.",
+      "replay": "Der Trace-Test fährt den echten agent/pre-step mit Fake-LLM und prüft Prompt, Datensatz und Fensterspiegelung in einem Lauf.",
+      "invariant": "Höchstens ein DERIVED-Eintrag mit pointer shinon.capabilities/v1 je Turn; kein Zeichen des Blocktexts im serialisierten Datensatz."
+    }
+  ]
+}

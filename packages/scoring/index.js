@@ -1,5 +1,7 @@
 import z from '@deepseek-ai/schemastery';
 import { readFileSync } from 'node:fs';
+// Der Entscheidungskanal hat EINE Definition: `@shinon/seams` (Host-Naht-Kern).
+import { PROMPTER_DECISION_CHANNEL } from '@shinon/seams/core';
 
 /**
  * @shinon/scoring — Scorecard, Decay, Relation (Kern, K3) und die Ohren (K5).
@@ -9,7 +11,23 @@ import { readFileSync } from 'node:fs';
  * Signaltabelle (./assets/signal-rules.json) — reines Replay: Anfangszustand +
  * Signalstrom → Scorecard + Injektion + Digest. Deterministisch (kein
  * Math.random, kein Date.now, kein Modell), fail-closed bei Unbekanntem. Die
- * → Kanon: docs/COMMENT-KANON.md#k-3a0bdde97092
+ * reine Mechanik liegt in ./assets/scoring-core.js (keine Imports, testbar ohne
+ * node_modules); diese Datei lädt nur Verträge, haengt die Ohren an den
+ * Ereigniskanal des Spines und re-exportiert den Kern.
+ *
+ * Kein Browser, keine Plattform-Abhaengigkeit: die Quellen sind Ereignisse, die
+ * DSH selbst schreibt (Urteil je Antwort, Widerruf, Sitzungsbemerkung,
+ * Menschen-Text, Turn-Ende). Was intern keine Quelle hat, steht in der Tabelle
+ * als nicht beobachtbar — und wird nie geraten.
+ *
+ * DIE ABLAGE (Zug 2): dieser Host SCHREIBT SELBST NICHTS — kein Dateisystem,
+ * keine Datenbank, kein `Date.now` (das Gate haelt das fest). Der Stand geht
+ * ueber den zweiten, schmalen Dienst des Projekt-Index (`shinon_index_store`,
+ * `shinon.project-index/store-v1`) in die SQLite, die der Index ohnehin fuer das
+ * Projekt fuehrt — und wird beim Start von dort wieder gelesen. Fehlt der Dienst
+ * (ein Profil ohne Project Index) oder ist er unbrauchbar, rechnet das Scoring
+ * unveraendert im Speicher weiter: die Ablage ist eine Verstaerkung, keine
+ * Bedingung.
  */
 
 export {
@@ -59,21 +77,22 @@ export const LEDGER_NAMESPACE = 'shinon.scoring/ledger-v1';
  * HALTUNG und ihre Stufen. Deshalb genau ZWEI Felder — `contract` und EINE
  * Operation `read` — und `read` gibt `null` zurueck, solange nichts zu sagen
  * ist. Dieselbe Bauform wie die Abfrage des Index, aus demselben Grund: kein
- * → Kanon: docs/COMMENT-KANON.md#k-03cfefd4eb43
+ * Paket liest ein anderes, und der Vertragsname wird auf beiden Seiten geprueft.
+ * Die Gleichheit der Namen pinnt `scripts/gate/tests/context-wiring.test.mjs`.
  */
 export const SCORING_SERVICE = 'shinon_scoring_state';
 export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
 
 /**
- * Der Entscheidungskanal des Veredlers als LITERAL (vierte Naht, Phase 3).
+ * Der Entscheidungskanal des Veredlers (vierte Naht, Phase 3) — aus
+ * `@shinon/seams`.
  *
- * Warum als Literal und nicht als Import: Pakete lesen einander nicht (jedes
- * Bundle reist eigenständig). Der Besitzer des Namens ist `@shinon/prompter`
- * (`DECISION_CHANNEL` in dessen `mode-core.js`); Drift pinnt
- * `scripts/gate/tests/context-wiring.test.mjs` auf beiden Seiten — dieselbe
- * Bauform wie beim Ton und der Ablage.
+ * Bis 2026-10-20 stand hier ein Literal ("Pakete lesen einander nicht"); das
+ * Scoring war damit die DRITTE Kopie desselben Namens, und `SOURCE_TWINS`
+ * kannte nur die anderen zwei. Der Naht-Kern ist importfrei, kostet also nicht
+ * die Eigenstaendigkeit, die das Literal begruendet hat.
  */
-export const BLOCKS_DECISION_CHANNEL = 'shinon/prompter/decision';
+export const BLOCKS_DECISION_CHANNEL = PROMPTER_DECISION_CHANNEL;
 
 /** Leere Scorecard: der Stub läuft dann lesend, aber ohne Werte. */
 const EMPTY_SCORING = { contract: 'shinon.scoring-state/unloaded', dimensions: {}, events: {}, relation: { levels: [], initial: null } };
@@ -152,7 +171,13 @@ export function apply(ctx, config) {
   //   fremder Dienst    wer den Namen traegt, muss den Vertrag UND beide
   //                     Operationen tragen. Sonst wird er nicht benutzt.
   //   nicht lesbar      LEER starten (die Tafel steht bei initial) mit dem
-// → Kanon: docs/COMMENT-KANON.md#k-cc7e067c400e
+  //                     GRUND im Protokoll. Ein kaputter Index darf den Host
+  //                     nicht anhalten — und nicht so tun, als sei er heil.
+  //   nicht schreibbar  warnen und weiterrechnen: der laufende Prozess ist
+  //                     wichtiger als die Ablage.
+  // Einmal gefunden, bleibt gefunden. Ein NICHT gefundener Dienst wird dagegen
+  // erneut gefragt: die Mount-Reihenfolge eines Profils ist keine Zusage, und
+  // eine Abfrage ist ein Nachschlagen im Dienstverzeichnis — kein Aufwand.
   let store = null;
 
   /**
@@ -163,8 +188,14 @@ export function apply(ctx, config) {
    * … der Stand bleibt im Speicher", waehrend derselbe Lauf mit dem ersten
    * Signal in genau diese Ablage schrieb (belegt: `Stand geladen: 1 Signale`
    * im naechsten Boot). Ein Satz, der eine Frage beantwortet, die zu diesem
- * → Kanon: docs/COMMENT-KANON.md#k-d2a0f472685d
- */
+   * Zeitpunkt noch offen ist, ist keine Auskunft.
+   *
+   * Deshalb jetzt: gefunden wird sofort genannt (das ist ein Fakt), NICHT
+   * gefunden erst beim ersten echten Gebrauch — dort liegt der Blick hinter
+   * allen Mounts, und dort ist „kein Gedaechtnis" eine Aussage statt einer
+   * Vermutung. Ein Boot ohne ein einziges Signal nennt die Ablage gar nicht:
+   * eine Zeile, die nichts weiss, ist besser als eine, die etwas behauptet.
+   */
   let mountProbe = true;
   let decided = false;
   const announceStore = () => {

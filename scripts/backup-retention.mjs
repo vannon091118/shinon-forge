@@ -7,7 +7,35 @@
  * Regel ist gefährlich: wer die falsche Datei löscht, merkt es erst, wenn er
  * sie braucht. Deshalb steht die Regel hier EINMAL, schriftlich, und jede
  * Anwendung protokolliert sich.
- * → Kanon: docs/COMMENT-KANON.md#k-465b4232cadc
+ *
+ * Die Regel (Standardwerte, alle übersteuerbar) — beide Grenzen sind OBERGRENZEN,
+ * keine Untergrenzen, und die erste Fassung war hier zweideutig: lag eine alte
+ * Sicherung noch unter den jüngsten N, gewann die Anzahl und die Altersgrenze
+ * war wirkungslos. Jetzt gilt:
+ *
+ *   1. Die **jüngsten N** Sicherungen sind die Obergrenze der Anzahl (`--keep`,
+ *      Default 5): was darüber liegt, fliegt.
+ *   2. Zusätzlich fliegt, was **älter als M Tage** ist (`--max-age`, Default 30)
+ *      — auch dann, wenn dadurch weniger als N übrig bleiben. Wer `--bare 30`
+ *      sagt, will keine Sicherung sehen, die älter als einen Monat ist.
+ *   3. Die **jüngste Sicherung wird NIE gelöscht** — auch nicht, wenn sie die
+ *      Altersgrenze reißt. Sonst löschte ein Regelwerk die letzte Kopie.
+ *   4. Angefasst werden ausschließlich Dateien, die wie eine Sicherung AUSSEHEN
+ *      (`.tar.gz`, `.tgz`, `.tar`, `.zip`, `.sqlite`, `.db`). Protokolle,
+ *      Notizen und alles andere bleiben liegen und werden als „unberührt"
+ *      gemeldet — fail-closed statt Sammel-Löschung.
+ *   5. Nichts wird stillschweigend getan: `--dry-run` zeigt den Plan, jeder
+ *      Lauf schreibt eine Zeile nach `<logDir>/backup-retention.jsonl`.
+ *
+ * Der Ordner dokumentiert sich selbst: jeder Lauf schreibt die geltende Policy
+ * samt letztem Ergebnis in `KEEP.md` im Zielordner. Wer später fragt, „warum
+ * fehlt Sicherung 7?", liest das dort und im Protokoll — nicht in der
+ * Erinnerung von jemandem.
+ *
+ * Aufruf:  node scripts/backup-retention.mjs [--dir DIR] [--keep N]
+ *          [--max-age TAGE] [--dry-run] [--json] [--quiet]
+ * Exit:    0 = durchgeführt bzw. (dry-run) nur geplant · 1 = Löschen scheiterte
+ *          · 2 = Bedienfehler (Zielordner fehlt, widersprüchliche Werte)
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';

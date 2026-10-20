@@ -17,6 +17,7 @@ import {
   SKILL_RULES_PATH,
 } from './mode-core.js';
 import { ContextSchema } from './schema.js';
+import { capabilityIssues } from './capability-map.js';
 
 /**
  * Das PAKETVERZEICHNIS als Basis fuer relative Pfade.
@@ -65,7 +66,11 @@ export function notesDir(config) {
  * Aenderungszeit haengen, um eine geaenderte Datei zu bemerken — beides gibt es
  * hier nicht. Ein paar kleine Dateien je Schritt kosten weniger als ein
  * veralteter Stand.
- * → Kanon: docs/COMMENT-KANON.md#k-27780b8e524c
+ *
+ * Was nicht gelesen werden kann, verschwindet nicht: es steht als Grund in
+ * `skipped`. Eine stille Luecke waere hier die teure Variante — ein Modell, das
+ * ohne seinen Zettel arbeitet und nicht weiss, warum.
+ * @returns { notes, skipped, reason } — `notes` sind gepruefte Zettel mit Datei.
  */
 export function readNotes(config, rules) {
   const format = rules?.format ?? {};
@@ -170,7 +175,9 @@ export function readSkillDescription(text) {
  * (name + description + use-when) — nicht der Inhalt. Wie bei den Zetteln gilt:
  * nur was geladen wird, geht in den Block; was nicht passt, bleibt außen vor.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-df74878c5180
+ * Fail-Richtungen, wie beim Zettel: ein unlesbarer Ordner landet in `skipped`,
+ * nicht in der Liste. Ein leerer Ordner ergibt `reason: SKILLS_EMPTY`, nicht
+ * einen still leeren Block.
  */
 export function readSkills(config, rules) {
   const reading = rules?.reading ?? {};
@@ -295,3 +302,46 @@ export function loadJsonContract(path, contract, validate) {
   return validate(parsed);
 }
 
+
+/**
+ * Die Faehigkeitskarte laden und gegen ihren Kern pruefen — EINMAL beim Mounten.
+ *
+ * Die Karte ist der einzige Ort, an dem steht, welches Paket welche Frage
+ * beantwortet. Sie wird nicht je Turn neu gelesen: eine Landkarte, die sich
+ * mitten im Lauf aendert, waere keine. Ein Defekt sperrt den Aufgabenbrief,
+ * nicht den Enhancer (fail-open) — aber er wird gemeldet, und `issues` nennt
+ * jeden Befund, statt die Karte still zu halbieren.
+ */
+export function loadCapabilityMap(path = new URL('../assets/capabilities.json', import.meta.url)) {
+  let map;
+  try {
+    map = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    return { map: null, issues: [], reason: 'KARTE_UNLESBAR', detail: error?.message ?? String(error) };
+  }
+  const issues = capabilityIssues(map);
+  if (issues.length > 0) return { map: null, issues, reason: 'KARTE_UNGUELTIG' };
+  return { map, issues: [], reason: null };
+}
+
+/**
+ * Die Abbruch-Regeln laden — EINMAL beim Mounten.
+ *
+ * Die Regeln sind DATEN (`abort-reasons.json`): ein neuer Grund ist ein Eintrag
+ * dort, kein Codepfad. Ein Defekt sperrt die Quote, nicht den Enhancer
+ * (fail-open) — aber er wird gemeldet, und `reason` nennt ihn.
+ */
+export function loadAbortReasons(path = new URL('../assets/abort-reasons.json', import.meta.url)) {
+  let table;
+  try {
+    table = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    return { table: null, reason: 'REGELN_UNLESBAR', detail: error?.message ?? String(error) };
+  }
+  if (table === null || typeof table !== 'object' || !Array.isArray(table.reasons) || table.reasons.length === 0) {
+    return { table: null, reason: 'REGELN_UNGUELTIG', detail: 'reasons fehlt oder ist leer' };
+  }
+  const broken = table.reasons.find((entry) => entry === null || typeof entry !== 'object' || typeof entry.id !== 'string' || entry.id === '');
+  if (broken !== undefined) return { table: null, reason: 'REGELN_UNGUELTIG', detail: 'Eintrag ohne id' };
+  return { table, reason: null, detail: null };
+}

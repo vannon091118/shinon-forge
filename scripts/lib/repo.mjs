@@ -6,7 +6,25 @@
  * prüfen und nicht auseinanderdriften.
  *
  * Namensvertrag - alle Quellen müssen denselben Namen führen:
- * → Kanon: docs/COMMENT-KANON.md#k-9dcaced34b1a
+ *
+ *   Quelle                                  Feld    erwarteter Wert
+ *   packages/<dir>/package.json             name    @shinon/<dir>
+ *   packages/<dir>/cordis.patch.yml         id      shinon-<dir>
+ *   packages/<dir>/cordis.patch.yml         name    @shinon/<dir>
+ *   packages/<dir>/client.js                id      @shinon/<dir>   (ModuleLoader)
+ *   profiles/<profil>/package.json          bundles @shinon/<dir> je aktiviertem Paket
+ *
+ * Geprüfte Regeln:
+ *   Manifest    Exports-Ziele, dsh.bundle.patch, dsh.client.platform, peer+dev,
+ *               unbekannte dsh-Felder
+ *   Patch       YAML-Schema der DSH-Loader-Patches: Struktur, Typen, required
+ *               keys, unbekannte Keys (näher an DSH als die frühere Regex-Prüfung)
+ *   Ressourcen  jede Referenz aus Manifest und Patch-Config existiert, ist eine
+ *               Datei, liegt im Paket und parst in ihrem Format
+ *   Komposition Profil-Manifest, doppelte insert-ids über alle Layer, azyklischer
+ *               Paketgraph
+ *   Idiome      generierte Plugin-Bausteine deckungsgleich mit ihrer einen Quelle
+ *               (scripts/lib/plugin-idioms.mjs) — und keine Kopie daneben
  */
 import { execFileSync } from 'child_process';
 import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, realpathSync, statSync } from 'fs';
@@ -14,6 +32,7 @@ import { dirname, join, relative, resolve, sep } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { loadYaml } from './yaml.mjs';
 import { idiomIssues } from './plugin-idioms.mjs';
+import { stripComments } from './source-scan.mjs';
 import { PRUNE_DIRS, isPruned } from './scan.mjs';
 
 // Generierte Plugin-Bausteine (settings-Registrierung, Locale-Fallback): sie stehen
@@ -343,7 +362,7 @@ export const LEGACY_SCAN_EXTENSIONS = ['.js', '.mjs', '.cjs', '.yml', '.yaml'];
  * Early-Pruning-Regel (`scan.mjs`): Fremdbaum, Cache, Laufzeitdaten und Symlinks
  * werden VOR der Rekursion verworfen, nicht nach dem Lesen ihrer Einträge.
  */
-function walkFiles(dir) {
+export function walkFiles(dir) {
   const found = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isSymbolicLink() || isPruned(entry.name)) continue;
@@ -380,7 +399,9 @@ export function legacyHits(packages) {
  * gerät leicht wieder in ein Skript.
  *
  * Deshalb hat die Invariante hier EINEN Eigentuemer mit praezisen Mustern statt eines
- * → Kanon: docs/COMMENT-KANON.md#k-152c9aa2c45e
+ * `grep pnpm` ueber Dateinamen: geprueft werden die zwei echten pnpm-Artefakte, ein
+ * echter Prozess-/Script-Aufruf und die Script-Eintraege des Root-Manifests. Ein
+ * Wortvorkommen in Kommentar oder Dokument ist kein Befund.
  */
 export const PNPM_ARTIFACTS = ['pnpm-workspace.yaml', 'pnpm-lock.yaml'];
 /**
@@ -438,75 +459,62 @@ export function pnpmIssues(root = ROOT) {
 }
 
 /**
- * Zwillings-Regeln: EINE Regel, die in zwei Paketen liegen MUSS.
+ * Zwillings-Regeln: EINE Regel, die als KOPIE in zwei Dateien liegen MUSS.
  *
- * Warum die Dopplung ueberhaupt existiert (gemessen, nicht behauptet): Pakete
- * dieses Repos duerfen einander zur Laufzeit nicht importieren, und jedes Bundle
- * reist eigenstaendig (ein Host mit nur EINEM der beiden Pakete darf nicht am
- * fehlenden anderen scheitern; kein Paket erklaert ein `@shinon/*`-Paket als
- * Abhaengigkeit). Ein `import` ueber die Paketgrenze waere der einzige Weg zu
- * → Kanon: docs/COMMENT-KANON.md#k-5943fb806509
+ * Seit 2026-10-20 gilt das nur noch fuer CLIENT-HAELFTEN. Die sechs
+ * Host↔Host-Regeln (Digest, Workspace-Identitaet, letzte menschliche Nachricht,
+ * Narrative-Kanal/-Vertrag, Entscheidungskanal) sind fort: sie importieren
+ * `@shinon/seams/core`, und der Kern ist importfrei (`node:`-Module), also kostet
+ * der Import NICHT die Eigenstaendigkeit, die die Kopie einmal begruendet hat.
+ * Was einstimmig war, muss nicht geprueft werden.
+ *
+ * Warum die Client-Kopien bleiben (Stufe 2, absichtlich hier): ein
+ * selbststaendiges Client-Bundle zieht React per `require` und kann keine
+ * Host-Datei laden — es gibt fuer diese Haelfte keinen Importweg. Der Transport
+ * ist deshalb eine Zwillingsregel mit EINEM Besitzer; Drift kann nicht landen,
+ * weil Gate und Build jede Regel bei jedem Lauf pruefen.
+ *
+ *   kind 'region'    Beide Seiten tragen den Regeltext zwischen zwei Markern,
+ *                    BYTEGLEICH. Der Besitzer steht im Marker und in dieser Liste.
+ *   kind 'literals'  Der Spiegel kann keinen Text teilen: ausgewaehlte WERTE des
+ *                    Besitzers muessen als Literal im Spiegel stehen.
+ *
+ * Ein `mirror`, der keine `client.js` ist, waere ein zurueckgekehrter
+ * Host-Spiegel — `hostMirrorIssues()` macht ihn rot, und zwar unabhaengig davon,
+ * ob er hier eingetragen wurde.
+ *
+ * Diese Liste ist die Besitzer-Erklaerung des Repos — nicht die Datei, die
+ * zufaellig zuerst da war.
  */
 export const SOURCE_TWINS = [
   {
-    rule: 'sha256-Digest',
-    kind: 'region',
-    marker: 'zwilling:sha256-digest',
-    owner: 'packages/events/index.js',
-    mirror: 'packages/hook/index.js',
-  },
-  {
-    // S1: Prompter und Project Index muessen dieselbe Workspace-Identitaet
-    // beantworten (explizit > Env > cwd, Pfadgrenzen, Realpath, Fingerprint).
-    // Ein Paket darf das andere nicht importieren, also ist die Fassung im
-    // Index ein Spiegel — und ein Spiegel ohne Drift-Pruefung ist eine zweite
-    // Wahrheit. Die Region deckt Werte UND Funktionen ab (bytegleich).
-    rule: 'Workspace-Identitaet (S1) — Prompter und Project Index',
-    kind: 'region',
-    marker: 'zwilling:workspace-identitaet',
-    owner: 'packages/prompter/assets/workspace.js',
-    mirror: 'packages/project-index/assets/workspace.js',
-  },
-  {
-    rule: 'letzte menschliche Nachricht mit Text',
-    kind: 'region',
-    marker: 'zwilling:letzte-menschliche-nachricht',
-    owner: 'packages/prompter/index.js',
-    mirror: 'packages/task-router/index.js',
-  },
-  {
-    // Die Naht Narrative -> Persona: die Persona kann `@shinon/narrative` nicht
-    // importieren (eigenstaendige Bundles), also traegt sie Kanalname und
-    // Vertragsnamen als Literal. Drift waere hier STILL und teuer: ein falscher
-    // Kanalname hiesse, dass der Abschnitt nie erscheint, und das saehe aus wie
-    // "es gibt keine Narrative" — dieselbe Falle wie beim falschen Token-Schluessel.
-    rule: 'Naht Narrative -> Persona (Kanal + Vertragsname)',
+    // Die zweite Richtung derselben Beziehung: die Persona schiebt ihren Zustand
+    // in die Seite. Ohne den Namen als Zwilling zeigt die Leiste weiter ihren
+    // Platzhalter, obwohl der Host den echten Zustand laengst hat.
+    rule: 'Naht Persona -> Core-UI (Zustandsglobal + Live-Route)',
     kind: 'literals',
-    owner: 'packages/narrative/index.js',
-    mirror: 'packages/persona/index.js',
+    owner: 'packages/persona/index.js',
+    mirror: 'packages/core/client.js',
     values: [
-      { export: 'STATE_CHANNEL', literal: 'string' },
-      { export: 'STATE_CONTRACT', literal: 'string' },
+      { export: 'UI_STATE_GLOBAL', literal: 'string' },
+      { export: 'UI_STATE_ROUTE', literal: 'string' },
     ],
   },
   {
-    // Derselbe Besitzer, zweiter Abnehmer: der Veredler kennt den Arc im
-    // MAX-Kontext nur ueber den Stand. Auch er kann `@shinon/narrative` nicht
-    // importieren und traegt die beiden Namen als Literal. Zwei Spiegel, EIN
-    // Besitzer — die Dopplung ist damit drift-geprueft, nicht hoffnungsvoll.
-    rule: 'Naht Narrative -> Prompter (Kanal + Vertragsname)',
+    // Die Pruef-Naht zeigt in BEIDE Richtungen: der Host legt den Startstand ins
+    // Fenster und oeffnet die Route, das Panel liest beides. Ein falscher Name
+    // hiesse nur, dass das Panel leer aussieht — wie „nichts zu entscheiden“.
+    rule: 'Naht Persona-Pruefung (Panel <-> Host)',
     kind: 'literals',
-    owner: 'packages/narrative/index.js',
-    mirror: 'packages/prompter/index.js',
-    // Das Paket ist modular: die Naht-Namen dürfen in `index.js` ODER in einem
-    // `assets/`-Kern stehen. Ein Zwilling, der nur die Komposition liest, würde
-    // bei einem sauberen Modulschnitt rot — und Rot ohne Drift ist eine Falle,
-    // kein Befund. Geprüft wird deshalb das ganze RUNTIME-Paket (index.js +
-    // assets/*.js), nie `test/` oder `fixtures/`.
-    mirrorScope: 'package',
+    owner: 'packages/persona/index.js',
+    mirror: 'packages/persona/client.js',
     values: [
-      { export: 'STATE_CHANNEL', literal: 'string' },
-      { export: 'STATE_CONTRACT', literal: 'string' },
+      { export: 'REVIEW_ROUTE', literal: 'string' },
+      { export: 'REVIEW_GLOBAL', literal: 'string' },
+      { export: 'REVIEW_CONTRACT', literal: 'string' },
+      // Das Panel haengt an der BESTEHENDEN Zustands-Route (SSE), nicht an einem
+      // zweiten Kanal: derselbe Name, derselbe Strom.
+      { export: 'UI_STATE_ROUTE', literal: 'string' },
     ],
   },
   {
@@ -752,6 +760,101 @@ export function twinIssues(root = ROOT, twins = SOURCE_TWINS) {
   return issues;
 }
 
+/** Der Host-Naht-Kern — die EINE Definition der sechs importierten Regeln. */
+export const SEAM_CORE = 'packages/seams/assets/seams.js';
+/** Das Inventar, gegen das geprueft wird (Daten, kein zweiter Regelsatz). */
+export const SEAM_INVENTORY = 'packages/seams/assets/seams.json';
+
+/** Alle Host-Runtime-Dateien: `index.js` je Paket plus jede `.js` unter `assets/`. */
+function hostRuntimeFiles(root) {
+  const files = [];
+  let dirs = [];
+  try {
+    dirs = readdirSync(join(root, 'packages'), { withFileTypes: true }).filter((entry) => entry.isDirectory());
+  } catch {
+    return files;
+  }
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.js')) files.push(full);
+    }
+  };
+  for (const entry of dirs) {
+    const base = join(root, 'packages', entry.name);
+    if (existsSync(join(base, 'index.js'))) files.push(join(base, 'index.js'));
+    if (existsSync(join(base, 'assets'))) walk(join(base, 'assets'));
+  }
+  return files;
+}
+
+/**
+ * Der Riegel gegen zurueckkehrende HOST-Spiegel.
+ *
+ * Die sechs Host↔Host-Naehte stehen seit 2026-10-20 EINMAL (`@shinon/seams`).
+ * Eine Zwillings-Regel kann das nicht mehr sichern — eine Kopie ohne Marker
+ * waere fuer `twinIssues` unsichtbar. Dieser Schritt prueft deshalb das
+ * Gegenteil: dass die Definition NIRGENDS sonst steht.
+ *
+ * Vier Zusagen, jede mit eigenem Befund:
+ *   1. Jede `SOURCE_TWINS`-Regel spiegelt in eine `client.js`. Ein Host-Ziel
+ *      waere ein zurueckgekehrter Host-Spiegel.
+ *   2. Keine Host-Haelfte traegt eine `zwilling:`-Region. Regionen sind das
+ *      Transportmittel der Kopie — im Host gibt es nichts zu transportieren.
+ *   3. Jede Funktion des Inventars wird in genau EINER Host-Datei definiert.
+ *   4. Jedes Literal des Inventars steht in keiner anderen Host-Datei.
+ *
+ * Client-Haelften sind ausgenommen (Stufe 2, `SOURCE_TWINS`) — die Pruefung liest
+ * nur `index.js` und die `.js`-Dateien unter `assets/`.
+ *
+ * @returns {string[]} Befunde; leer heisst: der Kern ist die einzige Quelle.
+ */
+export function hostMirrorIssues(root = ROOT) {
+  const issues = [];
+  const coreFile = join(root, SEAM_CORE);
+
+  for (const twin of SOURCE_TWINS) {
+    if (!twin.mirror.endsWith('client.js')) {
+      issues.push(`${twin.rule}: Spiegel ${twin.mirror} ist keine Client-Haelfte (Host-Spiegel zurueck?)`);
+    }
+  }
+
+  let inventory;
+  try {
+    inventory = JSON.parse(read(join(root, SEAM_INVENTORY)));
+  } catch (error) {
+    return [...issues, `Naht-Inventar ${SEAM_INVENTORY} fehlt oder parst nicht (${error.message})`];
+  }
+  const functions = inventory.functions ?? [];
+  const literals = inventory.literals ?? [];
+  const others = hostRuntimeFiles(root).filter((file) => file !== coreFile);
+  // Ein Besitzer einer CLIENT-Regel darf im Host stehen (der Popup-Kern haelt die
+  // Faltung, die Client-Haelfte spiegelt sie). Nur ein Host, der selbst NICHTS
+  // besitzt, darf keine Region tragen — dort waere sie eine zweite Wahrheit.
+  const owners = new Set(SOURCE_TWINS.map((twin) => twin.owner));
+
+  for (const file of others) {
+    const text = read(file);
+    const rel = relative(root, file).split(sep).join('/');
+    if (text.includes('// #region zwilling:') && !owners.has(rel)) {
+      issues.push(`${rel}: zwilling-Region in einer Host-Haelfte — Host-Regeln werden importiert, nicht kopiert`);
+    }
+    const code = stripComments(text);
+    for (const name of functions) {
+      if (new RegExp(`(?:^|\\n)\\s*(?:export\\s+)?function\\s+${name}\\s*\\(`).test(code)) {
+        issues.push(`${rel}: definiert ${name}() — die Definition steht in ${SEAM_CORE}`);
+      }
+    }
+    for (const { name, value } of literals) {
+      if (code.includes(`'${value}'`)) {
+        issues.push(`${rel}: traegt ${name} ("${value}") als Literal statt aus ${SEAM_CORE}`);
+      }
+    }
+  }
+  return issues;
+}
+
 /** Profilname aus scripts.dev (die eine Quelle für das aktive Profil). */
 export function activeProfile(root = readRoot()) {
   return (root.scripts?.dev ?? '').match(/--profile\s+(\S+)/)?.[1] ?? null;
@@ -765,7 +868,13 @@ export function activeProfile(root = readRoot()) {
  * mit
  *   package.json         dsh.profile.bundles - die Bundle-Patch-Layer in Reihenfolge
  *   cordis.patch.yml     die User-Ebene (top-level YAML-Array von Patch-Einträgen)
- * → Kanon: docs/COMMENT-KANON.md#k-1792d65d4401
+ * (eine `pnpm-workspace.yaml` legt UPSTREAMs initProfile bei Bedarf selbst an, wenn ein
+ * Profil `dsh plugin add` nutzt; dieses Repo trackt keine — Schritt 3.5/A1)
+ * Bundles sind Pakete mit dsh.bundle.patch; das Repo-Root ist ein gültiges
+ * DSH_HOME, weil es profiles/ enthält.
+ *
+ * `bundles` sind alle Bundle-Namen, `entries` nur die Bundles aus diesem Repo
+ * (Scope-Pakete). Fremde Bundles wie @deepseek-ai/dsh-base stehen nur in `bundles`.
  */
 /** Liegt `target` in `dir` (oder ist es `dir` selbst)? */
 function isInside(dir, target) {
@@ -780,7 +889,14 @@ function isInside(dir, target) {
  * Repo (lokal, muss existieren); ein Ziel ausserhalb `packages/` (absoluter Pfad
  * oder aus dem Repo heraus) ist ein fremdes Bundle — wie die `@deepseek-ai/*`-
  * Eintraege, die schon immer erlaubt waren.
- * → Kanon: docs/COMMENT-KANON.md#k-ead9b6e4ff9e
+ *
+ * Kein Eintrag, kein `link:`/`file:`-Ziel → `null`: ein unbekannter `@shinon/*`-
+ * Name ohne Ziel bleibt ein Fehler (Tippfehler-Schutz bleibt fail-closed).
+ *
+ * @param {string} name - Bundle-Name aus `dsh.profile.bundles`.
+ * @param {object|null} manifest - das Profil-Manifest.
+ * @param {string} profileDir - Verzeichnis des Profils (Bezug fuer relative Ziele).
+ * @returns {string|null} das aufgeloeste Ziel, wenn es fremd ist, sonst `null`.
  */
 export function foreignBundleTarget(name, manifest, profileDir) {
   const spec = manifest?.dependencies?.[name];
@@ -799,7 +915,9 @@ export function foreignBundleTarget(name, manifest, profileDir) {
  *   `link`     ein Symlink; `target` ist sein aufgelöstes Ziel
  *   `broken`   ein Symlink ins Leere; `target` ist sein ROHTEXT (er zeigt irgendwohin)
  *   `real`     kein Symlink, sondern eine echte Kopie — sie folgt dem Manifest nicht
- * → Kanon: docs/COMMENT-KANON.md#k-7422f0982f82
+ *
+ * @param {string} file - Pfad des erwarteten Eintrags.
+ * @returns {{kind: 'link'|'broken'|'real', target: string}|null}
  */
 function installedBundle(file) {
   let stats;
@@ -817,6 +935,66 @@ function installedBundle(file) {
 }
 
 /**
+ * Jedes `@deepseek-ai/*`-Paket genau EINMAL im Baum — die Regel für Modul-Identität.
+ *
+ * Warum: `dsh-agent-loop` holt den Tool-Scheduler über ein MODULWEITES Symbol aus
+ * `@deepseek-ai/dsh-tools` (`ctx.tools[TOOL_RUNTIME_SCHEDULER]`). Zwei Kopien sind
+ * zwei Symbole; dann ist der Scheduler `undefined` und JEDER Tool-Call stirbt mit
+ * `reading 'prepare'`, während alle statischen Gates grün bleiben (gemessen
+ * 2026-10-18: zehn Kopien im Lock, `npm dedupe` macht daraus eine).
+ */
+export function dshInstanceIssues(base = ROOT, options = {}) {
+  const scope = options.scope ?? '@deepseek-ai';
+  const modules = options.modulesDir ?? join(base, 'node_modules');
+  const show = (file) => {
+    const rel = relative(base, file);
+    return rel === '' || rel === '..' || rel.startsWith(`..${sep}`) ? file : rel;
+  };
+  if (!existsSync(modules)) return { issues: [], status: 'not-applicable', detail: 'kein node_modules — nichts installiert' };
+
+  const found = new Map();
+  const walk = (dir, depth) => {
+    if (depth > 6) return;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const path = join(dir, entry.name);
+      if (entry.name === 'node_modules') {
+        walk(path, depth + 1);
+        continue;
+      }
+      if (entry.name.startsWith('@')) {
+        walk(path, depth + 1);
+        continue;
+      }
+      if (dir.endsWith(scope)) {
+        if (!found.has(entry.name)) found.set(entry.name, []);
+        found.get(entry.name).push(path);
+      }
+      if (existsSync(join(path, 'node_modules'))) walk(join(path, 'node_modules'), depth + 1);
+    }
+  };
+  walk(modules, 0);
+
+  const duplicates = [...found.entries()].filter(([, paths]) => paths.length > 1);
+  const issues = duplicates.map(
+    ([name, paths]) =>
+      `${scope}/${name} liegt ${paths.length}× im Baum (${paths.map(show).join(', ')}) — ` +
+      'Abhilfe: npm dedupe (ein Modul, ein Symbol)',
+  );
+  return {
+    issues,
+    status: issues.length === 0 ? 'pass' : 'fail',
+    detail: `${found.size} ${scope}-Pakete geprüft`,
+  };
+}
+
+/**
  * Die Bündel-Auflösung des aktiven Profils — die EINE Regel für Gate und Doctor.
  *
  * Warum es diese Funktion gibt: ein `shinon`-Start löst jedes Bündel über
@@ -824,7 +1002,17 @@ function installedBundle(file) {
  * herauszeigt, BESCHATTET das Repo-Paket — Node lädt dann fremden Code, ohne dass
  * irgendein Gate es merkt (gemessen 2026-10-17: `@shinon/traceability` zeigte auf
  * `../../../Projekt Type/traceability-proto`, dessen `Config = {}` den Boot mit
- * → Kanon: docs/COMMENT-KANON.md#k-093928499e48
+ * `... (reading 'validate')` abriss). Deshalb prüft diese Funktion die Naht, an der
+ * die Beschattung entsteht, und nicht das Paket.
+ *
+ * Geprüft wird, was da ist. Ein FEHLENDER Eintrag ist kein Fehler — ein frischer
+ * Klon hat kein `profiles/<name>/node_modules`, und DSH installiert ihn beim Start
+ * aus dem Manifest. Ein vorhandener Eintrag dagegen muss dem Manifest folgen.
+ *
+ * @param {object} root - Root-Manifest (nur `name` wird gelesen: der Scope).
+ * @param {{profileName?: string, profilesDir?: string, packagesDir?: string, base?: string}} [options]
+ *   Übersteuerungen für Tests (Miniatur-Baum) und Doctor (fremde Wurzel).
+ * @returns {string[]} Befunde; jeder nennt Quelle, aufgelöstes Ziel und Abhilfe.
  */
 export function bundleResolutionIssues(root = readRoot(), options = {}) {
   const packagesDir = options.packagesDir ?? PACKAGES_DIR;
@@ -992,7 +1180,8 @@ export function resolveProfile(profileName, packages, root = readRoot()) {
  * Genau diese Prüfung hätte den Fremd-Link vom 2026-10-17 abgefangen: dessen
  * `Config = {}` fiel erst im Boot als `reading 'validate'` auf. Ohne
  * installiertes Schemastery ist die Prüfung nicht durchführbar und meldet das
- * → Kanon: docs/COMMENT-KANON.md#k-ea458e8d9a71
+ * (fail-closed) — ein stiller Skip wäre die Lücke wieder.
+ * @returns {Promise<string[]>} Befunde (leer = alle Configs sind Schemata).
  */
 export async function configShapeIssues(packages) {
   const issues = [];
@@ -1021,7 +1210,14 @@ export async function configShapeIssues(packages) {
  *   1. Ein `profiles/<name>/node_modules/@shinon/<pkg>`-Eintrag, dessen
  *      `realpath` NICHT unter `<root>/packages/` liegt, beschattet das Repo-Paket.
  *      Gemessen am 2026-10-17 zeigte `@shinon/traceability` auf einen externen
- * → Kanon: docs/COMMENT-KANON.md#k-965ff1e1d7ef
+ *      Prototyp; der Boot starb an `Config = {}` mit `reading 'validate'`. Ein
+ *      toter Link wird ebenfalls gemeldet, nicht still übersprungen.
+ *   2. pnpm-Reste (`.pnpm`, `.modules.yaml`, `.pnpm-workspace-state-v1.json`)
+ *      unter `profiles/<name>/node_modules`: dieses Repo installiert mit npm; ein
+ *      `dsh plugin add` (Upstream) darf sie anlegen, wir committen sie nie.
+ *
+ * Ein FEHLENDES `node_modules` ist kein Befund — ein frischer Klon hat keins.
+ * @returns {string[]} Befunde (leer = die installierte Ebene ist sauber).
  */
 export function profileInstallIssues(root = ROOT, options = {}) {
   const packagesDir = options.packagesDir ?? join(ROOT, 'packages');

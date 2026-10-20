@@ -8,8 +8,6 @@ window.__ModuleLoader__.load({
   id: '@shinon/hook',
   factory(require) {
     const PLUGIN = '@shinon/hook';
-    const React = require('react');
-
     // Event-Schema als Referenz für Client-seitige Beobachtung.
     const OBSERVED_EVENTS = [
       'session.created',

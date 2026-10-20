@@ -7,18 +7,42 @@
  * Vier Ebenen, bewusst getrennt:
  *   1. Die reine Extraktion (Zeilenheuristik) gegen Fixtures UND gegen echte
  *      Dateien dieses Repos — die Grenze wird gemessen, nicht behauptet.
- * → Kanon: docs/COMMENT-KANON.md#k-34d55a3bd058
+ *   2. Das Schema: die Primärdaten aus Plan §9, namentlich und zählbar, plus die
+ *      gemessene Tatsache, dass `references` ein SQLite-Schlüsselwort ist.
+ *   3. Ein echter Lauf gegen ein Fixture-Projekt: Vollauf, unveränderter zweiter
+ *      Lauf, geänderter Inhalt, gelöschte Datei, zu große Datei, FTS5.
+ *   4. Der Host-Pfad: der Lauf im Worker und im Host liefern denselben Index,
+ *      der Mount startet den Lauf und blockiert den Start nicht, und ein
+ *      scheiternder Worker wird protokolliert statt geworfen.
+ *
+ * Warum ein Fixture-Projekt und nicht nur dieses Repo: nur so sind „unverändert",
+ * „gelöscht" und „zu groß" deterministisch herstellbar. Gegen die echten Dateien
+ * dieses Repos läuft zusätzlich die Extraktion, damit die Zusage an echtem Text
+ * hängt und nicht an erfundenen Beispielen.
+ *
+ * Läuft mit `node --test` (CI: .github/workflows/commit-guard.yml). Kein Netz,
+ * kein Modell, kein node_modules im Repo (`dsh` muss im PATH liegen — wie beim
+ * Profiltest, weil das echte Schemastery aus der DSH-Installation kommt).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { codeOnly, findForbidden, findMissing } from '../../lib/source-scan.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
+
+/**
+ * Als root (uid 0) ignoriert der Kernel Dateirechte: `chmod 000` sperrt nichts,
+ * und die beiden Rechte-Tests wuerden ohne eigenen Befund rot. Sie werden dann
+ * SICHTBAR uebersprungen — ein Skip mit Grund, kein stilles Gruen.
+ */
+const AS_ROOT = typeof process.getuid === 'function' && process.getuid() === 0;
+const ROOT_SKIP = AS_ROOT ? 'als root (uid 0) greifen Dateirechte nicht' : false;
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/project-index/', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -33,6 +57,7 @@ const require = createRequire(join(root, 'package.json'));
 async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-index-test-'));
   cpSync(PACKAGE_DIR, join(work, 'pkg'), { recursive: true });
+  provideSeamCore(join(work, 'pkg'));
   const shim = join(work, 'pkg/node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(
@@ -208,10 +233,18 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
   const prompter = readFileSync(join(REPO_ROOT, 'packages/prompter/index.js'), 'utf8');
   const prompterModule = (relativePath) => readFileSync(join(REPO_ROOT, 'packages/prompter', relativePath), 'utf8');
   const symbolsIn = (source) => new Set(bundle.extractSymbols(source).map((symbol) => symbol.name));
-  for (const expected of ['readPrompt', 'apply']) {
-    assert.ok(symbolsIn(prompter).has(expected), `Symbol ${expected} fehlt in index.js`);
-  }
-  for (const [file, expected] of [['assets/enhancer.js', 'enhanceGuarded'], ['assets/schema.js', 'Config']]) {
+  // Der Schnitt vom 2026-10-20: `index.js` verdrahtet, die drei neuen Module
+  // tragen Lauf, Zustand und Ausgang — geprueft wird jeder Eigentuemer.
+  assert.ok(symbolsIn(prompter).has('apply'), 'Symbol apply fehlt in index.js');
+  for (const [file, expected] of [
+    ['assets/pre-step.js', 'onPreStep'],
+    ['assets/pre-step.js', 'readPrompt'],
+    ['assets/runtime-state.js', 'loadRuntime'],
+    ['assets/runtime-state.js', 'effectiveRoute'],
+    ['assets/trace-report.js', 'reportTrace'],
+    ['assets/enhancer.js', 'enhanceGuarded'],
+    ['assets/schema.js', 'Config'],
+  ]) {
     assert.ok(symbolsIn(prompterModule(file)).has(expected), `Symbol ${expected} fehlt in ${file}`);
   }
   // Vergleich als Menge: die Reihenfolge der Importe in index.js ist keine
@@ -221,24 +254,35 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
     bundle.extractEdges(prompter).sort(byTarget),
     [
       { kind: 'import', target: '@deepseek-ai/schemastery' },
-      { kind: 'import', target: 'node:fs' },
-      { kind: 'import', target: 'node:path' },
+      // Der Naht-Kern: `index.js` bindet die beiden Kanal-Namen, der Lauf
+      // liest sie aus demselben Kern (`assets/pre-step.js`).
+      { kind: 'import', target: '@shinon/seams/core' },
+      // Der Schnitt vom 2026-10-20 — die drei Eigentuemer-Module des Hosts:
+      // Lauf, Zustand, Ausgang. `node:fs`/`node:path` gingen mit dem Zustand.
+      { kind: 'import', target: './assets/pre-step.js' },
+      { kind: 'import', target: './assets/runtime-state.js' },
       // Zug 4/5: das Paket liest die Zettel und baut den Stand — der Kern liegt
       // in `assets/`, weil er ohne node_modules testbar sein muss.
       { kind: 'import', target: './assets/note-core.js' },
-      { kind: 'import', target: './assets/index-manager.js' },
-      // S1: DIE EINE Workspace-Identität — der Host löst sie einmal auf und
-      // bindet den Runtime-Index daran (kein stilles cwd).
-      { kind: 'import', target: './assets/workspace.js' },
-      // Der Modulschnitt: je Verantwortung ein Modul (Seam-Namen und Modus-
-      // Vertrag, Schemata, Ergebnisvertrag, XML-Marken, Dateien, Stand,
-      // One-Shot). Die Liste steht hier vollstaendig, damit eine neue Kante
-      // auffaellt, statt stillschweigend dazuzukommen.
+      // Der Modulschnitt: je Verantwortung ein Modul (Seam-Namen, Modus-Vertrag,
+      // Schemata, Ergebnis, XML-Marken, Dateien, Stand, One-Shot, Lebenszyklus).
+      // Die Liste steht vollstaendig hier, damit neue Kanten auffallen.
       { kind: 'import', target: './assets/mode-core.js' },
       { kind: 'import', target: './assets/schema.js' },
       { kind: 'import', target: './assets/result-contract.js' },
       { kind: 'import', target: './assets/render-context.js' },
       { kind: 'import', target: './assets/prompt-files.js' },
+      { kind: 'import', target: './assets/skill-lifecycle.js' },
+      // Die Faehigkeitskarte (2026-10-20): welche Frage gehoert welchem Paket.
+      // Daten + reiner Kern; die Zeigerpruefung kommt aus der Provenienz-Leiter.
+      { kind: 'import', target: './assets/capability-map.js' },
+      // Die Abbruchquote (Welle 2, 2026-10-20): Klassifikation, Zähler und
+      // Quote als importfreier Kern; `pre-step.js` hängt nur das Ergebnis an.
+      { kind: 'import', target: './assets/abort-core.js' },
+      // Die Provenienz-Leiter (2026-10-19): fünf Klassen, Zeigerpflicht,
+      // keine Beförderung — ein reiner Kern ohne Bare-Import, damit sein Test
+      // ohne node_modules läuft.
+      { kind: 'import', target: './assets/provenance.js' },
       { kind: 'import', target: './assets/stand.js' },
       { kind: 'import', target: './assets/enhancer.js' },
       // Die Injection-Runtime (Phase 1-4 + Selektionsvertrag): Registry-Auswahl,
@@ -247,6 +291,9 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/block-select.js' },
       { kind: 'import', target: './assets/block-review.js' },
       { kind: 'import', target: './assets/selection.js' },
+      // Der dauerhafte SALVAGED_PROSE-Zaehler: Form und Deckel sind ein reiner
+      // Kern, die Ablage haengt am Host (derselbe Schnitt wie oben).
+      { kind: 'import', target: './assets/salvage-store.js' },
     ].sort(byTarget),
     'Kanten sind Importe; externe Ziele bleiben drin, weil sie importiert werden',
   );
@@ -258,9 +305,15 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
     if (!edge.target.startsWith('./assets/')) continue;
     assert.ok(existsSync(join(REPO_ROOT, 'packages/prompter', edge.target)), `${edge.target} fehlt`);
   }
-  for (const core of ['assets/mode-core.js', 'assets/note-core.js']) {
+  for (const core of ['assets/note-core.js', 'assets/salvage-store.js']) {
     assert.deepEqual(bundle.extractEdges(prompterModule(core)), [], `${core} ist importfrei`);
   }
+  // `mode-core.js` hat EINEN Import — den Naht-Kern, der selbst importfrei ist.
+  // Die Eigenschaft („in CI ohne node_modules prüfbar") bleibt damit wahr; sie
+  // hinge an einem zweiten Bare-Import und wäre dann keine mehr.
+  assert.deepEqual(bundle.extractEdges(prompterModule('assets/mode-core.js')), [
+    { kind: 'import', target: '@shinon/seams/core' },
+  ]);
 
   // Alle Treffer einer Zeile zählen — nicht nur der erste.
   assert.deepEqual(bundle.findReferences('const a = alpha + beta;', ['alpha', 'beta']), [
@@ -491,6 +544,33 @@ test('S1: Prompter und Project Index beantworten die Workspace-Frage identisch',
   }
   assert.deepEqual(indexWs.fingerprintRoot('/tmp/shinon-s1-a'), prompterWs.fingerprintRoot('/tmp/shinon-s1-a'));
   assert.equal(indexWs.WORKSPACE_CONTRACT, prompterWs.WORKSPACE_CONTRACT);
+});
+
+/**
+ * S1 — ein Link aus dem Workspace heraus ist kein Quelltext.
+ *
+ * Der Lauf nimmt nur echte Dateien (`Dirent.isFile()`); ein Symlink wird damit
+ * gar nicht erst geoeffnet. Geprueft wird der INHALT, nicht nur der Pfad: ohne
+ * diese Probe waere „nichts indexiert" auch bei einem kaputten Lauf gruen.
+ */
+test('S1: ein Symlink aus der Root heraus wird nicht gelesen', () => {
+  const project = fixtureProject('symlink');
+  const outside = workDir('symlink-aussen');
+  writeFileSync(join(outside, 'geheim.mjs'), 'export const geheim = "niemals im Kontext";\n');
+  try {
+    symlinkSync(join(outside, 'geheim.mjs'), join(project, 'src', 'ausbruch.mjs'));
+  } catch {
+    return; // ohne Symlink-Recht keine Aussage — nicht gruenluegen, sondern ueberspringen
+  }
+  const { file } = fixtureIndex(project, 'symlink');
+  const db = bundle.openIndex(file);
+  bundle.updateIndex(db, project, {});
+  const paths = rows(db, 'select path from files').map((row) => row.path);
+  assert.equal(paths.includes('src/ausbruch.mjs'), false, 'das Ziel liegt ausserhalb des Workspace');
+  assert.equal(paths.includes('src/a.mjs'), true, 'die echten Dateien bleiben drin');
+  const bodies = rows(db, 'select body from chunks').map((row) => row.body).join('\n');
+  assert.equal(bodies.includes('niemals im Kontext'), false, 'der Inhalt des Ziels wird nie gelesen');
+  db.close();
 });
 
 // ── Zusage: der Lauf indiziert und bleibt inkrementell (Plan §11) ────────────
@@ -871,7 +951,8 @@ test('Zeitstempel: die benannte Lücke und ihr Gegenmittel verify=all', () => {
  * wiederhergestellt werden; ein Ersatz der Datei bewegt den Inode.
  *
  * Die Kostenaussage steckt im Bericht selbst (`readBytes`), nicht nur in einem
- * → Kanon: docs/COMMENT-KANON.md#k-d5584f40faa5
+ * Messskript: der stillste Lauf liest null Bytes, und der Lauf, der die Luecke
+ * schliesst, liest genau die eine verdaechtige Datei.
  */
 test('Zeitstempel: verify=stamp schliesst die Luecke, ohne den Baum zu lesen', () => {
   const project = fixtureProject('stamp-luecke');
@@ -1275,7 +1356,8 @@ test('Mount: ein scheiternder Worker wird protokolliert und im Host wiederholt',
 // Dieses Schema nennt Groesse und Hash `bytes` und `digest`: §10 nennt die
 // ANGABEN, kein SQL. Die Tests pinnen deshalb die Bedeutung und nicht die
 // Schreibweise — Groesse und mtime gegen das Dateisystem, der Digest als sha256
-// → Kanon: docs/COMMENT-KANON.md#k-796e46177eae
+// des ROHEN Inhalts. Dass der Digest nicht dem redigierten Text folgt, ist kein
+// Detail: er entscheidet, ob sich eine Datei geaendert hat.
 
 test('Indexdatei: path, language, Groesse, mtime und sha256 stimmen Zeile fuer Zeile', () => {
   const project = fixtureProject('dateizeile');
@@ -1366,10 +1448,11 @@ async function observeLoop(start) {
 }
 
 test('Worker: der Lauf laesst den Eventloop laufen, der Lauf im Host blockiert ihn', async () => {
-  // 150 files once measured only 95 ms on the Linux runner; the test's
-  // 100-ms premise was therefore false for that fixture. Increase work, not
-  // the acceptance threshold, so the host-side block remains measurable.
-  const project = bigProject('eventloop', 600, 60);
+  // Groesse bewusst so gewaehlt, dass der Host-Lauf auch auf schnellen Runnern
+  // deutlich ueber 100 ms liegt (gemessen: 150 Dateien ergaben 85 ms und rissen
+  // die Praemisse der Schranke). Die Zahl ist kein Zeitbudget, sondern die
+  // Bedingung dafuer, dass `host.ticks === 0` ueberhaupt etwas zeigen kann.
+  const project = bigProject('eventloop', 400, 40);
   const hostIndex = fixtureIndex(project, 'eventloop-host');
   const mountIndex = join(workDir('eventloop-mount'), 'indexes');
 
@@ -1511,7 +1594,8 @@ function secretProject(label) {
  *                      weil `listFiles` nur Textendungen aufnimmt. Sie sind
  *                      deshalb auch ohne Schutz nie im Index — der Grund, warum
  *                      die Musterliste aus Plan §13 zu einem Teil redundant ist.
- * → Kanon: docs/COMMENT-KANON.md#k-e08e648c0d8d
+ *   SCHUTZ_REGELN      Dateien MIT indexierbarer Endung, die Zugangsdaten sind.
+ *                      Genau hier lag der echte Fund: `.credentials.yaml`.
  */
 const EXCLUDED_BY_EXTENSION = ['.env', 'tief/verschachtelt/.env.production', 'keys/server.pem', '.ssh/id_rsa'];
 const PROTECTED_LISTED = ['.credentials.yaml', 'credentials.json', 'secrets.yml', 'settings/.env.yaml', 'src/secrets.mjs'];
@@ -1889,7 +1973,7 @@ test('Scan: die Dateireihenfolge ist eine Funktion der Dateimenge, nicht des Dur
  * als root greifen Dateirechte nicht, dann wäre die Probe leer) und verlangt
  * Pfad UND Grund.
  */
-test('Scan: ein unlesbarer Ordner wird benannt, statt still zu fehlen', () => {
+test('Scan: ein unlesbarer Ordner wird benannt, statt still zu fehlen', { skip: ROOT_SKIP }, () => {
   const project = join(workDir('ordnerfehler'), 'projekt');
   mkdirSync(join(project, 'src'), { recursive: true });
   mkdirSync(join(project, 'gesperrt'), { recursive: true });
@@ -1933,7 +2017,7 @@ test('Scan: ein unlesbarer Ordner wird benannt, statt still zu fehlen', () => {
  * daneben steht, welche Datei und warum. Der Unterschied ist der ganze Punkt —
  * „1 übersprungen" konnte eine bewusste Obergrenze sein oder ein Rechtefehler.
  */
-test('Scan: eine unlesbare Datei wird mit Pfad und Grund gemeldet', () => {
+test('Scan: eine unlesbare Datei wird mit Pfad und Grund gemeldet', { skip: ROOT_SKIP }, () => {
   const project = join(workDir('dateifehler'), 'projekt');
   mkdirSync(join(project, 'src'), { recursive: true });
   writeFileSync(join(project, 'src/a.mjs'), 'export const alpha = 1;\n');

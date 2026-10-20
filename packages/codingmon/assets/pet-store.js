@@ -6,7 +6,32 @@
  * des Node-Prozesses — aber er hängt am BROWSER-Profil. Ist das weg, ist der
  * Grind weg, und der Host hat nie etwas davon gesehen. Diese Datei ist die
  * Host-Seite dieses Spiegels: ein validierter Datensatz auf einem Medium, das
- * → Kanon: docs/COMMENT-KANON.md#k-39478e8b79a2
+ * der Host selbst besitzt.
+ *
+ * WARUM `ctx.storageDomain` UND NICHT EINE EIGENE DATEI: das Profil mountet die
+ * Storage-Familie bereits (`storage` + `storage-json` mit Wurzel
+ * `dshHomePath('storages')` + `storage-domain`). Der Vertrag dieser Familie ist
+ * genau der gesuchte: schema-validierte Datensätze, synchrone Reads, ein
+ * dauerhafter Write, der erste nach der Medium-Bestaetigung aufloest, ein
+ * lesbares JSON je Einheit. Eine zweite Ablage daneben waere ein zweiter
+ * Wahrheitsbegriff — und `node:sqlite` waere fuer einen Datensatz dieser Groesse
+ * ohnehin das falsche Medium (das JSON-Backend schreibt EINE Datei
+ * `codingmon_pet.json` unter `$DSH_HOME/storages`).
+ *
+ * ABHAENGIGKEITEN (bewusste Entscheidung, nicht Nebenwirkung): `zod` fuer die
+ * Datensatz-Schemas (die Domain ruft `parse`/`safeParse` duck-typed, ohne
+ * `instanceof`), `@deepseek-ai/dsh-storage-domain` fuer `defineDomain`/
+ * `domainTable`. Beide werden NICHT importiert, bevor `apply` sie braucht:
+ * dieses Modul wird dynamisch geladen, damit ein reiner Ladetest des Pakets
+ * (pack-test) nicht an der Modulaufloesung eines fremden Baums haengt. Zur
+ * Laufzeit loest der Host sie ueber seine eigene, gepatchte Aufloesung auf —
+ * dieselbe Mechanik, mit der `index.js` Schemastery zieht. `defineDomain`
+ * validiert den Namen (`/^[a-z][a-z0-9_]*$/`) beim Laden dieses Moduls, also
+ * bevor irgendein Medium angefasst wird.
+ *
+ * WAS HIER NICHT STEHT: kein Timer, kein Netz, kein Modell, kein Schreibvorgang
+ * ausser dem einen Datensatz. Der Store entscheidet nichts und rechnet nichts
+ * nach — er nimmt einen Stand an und gibt ihn zurueck.
  */
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain';
 import { SnapshotSchema, StoredSnapshotSchema } from './snapshot-schema.js';

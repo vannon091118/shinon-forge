@@ -6,7 +6,17 @@
  * war ein Link auf einen Prototyp AUSSERHALB dieses Repos. Node lädt für einen
  * Profil-Import zuerst `profiles/<name>/node_modules` — das Repo-Paket wurde also
  * beschattet, und der Boot starb mit `... (reading 'validate')`. Alle übrigen
- * → Kanon: docs/COMMENT-KANON.md#k-92e2eb4222c8
+ * Gates waren grün, weil keines den LINK ansah: sie prüfen `packages/` direkt.
+ *
+ * Die Regel ist EINE Quelle (`repo.bundleResolutionIssues`) — dasselbe Ergebnis
+ * lesen Gate und `scripts/profile-links.mjs --check`; das geplante Laufzeit-CLI
+ * `shinon doctor` ist noch nicht implementiert (Release-Slice S4). Ein Befund nennt
+ * immer Quelle, aufgelöstes Ziel und Abhilfe; ein Gate, das nur „kaputt" sagt,
+ * kostet die nächste Person dieselbe Suche noch einmal.
+ *
+ * Fail-closed: ein vorhandener Link, der woandershin zeigt, ist ein Fehler. Ein
+ * FEHLENDER Link ist keiner — ein frischer Klon hat kein
+ * `profiles/<name>/node_modules`, und DSH setzt ihn beim Start aus dem Manifest.
  */
 export const id = 'bundle-resolution';
 

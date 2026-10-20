@@ -12,7 +12,7 @@
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "dsh": {
     "bundle": {
@@ -24,7 +24,16 @@
     }
   },
   "meta": {
-    "title": { "en": "Shinon Forge - Better Errors", "de": "Shinon Forge - Bessere Fehler" },
-    "description": { "en": "Improved error display with German messages", "de": "Verbesserte Fehleranzeige mit deutschen Meldungen" }
+    "title": {
+      "en": "Shinon Forge - Better Errors",
+      "de": "Shinon Forge - Bessere Fehler"
+    },
+    "description": {
+      "en": "Improved error display with German messages",
+      "de": "Verbesserte Fehleranzeige mit deutschen Meldungen"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
   }
 }

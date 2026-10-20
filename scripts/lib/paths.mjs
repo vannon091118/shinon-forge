@@ -6,7 +6,34 @@
  * ab. Im Arbeitsbaum ist das bequem, für ein installiertes, schreibgeschütztes
  * Installat unmöglich — und `dist/`-Scans sowie Sitzungssuchen liefen über
  * Laufzeitdaten im Repo. Namen entstehen hier EINMAL; wer einen Ort braucht,
- * → Kanon: docs/COMMENT-KANON.md#k-160872a19dbc
+ * ruft hier an, statt einen Pfad zu wiederholen.
+ *
+ * Was DSH selbst unterstützt (gemessen an der gepinnten Fassung
+ * `@deepseek-ai/dsh-home-paths`, nicht erfunden): genau EIN Knopf,
+ * `DSH_HOME` — Home = `$DSH_HOME`, sonst `~/.dsh`. Weitere DSH_*-Variablen gibt
+ * es dort nicht (`DSH_LAUNCH_ENVIRONMENT_KEY` und `DSH_TELEMETRY_DISABLED`
+ * betreffen den Start bzw. die Telemetrie, keine Pfade). Deshalb:
+ *
+ *   - DSHs eigene Orte bleiben DSHs Sache: `dshHome()` nennt nur das Home.
+ *   - UNSERE Artefakte (Index, Ledger, Logs) folgen der OS-Konvention (XDG auf
+ *     Linux, AppData auf Windows) — DSH liest sie nicht, also darf es sie auch
+ *     nicht definieren.
+ *
+ * Rollen (keine zwei Orte für dieselbe Sache):
+ *   workspaceRoot()  der Arbeitsbaum (dieser Klon) — darf Laufzeitdaten tragen
+ *   installRoot()    das Installat (/opt/shinon-forge) — zur Laufzeit READ-ONLY
+ *   configDir()      Einstellungen     XDG_CONFIG_HOME  ~/.config/shinon
+ *   dataDir()        dauerhafte Daten  XDG_DATA_HOME    ~/.local/share/shinon
+ *   stateDir()       Zustand           XDG_STATE_HOME   ~/.local/state/shinon
+ *   cacheDir()       WEGWERFBAR        XDG_CACHE_HOME   ~/.cache/shinon
+ *   logDir()         Protokolle        <stateDir>/logs
+ *   dshHome()        DSH-Home (Profil + DSHs eigener Zustand)
+ *   indexRoot()      WEGWERFBARER Projektindex   <cacheDir>/indexes
+ *   ledgerFile()     DAUERHAFTES Scoring-Protokoll <dataDir>/ledger.sqlite
+ *
+ * Overrides werden geprüft: nur absolute Pfade zählen, ein relativer Wert ist ein
+ * Bedienfehler mit Begründung (kein stilles Auflösen gegen das Arbeitsverzeichnis
+ * — das war die Falle, die `DSH_HOME=` auf das CWD zeigen ließ).
  */
 
 import { existsSync } from 'node:fs';

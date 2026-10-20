@@ -7,7 +7,23 @@
  * Prompt liefern — aber der Enhancer darf ihn nicht IMPORTIEREN: die Pakete
  * dieses Repos referenzieren einander nicht. Die Naht ist deshalb eine
  * Faehigkeit, die der Index ueber `ctx.provide` anbietet und der Enhancer
- * → Kanon: docs/COMMENT-KANON.md#k-715a14a768e8
+ * OPTIONAL ueber `ctx.get` liest (kein Injektionszwang — sonst waere der
+ * Enhancer in einem Profil ohne Index gar nicht geladen).
+ *
+ * Vier Ebenen, bewusst getrennt:
+ *   1. Die Faehigkeiten des Index: seit Zug 2 sind es ZWEI — die Abfrage
+ *      (`resolveContext`, der Kontext fuer MAX) und die Ablage (`load`/`save`,
+ *      das dauerhafte Gedaechtnis des Scorings). Jede ist schmal, jede hat
+ *      ihren eigenen Vertragsnamen, und ohne Index gibt die Abfrage eine
+ *      ehrliche Leere (null) statt eines leeren Index.
+ *   2. Die Naht als Daten: Dienstname und Vertragsname stimmen in beiden Paketen
+ *      ueberein — gepinnt von AUSSEN, weil kein Paket das andere liest.
+ *   3. Der echte Durchlauf: beide Bundles an einem echten Cordis-Context, echter
+ *      Waterfall agent/pre-step, echte Validierung des gelieferten Kontexts.
+ *   4. Die Quelle im Datensatz: index | file | none — die Herkunft ist
+ *      nachpruefbar, nicht geraten.
+ *
+ * Kein Netz, kein Modell, kein node_modules im Repo.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,8 +33,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
-const PACKAGES = ['prompter', 'project-index', 'scoring'];
+const PACKAGES = ['prompter', 'project-index', 'scoring', 'persona'];
 const ROOT = new URL('../../../', import.meta.url);
 
 /** Beide Bundles isoliert laden, mit dem ECHTEN Schemastery der DSH-Installation. */
@@ -28,6 +45,7 @@ async function loadBundles() {
   const require = createRequire(join(root, 'package.json'));
   const work = mkdtempSync(join(tmpdir(), 'shinon-wiring-test-'));
   for (const name of PACKAGES) cpSync(new URL(`packages/${name}/`, ROOT), join(work, name), { recursive: true });
+  provideSeamCore(work);
   const shim = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(
@@ -52,6 +70,7 @@ process.on('exit', () => {
 const prompter = loaded.prompter;
 const index = loaded['project-index'];
 const scoring = loaded.scoring;
+const persona = loaded.persona;
 const dshRequire = createRequire(join(dshRoot(), 'package.json'));
 const { Context } = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/cordis')).href);
 
@@ -110,7 +129,16 @@ test('Index: die angebotenen Faehigkeiten sind schmal und tragen einen Vertragsn
   const dispose = quiet(() => index.apply(ctx, index.Config({ root: fixture('schmal'), indexRoot: workDir('schmal-index'), worker: false, trace: false })));
 
   const names = provided.map((entry) => entry.name).sort();
-  assert.deepEqual(names, [index.QUERY_SERVICE, index.STORE_SERVICE].sort(), 'genau zwei Faehigkeiten');
+  // Zug 3 der Wissens-Runtime: eine DRITTE schmale Faehigkeit (der Fakten-Snapshot).
+  // Die Regel bleibt: jede Naht ist schmal, keine wird geweitet.
+  assert.deepEqual(
+    names,
+    [index.QUERY_SERVICE, index.STORE_SERVICE, 'shinon_facts_snapshot'].sort(),
+    'drei schmale Faehigkeiten',
+  );
+  const facts = provided.find((entry) => entry.name === 'shinon_facts_snapshot').value;
+  assert.deepEqual(Object.keys(facts).sort(), ['contract', 'snapshot'], 'der Snapshot: Vertragsname und EINE Operation');
+  assert.equal(facts.contract, 'shinon.facts/snapshot-v1');
   const query = provided.find((entry) => entry.name === index.QUERY_SERVICE).value;
   assert.deepEqual(Object.keys(query).sort(), ['contract', 'resolveContext'], 'schmal: Vertragsname und EINE Operation');
   assert.equal(query.contract, index.QUERY_CONTRACT);
@@ -165,6 +193,23 @@ test('Naht: Dienst- und Vertragsname stimmen in beiden Paketen ueberein', () => 
   assert.equal(scoring.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
   assert.equal(typeof scoring.LEDGER_NAMESPACE, 'string');
   assert.ok(scoring.LEDGER_NAMESPACE.length > 0, 'ohne Namensraum gaebe es keine Adresse');
+
+  // Die Persona haengt am SELBEN Dienst, mit einem EIGENEN Raum: ihr
+  // Selbstmodell ist gelernte Selbstkenntnis, nicht das Protokoll des Scorings.
+  // Beide Namen sind Literale auf beiden Seiten — hier steht, dass sie stimmen.
+  assert.equal(persona.INDEX_STORE_SERVICE, index.STORE_SERVICE, 'derselbe Dienstname');
+  assert.equal(persona.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
+  assert.notEqual(persona.SELF_MODEL_NAMESPACE, scoring.LEDGER_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
+
+  // Der Prompter haengt am selben Dienst, ebenfalls mit einem EIGENEN Raum:
+  // der SALVAGED_PROSE-Zaehler beschreibt den Lauf (Sitzung), nicht das
+  // Protokoll und nicht das Selbstmodell. Auch hier sind beide Namen Literale
+  // auf beiden Seiten — und der Test ist der Ort, der sie zusammennagelt.
+  assert.equal(prompter.INDEX_STORE_SERVICE, index.STORE_SERVICE, 'derselbe Dienstname');
+  assert.equal(prompter.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
+  assert.notEqual(prompter.SALVAGE_NAMESPACE, scoring.LEDGER_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
+  assert.notEqual(prompter.SALVAGE_NAMESPACE, persona.SELF_MODEL_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
+  assert.equal(prompter.SALVAGE_CONTRACT, prompter.SALVAGE_NAMESPACE, 'Vertrag und Adresse sind derselbe Name der Form');
 
   // Die dritte Naht (Zug 5): der Ton. Der Veredler liest die Haltung ueber
   // dieselbe Bauform (optionales `get`, gepruefter Vertragsname); die Namen
@@ -265,8 +310,9 @@ test('MAX: mit Index-Dienst kommt der Kontext aus dem INDEX und die Quelle steht
  *
  * Ein Enhancer, der den falschen Workspace liest, ist keine Stilfrage. Der
  * Datensatz nennt deshalb Root, Kurz-Identitaet und QUELLE (explizit, Env, cwd)
- * je Schritt — und niemals den Prompt-Text: eine Spur, die den Inhalt kopiert,
- * waere selbst ein Leck.
+ * je Schritt. Der ROHE Nutzertext steht als `raw_prompt` ausdruecklich dabei —
+ * ohne ihn ist im Trace nicht nachvollziehbar, was veredelt wurde; Schluessel
+ * und Kontextinhalte bleiben draussen.
  */
 test('S1: der Entscheidungsdatensatz nennt die Workspace-Identität und ihre Quelle', async () => {
   const workspace = workDir('s1-workspace');
@@ -283,8 +329,8 @@ test('S1: der Entscheidungsdatensatz nennt die Workspace-Identität und ihre Que
   assert.equal(record.workspace.source, 'config');
   assert.match(record.workspace.rootId, /^[0-9a-f]{16}$/);
   assert.equal(record.workspace_contract, 'shinon.workspace/v1');
-  assert.equal(record.rawLength, prompt.length, 'nur die Laenge, nicht der Text');
-  assert.equal(JSON.stringify(record).includes(prompt), false, 'der Prompt-Text steht nicht in der Spur');
+  assert.equal(record.rawLength, prompt.length, 'die Laenge bleibt gemessen');
+  assert.equal(record.raw_prompt, prompt, 'der Rohtext ist im Trace verfuegbar');
   dispose();
 });
 
@@ -330,8 +376,8 @@ test('MAX: eine Datei gewinnt gegen den Dienst, und ohne beides wird abgelehnt',
   const third = connect({ llm: fakeLlm(result()), service: { contract: index.QUERY_CONTRACT, resolveContext: () => null } });
   await third.ctx.waterfall(prompter.PRE_STEP_EVENT, stepPayload(claimed), () => Promise.resolve(downstream));
   assert.equal(third.records[0].context_source, 'none');
-  // Verhaltensänderung: ohne Project-Index und leerem Runtime-Index heißt der
-  // Grund jetzt MODE_NEEDS_CONTEXT (früher MODE_NEEDS_INDEX am Project-Index-Pfad).
+  // Ohne Project-Index heißt der Grund MODE_NEEDS_CONTEXT: ein fehlender Index
+  // ist kein benutzbarer Kontext.
   assert.deepEqual(third.records[0].reasons, ['MODE_NEEDS_CONTEXT'], 'ein fehlender Index ist nicht dasselbe wie ein fehlender Kontext');
   third.dispose();
 });
@@ -354,9 +400,8 @@ test('MAX: ein fremder Dienst unter unserem Namen wird nicht benutzt', async () 
     assert.equal(llm.calls.length, 0, `${name}: kein Aufruf mit unbrauchbarem Kontext`);
     assert.equal(decision, downstream, name);
     assert.equal(records[0].context_source, 'none', name);
-    // Verhaltensänderung: wenn der Project-Index unbrauchbar ist (falscher Vertrag,
-    // wirft, Unsinn), aber der Runtime-Index leer ist, fällt der Prompter auf
-    // MODE_NEEDS_CONTEXT zurück (nicht mehr CONTEXT_INVALID vom Project-Index-Pfad).
+    // Ist der Project-Index unbrauchbar (falscher Vertrag, wirft, Unsinn),
+    // fällt der Prompter auf MODE_NEEDS_CONTEXT zurück.
     assert.deepEqual(records[0].reasons, ['MODE_NEEDS_CONTEXT'], name);
     dispose();
   }

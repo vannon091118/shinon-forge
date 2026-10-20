@@ -1,7 +1,7 @@
 # Shinon Forge – verifizierbarer Implementierungsplan
 
 > **Status:** historical — abgeschlossener Stand, keine Quelle für aktuelle Zahlen. **Stand:** 2026-10-07
-> **Einstieg:** `docs/INDEX.md` · **Zahlen (aktuell):** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen (aktuell):** `docs/ZAHLEN.md`
 
 ## Zweck
 
@@ -85,7 +85,7 @@ Referenz:
 
 ## 2.2 Bestehende Paketregeln
 
-`docs/ARCHITECTURE.md` definiert:
+`AGENTS.md` definiert:
 
 - Paketstruktur
 - Namespace-Regeln
@@ -1298,7 +1298,7 @@ Untersuche:
 
 ```text
 packages/hook/index.js
-docs/ARCHITECTURE.md
+AGENTS.md
 profiles/shinon/package.json
 ```
 

@@ -1,5 +1,18 @@
 {
   "contract": "shinon.commit-policy/v1",
+  "name": "commit-policy",
+  "status": "IMPLEMENTED",
+  "rules": [
+    {
+      "positive": "Jede Commit-Nachricht traegt mindestens 150 Woerter Fliesstext, einen harten Datenbeleg, einen Bildsprache-Marker und den VANNON-Trailer als letzte Zeile.",
+      "forbidden": "Kein KI-Footer, kein Co-Authored-By, keine Emoji-Signatur — in keinem Preset abwaehlbar.",
+      "fallback": "Ein defekter Policy-Input endet mit Exit 2, nie mit einem Rueckfall auf schwaechere Regeln.",
+      "error": "Eine Regelverletzung blockt den Commit ueber Hook und CI; die Reparatur tauscht nur Footer, nie Prosa.",
+      "trace": "Geprueft wird mit scripts/commit-guard.mjs (--stdin, --file, --ci, --range, --last, --all); dieselbe Pruefung laeuft im commit-msg-Hook.",
+      "replay": "CI prueft jeden Push und PR ohne Filter; eine unaufloesbare Range faellt auf die volle Historie zurueck, nie auf einen engeren Ausschnitt.",
+      "invariant": "Der Fussboden (kein KI-Footer, kein co-authored-by) ist kein Preset-Feld und damit von keinem Preset abwaehlbar; die Presets sind Daten, das Repo-Verhalten bleibt shinon-maintainer."
+    }
+  ],
   "version": 1,
   "default": "shinon-maintainer",
   "floor": {

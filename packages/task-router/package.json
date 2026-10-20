@@ -9,11 +9,14 @@
     "./client": "./client.js",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
+  "dependencies": {
+    "@shinon/seams": "1.0.0"
+  },
   "peerDependencies": {
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "dsh": {
     "bundle": {
@@ -24,7 +27,16 @@
     }
   },
   "meta": {
-    "title": { "en": "Shinon Forge - Task Router", "de": "Shinon Forge - Aufgabenverteiler" },
-    "description": { "en": "Deterministic goal policy: the label is necessary, not sufficient", "de": "Deterministische Goal-Policy: das Etikett ist notwendig, nicht ausreichend" }
+    "title": {
+      "en": "Shinon Forge - Task Router",
+      "de": "Shinon Forge - Aufgabenverteiler"
+    },
+    "description": {
+      "en": "Deterministic goal policy: the label is necessary, not sufficient",
+      "de": "Deterministische Goal-Policy: das Etikett ist notwendig, nicht ausreichend"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
   }
 }

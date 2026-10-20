@@ -158,6 +158,17 @@
       "herkunft": "packages/persona/index.js (renderNarrative, Interpretation nicht Autorität)"
     },
     {
+      "id": "persona-user-lage",
+      "quelle": "persona",
+      "lage": "system",
+      "sektion": "shinon:user-lage",
+      "modus": ["MID", "MAX"],
+      "pflicht": false,
+      "budgetTokens": 200,
+      "ausloeser": { "haystack": ["genervt", "frust", "nervt", "lob", "nice", "danke", "super", "bock"], "nurWenn": "lastUserMood != null" },
+      "herkunft": "packages/persona/index.js (detectUserMood + renderUserLage: erkannte User-Stimmung als System-Abschnitt, jede Interaktion wirkt)"
+    },
+    {
       "id": "enhancer-system-policy",
       "quelle": "prompter",
       "lage": "one-shot-system",
@@ -187,7 +198,7 @@
       "modus": ["MAX"],
       "pflicht": false,
       "budgetTokens": 6000,
-      "ausloeser": { "modus": "MAX", "quelle": "Runtime-Index bevorzugt, Project-Index als Fallback, Datei vor beiden", "nurWenn": "needsContext && Kontext vorhanden" },
+      "ausloeser": { "modus": "MAX", "quelle": "Project-Index (Dienst shinon_index_query), Datei davor", "nurWenn": "needsContext && Kontext vorhanden" },
       "herkunft": "packages/prompter/index.js (maxContext) + assets/render-context.js (renderContext, neutralizeMarkers)"
     },
     {
@@ -242,7 +253,7 @@
       "modus": ["MIN", "MID", "MAX"],
       "pflicht": false,
       "budgetTokens": 500,
-      "ausloeser": { "regeln": "shinon.intent-rules/v1 (6 Patterns: update-docs/documentation/tests/bugfix/refactor/read-code)", "trigger": "Trigger-Listen deutsch/englisch, case-insensitive", "nurWenn": "intentPatternsPath gesetzt und Pattern trifft" },
+      "ausloeser": { "regeln": "shinon.intent-rules/v1 Fassung 2 (40 Patterns über fünf Klassen, `staerke`/`signale`/`semantik`)", "trigger": "Trigger-Listen deutsch/englisch, case-insensitive, ganze Phrasen", "nurWenn": "intentPatternsPath gesetzt und Pattern trifft" },
       "herkunft": "packages/prompter/assets/intent-rules.json (Trigger → Klassifikation → Expansion)"
     }
   ]

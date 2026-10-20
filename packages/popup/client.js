@@ -6,7 +6,35 @@
  * einen Sidebar-Eintrag malt, ist von einem kaputten nicht zu unterscheiden; das
  * Paket erklärte sich deshalb im eigenen Manifest als inaktiv.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-cf9fdc4a21d3
+ * DER DATENWEG (der einzige, der einem Out-of-Tree-Bundle offensteht): ein
+ * Client-Bundle kann KEINEN Host-Endpunkt registrieren — die Remote-Beiträge der
+ * Browser-Hälfte kommen aus einer kompilierten Liste in
+ * `@deepseek-ai/dsh-api-remotes`, und die Connection-Naht ist reines
+ * Anfrage/Antwort (`rpc.call`) ohne Abo. Der Host emittiert seine
+ * Trajectory-Einträge weiterhin auf `shinon/trajectory` (index.js), hier als
+ * Probe-API ohne In-Tree-Konsument (siehe Gate-Test `popup-overlay.test.mjs`) —
+ * dieser Client faltet stattdessen die SITZUNG:
+ *
+ *   ctx.get('uiSession')?.adapter?.current?.getSnapshot()   → welche Sitzung
+ *   ctx.get('sessions')?.binding(id)                        → deren Bindung
+ *   …binding.eventSource.getSnapshot().entries              → das Ereignisfenster
+ *   …binding.eventSource.subscribe(fn)                      → jede Änderung
+ *
+ * Denselben Weg geht `@shinon/token-usage`; er ist gemessen, nicht behauptet
+ * (der Vertrag der installierten DSH-Fassung: `ctx.get(name)` ist die optionale
+ * Abfrage, ein direkter Dienst-Zugriff wirft ohne `inject`).
+ *
+ * DIE REGEL SELBST steht als bytegleiche Region aus dem Kern
+ * (packages/popup/assets/trajectory-core.js): ein Client-Bundle ist eigenständig
+ * und zieht kein `import` über die Paketgrenze. Die Region ist die Zusage, dass
+ * der Browser dieselbe Rechnung fährt wie die Unit-Tests — geprüft von
+ * `scripts/lib/repo.mjs` (Zwilling) bei jedem Gate-Lauf.
+ *
+ * WAS SIE RENDERT: den Fortschritt des laufenden Vorgangs (Schritt, offene
+ * Aufrufe, zuletzt benutztes Werkzeug) im Dock über dem Eingabefeld — derselbe
+ * Slot, den `@shinon/core` (Info-Leiste) und `@shinon/codingmon` (EXP-Leiste)
+ * schon besetzen. Ohne laufenden Turn rendert sie NICHTS (ein leeres Overlay wäre
+ * eine Oberfläche, die nichts aussagt) — sichtbar bleibt die Sidebar-Zeile.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/popup',
@@ -18,13 +46,21 @@ window.__ModuleLoader__.load({
     /** Derselbe Slot wie die Vorgabe des Host-Schemas (packages/popup/index.js). */
     const DOCK_SLOT = 'conversation.composer.dock';
     const OVERLAY_ID = 'shinon-popup-progress';
+    /**
+     * Derselbe Fensterspiegel, den das Prompter-Panel liest — KEIN zweiter Kanal.
+     * Der Prompter-Host schreibt ihn (in-process) und der Prompter-Client pflegt
+     * ihn aus SSE; hier wird nur gelesen. Der Name ist ein Literal (ein
+     * Client-Bundle kann den Host nicht importieren) und wird von
+     * `scripts/gate/tests/abort-trace.test.mjs` gegen die Host-Konstante geprüft.
+     */
+    const TRACE_GLOBAL = '__shinonPrompterTrace';
 
     /** Sichtbarkeit (Schritt 1): meldet dieses Bundle bei der System-Uebersicht an. */
     const LABEL = 'Shinon Popup';
     const ROLE = 'Trajectory-Overlay (Fortschritt aus dem Sitzungsfenster)';
 
     function announce(detail) {
-      const table = window.__shinon_plugins ?? (window.__shinon_plugins = {});
+      const table = window.__shinonPluginCatalog ?? (window.__shinonPluginCatalog = {});
       table[PLUGIN] = {
         id: PLUGIN,
         label: LABEL,
@@ -68,6 +104,59 @@ function eventsOf(entries) {
 }
 
 /**
+ * Die ABBRUCHQUOTE aus den Prompter-Entscheidungen falten.
+ *
+ * Dieselben Einträge, die das Prompter-Panel liest (Fensterspiegel), werden hier
+ * gezählt: `abort` trägt den klassifizierten Grund, `abort_counts` den Zähler
+ * je Grund. KEIN Grund wird hier beim Namen genannt — ein neuer Grund ist ein
+ * Dateneintrag in `packages/prompter/assets/abort-reasons.json`, und diese
+ * Faltung liest nur `abort.id`/`abort.label`. Genau deshalb braucht ein neuer
+ * Grund keine Client-Änderung.
+ *
+ * `top` ist der häufigste Grund; bei Gleichstand gewinnt der zuerst gesehene —
+ * deterministisch, weil die Einträge in Puffer-Reihenfolge (neuester zuerst)
+ * ankommen und die Schleife stabil ist.
+ */
+function foldAborts(entries) {
+  const counts = {};
+  const ranks = {};
+  const labels = {};
+  let turns = 0;
+  let aborts = 0;
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    if (!isRecord(entry) || typeof entry.outcome !== 'string') continue;
+    turns += 1;
+    const abort = isRecord(entry.abort) && typeof entry.abort.id === 'string' ? entry.abort : null;
+    if (abort === null) continue;
+    aborts += 1;
+    counts[abort.id] = (counts[abort.id] ?? 0) + 1;
+    // `rank` reist im Datensatz (Position in `abort-reasons.json`); ohne ihn
+    // gäbe es hier eine zweite Rangfolge unter demselben Namen.
+    if (Number.isInteger(abort.rank)) ranks[abort.id] = abort.rank;
+    if (typeof abort.label === 'string' && abort.label !== '') labels[abort.id] = abort.label;
+  }
+  // Häufigster Grund; bei Gleichstand der kleinere `rank`, danach die ID. Die
+  // Eingabereihenfolge entscheidet nie.
+  let top = null;
+  for (const id of Object.keys(counts)) {
+    if (top === null) { top = id; continue; }
+    if (counts[id] !== counts[top]) { if (counts[id] > counts[top]) top = id; continue; }
+    const rankA = Number.isInteger(ranks[id]) ? ranks[id] : Number.MAX_SAFE_INTEGER;
+    const rankB = Number.isInteger(ranks[top]) ? ranks[top] : Number.MAX_SAFE_INTEGER;
+    if (rankA !== rankB) { if (rankA < rankB) top = id; continue; }
+    if (id < top) top = id;
+  }
+  return {
+    turns,
+    aborts,
+    quote: turns === 0 ? 0 : aborts / turns,
+    top,
+    topLabel: top === null ? null : (labels[top] ?? top),
+    counts,
+  };
+}
+
+/**
  * Den Fortschritt aus dem Ereignisfenster falten — deterministisch, ohne Uhr.
  *
  * Die Lesart ist eine Momentaufnahme des FENSTERS: das Fenster ist
@@ -75,9 +164,17 @@ function eventsOf(entries) {
  * letzten Abschnitt der Sitzung. Ein neues `turn/start` setzt sie zurück, ein
  * `turn/end` schließt sie ab — die Anzeige ist damit „läuft" oder „bereit", und
  * beides ist aus den Ereignissen ablesbar statt behauptet.
- * → Kanon: docs/COMMENT-KANON.md#k-84b84a002cbc
+ *
+ * Ohne `callId` ist ein Aufruf nicht zuordenbar. Er zählt trotzdem als OFFEN —
+ * fail-closed: es gibt keine Evidenz, dass er fertig ist, und „geschlossen" wäre
+ * eine Behauptung. Sein synthetischer Schlüssel kann von keinem `tool/result`
+ * getroffen werden (die tragen echte callIds), also bleibt er es auch.
+ *
+ * @param entries - Einträge des Sitzungsfensters (`binding.eventSource…entries`).
+ * @param limit - wie viele Werkzeugnamen behalten werden.
+ * @param aborts - Prompter-Entscheidungen (Fensterspiegel); leer = keine Quote.
  */
-function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT) {
+function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT, aborts = []) {
   const open = new Map();
   const tools = [];
   let turn = null;
@@ -134,6 +231,7 @@ function foldTrajectory(entries, limit = TOOL_HISTORY_LIMIT) {
     running: named.length > 0 ? named[named.length - 1] : null,
     tools: [...tools],
     active: turn !== null,
+    aborts: foldAborts(aborts),
   };
 }
 
@@ -178,9 +276,15 @@ function progressReading(reading) {
       return ctx.get?.('sessions')?.binding?.(sessionId);
     }
 
+    /** Die Prompter-Entscheidungen aus dem Fensterspiegel (leer, wenn es keinen gibt). */
+    function abortEntries() {
+      const list = globalThis?.window?.[TRACE_GLOBAL];
+      return Array.isArray(list) ? list : [];
+    }
+
     /** Die Lesart des Fensters: fehlt der Dienst, ist sie leer (und das Overlay schweigt). */
     function readTrajectoryOf(ctx) {
-      return foldTrajectory(seamOf(ctx)?.eventSource?.getSnapshot?.()?.entries);
+      return foldTrajectory(seamOf(ctx)?.eventSource?.getSnapshot?.()?.entries, TOOL_HISTORY_LIMIT, abortEntries());
     }
 
     /**

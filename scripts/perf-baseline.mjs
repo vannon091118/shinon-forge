@@ -413,7 +413,7 @@ function probesOf(value) {
   const base = {
     id: `perf-baseline-lokal-${value.measuredAt.slice(0, 10)}`,
     claim: 'Der lokale Anteil eines Laufs ist millisekundengroß, außer dem Indexweg: Dateiscan, Scoring, Workspace-Auflösung, One-Shot und agent/pre-step liegen unter 4 ms, der Index kalt bei Sekunden.',
-    targets: ['scripts/perf-baseline.mjs', 'scripts/lib/perf-stats.mjs', 'docs/audit/PERF-BASELINE-2026-10-17.md'],
+    targets: ['scripts/perf-baseline.mjs', 'scripts/lib/perf-stats.mjs', 'docs/probes/perf-baseline.json'],
     expect: 'Je Fall dieselbe Operation auf identischer Fixture, P50/P95 über ≥ 25 Läufe (index-cold 7, weil jeder Lauf ~20 MB schreibt), und ein Fingerabdruck je Stichprobe, der beweist, dass alle Läufe dasselbe Ergebnis hatten.',
     result: 'BESTAETIGT',
     verdict: 'WRITE',
@@ -424,11 +424,11 @@ function probesOf(value) {
   const commit = {
     id: `index-open-sieben-commits-${value.measuredAt.slice(0, 10)}`,
     claim: 'Das Öffnen des Projektindex zahlt einen inhaltsunabhängigen Festpreis: sieben Meta-Zeilen (4× Fassung, 3× Root) in sieben eigenen Transaktionen, jede ein fsync. Gebündelt in EINER Transaktion fällt genau dieser Anteil weg.',
-    targets: ['packages/project-index/assets/index-core.js', 'scripts/gate/tests/project-index.test.mjs', 'docs/audit/PERF-BASELINE-2026-10-17.md'],
+    targets: ['packages/project-index/assets/index-core.js', 'scripts/gate/tests/project-index.test.mjs', 'docs/probes/perf-baseline.json'],
     expect: 'Wenn die sieben Commits den Preis tragen, muss dieselbe Arbeit in EINER Transaktion deutlich billiger sein — gleiche Zeilenzahl, dieselben Pragmas, abwechselnd in derselben Schleife gemessen —, und der Öffnen-Preis muss danach fallen.',
     result: 'BESTAETIGT',
     verdict: 'WRITE',
-    evidence: `GEMESSEN, ${runtimeLine}. index-open P50 ${value.cases.find((entry) => entry.id === 'index-open')?.ms.p50} ms auf vorhandener Datei; sieben Meta-Zeilen einzeln P50 ${batch?.ms?.p50} ms (min ${batch?.ms?.min}, max ${batch?.ms?.max}, n=${batch?.ms?.n}) gegen ${batch?.compare?.ms?.p50} ms in einer Transaktion (n=${batch?.compare?.ms?.n}), also ~${Math.round((batch?.ms?.p50 ?? 0) - (batch?.compare?.ms?.p50 ?? 0))} ms Unterschied je Öffnen. Der Vorher-Lauf derselben Fixture (index-open P50 912,2 ms) steht in docs/audit/PERF-BASELINE-2026-10-17.md; Last und Maschine sind zwischen beiden Läufen nicht gleich, der kontrollierte Teil ist die gepaarte Diagnose.`,
+    evidence: `GEMESSEN, ${runtimeLine}. index-open P50 ${value.cases.find((entry) => entry.id === 'index-open')?.ms.p50} ms auf vorhandener Datei; sieben Meta-Zeilen einzeln P50 ${batch?.ms?.p50} ms (min ${batch?.ms?.min}, max ${batch?.ms?.max}, n=${batch?.ms?.n}) gegen ${batch?.compare?.ms?.p50} ms in einer Transaktion (n=${batch?.compare?.ms?.n}), also ~${Math.round((batch?.ms?.p50 ?? 0) - (batch?.compare?.ms?.p50 ?? 0))} ms Unterschied je Öffnen. Der Vorher-Lauf derselben Fixture (index-open P50 912,2 ms) steht in docs/probes/perf-baseline.json; Last und Maschine sind zwischen beiden Läufen nicht gleich, der kontrollierte Teil ist die gepaarte Diagnose.`,
     evidence_note: 'Nur Dauern und Zeilenzahlen; kein Tabelleninhalt, kein Schlüssel.',
     change: 'UMGESETZT: openIndex schreibt seine sieben Meta-Zeilen über setMetaMany in EINER Transaktion (packages/project-index/assets/index-core.js); gepinnt von scripts/gate/tests/project-index.test.mjs (alle sieben Schlüssel da, kein einzelner setMeta-Commit im Öffnen).',
     measurements: batch ?? null,

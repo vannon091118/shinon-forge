@@ -3,9 +3,15 @@
  *
  * Vertraege, Faehigkeitslisten und die Modus-Stufen (MIN ⊂ MID ⊂ MAX) — die DATEN
  * hinter dem Verhalten: Vertragsnamen, Operations-Tabellen, Policies, Vokabulare.
- * Reine Daten ohne Importe, damit die Modus-Logik in CI ohne node_modules pruefbar
- * bleibt (dieselbe Teilung wie `note-core.js`).
+ *
+ * EIN Import — und zwar der einzige, der die Eigenschaft nicht kostet:
+ * `@shinon/seams/core` ist selbst importfrei (nur `node:`-Module), also bleibt
+ * "in CI ohne node_modules pruefbar" fuer alles wahr, was hier drin steht. Der
+ * Entscheidungskanal ist die Naht zum Scoring und zur Persona; ihn hier als
+ * Literal zu fuehren hiesse, eine der drei Kopien zu behalten, die
+ * `SOURCE_TWINS` bis 2026-10-20 zusammenhielt.
  */
+import { PROMPTER_DECISION_CHANNEL } from '@shinon/seams/core';
 
 /** Vertragsname der One-Shot-Antwort. */
 export const CONTRACT = 'shinon.prompter/result-v1';
@@ -20,7 +26,7 @@ export const CONTEXT_TAG = 'untrusted_project_context';
 export const PRE_STEP_EVENT = 'agent/pre-step';
 
 /** Kanal, auf dem Entscheidungen den Host verlassen (Provenienz, ohne Prompt-Text). */
-export const DECISION_CHANNEL = 'shinon/prompter/decision';
+export const DECISION_CHANNEL = PROMPTER_DECISION_CHANNEL;
 
 /**
  * Die Abfrage-Faehigkeit des Project Index (Plan §14/§17).
@@ -38,6 +44,18 @@ export const INDEX_SERVICE = 'shinon_index_query';
 export const INDEX_CONTRACT = 'shinon.project-index/query-v1';
 
 /**
+ * Die ZWEITE, schmale Faehigkeit des Project Index: die dauerhafte Ablage.
+ *
+ * Dieselben Namen wie in `@shinon/scoring` und `@shinon/persona` (jedes Paket
+ * traegt sein eigenes Literal; `scripts/gate/tests/context-wiring.test.mjs`
+ * pinnt die Gleichheit). Gelesen wird optional ueber `ctx.get`, nie per
+ * `inject`: ohne Index bleibt der Prompter montiert, dann zaehlt er nur im
+ * Prozess.
+ */
+export const INDEX_STORE_SERVICE = 'shinon_index_store';
+export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
+
+/**
  * Die Ton-Faehigkeit des Scorings (Zug 5) — optional, wie die Abfrage des Index.
  *
  * Der Stand-Block traegt zwei Dinge: die passenden ZETTEL (aus dem Verzeichnis)
@@ -49,12 +67,14 @@ export const INDEX_CONTRACT = 'shinon.project-index/query-v1';
  */
 export const SCORING_SERVICE = 'shinon_scoring_state';
 export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
+// Zug 3 der Wissens-Runtime: der Projekt-Index bietet einen Snapshot an, der
+// Prompter liest ihn über diesen Namen. Das Literal steht auf beiden Seiten und
+// wird in packages/prompter/test/knowledge-block.test.mjs gegen den Vertrag geprüft.
+export const FACTS_SNAPSHOT_SERVICE = 'shinon_facts_snapshot';
+export const FACTS_SNAPSHOT_CONTRACT = 'shinon.facts/snapshot-v1';
 
 /** Budget des MAX-Kontexts. Derselbe Wert wie der Vorgabewert des Index (§14). */
 export const INDEX_BUDGET_TOKENS = 6000;
-
-/** Kontextquelle: altes Projekt-Index vs. neuer Runtime-Index. */
-export const CONTEXT_SOURCES_RUNTIME = ['none', 'file', 'index', 'runtime'];
 
 /** Vertragsname der Zettel-Regeln (Zug 4). */
 export const NOTE_RULES_CONTRACT = 'shinon.note-rules/v1';
@@ -125,7 +145,10 @@ export const UNTRUSTED_RULE = [
  * sein System-Prompt zusaetzlich traegt (`extras`). `MODES`, `MODE_DELTAS`,
  * `MODE_CAPABILITIES` und `POLICIES` werden daraus ABGELEITET.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-dd7d8973d632
+ * Vorher lagen die Deltas in einer Tabelle und der Kontextbedarf als
+ * `mode === 'MAX'` an fuenf Stellen im Code: ein vierter Modus haette fuenf
+ * Aenderungen gebraucht, und eine vergessene Stelle haette still das Falsche
+ * getan — MAX ohne Kontextregel, MIN mit Kontextblock.
  */
 export const MODE_STEPS = [
   { mode: 'MIN', delta: MIN_OPS, needsContext: false, extras: [] },
@@ -176,14 +199,14 @@ export const RESULT_BRIEF = [
   'Du bist ein Prompt-Veredler. Du veraenderst die Formulierung, nicht die Aufgabe.',
   '',
   'Antworte ausschliesslich mit genau einem JSON-Objekt, ohne Erklaerung, ohne Markdown-Zaun:',
-  '{"enhancedPrompt":"…","preservedIntent":true,"addedRequirements":[],"removedRequirements":[],"uncertainties":[],"references":[],"intentClassification":"CHAT"}',
+  '{"enhancedPrompt":"…","preservedIntent":true,"addedRequirements":[],"removedRequirements":[],"uncertainties":[],"references":[]}',
   '',
   'Regeln:',
   '- preservedIntent ist true, solange du die Absicht des Nutzers nicht aenderst.',
   '- addedRequirements und removedRequirements bleiben leer. Wenn du meinst, dass eine',
   '  Anforderung fehlt: nicht erfinden, sondern in uncertainties benennen.',
   '- uncertainties nennt echte Unklarheiten des Originals, in eigenen Worten.',
-  '- intentClassification ist genau einer von: ' + INTENT_CLASSES.join(', ') + '.',
+  '- Die Einordnung in Intent-Klassen trifft die Runtime; du lieferst sie nicht.',
 ].join('\n');
 
 /**
@@ -230,7 +253,7 @@ export function resolveMode(mode) {
 
 /** Die Achsen, auf denen der Kontext eines Schritts beschrieben wird. */
 export const CONTEXT_STATES = ['absent', 'loaded', 'invalid'];
-export const CONTEXT_SOURCES = ['none', 'file', 'index', 'runtime'];
+export const CONTEXT_SOURCES = ['none', 'file', 'index'];
 export const CONTEXT_REASONS = ['MODE_NEEDS_CONTEXT', 'MODE_NEEDS_INDEX', 'CONTEXT_INVALID'];
 
 /**

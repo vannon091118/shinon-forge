@@ -7,11 +7,21 @@
  * Das ist der User-Flow, den die spätere Tauri-Shell 1:1 übernimmt:
  * dieselbe URL, dasselbe Profil — nur andere Fassade statt Browser-Tab.
  *
- * → Kanon: docs/COMMENT-KANON.md#k-a4a8f65c357f
+ * Warum --no-open + eigener Browser-Start: DSHs Autoöffnung kennt die
+ * trusted-host-Zusagen nicht, und wir brauchen den stabilen, tokenisierten
+ * Link aus der READY-Zeile `dsh web: http://…/?token=…` — den öffnen wir selbst.
+ *
+ * Port: NICHT fest. Früher stand hier die Konstante 3081; war sie belegt,
+ * brach der Boot ab, bevor die READY-Zeile kam (Fehlerbild: „Profil kaputt“).
+ * Jetzt wählt `lib/port.mjs` den ersten freien Port ab 3081 mit einem echten
+ * Bind-Versuch, `--port <n>` bleibt der ausdrückliche Wunsch (`--port 0`: das
+ * Betriebssystem bindet). Der bediente Port wird aus der READY-Zeile
+ * zurückgelesen und eine Abweichung gemeldet — die Probe ist kein Beweis.
+ *
+ * Aufruf: `npm run open`  (Profil über das dev-Skript, eine Quelle)
+ * Exit: Ctrl-C stoppt DSH und den Wrapper sauber (Kind-Process wird beendet).
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { dshBinary, dshSource } from './lib/dsh.mjs';
 import { childEnv, describePaths } from './lib/paths.mjs';
@@ -181,7 +191,8 @@ child.stdout.on('data', (chunk) => {
  * 'exit'-Handler, der `child.exitCode` setzt: sie kann den Exit NIE beobachten
  * und läuft immer die volle Frist ab. Gemessen (Kind endet nach 300ms):
  * Warteschleife 3020ms Wanduhr und volle CPU-Last; mit der Frist auf dem Timer
- * → Kanon: docs/COMMENT-KANON.md#k-56fa110709cb
+ * endet der Wrapper nach 315ms, sobald das Kind wirklich weg ist. SIGKILL
+ * greift nur, wenn es nicht wegkommt — das ist die harte Frist, wie vorher.
  */
 /** Exit-Code, wenn ein Signal den Wrapper beendet (null = kein Signal). */
 let closing = null;

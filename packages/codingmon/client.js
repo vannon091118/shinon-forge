@@ -1,12 +1,23 @@
 /**
  * @shinon/codingmon — Client-Hälfte (Codemons + Arena).
  *
- * Die Marken-Slots der Sidebar und des Hero haelt @shinon/core: es zeigt dort
- * Shinons gezeichnetes Zeichen (eine Marke, eine Formensprache). Dieser Client
- * besetzt keinen Marken-Slot und gibt auch keine Marke heraus — die Figur
- * bleibt in ihren eigenen Flaechen (Panel, XP-Leiste, Arena). Nach aussen
- * lesbar ist allein der ZUSTAND, ueber eine Fenster-Konvention statt ueber
- * → Kanon: docs/COMMENT-KANON.md#k-a552c23582de
+ * Die Marken-Slots von Sidebar und Hero haelt @shinon/core; dieser Client gibt
+ * allein den ZUSTAND heraus (ueber `window.__codingmon`, dasselbe Muster wie
+ * `window.__mk` bei @shinon/markers, damit Pakete referenzfrei bleiben).
+ *
+ * ZEHN CODEMONS: Werte, Faehigkeiten und Gegnerauswahl stehen in `SPECIES`,
+ * `ABILITIES` und `arenaFor()` — gespiegelt aus der Host-Hälfte in index.js
+ * (dieselbe Formel, dieselbe Tabelle, dieselbe Reihenfolge); zusaetzlich lebt
+ * hier ZUSTAND (XP, HP, Runde) und Darstellung.
+ *
+ * KAMPF: rundenbasiert, ausgeloest durch Klick; der Gegner antwortet sofort mit
+ * seiner Faehigkeit, wer zuerst schlaegt entscheidet die AGI (Gleichstand an
+ * den Herausforderer). Jede Zahl im Log kommt aus einer reinen Funktion
+ * (damage), nicht aus einer Animation.
+ *
+ * XP: Fortschritt kommt aus erfolgreichen Agent-Completions und Kampfsiegen.
+ * Der Host zaehlt erfolgreiche `turn/end`-Ereignisse; der Client liest diesen
+ * Zaehler und belohnt neue Completions. Tokenverbrauch hat keinen Einfluss auf XP.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/codingmon',
@@ -50,8 +61,12 @@ window.__ModuleLoader__.load({
      * Die zehn Spezies teilen sich DREI Familien — die Form kommt aus der
      * Familie, die Identitaet aus Werten, Faehigkeiten und Farbton. Zehn eigene
      * Matrizen waeren 21 weitere handgezeichnete Sprites; sie werden nicht
- * → Kanon: docs/COMMENT-KANON.md#k-10be308a1da3
- */
+     * erfunden, sondern benannt.
+     *
+     *   .  transparent        o  Outline
+     *   a  hell               b  Koerper      c  Schatten
+     *   w  Augenweiss         e  Pupille      y  Akzent (Blitz/Horn/Flamme)
+     */
     const SPRITES = {
       spark: [
         [
@@ -924,18 +939,25 @@ window.__ModuleLoader__.load({
 
     /**
      * ── Uebergabe (Client -> Host) ─────────────────────────────────────────
-     * Der Stand liegt in `localStorage` und haengt damit am BROWSER-Profil: ist
-     * das weg, ist der Grind weg. Der Host haelt daneben einen dauerhaften
-     * Spiegel (`assets/pet-store.js`), und diese Funktion ist der ABSENDER —
-     * sie schickt den Stand ueber den Typert-RPC von DSH an den Host, sofern
-     * das Client-Bundle den Beitrag dieses Pakets gemountet hat.
-     *
- * → Kanon: docs/COMMENT-KANON.md#k-8a3e82b5bc53
- */
+     * Der Stand liegt in `localStorage` und haengt damit am BROWSER-Profil; der
+     * Host haelt daneben einen dauerhaften Spiegel (`assets/pet-store.js`).
+     * Diese Funktion ist der ABSENDER und wirft nie, wartet nie, aendert nie
+     * den Spielstand: ohne Kanal bleibt alles wie vorher, und der Zustand merkt
+     * sich die Absage. Die Namen sind LITERAL (das Bundle kann nichts aus
+     * `assets/` laden); Quelle ist `assets/uebergabe.js` und
+     * `test/uebergabe.test.mjs` vergleicht beide Seiten Zeichen fuer Zeichen.
+     */
     const HOST_NAMESPACE = 'codingmon';
     const HOST_METHOD = 'writeSnapshot';
-    /** Die Lese-Methode derselben Naht (Quelle: `assets/uebergabe.js`). */
     const HOST_ACTIVITY_METHOD = 'readActivity';
+    const HOST_PARAMETER = 'snapshot';
+    const HOST_SERVICE = 'codingmonRemote';
+    const strict = (type) => ({ mode: 'strict', typeSymbol: `${PLUGIN}#${type}`, create: () => null });
+    /** Der eigene Remote-Beitrag (Form: `assets/uebergabe.js`; der Browser kennt nur seine Liste). */
+    const CONTRIBUTION = { package: PLUGIN, descriptors: [
+      { id: `${PLUGIN}#${HOST_NAMESPACE}/${HOST_METHOD}`, service: HOST_SERVICE, namespace: HOST_NAMESPACE, method: HOST_METHOD, invocation: { kind: 'direct' }, parameters: [{ name: HOST_PARAMETER, wire: HOST_PARAMETER, source: 'json', codec: strict('Snapshot') }], result: strict('SnapshotAck') },
+      { id: `${PLUGIN}#${HOST_NAMESPACE}/${HOST_ACTIVITY_METHOD}`, service: HOST_SERVICE, namespace: HOST_NAMESPACE, method: HOST_ACTIVITY_METHOD, invocation: { kind: 'direct' }, parameters: [], result: strict('Activity') },
+    ] };
     let clientCtx = null;
     let hostMirror = { sent: 0, lastAt: null, lastLevel: null, error: null, reason: 'kein Kanal' };
 
@@ -1618,12 +1640,18 @@ window.__ModuleLoader__.load({
     // sind ins Dock gezogen (`WildDock`/`DockBattle`) — der Kampf laeuft im
     // Chat-Bereich. `startBattle`, `rest` und `useAbility` bleiben: als
     // Fenster-API und fuer den Dock-Kampf.
+    // ENTFERNT (WEG b): `Arena` + `ArenaSide` (`__cm_arena` im Panel `main`)
+    // sind ins Dock gezogen (`WildDock`/`DockBattle`) — der Kampf laeuft im
+    // Chat-Bereich. `startBattle`, `rest` und `useAbility` bleiben: als
+    // Fenster-API und fuer den Dock-Kampf.
     /**
      * ESKALATION: was eine Stufe ausmacht. Die Zahlen stehen formatiert da,
      * weil die Aussage die Zahl ist: Schwelle, Werte und Lohn wachsen
      * multiplikativ (x1,35 je Stufe), und der Lebenslauf steht daneben als
-// → Kanon: docs/COMMENT-KANON.md#k-c83e791235d1
- */
+     * BigInt — in Millionenhöhe exakt und nicht gerundet. Der Stellensprung
+     * (zwei- auf fuenfstellig) ist damit der Beweis der investierten Zeit und
+     * keine Behauptung: er steht als Meilenstein mit Wert und Datum im Log.
+     */
     function EscalationBlock({ s, lvl }) {
       const next = threshold(lvl + 1);
       const base = statsAtExact(s.species, 1);
@@ -2152,6 +2180,18 @@ window.__ModuleLoader__.load({
         // Remote-Beitrag. Er wird nicht kopiert und nicht gehalten ueber den
         // Abbau hinaus — der Zustand des Spiegels ist der Zustand, nicht der Context.
         clientCtx = ctx;
+        let remoteMount = 'offen'; // offen | laeuft | bereit
+        const mountRemote = (holder) => { // holder traegt `remote`, der Wurzel-Context nicht
+          const remote = holder?.get?.('remote');
+          if (remoteMount !== 'offen' || typeof remote?.$mount !== 'function') return; // Dienstwechsel feuert erneut
+          if (holder.get(`remote.${HOST_NAMESPACE}`) !== undefined) return void (remoteMount = 'bereit');
+          remoteMount = 'laeuft';
+          clientCtx = holder;
+          const fail = (e) => { remoteMount = 'offen'; hostMirror = { ...hostMirror, reason: 'abgelehnt', error: e?.message ?? String(e) }; };
+          try { Promise.resolve(remote.$mount(CONTRIBUTION)).then(() => { remoteMount = 'bereit'; }, fail); } catch (error) { fail(error); }
+        };
+        if (typeof ctx.inject === 'function') ctx.inject(['remote'], mountRemote);
+        else mountRemote(ctx);
 
         window.__codingmon = {
           plugin: PLUGIN,
@@ -2288,13 +2328,9 @@ window.__ModuleLoader__.load({
           id: 'shinon-exp-bar',
           order: 20,
         }, ExpBar));
-        // SLOT-ENTSCHEIDUNG (Auftrag Abschnitt 4, Schritt 2 — belegt vor Code):
-        // Ball, Wild und Kampf wohnen in `conversation.composer.dock` — live
-        // sichtbar, waehrend der Agent arbeitet, geteilt mit der EXP-Leiste
-        // (kein Single-Slot-Konflikt). Das Ergebnis liegt zusaetzlich in
-        // `conversation.chat.turnTail` (Liste, erscheint nach dem Turn).
-        // `conversation.chat.node` (`keyed`) ist ausgeschlossen:
-        // `replaceRisk: shadows-shipped-ui` — keine Begruendung, kein Knoten.
+        // SLOT-ENTSCHEIDUNG (belegt vor Code): Ball, Wild und Kampf wohnen in
+        // `conversation.composer.dock` (live sichtbar, geteilt mit der EXP-Leiste);
+        // `conversation.chat.node` bleibt aus (shadows-shipped-ui).
         ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
           name: 'conversation.composer.dock',
           id: 'shinon-wild-dock',

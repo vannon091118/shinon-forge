@@ -6,7 +6,16 @@
  * der Index jederzeit neu bauen darf und die als Cache jederzeit verschwinden
  * kann. Nutzerurteile sind nicht herstellbar; ein `rm -rf` im Cache hätte sie
  * mitgenommen. Seit der Trennung: Index → XDG-Cache (wiederherstellbar),
- * → Kanon: docs/COMMENT-KANON.md#k-624662eb6a53
+ * Ledger → XDG-Daten (`ledger.sqlite`, eigene Fassung, eigene Verbindung).
+ *
+ * Gepinnt wird:
+ *   1. WAL/Busy-Timeout/Foreign-Keys an BEIDEN Verbindungen (eine Öffnungsquelle),
+ *   2. die Migration ist VERLUSTFREI (Zeilen, Ordnung, Dokumente byte-gleich),
+ *   3. sie ist IDEMPOTENT (zweiter Lauf tut nichts) und lässt die Quelle stehen,
+ *   4. der Stand überlebt einen Index-Neuaufbau UND eine geleerte Indexwurzel,
+ *   5. ein Lauf im Worker hinterlässt keinen Zombieprozess und kein Handle.
+ *
+ * Läuft mit `node --test`; kein Netz, kein Modell, kein node_modules nötig.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

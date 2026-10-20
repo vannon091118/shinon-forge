@@ -1,0 +1,36 @@
+{
+  "contract": "shinon.e2e-scenario/v1",
+  "project": "leitstand",
+  "workspace": "default-workspace",
+  "brief": "BRIEF.md",
+  "note": "Ein Sitzungsprotokoll, kein Testskript: die Chat-Schritte faehrt ein Mensch (oder ein Agent) in der DSH-Oberflaeche; probe/mutate/report liefern die Belege unabhaengig vom Chat.",
+  "turns": [
+    { "n": 1, "goal": "Plan + Zustandsmaschine", "expect": "Dateien, npm test Exit 0, Testzahl genannt" },
+    { "n": 2, "goal": "Kritische Pruefung ohne Aenderung", "expect": "Luecken mit Datei und Zeile, keine Behauptung ohne Beleg" },
+    { "n": 3, "goal": "Fahrzeug + Zuweisung", "expect": "Kapazitaet, Zeitfenster, Doppelbelegung als benannte Fehler" },
+    { "n": 4, "goal": "SQLite-Store", "expect": "Migrationen, Neustart verliert nichts" },
+    { "n": 5, "goal": "HTTP-API", "expect": "ETag, Idempotenz, strukturierte Fehler, /health" },
+    { "n": 6, "goal": "Web-Oberflaeche", "expect": "Board, Detail, Tastatur, sichere Notizen" },
+    { "n": 7, "goal": "Dokumentation", "expect": "README, ADR-0001, ADR-0002, Betriebsnotiz" },
+    { "n": 8, "goal": "Abnahme", "expect": "npm test, /health, kompletter Durchlauf" },
+    { "n": 9, "goal": "Konsistenzaudit ueber alle Schritte", "expect": "Widersprueche mit Datei/Zeile, keine Erfindung" },
+    { "n": 10, "goal": "Anforderungswechsel (Express-Zuschlag)", "expect": "bestehende Zusagen bleiben, neue Regel getestet" },
+    { "n": 11, "goal": "Gegenprobe gegen BRIEF", "expect": "offene Punkte ehrlich benannt" },
+    { "n": 12, "goal": "Abschlussbericht", "expect": "Zahlen aus Laeufen, keine Schaetzung" }
+  ],
+  "mutations": [
+    { "afterTurn": 1, "case": "delete-test", "why": "Ein Test verschwindet; npm test bleibt gruen und beweist nichts." },
+    { "afterTurn": 3, "case": "duplicate-rule", "why": "Eine zweite Regelkopie entsteht mit abweichendem Zielzustand." },
+    { "afterTurn": 3, "case": "comment-contradiction", "why": "Ein Kommentar behauptet das Gegenteil des Codes." },
+    { "afterTurn": 4, "case": "swallow-error", "why": "Ein Fehler wird still geschluckt statt benannt." },
+    { "afterTurn": 5, "case": "api-field-rename", "why": "Ein Feld wird nur in einer Schicht umbenannt." },
+    { "afterTurn": 6, "case": "innerhtml", "why": "Nutzertext landet in innerHTML." },
+    { "afterTurn": 7, "case": "doc-limit-drift", "why": "Dokumentation und Code nennen verschiedene Grenzen." },
+    { "afterTurn": 8, "case": "etag-ignore", "why": "Der Nebenlaeufigkeitsvergleich wird umgangen." }
+  ],
+  "probes": [
+    { "when": "vor Turn 1", "what": "Dateibestand, Index, Ledger, Session (leer erwartet)" },
+    { "when": "nach jeder Mutation", "what": "Dateibestand + npm test Exit" },
+    { "when": "nach Turn 9", "what": "Index-Abdeckung gegen Dateibestand, Ledger-Signale der Sitzung" }
+  ]
+}

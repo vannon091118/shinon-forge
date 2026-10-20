@@ -1,0 +1,16 @@
+{
+  "name": "@shinon/prompter — Abbruchquote (welcher Ausfall war es, wie viele, welcher führt)",
+  "status": "IMPLEMENTED",
+  "note": "Der Kern steht in packages/prompter/assets/abort-core.js (importfrei), die Gründe in packages/prompter/assets/abort-reasons.json (shinon.abort-reasons/v1), die Übergabe in packages/prompter/index.js (withAbort). Geprüft von packages/prompter/test/abort-core.test.mjs (Klassifikation, Zähler, Quote, neuer Grund als Dateneintrag, Leitstand 5/9), packages/prompter/test/abort-trace.test.mjs (echter agent/pre-step mit Fake-LLM: Datensatz UND Fensterspiegel), packages/popup/test/trajectory-core.test.mjs (dieselbe Faltung im Popup), scripts/gate/tests/popup-overlay.test.mjs (ein Fenster-Global, kein zweiter Kanal) und scripts/gate/tests/client-activation.test.mjs (Quote und häufigster Grund im gerenderten Panel).",
+  "rules": [
+    {
+      "positive": "Jede Entscheidung, die den Prompt NICHT durch eine gültige Antwort ersetzt hat, trägt genau einen klassifizierten Grund (`abort.id`/`abort.label`) und ihren Zähler (`abort_counts`); `abort_quote` summiert Puffer und aktuellen Turn zu `turns`, `aborts`, `quote`, `top` und `topLabel`. Ein neuer Grund ist ein Eintrag in `abort-reasons.json` — Klassifikation, Zähler, Quote, Panel und Popup lesen die Daten, kein Client nennt einen Grund beim Namen.",
+      "forbidden": "Ein Grund als Codeänderung oder Literal im Client, ein zweiter Kanal neben `window.__shinonPrompterTrace`, eine im Client selbst gerechnete Zählung, ein `accepted` ohne Salvage als Abbruch, und ein abgebrochener Stream, der als Formatfehler (`KEIN_JSON`) statt als `TIMEOUT` zählt.",
+      "fallback": "Ist die Regeldatei unlesbar, bleibt der Enhancer unberührt: die Quote läuft weiter, jeder Abbruch heißt `UNKLASSIFIZIERT`, und der Grund steht im Mount-Log. Ohne Puffer bleibt `abort_quote` bei `turns: 0` — leer statt geraten.",
+      "error": "REGELN_UNLESBAR, REGELN_UNGUELTIG, UNKLASSIFIZIERT",
+      "trace": "DECISION_CHANNEL trägt `abort`, `abort_counts` und `abort_quote`; runtime.trace und window.__shinonPrompterTrace tragen dieselben drei Felder, das Popup faltet sie über die Zwillingsregion `zwilling:popup-trajectory`.",
+      "replay": "classifyAbort und abortSummary sind rein und reihenfolge-unabhängig: dieselbe Liste ergibt dieselbe Quote und denselben Top-Grund.",
+      "invariant": "Höchstens ein Grund je Entscheidung; `aborts` ist die Summe der Zähler; `quote = aborts / turns` (0 bei leerem Puffer); `top` ist der häufigste Grund, bei Gleichstand der mit dem kleineren `abort.rank` (Position in `abort-reasons.json`, reist im Datensatz), danach die kleinere ID."
+    }
+  ]
+}

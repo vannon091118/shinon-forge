@@ -7,7 +7,12 @@
  *      und jede mutierte Kopie muss Befunde liefern — ein Gate, das nie rot
  *      werden kann, ist Dekoration.
  *   2. Spiegel-Logik im echten Bundle: das Paket wird in ein Temp-Verzeichnis
- * → Kanon: docs/COMMENT-KANON.md#k-a29e0a72ced1
+ *      kopiert und mit einem Schemastery-Stub geladen (wie beim Event-Spine).
+ *      Geprüft werden Ableitung, Prüfung, Nutzlast-Format und Fail-Closed.
+ *   3. Client-Vertrag: Slot-Verdrahtung, Speicherschlüssel und die Nutzlast-
+ *      Vorlage — Client und Vertrag dürfen nicht auseinanderlaufen.
+ *
+ * Läuft mit `node --test` — kein node_modules, kein Netz.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -7,7 +7,9 @@
  * (`../assets/mechanik.js`), der keinen Bare-Import hat. Geprueft wird gegen die
  * ROHEN Tabellen (SPECIES, ELEMENTS, CATEGORY, SYNERGY, BUFFS) — die Formel ist
  * hier ein zweites Mal von Hand aufgeschrieben. Waere der Pruefer ein Aufruf von
- * → Kanon: docs/COMMENT-KANON.md#k-a6ba014a7a44
+ * `resolveAttack` gegen sich selbst, bewiese er nichts.
+ *
+ * Lauf: `npm run test:codingmon` bzw. `node --test packages/codingmon/test/*.test.mjs`.
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
