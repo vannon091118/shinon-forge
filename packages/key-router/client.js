@@ -16,7 +16,7 @@
  * deshalb ein Werkzeug des Hosts (`key_router_status`) — und ein Panel, das diese
  * Zahl nur behaupten könnte, wird nicht gebaut.
  *
- * Was bleibt: ein Eintrag in `__shinon_plugins` und eine Zeile in der
+ * Was bleibt: ein Eintrag in `__shinonPluginCatalog` und eine Zeile in der
  * Sidebar-Liste. Beide behaupten nichts über eine Oberfläche, die es nicht gibt.
  */
 window.__ModuleLoader__.load({
@@ -31,7 +31,7 @@ window.__ModuleLoader__.load({
     const ROLE = 'Schluessel-Pool des Hosts (Werkzeuge: status, rotate, probe)';
 
     function announce(detail) {
-      const table = window.__shinon_plugins ?? (window.__shinon_plugins = {});
+      const table = window.__shinonPluginCatalog ?? (window.__shinonPluginCatalog = {});
       table[PLUGIN] = {
         id: PLUGIN,
         label: LABEL,

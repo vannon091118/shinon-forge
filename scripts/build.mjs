@@ -18,6 +18,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import { join, relative } from 'path';
 import * as repo from './lib/repo.mjs';
 import { diaryIssues } from './lib/diary.mjs';
+import { canonIssues } from './lib/canon.mjs';
 
 const DIST = join(repo.ROOT, 'dist');
 
@@ -67,6 +68,8 @@ for (const issue of repo.hostMirrorIssues()) problems.push(`Host-Spiegel: ${issu
 // Dev-Tagebuch: die erzaehlte Timeline muss verankert bleiben — jeder Tag, jeder SHA,
 // jeder Belegpfad. Ohne git (Tarball, Isolat) meldet der Schritt nichts.
 for (const issue of diaryIssues()) problems.push(`Tagebuch: ${issue}`);
+// Kanon: ein Name, eine Schreibweise, eine Definition — Globals, Vertraege, Dienste.
+for (const issue of canonIssues()) problems.push(`Kanon: ${issue}`);
 // Generierte Idiome: dieselbe Regel für die Plugin-Bausteine — die Ableitung in den
 // Paketen muss zeichengenau zu scripts/lib/plugin-idioms.mjs passen.
 for (const half of ['index.js', 'client.js']) {

@@ -948,7 +948,7 @@ test('Probe-Journal: eine verworfene Antwort steht als JSONL-Zeile im Journal', 
   const lines = readFileSync(journal, 'utf8').trim().split('\n');
   assert.equal(lines.length, 1, 'genau eine Zeile je Verwerfung');
   const entry = JSON.parse(lines[0]);
-  assert.equal(entry.contract, 'shinon.prompter/one-shot-journal/v1');
+  assert.equal(entry.contract, 'shinon.prompter/one-shot-journal-v1');
   assert.deepEqual(entry.reasons, ['NO_JSON']);
   assert.equal(entry.mode, 'MIN');
   assert.equal(entry.prompt, raw, 'der Auftrag reist mit — sonst ist die Antwort nicht messbar');

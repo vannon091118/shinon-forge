@@ -43,7 +43,7 @@ window.__ModuleLoader__.load({
             console.log(`[shinon-task-router-client] ${decision?.outcome ?? 'unbekannt'} / ${goal} (${decision?.reason ?? '—'})`);
           });
         }
-        window.__shinon_task_router = mirror;
+        window.__shinonTaskRouter = mirror;
         const stop = () => {
           console.log(`[shinon-task-router-client] ${PLUGIN} gestoppt — keine Anzeige mehr aktiv`);
         };

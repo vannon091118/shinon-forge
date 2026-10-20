@@ -362,7 +362,7 @@ export const LEGACY_SCAN_EXTENSIONS = ['.js', '.mjs', '.cjs', '.yml', '.yaml'];
  * Early-Pruning-Regel (`scan.mjs`): Fremdbaum, Cache, Laufzeitdaten und Symlinks
  * werden VOR der Rekursion verworfen, nicht nach dem Lesen ihrer Einträge.
  */
-function walkFiles(dir) {
+export function walkFiles(dir) {
   const found = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isSymbolicLink() || isPruned(entry.name)) continue;

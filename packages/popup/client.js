@@ -60,7 +60,7 @@ window.__ModuleLoader__.load({
     const ROLE = 'Trajectory-Overlay (Fortschritt aus dem Sitzungsfenster)';
 
     function announce(detail) {
-      const table = window.__shinon_plugins ?? (window.__shinon_plugins = {});
+      const table = window.__shinonPluginCatalog ?? (window.__shinonPluginCatalog = {});
       table[PLUGIN] = {
         id: PLUGIN,
         label: LABEL,

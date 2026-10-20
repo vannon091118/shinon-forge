@@ -52,7 +52,7 @@ window.__ModuleLoader__.load({
 
     /** Sichtbarkeit in der Plugin-Liste (Konvention, kein Import). */
     function announce(detail) {
-      const table = window.__shinon_plugins ?? (window.__shinon_plugins = {});
+      const table = window.__shinonPluginCatalog ?? (window.__shinonPluginCatalog = {});
       table[PLUGIN] = {
         id: PLUGIN,
         label: LABEL,

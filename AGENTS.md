@@ -28,10 +28,33 @@ remote, so there is deliberately no sync script.
    --stdin`). Der lokale Hook tauscht nur Footer; die Wort-Regel repariert
    niemand.
 
+## Kanon — ein Name, eine Schreibweise, eine Definition
+
+Die Tabelle ist kurz, weil `canonIssues()` sie bei jedem statischen Gate und jedem Build
+prüft (`docs/contracts/canon.json` ist die Registry). Eine zweite Schreibweise, ein
+Browser-Global ohne Registry-Zeile und ein Vertrags-Literal außerhalb der drei Formen
+sind rot.
+
+| Begriff | Schreibweise | wo definiert |
+|---|---|---|
+| Plugin-Registry (Browser) | `__shinonPlugins` (Map) | Literal je Client-Hälfte; `packages/core/client.js` |
+| Panel-Tabelle (Browser) | `__shinonPluginCatalog` (Objekt) | `packages/key-router/client.js` |
+| Prompter-Trace | `__shinonPrompterTrace` | `packages/prompter/index.js` (`TRACE_GLOBAL`) |
+| Persona-Zustand | `__shinonPersonaState`, `__shinonPersonaReview` | `packages/persona/index.js` |
+| Task-Router-Zustand | `__shinonTaskRouter` | `packages/task-router/client.js` |
+| Vertrag mit Sache | `shinon.<bereich>/<sache>-v<N>` | z. B. `packages/codingmon/index.js` (`store-v1`) |
+| Vertrag, Sache = Bereich | `shinon.<bereich>/v<N>` | `packages/seams/assets/seams.js` (`workspace/v1`) |
+| Zustandsmarker | `shinon.<bereich>/unloaded` | `packages/persona/index.js` |
+| Dienst | `shinon_<bereich>_<sache>` | `packages/codingmon/index.js` (`shinon_codingmon_store`) |
+| Produktname des Routers | `Shinon Task Manager` | `packages/task-router/index.js` |
+| Eine Runde mit ihrem Goal | `Task-Gruppe` | `packages/task-router/index.js` |
+| Identitätsschicht | `Persona` | `packages/persona/index.js` |
+| Pet im UI | `Begleiter` (Code: `pet`/`codingmon`) | `packages/prompter/assets/capabilities.json` |
+
 ## Dev environment
 - Node and npm must be on PATH — **npm ist die einzige Paketquelle**
   (`packageManager`, `pnpm-workspace.yaml` und die pnpm-Aufrufe sind raus;
-  Beleg: `docs/CHANGELOG.md`). Die deklarierten Werte und ihre Prüfbefehle:
+  Beleg: `docs/TAGEBUCH.md`, Kapitel 2026-10-11). Die deklarierten Werte und ihre Prüfbefehle:
   `docs/ZAHLEN.md` §1.
 - pnpm wird vom Repo **nicht** mehr aufgerufen. Zwei Ausnahmen, die bleiben und die man
   kennen muss, weil sie fremder Code sind: `dsh plugin add` (der Upstream-Plugin-Manager)

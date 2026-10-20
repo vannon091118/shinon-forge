@@ -334,7 +334,7 @@ function journalRejection(onReject, config, prompt, outcome, text = null) {
   if (typeof onReject !== 'function' || typeof text !== 'string') return outcome;
   try {
     onReject({
-      contract: 'shinon.prompter/one-shot-journal/v1',
+      contract: 'shinon.prompter/one-shot-journal-v1',
       reasons: outcome.reasons,
       mode: config.mode,
       provider: config.provider,

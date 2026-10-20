@@ -281,7 +281,7 @@ test('Salvage: der Host bekommt die verworfene Antwort als Beleg (onReject)', as
   assert.deepEqual(seen[0].reasons, ['NO_JSON']);
   assert.equal(seen[0].answer, answer);
   assert.equal(seen[0].prompt, PROMPT);
-  assert.equal(seen[0].contract, 'shinon.prompter/one-shot-journal/v1');
+  assert.equal(seen[0].contract, 'shinon.prompter/one-shot-journal-v1');
 });
 
 test('Salvage: ein akzeptierter Lauf ruft den Journal-Haken nicht', async () => {

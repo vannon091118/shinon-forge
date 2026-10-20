@@ -6,6 +6,10 @@ import { PROMPTER_DECISION_CHANNEL, lastHumanMessage } from '@shinon/seams/core'
 /**
  * shinon-task-router — Phase 5/6, Plan §16 und §17.
  *
+ * KANON (AGENTS.md, Abschnitt Kanon): diese Komponente heißt **Shinon Task Manager**.
+ * Eine Task-Gruppe ist ein Goal mit seinen Runden — ein Goal, keine zweite
+ * Session-Historie.
+ *
  *   LLM  →  validierte Klassifikation (aus @shinon/prompter)
  *        →  Shinon policy (DIESES Paket)
  *        →  goal / no goal

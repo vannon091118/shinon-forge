@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { diaryHistory, diaryIssues } from './lib/diary.mjs';
+import { canonIssues } from './lib/canon.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -123,6 +124,11 @@ if (diary.skip) {
 } else {
   checkIssues('jedes Kapitel haengt an Commit und Pfad', () => diaryIssues());
 }
+
+// Der Kanon: ein Name, eine Schreibweise, eine Definition — Globals, Vertraege,
+// Dienste und Begriffe stehen in `docs/contracts/canon.json`.
+console.log('\n📖 Kanon:');
+checkIssues('ein Name, eine Schreibweise, eine Definition', () => canonIssues());
 
 console.log('\n🧩 Generierte Idiome:');
 checkIssues('eine Quelle, generierte Blöcke — kein Drift', () => [
