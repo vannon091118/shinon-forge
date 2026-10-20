@@ -134,3 +134,14 @@ nur für echte Verzeichnisse.
    `node scripts/pack-test.mjs` (B1, B9, B10).
 5. Trace statt Theorie (Post-Mortem 0001): Fiber-Walk instrumentieren, echten
    Subprozess laufen lassen.
+
+<!-- shinon-konsolidiert: 134f9799 -->
+## Gelernt: konzept
+
+- Wann: Ein Mechanismus wird aus einem Konzept gestrichen
+- Regel: im selben Zug die Pruefung suchen, die ihn festhaelt, und sie auf das Verbot umstellen
+- Warum: ein gestrichener Mechanismus, dessen Pruefung stehen bleibt, kehrt beim naechsten Schreiben zurueck und niemand merkt es
+
+## Belege
+
+- zettel · legacy-json · docs/probes/skill-lifecycle-migration/konzept-toter-mechanismus.json

@@ -538,6 +538,31 @@ Menschen, nicht in eine stille Ueberschreibung.
 
 ---
 
+## 2026-10-20 — Der Skill-Lebenszyklus: ein Weg, nicht zwei
+
+Die Lernzettel (`generated-skills/*.json`) waren eine zweite Wahrheitsquelle neben
+`.agents/skills/*/SKILL.md`. Zwei Zettel wurden in `shinon-dev-workflow` und
+`shinon-bug-muster` konsolidiert, die Originale liegen unter
+`docs/probes/skill-lifecycle-migration/` (Migrationsprobe `docs/probes/skill-lifecycle-migration.json`).
+Die automatische Dublettenprüfung fand dabei **keine** Dublette (`BELEG_ZU_DUENN`); die Zuordnung
+war eine manuelle Entscheidung und steht so in der Probe.
+
+Neu: `packages/prompter/assets/skill-lifecycle-core.js` (reiner Kern: Prüfung, Fingerabdruck,
+Konsolidierung, Rendern), `skill-lifecycle.js` (Host: Ereignisse, Puffer je Sitzung, begrenzte
+Queue, One-Shot-Extraktion, atomares Schreiben nach `.agents/skills`, Ledger unter `.shinon/`),
+Regeln in `skill-lifecycle-rules.json` (`shinon.skill-lifecycle/v1`). Das Config-Feld
+`skillLifecycle` ist im Schema **aus** (Vorgabe `false`); das Profil `profiles/shinon` schaltet es ein.
+
+Gemessen: `test:prompter` 228/228 Exit 0 (198 Bestand + 30 neu), `test:scoring` 50/50 Exit 0,
+`gate:test` 792/795 — der `.deb`-Test bleibt rot (`dpkg-deb -c` liefert 65 508 Einträge, 9,35 MB
+Listing; der Test erlaubt kein `node_modules` im Paket, der Payload enthält aber 62 005 solcher Einträge).
+Das ist Packaging-Arbeit außerhalb dieses Schritts und wurde nicht angefasst.
+`npm test` PASS Exit 0, Profil-Boot `shinon-profile-test` 4/4 Exit 0.
+
+Nicht gemessen: ein echter Modellturn mit Lernauslösung und Veröffentlichung im laufenden DSH.
+Der Host-Test fährt die Pfade mit einem Fake-LLM; die DSH-Entdeckung ist über den nativen
+Skill-Provider gemessen (`scripts/gate/tests/skill-discovery.test.mjs`, 42 ms bis zum Katalog).
+
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
 **Was fiel:** 73 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`

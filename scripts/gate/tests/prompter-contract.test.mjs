@@ -727,7 +727,7 @@ function runtimeModules() {
   const assets = join(PACKAGE_DIR, 'assets');
   return [
     INDEX_FILE,
-    ...readdirSync(assets).sort().filter((name) => name.endsWith('.js') && name !== 'learned-store.js').map((name) => join(assets, name)),
+    ...readdirSync(assets).sort().filter((name) => name.endsWith('.js') && name !== 'learned-store.js' && name !== 'skill-lifecycle.js').map((name) => join(assets, name)),
   ];
 }
 
@@ -1611,13 +1611,13 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     // deshalb ist er hier gepinnt und nicht nur behauptet.
     indexBudgetTokens: 6000,
     // Neu mit den Zetteln (Zug 4): das Verzeichnis, aus dem der Veredler liest.
-    // Der Vorgabewert steht als Konstante des Pakets hier GEPINNT — ein
-    // stiller Wechsel des Ordners waere ein Lauf ohne seine Lessons.
+    // Vorgabe als Konstante des Pakets, GEPINNT — ein Wechsel waere ein Lauf ohne Lessons.
     notesPath: bundle.NOTES_DIR_DEFAULT,
-    // Neu mit der Skill-Selektion (Zug 6): das Verzeichnis der Skills im Projekt.
-    // Die Vorgabe steht als Konstante des Pakets, GEPINNT — ein stiller Wechsel
-    // des Ordners waere ein Lauf ohne seine Skills.
+    // Neu mit der Skill-Selektion (Zug 6): Projektverzeichnis der Skills, GEPINNT.
+    // Ein stiller Wechsel des Ordners waere ein Lauf ohne seine Skills.
     skillsPath: bundle.SKILLS_DIR_DEFAULT,
+    skillLifecycle: false,
+    eventsChannel: 'shinon/event',
     maxTokens: 1200,
     temperature: 0,
     timeoutMs: 15000,

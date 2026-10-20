@@ -28,6 +28,7 @@ import { PROPOSE_CONTRACT, PROPOSE_SERVICE } from './assets/block-review.js';
 import { notesDir } from './assets/prompt-files.js';
 import { loadRuntime, proposeBlock } from './assets/runtime-state.js';
 import { onPreStep } from './assets/pre-step.js';
+import { createSkillLifecycle, loadLifecycleRules } from './assets/skill-lifecycle.js';
 /** Das Global, in das der Host die letzten Entscheidungen legt (der Client liest es). */
 export const TRACE_GLOBAL = '__shinonPrompterTrace';
 
@@ -222,7 +223,24 @@ export function apply(ctx, config) {
   const canProvide = typeof ctx?.provide === 'function';
   const releasePropose = canProvide ? ctx.provide(PROPOSE_SERVICE, proposeService) : null;
 
+  // Skill-Lebenszyklus (Zug 7): Ereignisse hoeren, Kandidaten im Hintergrund
+  // pruefen, Skills nach .agents/skills schreiben (der Root, den DSH nativ
+  // entdeckt). Fail-closed: ohne gueltige Regeln gibt es keinen Lebenszyklus.
+  let lifecycle = null;
+  let disposeLifecycle = null;
+  if (config.skillLifecycle && config.eventsChannel !== '') {
+    try {
+      lifecycle = createSkillLifecycle({ ctx, rules: loadLifecycleRules(), noteRules: runtime.noteRules ?? {}, route });
+      disposeLifecycle = ctx.on(config.eventsChannel, (envelope, payload) => lifecycle.observe(envelope, payload));
+      console.log(`[shinon-prompter] Skill-Lebenszyklus aktiv — Ereignisse auf ${config.eventsChannel}, Ablage ${lifecycle.skillsRoot}`);
+    } catch (error) {
+      console.error(`[shinon-prompter] Skill-Lebenszyklus NICHT angebunden (${error?.message ?? error})`);
+    }
+  }
+
   return () => {
+    lifecycle?.dispose();
+    if (typeof disposeLifecycle === 'function') disposeLifecycle();
     if (typeof dispose === 'function') dispose();
     if (typeof disposeInject === 'function') disposeInject();
     if (typeof disposeRoute === 'function') disposeRoute();

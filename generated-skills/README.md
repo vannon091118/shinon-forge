@@ -1,6 +1,8 @@
 # Generierte Skills — Zettel
 
-> **Status:** current — das Verzeichnis der Zettel (Zug 4, 2026-10-12). **Stand:** 2026-10-12
+> **Status:** RETIRED (Zug 7, 2026-10-20) — dieses Verzeichnis ist KEINE Wahrheitsquelle mehr. **Stand:** 2026-10-20
+>
+> Gelernte Regeln leben jetzt in **`.agents/skills/<name>/SKILL.md`**: derselbe Root, den DSH nativ entdeckt und beobachtet. Neue Lerninhalte entstehen ereignisgestützt im Skill-Lebenszyklus (`packages/prompter/assets/skill-lifecycle*.js`, Regeln `skill-lifecycle-rules.json`, Ledger `.shinon/skill-ledger.json`). Die beiden bisherigen Zettel sind in die passenden Skills konsolidiert; ihre Originale liegen als Belege in `docs/probes/skill-lifecycle-migration/`, Nachweis in `docs/probes/skill-lifecycle-migration.json`.
 > **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Ein **Zettel** ist eine Lesson in der Form **„bei X immer Y, weil Z"** — nicht

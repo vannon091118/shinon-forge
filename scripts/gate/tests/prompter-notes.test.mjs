@@ -106,12 +106,14 @@ test('zettel-regeln: ein Vertrag ist Pflicht, und neben den Regeln liegt keine z
 const notesDir = join(fileURLToPath(ROOT), rules.format.dir);
 const noteFiles = readdirSync(notesDir).filter((name) => name.endsWith(rules.format.extension)).sort();
 
-test('zettel: jede Datei der echten Sammlung ist ein Zettel', () => {
-  assert.ok(noteFiles.length > 0, 'die Sammlung ist nicht leer — eine leere Ablage waere ein stiller Ausfall');
-  for (const name of noteFiles) {
-    const parsed = parseNote(readFileSync(join(notesDir, name), 'utf8'), rules.format);
-    assert.equal(parsed.ok, true, `${name}: ${parsed.reason}`);
-  }
+test('zettel: die Sammlung ist stillgelegt — keine Zettel-Datei mehr, die Skills liegen unter .agents/skills', () => {
+  // Zug 7: Lerninhalte leben nur noch als SKILL.md in dem Root, den DSH nativ
+  // entdeckt. Eine Zettel-Datei, die hier wieder auftaucht, waere eine zweite
+  // Wahrheitsquelle — und das ist der Rueckfall, den dieser Test verhindert.
+  assert.deepEqual(noteFiles, [], 'keine Zettel-JSON mehr in generated-skills');
+  const skillsRoot = join(fileURLToPath(ROOT), '.agents', 'skills');
+  const skills = readdirSync(skillsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+  assert.ok(skills.length > 0, 'die kanonische Ablage .agents/skills ist nicht leer');
 });
 
 test('zettel: die echte Sammlung hat keinen Befund', () => {

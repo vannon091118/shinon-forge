@@ -264,15 +264,15 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       // Zug 4/5: das Paket liest die Zettel und baut den Stand — der Kern liegt
       // in `assets/`, weil er ohne node_modules testbar sein muss.
       { kind: 'import', target: './assets/note-core.js' },
-      // Der Modulschnitt: je Verantwortung ein Modul (Seam-Namen und Modus-
-      // Vertrag, Schemata, Ergebnisvertrag, XML-Marken, Dateien, Stand,
-      // One-Shot). Die Liste steht hier vollstaendig, damit eine neue Kante
-      // auffaellt, statt stillschweigend dazuzukommen.
+      // Der Modulschnitt: je Verantwortung ein Modul (Seam-Namen, Modus-Vertrag,
+      // Schemata, Ergebnis, XML-Marken, Dateien, Stand, One-Shot, Lebenszyklus).
+      // Die Liste steht vollstaendig hier, damit neue Kanten auffallen.
       { kind: 'import', target: './assets/mode-core.js' },
       { kind: 'import', target: './assets/schema.js' },
       { kind: 'import', target: './assets/result-contract.js' },
       { kind: 'import', target: './assets/render-context.js' },
       { kind: 'import', target: './assets/prompt-files.js' },
+      { kind: 'import', target: './assets/skill-lifecycle.js' },
       // Die Faehigkeitskarte (2026-10-20): welche Frage gehoert welchem Paket.
       // Daten + reiner Kern; die Zeigerpruefung kommt aus der Provenienz-Leiter.
       { kind: 'import', target: './assets/capability-map.js' },

@@ -275,6 +275,10 @@
     provider: prompter
     model: agnes-2.5-flash
     providerKeyEnv: PROMPTER_API_KEY
+    # Skill-Lebenszyklus (Zug 7): Korrekturen und abgeschlossene Zuege erzeugen
+    # Kandidaten; veroeffentlicht wird nach .agents/skills, dem Root, den DSH nativ
+    # entdeckt. Der Vorgabewert im Paket ist AUS; die Entscheidung steht hier.
+    skillLifecycle: true
     providerFallback: agnes
     modelFallback: agnes-2.5-flash
     skillsPath: .agents/skills

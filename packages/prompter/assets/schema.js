@@ -153,6 +153,14 @@ export const Config = z.object({
    */
   skillsPath: z.string().default(SKILLS_DIR_DEFAULT),
   /**
+   * Skill-Lebenszyklus (Zug 7): Kandidaten aus Korrekturen und abgeschlossenen
+   * Zuegen. Der Vorgabewert ist AUS: die Defaults rufen nichts auf. Wirksam wird
+   * er im Profil (`profiles/shinon/cordis.patch.yml`), wo die Entscheidungen leben.
+   */
+  skillLifecycle: z.boolean().default(false),
+  /** Kanal, auf dem der Host die Session-Ereignisse hoert (wie beim Scoring). */
+  eventsChannel: z.string().default('shinon/event'),
+  /**
    * Budget des Index-Kontexts. Der Enhancer deckelt selbst — der Wert aus dem
    * Profil gilt, das Paket hat nur einen Vorgabewert.
    */

@@ -1,0 +1,80 @@
+{
+  "contract": "shinon.skill-lifecycle/v1",
+  "note": "Die Regeln des Skill-Lebenszyklus (Zug 7). Alles ist DATEN: Auslöser, Beleg-Schwellen, Formgrenzen, verbotene Muster, Dubletten- und Widerspruchsregeln und das Budget der Hintergrundarbeit. Der Kern (skill-lifecycle-core.js) rechnet nur; der Host (skill-lifecycle.js) liest Ereignisse, ruft das Modell für EINEN Kandidaten auf und schreibt. Kein Zufall, keine Uhr im Kern: dieselben Belege ergeben dieselbe Entscheidung.",
+  "root": {
+    "note": "Die kanonische Skill-Ablage ist EIN Ort: <projectRoot>/.agents/skills. DSH entdeckt diesen Root nativ (dsh-skill-filesystem, Rang 200, Projekt-Wurzel = nächstes Verzeichnis mit .git) und beobachtet ihn mit seinem Datei-Watcher; der Katalog des Modells wird bei jeder Änderung neu aufgebaut. Der Prompter liest denselben Root (skill-rules.json). Ein zweiter Ort existiert nicht.",
+    "dir": ".agents/skills",
+    "file": "SKILL.md"
+  },
+  "ledger": {
+    "note": "Die Ablage der Kandidaten und ihrer Belege. Sie ist die einzige Wahrheit über den Lebenszyklus (Kandidat, Beleg, Entscheidung, Ziel). Sie enthält keine Modelltexte und keine Sitzungs-Kennungen im Klartext: Sitzungen werden gehasht. Gelöscht wird nur, was abgelehnt wurde, und nur über die Obergrenze.",
+    "path": ".shinon/skill-ledger.json",
+    "contract": "shinon.skill-ledger/v1",
+    "version": 1,
+    "maxEntries": 200
+  },
+  "trigger": {
+    "note": "Zwei Ereignisarten erzeugen einen Kandidaten. Korrektur ist das stärkste Signal (der Mensch hat den Zug verworfen). Wiederholung ist das schwächere (abgeschlossene Züge derselben Sitzung): ein Kandidat ohne Korrektur wird erst veröffentlicht, wenn sein Fingerabdruck in genug abgeschlossenen Zügen wiederkehrt.",
+    "correction": {
+      "event": "feedback/message-put",
+      "rating": "negative",
+      "recordEvent": "feedback/record",
+      "settleMs": 1500
+    },
+    "completed": {
+      "event": "turn/end",
+      "reason": "completed"
+    }
+  },
+  "evidence": {
+    "note": "Wann ein Kandidat veröffentlicht werden darf. Eine Korrektur reicht allein. Ohne Korrektur braucht der Fingerabdruck mindestens `minCompleted` abgeschlossene Züge. Ein Ziel, das schon existiert, nimmt Belege ohne Schwelle auf (Konsolidierung).",
+    "minCompleted": 3
+  },
+  "format": {
+    "note": "Form der Skill-Datei. Die Frontmatter-Felder sind genau die, die DSH verlangt (name, description); der Name ist kebab-case, wie der Namensvertrag von dsh-skill (SKILL_NAME) es fordert.",
+    "nameMax": 60,
+    "nameMin": 3,
+    "descriptionMin": 40,
+    "descriptionMax": 400,
+    "triggerWord": "nutzen",
+    "bodyMax": 4000,
+    "fields": {
+      "thema": 60,
+      "bei": 200,
+      "immer": 200,
+      "weil": 300
+    }
+  },
+  "forbidden": {
+    "note": "Ein Kandidat, der eines dieser Muster trägt, wird NICHT veröffentlicht. Er betrifft Berechtigungen, Sandbox, Geheimnisse, Anweisungen gegen die Umgebung (Injektion) und Eingriffe in Gates, Verträge und ausführbaren Code. Skills werden von DSH als vertrauenswürdiger Inhalt in den Kontext geladen; deshalb wird hier streng geprüft und nicht gewertet.",
+    "patterns": [
+      { "id": "berechtigung", "pattern": "danger-full-access|approval[_ -]?policy|sandbox[_ -]?(mode|policy|config)|berechtigung|permission|allow[_ -]?all", "why": "Freigaben und Sandbox sind Sache der Konfiguration, nie eines gelernten Skills" },
+      { "id": "geheimnis", "pattern": "api[_ -]?key|apikey|secret|passwort|password|token|\\.env\\b|credentials", "why": "Geheimnisse gehören in keinen Skill" },
+      { "id": "injektion", "pattern": "ignor(e|iere|ieren|ier)\\s+(alle|alles|die|den|der|das|bisherigen|vorherigen|all|previous|the)|ignore\\s+(all\\s+)?(previous|prior|above)|system prompt|neue anweisung", "why": "ein Skill darf keine Anweisungen gegen Regeln oder Umgebung geben" },
+      { "id": "ausfuehrbar", "pattern": "rm\\s+-rf|curl\\s|wget\\s|sudo\\s|chmod\\s|eval\\(|child_process|\\|\\s*sh\\b", "why": "ausführbarer Code und Shell-Befehle sind kein Lernstoff" },
+      { "id": "geschuetzt", "pattern": "scripts/gate|docs/contracts|profiles/|vendor/|dist/|package-lock", "why": "Gates, Verträge, Profile und Build-Artefakte ändert kein Skill" }
+    ]
+  },
+  "duplicate": {
+    "note": "Ein Kandidat ist eine DUBLETTE eines bestehenden Skills, wenn seine Begriffe aus Wann und Regel mindestens minShared Begriffe und den Anteil minShare der Kandidaten-Begriffe im Text des Skills treffen. Dublette heißt: konsolidieren (Beleg anhängen), nicht neu anlegen.",
+    "minShared": 3,
+    "minShare": 0.6,
+    "minTokenLength": 4
+  },
+  "conflict": {
+    "note": "Ein WIDERSPRUCH liegt vor, wenn ein Kandidat denselben Auslöser (Wann) wie ein bestehender Skill trägt, aber eine andere Regel (Regel) — gemessen an der Begriffsüberlappung. Solche Kandidaten bleiben unveröffentlicht und werden als Befund gemeldet. Benannte Grenze: die Erkennung ist lexikalisch, sie erkennt keine Negation im Satz.",
+    "triggerShare": 0.6,
+    "ruleShareMax": 0.3,
+    "minTokenLength": 4
+  },
+  "budget": {
+    "note": "Hintergrundarbeit ist begrenzt, abbrechbar und idempotent. Ein Kandidat je Ereignis, nie je Schritt. Es laufen höchstens maxConcurrent Jobs; die Warteschlange ist auf maxQueue begrenzt; eine Sitzung darf maxPerSession Jobs anstoßen; ein Job endet nach timeoutMs.",
+    "maxConcurrent": 1,
+    "maxQueue": 2,
+    "maxPerSession": 6,
+    "timeoutMs": 90000,
+    "maxEvidenceChars": 1500,
+    "maxPromptChars": 1000,
+    "maxTokens": 700
+  }
+}

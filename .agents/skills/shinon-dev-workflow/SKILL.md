@@ -99,3 +99,14 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
 | Cordis-Mechaniken | `cordis-architektur` + `docs/research/2026-10-09-cordis-dsh-recherche.md` — **Ziel fehlt in diesem Baum** (offener Posten, STAND §6.4) |
 | Verträge/Probes | `docs/contracts/`, `docs/probes/` |
 | Prompt/Persona-Flächen | `packages/persona/index.js` (System-Prompt-Registry, keine Datei-Templates) |
+
+<!-- shinon-konsolidiert: ad741e37 -->
+## Gelernt: gate
+
+- Wann: Eine neue Datendatei kommt in den assets-Ordner eines Pakets
+- Regel: den Dateinamen in der Whitelist des Gate-Plugins dieses Pakets eintragen, sonst gilt er als fremde Schreibspur
+- Warum: das Paket-Gate jede Datei unter assets gegen eine feste Liste prueft und eine unbekannte Datei ein Befund ist, kein Zugestaendnis
+
+## Belege
+
+- zettel · legacy-json · docs/probes/skill-lifecycle-migration/gate-datei-whitelist.json
