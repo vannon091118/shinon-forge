@@ -167,7 +167,7 @@ jobs:
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $work $script), [ref]$null, [ref]$errors) | Out-Null
             if ($errors.Count -gt 0) { throw "$script hat Syntaxfehler: $($errors[0].Message)" }
-            Write-Host "$script: Syntax ok"
+            Write-Host "${script}: Syntax ok"
           }
 
           Write-Host '--- Installation ---'
