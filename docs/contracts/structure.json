@@ -98,7 +98,7 @@
     "packages/project-index/assets/index-core.js": 2220,
     "packages/prompter/client.js": 285,
     "packages/scoring/assets/scoring-core.js": 784,
-    "packages/task-router/index.js": 797,
+    "packages/task-router/index.js": 770,
     "packages/token-usage/client.js": 574,
     "packages/traceability/client.js": 547,
     "scripts/branding-check.mjs": 660,

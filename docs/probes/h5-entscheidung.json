@@ -1,0 +1,29 @@
+{
+  "probe": "task-router/h5-entscheidung",
+  "date": "2026-10-20",
+  "question": "Darf der Task-Router Goals automatisch aktivieren, oder bleibt der Schalter aus, bis H5 (Benchmark 4.6) mit einem Messwert entschieden ist?",
+  "verdict": "NOT_MEASURED",
+  "why": "H5 ist der Benchmark 4.6 aus docs/ROADMAP.md §2.3: Aufgaben-Set, DSH-Baseline, Shinon-Messung, Feature-Entscheidung mit Messwert. Es gibt in diesem Repo kein Aufgaben-Set und keine Baseline, also auch keinen Messwert — und ohne Messwert keine Entscheidung. Der Schalter bleibt deshalb aus; das ist die Entscheidung, nicht ihr Fehlen.",
+  "method": "Kein Lauf, sondern eine Bestandsaufnahme: das Profil gelesen, die Rundengrenze gelesen, die vorhandenen Proben nach einem H5-Messwert durchsucht und die Aktivierungsbedingung im Code geprüft (activateGoal). Der Gate-Test task-router-h5.test.mjs liest Profil und diese Datei und vergleicht sie, damit die Zusage nicht nur im Text steht.",
+  "measurement": {
+    "profil_activate": false,
+    "profil_maxGoalRounds": 6,
+    "shinon_obergrenze": 12,
+    "dsh_defaultMaxGoalRounds": 256,
+    "h5_messwert_vorhanden": false,
+    "aufgaben_set_vorhanden": false,
+    "dsh_baseline_vorhanden": false,
+    "beobachteter_boot_mit_goal_an": "docs/probes/goal-micro-state.json — dort lief ein Boot mit eingeschalteter Aktivierung (Logzeile \"goal=an (max 6 Runden)\"); das ausgelieferte Profil schaltet sie bewusst nicht ein"
+  },
+  "limits": [
+    "Diese Probe misst NICHTS am Modell. Sie hält fest, dass eine Messung fehlt — ein fehlender Wert ist kein grüner Wert.",
+    "Ob ein automatisch aktiviertes Goal bessere Ergebnisse liefert, ist damit unbeantwortet. Belegt ist nur, dass die Fortsetzung begrenzt ist und ein bestehendes Goal unberührt bleibt.",
+    "Die Rundengrenze ist eine Obergrenze gegen Endlosigkeit, keine Kostenmessung: was eine Runde real kostet, steht hier nicht."
+  ],
+  "artifacts": {
+    "router": "packages/task-router/index.js",
+    "profil": "profiles/shinon/cordis.patch.yml",
+    "test": "scripts/gate/tests/task-router-h5.test.mjs",
+    "roadmap": "docs/ROADMAP.md"
+  }
+}

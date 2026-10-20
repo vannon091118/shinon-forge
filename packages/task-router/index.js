@@ -111,58 +111,18 @@ export const DISPOSED_EVENT = 'agent/disposed';
 /** Der Dienstname der Goal-Domaene in `ctx.goals`. */
 export const GOAL_SERVICE = 'goals';
 
-// Kein Paket importiert das andere; ein Abnahmetest pinnt die Gleichheit.
-/**
- * Das geschlossene Vokabular aus §16, wortgleich mit dem Enhancer. Eine Klasse
- * ausserhalb dieser Liste ist keine Klassifikation, sondern Text. UNDEFINED ist
- * ausdruecklich KEIN Mitglied: der Resolver sagt damit „ich entscheide das
- * nicht" — wer sie als Klasse fuehrt, hat geraten.
- */
-export const INTENT_CLASSES = ['CHAT', 'LOOKUP', 'TRANSFORM', 'MULTI_STEP_TASK', 'LONG_RUNNING_GOAL'];
-export const INTENT_UNDEFINED = 'UNDEFINED';
+// Das §16-Vokabular und seine Gewichte stehen in `assets/intent-policy.js`
+// (importfrei, reine Daten). Hier bleiben nur die öffentlichen Namen.
+export { INTENT_CLASSES, INTENT_UNDEFINED, INTENT_WEIGHTS, DEFAULT_THRESHOLD, DEFAULT_MIN_RAW_LENGTH };
+import { INTENT_CLASSES, INTENT_UNDEFINED, INTENT_WEIGHTS, DEFAULT_THRESHOLD, DEFAULT_MIN_RAW_LENGTH } from './assets/intent-policy.js';
 
-/**
- * Gewicht je Klasse — DATEN. §16 nennt fuer CHAT, LOOKUP und TRANSFORM einen
- * linearen Turn und fuer MULTI_STEP_TASK und LONG_RUNNING_GOAL einen
- * Goal-Kandidaten; diese Tabelle IST diese Aussage, in Zahlen.
- *
- * LONG_RUNNING_GOAL wiegt hoeher als MULTI_STEP_TASK, damit eine Schwelle
- * oberhalb von 2 den Mehrschritt-Auftrag zurueckstufen kann, ohne auch die
- * langfristige Absicht zu verlieren — sonst gaebe es nur "alles oder nichts".
- */
-export const INTENT_WEIGHTS = {
-  CHAT: 0,
-  LOOKUP: 0,
-  TRANSFORM: 0,
-  MULTI_STEP_TASK: 2,
-  LONG_RUNNING_GOAL: 3,
-};
+import { DEFAULT_MAX_GOAL_ROUNDS, MAX_GOAL_ROUNDS_CEILING, goalRoundsVerdict } from './assets/goal-budget.js';
 
-/** Die Schwelle aus §16 („der konkrete Schwellenwert ... als Runtime-Policy"). */
-export const DEFAULT_THRESHOLD = 2;
-
-/**
- * Die Substanzgrenze in ZEICHEN des rohen Prompts.
- *
- * Bewusst eine Zeichenzahl und keine Sprachanalyse: ein Detektor, der Auftraege
- * "versteht", waere eine zweite Klassifikation neben der ersten. Eine Grenze auf
- * die LANGE ist grob, deterministisch und nachpruefbar — und sie kann nur
- * zurueckstufen. Der konkrete Wert ist eine Entscheidung (im Profil sichtbar),
- * keine Wahrheit.
- */
-export const DEFAULT_MIN_RAW_LENGTH = 24;
-
-/**
- * Die Runden-Obergrenze eines automatisch aktivierten Goals — SHINONS
- * Stop-Policy.
- *
- * DSH selbst erlaubt 256 Runden (`defaultMaxGoalRounds: 256` in der
- * installierten Fassung). Das ist eine Obergrenze gegen Endlosigkeit, keine
- * Kostenbremse: eine Runde ist ein vollstaendiger Agentenschritt mit
- * Modellaufrufen. Der Wert hier ist deshalb klein und bewusst eine Entscheidung
- * im Profil — und die Blockade am Limit macht DSH selbst (`round-limit`).
- */
-export const DEFAULT_MAX_GOAL_ROUNDS = 6;
+// Die Runden-Policy (Default, Obergrenze, Prüfung) steht in `assets/goal-budget.js`:
+// ein importfreier Kern, der nur Zahlen kennt. `index.js` re-exportiert ihn, damit
+// die öffentlichen Namen dieselben bleiben — und weil diese Datei eine
+// eingefrorene Zeilengrenze hat, die nur sinken darf.
+export { DEFAULT_MAX_GOAL_ROUNDS, MAX_GOAL_ROUNDS_CEILING, goalRoundsVerdict };
 
 /** Die zwei Ausgaenge. Mehr gibt es nicht: Kandidat oder linearer Turn. */
 export const OUTCOMES = ['goal', 'linear'];
@@ -184,6 +144,9 @@ export const ACTIVATION_REASONS = [
   'NO_GOAL_SERVICE',
   'GOAL_EXISTS',
   'GOAL_ERROR',
+  // Zug 5: die Runden-Obergrenze wird geprueft, bevor ein Goal entsteht.
+  'ROUNDS_UNGUELTIG',
+  'ROUNDS_ZU_HOCH',
 ];
 
 /**
@@ -449,10 +412,20 @@ export function activateGoal(ctx, config, runtime, record) {
   }
   if (current !== undefined && current !== null) return activationVerdict({ reason: `GOAL_EXISTS:${current?.phase ?? 'unknown'}` });
 
+  // Die Fortsetzung ist begrenzt, und die Grenze wird GEPRUEFT statt gesendet.
+  // Ein unbrauchbarer Wert ist ein benannter Befund; ein zu grosser wird nicht
+  // still gekappt, sonst behauptet der Datensatz spaeter eine andere Zahl als
+  // die, mit der DSH laeuft.
+  const budget = goalRoundsVerdict(config.maxGoalRounds);
+  if (!budget.ok) {
+    if (config.trace) console.warn(`[shinon-task-router] Goal NICHT aktiviert (${budget.reason}: ${config.maxGoalRounds} > ${MAX_GOAL_ROUNDS_CEILING}) — linearer Turn bleibt`);
+    return activationVerdict({ reason: budget.reason });
+  }
+
   try {
-    const view = goals.create(step.agent, { objective: step.objective, maxGoalRounds: config.maxGoalRounds });
+    const view = goals.create(step.agent, { objective: step.objective, maxGoalRounds: budget.rounds });
     const goalId = typeof view?.id === 'string' ? view.id : '';
-    const rounds = Number.isFinite(view?.maxGoalRounds) ? view.maxGoalRounds : config.maxGoalRounds;
+    const rounds = Number.isFinite(view?.maxGoalRounds) ? view.maxGoalRounds : budget.rounds;
     if (config.trace) console.log(`[shinon-task-router] Goal aktiviert (${goalId}, max ${rounds} Runden) — Runden faehrt DSH`);
     return activationVerdict({ activated: true, reason: 'ACTIVATED', goalId, maxGoalRounds: rounds });
   } catch (error) {
