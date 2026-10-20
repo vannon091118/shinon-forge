@@ -727,6 +727,50 @@ dass sie begrenzt ist und eine bestehende Absicht nicht überschreibt.
 
 ---
 
+## 2026-10-21 — Der Stand, der in der Ecke steht
+
+Dieser Tag hat dem installierten Shinon beigebracht, zu sagen, was er ist. Vorher stand
+nirgends, welcher Commit lief — nach einem Update, einem Rollback oder einem Handgriff
+in den Klon war das eine Vermutung, und eine Vermutung, die man fuer einen Zustand
+haelt, ist schlimmer als eine Luege, weil sie keiner nachfragt.
+
+**Anker:** `dd5d319` · Belege: `packages/version/index.js`, `packages/version/client.js`, `packages/version/assets/version-probe.js`, `scripts/lib/desktop-entry.mjs`, `scripts/lib/payload.mjs`, `scripts/gate/tests/version-package.test.mjs`
+
+Das neue Paket `@shinon/version` hat drei Schichten, und die Trennung ist der eigentliche
+Inhalt: die Messung fragt `git` und liest den Bau-Schatten, die Formel rechnet daraus
+eine Zeile, einen Tooltip und einen Updatesatz — ohne Uhr und ohne Netz —, und der
+Client malt das Ergebnis in die untere rechte Ecke. Der Host schiebt seinen Zustand
+ueber `webserver/index-inject` als `window.__DSH_VERSION_INFO__` in die Seite; die Route
+`/shinon/version` liefert denselben Zustand fuer den Klick. Der Klick startet
+`scripts/install-user.mjs auto` — Kandidat bauen, dort abnehmen, erst bei gruem Urteil
+umschalten. Bewusst **nicht** `update --force`: ein Update, das dem laufenden Prozess die
+`node_modules` unter den Fuessen wegzieht, ist kein Update, sondern ein Ausfall mit
+Ansage.
+
+Damit die Aussage auch fuer ein installiertes Paket gilt, traegt die Nutzlast jetzt einen
+Bau-Schatten: `scripts/lib/payload.mjs` schreibt `.shinon-build.json` mit Commit, Zeit
+und Herkunft, und `packages/version/assets/version-probe.js` liest dieselbe Datei. Ein
+Paket ohne Git-Baum kann so wenigstens sagen, aus welchem Commit es gebaut wurde. Der
+Dateiname ist ein Literal auf beiden Seiten — `scripts/gate/tests/version-package.test.mjs`
+vergleicht ihn, samt der Probe, dass ein gedrehter Name im Client rot wird.
+
+Der zweite Teil des Tages betraf das Setup. Die Desktop-Eintraege hatten zwei Erzeuger
+(den Entwickler-Launcher und das Nutzer-Installat) und damit zwei Regeln; jetzt gibt es
+eine: `scripts/lib/desktop-entry.mjs` baut, schreibt, prueft und entfernt sie, und
+`scripts/install-user.mjs` ruft sie nach der Abnahme auf. Fuer die Deinstallation war der
+Weg schon da — sie entfernt den Eintrag ueber genau denselben Launcher.
+
+Belegt: `npm test` Exit 0, statisches Gate 126/126, Verteilungs-Test 92/92,
+Profiltest 4/4 mit 20 Paket-Bundles, `packages/version/test/version.test.mjs` 8/8 und
+`scripts/gate/tests/version-package.test.mjs` 7/7.
+
+Ausserhalb des Baums war dieser Tag ein Aufräumtag: drei Altbestaende wurden geloescht
+(der 70 Commits alte Klon unter `~/Projekte`, das Duplikat auf der SSD und der
+Notiz-Scratch), die Draft-PRs wurden geschlossen, und uebrig bleiben `main` und der
+CodingMon-Zweig.
+
+---
+
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
 **Was fiel:** 73 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`
