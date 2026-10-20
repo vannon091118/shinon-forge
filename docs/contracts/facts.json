@@ -1,0 +1,80 @@
+{
+  "name": "@shinon/project-index — Faktenebene (Lebenszyklus, Kennung, Quelle, Store)",
+  "status": "IMPLEMENTED",
+  "note": "Zug 1 der Wissens-Runtime (docs/WISSENS-RUNTIME-PLAN.md §2). Der reine Kern liegt in packages/project-index/assets/facts-core.js (importfrei), der Speicher in assets/facts-store.js (eigene facts.sqlite, additive Migrationen über PRAGMA user_version). Geprüft von packages/project-index/test/facts.test.mjs: 15 Tests über alle 64 Statuspaare, alle 25 Klassenpaare, jede Zeigerform, Persistenz über einen Neustart, Zyklenverbot und die Migration v1 → v2 mit Erhalt der Zeilen. Die Form prüft das Gate `contracts`. Regeln zu Extraktion (Zug 2), Snapshot (Zug 3), Reconciliation und Post-Checks (Zug 4) folgen in eigenen Sitzungen und erweitern diesen Vertrag additiv.",
+  "contract": "shinon.facts/v1",
+  "store": {
+    "file": "facts.sqlite (eigene Datei im Zustandsordner, nicht die des Index)",
+    "version": "PRAGMA user_version, FACTS_VERSION = Anzahl der Migrationsschritte",
+    "migration": "additiv; ein Schritt wird nie geändert, ein neuer kommt ans Ende",
+    "decision_probe": "docs/probes/facts-store-entscheidung.json"
+  },
+  "kinds": ["FACT", "DERIVED", "DECISION", "PROPOSAL", "CONFLICT"],
+  "statuses": ["DISCOVERED", "EXTRACTED", "VALIDATING", "VALID", "STALE", "DISPUTED", "SUPERSEDED", "REJECTED"],
+  "actors": ["extractor", "validator", "invalidator", "reconciler"],
+  "rules": [
+    {
+      "positive": "Ein Fakt entsteht als DISCOVERED und durchläuft nur die Übergänge der Tabelle in facts-core.js: DISCOVERED → EXTRACTED|REJECTED, EXTRACTED → VALIDATING|REJECTED, VALIDATING → VALID|DISPUTED|REJECTED, VALID → STALE|DISPUTED|SUPERSEDED, STALE → VALIDATING|SUPERSEDED|REJECTED, DISPUTED → VALIDATING|SUPERSEDED|REJECTED. Jeder Übergang nennt einen Akteur aus ACTORS.",
+      "forbidden": "Ein Statuswechsel ohne Akteur, ein Akteur außerhalb von ACTORS (insbesondere `model`, `llm` oder ein leerer Wert), ein Übergang außerhalb der Tabelle, ein Einstieg mitten im Lebenszyklus (jeder neue Fakt ist DISCOVERED) und jede Rückkehr aus SUPERSEDED oder REJECTED.",
+      "fallback": "canTransition gibt { ok: false, reason } zurück und wirft nicht; der Aufrufer schreibt den Grund in seinen Befund, und der Fakt bleibt im alten Status.",
+      "error": "AKTEUR_VERBOTEN (Akteur fehlt oder unbekannt), UEBERGANG_VERBOTEN (Paar nicht in der Tabelle), TERMINAL (aus SUPERSEDED/REJECTED), STATUS_UNBEKANNT (Wert nicht in STATUSES), EINSTIEG_NICHT_DISCOVERED (aus checkFact)",
+      "trace": "facts.status trägt den aktuellen Status, facts.status_at den vom Aufrufer gelieferten Zeitpunkt; der Store liest keine Uhr. transitionFact nennt den Grund, der Test zählt 16 erlaubte von 64 Paaren.",
+      "replay": "canTransition ist eine reine Funktion ohne Zustand: dasselbe Tripel ergibt dasselbe Ergebnis, und die Testsuite prüft alle 64 Paare gegen die Tabelle.",
+      "invariant": "Aus SUPERSEDED und REJECTED führt kein Übergang; VALID erreicht REJECTED nur über DISPUTED. Die Zahl der Status ist 8, die Zahl der Paare 64, die Zahl der erlaubten Übergänge 16."
+    },
+    {
+      "positive": "Die Kennung eines Fakts ist ein Hash aus scope, subject, predicate und value in fester Reihenfolge, gebildet von factId in facts-core.js; dieselbe Aussage heißt damit über Läufe, Prozesse und Quellen hinweg gleich.",
+      "forbidden": "Ein Zeitstempel, eine laufende Nummer, eine Zufallszahl oder der Dateipfad als Teil der Kennung; eine Kennung aus der Modellantwort; eine zweite Kennungsfunktion neben factId.",
+      "fallback": "Ein mitgegebener `id`, der nicht zu factId(fact) passt, ist ein Befund (KENNUNG_FALSCH) und wird abgelehnt; der Store vergibt die Kennung selbst.",
+      "error": "KENNUNG_FALSCH (checkFact), f_unbekannt (getFact/transitionFact auf eine nicht vorhandene Kennung)",
+      "trace": "facts.id ist der Primärschlüssel; der Test prüft Gleichheit bei gleicher Aussage (auch bei anderer Objektschlüssel-Reihenfolge) und Ungleichheit bei geändertem value oder subject.",
+      "replay": "factId ist rein: gleiche vier Felder ergeben dieselbe 16-stellige Hex-Kennung mit Präfix f_. FNV-1a mit zwei Startwerten, ohne Bare-Import.",
+      "invariant": "Jede Kennung passt auf ^f_[0-9a-f]{16}$, und zu einer Kennung gehört höchstens eine Aussage."
+    },
+    {
+      "positive": "Jeder Fakt trägt mindestens eine Quelle mit Zeiger und Quellrevision. Der Zeiger ist ein relativer Dateipfad mit optionaler Zeile oder eine Vertrags-ID; die Revision stammt aus dem Quellstempel (dev:ino:size:mtime:ctimeNs).",
+      "forbidden": "Ein Fakt ohne Quelle, eine Quelle ohne Revision, ein absoluter Pfad, ein Pfad mit .., ein Backslash, ein Windows-Laufwerk, Zeile 0 und ein Zeiger auf den Prompt-Text.",
+      "fallback": "insertFact schreibt nichts, wenn checkFact Befunde liefert; die Liste der Befunde kommt zurück, und die Datenbank bleibt unverändert.",
+      "error": "QUELLE_FEHLT, QUELLE_OHNE_REVISION, ZEIGER_LEER, ZEIGER_ABSOLUT, ZEIGER_AUSBRUCH, ZEIGER_FORM, ZEIGER_ZEILE, FELD_LEER:<feld>, FELD_KEIN_TEXT:value",
+      "trace": "fact_sources trägt (fact_id, pointer, rev) als Primärschlüssel; getFact gibt die Quellen sortiert nach pointer und rev zurück.",
+      "replay": "parsePointer ist eine reine Stringprüfung ohne Dateisystem: derselbe Zeiger ergibt dasselbe Ergebnis, auch wenn die Datei fehlt.",
+      "invariant": "Kein Fakt in der Datenbank ohne mindestens eine Quelle; die Zahl der Quellen ist nie kleiner als 1."
+    },
+    {
+      "positive": "Die Klasse eines Fakts ist unveränderlich. Eine ehrlichere Aussage entsteht nur durch einen neuen Fakt mit neuer Quelle, also durch einen neuen Eintrag.",
+      "forbidden": "DERIVED zu FACT, JUDGEMENT zu FACT, PROPOSAL zu FACT, jede Rangfolge, die als Aufstieg gelesen werden kann, und jedes Umschreiben der Spalte kind.",
+      "fallback": "canReclassify ist nur für from === to wahr; der Store bietet keinen Schreibweg für kind, und ein Wechsel bleibt ein Befund.",
+      "error": "KLASSE_WECHSEL_VERBOTEN, KLASSE_UNBEKANNT (checkFact und canReclassify)",
+      "trace": "facts.kind wird beim Anlegen geschrieben und nie aktualisiert; der Test prüft alle 25 Paare und zählt 20 verbotene Wechsel.",
+      "replay": "canReclassify ist rein und hängt nur von den beiden Werten ab; ein unbekannter Wert ergibt KLASSE_UNBEKANNT und keinen stillen Vergleich.",
+      "invariant": "Der Wert von facts.kind gehört zu KINDS und ändert sich für eine Kennung nie."
+    },
+    {
+      "positive": "Abhängigkeiten stehen in fact_deps und verbinden zwei vorhandene Fakten; die Kante bedeutet: dieser Fakt hängt von jenem ab. Die Prüfung läuft über den Abhängigkeitsgraph in Facts-core, bevor geschrieben wird.",
+      "forbidden": "Eine Kante auf einen unbekannten Fakt, eine Selbstkante, ein Zyklus über mehrere Ecken und ein Löschen von Fakten, um einen Zyklus zu umgehen.",
+      "fallback": "addDependency gibt { ok: false, reason } zurück und schreibt nichts; der Graph bleibt, wie er war.",
+      "error": "FAKT_UNBEKANNT (eine Seite fehlt), ZYKLUS (wouldCreateCycle ist wahr, auch bei from === to)",
+      "trace": "fact_deps trägt (fact_id, depends_on) als Primärschlüssel; getFact gibt dependsOn sortiert zurück.",
+      "replay": "wouldCreateCycle ist eine reine Graphsuche über die übergebene Map und liest weder Datei noch Datenbank.",
+      "invariant": "Der Graph in fact_deps ist azyklisch; jede Kante zeigt auf zwei vorhandene Fakten."
+    },
+    {
+      "positive": "Die Fakten liegen in einer eigenen SQLite-Datei (facts.sqlite) mit eigener Fassung; Migrationen sind Schritte, die PRAGMA user_version hochsetzen, und jeder Schritt fügt nur hinzu.",
+      "forbidden": "Ein drop table in einer Migration, ein delete from in einer Migration, ein Löschen der Fakten-Tabellen bei einem Index-Versionssprung und ein stilles Weiterschreiben in eine Datei mit neuerer Fassung.",
+      "fallback": "Eine Datei mit höherer user_version wird mit FACTS_VERSION_NEU abgelehnt; der Handle wird geschlossen, und nichts wird geschrieben. Jeder Schreibvorgang läuft in einer Transaktion mit Rollback im Fehlerfall.",
+      "error": "FACTS_VERSION_NEU (Datei neuer als der Code)",
+      "trace": "openFacts liefert den Handle und setzt user_version auf FACTS_VERSION; der Test baut eine v1-Datei, öffnet sie mit dem aktuellen Code und prüft, dass Fakt, Status und Quellen erhalten bleiben.",
+      "replay": "MIGRATIONS ist eine eingefrorene Liste; der Test prüft, dass kein Schritt drop table oder delete from enthält und dass die Schritte lückenlos bei 1 beginnen.",
+      "invariant": "FACTS_VERSION entspricht der Zahl der Migrationsschritte; nach openFacts ist user_version === FACTS_VERSION."
+    },
+    {
+      "positive": "Ein Widerspruch zwischen zwei Fakten bleibt als DISPUTED beziehungsweise als Fakt der Klasse CONFLICT sichtbar und trägt beide Quellen; eine Auflösung ist ein eigener Übergang mit Akteur.",
+      "forbidden": "Ein stilles Überschreiben, ein Löschen des unterlegenen Fakts, eine Auswahl nach Zeitstempel und ein Statuswechsel ohne genannte Quelle des Widerspruchs.",
+      "fallback": "Solange der Widerspruch ungelöst ist, bleibt der Fakt DISPUTED; ein VALID erreicht er nur über VALIDATING mit einem Akteur, der die Prüfung belegt.",
+      "error": "UEBERGANG_VERBOTEN (VALID → REJECTED ohne DISPUTED), AKTEUR_VERBOTEN (Auflösung ohne Akteur)",
+      "trace": "facts.status und facts.status_at tragen den Weg; die Quellen beider Seiten stehen in fact_sources. Die vollständige Reconciliation-Regel folgt in Zug 4 und erweitert diesen Vertrag additiv.",
+      "replay": "Die Regel ist heute als Übergangstabelle prüfbar: VALID erreicht REJECTED nur über DISPUTED, und der Test prüft genau diesen Weg.",
+      "invariant": "Ein gelöster Widerspruch hat einen Akteur und einen Zeitpunkt; ein ungelöster bleibt DISPUTED und verschwindet nicht."
+    }
+  ]
+}

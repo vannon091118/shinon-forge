@@ -563,6 +563,34 @@ Nicht gemessen: ein echter Modellturn mit Lernauslösung und Veröffentlichung i
 Der Host-Test fährt die Pfade mit einem Fake-LLM; die DSH-Entdeckung ist über den nativen
 Skill-Provider gemessen (`scripts/gate/tests/skill-discovery.test.mjs`, 42 ms bis zum Katalog).
 
+## 2026-10-20 — Wissens-Runtime, Zug 1: Fakten bekommen einen eigenen Ort
+
+Die Wissens-Runtime beginnt mit dem Vertrag, nicht mit dem Feature. `docs/contracts/facts.json`
+trägt sieben Regeln in der 7-Punkt-Form: Lebenszyklus, Kennung, Quelle, Klasse,
+Abhängigkeit, Speicher und Konflikt. Die Gegenprobe ist gelaufen: eine Kopie ohne
+`invariant` macht das Gate `contracts` rot (`Verdict: FAIL`), danach war die Probe-Datei
+wieder gelöscht.
+
+Der Kern `packages/project-index/assets/facts-core.js` ist importfrei und hält die
+Übergangstabelle: **16 erlaubte von 64 Paaren**, `SUPERSEDED` und `REJECTED` sind Enden,
+und `VALID` erreicht `REJECTED` nur über `DISPUTED` — ein gültiger Fakt wird nicht still
+verworfen. Ein Akteur ist Pflicht, `model` ist keiner. Die Kennung ist ein FNV-1a-Hash aus
+Scope, Subjekt, Prädikat und Wert, damit dieselbe Aussage über Läufe hinweg gleich heißt.
+
+Der Speicher liegt in einer **eigenen** Datei (`facts.sqlite`), nicht in der des Index.
+Gemessen, nicht gewählt (`docs/probes/facts-store-entscheidung.json`): In der gemeinsamen
+Datei überlebt die Faktzeile einen Index-Versionssprung nur, weil `facts` nicht in
+`PRIMARY_TABLES` steht; die Indexzeile selbst geht verloren (1 → 0), und der Rebuild läuft
+mit `vacuum` über dieselbe Datei (29,1 ms gegen 5,87 ms bei eigener Datei). Zwei
+Lebenszyklen brauchen zwei Versionsleitern: `pragma user_version` für die Fakten,
+`meta.schema_version` für den abgeleiteten Index.
+
+`packages/project-index/test/facts.test.mjs` prüft 15 Fälle, darunter alle 64 Statuspaare,
+alle 25 Klassenpaare, jede Zeigerform, Persistenz über einen Neustart, das Zyklenverbot und
+eine echte Migration v1 → v2: der alte Fakt behält Status und Quellen, die neue Tabelle
+kommt daneben. Kein Migrationsschritt enthält `drop table` oder `delete from`; eine Datei
+mit neuerer Fassung wird abgelehnt statt geraten.
+
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
 **Was fiel:** 73 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`
