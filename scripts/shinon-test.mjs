@@ -13,6 +13,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
+import { diaryHistory, diaryIssues } from './lib/diary.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -111,6 +112,17 @@ checkIssues('eine Quelle, ein Spiegel — keine Drift', () => repo.twinIssues())
 // `twinIssues` unsichtbar — dieser Schritt prueft, dass sie nirgends sonst steht.
 console.log('\n🧵 Host-Naht-Kern:');
 checkIssues('sechs Naehte einmal definiert, keine Host-Spiegel', () => repo.hostMirrorIssues());
+
+// Das Dev-Tagebuch haelt die Geschichte, aber keine Behauptung: jedes Kapitel
+// haengt an einem Commit-Bereich und an einem Pfad, den es heute noch gibt.
+// Ohne git (Fixture, Isolat) ist das ein sichtbarer Skip, kein stilles Gruen.
+console.log('\n📓 Dev-Tagebuch:');
+const diary = diaryHistory();
+if (diary.skip) {
+  console.log(`  ⏭️  ${diary.skip} — Anker nicht pruefbar`);
+} else {
+  checkIssues('jedes Kapitel haengt an Commit und Pfad', () => diaryIssues());
+}
 
 console.log('\n🧩 Generierte Idiome:');
 checkIssues('eine Quelle, generierte Blöcke — kein Drift', () => [
