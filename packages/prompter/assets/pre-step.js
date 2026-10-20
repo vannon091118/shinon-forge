@@ -502,13 +502,17 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
     && contract.mode !== undefined && runtime.turn?.resolution !== null
     && runtime.turn?.resolution !== undefined
     && ['CHAT', 'LOOKUP'].includes(runtime.turn.resolution.classification);
+  // Der Snapshot wird VOR dem One-Shot gelesen: nur so weiss der Aufruf, ob der
+  // wissensgebundene Weg gilt (strenge Ergebnispruefung), und der Block haengt
+  // danach unabhaengig vom Ausgang am Prompt.
+  const knowledgeSnapshot = readKnowledgeSnapshot(ctx, runtime);
   const outcome = direct
     ? {
       outcome: 'accepted',
       reasons: ['NO_ENHANCEMENT_NEEDED'],
       result: { enhancedPrompt: prompt.text, preservedIntent: true, addedRequirements: [], removedRequirements: [], uncertainties: [], references: [] },
     }
-    : await enhanceGuarded(ctx, contract, { ...config, ...runtime.route }, expandedText, supply.context, stand, skills, payload.signal, journalRejected);
+    : await enhanceGuarded(ctx, contract, { ...config, ...runtime.route, strictFacts: knowledgeSnapshot !== null }, expandedText, supply.context, stand, skills, payload.signal, journalRejected);
   if (direct) console.log(`[shinon-prompter] Direkt durchgereicht (${runtime.turn.resolution.classification}) — kein One-Shot`);
 
   // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
@@ -534,7 +538,7 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   // Ende des Prompts, gleich ob der One-Shot angenommen, abgelehnt oder
   // uebersprungen wurde und gleich ob der Veredler lief. Ohne Snapshot bleibt
   // der Text unveraendert — ein leerer Block waere eine Behauptung.
-  const knowledge = renderKnowledgeBlock(readKnowledgeSnapshot(ctx, runtime));
+  const knowledge = renderKnowledgeBlock(knowledgeSnapshot);
   const withKnowledge = (text) => (knowledge.text === '' ? text : `${text}\n\n${knowledge.text}`);
   const replacement = effect.replacePrompt && typeof outcome.result?.enhancedPrompt === 'string'
     ? withKnowledge(briefState.rendered === undefined

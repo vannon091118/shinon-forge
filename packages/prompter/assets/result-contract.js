@@ -120,12 +120,17 @@ export function acceptance(result, options = {}) {
   if (needsContext && stringList(result.references).length > 0) {
     const unresolvable = resolveReferences(result.references, options.context ?? null);
     if (unresolvable.length > 0) {
-      // Unbekannte Referenzen protokollieren, aber Kontext trotzdem liefern:
-      // Der Prompt bleibt funktionsfähig — das Modell ignoriert unbekannte
-      // Referenzen von selbst. Komplettes Verwerfen (alte Logik) war zu
-      // aggressiv: eine einzelne unbekannte Referenz (z. B. Vertrag oder
-      // Mood-Text) hat den gesamten Kontext invalidiert.
-      console.warn(`[shinon-prompter] Unbekannte Referenzen ignoriert: ${unresolvable.join(', ')}`);
+      // Zwei Modi, eine Regel: im Standardweg wird protokolliert und der Kontext
+      // trotzdem geliefert (der Prompt bleibt funktionsfähig, das Modell ignoriert
+      // unbekannte Referenzen von selbst). Im WISSENSGEBUNDENEN Weg
+      // (`strictFacts`, Zug 4) ist eine unbekannte Referenz dagegen ein Grund:
+      // wer einen Faktenblock bekommt, darf sich nicht auf Quellen berufen, die
+      // in ihm nicht stehen.
+      if (options.strictFacts === true) {
+        for (const reference of unresolvable) reasons.push(`UNRESOLVED_REFERENCE:${reference}`);
+      } else {
+        console.warn(`[shinon-prompter] Unbekannte Referenzen ignoriert: ${unresolvable.join(', ')}`);
+      }
     }
   }
   return { accepted: reasons.length === 0, reasons };

@@ -9,7 +9,7 @@
     "migration": "additiv; ein Schritt wird nie geändert, ein neuer kommt ans Ende",
     "decision_probe": "docs/probes/facts-store-entscheidung.json"
   },
-  "kinds": ["FACT", "DERIVED", "DECISION", "PROPOSAL", "CONFLICT"],
+  "kinds": ["FACT", "DERIVED", "DECISION", "PROPOSAL", "CONFLICT", "JUDGEMENT"],
   "statuses": ["DISCOVERED", "EXTRACTED", "VALIDATING", "VALID", "STALE", "DISPUTED", "SUPERSEDED", "REJECTED"],
   "actors": ["extractor", "validator", "invalidator", "reconciler"],
   "rules": [
@@ -120,6 +120,15 @@
       "trace": "Der Entscheidungsdatensatz trägt knowledge { contract, facts, constraints, conflicts, hash, reason } — Zahlen und Hash, keinen Blocktext.",
       "replay": "renderKnowledgeBlock ist rein und sortiert Fakten, Constraints und Konflikte; der Test fährt angenommenen, abgelehnten und direkten Ausgang und prüft den Block im finalen messages-Array.",
       "invariant": "Bei vorhandenem Snapshot enthält die letzte Nutzernachricht genau einen `<project_facts>`-Block; ohne Snapshot ist der Prompt bytegleich zum Roh-Prompt."
+    },
+    {
+      "positive": "Gleiche Aussagen (Scope, Subjekt, Prädikat, Wert) werden zu einem Eintrag mit allen Quellen zusammengeführt. Ein echter Widerspruch bleibt als offener Konflikt mit allen Seiten sichtbar, sortiert nach Autorität: bestätigter Vertrag (docs/contracts) vor Code (packages/, scripts/, bin/) vor Prosa (docs/). Danach leiten sich gezielte Post-Checks ab, deren Ergebnis als Fakt der Klasse JUDGEMENT mit Beleg gespeichert wird.",
+      "forbidden": "Ein stilles Überschreiben der unterlegenen Seite, ein Löschen eines widersprechenden Fakts, eine Auswahl nach Zeitstempel, ein zusammengeführter Eintrag mit zwei Werten und ein JUDGEMENT ohne Quellenzeiger.",
+      "fallback": "reconcile gibt { ok: false } zurück, sobald ein Konflikt besteht, und nennt beide Seiten mit Autorität und Quellen; merge und Konflikt schließen sich je Schlüssel aus.",
+      "error": "ok=false (Konflikt offen), QUELLE_OHNE_REVISION (aus checkFact für das JUDGEMENT)",
+      "trace": "merged nennt je Schlüssel Wert, Ids und Quellen; conflicts nennt je Schlüssel die Seiten mit Autorität und `resolved: false`; judgementFact trägt den Beleg als pointer mit Revision und den Zeitpunkt im Wert.",
+      "replay": "reconcile und deriveChecks sind rein und sortiert: dieselben Eingaben in anderer Reihenfolge ergeben dieselbe Ausgabe, und der Test vergleicht genau das.",
+      "invariant": "Jeder Konflikt ist offen (resolved false) und behält beide Seiten; jedes JUDGEMENT hat mindestens eine Quelle mit Revision."
     }
   ]
 }

@@ -643,6 +643,25 @@ Der Projekt-Index bietet jetzt eine **dritte** schmale Fähigkeit an; die beiden
 die die Naht pinnen, sind additiv erweitert (`shinon_facts_snapshot` mit genau `contract`
 und `snapshot`). Keine bestehende Naht wurde geweitet.
 
+## 2026-10-20 — Wissens-Runtime, Zug 4: Widersprüche bleiben stehen, Prüfungen werden belegt
+
+Zug 4 führt zusammen, was zusammengehört, und lässt stehen, was sich widerspricht.
+`facts-reconcile.js` gruppiert nach Scope, Subjekt und Prädikat: gleicher Wert ergibt **einen**
+Eintrag mit allen Quellen, verschiedene Werte ergeben einen offenen Konflikt mit beiden
+Seiten, sortiert nach Autorität aus dem Pfad — Vertrag (3) vor Code (2) vor Prosa (1). Die
+Autorität kommt aus dem Ort, nicht aus der Zeit; ein Zeitstempel entscheidet hier nichts.
+
+Dazu kommen gezielte Post-Checks: aus Auftrag und Änderungsbereich folgt eine deterministische
+Liste (`paket:<name>`, `gate:contracts`, `gate:profile`, `tests:pakete`), und ihr Ergebnis
+wird ein Fakt der Klasse **JUDGEMENT** mit Quellenzeiger und Zeitpunkt im Wert — eine
+begrenzte Aussage über eine Prüfung, keine Wahrheit über das Projekt.
+
+Die strenge Ergebnisprüfung ist ein **Modus**, kein neuer Default: `acceptance()` verwirft
+im wissensgebundenen Weg (`strictFacts`) eine unbekannte Referenz mit
+`UNRESOLVED_REFERENCE:<pfad>`; ohne Faktenblock bleibt es beim bisherigen `console.warn`.
+Der Modus hängt am Snapshot, nicht an einer Einstellung: `pre-step.js` liest den Snapshot
+vor dem One-Shot und schaltet ihn nur dann ein.
+
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
 **Was fiel:** 73 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`

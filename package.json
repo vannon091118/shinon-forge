@@ -37,7 +37,7 @@
     "test:hook": "node scripts/run-with-node.mjs packages/hook/test/replay.test.mjs && node scripts/run-with-node.mjs node --test scripts/gate/tests/hook-pre-step.test.mjs",
     "test:codingmon": "node scripts/run-with-node.mjs node --test packages/codingmon/test/*.test.mjs",
     "test:scoring": "node scripts/run-with-node.mjs node --test packages/scoring/test/*.test.mjs",
-    "test:facts": "node scripts/run-with-node.mjs node --test packages/project-index/test/facts.test.mjs packages/project-index/test/facts-pipeline.test.mjs packages/project-index/test/facts-snapshot.test.mjs",
+    "test:facts": "node scripts/run-with-node.mjs node --test packages/project-index/test/facts.test.mjs packages/project-index/test/facts-pipeline.test.mjs packages/project-index/test/facts-snapshot.test.mjs packages/project-index/test/facts-reconcile.test.mjs",
     "test:prompter": "node scripts/run-with-node.mjs node --test packages/prompter/test/*.test.mjs",
     "test:narrative": "node scripts/run-with-node.mjs node --test packages/narrative/test/*.test.mjs",
     "test:popup": "node scripts/run-with-node.mjs node --test packages/popup/test/*.test.mjs",

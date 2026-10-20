@@ -17,7 +17,10 @@
 
 export const FACTS_CONTRACT = 'shinon.facts/v1';
 
-export const KINDS = Object.freeze(['FACT', 'DERIVED', 'DECISION', 'PROPOSAL', 'CONFLICT']);
+// JUDGEMENT (Zug 4): das Ergebnis einer gezielten Nachprüfung. Es ist eine
+// belegte, BEGRENZTE Aussage (eine Prüfung zu einem Zeitpunkt), keine Wahrheit
+// über das Projekt; deshalb steht der Beleg im Quellenfeld.
+export const KINDS = Object.freeze(['FACT', 'DERIVED', 'DECISION', 'PROPOSAL', 'CONFLICT', 'JUDGEMENT']);
 
 export const STATUSES = Object.freeze([
   'DISCOVERED',

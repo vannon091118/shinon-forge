@@ -434,7 +434,9 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
     }, text);
   }
 
-  const decision = acceptance(parsed.result, { needsContext: contract.needsContext, context });
+  // `strictFacts` kommt aus dem Aufrufer und gilt NUR fuer den wissensgebundenen
+  // Weg (Zug 4). Ohne die Angabe bleibt das Verhalten des Standardwegs gleich.
+  const decision = acceptance(parsed.result, { needsContext: contract.needsContext, context, strictFacts: config.strictFacts === true });
   if (!decision.accepted) {
     logRejectedAnswer(decision.reasons, text, counts, finish, usage, request, elapsedMs);
     return journalRejection(onReject, config, prompt, { outcome: 'rejected', reasons: decision.reasons, result: parsed.result }, text);

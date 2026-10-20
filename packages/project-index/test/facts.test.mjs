@@ -104,7 +104,7 @@ test('lebenszyklus: unbekannte Status sind ein Befund, kein stilles Nein', () =>
   assert.equal(canTransition('VALID', 'ERFUNDEN', 'validator').reason, 'STATUS_UNBEKANNT');
 });
 
-test('klassen: eine Klasse wird nie umgeschrieben (alle 25 Paare)', () => {
+test('klassen: eine Klasse wird nie umgeschrieben (alle Paare der deklarierten Klassen)', () => {
   let changes = 0;
   for (const from of KINDS) {
     for (const to of KINDS) {
@@ -118,7 +118,8 @@ test('klassen: eine Klasse wird nie umgeschrieben (alle 25 Paare)', () => {
       }
     }
   }
-  assert.equal(changes, 20);
+  // Jede Klasse ist mit sich selbst erlaubt; jede der übrigen ist verboten.
+  assert.equal(changes, KINDS.length * (KINDS.length - 1));
   assert.equal(canReclassify('FAKT', 'FACT').reason, 'KLASSE_UNBEKANNT');
 });
 
