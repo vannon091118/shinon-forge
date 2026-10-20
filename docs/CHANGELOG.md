@@ -13,6 +13,23 @@ den Rest); hier steht die kurze, datierte Zeile.
 
 ## 2026-10-20
 
+- **Der Provider ist die Wahl des Nutzers — und die Doku sagt das jetzt.**
+  `agent-default-model` ist ein live-Feld; der gemountete `config-editor`
+  schreibt die Wahl in `profiles/shinon/cordis.patch.yml`
+  (`saveSelection` in `node_modules/@deepseek-ai/dsh-agent-default-model/lib/index.js`).
+  Damit war die alte Behauptung im Patch („der Default steht auf agnes, die
+  Haupt-Route bleibt unberührt") falsch, sobald sie jemand wechselte — derselbe
+  Satz stand in `AGENTS.md`, in `docs/ZAHLEN.md` §2 und in
+  `docs/S6-RUNBOOK-2026-10-17.md`. Alle vier nennen jetzt die Regel statt eines
+  Namens: geprüft wird die FORM (`scripts/lib/model-route.mjs`), die gespeicherte
+  Route steht im Dump. Dazu ein echter Fehler im S6-Preflight: er prüfte fest
+  `AGNES_API_KEY` und meldete „bereit", während die Route `prompter`
+  `PROMPTER_API_KEY` liest. Der Name kommt jetzt aus `chosenRoute(dump)` —
+  belegt von `scripts/gate/tests/model-route.test.mjs` (7 Tests, beide Richtungen),
+  `npm run s6:check` Exit 0 mit `route: prompter/agnes-2.5-flash, key:
+  PROMPTER_API_KEY bereit über .env`. Der Dump selbst: 58 Layer-Köpfe,
+  215 Einträge (Zahl in `docs/ZAHLEN.md` §2 nachgezogen).
+
 - **Modellwahl bleibt variabel.** Der Gate-Test der One-Shot-Route verlangte
   bis heute „der Haupt-Turn läuft NICHT auf dem Prompter-Provider" — ein
   Modell-Literal mit anderem Namen, das jede Route-Auswahl zum Gate-Fall

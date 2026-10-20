@@ -69,16 +69,24 @@
 # das Secret kommt aus der Umgebung (SHINON_API_KEY), nie aus dieser Datei.
 # Ohne gesetzte Variable bleibt die Route konfiguriert-aber-schlüssellos.
 #
-# WICHTIG: `agent-default-model` MUSS auf eine Route mit Key zeigen. Die
-# deepseek-official-Route (dsh-llm-deepseek) ist gemountet, hat aber ohne
-# DEEPSEEK_API_KEY keinen Schlüssel → MISSING_CREDENTIAL. Deshalb zeigt der
-# Default auf die Route, die die Entscheidung A8 festgelegt hat:
-# agnes/agnes-2.5-flash (apiKeyEnv AGNES_API_KEY, api openai-completions, baseURL
-# unten in der llm-pi-ai-Route). Die Modellwahl in der UI darf ihn überschreiben,
-# aber der Startzustand muss funktionieren.
+# WER DIE ROUTE WÄHLT: DER NUTZER. `agent-default-model` ist ein live-Feld
+# (`dsh-agent-default-model`), die Modellwahl in der UI schreibt sie über den
+# gemounteten `config-editor` (`saveSelection`) in GENAU DIESE Datei. Der Wert
+# unten ist deshalb der zuletzt gespeicherte Stand und keine Vorgabe des Repos:
+# nach einem Wechsel in der UI steht hier eine andere Route, und das ist die
+# Zusage, kein Fehler. Gemessen 2026-10-20: `provider: prompter`,
+# `model: agnes-2.5-flash` — beide Provider zeigen auf den Agnes-Host,
+# `prompter` liest `PROMPTER_API_KEY`, `agnes` liest `AGNES_API_KEY`.
 #
-# Diese Zeile und der Kommentar oben nennen DIESELBE Route (C8); wer sie ändert,
-# ändert beide — sonst widersprechen sich Kommentar und Config.
+# WAS GEPRÜFT WIRD, IST DIE FORM, NICHT DER NAME
+# (`scripts/lib/model-route.mjs`, `scripts/gate/tests/model-route.test.mjs`):
+# der Provider muss in diesem Patch definiert sein, das Modell in seinem
+# Katalog stehen, und `apiKeyEnv` muss einen Namen nennen (nie einen Wert).
+# Ein Modell-Literal im Test wäre beim nächsten Wechsel rot und würde die Zahl
+# ändern statt die Frage. Hart bleibt nur: eine Route OHNE Schlüssel ist
+# MISSING_CREDENTIAL — die deepseek-official-Route (dsh-llm-deepseek) ist
+# gemountet, hat aber ohne DEEPSEEK_API_KEY keinen. Wer hier eine Route ohne
+# gesetzte Variable einträgt, nimmt genau das in Kauf.
 - id: llm-pi-ai
   name: '@deepseek-ai/dsh-llm-pi-ai'
   config:
@@ -166,7 +174,7 @@
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
-    provider: agnes
+    provider: prompter
     model: agnes-2.5-flash
 - id: agent-preset-registry
   name: "@deepseek-ai/dsh-agent-preset-registry"
@@ -262,7 +270,8 @@
     # (PROMPTER_API_KEY, `prompter`-Block in llm-pi-ai oben). Fehlt die
     # Variable, faellt der Host beim Mounten auf `agnes` zurück — der Enhancer
     # bleibt damit lauffähig, auch ohne eigenen Schlüssel. Die Haupt-Route
-    # (`agent-default-model`) bleibt unberührt bei agnes.
+    # (`agent-default-model`) schreibt dieses Paket NIE: sie ist die Wahl des
+    # Nutzers (Config-Editor), und der Enhancer liest sie nicht einmal.
     provider: prompter
     model: agnes-2.5-flash
     providerKeyEnv: PROMPTER_API_KEY

@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadYaml } from '../../lib/yaml.mjs';
-import { modelRouteIssues, readModelRoutes, routeIssues } from '../../lib/model-route.mjs';
+import { chosenRoute, modelRouteIssues, readModelRoutes, routeIssues } from '../../lib/model-route.mjs';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const PROFILES = ['mobile', 'shinon', 'headless'];
@@ -70,6 +70,60 @@ test('der mobile-Vertrag prüft die Form, kein Modell-Literal', () => {
   assert.match(script, /modelRouteIssues/);
   assert.doesNotMatch(script, /agnes-\d/);
   assert.doesNotMatch(script, /deepseek-chat/);
+});
+
+test('der Schlüsselname kommt aus der gewählten Route, nicht aus dem Skript', () => {
+  const base = {
+    providers: { agnes: { apiKeyEnv: 'AGNES_API_KEY', models: ['agnes-x'] } },
+    route: { provider: 'agnes', model: 'agnes-x' },
+  };
+  const dump = (route, providers = base.providers) => [
+    '- id: llm-pi-ai',
+    '  config:',
+    '    providers:',
+    ...Object.entries(providers).flatMap(([name, provider]) => [
+      `      ${name}:`,
+      `        apiKeyEnv: ${provider.apiKeyEnv}`,
+      '        models:',
+      ...provider.models.map((model) => `          - id: ${model}`),
+    ]),
+    '- id: agent-default-model',
+    '  config:',
+    `    provider: ${route.provider}`,
+    `    model: ${route.model}`,
+  ].join('\n');
+
+  // Zwei Routen, zwei Schlüssel: derselbe Dump-Aufbau, verschiedene Namen.
+  assert.equal(chosenRoute(dump({ provider: 'agnes', model: 'agnes-x' })).keyName, 'AGNES_API_KEY');
+  const prompter = dump({ provider: 'prompter', model: 'agnes-x' }, {
+    ...base.providers,
+    prompter: { apiKeyEnv: 'PROMPTER_API_KEY', models: ['agnes-x'] },
+  });
+  assert.deepEqual(chosenRoute(prompter), {
+    provider: 'prompter', model: 'agnes-x', apiKeyEnv: 'PROMPTER_API_KEY', keyName: 'PROMPTER_API_KEY',
+  });
+
+  // Unbekannter Provider heißt leerer Name — der Aufrufer wird rot, statt zu raten.
+  assert.equal(chosenRoute(dump({ provider: 'fremd', model: 'agnes-x' })).keyName, '');
+
+  // Der echte Profil-Patch: der Name ist der des gewählten Providers.
+  for (const profile of PROFILES) {
+    const routes = readModelRoutes(read(profile));
+    assert.equal(
+      chosenRoute(read(profile)).keyName,
+      routes.providers[routes.route.provider].apiKeyEnv,
+      `${profile}: apiKeyEnv der gewählten Route`,
+    );
+  }
+});
+
+test('der S6-Preflight fragt die Route, die er anzeigt', () => {
+  const script = readFileSync(join(ROOT, 'scripts/s6-turn.mjs'), 'utf8');
+  assert.match(script, /chosenRoute/);
+  // Kein fester Schlüsselname bei der Prüfung: eine Konstante neben einer
+  // wählbaren Route beantwortet die falsche Frage (der Fall vom 2026-10-20).
+  assert.doesNotMatch(script, /process\.env\[\s*['"]?AGNES_API_KEY/);
+  assert.doesNotMatch(script, /keySource\(\s*\)/);
 });
 
 test('Formfehler werden benannt, nicht still hingenommen', () => {

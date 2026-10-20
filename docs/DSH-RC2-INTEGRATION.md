@@ -52,7 +52,10 @@ ungeprüfter Einbau wäre eine Behauptung, keine Funktion.
   Datei in `docs/contracts/` verlangt. Die Datei ist unverändert aus `origin/main`
   übernommen; sie ist eine Richtlinien-Datenquelle, kein Fähigkeitsvertrag — die
   Entscheidung „sieben Punkte ergänzen oder Datei verschieben" gehört dem Eigentümer.
-- `profile-config-override` ist rot, weil `profiles/shinon/cordis.patch.yml` uncommittet
-  `agent-default-model.provider: prompter` setzt. Das ist eine bewusste Modellwahl des
-  Eigentümers, keine Regression des Umzugs; der Test verbietet genau diese Route für den
-  Haupt-Turn.
+- `profile-config-override` war rot, weil `profiles/shinon/cordis.patch.yml`
+  `agent-default-model.provider: prompter` setzt — eine bewusste Modellwahl des
+  Eigentümers, keine Regression des Umzugs. **Erledigt 2026-10-20:** der Test verbietet
+  die Route nicht mehr, sondern prüft die FORM (Provider im Katalog, Modell in seinem
+  Katalog, Fallback eine definierte Route); der Default ist ein live-Feld, das der
+  `config-editor` aus der UI in die Profil-Ebene schreibt. Der Haupt-Turn darf damit auf
+  jeder Route mit Schlüssel laufen.

@@ -59,10 +59,13 @@ remote, so there is deliberately no sync script.
   Ein fremder Link im Home wird gemeldet und nie überschrieben, wie bei `profile:links`.
 - Der Arbeits-Schlüssel für echte Modell-Turns liegt in `.env` im Repo-Root (gitignoriert,
   `chmod 600`) — **nie committen, nie ausgeben, nie in eine Antwort kopieren.** `dsh` lädt
-  die Datei beim Start selbst; das geseedete Home verlinkt sie, es ist dieselbe Datei. Die
-  **konfigurierte** Route ist `agnes/agnes-2.5-flash` (`apiKeyEnv: AGNES_API_KEY` im Profil)
-  — gemessen mit `node_modules/.bin/dsh --profile shinon --dump-config`; welche Route ein
-  konkreter Lauf hatte, steht im Messheader des Laufs, nicht hier. Wer einen e2e-Lauf braucht, nimmt sie; **„kein Schlüssel" ist kein Grund mehr,
+  die Datei beim Start selbst; das geseedete Home verlinkt sie, es ist dieselbe Datei.
+  **Welche Route der Default hat, wählt der Nutzer** — `agent-default-model` ist ein
+  live-Feld, die Modellwahl in der UI schreibt sie über den `config-editor` in die
+  Profil-Ebene; harte Prüfung ist die FORM (`scripts/lib/model-route.mjs`: Provider im
+  selben Patch definiert, Modell in seinem Katalog, `apiKeyEnv` nicht leer), nie ein
+  Modellname. Die zuletzt gemessene Konfiguration und welche Route ein konkreter Lauf
+  hatte, stehen in `docs/ZAHLEN.md` §2 bzw. im Messheader des Laufs, nicht hier. Wer einen e2e-Lauf braucht, nimmt sie; **„kein Schlüssel" ist kein Grund mehr,
   eine Messung zu verschieben** — der erste Durchlauf (echter Boot, echtes Urteil, Widerruf,
   Host-Ende, Neustart) steht in `docs/ZAHLEN.md` §2, die Belege in
   `docs/probes/store-cost.json`.

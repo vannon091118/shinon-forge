@@ -150,3 +150,26 @@ export function routeIssues(routes) {
 export function modelRouteIssues(text) {
   return routeIssues(readModelRoutes(text));
 }
+
+/**
+ * Die GEWÄHLTE Route samt dem Umgebungsnamen, den sie liest.
+ *
+ * Der Name ist keine Konstante neben der Route: `agent-default-model` ist ein
+ * live-Feld (die UI schreibt es über den `config-editor` in die Profil-Ebene),
+ * also liest `agnes` `AGNES_API_KEY` und `prompter` `PROMPTER_API_KEY`. Ein
+ * Preflight mit festem `AGNES_API_KEY` meldete den Schlüssel „bereit", obwohl
+ * die gewählte Route einen anderen liest — die falsche Antwort auf die Frage,
+ * ob ein Start möglich ist.
+ *
+ * `keyName` ist leer, wenn der Provider unbekannt ist oder `apiKeyEnv` fehlt;
+ * der Aufrufer entscheidet dann (Preflight: rot), statt einen Namen zu raten.
+ *
+ * @returns {{ provider: string, model: string, apiKeyEnv: string, keyName: string }}
+ */
+export function chosenRoute(text) {
+  const { providers, route } = readModelRoutes(text);
+  const provider = typeof route?.provider === 'string' ? route.provider.trim() : '';
+  const model = typeof route?.model === 'string' ? route.model.trim() : '';
+  const apiKeyEnv = provider === '' ? '' : String(providers?.[provider]?.apiKeyEnv ?? '').trim();
+  return { provider, model, apiKeyEnv, keyName: apiKeyEnv };
+}
