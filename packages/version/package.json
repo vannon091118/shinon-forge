@@ -1,0 +1,39 @@
+{
+  "name": "@shinon/version",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "3.18.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "meta": {
+    "title": {
+      "en": "Shinon Forge - Version",
+      "de": "Shinon Forge - Version"
+    },
+    "description": {
+      "en": "Shows the newest and the installed commit and updates on click",
+      "de": "Zeigt den neuesten und den installierten Commit und aktualisiert auf Klick"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
+  }
+}

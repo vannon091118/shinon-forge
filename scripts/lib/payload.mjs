@@ -81,6 +81,70 @@ export const FORBIDDEN_IN_PAYLOAD = Object.freeze([
 export const PAYLOAD_MANIFEST = 'manifest.json';
 
 /**
+ * Der BAU-SCHATTEN: die Datei, die einem Paket sagt, aus welchem Commit es
+ * gebaut wurde. Ein .deb hat kein Git — ohne diesen Schatten wüsste das
+ * installierte Shinon nicht, welcher Stand in /opt liegt, und könnte seinen
+ * eigenen Stand nicht nennen. Der Name ist ein Literal und wird gegen die
+ * Leseseite (packages/version/assets/version-probe.js) geprueft.
+ */
+export const BUILD_STAMP = '.shinon-build.json';
+
+/**
+ * Der Commit des Quellbaums (oder `null`, wenn er keiner ist).
+ * @param {string} source
+ * @returns {string|null}
+ */
+function gitCommit(source) {
+  try {
+    const out = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: source,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return /^[0-9a-f]{40}$/.test(out) ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Die Herkunft des Quellbaums (die Remote-URL) — damit ein Paket ohne Git
+ * wenigstens weiss, WO der neueste Stand liegt.
+ * @param {string} source
+ * @returns {string|null}
+ */
+function gitRemote(source) {
+  try {
+    const out = execFileSync('git', ['remote', 'get-url', 'origin'], {
+      cwd: source,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return out === '' ? null : out;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Den Bau-Schatten in die Nutzlast schreiben. Er nennt Commit, Zeit, Fassung
+ * und Herkunft — der Commit ist das Wichtige: er ist die einzige Angabe, die
+ * ein installiertes Paket von sich selbst weiss.
+ * @param {{source: string, stage: string, version?: string|null}} options
+ * @returns {{commit: string|null, builtAt: string, version: string|null, source: string|null}}
+ */
+export function writeBuildStamp({ source, stage, version = null }) {
+  const stamp = {
+    commit: gitCommit(source),
+    builtAt: new Date().toISOString(),
+    version,
+    source: gitRemote(source),
+  };
+  writeFileSync(join(stage, BUILD_STAMP), `${JSON.stringify(stamp, null, 2)}\n`, 'utf8');
+  return stamp;
+}
+
+/**
  * Das Ziel eines Node-Archivs. `platform`/`arch` sind die Node-Bezeichner
  * (nicht die des Kernels): `linux`/`win32` und `x64`/`arm64`.
  * @returns {{platform: string, arch: string, slug: string}}
@@ -398,6 +462,7 @@ export async function buildPayload({
   mkdirSync(stage, { recursive: true });
 
   const code = stageCode({ source, stage });
+  const stamp = writeBuildStamp({ source, stage, version });
   if (modules === 'npm') installModules({ stage });
   const links = linkProfilePackages({ stage, mode: linkMode });
   if (links.refused.length > 0) {
@@ -439,6 +504,7 @@ export async function buildPayload({
     linkMode,
     code,
     links: links.count,
+    build: stamp,
   }, null, 2)}\n`, 'utf8');
 
   return { root: stage, code, links: links.count, node };

@@ -1,0 +1,9 @@
+- insert:
+    - id: shinon-version
+      name: '@shinon/version'
+      config:
+        enabled: true
+        remote: 'origin'
+        branch: 'main'
+        endpoint: '/shinon/version'
+        refreshMs: 300000

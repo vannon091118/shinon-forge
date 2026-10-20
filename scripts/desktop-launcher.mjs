@@ -27,20 +27,25 @@
  * der nirgends sichtbar wird. Und der Eintrag wird bei jedem Lauf neu geprüft:
  * ändert sich die Laufzeit (Upgrade), schreibt der nächste Lauf den Eintrag um.
  */
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { dshBinary, dshSource } from './lib/dsh.mjs';
 import { resolveRuntime, runtimeFailure } from './lib/runtime.mjs';
 import { describePaths } from './lib/paths.mjs';
+import {
+  APP_ID,
+  APP_NAME,
+  checkDesktopEntries,
+  desktopEntryText,
+  desktopTargets,
+  removeDesktopEntries,
+  writeDesktopEntries,
+} from './lib/desktop-entry.mjs';
 
 const ROOT = repo.ROOT;
 const HOME = homedir();
-const APP_DIR = join(HOME, '.local', 'share', 'applications');
-const CANNED = ['cinnamon', 'cinnamon-desktop-icons', 'spices'];
-const APP_NAME = 'Shinon Forge';
-const APP_ID = 'shinon-forge';
 
 const args = process.argv.slice(2);
 const UNINSTALL = args.includes('--uninstall');
@@ -89,64 +94,44 @@ const hasIcon = existsSync(iconPath);
 const execLine = `"${node}" "${openScript}"`;
 
 function buildDesktopFile() {
-  const lines = [
-    '[Desktop Entry]',
-    'Type=Application',
-    `Name=${APP_NAME}`,
-    `GenericName=Shinon Forge DSH-Shell`,
-    `Comment=Startet Shinon mit dem aktiven Profil und öffnet die UI im Browser (1-Click, kein Terminal)`,
-    `Exec=${execLine}`,
-    `Path=${ROOT}`,
-    'Terminal=false',
-    'StartupNotify=true',
-  ];
-  if (hasIcon) lines.push(`Icon=${iconPath}`);
-  lines.push(`Categories=Development;IDE;`);
-  lines.push(`Keywords=shinon;dsh;ai;agent;`);
-  lines.push(`X-Shinon-Profile=${profileName}`);
-  lines.push('');
-  return lines.join('\n');
+  return desktopEntryText({
+    name: APP_NAME,
+    genericName: 'Shinon Forge DSH-Shell',
+    comment: 'Startet Shinon mit dem aktiven Profil und öffnet die UI im Browser (1-Klick, kein Terminal)',
+    exec: execLine,
+    path: ROOT,
+    icon: hasIcon ? iconPath : null,
+    extra: [`X-Shinon-Profile=${profileName}`],
+  });
 }
 
-const targets = [
-  { path: join(APP_DIR, `${APP_ID}.desktop`), label: 'App-Menü/Dock' },
-];
-for (const flavor of CANNED) {
-  targets.push({ path: join(HOME, '.config', flavor, 'desktop', `${APP_ID}.desktop`), label: `${flavor}/Desktop` });
-}
+const targets = desktopTargets({ home: HOME, appId: APP_ID });
 
 if (CHECK) {
   // Ist der Eintrag noch gültig? Geprüft wird die Exec-Zeile gegen die JETZT
   // verifizierte Laufzeit — ein Upgrade macht einen alten Eintrag sichtbar.
   const content = buildDesktopFile();
-  let stale = 0;
+  const found = checkDesktopEntries({ content, home: HOME, appId: APP_ID });
   for (const { path, label } of targets) {
-    if (!existsSync(path)) {
+    if (found.missing.includes(path)) {
       console.log(`  ⏭  ${label}: nicht installiert`);
       continue;
     }
-    const existing = readFileSync(path, 'utf8');
-    if (existing === content) {
+    if (found.current.includes(path)) {
       console.log(`  ✅ ${label}: aktuell (${node})`);
       continue;
     }
-    stale += 1;
     console.log(`  ⚠️  ${label}: veraltet — erwartet wird\n      ${execLine}`);
   }
+  const stale = found.stale.length;
   console.log(stale === 0 ? '\n✅ Desktop-Einträge aktuell.' : '\n💥 Desktop-Einträge veraltet — `npm run desktop:launcher` schreibt sie neu.');
   process.exit(stale === 0 ? 0 : 1);
 }
 
 if (UNINSTALL) {
-  let removed = 0;
-  for (const { path, label } of targets) {
-    if (existsSync(path)) {
-      rmSync(path);
-      console.log(`  🗑  ${label}: ${path}`);
-      removed += 1;
-    }
-  }
-  console.log(removed === 0 ? 'keine Einträge entfernt (nicht installiert)' : `${removed} Einträge entfernt`);
+  const removed = removeDesktopEntries({ home: HOME, appId: APP_ID });
+  for (const path of removed.removed) console.log(`  🗑  ${path}`);
+  console.log(removed.removed.length === 0 ? 'keine Einträge entfernt (nicht installiert)' : `${removed.removed.length} Einträge entfernt`);
   console.log('ℹ️  dsh-Prozesse, falls noch aktiv, laufen weiter — beende DSH separat.');
   process.exit(0);
 }
@@ -160,24 +145,17 @@ console.log(`  DSH_HOME (beim Klick): ${describePaths().dshHome}`);
 console.log('═══════════════════════════════════\n');
 
 const content = buildDesktopFile();
-let created = 0;
-let updated = 0;
+const written = writeDesktopEntries({ content, home: HOME, appId: APP_ID });
 for (const { path, label } of targets) {
-  mkdirSync(dirname(path), { recursive: true });
-  const before = existsSync(path) ? readFileSync(path, 'utf8') : null;
-  if (before === content) {
+  if (written.unchanged.includes(path)) {
     console.log(`  = ${label}: unverändert (idempotent) — ${path}`);
     continue;
   }
-  writeFileSync(path, content, 'utf8');
-  chmodSync(path, 0o755); // .desktop muss ausführbar + trusted sein
-  const word = before === null ? 'angelegt' : 'aktualisiert';
+  const word = written.created.includes(path) ? 'angelegt' : 'aktualisiert';
   console.log(`  ✅ ${label}: ${word} — ${path}`);
-  if (before === null) created += 1;
-  else updated += 1;
 }
 
-console.log(`\n${created} Einträge angelegt, ${updated} aktualisiert.`);
+console.log(`\n${written.created.length} Einträge angelegt, ${written.updated.length} aktualisiert.`);
 console.log(`   Laufzeit im Eintrag: ${runtime.version} — ${node}\n`);
 console.log('Nächster Schritt:');
 console.log('  • App-Menü/Dock: „Shinon Forge" suchen → Klick startet den 1-Click.');

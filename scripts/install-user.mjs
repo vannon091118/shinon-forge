@@ -59,14 +59,11 @@
  * Fehlerzeilen. Exit 0 gibt es nur, wenn die ganze Kette steht. Der Server wird
  * danach über die PID aus dem Listener beendet, nicht über ein Muster.
  *
- * Grenzen, absichtlich:
- *   - Kein `git clean`: ein `--dry-run` gibt es nicht, aber auch kein Löschen
- *     unversionierter Dateien. Ein `.env` im Installat überlebt jedes Update.
- *   - Läuft eine Instanz aus dem Zielverzeichnis, verweigert der Befehl das
- *     Neuinstallieren (npm ci würde ihr node_modules unter den Füßen
- *     wegziehen) — `--force` ist die ausdrückliche Ausnahme.
- *   - Ein Rollback ist eine Neuinstallation, kein Symlinkwechsel: der Zustand
- *     (Sessions, Ledger, Index) liegt außerhalb und bleibt unberührt.
+ * Grenzen, absichtlich: kein `git clean` — ein `.env` im Installat überlebt
+ *   jedes Update; eine laufende Instanz aus dem Zielverzeichnis verweigert das
+ *   Neuinstallieren (npm ci zöge ihr node_modules weg), `--force` ist die
+ *   ausdrückliche Ausnahme; ein Rollback ist eine Neuinstallation, kein
+ *   Symlinkwechsel — der Zustand (Sessions, Ledger, Index) liegt außerhalb.
  *
  * Aufruf:
  *   node scripts/install-user.mjs install  [--prefix DIR] [--ref R] [--source URL] [--no-verify]
@@ -87,6 +84,7 @@ import { createServer, connect } from 'node:net';
 import * as paths from './lib/paths.mjs';
 import { resolveRuntime } from './lib/runtime.mjs';
 import { collectSecrets, describeSecrets, readVault, restoreSecrets, writeVault } from './lib/secrets.mjs';
+import { writeInstallDesktopIcon } from './lib/desktop-entry.mjs';
 
 const DEFAULT_PREFIX = join(homedir(), '.local', 'opt', 'shinon-forge');
 const STATE_FILE = join(paths.stateDir(), 'install-state.json');
@@ -660,7 +658,9 @@ async function cmdInstall() {
   checkout(target.sha);
   recordStand(target.sha, target.ref, 'install');
   installDependencies();
-  return verifyStand({ trigger: 'install' });
+  const code = await verifyStand({ trigger: 'install' });
+  if (code === 0) writeInstallDesktopIcon({ prefix: PREFIX, node: nodeBinary() });
+  return code;
 }
 
 async function cmdUpdate() {
