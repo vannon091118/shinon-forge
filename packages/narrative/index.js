@@ -1,6 +1,8 @@
 import z from '@deepseek-ai/schemastery';
 import { readFileSync } from 'node:fs';
 import { advance, initialState, validateNarrativeState } from './assets/narrative-core.js';
+// Kanal und Vertrag haben EINE Definition: `@shinon/seams` (Host-Naht-Kern).
+import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT } from '@shinon/seams/core';
 
 /**
  * @shinon/narrative — Narrative Engine (Zug 5: aktiviert).
@@ -65,14 +67,23 @@ export {
   validateNarrativeState,
 } from './assets/narrative-core.js';
 
-/** Vertragsname des Zustands (Daten, nicht Code). */
-export const STATE_CONTRACT = 'shinon.narrative/v1';
+/**
+ * Vertragsname und Kanal des Zustands — EINE Definition in `@shinon/seams`.
+ *
+ * Der Name bleibt hier oeffentlich (`STATE_CONTRACT`/`STATE_CHANNEL`), weil
+ * dieses Paket der BESITZER der Naht ist; die Definition liegt aber nicht mehr
+ * hier. Bis 2026-10-20 standen beide Literale hier UND in `@shinon/persona` und
+ * `@shinon/prompter`; `SOURCE_TWINS` hielt die Kopien zusammen. Ein falscher
+ * Kanalname hiesse nur, dass der Abschnitt nie erscheint — und das saehe aus wie
+ * "es gibt keine Narrative".
+ */
+export const STATE_CONTRACT = NARRATIVE_STATE_CONTRACT;
 
 /**
  * Ereignis-Kanal, auf dem der eigene Zustand hinausgeht. Er ist der EINE Ausgang
  * dieses Pakets: lesend beobachten, ableiten, melden — nie handeln.
  */
-export const STATE_CHANNEL = 'shinon/narrative/state';
+export const STATE_CHANNEL = NARRATIVE_STATE_CHANNEL;
 
 /** Die dauerhafte Ablage — derselbe Dienst wie beim Scoring und der Persona. */
 export const STORE_SERVICE = 'shinon_index_store';

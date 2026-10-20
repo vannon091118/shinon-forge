@@ -27,6 +27,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
@@ -40,6 +41,7 @@ async function loadBundles() {
   for (const name of ['events', 'scoring']) {
     cpSync(join(ROOT, 'packages', name), join(work, 'packages', name), { recursive: true });
   }
+  provideSeamCore(work);
   const events = await import(pathToFileURL(join(work, 'packages/events/index.js')).href);
   const scoring = await import(pathToFileURL(join(work, 'packages/scoring/index.js')).href);
   return { events, scoring };

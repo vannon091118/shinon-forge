@@ -36,6 +36,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const CORE_URL = new URL('../../../packages/project-index/assets/index-core.js', import.meta.url);
 const PROMPTER_DIR = fileURLToPath(new URL('../../../packages/prompter/', import.meta.url));
@@ -50,6 +51,7 @@ async function loadPrompter() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-resolver-test-'));
   const pkg = join(work, 'pkg');
   cpSync(PROMPTER_DIR, pkg, { recursive: true });
+  provideSeamCore(pkg);
   const shim = join(pkg, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(

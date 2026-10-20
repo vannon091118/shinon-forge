@@ -1,5 +1,6 @@
 import z from '@deepseek-ai/schemastery';
-import { createHash } from 'node:crypto';
+// Die Digest-Regel hat EINE Definition: `@shinon/seams` (Host-Naht-Kern).
+import { digest } from '@shinon/seams/core';
 
 /**
  * shinon-hook — der echte DSH-Entry-Point von Shinon (Phase 1).
@@ -59,23 +60,11 @@ export const TRACE_EVENT_TYPE = 'agent.pre-step';
 /** Kanal, auf dem korrelierte Schritt-Datensätze den Host verlassen. */
 export const TRACE_CHANNEL = 'shinon/hook/pre-step';
 
-// #region zwilling:sha256-digest — Besitzer: packages/events/index.js
 /**
- * Erste `length` Hex-Zeichen von sha256(text).
- *
- * `text` ist ein String und `length` ist PFLICHT: eine vergessene Laenge ergaebe
- * still einen 64-stelligen Wert statt eines kurzen ids. Kein Aufrufer ratet sie
- * — beide Seiten nennen sie ausdruecklich.
- */
-function digest(text, length) {
-  return createHash('sha256').update(text).digest('hex').slice(0, length);
-}
-// #endregion zwilling:sha256-digest
-
-/**
- * Laenge der vom Hook erzeugten ids. Die gemeinsame Regel verlangt die Laenge
- * ausdruecklich: ein Vorgabewert waere eine zweite Wahrheit ueber die id-Laenge und
- * wuerde auf der events-Seite das Verhalten eines Aufrufs OHNE Laenge aendern.
+ * Laenge der vom Hook erzeugten ids. Die gemeinsame Regel (`@shinon/seams`)
+ * verlangt die Laenge ausdruecklich: ein Vorgabewert waere eine zweite Wahrheit
+ * ueber die id-Laenge und wuerde auf der events-Seite das Verhalten eines
+ * Aufrufs OHNE Laenge aendern.
  */
 const ID_LENGTH = 12;
 

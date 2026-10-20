@@ -32,6 +32,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/persona/', import.meta.url));
 /** Die Repo-Wurzel — der eine erlaubte Persona-Scope (die Persona spricht nur benannt). */
@@ -46,6 +47,7 @@ async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-persona-prompt-'));
   const dir = join(work, 'pkg');
   cpSync(PACKAGE_DIR, dir, { recursive: true });
+  provideSeamCore(dir);
   const shim = join(dir, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(

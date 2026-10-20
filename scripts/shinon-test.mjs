@@ -106,6 +106,11 @@ if (!schemastery) {
 
 console.log('\n🔗 Quell-Zwillinge:');
 checkIssues('eine Quelle, ein Spiegel — keine Drift', () => repo.twinIssues());
+// Der Riegel gegen die Rueckkehr: die sechs Host↔Host-Naehte stehen seit
+// 2026-10-20 EINMAL (`@shinon/seams`). Eine Kopie ohne Marker waere fuer
+// `twinIssues` unsichtbar — dieser Schritt prueft, dass sie nirgends sonst steht.
+console.log('\n🧵 Host-Naht-Kern:');
+checkIssues('sechs Naehte einmal definiert, keine Host-Spiegel', () => repo.hostMirrorIssues());
 
 console.log('\n🧩 Generierte Idiome:');
 checkIssues('eine Quelle, generierte Blöcke — kein Drift', () => [

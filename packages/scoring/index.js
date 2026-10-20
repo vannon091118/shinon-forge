@@ -1,5 +1,7 @@
 import z from '@deepseek-ai/schemastery';
 import { readFileSync } from 'node:fs';
+// Der Entscheidungskanal hat EINE Definition: `@shinon/seams` (Host-Naht-Kern).
+import { PROMPTER_DECISION_CHANNEL } from '@shinon/seams/core';
 
 /**
  * @shinon/scoring — Scorecard, Decay, Relation (Kern, K3) und die Ohren (K5).
@@ -82,15 +84,15 @@ export const SCORING_SERVICE = 'shinon_scoring_state';
 export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
 
 /**
- * Der Entscheidungskanal des Veredlers als LITERAL (vierte Naht, Phase 3).
+ * Der Entscheidungskanal des Veredlers (vierte Naht, Phase 3) — aus
+ * `@shinon/seams`.
  *
- * Warum als Literal und nicht als Import: Pakete lesen einander nicht (jedes
- * Bundle reist eigenständig). Der Besitzer des Namens ist `@shinon/prompter`
- * (`DECISION_CHANNEL` in dessen `mode-core.js`); Drift pinnt
- * `scripts/gate/tests/context-wiring.test.mjs` auf beiden Seiten — dieselbe
- * Bauform wie beim Ton und der Ablage.
+ * Bis 2026-10-20 stand hier ein Literal ("Pakete lesen einander nicht"); das
+ * Scoring war damit die DRITTE Kopie desselben Namens, und `SOURCE_TWINS`
+ * kannte nur die anderen zwei. Der Naht-Kern ist importfrei, kostet also nicht
+ * die Eigenstaendigkeit, die das Literal begruendet hat.
  */
-export const BLOCKS_DECISION_CHANNEL = 'shinon/prompter/decision';
+export const BLOCKS_DECISION_CHANNEL = PROMPTER_DECISION_CHANNEL;
 
 /** Leere Scorecard: der Stub läuft dann lesend, aber ohne Werte. */
 const EMPTY_SCORING = { contract: 'shinon.scoring-state/unloaded', dimensions: {}, events: {}, relation: { levels: [], initial: null } };

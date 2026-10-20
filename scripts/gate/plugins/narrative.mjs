@@ -21,11 +21,17 @@
  *      (`STATE_CHANNEL`) hinaus. Es gibt keinen zweiten Weg — ein `ctx.provide`
  *      eines Zustands wäre der „tote Dienst" von vorher, und der ist entfernt.
  *   4. Der KANAL HAT ABNEHMER. Das ist die Zusage, die bis Zug 6 fehlte: die
- *      Persona trägt den Kanalnamen als Literal und registriert daraus einen
- *      Prompt-Abschnitt, der Veredler trägt ihn ebenso und baut daraus das
- *      Element `<narrative>` seines Stand-Blocks (der in den MAX-Aufruf geht).
- *      Ohne diese Prüfung darf das Gate nicht grün sein — ein Sender ohne
- *      Empfänger ist kein Feature.
+ *      Persona abonniert den Kanal und registriert daraus einen
+ *      Prompt-Abschnitt, der Veredler baut daraus das Element `<narrative>`
+ *      seines Stand-Blocks (der in den MAX-Aufruf geht). Ohne diese Prüfung
+ *      darf das Gate nicht grün sein — ein Sender ohne Empfänger ist kein
+ *      Feature.
+ *
+ *      DER NAME KOMMT SEIT 2026-10-20 AUS `@shinon/seams/core`, nicht mehr als
+ *      Literal. Beide Abnehmer sind Host-Hälften und dürfen importieren; die
+ *      Prüfung verlangt deshalb den IMPORT und meldet ein Literal als Befund.
+ *      Vorher war es umgekehrt — richtig für die damalige Lage, falsch seither:
+ *      zwei Literale, die niemand liest, sind eine Kopie, kein Empfänger.
  *   5. Das Profil aktiviert das Bundle, sonst läuft die Engine nie (dieselbe
  *      Regel wie beim Persona- und beim Scoring-Gate).
  *
@@ -56,18 +62,18 @@ export const EVIDENCE_LEVELS = ['EVENT_TYPE', 'EXPLICIT_PAYLOAD', 'NONE'];
  * Die ABNEHMER. Bis Zug 6 war diese Liste leer — und das Gate hätte die Lücke
  * benannt, statt sie zu überspringen.
  *
- * Ein Abnehmer ist: ein Paket, das den Kanalnamen als LITERAL trägt (es kann
- * `index.js` nicht importieren), den Kanal wirklich abonniert (`ctx.on` auf genau
- * diesen Namen) und aus dem Composite etwas SICHTBARES macht — ein Element, das
- * eine Prüfung finden kann. Es sind zwei, und sie lesen denselben Composite in
- * zwei verschiedene Ausgänge:
+ * Ein Abnehmer ist: eine Host-Hälfte, die Kanal (und ggf. Vertrag) aus
+ * `@shinon/seams/core` IMPORTIERT, den Kanal wirklich abonniert (`ctx.on` auf
+ * genau diesen Namen) und aus dem Composite etwas SICHTBARES macht — ein
+ * Element, das eine Prüfung finden kann. Es sind zwei, und sie lesen denselben
+ * Composite in zwei verschiedene Ausgänge:
  *
  *   persona   den System-Prompt-Abschnitt `shinon:narrative-arc`
  *   prompter  das Element `<narrative>` im Stand-Block, den MAX als eigenen
  *             Block in den Modellaufruf hängt
  *
- * Beide Spiegel werden von `scripts/lib/repo.mjs` (SOURCE_TWINS) gegen den einen
- * Besitzer gepinnt; hier wird geprüft, dass daraus auch ein Abnehmer wird.
+ * Beide Namen haben EINE Definition (`@shinon/seams`); hier wird geprüft, dass
+ * daraus auch ein Abnehmer wird.
  */
 export const CONSUMERS = [
   {
@@ -297,13 +303,13 @@ export function staticIssues(sources) {
  * Den ABNEHMER prüfen — die Zusage, die bis Zug 6 fehlte.
  *
  * Geprüft wird nicht, dass irgendwo "narrative" steht, sondern die drei Dinge,
- * die einen Abnehmer ausmachen: der Kanalname als LITERAL (das Paket kann
- * `@shinon/narrative` nicht importieren), ein `ctx.on` auf diesen Namen, und ein
- * Element, das aus dem Composite entsteht. Ein Abnehmer, der den Kanalnamen
- * falsch schreibt, sieht aus wie "es gibt keine Narrative" — deshalb ist die
- * Buchstabenfolge hier keine Stilfrage, sondern der Befund. Und es sind ZWEI
- * Abnehmer: die Prüfung läuft über die Liste CONSUMERS, an den Abnehmer selbst
- * werden die beiden Quelltexte gereicht.
+ * die einen Abnehmer ausmachen: der Kanalname als IMPORT aus dem Naht-Kern
+ * (`'@shinon/seams/core'`), ein `ctx.on` auf diesen Namen, und ein Element, das
+ * aus dem Composite entsteht. Ein Abnehmer, der den Kanalnamen falsch schreibt,
+ * sieht aus wie "es gibt keine Narrative" — deshalb ist die Buchstabenfolge hier
+ * keine Stilfrage, sondern der Befund. Und es sind ZWEI Abnehmer: die Prüfung
+ * läuft über die Liste CONSUMERS, an den Abnehmer selbst werden die beiden
+ * Quelltexte gereicht.
  *
  * @param consumer - Eintrag aus CONSUMERS.
  * @param sources - `{ main, evidence }`; `null`, wo die Datei fehlt.
@@ -317,8 +323,11 @@ export function consumerIssues(consumer, sources, stateContract) {
     issues.push(`${file}: fehlt — der Kanal ${STATE_CHANNEL} hat hier keinen Abnehmer`);
     return issues;
   }
-  if (!main.includes(`'${STATE_CHANNEL}'`)) {
-    issues.push(`${file}: trägt den Kanalnamen '${STATE_CHANNEL}' nicht als Literal — kein Abnehmer für den Composite`);
+  if (!/import\s*\{[^}]*NARRATIVE_STATE_CHANNEL[^}]*\}\s*from\s*'@shinon\/seams\/core'/.test(main)) {
+    issues.push(`${file}: importiert NARRATIVE_STATE_CHANNEL nicht aus '@shinon/seams/core' — der Kanalname ist eine Definition, keine Kopie`);
+  }
+  if (main.includes(`'${STATE_CHANNEL}'`)) {
+    issues.push(`${file}: trägt den Kanalnamen '${STATE_CHANNEL}' wieder als Literal — das ist die Kopie, die der Naht-Kern ersetzt hat`);
   }
   if (!/ctx\.on\(\s*NARRATIVE_CHANNEL/.test(main)) {
     issues.push(`${file}: kein \`ctx.on(NARRATIVE_CHANNEL, …)\` — der Composite geht ins Leere`);

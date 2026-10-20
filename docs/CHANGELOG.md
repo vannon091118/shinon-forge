@@ -13,6 +13,32 @@ den Rest); hier steht die kurze, datierte Zeile.
 
 ## 2026-10-20
 
+- **Welle 3, Stufe 1: sechs Host↔Host-Zwillinge werden ein Paket.** `digest`,
+  die Workspace-Identität, `lastHumanMessage`, der Narrative-Kanal samt Vertrag
+  und der Entscheidungskanal des Veredlers standen doppelt im Baum — als
+  bytegleiche `zwilling:`-Region bzw. als Literal, zusammengehalten von
+  `SOURCE_TWINS`. Sie liegen jetzt EINMAL in `packages/seams/assets/seams.js`
+  (`@shinon/seams/core`, importfrei, also weiter ohne `npm install` prüfbar) und
+  werden von `events`, `hook`, `prompter`, `project-index`, `task-router`,
+  `narrative`, `persona` und `scoring` importiert; die sechs Regeln sind aus
+  `SOURCE_TWINS` entfernt (die zehn Client-Spiegel bleiben für Stufe 2). Der
+  Umbau fand dabei drei weitere Kopien, die keine Regel kannte: ein zweites
+  `resolveWorkspaceRoot` in `persona` (andere Semantik, gleicher Name — heißt
+  jetzt `declaredWorkspaceRoot`), den Kanal als viertes Literal in
+  `task-router` und den in `scoring` (der stand schon in keinem Zwilling).
+  Neuer Gate-Schritt `hostMirrorIssues` (`scripts/shinon-test.mjs`, `build.mjs`):
+  ein Spiegel, der keine `client.js` ist, eine `zwilling:`-Region in einer
+  Host-Hälfte ohne Besitzerrolle, eine zweite Definition einer Kern-Funktion
+  oder ein Kern-Literal in einer anderen Host-Datei sind rot — belegt von
+  `scripts/gate/tests/seams-core.test.mjs` (5 Tests, Identität statt Gleichheit,
+  plus Mutationsprobe auf einem Miniatur-Baum). Der Distributionstest packt
+  jetzt vorab ALLE Pakete und legt die deklarierten `@shinon/*`-Tarballs ins
+  Isolat (sonst ginge `npm install` für `seams` in die Registry): 88/88 grün,
+  `npm run gate:test` **747/747** (frisches `XDG_STATE_HOME`), `npm test` Exit 0,
+  `npm run build` Exit 0 (22 Pakete, 198 Dateien), `npm run zahlen:check` Exit 0.
+  Fähigkeitskarte (ein Eintrag `host-naht-kern`), Provenienzspur, Popup- und
+  Prompter-Suiten (198 bzw. 13) unverändert grün.
+
 - **Der Provider ist die Wahl des Nutzers — und die Doku sagt das jetzt.**
   `agent-default-model` ist ein live-Feld; der gemountete `config-editor`
   schreibt die Wahl in `profiles/shinon/cordis.patch.yml`

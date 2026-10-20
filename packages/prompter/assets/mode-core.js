@@ -3,9 +3,15 @@
  *
  * Vertraege, Faehigkeitslisten und die Modus-Stufen (MIN ⊂ MID ⊂ MAX) — die DATEN
  * hinter dem Verhalten: Vertragsnamen, Operations-Tabellen, Policies, Vokabulare.
- * Reine Daten ohne Importe, damit die Modus-Logik in CI ohne node_modules pruefbar
- * bleibt (dieselbe Teilung wie `note-core.js`).
+ *
+ * EIN Import — und zwar der einzige, der die Eigenschaft nicht kostet:
+ * `@shinon/seams/core` ist selbst importfrei (nur `node:`-Module), also bleibt
+ * "in CI ohne node_modules pruefbar" fuer alles wahr, was hier drin steht. Der
+ * Entscheidungskanal ist die Naht zum Scoring und zur Persona; ihn hier als
+ * Literal zu fuehren hiesse, eine der drei Kopien zu behalten, die
+ * `SOURCE_TWINS` bis 2026-10-20 zusammenhielt.
  */
+import { PROMPTER_DECISION_CHANNEL } from '@shinon/seams/core';
 
 /** Vertragsname der One-Shot-Antwort. */
 export const CONTRACT = 'shinon.prompter/result-v1';
@@ -20,7 +26,7 @@ export const CONTEXT_TAG = 'untrusted_project_context';
 export const PRE_STEP_EVENT = 'agent/pre-step';
 
 /** Kanal, auf dem Entscheidungen den Host verlassen (Provenienz, ohne Prompt-Text). */
-export const DECISION_CHANNEL = 'shinon/prompter/decision';
+export const DECISION_CHANNEL = PROMPTER_DECISION_CHANNEL;
 
 /**
  * Die Abfrage-Faehigkeit des Project Index (Plan §14/§17).

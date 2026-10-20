@@ -60,6 +60,9 @@ for (const hit of repo.legacyHits(packages)) problems.push(`Legacy-Referenz: ${h
 for (const issue of repo.pnpmIssues()) problems.push(`pnpm-Reste: ${issue}`);
 // Zwillings-Regeln (eine Quelle, ein Spiegel): Drift bricht den Build, nicht erst den Betrieb.
 for (const issue of repo.twinIssues()) problems.push(`Quell-Zwillinge: ${issue}`);
+// Host-Naht-Kern: die sechs Host↔Host-Regeln stehen EINMAL (@shinon/seams) —
+// eine zurueckgekehrte Kopie ohne Marker faengt nur dieser Schritt.
+for (const issue of repo.hostMirrorIssues()) problems.push(`Host-Spiegel: ${issue}`);
 // Generierte Idiome: dieselbe Regel für die Plugin-Bausteine — die Ableitung in den
 // Paketen muss zeichengenau zu scripts/lib/plugin-idioms.mjs passen.
 for (const half of ['index.js', 'client.js']) {

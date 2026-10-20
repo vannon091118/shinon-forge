@@ -92,6 +92,7 @@
     "@shinon/project-index": "workspace:*",
     "@shinon/prompter": "workspace:*",
     "@shinon/scoring": "workspace:*",
+    "@shinon/seams": "workspace:*",
     "@shinon/task-router": "workspace:*",
     "@shinon/token-usage": "workspace:*",
     "@shinon/tooltip": "workspace:*",

@@ -34,6 +34,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { codeOnly, findForbidden, findMissing } from '../../lib/source-scan.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 /**
  * Als root (uid 0) ignoriert der Kernel Dateirechte: `chmod 000` sperrt nichts,
@@ -56,6 +57,7 @@ const require = createRequire(join(root, 'package.json'));
 async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-index-test-'));
   cpSync(PACKAGE_DIR, join(work, 'pkg'), { recursive: true });
+  provideSeamCore(join(work, 'pkg'));
   const shim = join(work, 'pkg/node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(
@@ -244,6 +246,9 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
     bundle.extractEdges(prompter).sort(byTarget),
     [
       { kind: 'import', target: '@deepseek-ai/schemastery' },
+      // Seit 2026-10-20: der Naht-Kern (Narrative-Kanal, letzte menschliche
+      // Nachricht). Vorher standen beide hier als Literal bzw. als Kopie.
+      { kind: 'import', target: '@shinon/seams/core' },
       { kind: 'import', target: 'node:fs' },
       { kind: 'import', target: 'node:path' },
       // Zug 4/5: das Paket liest die Zettel und baut den Stand — der Kern liegt
@@ -300,9 +305,15 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
     if (!edge.target.startsWith('./assets/')) continue;
     assert.ok(existsSync(join(REPO_ROOT, 'packages/prompter', edge.target)), `${edge.target} fehlt`);
   }
-  for (const core of ['assets/mode-core.js', 'assets/note-core.js', 'assets/salvage-store.js']) {
+  for (const core of ['assets/note-core.js', 'assets/salvage-store.js']) {
     assert.deepEqual(bundle.extractEdges(prompterModule(core)), [], `${core} ist importfrei`);
   }
+  // `mode-core.js` hat EINEN Import — den Naht-Kern, der selbst importfrei ist.
+  // Die Eigenschaft („in CI ohne node_modules prüfbar") bleibt damit wahr; sie
+  // hinge an einem zweiten Bare-Import und wäre dann keine mehr.
+  assert.deepEqual(bundle.extractEdges(prompterModule('assets/mode-core.js')), [
+    { kind: 'import', target: '@shinon/seams/core' },
+  ]);
 
   // Alle Treffer einer Zeile zählen — nicht nur der erste.
   assert.deepEqual(bundle.findReferences('const a = alpha + beta;', ['alpha', 'beta']), [

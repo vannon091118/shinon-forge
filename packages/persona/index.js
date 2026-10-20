@@ -4,6 +4,14 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, isAbsolute, resolve, relative } from 'node:path';
 import { emptySelfModel, observeDecision, observeError, decaySelfModel, selfModelSummary, selfModelView, validateSelfModel } from './assets/self-model.js';
 import { MEMORY_CONTRACT, acceptedCommitments, decideProposal, decayMemory, emptyMemory, memoryView, proposeFromMemory, rememberDecision, rememberEvent, renderCommitments, renderMemory, selectMemories, validateMemory } from './assets/memory-core.js';
+// Die Host-Nähte (Narrative-Kanal, Entscheidungskanal des Veredlers) haben EINE
+// Definition: `@shinon/seams`. Der Kern ist importfrei — der Import zieht keine
+// zweite Engine mit, und genau das war der Grund für die früheren Literale.
+import {
+  NARRATIVE_STATE_CHANNEL,
+  NARRATIVE_STATE_CONTRACT,
+  PROMPTER_DECISION_CHANNEL as PROMPTER_DECISION_CHANNEL_CORE,
+} from '@shinon/seams/core';
 
 /**
  * Die Naht Persona -> Core-UI: der Zustand der Persona als Global und live.
@@ -23,8 +31,15 @@ export const REVIEW_GLOBAL = '__shinonPersonaReview';
 const REVIEW_BODY_LIMIT = 8192;
 export const UI_STATE_CONTRACT = 'shinon.persona-ui/v1';
 
-/** Kanal des Veredlers — Literal, weil `@shinon/prompter` nicht importierbar ist. */
-export const PROMPTER_DECISION_CHANNEL = 'shinon/prompter/decision';
+/**
+ * Kanal des Veredlers — aus `@shinon/seams`, nicht als Literal.
+ *
+ * Bis 2026-10-20 stand hier ein Literal mit der Begruendung „`@shinon/prompter`
+ * ist nicht importierbar": der Enhancer haette eine ganze Engine mitgebracht, nur
+ * um einen String zu lesen. Der Naht-Kern ist die kleinste gemeinsame
+ * Abhaengigkeit — und der Kanal hat damit eine Definition statt vier.
+ */
+export const PROMPTER_DECISION_CHANNEL = PROMPTER_DECISION_CHANNEL_CORE;
 
 /** Die Naht des Webservers, ueber die Globals in die Seite kommen. */
 export const INDEX_INJECT = 'webserver/index-inject';
@@ -92,8 +107,15 @@ function isInside(root, dir) {
  * ableitet, injiziert Shinon-Persona in fremde Projekte. Deshalb: explizite Config
  * (`workspaceRoot`) oder `SHINON_WORKSPACE_ROOT`; fehlt beides, ist der Scope
  * UNKLAR und die Persona bleibt aus (fail-closed, nicht fail-open).
+ *
+ * WARUM DER ANDERE NAME: `@shinon/seams` hat die EINE Workspace-Auflösung
+ * (`resolveWorkspaceRoot`) — die faellt auf `cwd` zurück, weil Prompter und
+ * Project Index den Projektbaum BRAUCHEN. Hier ist der Rückfall genau der
+ * Fehler (fremde Persona in fremden Projekten), also ist das eine andere Regel
+ * mit anderem Ergebnis. Zwei Regeln tragen nicht denselben Namen: ein Gate-Schritt
+ * (`hostMirrorIssues`) macht eine zweite `resolveWorkspaceRoot`-Definition rot.
  */
-function resolveWorkspaceRoot(config) {
+function declaredWorkspaceRoot(config) {
   const declared = typeof config.workspaceRoot === 'string' ? config.workspaceRoot.trim() : '';
   if (declared !== '') return isAbsolute(declared) ? declared : join(process.cwd(), declared);
   const fromEnv = (process.env.SHINON_WORKSPACE_ROOT ?? '').trim();
@@ -430,16 +452,16 @@ export function renderTendency(contract, tone) {
 }
 
 /**
- * Die Naht zur Narrative Engine (Zug 6) — Kanal- und Vertragsname als LITERAL.
+ * Die Naht zur Narrative Engine (Zug 6) — beide Namen aus `@shinon/seams`.
  *
- * Warum als Literal und nicht als Import: Pakete dieses Repos duerfen einander zur
- * Laufzeit nicht importieren (jedes Bundle reist eigenstaendig). Der Besitzer der
- * beiden Namen ist `@shinon/narrative`; Drift kann deshalb nicht landen, weil
- * `scripts/lib/repo.mjs` die Zwillinge prueft (SOURCE_TWINS, kind `literals`) —
- * dieselbe Bauform wie bei den Markern und der Token-Anzeige.
+ * Warum nicht mehr als Literal: bis 2026-10-20 standen sie hier als Spiegel von
+ * `@shinon/narrative`, gehalten von `SOURCE_TWINS` (kind `literals`). Der Besitzer
+ * der Naht bleibt die Narrative Engine — sie exportiert `STATE_CHANNEL` und
+ * `STATE_CONTRACT` unter denselben Namen weiter; die DEFINITION ist jetzt der
+ * Naht-Kern, den beide Hälften importieren.
  */
-export const NARRATIVE_CHANNEL = 'shinon/narrative/state';
-export const NARRATIVE_CONTRACT = 'shinon.narrative/v1';
+export const NARRATIVE_CHANNEL = NARRATIVE_STATE_CHANNEL;
+export const NARRATIVE_CONTRACT = NARRATIVE_STATE_CONTRACT;
 
 /**
  * Den Composite der Narrative Engine als System-Abschnitt rendern.
@@ -759,7 +781,7 @@ export function apply(ctx, config) {
   // `sessionRoot` ab, und `speaksForSession` entscheidet je Abschnitt. Der Mount
   // registriert also immer; ein fremder Workspace bekommt weiterhin leere
   // Abschnitte (fail-closed bleibt fail-closed).
-  const declaredRoot = resolveWorkspaceRoot(config);
+  const declaredRoot = declaredWorkspaceRoot(config);
   // Ein BEKANNT fremder Scope bleibt ein harter Aus: dort wird weder gelesen noch
   // gelauscht (kein Abschnitt, kein Handler). Nur der UNBEKANNTE Scope wartet auf
   // die Sitzung — sonst wäre der Boot wieder die Autorität, die er nicht ist.

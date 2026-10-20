@@ -20,6 +20,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 import {
   EVENT_TYPES as SPINE_EVENTS,
 } from '../plugins/events-spine.mjs';
@@ -42,6 +43,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-persona-test-'));
   cpSync(PACKAGE_DIR, join(work, 'pkg'), { recursive: true });
+  provideSeamCore(work);
   const stub = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(stub, { recursive: true });
   writeFileSync(join(stub, 'package.json'), JSON.stringify({ name: '@deepseek-ai/schemastery', version: '0.0.0-test-stub', type: 'module', exports: { '.': './index.js' } }));

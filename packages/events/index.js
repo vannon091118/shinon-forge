@@ -1,6 +1,7 @@
 import z from '@deepseek-ai/schemastery';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+// Die Digest-Regel hat EINE Definition: `@shinon/seams` (Host-Naht-Kern).
+import { digest } from '@shinon/seams/core';
 
 /**
  * @shinon/events — Wave 2: Shinon Hook/Event Spine.
@@ -48,23 +49,11 @@ export function canonicalJson(value) {
   return JSON.stringify(value ?? null);
 }
 
-// #region zwilling:sha256-digest — Besitzer: packages/events/index.js
 /**
- * Erste `length` Hex-Zeichen von sha256(text).
- *
- * `text` ist ein String und `length` ist PFLICHT: eine vergessene Laenge ergaebe
- * still einen 64-stelligen Wert statt eines kurzen ids. Kein Aufrufer ratet sie
- * — beide Seiten nennen sie ausdruecklich.
- */
-function digest(text, length) {
-  return createHash('sha256').update(text).digest('hex').slice(0, length);
-}
-// #endregion zwilling:sha256-digest
-
-/**
- * `digest` bleibt oeffentlich (der Name aendert sich nicht); der Text der Regel
- * steht als Zwilling in `@shinon/hook` — die Byte-Gleichheit prueft
- * `scripts/lib/repo.mjs` (SOURCE_TWINS) im Gate und im Build.
+ * `digest` bleibt oeffentlich und behaelt seinen Namen — die Definition steht
+ * aber nur noch in `@shinon/seams` (`assets/seams.js`). Vorher lag hier eine
+ * Kopie, die `SOURCE_TWINS` bytegleich zu `@shinon/hook` hielt; ein Gate-Schritt
+ * (`hostMirrorIssues`) macht eine zurueckkehrende Kopie heute rot.
  */
 export { digest };
 

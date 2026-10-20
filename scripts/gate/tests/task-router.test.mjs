@@ -37,6 +37,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const PACKAGES = ['prompter', 'task-router'];
 const ROOT = new URL('../../../', import.meta.url);
@@ -54,6 +55,7 @@ async function loadBundles() {
   for (const name of PACKAGES) {
     cpSync(new URL(`packages/${name}/`, ROOT), join(work, name), { recursive: true });
   }
+  provideSeamCore(work);
   const shim = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(

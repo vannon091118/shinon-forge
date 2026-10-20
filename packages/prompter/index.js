@@ -5,6 +5,9 @@ import z from '@deepseek-ai/schemastery';
 import { isAbsolute, join } from 'node:path';
 import { parseNote, renderStand, reviewNotes, selectNotes, tokens } from './assets/note-core.js';
 import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
+// Die Host-Nähte (Workspace, letzte menschliche Nachricht, Narrative-Kanal)
+// haben EINE Definition: `@shinon/seams` — der Kern ist importfrei.
+import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT, lastHumanMessage } from '@shinon/seams/core';
 
 // ── Die Module dieses Pakets ────────────────────────────────────────────────
 // Der Modulschnitt hat die Innenflaeche geteilt, nicht die Aussenflaeche: die
@@ -36,9 +39,14 @@ export const INDEX_INJECT = 'webserver/index-inject';
 /** Der Live-Kanal des Trace-Panels (Server-Sent Events, gleiche Herkunft). */
 export const TRACE_ENDPOINT = '/shinon/prompter/trace';
 
-/** Kanal und Vertragsname der Narrative Engine (Zug 6). Literale Spiegel von `@shinon/narrative` (Naht, drift-geprueft). */
-const NARRATIVE_CHANNEL = 'shinon/narrative/state';
-const NARRATIVE_CONTRACT = 'shinon.narrative/v1';
+/**
+ * Kanal und Vertragsname der Narrative Engine (Zug 6) — aus `@shinon/seams`,
+ * nicht als Literal. Bis 2026-10-20 standen beide Namen hier als Spiegel von
+ * `@shinon/narrative` und wurden von `SOURCE_TWINS` verglichen; ein falscher
+ * Name hätte nur bewirkt, dass der Arc im MAX-Kontext nie erscheint.
+ */
+const NARRATIVE_CHANNEL = NARRATIVE_STATE_CHANNEL;
+const NARRATIVE_CONTRACT = NARRATIVE_STATE_CONTRACT;
 
 /**
  * Der Zettel-Kern wird RE-EXPORTIERT, nicht nachgebaut: die reinen Funktionen
@@ -131,43 +139,11 @@ export const Config = _config_schema;
 
 export const inject = ['llm'];
 
-// #region zwilling:letzte-menschliche-nachricht — Besitzer: packages/prompter/index.js
-/**
- * Die letzte MENSCHLICHE Nachricht mit Text — oder null.
- *
- * `source.kind === 'user'` ist der Unterschied zwischen Eingabe und Harness: der
- * Batch eines Schritts besteht oft AUSSCHLIESSLICH aus erzeugtem Kontext (Zeit,
- * Terminal, Instruktionen, Erinnerungen, Werkzeug-Feedback). Ohne diesen Test
- * waere die jeweils letzte Nachricht irgendein Harness-Text — und der wuerde
- * veredelt und ersetzt (Enhancer) bzw. als Auftrag gelesen (Router). Fremde
- * Herkunft heisst deshalb: nicht anfassen.
- *
- * Die Nachricht kommt MIT zurueck, weil ein Aufrufer sie ueber ihre Identitaet
- * wiederfinden muss — ueber einen Index zu raten waere ein stiller Fehler. Der
- * Text ist UNGETRIMMT; was ein Aufrufer davon will, entscheidet er.
- */
-function lastHumanMessage(messages) {
-  const list = Array.isArray(messages) ? messages : [];
-  for (let index = list.length - 1; index >= 0; index -= 1) {
-    const message = list[index];
-    if (message?.role !== 'user') continue;
-    if (message.source?.kind !== 'user') continue;
-    const text = (Array.isArray(message.content) ? message.content : [])
-      .filter((block) => block?.type === 'text' && typeof block.text === 'string')
-      .map((block) => block.text)
-      .join('\n');
-    if (text.trim() === '') continue;
-    return { message, text, index };
-  }
-  return null;
-}
-// #endregion zwilling:letzte-menschliche-nachricht
-
 /**
  * Den zu verbessernden Prompt aus der Nutzlast holen: Nachricht, Text und Index
- * der letzten menschlichen Nachricht. Die Regel selbst steht in der
- * Zwillings-Region direkt darueber — bytegleich mit @shinon/task-router, geprueft
- * von `scripts/lib/repo.mjs` (SOURCE_TWINS) im Gate und im Build.
+ * der letzten menschlichen Nachricht. Die Regel selbst steht in
+ * `@shinon/seams` (`lastHumanMessage`) — bis 2026-10-20 stand sie hier als
+ * Zwillings-Region, bytegleich mit `@shinon/task-router`.
  */
 export function readPrompt(payload) {
   return lastHumanMessage(payload?.messages);

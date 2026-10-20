@@ -38,6 +38,7 @@ import { codeOnly, findForbidden } from '../../lib/source-scan.mjs';
 // Sammeln benutzt (listFiles + protectedReason) — kein eigener Walker, der
 // still von der Indexregel abweichen könnte.
 import { listFiles, protectedReason, toProjectPath } from '../../../packages/project-index/assets/index-core.js';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/prompter/', import.meta.url));
 const INDEX_FILE = join(PACKAGE_DIR, 'index.js');
@@ -54,6 +55,7 @@ async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-prompter-test-'));
   bundleDir = join(work, 'pkg');
   cpSync(PACKAGE_DIR, bundleDir, { recursive: true });
+  provideSeamCore(join(work, 'pkg'));
   const shim = join(work, 'pkg/node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(

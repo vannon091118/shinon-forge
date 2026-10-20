@@ -10,6 +10,9 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./assets/narrative-state.json": "./assets/narrative-state.json"
   },
+  "dependencies": {
+    "@shinon/seams": "1.0.0"
+  },
   "peerDependencies": {
     "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
   },

@@ -53,8 +53,15 @@ das Paket verlassen, und das Build kopiert nur `assets/` plus `artifactFiles`
 Für Enums gilt die deklarierte Schemastery-Fassung (`docs/ZAHLEN.md` §1): sie kennt
 **kein** `z.enum` — Enums werden als `z.union([z.const('a'), z.const('b')])` modelliert.
 
-- Pakete kennen sich nicht gegenseitig; gemeinsame Tooling-Logik lebt in
-  `scripts/lib/`, **niemals** in Paketen.
+- Pakete kennen sich nicht gegenseitig — mit **einer** benannten Ausnahme:
+  `@shinon/seams` (`packages/seams/assets/seams.js`, Export `./core`) ist der
+  importfreie Host-Naht-Kern und darf von jeder Host-Hälfte importiert werden.
+  Er existiert, weil sechs Host↔Host-Regeln bis 2026-10-20 als Kopien in zwei
+  Paketen standen; die Client-Hälften können ihn NICHT importieren (ein
+  Client-Bundle zieht React per `require`) und bleiben Kopien mit Drift-Prüfung
+  (`SOURCE_TWINS`). Eine zurückkehrende Host-Kopie meldet `hostMirrorIssues` in
+  Gate und Build. Gemeinsame Tooling-Logik lebt weiterhin in `scripts/lib/`,
+  **niemals** in Paketen.
 - Client-interne Slot-IDs folgen `<name>-<zweck>` (z. B. `shinon-core-brand`,
   `shinon-info-banner`).
 - Host-shared Abhängigkeiten stehen in `SHARED_DEPS` (`scripts/lib/repo.mjs`) und

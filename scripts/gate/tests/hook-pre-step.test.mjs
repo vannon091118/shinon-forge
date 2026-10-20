@@ -32,6 +32,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { codeOnly, findForbidden } from '../../lib/source-scan.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/hook/', import.meta.url));
 const INDEX_FILE = join(PACKAGE_DIR, 'index.js');
@@ -49,6 +50,7 @@ const require = createRequire(join(root, 'package.json'));
 async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-hook-test-'));
   cpSync(PACKAGE_DIR, join(work, 'pkg'), { recursive: true });
+  provideSeamCore(join(work, 'pkg'));
   const shim = join(work, 'pkg/node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(

@@ -1,4 +1,7 @@
 import z from '@deepseek-ai/schemastery';
+// Die Regel „letzte menschliche Nachricht mit Text" hat EINE Definition:
+// `@shinon/seams` (`lastHumanMessage`) — der Kern ist importfrei.
+import { PROMPTER_DECISION_CHANNEL, lastHumanMessage } from '@shinon/seams/core';
 
 /**
  * shinon-task-router — Phase 5/6, Plan §16 und §17.
@@ -84,11 +87,12 @@ export const CONTRACT = 'shinon.task-router/decision-v1';
  * stammt aus dem Runtime-Resolver des Prompters (Text-Patterns, kein Modell) —
  * der Router liest damit eine Runtime-Entscheidung, keine Modellantwort.
  *
- * Der Vertragsname steht hier als eigene Konstante statt als Import: die Pakete
- * dieses Repos referenzieren einander nicht. Dass beide denselben Namen fuehren,
- * pinnt ein Abnahmetest — eine Abweichung wird dort rot, nicht still.
+ * Der Kanal kommt aus `@shinon/seams`, nicht als eigenes Literal: bis
+ * 2026-10-20 stand hier eine vierte Kopie desselben Namens (Prompter, Persona,
+ * Scoring, Router), gehalten von `SOURCE_TWINS` — und der Router war eine davon
+ * gar nicht gelistet. Der Naht-Kern ist importfrei, kostet also nichts.
  */
-export const SOURCE_CHANNEL = 'shinon/prompter/decision';
+export const SOURCE_CHANNEL = PROMPTER_DECISION_CHANNEL;
 export const SOURCE_CONTRACT = 'shinon.prompter/result-v1';
 
 /** Der Ausgang: die Entscheidung als Datensatz. */
@@ -308,43 +312,11 @@ export function decide(record, config = {}) {
   };
 }
 
-// #region zwilling:letzte-menschliche-nachricht — Besitzer: packages/prompter/index.js
-/**
- * Die letzte MENSCHLICHE Nachricht mit Text — oder null.
- *
- * `source.kind === 'user'` ist der Unterschied zwischen Eingabe und Harness: der
- * Batch eines Schritts besteht oft AUSSCHLIESSLICH aus erzeugtem Kontext (Zeit,
- * Terminal, Instruktionen, Erinnerungen, Werkzeug-Feedback). Ohne diesen Test
- * waere die jeweils letzte Nachricht irgendein Harness-Text — und der wuerde
- * veredelt und ersetzt (Enhancer) bzw. als Auftrag gelesen (Router). Fremde
- * Herkunft heisst deshalb: nicht anfassen.
- *
- * Die Nachricht kommt MIT zurueck, weil ein Aufrufer sie ueber ihre Identitaet
- * wiederfinden muss — ueber einen Index zu raten waere ein stiller Fehler. Der
- * Text ist UNGETRIMMT; was ein Aufrufer davon will, entscheidet er.
- */
-function lastHumanMessage(messages) {
-  const list = Array.isArray(messages) ? messages : [];
-  for (let index = list.length - 1; index >= 0; index -= 1) {
-    const message = list[index];
-    if (message?.role !== 'user') continue;
-    if (message.source?.kind !== 'user') continue;
-    const text = (Array.isArray(message.content) ? message.content : [])
-      .filter((block) => block?.type === 'text' && typeof block.text === 'string')
-      .map((block) => block.text)
-      .join('\n');
-    if (text.trim() === '') continue;
-    return { message, text, index };
-  }
-  return null;
-}
-// #endregion zwilling:letzte-menschliche-nachricht
-
 /**
  * Die ABSICHT aus den Nachrichten des Schritts lesen: der getrimmte Text der
- * letzten menschlichen Nachricht. Die Regel selbst steht in der Zwillings-Region
- * darueber — bytegleich mit @shinon/prompter, geprueft von `scripts/lib/repo.mjs`
- * (SOURCE_TWINS) im Gate und im Build. Hier bleibt nur, was der Router daraus
+ * letzten menschlichen Nachricht. Die Regel selbst steht in `@shinon/seams`
+ * (`lastHumanMessage`) — bis 2026-10-20 stand sie hier als Zwillings-Region,
+ * bytegleich mit `@shinon/prompter`. Hier bleibt nur, was der Router daraus
  * macht: eine Absicht aus Harness-Text waere ein Fremdauftrag, dann liefe ein Goal
  * auf „Kontext: du hast 3 neue Werkzeugergebnisse".
  */

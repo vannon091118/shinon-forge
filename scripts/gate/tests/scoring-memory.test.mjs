@@ -32,6 +32,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
 const PACKAGES = ['events', 'scoring', 'project-index'];
 const ROOT = new URL('../../../', import.meta.url);
@@ -47,6 +48,7 @@ async function loadBundles() {
   const require = createRequire(join(root, 'package.json'));
   const work = mkdtempSync(join(tmpdir(), 'shinon-memory-test-'));
   for (const name of PACKAGES) cpSync(new URL(`packages/${name}/`, ROOT), join(work, name), { recursive: true });
+  provideSeamCore(work);
   const shim = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(shim, { recursive: true });
   writeFileSync(

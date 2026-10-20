@@ -218,7 +218,11 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - If a contract changes, edit it in `scripts/lib/repo.mjs` (the shared source) — never in
   `scripts/shinon-test.mjs` or `build.mjs` directly.
 - Client-internal slot ids follow `<name>-<purpose>` (e.g. `shinon-core-brand`,
-  `shinon-info-banner`). Packages don't reference each other; shared logic goes in
+  `shinon-info-banner`). Packages don't reference each other — with ONE exception:
+  `@shinon/seams` (`packages/seams/assets/seams.js`) is the import-free host seam
+  core and may be imported (`@shinon/seams/core`) by any host half. It exists
+  because six host↔host rules were duplicates until 2026-10-20; a copy that comes
+  back is a gate finding (`hostMirrorIssues`). Shared TOOLING still goes in
   `scripts/lib/`.
 - A Client -> Host seam keeps its names in ONE place: `packages/codingmon/assets/uebergabe.js`
   (package, service key, wire namespace, method, endpoint, field list). `index.js` re-exports
@@ -226,18 +230,18 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   self-contained (it pulls React through `require`, not `import`). So the bundle carries the
   names as LITERALS and `packages/codingmon/test/uebergabe.test.mjs` compares both sides
   character by character. Never let a literal drift; extend that assertion instead.
-- Workspace identity has ONE source (`packages/prompter/assets/workspace.js`, contract
+- Workspace identity has ONE definition (`packages/seams/assets/seams.js`, contract
   `shinon.workspace/v1`): explicit `workspaceRoot` > `SHINON_WORKSPACE_ROOT` > `cwd`.
-  Der Project Index führt dieselbe Datei als **bytegleichen Spiegel**
-  (`packages/project-index/assets/workspace.js`, Region `zwilling:workspace-identitaet`,
-  geprüft von `SOURCE_TWINS` in Gate und Build): nie eine Seite allein ändern.
+  `packages/prompter/assets/workspace.js` und `packages/project-index/assets/workspace.js`
+  re-export that core; the byte-equal mirror and its `zwilling:workspace-identitaet`
+  region are gone (2026-10-20) — wer die Regel hier ändert, ändert sie für beide.
   `process.cwd()` never silently decides the project. Persisted indexes carry
   `root`/`rootId`; a foreign root is rejected (`FOREIGN_ROOT`) and rebuilt, stale
   entries are reconciled, `..`/absolute/separator escapes are refused, symlinks are
   never followed out of the root, and `.agents/` is never indexed as ordinary source
   (skills run separately). Every decision record carries workspace, source, paths and
   budget — never prompt text or key values. Tests: `packages/prompter/test/workspace.test.mjs`
-  (the identity twin) and `scripts/gate/tests/project-index.test.mjs` (the one index).
+  (the identity) and `scripts/gate/tests/project-index.test.mjs` (the one index).
 - Prompt building blocks are DATA (`packages/prompter/assets/blocks.json`, contract
   `shinon.blocks/v1`): each block carries its trigger (haystack markers, intent class,
   scoring stance, self-question markers), a token budget and a placement
