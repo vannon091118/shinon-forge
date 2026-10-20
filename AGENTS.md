@@ -156,6 +156,19 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   kopieren: der Prüfer oben vergleicht danach Fassung und Integrität.
 - `npm run build` → `node scripts/build.mjs`: re-validates everything, then wipes and
   regenerates `dist/` (`manifest.json`, `profile.json`, `dist/packages/*`).
+
+- `npm run deb` / `npm run win` → the packaging path: ONE payload, TWO shells.
+  `scripts/lib/payload.mjs` builds the payload (code, production dependencies
+  from the lockfile, the BUNDLED Node runtime, relative bundle links, the
+  starters); `scripts/lib/huelle.mjs` owns the shell texts (Debian
+  `control`/`postinst`/menu entry/PATH starter, Windows `install.ps1`/
+  `uninstall.ps1`). Rules that are not negotiable: the package carries its
+  runtime (no `Depends: nodejs` — that is what broke Mint), the `postinst`
+  installs NOTHING (no `npm ci`, no network), and the Windows archive is built
+  on a WINDOWS host (on Linux it would carry Linux binaries and look fine
+  until it fails on someone else's machine — the script refuses).
+  The BUILD runs in the CI (`.github/workflows/package-build.yml`), not on the
+  developer machine; the gate test is `scripts/gate/tests/packaging.test.mjs`.
 - `npm run scale:check` → `node scripts/scale-check.mjs`: the scaling proof — copies the
   tree to `/tmp`, adds N clone plugins (`--plugins N`, default 20, `--keep`, `--json`)
   and runs idioms → static gate → `gate --full` → gate tests → distribution test → build

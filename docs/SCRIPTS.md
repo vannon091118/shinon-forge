@@ -69,13 +69,15 @@
 | `backup-retention.mjs` | `backup:retention` | Aufbewahrung des Sicherungsordners (`--keep`, `--max-age`, `--dry-run`, `--json`) |
 | `desktop-launcher.mjs` | `desktop:launcher` | Desktop-Starter (Konzept, ROADMAP §2.3); `--uninstall` |
 | `dsh-update.mjs` | `update` | **DSH-Upstream**-Update ins kanonische Profil; offline UNGEPRÜFT statt „keine Updates" |
-| `debuild.mjs` / `deb-build.mjs` | — | `.deb`-Bau (ohne npm-Verweis; kein v0.4.0-Unterstützungsweg) |
+| `deb-build.mjs` | `deb` | `.deb`-Bau (Mint/Ubuntu) aus der gemeinsamen Nutzlast: Code + Prod-Abhängigkeiten aus dem Lockfile + mitgelieferte Node-Laufzeit. `postinst` installiert **nichts** nach; das Paket zwingt **kein** System-Node. Braucht `dpkg-deb`. |
+| `win-build.mjs` | `win` | Windows-ZIP aus derselben Nutzlast: `shinon.cmd` (portabel), `install.ps1` (kopieren, PATH, Startmenü), `uninstall.ps1`. **Nur auf einem Windows-Bauhost** — sonst trägt das Archiv Linux-Binärdateien und ist nicht lauffähig (`--force` nur zum Prüfen der Form). |
 
 ## Bibliotheken (nur importiert)
 
 `lib/` — kein Script für sich; Träger der Namen und Regeln:
 
 - **Pfade/Repo:** `paths`, `repo`, `yaml`, `structure`, `canon`, `diary` (Tagebuch-Prüfung `diaryIssues()`), `source-scan`
+- **Pakete:** `payload` (die Nutzlast: Code, Prod-Abhängigkeiten, mitgelieferte Node-Laufzeit, relative Bundle-Links), `huelle` (die Texte der beiden Verpackungshüllen: Debian `control`/`postinst`/Menüeintrag/PATH-Starter, Windows `install.ps1`/`uninstall.ps1`), `runtime` (die EINE Node-Auflösung: `engines.node` → Untergrenze → Archivname → Prüfsumme)
 - **Boot:** `runtime` (Node-Heilung), `dsh` (Auflösung), `dsh-home`, `dsh-versions`, `port`
 - **Regeln:** `model-route` (Routen-Formprüfung), `plugin-idioms`, `commit-text`, `commit-policy`, `commit-policy-file`, `ci-range`, `pr-promotion`
 - **Sonstiges:** `perf-stats`, `secrets` (Tresor-Disziplin der Nutzer-Installation)

@@ -1,0 +1,226 @@
+name: Shinon Forge Installationspakete
+
+# WAS DIESER WORKFLOW IST: der BAU der beiden Installationspakete — ein .deb
+# fuer Linux Mint/Ubuntu und ein ZIP fuer Windows. Beide entstehen aus DER
+# NUTZLAST (`scripts/lib/payload.mjs`): derselbe Code, dieselben
+# Produktions-Abhaengigkeiten, dieselbe mitgelieferte Node-Laufzeit. Nur die
+# Huelle unterscheidet sich, weil Windows kein `dpkg-deb` hat.
+#
+# WARUM EIN EIGENER WORKFLOW (und nicht der Release-Gate):
+#   - Das `.deb` wird auf einem Linux-Bauhost gebaut, weil `dpkg-deb` dort
+#     vorhanden ist; die Entwickler-Maschine traegt den Bau nicht (Platte,
+#     Zeit, und ein gebautes Paket gehoert nicht in einen Arbeitsbaum).
+#   - Das Windows-ZIP wird auf einem WINDOWS-Bauhost gebaut, weil die
+#     Abhaengigkeiten dann die Windows-Fassung sind. Auf Linux gebaut, traegt
+#     das Archiv Linux-Binaerdateien — gebaut waere es, lauffaehig nicht.
+#   - Beide bauen aus demselben Commit, und beide legen ihre Pruefsumme ab.
+#
+# Der Trigger ist bewusst "jeder Push auf main": ein Installationspaket ist
+# eine Frage ("welche Fassung bekomme ich?") und keine Samstagsarbeit. Bei
+# einem `v*`-Tag wird das Paket zusaetzlich an ein BESTEHENDES Release
+# gehaengt; ein Release wird hier nicht erzeugt (das bleibt eine eigene
+# Entscheidung, siehe .github/workflows/release.yml).
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deb:
+    name: '.deb (Linux Mint/Ubuntu, x64)'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+          cache: npm
+
+      - name: 'Paket-Gate (Nutlast, Starter, Installer-Skripte)'
+        run: node scripts/run-with-node.mjs node --test scripts/gate/tests/packaging.test.mjs
+
+      # Die Nutzlast holt ihre Produktions-Abhaengigkeiten selbst (npm ci
+      # --omit=dev im Staging) — der Bauhost braucht also kein volles
+      # node_modules im Arbeitsbaum.
+      - name: 'Paket bauen (.deb)'
+        run: node scripts/deb-build.mjs --out dist-package
+
+      - name: 'Pruefsumme ablegen'
+        run: |
+          set -euo pipefail
+          cd dist-package
+          sha256sum ./*.deb > ./*.deb.sha256
+          cat ./*.deb.sha256
+
+      - name: 'Paketinhalt pruefen (kein node_modules des Entwicklerbaums, kein .git)'
+        run: |
+          set -euo pipefail
+          dpkg-deb -c dist-package/*.deb | grep -E "opt/shinon-forge/(runtime/node/bin/node|bin/shinon.mjs|packages/core/package.json)" || {
+            echo "💥 das Paket traegt den Kern nicht"; exit 1; }
+          if dpkg-deb -c dist-package/*.deb | grep -qE "opt/shinon-forge/(\.git|dist)/"; then
+            echo "💥 das Paket traegt einen verbotenen Baum"; exit 1
+          fi
+          dpkg-deb -f dist-package/*.deb Package Version Architecture Depends
+
+      # Der ECHTE Nachweis: das Paket wird auf dem Bauhost installiert (wie
+      # auf Mint), der Starter laeuft, und der Starter meldet die
+      # mitgelieferte Laufzeit. Ein gebautes Paket ist noch kein
+      # installierbares Paket.
+      - name: 'Install-Nachweis: dpkg -i, Starter, doctor'
+        run: |
+          set -euo pipefail
+          sudo dpkg -i dist-package/*.deb
+          echo "--- dpkg-Status ---"
+          dpkg -s shinon-forge | grep -E "^(Status|Version|Architecture|Depends):"
+          echo "--- Starter im PATH ---"
+          command -v shinon
+          echo "--- mitgelieferte Laufzeit ---"
+          /opt/shinon-forge/runtime/node/bin/node --version
+          echo "--- Startfaehigkeit (isoliertes XDG, damit der Runner sauber bleibt) ---"
+          export XDG_CONFIG_HOME=/tmp/pkg-home/config XDG_DATA_HOME=/tmp/pkg-home/data
+          export XDG_STATE_HOME=/tmp/pkg-home/state XDG_CACHE_HOME=/tmp/pkg-home/cache
+          mkdir -p /tmp/pkg-home/config /tmp/pkg-home/data /tmp/pkg-home/state /tmp/pkg-home/cache
+          shinon --check
+          echo "--- Menueeintrag ---"
+          test -f /usr/share/applications/shinon-forge.desktop && echo "Menueeintrag vorhanden"
+
+      - name: 'Deinstallations-Nachweis: apt remove'
+        run: |
+          set -euo pipefail
+          sudo apt-get remove -y shinon-forge
+          test ! -e /opt/shinon-forge && echo "Installat entfernt"
+          echo "--- Nutzerdaten unberuehrt? ---"
+          ls /tmp/pkg-home/state/shinon 2>/dev/null && echo "Nutzerdaten liegen noch da (gewuenscht)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shinon-forge-deb-x64
+          path: |
+            dist-package/*.deb
+            dist-package/*.deb.sha256
+          if-no-files-found: error
+
+  windows:
+    name: 'ZIP (Windows, x64)'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+          cache: npm
+
+      # Derselbe Paket-Test wie im Linux-Job — und hier ist er wertvoller:
+      # der Windows-Weg nutzt echte Verzeichnisse statt Verknuepfungen und
+      # packt die Laufzeit als ZIP.
+      - name: 'Paket-Gate (Nutlast, Starter, Installer-Skripte)'
+        run: node scripts/run-with-node.mjs node --test scripts/gate/tests/packaging.test.mjs
+
+      - name: 'Paket bauen (Windows-ZIP)'
+        run: node scripts/win-build.mjs --out dist-package
+
+      - name: 'Archivinhalt pruefen (Starter, Installer, mitgelieferte Laufzeit)'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Get-ChildItem dist-package/*.zip | Select-Object -First 1
+          if (-not $zip) { throw 'kein ZIP gebaut' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $entries = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName).Entries.FullName
+          foreach ($need in @('shinon.cmd', 'install.ps1', 'uninstall.ps1', 'bin/shinon.mjs', 'runtime/node/node.exe')) {
+            if (-not ($entries | Where-Object { $_ -like "*$need" })) { throw "das Archiv traegt $need nicht" }
+          }
+          Write-Host "Archiveintraege: $($entries.Count)"
+
+      # Der ECHTE Nachweis auf Windows: entpacken, install.ps1 laufen lassen
+      # (kopieren, PATH, Startmenue), den Starter aufrufen, dann uninstall.ps1
+      # und pruefen, dass nichts mehr da ist. Das ist der Weg, den der Benutzer
+      # geht — nur ohne Handarbeit.
+      - name: 'Install-Nachweis: entpacken, install.ps1, Startmenue, uninstall.ps1'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Get-ChildItem dist-package/*.zip | Select-Object -First 1
+          $work = Join-Path $env:RUNNER_TEMP 'shinon-payload'
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath $work -Force
+
+          Write-Host '--- Syntaxpruefung der PowerShell-Dateien ---'
+          foreach ($script in @('install.ps1', 'uninstall.ps1')) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $work $script), [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { throw "$script hat Syntaxfehler: $($errors[0].Message)" }
+            Write-Host "$script: Syntax ok"
+          }
+
+          Write-Host '--- Installation ---'
+          & (Join-Path $work 'install.ps1') -NoPath
+          if ($LASTEXITCODE -ne 0) { throw "install.ps1 endete mit $LASTEXITCODE" }
+
+          $target = Join-Path $env:LOCALAPPDATA 'Programs\shinon-forge'
+          if (-not (Test-Path (Join-Path $target 'shinon.cmd'))) { throw 'der Starter fehlt nach der Installation' }
+          if (-not (Test-Path (Join-Path $target 'runtime\node\node.exe'))) { throw 'die mitgelieferte Laufzeit fehlt' }
+          Write-Host "Installat: $target"
+
+          Write-Host '--- Startmenue ---'
+          $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+          foreach ($name in @('Shinon Forge.lnk', 'Shinon Forge deinstallieren.lnk')) {
+            if (-not (Test-Path (Join-Path $startMenu $name))) { throw "die Verknuepfung $name fehlt" }
+          }
+          Write-Host "Startmenue: $startMenu"
+
+          Write-Host '--- der Starter laeuft (mitgelieferte Laufzeit) ---'
+          $version = & (Join-Path $target 'runtime\node\node.exe') --version
+          Write-Host "Laufzeit: $version"
+          & (Join-Path $target 'shinon.cmd') --check
+
+          Write-Host '--- Deinstallation ---'
+          & (Join-Path $target 'uninstall.ps1')
+          if (Test-Path $target) { throw 'das Installat liegt noch da' }
+          foreach ($name in @('Shinon Forge.lnk', 'Shinon Forge deinstallieren.lnk')) {
+            if (Test-Path (Join-Path $startMenu $name)) { throw "die Verknuepfung $name liegt noch da" }
+          }
+          Write-Host 'Deinstallation ok: Installat und Startmenue-Eintraege weg'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shinon-forge-win32-x64
+          path: |
+            dist-package/*.zip
+            dist-package/*.zip.sha256
+          if-no-files-found: error
+
+  release:
+    name: 'Release-Anhang (nur bei v*-Tags, nur an ein bestehendes Release)'
+    needs: [deb, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 'Pakete an das Release haengen (kein Release ohne Freigabe)'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Kein Release ${GITHUB_REF_NAME} vorhanden — die Pakete bleiben als Artefakte liegen; es wird nichts veroeffentlicht."
+            exit 0
+          fi
+          find artifacts -type f \( -name '*.deb' -o -name '*.deb.sha256' -o -name '*.zip' -o -name '*.zip.sha256' \) -print0 \
+            | xargs -0 gh release upload "${GITHUB_REF_NAME}" --clobber
+          echo "Angehaengt an ${GITHUB_REF_NAME}:"
+          gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name'

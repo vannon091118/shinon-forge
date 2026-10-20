@@ -34,7 +34,11 @@ QoL-Top-10 sind **kein** v0.4.0-Umfang.
 **Werkzeuge im Baum, außerhalb des Urteils:** `scripts/install-user.mjs` (`npm run
 install:user`), `npm run verify:install` und `scripts/backup-retention.mjs`
 existieren als Bediener-Werkzeuge mit eigenen Gate-Tests — sie sind noch kein
-belegter Release-Installationsweg. Namensgrenze: `npm run install:user update`
+belegter Release-Installationsweg. Dasselbe gilt für den Paketbau
+(`npm run deb` / `npm run win`, CI in `.github/workflows/package-build.yml`):
+der Code für `.deb` und Windows-ZIP steht im Baum, der Freeze gilt unberührt,
+und ein Paket ist erst dann ein Release-Installationsweg, wenn ein echter
+Install auf einem echten System belegt ist (Beleg: `docs/probes/`). Namensgrenze: `npm run install:user update`
 pflegt ein Nutzer-Installat, `npm run update` prüft den DSH-Upstream —
 `shinon update` (Forge-Selbstupdate) bleibt Folgearbeit.
 
@@ -62,6 +66,7 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 
 ### 2.2 v0.5.0-Kandidaten (keine Versprechen — was landet, entscheidet der Betreiber)
 
+- **Installationspakete** (v0.5.0, per Freeze §1.5 **kein** v0.4.0-Umfang): eine Nutzlast, zwei Hüllen — `.deb` für Linux Mint/Ubuntu (selbsttragend: Prod-Abhängigkeiten aus dem Lockfile + mitgelieferte Node-Laufzeit, `postinst` ohne Netz, **kein** `Depends: nodejs`) und ein Windows-ZIP (`shinon.cmd` portabel, `install.ps1` für PATH + Startmenü, `uninstall.ps1`). Gebaut wird in der CI (`.github/workflows/package-build.yml`: Linux- und Windows-Bauhost getrennt, weil die Abhängigkeiten plattformgebunden sind), nicht auf der Entwickler-Maschine. Offen: der belegte Install-Nachweis auf einem echten Mint-System (die CI baut, ein Mensch installiert) und der Windows-Pendant-Nachweis; beides steht in `docs/probes/`.
 - Live-429-Rotation gegen den echten Anbieter mit echten Schlüsseln (Kette bis zum Loopback-Draht ist belegt).
 - Mobile-first-Prototyp: eigenes schlankes Mobile-Profil, responsive Client-Schicht, Profil-/UI-/Security-CI-Gates, validierte Android-Runtime-Strategie (Details aus dem gefalteten Mobile-Plan: zuerst Profil + Web-UI im Repo, App-Shell erst nach reproduzierbarem Android-Proof; kein globaler Paket-Cut vor Messung; Fremdvergleich `dsh-io/dsh-mobile` als Spike prüfen).
 - `LAST_VERIFIED_FACT` (§19): Loop Guard / Progress Evaluator als alleiniger Produzent, Gate pinnt Ereignis, Produzent, Herkunft und fail-closed-Fälle. Produzenten-Regel wird im Wissens-Runtime-Plan (`docs/WISSENS-RUNTIME-PLAN.md`, Zug 4) als Fakt mit gepinntem Produzenten fortgeführt.

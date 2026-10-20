@@ -97,6 +97,55 @@ export function satisfiesRange(version, range) {
 }
 
 /**
+ * Die UNTERGRENZE einer Range — die Fassung, die ein mitgeliefertes Node sein
+ * MUSS, damit es in der Range liegt.
+ *
+ * Warum das hier steht und nicht als Zahl im Manifest: `engines.node` ist die
+ * eine Quelle der unterstuetzten Fassung. Ein mitgeliefertes Node (im .deb, im
+ * Windows-Archiv) muss in diese Range passen, sonst startet der Forge nicht
+ * und der Fehler erscheint nicht beim Installieren, sondern beim ersten
+ * Klick. Die Untergrenze ist damit die EINZIGE Fassung, die die Range selbst
+ * nennt — `22.19.0` fuer `^22.19.0 || >=24.0.0`.
+ *
+ * Fail-closed: ein Ausdruck, den diese Rechnung nicht versteht, ist ein
+ * Fehler und keine geratene Fassung. Das Ergebnis wird gegengeprueft (es
+ * muss die Range erfuellen), sonst stimmt die Rechnung nicht.
+ * @param {string} range die Range aus `engines.node`
+ * @returns {string} die Fassung, z.B. `22.19.0`
+ */
+export function floorVersion(range) {
+  const alternatives = String(range)
+    .split('||')
+    .map((part) => part.trim().split(/\s+/).filter((term) => term !== ''))
+    .filter((terms) => terms.length > 0);
+  if (alternatives.length === 0) {
+    throw new Error(`floorVersion: die Range "${range}" nennt keine Alternative`);
+  }
+  const floors = alternatives.map((terms) => {
+    let floor = [0, 0, 0];
+    for (const term of terms) {
+      const match = /^(\^|~|>=|<=|>|<|=)?\s*v?(\d+)\.(\d+)\.(\d+)$/.exec(term.trim());
+      if (match === null) {
+        throw new Error(`floorVersion: Ausdruck "${term}" in der Range "${range}" ist nicht lesbar — Abbruch statt Raten`);
+      }
+      const [, operator = '=', major, minor, patch] = match;
+      const value = [Number(major), Number(minor), Number(patch)];
+      // ">X.Y.Z" heisst: mindestens X.Y.(Z+1). "<" und "<=" nennen keine
+      // Untergrenze, lassen die Alternative aber nach unten offen.
+      if (operator === '>') value[2] += 1;
+      if (compare(value, floor) > 0) floor = value;
+    }
+    return floor;
+  });
+  const lowest = floors.reduce((left, right) => (compare(right, left) < 0 ? right : left));
+  const version = lowest.join('.');
+  if (!satisfiesRange(version, range)) {
+    throw new Error(`floorVersion: die Untergrenze ${version} erfuellt die Range "${range}" nicht — Abbruch`);
+  }
+  return version;
+}
+
+/**
  * Eine Fassung als Daten prüfen: Version UND `node:sqlite`-Rauchtest.
  * @returns {{ ok: boolean, version: string|null, sqlite: string|null, reason: string|null }}
  */

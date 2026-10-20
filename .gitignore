@@ -90,3 +90,14 @@ attachments/
 # kanonischen Doku-Satzes aus `AGENTS.md`.)
 docs/FEATURE_ANALYSIS.md
 docs/FEATURE_RANKING.md
+
+# Installationspakete — gebaute Artefakte, nie eingecheckt. Der BAU gehoert
+# in die CI (.github/workflows/package-build.yml): ein gebautes .deb oder
+# Windows-ZIP ist ein Ergebnis, kein Quelltext. `dist-deb/`, `dist-win/` und
+# `dist-package/` sind die Ausgabeverzeichnisse der beiden Bauern.
+dist-deb/
+dist-win/
+dist-package/
+
+# Laufzeit-Cache des Paketbaus (die geholte Node-Laufzeit des Archivs).
+.cache/

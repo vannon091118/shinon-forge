@@ -23,6 +23,8 @@
     "verify:panel": "node scripts/panel-check.mjs",
     "verify:install": "node scripts/install-user.mjs selftest",
     "build": "node scripts/build.mjs",
+    "deb": "node scripts/deb-build.mjs",
+    "win": "node scripts/win-build.mjs",
     "branding": "node scripts/branding-check.mjs",
     "idioms": "node scripts/sync-idioms.mjs",
     "idioms:check": "node scripts/sync-idioms.mjs --check",

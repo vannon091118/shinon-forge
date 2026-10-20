@@ -480,6 +480,62 @@ dem man ihn nachzählen kann.
 
 **Anker:** `d0691b2..1a5b1d4` · Tag: 17 Commits bis `1a5b1d4` · Belege: `docs/VISION-ABGLEICH.md`, `docs/ROADMAP.md`, `docs/INDEX.md`, `packages/persona/index.js`, `packages/prompter/assets/pre-step.js`
 
+### Die Installationspakete: eine Nutzlast, zwei Huellen
+
+Die Frage des Tages war eine Bestandsaufnahme: welche Start-, Update-,
+Installations- und Deinstallationswege gibt es ueberhaupt, welche sind aktiv,
+welche sind veraltet — und wie wird daraus ein Installer, der auf Windows wie
+auf Mint traegt? Die Antwort fiel unangenehm aus, weil sie zwei Luecken
+zeigte, die im Baum niemandem auffielen: `scripts/deb-build.mjs` baute ein
+`.deb`, dessen `postinst` beim Installieren ein `npm ci` nachlud und das
+`Depends: nodejs` (>= 22.19.0) verlangte — genau die Stelle, an der Mint mit
+seinem aelteren Node haengen bleibt, weil der Start spaeter an `engines`
+scheitert und nicht an der Installation. Fuer Windows gab es kein Artefakt,
+keinen Menueeintrag, keinen Zeitplan.
+
+Die Antwort darauf ist eine Nutzlast und zwei Huellen. Die Nutzlast
+(`scripts/lib/payload.mjs`) traegt den Code, die Produktionsabhaengigkeiten aus
+dem Lockfile, die **mitgelieferte Node-Laufzeit** und die Starter; die Huellen
+(`scripts/lib/huelle.mjs`) tragen nur Text — Debian-`control`, `postinst`,
+Menueeintrag und PATH-Starter auf der einen Seite, `install.ps1` und
+`uninstall.ps1` auf der anderen. Drei Regeln fallen daraus zwangslaeufig ab:
+das Paket traegt seine Laufzeit (kein `Depends: nodejs`), der `postinst`
+installiert **nichts** nach (kein Netz beim Installieren), und das
+Windows-Archiv wird auf einem Windows-Bauhost gebaut, weil die
+Abhaengigkeiten plattformgebunden sind — auf Linux gebaut, traegt es
+Linux-Binaerdateien und faellt erst auf dem fremden Rechner auf. Das Skript
+verweigert diesen Bau darum ausserhalb von Windows.
+
+Der Beleg ist ein gemessener, kein behaupteter: das Paket wurde gebaut
+(122,5 MiB), entpackt, gestartet und ueber HTTP befragt. `shinon --check`
+meldete „startfaehig" mit der Laufzeit aus dem Paket (v22.19.0), `shinon
+doctor` endete mit 0 Befunden, der Serverstart brachte 29 Paket-Bundles auf
+127.0.0.1:3099, die Oberfläche antwortete mit HTTP 200 und 44109 Bytes, und
+die Client-Haelften kamen aus dem Archiv (core 67613 Bytes, codingmon 129964
+Bytes). Das Bild liegt in `docs/probes/paket-deb-boot-2026-10-20.png`, der
+Messbericht in `docs/probes/pakete-2026-10-20.md`.
+
+Drei Fehler kamen beim Messen heraus, nicht beim Planen. Der erste: der
+Windows-Weg kopierte in sich selbst, wenn der Benutzer das Archiv direkt in
+den Zielordner entpackte — der Vergleich lief gegen das Elternverzeichnis.
+Der zweite: der Form-Test im Gate baute das volle Paket mit `npm ci` und
+brauchte 140 Sekunden; das hung die uebrigen (parallel laufenden) Tests aus
+— sieben DSH-abhaengige Testdateien fielen dabei um, gemessen. Der dritte:
+`dpkg-deb -c` lieferte 54000 Zeilen und sprengte den Standardpuffer. Alle
+drei sind behoben, und die Beweise stehen in `scripts/gate/tests/
+packaging.test.mjs` (9 Faelle) und `scripts/gate/tests/desktop-integration.test.mjs`.
+
+Der vierte Befund ist der unangenehmste: waehrend dieser Arbeit hat ein
+paralleler Thread den Branch gewechselt und dabei den Arbeitsbaum
+verworfen — die Arbeit war nur als Stash wieder da. Sie steht jetzt in einem
+eigenen Worktree (`git worktree add`), damit ein Branch-Wechsel eines
+fremden Threads nicht wieder den halben Tag frisst. Als Nebenbefund: zwei
+Auschecken desselben Repos teilen sich ein DSH-Home, und die Seeding-Regel
+verweigert dann korrekt den fremden Link. Beides gehoert in die Hand des
+Menschen, nicht in eine stille Ueberschreibung.
+
+**Anker:** `4a1bc31` · Belege: `scripts/lib/payload.mjs`, `scripts/lib/huelle.mjs`, `scripts/deb-build.mjs`, `scripts/win-build.mjs`, `.github/workflows/package-build.yml`, `scripts/gate/tests/packaging.test.mjs`, `docs/probes/pakete-2026-10-20.md`
+
 ---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb

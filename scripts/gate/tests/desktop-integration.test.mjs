@@ -16,7 +16,10 @@
  *   3. der Lauf ist idempotent und `--check` erkennt einen veralteten Eintrag,
  *   4. `--uninstall` entfernt genau die Einträge,
  *   5. `node scripts/deb-build.mjs` baut mit `dpkg-deb` ein echtes Paket nach
- *      /opt/shinon-forge — ohne node_modules, ohne Laufzeitdaten.
+ *      /opt/shinon-forge — ohne Fremdbaum und ohne Laufzeitdaten. Geprueft
+ *      wird die FORM (`--no-modules --no-runtime`, kein Netz, Sekunden statt
+ *      Minuten); das volle Paket mit Laufzeit und Produktionsabhaengigkeiten
+ *      baut die CI und wird dort installiert und gestartet.
  *
  * Läuft mit `node --test`; kein Netz, kein Modell. Ohne `dpkg-deb` meldet der
  * Paketteil SICHTBAR „übersprungen mit Grund\" statt grün zu lügen.
@@ -133,10 +136,36 @@ test('desktop: --uninstall entfernt genau die Einträge (und ist wiederholbar)',
   }
 });
 
+
+/**
+ * EIN Mitglied aus dem Dateisystem-tarball eines .deb lesen.
+ *
+ * Warum der Umweg: `dpkg-deb --fsys-tarfile` liefert den TARBASTROM des
+ * Pakets — bei der selbsttragenden Nutzlast rund 800 MiB. Das Ganze in einen
+ * Puffer zu ziehen waere Speicherfresse; darum laeuft der Strom durch eine
+ * Pipe direkt in `tar -xO`, das nur das eine Mitglied ausgibt.
+ */
+function readPackageMember(file, member) {
+  const result = spawnSync('/bin/sh', ['-c', 'dpkg-deb --fsys-tarfile "$1" | tar -xO "$2"', 'sh', file, member], {
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    throw new Error(`Mitglied ${member} nicht lesbar (Exit ${result.status}): ${result.stderr}`);
+  }
+  return result.stdout;
+}
+
 test('desktop: der .deb-Build liefert ein echtes, prüfbares Paket', { skip: HAS_DPKG ? false : 'dpkg-deb fehlt in dieser Umgebung (apt install dpkg-dev)' }, () => {
   const out = mkdtempSync(join(tmpdir(), 'shinon-deb-test-'));
   try {
-    const built = spawnSync(process.execPath, [join(ROOT, 'scripts', 'deb-build.mjs'), '--out', out], { encoding: 'utf8' });
+    // Der FORM-Bau: kein `npm ci`, keine Laufzeit. Zwei Gruende: ein Gate-Test
+    // braucht kein Netz, und ein Test, der zwei Minuten baut, hungt die
+    // uebrigen (parallel laufenden) Tests aus — das war gemessen: sieben
+    // DSH-abhaengige Testdateien fielen dabei um. Das VOLLE Paket (mit
+    // Laufzeit und Produktionsabhaengigkeiten) baut die CI, und dort wird es
+    // installiert und gestartet; die Form wird hier geprueft.
+    const built = spawnSync(process.execPath, [join(ROOT, 'scripts', 'deb-build.mjs'), '--out', out, '--no-modules', '--no-runtime'], { encoding: 'utf8' });
     assert.equal(built.status, 0, `deb-build endete mit ${built.status}: ${built.stderr}`);
     const version = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
     const architecture = process.arch === 'x64' ? 'amd64' : process.arch;
@@ -148,23 +177,40 @@ test('desktop: der .deb-Build liefert ein echtes, prüfbares Paket', { skip: HAS
     assert.match(control, new RegExp(`^Version: ${version}$`, 'm'), 'die Fassung kommt aus dem Manifest (eine Quelle)');
     assert.match(control, new RegExp(`^Architecture: ${architecture}$`, 'm'));
 
-    const listing = execFileSync('/usr/bin/dpkg-deb', ['-c', file], { encoding: 'utf8' });
+    // Die Paketliste ist lang (die Nutzlast traegt die Produktions-
+    // abhaengigkeiten MIT), also braucht der Puffer mehr als die Vorgabe.
+    const listing = execFileSync('/usr/bin/dpkg-deb', ['-c', file], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     for (const wanted of [
       './usr/bin/shinon',
       './usr/share/applications/shinon-forge.desktop',
       './opt/shinon-forge/bin/shinon.mjs',
       './opt/shinon-forge/package.json',
+      // Die Buendel-Links sind RELATIVE Verknuepfungen auf die Pakete — sie
+      // zeigen ins Paket hinein und wandern beim Upgrade mit.
+      './opt/shinon-forge/profiles/shinon/node_modules/@shinon/core',
     ]) {
       assert.ok(listing.includes(wanted), `${wanted} fehlt im Paket`);
     }
     // Der Menüeintrag des Pakets zeigt auf den absoluten Starter — gelesen aus
     // dem Paket, nicht aus dem Arbeitsbaum (das ist der Unterschied zwischen
-    // „gebaut" und „behauptet").
-    const desktop = execFileSync('/usr/bin/dpkg-deb', ['--fsys-tarfile', file], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+    // „gebaut" und „behauptet"). Gelesen wird EIN Mitglied aus dem Dateisystem-
+    // tarball: der ganze Tarball waere ein halber Gigabyte im Speicher.
+    const desktop = readPackageMember(file, './usr/share/applications/shinon-forge.desktop');
     assert.match(desktop, /Exec=\/usr\/bin\/shinon/, 'der Menüeintrag startet den absoluten Starter');
     assert.match(desktop, /Terminal=false/);
-    // Fremdbaum und Laufzeitdaten kommen NICHT mit.
-    for (const forbidden of ['node_modules', './opt/shinon-forge/dist/', 'sessions/', 'storages/', '.git']) {
+    // Fremdbaum und Laufzeitdaten kommen NICHT mit; die ENTWICKLER-
+    // abhaengigkeiten auch nicht (nur die Produktionsabhaengigkeiten).
+    // WICHTIG: die Pfade sind WURZELPFADE. Ein blosses 'sessions/' trifft
+    // auch `./opt/shinon-forge/node_modules/@anthropic-ai/sdk/lib/sessions/`
+    // — eine Abhaengigkeit, die nichts mit den Sitzungsdaten des Nutzers zu
+    // tun hat. Der Pfad muss am Installat-Wurzel liegen.
+    for (const forbidden of [
+      './opt/shinon-forge/dist/',
+      './opt/shinon-forge/sessions/',
+      './opt/shinon-forge/storages/',
+      './opt/shinon-forge/logs/',
+      './opt/shinon-forge/.git/',
+    ]) {
       assert.equal(listing.includes(forbidden), false, `${forbidden} liegt im Paket`);
     }
   } finally {
