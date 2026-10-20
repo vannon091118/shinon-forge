@@ -1,10 +1,10 @@
 # Zahlen — Shinon Forge
 
-> **Status:** current — **einziger Eigentümer** aller harten Zahlen dieses Repos. **Stand:** 2026-10-19
-> **Einstieg:** `docs/INDEX.md` · gemessen mit Node v22.23.3 und npm 10.9.9, dsh `0.2.1-rc.2` (Repo, zuerst im PATH)
+> **Status:** current — **einziger Eigentümer** aller harten Zahlen dieses Repos. **Stand:** 2026-10-20
+> **Einstieg:** `AGENTS.md` · gemessen mit Node v22.23.3 und npm 10.9.9, dsh `0.2.1-rc.2` (Repo, zuerst im PATH)
 
-Regel: **Kein anderes Dokument nennt eine dieser Zahlen.** README, `AGENTS.md` und
-`docs/ARCHITECTURE.md` verweisen hierher. Wer eine Zahl ändert, ändert den Messweg
+Regel: **Kein anderes Dokument nennt eine dieser Zahlen.** README und `AGENTS.md`
+verweisen hierher. Wer eine Zahl ändert, ändert den Messweg
 (hier oder in `scripts/sync-zahlen.mjs`) — nicht die Zahl im Dokument.
 
 ## 1. Bestand
@@ -12,7 +12,7 @@ Regel: **Kein anderes Dokument nennt eine dieser Zahlen.** README, `AGENTS.md` u
 Dieser Block wird **gemessen, nicht gepflegt**: `npm run zahlen:sync` schreibt ihn aus dem
 Baum, `npm run zahlen:check` vergleicht ohne zu schreiben (Exit 1 bei Abweichung). Alles
 außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile steht in
-`git log` und `docs/archive/`, nicht in der Zelle.
+`git log` und `docs/TAGEBUCH.md`, nicht in der Zelle.
 
 <!-- zahlen:bestand:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
@@ -29,12 +29,12 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Schemastery (deklariert) | `3.18.5` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
 | Node (`engines.node`) | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
 | pnpm-Artefakte (getrackt) | 0 | `git ls-files '*pnpm-workspace.yaml' '*pnpm-lock.yaml' \| wc -l` (Aufrufe: Gate-Prüfung „pnpm-Reste“) | 0 |
-| Markdown-Dokumente (getrackt) | 90 | `git ls-files '*.md' \| wc -l` | 0 |
-| Verträge unter `docs/contracts/` | 10 | `ls docs/contracts/*.json \| wc -l` | 0 |
+| Markdown-Dokumente (getrackt) | 22 | `git ls-files '*.md' \| wc -l` | 0 |
+| Verträge unter `docs/contracts/` | 12 | `ls docs/contracts/*.json \| wc -l` | 0 |
 | Proben unter `docs/probes/` | 39 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 22 Pakete, 198 Dateien, 1777862 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 22 Pakete, 201 Dateien, 1783025 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -51,6 +51,36 @@ liest genau diese Datei.
 | DSH global daneben | **0.2.0-rc.2** — darf abweichen; keine Zusage hängt an dieser Fassung | `dsh --version` ohne `node_modules/.bin` im PATH | 0 |
 | Node-Range des Repos | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
 
+### 1.2 Struktur (Klassen, Grenzen, Bestand)
+
+Die Grenzen stehen **nicht** hier, sondern in `docs/contracts/structure.json` — dort
+zusammen mit der Messung, aus der sie folgen. Diese Datei nennt nur, was der Riegel
+heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
+
+| Zahl | Wert | Befehl | Exit |
+|---|---|---|---|
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | **276** | `node -e "import('./scripts/lib/structure.mjs').then(m => console.log(m.structureIssues()))"` | 0 |
+| Klassen | **6** (host-entry, client, core, test, gate-plugin, script) | dieselbe Registry lesen | 0 |
+| Benannte Bestandsdateien (über ihrer Klassengrenze) | **30** | Registry lesen (`bestand`) | 0 |
+| Dateien ohne Klasse | **0** | `npm test` (Schritt „Struktur“) | 0 |
+| Verstöße gegen den Contract der Klasse | **0** | `npm test` (Schritt „Struktur“) | 0 |
+
+Die Herleitung der Grenze ist Teil der Registry (`herleitung`): 3 × Median der Klasse,
+auf 50 gerundet, mindestens 100 — gemessen am 2026-10-20. Wer eine Datei über die
+Grenze bringt, trägt sie **namentlich** in `bestand` ein; der Eintrag darf danach nur
+sinken. Genau das prüft `scripts/gate/tests/structure.test.mjs` (8 Fälle: Echtbaum
+plus sieben Mutationen), und `npm run build` fährt denselben Schritt.
+
+Der Riegel hat 2026-10-20 seinen ersten Bestandseintrag **eingelöst**: der
+Prompter-Einstieg lag mit 1350 Zeilen über der Grenze (550) und steht jetzt bei
+**256** — der Eintrag ist aus `bestand` verschwunden, nicht angehoben. Die Probe
+dazu: 300 angehängte Zeilen machen ihn mit *„558 Zeilen über der Grenze 550"*
+rot, danach ist er wieder grün. Die drei neuen Module liegen bei 544
+(`assets/pre-step.js`), 547 (`assets/runtime-state.js`) und 120
+(`assets/trace-report.js`) Zeilen; zusammen 1466 statt 1350, weil die drei
+Modulköpfe und die getrennten Import-Listen dazukommen — geteilt, nicht
+aufgebläht.
+
 ## 2. Prüfläufe (Ist-Zustand 2026-10-20)
 
 Jede Zeile nennt das Ergebnis **dieses** Durchgangs, den Befehl und seinen Exit-Code.
@@ -60,14 +90,14 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 |---|---|---|---|
 | Volle Kette | **Exit 0** — Paket-Suiten → statisches Gate → Fixtures → Distribution → Profilboot, in dieser Reihenfolge (nur CI/auf Zuruf) | 0 | `npm run test:full` |
 | Schneller Pfad (lokal) | **Exit 0** — statisches Gate + lokale Engine-Slices, in dieser Reihenfolge | 0 | `npm test` |
-| Gate (statisch) | **112** bestanden, **0** fehlgeschlagen | 0 | `npm test` bzw. `node scripts/run-with-node.mjs scripts/shinon-test.mjs` |
+| Gate (statisch) | **121** bestanden, **0** fehlgeschlagen | 0 | `npm test` bzw. `node scripts/run-with-node.mjs scripts/shinon-test.mjs` |
 | Regel-Fixtures | **9** bestanden, **0** fehlgeschlagen (Kontrolle + 8 Regelbrüche, je Gate *und* Build rot) | 0 | `node scripts/run-with-node.mjs scripts/validate-test.mjs` |
 | Distributionstest | **88** bestanden, **0** fehlgeschlagen (22 Pakete × 4 Stufen; jedes Isolat bekommt seine lokalen `@shinon/*`-Abhängigkeiten als Tarball daneben) | 0 | `npm test` bzw. `scripts/pack-test.mjs` |
 | Profiltest | **3** bestanden, **0** fehlgeschlagen — **24** Layer, **19** Repo-Bundles | 0 | `node scripts/run-with-node.mjs scripts/shinon-profile-test.mjs` |
 | Profil-Dump im echten Boot | **58** Layer-Köpfe, **215** Einträge; `shinon-task-router.activate: false`, `permission.defaultPreset: workspace-write`, `agent-default-model: prompter/agnes-2.5-flash` (die gespeicherte Wahl des Nutzers — der Config-Editor schreibt sie in die Profil-Ebene, ein Dump kann je Installation abweichen) | 0 | `DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config` |
-| Frischklon-Repro S3 | Klon @ `d8999ab` Exit 0, `npm ci` Exit 0, 29 Links Exit 0, Dump 60/210 Exit 0, Build 185 Dateien Exit 0, UI HTTP 200 (41 314 Bytes HTML, ohne Token 401), gate 546/546 | 0 | `docs/S3-FRESH-d8999ab.md` |
-| Gate-Engine `--full` | **25** Gates gelaufen, **25** grün, **1** `NOT_APPLICABLE` (`typescript`: keine First-Party-TS-Datei), **0** fehlgeschlagen, **0** geskippt; Branding ohne Flag sichtbar übersprungen | 0 | `npm run gate:full` |
-| Gate-Tests | **747** Tests, **747** grün, **0** rot, **0** geskippt — 6 für den Secrets-Tresor (Sammlung, Bericht ohne Werte, Modus 0600, fail-closed, Wiederherstellung, Idempotenz) und 4 für `uninstall` (Tresor, `--purge`, `--keep-checkout`, leerer Ort) — davon 2 für den Prompter-Trace-Kanal (Literal-Pin, Fenster-Spiegel), 4 für die S1-Wurzelbindung (fremde Root wird verworfen, keine Migration aus fremdem Index, Prompter und Project Index antworten gleich, der Entscheidungsdatensatz nennt Identität und Quelle), 3 für die eine schemastery-Fassung (Manifest-Gleichheit, Harness-Range, genau ein Lock-Eintrag), 1 dafür, dass nur der Nutzertext einen Skill ausdrücklich nennt — die Intent-Expansion nicht — und 6 für `shinon doctor` S4 (eigener Unterbefehl, stabile Codes, read-only, presence-only, Hilfe, Fehlerpfade), 16 für das Nutzer-Installat (Befehlsoberfläche, `auto`-Staging-Verweigerung, `units`-Timer ohne systemd, read-only `selftest` mit Stufen und `--json`) und 6 für die Backup-Aufbewahrung (Obergrenzen, jüngste unantastbar, Dry-Run, Protokoll, Exit-2-Verweigerung), 1 für die Symlink-Grenze des Project-Index (Ausbruch wird nicht gelesen), 1 für die Propsa-Form der Commit-Policy (ganz oder gar nicht), 3 für das Probe-Journal und den immer aktiven One-Shot (JSONL-Zeile, angenommener Lauf schreibt nichts, ausdrücklicher Kurzweg), 5 für das Prüf-Panel der Persona (Literale beider Seiten, Anzeige mit Belegzahl, POST-Entscheidung, SSE statt Intervall, fremder Vertrag fail-closed), 1 dafür, dass eine Antwort auf den Auftrag den Prompt nicht ersetzt, und 2 für die Prüf-Route im echten Bundle (GET zeigt Belege, POST entscheidet genau einmal; der Prüf-Stand reist als eigenes SSE-Ereignis und wird geschoben) 2 für den dauerhaften `SALVAGED_PROSE`-Zaehler (die Zahl ueberlebt einen Neustart, leerer Namensraum und fremder Stand sind fail-closed) 6 für die Fähigkeitskarte (jede Frage genau ein Eigentümer, jedes Paket mindestens einmal genannt, Beleg existiert, Naht wörtlich im Eigentümer, Brief unter der Grenze) 13 für Welle 1 (3 Hook-Riegel gegen §1-Drift und für die Installer-Vorlage, 5 Intent-Durchgängigkeit von Text über Klasse, Modus und Expansion bis zum Router, 5 Modellroute als Form samt Vergleich des schlanken Extraktors mit js-yaml, dazu 2 für den Schlüsselnamen aus der gewählten Route bis in den S6-Preflight, 5 für den Host-Naht-Kern (Identität statt Kopie, importfreier Kern, nur Client-Spiegel in `SOURCE_TWINS`, gerader Gate-Schritt, Mutationsprobe) 2 für die Abbruchquote (ein Fenster-Global statt zweitem Kanal, Quote und häufigster Grund im gerenderten Prompter-Panel) und 7 für den warmen Project Index (sechs Schlüssel, kalt gegen warm, geänderte Datei bei gleicher Größe und zurückgesetzter mtime, neue Datei, gelöschte Datei, ohne refresh, leere Abfrage) | 0 | `npm run gate:test` |
+| Frischklon-Repro S3 | Klon @ `d8999ab` Exit 0, `npm ci` Exit 0, 29 Links Exit 0, Dump 60/210 Exit 0, Build 185 Dateien Exit 0, UI HTTP 200 (41 314 Bytes HTML, ohne Token 401), gate 546/546 | 0 | `docs/TAGEBUCH.md`, Kapitel 2026-10-17 (Commit `d8999ab`) |
+| Gate-Engine `--full` | **23** Gates gelaufen, **23** grün, **1** `NOT_APPLICABLE` (`typescript`: keine First-Party-TS-Datei), **0** fehlgeschlagen, **0** geskippt; Branding ohne Flag sichtbar übersprungen | 0 | `npm run gate:full` |
+| Gate-Tests | **780** Tests, **780** grün, **0** rot, **0** geskippt — 5 für den Prompter-Schnitt (die 99 öffentlichen Namen unverändert, die drei Eigentümer-Module mit genau ihren Exporten, kein Modul importiert `index.js`, das Runtime-Objekt hat einen Erzeuger und nur der berührt Dateien, jeder Kopf nennt seinen Eigentümer; Mutationsprobe: ein gestrichener Name macht den ersten Fall rot) und 8 für den Struktur-Riegel (Echtbaum: jede Datei hat eine Klasse, keine reißt ihre Grenze, jeder Bestand stimmt; sieben Mutationen: über der Grenze, ohne Klasse, Client mit Schema, Host ohne `apply`, wachsender Bestand, sinkender Bestand, toter Bestandseintrag samt fehlender Registry) und 8 für den Kanon (echter Baum, Registry-Form, fünf Mutationen) und 12 für das Dev-Tagebuch (Kapitel je Commit-Tag, Anker-SHA mit Datum, Bereichsreihenfolge, lebender Belegpfad, Akten-Tabellenzeile, sieben Mutationsproben) — 6 für den Secrets-Tresor (Sammlung, Bericht ohne Werte, Modus 0600, fail-closed, Wiederherstellung, Idempotenz) und 4 für `uninstall` (Tresor, `--purge`, `--keep-checkout`, leerer Ort) — davon 2 für den Prompter-Trace-Kanal (Literal-Pin, Fenster-Spiegel), 4 für die S1-Wurzelbindung (fremde Root wird verworfen, keine Migration aus fremdem Index, Prompter und Project Index antworten gleich, der Entscheidungsdatensatz nennt Identität und Quelle), 3 für die eine schemastery-Fassung (Manifest-Gleichheit, Harness-Range, genau ein Lock-Eintrag), 1 dafür, dass nur der Nutzertext einen Skill ausdrücklich nennt — die Intent-Expansion nicht — und 6 für `shinon doctor` S4 (eigener Unterbefehl, stabile Codes, read-only, presence-only, Hilfe, Fehlerpfade), 16 für das Nutzer-Installat (Befehlsoberfläche, `auto`-Staging-Verweigerung, `units`-Timer ohne systemd, read-only `selftest` mit Stufen und `--json`) und 6 für die Backup-Aufbewahrung (Obergrenzen, jüngste unantastbar, Dry-Run, Protokoll, Exit-2-Verweigerung), 1 für die Symlink-Grenze des Project-Index (Ausbruch wird nicht gelesen), 1 für die Propsa-Form der Commit-Policy (ganz oder gar nicht), 3 für das Probe-Journal und den immer aktiven One-Shot (JSONL-Zeile, angenommener Lauf schreibt nichts, ausdrücklicher Kurzweg), 5 für das Prüf-Panel der Persona (Literale beider Seiten, Anzeige mit Belegzahl, POST-Entscheidung, SSE statt Intervall, fremder Vertrag fail-closed), 1 dafür, dass eine Antwort auf den Auftrag den Prompt nicht ersetzt, und 2 für die Prüf-Route im echten Bundle (GET zeigt Belege, POST entscheidet genau einmal; der Prüf-Stand reist als eigenes SSE-Ereignis und wird geschoben) 2 für den dauerhaften `SALVAGED_PROSE`-Zaehler (die Zahl ueberlebt einen Neustart, leerer Namensraum und fremder Stand sind fail-closed) 6 für die Fähigkeitskarte (jede Frage genau ein Eigentümer, jedes Paket mindestens einmal genannt, Beleg existiert, Naht wörtlich im Eigentümer, Brief unter der Grenze) 13 für Welle 1 (3 Hook-Riegel gegen §1-Drift und für die Installer-Vorlage, 5 Intent-Durchgängigkeit von Text über Klasse, Modus und Expansion bis zum Router, 5 Modellroute als Form samt Vergleich des schlanken Extraktors mit js-yaml, dazu 2 für den Schlüsselnamen aus der gewählten Route bis in den S6-Preflight, 5 für den Host-Naht-Kern (Identität statt Kopie, importfreier Kern, nur Client-Spiegel in `SOURCE_TWINS`, gerader Gate-Schritt, Mutationsprobe) 2 für die Abbruchquote (ein Fenster-Global statt zweitem Kanal, Quote und häufigster Grund im gerenderten Prompter-Panel) und 7 für den warmen Project Index (sechs Schlüssel, kalt gegen warm, geänderte Datei bei gleicher Größe und zurückgesetzter mtime, neue Datei, gelöschte Datei, ohne refresh, leere Abfrage) | 0 | `npm run gate:test` |
 | Codingmon-Tests | **46** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:codingmon` |
 | Scoring-Tests (Kern, Signale, Ablage, Block-Gewichte) | **50** bestanden, **0** rot, **0** übersprungen — importfrei, läuft in CI ohne `npm ci`; die Host-Naht des Lernens fährt `scripts/gate/tests/scoring-block-learning.test.mjs` | 0 | `npm run test:scoring` |
 | Token-Usage-Tests | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:token` |
@@ -78,7 +108,7 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Key-Router-Tests (Pool-Kern) | **17** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:key-router` |
 | Traceability-Tests | **12** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:traceability` |
 | Idiom-Blöcke | **16** Blöcke in **12** Dateien, deckungsgleich mit `scripts/lib/plugin-idioms.mjs` | 0 | `npm run idioms:check` |
-| Build (`dist/`) | **22** Pakete, **198** Dateien, **1 777 862** Bytes | 0 | `npm run build` |
+| Build (`dist/`) | **22** Pakete, **201** Dateien, **1 783 025** Bytes | 0 | `npm run build` |
 | Bestands-Block dieser Datei | deckungsgleich mit dem Baum | 0 | `npm run zahlen:check` |
 
 **Warum die Umgebung zählt:** `gate:test` und `npm test` brauchen Node ≥ 22 (`node:sqlite`)
@@ -94,8 +124,8 @@ Ein nacktes `node --test …` bleibt der ungeschützte Weg und ist kein Beleg.
 | Kosten der Ablage bei vielen Signalen | 2026-10-11 | 58,6 ms (10 Zeilen) → 500,2–517,0 ms (20 000); 0,03 ms je Zeile; 99,6 % der Kette ist Ablage | [docs/probes/store-cost.json](probes/store-cost.json) |
 | Startscan des Projektindex (353 Dateien) | 2026-10-13 | kalt 2627 ms, unverändert 21 ms, Mount 1 ms, Worker-Bericht 2856 ms | [docs/probes/project-index-startscan.json](probes/project-index-startscan.json) |
 | Branding-Wirkung im echten Chromium | 2026-10-13 | 28 bestanden, 0 fehlgeschlagen | `npm run branding` (braucht `dist/` und Browser) |
-| Skalierungslauf (Kopie + 20 Pakete = 39) | 2026-10-11 | 6 von 6 Stufen grün, ≈ 98 s | [docs/archive/SKALIERUNG_2026-10-11.md](archive/SKALIERUNG_2026-10-11.md) |
-| Frischer Klon: `npm install` + `npm start -- --check` | 2026-10-13 | 731 Pakete, Lockfile byteidentisch, ohne `pnpm`/globales `dsh` | [CHANGELOG.md](CHANGELOG.md) (Einstieg, pnpm-Rückbau) |
+| Skalierungslauf (Kopie + 20 Pakete) | 2026-10-11 | 6 von 6 Stufen grün | `npm run scale:check` (Kopfkommentar; das damalige Protokoll fiel mit dem Cut) |
+| Frischer Klon: `npm install` + `npm start -- --check` | 2026-10-13 | 731 Pakete, Lockfile byteidentisch, ohne `pnpm`/globales `dsh` | `docs/TAGEBUCH.md`, Kapitel 2026-10-11 |
 | CI-Lauf (Branch-Stand `bf003a2`) | 2026-10-13 | 14 Jobs grün, Conclusion `success` | Run `38474747771` in der Actions-API |
 
 ## 3. Rote Befunde
@@ -154,5 +184,5 @@ Offen **außerhalb** der Gates (kein Rot, nur ungemessen):
 ## 5. Historie
 
 Reparaturen, Ursachen und Vorher/Nachher-Messungen stehen **nicht** hier, sondern in
-`git log` (Commit-Nachricht mit Datenbeleg) und in `docs/archive/` (abgeschlossene
-Nachweise und Übergaben). Diese Datei trägt nur den heutigen Ist-Zustand.
+`git log` (Commit-Nachricht mit Datenbeleg) und in `docs/TAGEBUCH.md`. Diese Datei
+trägt nur den heutigen Ist-Zustand.

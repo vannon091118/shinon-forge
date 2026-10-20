@@ -1,11 +1,11 @@
 # Roadmap — wohin das Repo geht
 
 > **Status:** plan — die einzige Liste offener Arbeit: Release-Ziele, Abnahmen, zurückgestellte Punkte. **Stand:** 2026-10-18
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Regeln dieser Datei: kein Punkt ohne Abnahme (Befehl oder beobachtbares Ergebnis),
 keine Zahl außer Datum und SHA (Bestand und Messungen stehen ausschließlich in
-`docs/ZAHLEN.md`), keine erledigte Arbeit (die steht in `docs/CHANGELOG.md`).
+`docs/ZAHLEN.md`), keine erledigte Arbeit (die steht in `docs/TAGEBUCH.md`).
 Ein Punkt zählt als erledigt, sobald Befehl, Exit-Code und Ergebnis in einem Beleg
 stehen — Code ohne belegten Lauf ist offen. `UNGEPRÜFT` ist kein Pass.
 
@@ -48,10 +48,10 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 | S0 Freeze | Freeze dokumentiert; v0.5.0-Liste vollständig | diese Datei (§1.5, §2) | belegt |
 | S1 Workspace | Prompter und Project Index beantworten dieselbe Workspace-Frage; fremde Root abgelehnt, `..`/Symlink-Ausbruch gestoppt, Veraltetes entfernt — jede Probe wird bei Mutation rot | `npm run test:prompter`, `npm run gate:test` | belegt |
 | S2 Kontext | Eine Quelle je Schritt; Budget vor dem Modellaufruf; Provenienz (Workspace, Quelle, Pfade, Budget) im Datensatz, ohne Prompt-Text und ohne Schlüsselwerte | `npm run test:prompter`, Gate-Naht `context-wiring`, `docs/probes/index-konsolidierung.json` | belegt |
-| S3 Quellklon | Frischer Klon ohne globales DSH: nur die dokumentierten Befehle bis zum UI-Start | `docs/S3-FRESH-d8999ab.md` | belegt |
-| S4 Doctor | `shinon doctor` als Laufzeit-Unterbefehl, read-only, stabile Exitcodes, Schlüssel nur als Anwesenheit | `docs/S4-DOCTOR-2026-10-17.md` | belegt |
-| S5 Schranke | Alle Gates grün, Version/Tag/Lock konsistent, Quellarchiv + SHA-256 | `docs/S5-RELEASE-2026-10-17.md` | teils — **offen:** Tag `v0.4.0` + Schranken-Lauf darauf |
-| S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel, Security-/Dependency-Audit, finale Doku, CI-Run-ID | `docs/S6-MODELLTURN-AUDIT-CI-2026-10-17.md` | **offen** — Audit grün, Modellturn und CI-Run-ID fehlen |
+| S3 Quellklon | Frischer Klon ohne globales DSH: nur die dokumentierten Befehle bis zum UI-Start | `docs/TAGEBUCH.md`, 2026-10-17 (`d8999ab`) | belegt |
+| S4 Doctor | `shinon doctor` als Laufzeit-Unterbefehl, read-only, stabile Exitcodes, Schlüssel nur als Anwesenheit | `docs/TAGEBUCH.md`, 2026-10-17 (`dd18824`) | belegt |
+| S5 Schranke | Alle Gates grün, Version/Tag/Lock konsistent, Quellarchiv + SHA-256 | `docs/TAGEBUCH.md`, 2026-10-17 (`c30112c`) | teils — **offen:** Tag `v0.4.0` + Schranken-Lauf darauf |
+| S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel, Security-/Dependency-Audit, finale Doku, CI-Run-ID | `docs/TAGEBUCH.md`, 2026-10-17 (`4db4006`) | **offen** — Audit grün, CI-Run rot (Ursache offen), Modellturn offen |
 
 ## 2. Offene Punkte (vollständig — alles andere ist Folgearbeit oder zurückgestellt)
 
@@ -71,6 +71,10 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 - `profiles/`-Umbau auf Code-Konfiguration (3.6) — nur wenn ein fremder Boot daraus liest/schreibt; derzeit angehalten.
 - Overlay-MVP (3.8) — blockiert, bis die drei Upstream-Punkte entschieden sind (Slot-Definition, Launcher-only-Patch, Remote-Listen-Extensibilität).
 - Onboarding (Eignerentscheidung): keine fest verdrahteten Modell-/Provider-Defaults — der Nutzer entscheidet beim Einstieg, ob der Prompter dasselbe Modell und denselben Schlüssel nutzt oder eigene; Anker ist die DSH-seitige API-Key-Abfrage beim First-Start.
+- Persona-Einstieg teilen (Voraussetzung, nicht der Schnitt): `packages/persona/index.js`
+  hält 1526 Zeilen und 18 `let`-Bindungen in EINEM `apply`-Closure — der Prompter-Schnitt
+  (2026-10-20) ging, weil dort schon ein `runtime`-Objekt der alleinige Zustand war. Hier
+  steht zuerst der Zustands-Eigentümer auf dem Programm; erst danach dieselbe Teilung.
 - Architektur-Folge aus dem Audit: Workspace-Twin zusammenlegen (C3), Prompt-Schichten zu einem Assembler (C4), `preset shinon` statt `cordis`, Katalog-Snapshot statt Einzelprüfungen (P2).
 - Vendor-Baum zu Hash-Manifest verdichten (B5); `.session-eval/`-Zweck klären (B7-Rest; K5-Offenpunkte aus dem Report: Scope-Erkennung, Fehler-Turn-Signal, K7a-Kopplung — siehe Archiv).
 
@@ -79,14 +83,14 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 - Benchmarks und Metriken (4.1–4.6): Aufgaben-Set, DSH-Baseline, Shinon-Messung, Feature-Entscheidung mit Messwert.
 - Desktop (5.1–5.3, A10): Tauri-Shell, Shell-Protokoll, Single-Binary — Stufe 1 (`npm run open`) ist scharf; der Rest wartet auf die Engine-Messung und die A10-Entscheidung (Electron vs. Tauri vs. TUI).
 - Engine-Port (8.1–8.4): nur bei positivem 4.1-Befund und eingefrorenen Verträgen.
-- Commit `487c559`-Bewertung: gegenstandslos — der Stand ist committet und gemessen (siehe `docs/CHANGELOG.md`); ein Verdikt über einen Arbeitsbaum von 2026-10-10 baut nichts mehr.
+- Commit `487c559`-Bewertung: gegenstandslos — der Stand ist committet und gemessen (siehe `docs/TAGEBUCH.md`, 2026-10-10); ein Verdikt über einen Arbeitsbaum von 2026-10-10 baut nichts mehr.
 
 ## 3. `1.0.0`-Kriterien
 
 `1.0.0` heißt: jedes Profil-Paket ist ausgeliefert (kein `dsh.inactive` ohne
 begründetes Verdikt), der Task-Router ist per H5 entschieden, die
-Live-Verifikation 3.9 ist grün belegt, und die Branch-Regel (`docs/CI.md` §2)
-ist scharf — nicht nur gebaut.
+Live-Verifikation 3.9 ist grün belegt, und die Branch-Regel im Wächter
+(`scripts/commit-guard.mjs`) ist scharf — nicht nur gebaut.
 
 ## 4. Was kein Release ist
 
