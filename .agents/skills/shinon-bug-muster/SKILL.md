@@ -6,7 +6,7 @@ description: Haeufige Bug-Klassen im Shinon-Forge/DSH/Cordis-Stack mit Symptom, 
 # Bug-Katalog DSH/Cordis — Symptom → Mechanismus → Workaround
 
 > **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Jede Klasse ist real aufgetreten (Repo-Pitfalls, DSH-Post-Mortems 0001–0004,
 `defensive-patterns.md`). Erst hier gegenhalten, dann neu forschen.

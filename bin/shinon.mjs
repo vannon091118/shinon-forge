@@ -17,11 +17,10 @@
  *   3. Start: `node <bin.js> --profile <aktiv> …` mit `DSH_HOME=<Repo-Root>`;
  *      eigene Argumente werden durchgereicht (`shinon --no-open --port 3085`).
  *
- * **Kein Stub.** Die Audit-Befunde A-INV-03 (`docs/archive/DEPENDENCY_FINDINGS.md`)
- * und A-INV-03 (`docs/archive/ARCHITECTURE_MAP.md`) beschreiben genau diesen Pfad
- * als „verwaist: nur Logs, kein `bin`-Feld, kein Script verweist darauf". Diese
- * Fassung arbeitet: sie löst auf, prüft und startet — und sie steht im
- * `bin`-Feld des Root-Manifests, also unter dem Namen `shinon`.
+ * **Kein Stub.** Der frühere Zustand war „verwaist: nur Logs, kein `bin`-Feld,
+ * kein Script verweist darauf". Diese Fassung arbeitet: sie löst auf, prüft und
+ * startet — und sie steht im `bin`-Feld des Root-Manifests, also unter dem Namen
+ * `shinon`.
  *
  * Was hier NOCH nicht passiert (bewusst, nicht vergessen): der Einstieg startet
  * das aufgelöste dsh mit `--profile <name>`. Der Bootpfad, der ohne

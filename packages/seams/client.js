@@ -8,7 +8,7 @@
  * nicht angefasst.
  *
  * Die Datei existiert, weil die Form eines Pakets in diesem Repo eine ist
- * (`docs/ARCHITECTURE.md` §2): vier Rollendateien, geprüft von Gate und Build.
+ * (`AGENTS.md`, Abschnitt Conventions): vier Rollendateien, geprüft von Gate und Build.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/seams',

@@ -293,7 +293,7 @@ const probes = [
   {
     id: `index-cold-zerlegung-${verdict.measuredAt.slice(0, 10)}`,
     claim: 'Der Kaltlauf des Projektindex ist nicht I/O-gebunden: Lesen und Hashen sind zusammen ein Bruchteil, der Referenzdurchgang ist der größte Einzelposten und SQLite der zweite.',
-    targets: ['scripts/index-cold-cost.mjs', 'packages/project-index/assets/index-core.js', 'docs/audit/PERF-BASELINE-2026-10-17.md'],
+    targets: ['scripts/index-cold-cost.mjs', 'packages/project-index/assets/index-core.js', 'docs/probes/index-cold-breakdown.json'],
     expect: 'Jede Phase wird auf derselben Fixture gemessen; die Summe der Phasen muss den echten Lauf innerhalb der Streuung erklären, sonst ist die Zerlegung falsch.',
     result: 'BESTAETIGT',
     verdict: 'WRITE',
@@ -304,7 +304,7 @@ const probes = [
   {
     id: `index-cold-fts-loeschen-${verdict.measuredAt.slice(0, 10)}`,
     claim: 'Auf einem LEEREN Index löscht forgetFile je Datei neun Zeilengruppen, die es nicht gibt; das FTS-Löschen ist darunter der teuerste Posten und teurer als Lesen, Hashen, Redigieren und Extrahieren zusammen.',
-    targets: ['packages/project-index/assets/index-core.js', 'docs/audit/PERF-BASELINE-2026-10-17.md'],
+    targets: ['packages/project-index/assets/index-core.js', 'docs/probes/index-cold-breakdown.json'],
     expect: 'Wenn das Löschen nichts findet, darf es nichts kosten. Kostet es messbar, ist es auf dem Kaltlauf Arbeit ohne Wirkung — ein Kandidat, kein Beweis für einen Umbau.',
     result: 'BESTAETIGT',
     verdict: 'WRITE',
@@ -315,7 +315,7 @@ const probes = [
   {
     id: `index-cold-doppelarbeit-${verdict.measuredAt.slice(0, 10)}`,
     claim: 'Der Kaltlauf liest jede Datei zweimal und hasht sie zweimal — der zweite Lesevorgang ist der Referenzdurchgang, der zweite Hash steht in indexFile.',
-    targets: ['packages/project-index/assets/index-core.js', 'docs/audit/PERF-BASELINE-2026-10-17.md'],
+    targets: ['packages/project-index/assets/index-core.js', 'docs/probes/index-cold-breakdown.json'],
     expect: 'Die Doppelarbeit ist nur ein Kandidat, wenn sie messbar teuer ist; ist sie billig, bleibt sie stehen.',
     result: 'BESTAETIGT',
     verdict: 'WRITE',

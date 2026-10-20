@@ -1,7 +1,7 @@
 # Third-Party Notices — Shinon Forge
 
 > **Status:** current — Fremdhinweise, getrennt vom eigenen Copyright. **Stand:** 2026-10-17
-> **Einstieg:** `docs/INDEX.md` · **Änderungslog des Vendoring-Stands:** `vendor/MODIFICATIONS.md`
+> **Einstieg:** `AGENTS.md` · **Änderungslog des Vendoring-Stands:** `vendor/MODIFICATIONS.md`
 
 Dieses Repo ist ein Fork und bindet fremde Software ein. Eigener und fremder Text
 bleiben getrennt (Entscheidung A12): unser Copyright steht in [`LICENSE`](LICENSE),
@@ -45,7 +45,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-**Befund zum Vendoring (gemessen, nicht vermutet, Beleg: `docs/CHANGELOG.md`):** Der Plan nannte
+**Befund zum Vendoring (gemessen, nicht vermutet, Beleg: `docs/TAGEBUCH.md`, 2026-10-11):** Der Plan nannte
 `LICENSE` **und** `THIRD_PARTY_NOTICES.md` als unverändert zu übernehmen. Das
 veröffentlichte Paket liefert **kein** `THIRD_PARTY_NOTICES.md` aus: der Tarball hat
 20 Dateien — bei `0.2.1-alpha.1` wie bei `0.2.1-alpha.2`, keine trägt diesen Namen (`lib/*.js`, `lib/types/*.d.ts`, `LICENSE`,

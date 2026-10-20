@@ -6,7 +6,7 @@ description: Schnellster Weg zu echtem Signal - welcher Test wann, Skip-Regeln, 
 # Test-Tempo: Signal statt Aktivität
 
 > **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Zeit geht nicht beim Laufen der Tests verloren, sondern beim Wiederholen der
 falschen. Regeln aus DSHs Testing-Policy (`docs/testing.md`) und diesem Repo.

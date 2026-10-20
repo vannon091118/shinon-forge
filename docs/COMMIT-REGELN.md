@@ -1,7 +1,7 @@
 # Commit-Regeln — Shinon Forge
 
 > **Status:** current — Regeln und ihre Durchsetzung. **Stand:** 2026-10-08
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Drei Regeln. Alle fail-closed. Keine Ausnahmen, kein Schalter.
 

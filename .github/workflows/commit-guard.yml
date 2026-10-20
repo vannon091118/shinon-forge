@@ -151,6 +151,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Volle Historie: `diaryIssues` prueft jeden Tagebuch-Anker gegen die
+          # Commit-Historie. Mit einem flachen Klon koennte der Schritt die Anker
+          # nicht belegen und wuerde sie sichtbar ueberspringen — der Vertrag
+          # waere ungeprueft.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

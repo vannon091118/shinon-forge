@@ -1,7 +1,7 @@
 # Shinon Forge
 
 > **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-17
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** diese Datei · **Geschichte:** `docs/TAGEBUCH.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 An independent fork of the DeepSeek Harness (DSH). It ships the `@shinon/*` Cordis
 plugin bundles under `packages/`, enabled by the canonical profile `profiles/shinon`
@@ -136,7 +136,7 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   and runs idioms → static gate → `gate --full` → gate tests → distribution test → build
   over the copy. The repo tree is never touched; needs Node ≥ 22. Not part of `npm test`
   (it copies the tree and takes about a minute and a half); numbers in `docs/ZAHLEN.md`
-  §2, method in `docs/archive/SKALIERUNG_2026-10-11.md`.
+  §2, the method stands in its own header comment.
 - `npm run branding` → the effect measurement for the branding layer in a real Chromium
   (`scripts/branding-check.mjs`, needs a built `dist/` and a browser binary; `--browser
   <path>` or `SHINON_CHROME`). It is NOT one of the gate plugins — the gate engine runs it
@@ -168,16 +168,16 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   - `packages/<dir>/cordis.patch.yml` `name` → `@shinon/<dir>`
   - `packages/<dir>/client.js` `__ModuleLoader__.load({ id })` → `@shinon/<dir>`
   - `profiles/<name>/cordis.patch.yml` `id`/`name` → same as the package patch.
-- The shape of a package — which files and folders it may contain — is owned by
-  `docs/ARCHITECTURE.md` §2. **One** statement, matching the measured tree: the four role
+- The shape of a package — which files and folders it may contain — is owned by THIS
+  section. **One** statement, matching the measured tree: the four role
   files are mandatory (`index.js` host half with Schemastery `Config` + `apply(ctx,
   config)`, `client.js` UI half with `__ModuleLoader__.load` + slots/styles/locale,
   `cordis.patch.yml` with a single `insert` entry, `package.json` manifest); allowed extras
   are `assets/` (runtime helpers, shipped into `dist/`), `test/` (package-local tests, not
   shipped), `fixtures/` (frozen test inputs), a package `README.md` and a resource that
   manifest or patch really reference (`packages/openapi/openapi.yaml`). No runtime logic in
-  `package.json`; no config schema in `client.js`. Do not restate this rule here and do not
-  invent a sixth exception. Pure mechanics belong in an `assets/` core WITHOUT bare imports
+  `package.json`; no config schema in `client.js`. Do not invent a sixth exception.
+  Pure mechanics belong in an `assets/` core WITHOUT bare imports
   (project-index: the worker; codingmon: `packages/codingmon/assets/mechanik.js`): only then
   can their unit tests run in CI, which has no `node_modules`. `index.js` re-exports that
   core, so the public names stay the same.
@@ -315,18 +315,14 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   `scripts/gate/tests/context-wiring.test.mjs` (names) and
   `scripts/gate/tests/scoring-memory.test.mjs` (behaviour: signal → value → restart →
   retraction → late criticism → corrupt index).
-- Documentation: every tracked Markdown file carries a status block — the gate
-  `docs-status` fails a file without one. Exempt are `docs/archive/` (the archival
-  banner replaces it) and `vendor/` (unchanged upstream text, hashed in
-  `MANIFEST.json`). Hard numbers (packages, layers, test counts, versions) have exactly
-  **one** owner. Read `docs/INDEX.md` §2 and `docs/ZAHLEN.md` before writing a number
-  into any document — no gate checks numeric drift between documents,
-  `npm run zahlen:check` covers only the generated inventory block. A documented
-  exception to a documentation rule stands in the file that sets it, with an end date;
-  currently there is none. The inventory block in `docs/ZAHLEN.md` §1 is generated
-  (`npm run zahlen:sync`, checked with `npm run zahlen:check`); the run table in §2 is
-  measured per pass. History, causes and before/after numbers belong in the commit
-  message or `docs/archive/` (the one history folder) — not in a table cell.
+- Documentation: `docs/` carries exactly four prose files — `TAGEBUCH.md` (history),
+  `ZAHLEN.md` (numbers), `ROADMAP.md` (open work), `COMMIT-REGELN.md` (enforcement) —
+  plus `contracts/` and `probes/`. Everything else was cut on 2026-10-20; what it said
+  lives in the diary, anchored to commits. History belongs in `docs/TAGEBUCH.md`, never
+  in a new file. Hard numbers (packages, layers, test counts, versions) have exactly
+  **one** owner: `docs/ZAHLEN.md` — read it before writing a number anywhere.
+  `npm run zahlen:check` covers the generated inventory block; the run table in §2 is
+  measured per pass.
 - A Client -> Host endpoint needs someone to SELECT it. Host-side `./typert` discovery exists
   (`dsh-typert-loader`), but the browser client mounts its Remote contributions from a
   hardcoded COMPILED list in `@deepseek-ai/dsh-api-remotes` (25 entries, `$mount`), so an

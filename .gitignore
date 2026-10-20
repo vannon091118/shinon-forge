@@ -11,7 +11,7 @@ storages/
 # Symlinks auf profiles/sessions/logs — Zustand, kein Inhalt.
 dev-dsh-home/
 
-# .shinon/ — der repo-lokale Inhaltsordner (Lebenszyklus: docs/ARCHITECTURE.md §5).
+# .shinon/ — der repo-lokale Inhaltsordner (Lebenszyklus: `AGENTS.md`).
 # Hier liegt nur noch INHALT: `.shinon/project-context.md` (Persona),
 # `.shinon/blocks.learned.json` (gelernte Bausteine). Der Laufzeit-Index des
 # Prompters ist entfallen; einen Index fuehrt allein der Project Index, und der
@@ -81,6 +81,6 @@ attachments/
 
 # Fremde Arbeitsnotizen — bewusst untracked, kein Teil des Repos.
 # (Vergleichsanalysen anderer Projekte; ohne Statusblock, nicht Teil des
-# kanonischen Doku-Satzes aus docs/INDEX.md.)
+# kanonischen Doku-Satzes aus `AGENTS.md`.)
 docs/FEATURE_ANALYSIS.md
 docs/FEATURE_RANKING.md

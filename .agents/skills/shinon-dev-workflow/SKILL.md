@@ -6,7 +6,7 @@ description: Arbeitsablauf fuer Shinon Forge - welcher Check wann, wo Vertraege 
 # Dev-Workflow Shinon Forge
 
 > **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Repo-Root ist **nicht** das `DSH_HOME` (Stand 2026-10-17: das Home liegt unter
 `dev-dsh-home` und wird beim Start aus dem Baum geseedet — `$DSH_HOME/AGENTS.md`
@@ -93,9 +93,9 @@ Testnamen) — das ist kein Grün. Ein Skip-Grund ist im Bericht zu nennen.
 
 | Frage | Ort |
 |---|---|
-| Architektur-Regeln, Validierung | `docs/ARCHITECTURE.md`, `scripts/lib/repo.mjs` |
+| Architektur-Regeln, Validierung | `AGENTS.md`, `scripts/lib/repo.mjs` |
 | Commit-Regeln | `docs/COMMIT-REGELN.md`, `scripts/lib/commit-text.mjs` |
 | Pitfalls (Stack-Fallen) | `AGENTS.md` „Pitfalls" + `shinon-bug-muster` |
 | Cordis-Mechaniken | `cordis-architektur` + `docs/research/2026-10-09-cordis-dsh-recherche.md` — **Ziel fehlt in diesem Baum** (offener Posten, STAND §6.4) |
 | Verträge/Probes | `docs/contracts/`, `docs/probes/` |
-| Prompt/Persona-Flächen | `docs/archive/prompts-README.md` (System-Prompt-Registry, keine Datei-Templates) |
+| Prompt/Persona-Flächen | `packages/persona/index.js` (System-Prompt-Registry, keine Datei-Templates) |

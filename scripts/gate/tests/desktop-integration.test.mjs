@@ -7,7 +7,7 @@
  * Launcher zufällig gestartet wurde. Ein `.desktop`-Eintrag überlebt den Aufruf,
  * der ihn geschrieben hat: zeigt er danach auf ein untaugliches Node, startet der
  * Klick in einen Fehler, den niemand sieht. Außerdem gab es keinen
- * Paketierungsweg (nur einen Satz in `docs/STARTER-PLAN.md`).
+ * Paketierungsweg (nur ein Satz im Starter-Plan, nicht im Baum).
  *
  * Gepinnt wird:
  *   1. Exec nennt ABSOLUTE Pfade, und das Node-Binary ist gegen `engines`

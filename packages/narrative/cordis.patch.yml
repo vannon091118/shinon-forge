@@ -3,7 +3,7 @@
 # Beobachtet Events, baut Chronicle, trackt Arcs und Relationships,
 # leitet Composite-Zustand deterministisch ab.
 #
-# Architektur (aus docs/archive/SYSTEM-ANALYSIS.md):
+# Architektur (aus der Systemanalyse, festgehalten im Dev-Tagebuch):
 #   REAL EVENT → OBSERVATION → EVIDENCE → NARRATIVE → PERSONA STATE → VOICE
 #
 # Niemals umgekehrt. Narrative ist Interpretation, nie technische Autorität.

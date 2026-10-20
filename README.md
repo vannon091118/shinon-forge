@@ -9,7 +9,7 @@
 <a href="https://github.com/vannon091118/shinon-forge/releases"><img src="https://img.shields.io/badge/version-v0.4.0-7B2FF7?style=for-the-badge&logo=git&logoColor=white" alt="Version (Spiegel von package.json, Zahl: docs/ZAHLEN.md §1)"/></a>&nbsp;
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6B7280?style=for-the-badge" alt="MIT"/></a>&nbsp;
 <a href="package.json"><img src="https://img.shields.io/badge/node-%5E22.19.0%20%7C%7C%20%3E%3D24-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node (Spiegel von package.json, Zahl: docs/ZAHLEN.md §1)"/></a>&nbsp;
-<a href="docs/INDEX.md"><img src="https://img.shields.io/badge/DOKU-INDEX-1D4ED8?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Doku-Index"/></a>&nbsp;
+<a href="AGENTS.md"><img src="https://img.shields.io/badge/DOKU-AGENTS-1D4ED8?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Agenten-Regeln"/></a>&nbsp;
 <a href="docs/ZAHLEN.md"><img src="https://img.shields.io/badge/ZAHLEN-belegt-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Zahlen"/></a>
 
 <br/><br/>
@@ -24,7 +24,7 @@
 ---
 
 > **Status:** current — Einstieg in das Repository. **Stand:** 2026-10-17
-> **Dokumentation:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Geschichte:** `docs/TAGEBUCH.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 ---
 
@@ -108,14 +108,14 @@ npm run profile:links
                                          (Layer und Bundles: docs/ZAHLEN.md §2)
 DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config
 
-# 5. Booten (Web-UI)   → im Frischklon mit HTTP 200 belegt, siehe docs/S3-FRESH-d8999ab.md
+# 5. Booten (Web-UI)   → im Frischklon mit HTTP 200 belegt (Tagebuch, 2026-10-17)
 DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon
 ```
 
 Schritt 4 ist belegt (`node scripts/shinon-profile-test.mjs`, Exit 0, Zahl: `docs/ZAHLEN.md` §2).
-Schritte 2, 3 und 5 sind am 2026-10-17 in einem frischen Klon mit Exit-Codes belegt:
-`docs/S3-FRESH-d8999ab.md` (`npm ci` Exit 0, 29 Links Exit 0, UI HTTP 200 mit 41 314 Bytes
-HTML). Für Schritte, die einen Modellschlüssel oder einen Browser brauchen, gibt
+Schritte 2, 3 und 5 sind am 2026-10-17 in einem frischen Klon mit Exit-Codes belegt
+(`docs/TAGEBUCH.md`, Kapitel 2026-10-17; `npm ci` Exit 0, 29 Links Exit 0, UI HTTP 200
+mit 41 314 Bytes HTML). Für Schritte, die einen Modellschlüssel oder einen Browser brauchen, gibt
 es hier keinen Beleg — sie stehen in `docs/ZAHLEN.md` §4 unter „nicht geprüft“.
 
 `shinon doctor` ist seit 2026-10-17 die read-only Diagnose für v0.4.0: `bin/shinon.mjs`
@@ -181,7 +181,7 @@ gesetzt, Modell im Katalog dieses Providers — statt eines Namens.
 Ein Paket ist ein Ordner unter `packages/`. Vier Rollendateien sind Pflicht
 (`index.js`, `client.js`, `cordis.patch.yml`, `package.json`); zusätzlich erlaubt sind
 `assets/`, `test/` und benannte Ausnahmen — die **eine** verbindliche Aussage dazu
-steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
+steht in [`AGENTS.md`](AGENTS.md), Abschnitt Conventions.
 
 | Paket | Rolle | Profil |
 |---|---|---|
@@ -209,9 +209,9 @@ steht in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2.
 
 Die Spalte „Profil“ ist gemessen aus `profiles/shinon/package.json` (Zahl: `docs/ZAHLEN.md` §1).
 `mobile` und `openapi` stehen nicht darin — bei `openapi` dokumentierte Entscheidung
-(`docs/ARCHITECTURE.md` §4), bei `mobile` Vorbereitung (`0.1.0`, Weg ins Mobile-Profil).
+(`AGENTS.md`, Abschnitt Conventions), bei `mobile` Vorbereitung (`0.1.0`, Weg ins Mobile-Profil).
 Beide tragen selbst `"dsh": { "inactive": true }` im eigenen Manifest (`dead-package`-Gate).
-Das Shinon-Forge-Paket ist gelöscht (Beleg: `docs/CHANGELOG.md`).
+Das Shinon-Forge-Paket ist gelöscht (Beleg: `docs/TAGEBUCH.md`, 2026-10-11).
 Alle Pakete sind eingecheckt; ob ein Paket aktiv ist, entscheidet
 allein `dsh.profile.bundles` im Profil (Bestandszahlen: `docs/ZAHLEN.md` §1).
 
@@ -238,7 +238,7 @@ allein `dsh.profile.bundles` im Profil (Bestandszahlen: `docs/ZAHLEN.md` §1).
 ```
 
 **Regel:** DSH ist die Laufzeit, wir bauen Schichten darauf — kein zweiter Kernel
-daneben. Verbindlich: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+daneben. Verbindlich: [`AGENTS.md`](AGENTS.md).
 
 ---
 
@@ -280,7 +280,7 @@ Die Befehle aus `package.json` (`scripts`), in der Reihenfolge, in der man sie b
 |---|---|
 | `npm test` | schneller lokaler Pfad (Sekunden): statisches Gate + lokale Engine-Slices — die einzige Option für den Alltag; stoppt beim ersten Fehler |
 | `npm run test:full` | volle Kette (nur CI/auf Zuruf): Codingmon-Tests → Gate → Fixtures → Distribution → Profil (stoppt beim ersten Fehler) |
-| `node scripts/shinon-test.mjs` | statisches Gate: Manifest, Namensvertrag, `index.js`, `client.js`, `cordis.patch.yml`, Legacy-Guard, Quell-Zwillings-Drift, Profil |
+| `node scripts/shinon-test.mjs` | statisches Gate: Manifest, Namensvertrag, `index.js`, `client.js`, `cordis.patch.yml`, Legacy-Guard, Quell-Zwillings-Drift, Profil, Kanon, Struktur (Klassen, Grenzen, Bestand) |
 | `node scripts/validate-test.mjs` | Regel-Fixtures: jede Regel muss Gate **und** Build rot werden |
 | `node scripts/pack-test.mjs` | Distribution je Paket: `npm pack` → entpacken → isoliert installieren → laden |
 | `node scripts/shinon-profile-test.mjs` | Profiltest: `dsh --profile shinon --dump-config`, alle Layer |
@@ -309,11 +309,11 @@ Die Befehle aus `package.json` (`scripts`), in der Reihenfolge, in der man sie b
 
 Offene Arbeit steht genau einmal — in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 Rote Prüfläufe stehen in [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §3, Erledigtes in
-[`docs/CHANGELOG.md`](docs/CHANGELOG.md). Eine zweite Liste hier wäre die
+[`docs/TAGEBUCH.md`](docs/TAGEBUCH.md). Eine zweite Liste hier wäre die
 zweite Wahrheit.
 
 Open work lives in exactly one place — [`docs/ROADMAP.md`](docs/ROADMAP.md).
-Red runs: [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §3, done: [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
+Red runs: [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §3, done: [`docs/TAGEBUCH.md`](docs/TAGEBUCH.md).
 
 ---
 
@@ -330,23 +330,20 @@ Shinon-forge/
 │   ├── shinon/                # kanonisches Profil (dsh.profile.bundles, cordis.patch.yml)
 │   └── headless/              # One-shot-Profil (Modell-Route)
 ├── docs/
-│   ├── INDEX.md               # Einstieg + Statusregel für jedes Dokument
+│   ├── TAGEBUCH.md            # erzählte Timeline, je Kapitel an Commit und Pfad gebunden
 │   ├── ZAHLEN.md              # einziger Eigentümer aller harten Zahlen
-│   ├── ARCHITECTURE.md        # Namespace, Paketgrenzen, Profil-Vertrag
+│   ├── ROADMAP.md             # einzige Liste offener Arbeit
 │   ├── COMMIT-REGELN.md       # Commit-Regeln und Durchsetzung
-│   ├── S*-Protokolle (S3/S4/S5/S6: Release-Belege 2026-10-17, current)
 │   ├── contracts/             # Verträge (JSON, mit Statusfeld)
 │   ├── probes/                # Falsifikations-Proben (JSON, mit Datum)
-│   ├── archive/               # abgeschlossene Stände (Regel + Umleitung: README dort)
-│   ├── audit/                 # laufende Nachweise (transient, wandern nach Abschluss ins Archiv)
 ├── IDEA.md · shinon-forge-implementierungsplan.md   # current bzw. historical (Statusblock im Kopf)
 ├── scripts/                   # Gate-Engine, Build, Tests, Helfer (gate/, lib/, *.mjs)
 ├── assets/banner.svg
 └── profiles/shinon/          # out-of-tree-Profil (package.json, cordis.patch.yml, cordis.yml)
 ```
 
-Jede Datei in `docs/` trägt einen Statusblock; die vollständige Liste steht in
-[`docs/INDEX.md`](docs/INDEX.md) §3.
+`docs/` hat vier Dokumente — Tagebuch (Geschichte), Zahlen (Zahlen), Roadmap (offen),
+Commit-Regeln (Durchsetzung) — dazu `contracts/` und `probes/`.
 
 ---
 

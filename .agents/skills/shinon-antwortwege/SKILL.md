@@ -6,7 +6,7 @@ description: Wo Antworten zu DSH/Cordis schnell herkommen - Doku-Karte mit Pfade
 # Antwortwege: raten ist langsam, nachschlagen ist schnell
 
 > **Status:** current — Arbeitsanweisung; Aussagen gegen `AGENTS.md` und den Baum abgeglichen am 2026-10-19. · **Stand:** 2026-10-19
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Die DSH-Doku ist öffentlich und nach **Frage-Typ** sortiert. Erst die passende
 Quelle wählen, dann lesen — und was gelesen wurde, mit Fundstelle festhalten
@@ -56,7 +56,7 @@ installierten Fassung** — Probe-Muster `docs/probes/goal-integration.json`:
 
 | Frage | Ort |
 |---|---|
-| Konvention/Vertrag des Repos | `AGENTS.md`, `docs/ARCHITECTURE.md` |
+| Konvention/Vertrag des Repos | `AGENTS.md` |
 | Ist diese Bug-Klasse bekannt? | `.agents/skills/shinon-bug-muster` (Katalog B1–B14) |
 | Wie nutze ich Cordis hier maximal? | `.agents/skills/cordis-architektur` |
 | Welcher Check wann? | `.agents/skills/shinon-dev-workflow`, `.agents/skills/shinon-test-tempo` |

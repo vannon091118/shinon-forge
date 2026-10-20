@@ -10,7 +10,7 @@
  * wirft (`cannot get property "locale" without inject`) und kostet die ganze
  * Aktivierung. Die bis dahin einzigen Client-Tests hängten die Bundles an ein
  * PLATTES Attrappen-`ctx` an — ein flaches Objekt kann nicht werfen, also war der
- * Fehler unsichtbar (docs/testing.md: „test the real entry path“).
+ * Fehler unsichtbar (Regel: „test the real entry path“).
  *
  * Zwei Wachen, absichtlich mit verschiedenem Geltungsbereich (der Vertrag, den sie
  * prüfen, steht in der ausgelieferten Fassung: `dsh-cordis-client-runner/lib/client.js`

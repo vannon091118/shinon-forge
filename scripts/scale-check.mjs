@@ -24,7 +24,7 @@
  * Ordners braucht, um die Ketten grün zu halten (`npm run idioms` schreibt den
  * generierten Block aus der Erklärung im Paket). Was er NICHT misst: ein neues
  * Paket, das ins PROFIL soll — das ist bewusst Handarbeit (Patch + Profil-Manifest,
- * siehe docs/ARCHITECTURE.md §2) und braucht ein Install.
+ * siehe `AGENTS.md`, Abschnitt Conventions) und braucht ein Install.
  *
  * Aufruf:
  *   node scripts/scale-check.mjs [--plugins N] [--keep] [--json <pfad>]

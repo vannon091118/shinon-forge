@@ -931,7 +931,7 @@ const setMeta = (db, key, value) => db.prepare('insert or replace into meta(key,
  * Mehrere meta-Werte in EINER Transaktion.
  *
  * Jede Transaktion ist ein fsync: das Oeffnen schrieb sieben einzelne und zahlte
- * den Festpreis siebenmal (Messung: docs/audit/PERF-BASELINE-2026-10-17.md).
+ * den Festpreis siebenmal (Messung: docs/probes/perf-baseline.json).
  * Nur ausserhalb einer laufenden Transaktion aufrufen — SQLite verschachtelt nicht.
  */
 function setMetaMany(db, entries) {
@@ -1201,7 +1201,7 @@ function indexFile(db, root, absolute, file, options) {
   const safe = redactSecrets(file.text);
   // Nur eine Datei mit Vorzeilen kann gelöschte Zeilen haben; auf einer frischen
   // Datei sind neun Deletes gegen eine wachsende FTS-Tabelle Wegwerfzeit
-  // (gemessen ~1,0 s je Kaltlauf, docs/audit/PERF-BASELINE-2026-10-17.md §5).
+  // (gemessen ~1,0 s je Kaltlauf, docs/probes/index-cold-breakdown.json).
   if (options.known !== false) forgetFile(db, path);
 
   db.prepare('insert or replace into files(path, language, bytes, mtime_ms, digest, indexed_at_ms, stamp) values (?, ?, ?, ?, ?, ?, ?)')

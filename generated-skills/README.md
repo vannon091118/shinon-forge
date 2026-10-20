@@ -1,7 +1,7 @@
 # Generierte Skills — Zettel
 
 > **Status:** current — das Verzeichnis der Zettel (Zug 4, 2026-10-12). **Stand:** 2026-10-12
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Ein **Zettel** ist eine Lesson in der Form **„bei X immer Y, weil Z"** — nicht
 offensichtlich, aus einer gelösten Aufgabe gelernt. Er ist kein Log: „am 12.03.

@@ -8,7 +8,7 @@
  * Export, der die importfreie Datei `assets/seams.js` herausgibt.
  *
  * Warum dann überhaupt `Config` und `apply()`? Weil die Form eines Pakets in
- * diesem Repo EINE ist (`docs/ARCHITECTURE.md` §2): vier Rollendateien, Gate
+ * diesem Repo EINE ist (`AGENTS.md`, Abschnitt Conventions): vier Rollendateien, Gate
  * und Build prüfen sie bei jedem Paket. Ein Paket ohne Hälften wäre eine
  * zweite Bauform, und die kostet mehr, als sie spart. `dsh.inactive: true` im
  * Manifest sagt zugleich, dass kein Profil dieses Bundle lädt.

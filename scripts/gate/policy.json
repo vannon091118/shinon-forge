@@ -11,15 +11,13 @@
       "legacy-guard",
       "profile",
       "typescript",
-      "dsh-singleton",
-      "docs-status"
+      "dsh-singleton"
     ],
     "local": [
       "bundle-resolution",
       "contract",
       "legacy-guard",
-      "dsh-singleton",
-      "docs-status"
+      "dsh-singleton"
     ],
     "slices": {
       "package-drift": {
@@ -106,17 +104,6 @@
           "profiles/",
           "scripts/gate/plugins/markers.mjs",
           "scripts/gate/tests/markers.test.mjs"
-        ]
-      },
-      "docs-status": {
-        "prefixes": [
-          "docs/",
-          "AGENTS.md",
-          "README.md",
-          "IDEA.md",
-          "THIRD_PARTY_NOTICES.md",
-          ".agents/",
-          ".shinon/"
         ]
       },
       "commit-trailer": {

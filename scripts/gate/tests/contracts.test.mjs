@@ -78,7 +78,7 @@ test('probe-twin: Vokabular wird erzwungen', () => {
 });
 
 test('probe-twin: der Nachtrag braucht Datum, Geltungsbereich und Nachmessung', () => {
-  // Das Feld ersetzt das stille Umschreiben eines Belegtextes (docs/INDEX.md §2).
+  // Das Feld ersetzt das stille Umschreiben eines Belegtextes (AGENTS.md).
   const good = { ...goodProbe, nachtrag: { date: '2026-10-10', scope: 'Geometrie', note: 'neu gezeichnet' } };
   assert.deepEqual(probeIssues(good, 'p.json'), []);
   assert.ok(probeIssues({ ...goodProbe, nachtrag: '2026-10-10, irgendwas' }, 'p.json')[0].includes('Objekt'), 'ein bloßer Text ist keine standardisierte Nachmessung');

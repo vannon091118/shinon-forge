@@ -10,7 +10,7 @@ name: Shinon Forge Release-Schranke (S5)
 # Warum `git archive` statt `npm pack`: die Schranke prüft den AUSGELIEFERTEN
 # Quellbaum (derselbe Baum, den ein Klon sieht), nicht ein Paket-Tarball. Der
 # Archivbau ist deterministisch pro Commit: zwei Läufe desselben SHAs liefern
-# dasselbe SHA-256 (belegt in docs/S5-RELEASE-2026-10-17.md). Der Workflow baut
+# dasselbe SHA-256 (belegt im Dev-Tagebuch, 2026-10-17, `c30112c`). Der Workflow baut
 # deshalb einmal und vergleicht gegen einen zweiten Lauf — weicht er ab, ist der
 # Baum nicht reproduzierbar und der Zweig wird rot, statt ein Archiv zu
 # behaupten.

@@ -1,7 +1,7 @@
 # @shinon/narrative — Narrative Engine
 
 > **Status:** current — Paket-Doku Narrative Engine. **Stand:** 2026-10-17
-> **Einstieg:** `docs/INDEX.md` · **Zahlen:** `docs/ZAHLEN.md`
+> **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 **Stand der Umsetzung:** aktiv im Profil (`shinon-narrative`); der Composite geht
 auf `shinon/narrative/state` hinaus und wird von Persona und Veredler gelesen.
@@ -211,4 +211,4 @@ Codingmon kann Narrative-Events nutzen, um XP/Battles basierend auf tatsächlich
 ---
 
 *Erstellt: 2026-10-07*  
-*Quelle: `docs/archive/SYSTEM-ANALYSIS.md`, SyxCraft Commit Layer, DOKI*
+*Quelle: SyxCraft Commit Layer, DOKI (Systemanalyse im Dev-Tagebuch)*

@@ -29,7 +29,7 @@ export const VERDICTS = ['PLAN', 'RESEARCH', 'ASK', 'WRITE'];
  * `nachtrag` — die standardisierte Nachmessung.
  *
  * Warum es das Feld gibt und warum es eine FORM hat: eine Probe wird nicht
- * nachträglich aktuell gemacht (`docs/INDEX.md` §2), aber eine Aussage kann durch
+ * nachträglich aktuell gemacht (ein Beleg wird nicht umgeschrieben), aber eine Aussage kann durch
  * eine spätere Messung teilweise überholt sein. Statt den Belegtext still zu
  * überschreiben, trägt die Probe einen Nachtrag mit DATUM und GELTUNGSBEREICH —
  * maschinenlesbar, damit er nicht zur Prosa wird, die niemand prüft.
