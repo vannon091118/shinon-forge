@@ -36,7 +36,7 @@
  * — das war die Falle, die `DSH_HOME=` auf das CWD zeigen ließ).
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -120,6 +120,56 @@ export function isInstalled(env = process.env) {
   return installRoot(env) !== WORKSPACE_ROOT;
 }
 
+/**
+ * Der Pfad, den das Dateisystem wirklich kennt — Symlinks aufgeloest.
+ * `~/.local/opt` ist auf dieser Maschine ein Link auf die SSD; wer nur den
+ * Pfad vergleicht, vergleicht zwei Schreibweisen desselben Ortes und
+ * erkennt ihn nicht.
+ * @param {string} path
+ * @returns {string}
+ */
+function realPath(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
+ * Der Zustand des Installats: welcher Baum ist als Installat registriert?
+ * Das Werkzeug `scripts/install-user.mjs` schreibt ihn; er ist die einzige
+ * Stelle, die weiss, dass ein Baum ein NUTZER-Installat ist.
+ * @param {object} [env]
+ * @returns {{installDir: string}|null}
+ */
+function installState(env = process.env) {
+  try {
+    const parsed = JSON.parse(readFileSync(join(stateDir(env), 'install-state.json'), 'utf8'));
+    return typeof parsed?.installDir === 'string' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `true`, wenn dieser Baum das registrierte NUTZER-Installat ist.
+ *
+ * WARUM DAS EIGENTLICH NÖTIG WAR (gemessen am 2026-10-21): die Trennung
+ * „Entwicklerbaum hat .git, ein Installat nicht" gilt nur für das Paket unter
+ * /opt. Das Nutzer-Installat ist ein KLON und hat .git — es wurde also als
+ * Entwicklerbaum erkannt, benutzte das Home des Entwicklerbaums und stolperte
+ * über dessen Verknüpfungen. Der Zustand des Installats sagt die Wahrheit:
+ * er nennt das Verzeichnis, das als Installat registriert wurde.
+ * @param {object} [env]
+ * @returns {boolean}
+ */
+export function isInstallat(env = process.env) {
+  const state = installState(env);
+  if (state === null) return false;
+  return realPath(state.installDir) === realPath(WORKSPACE_ROOT);
+}
+
 /** Einstellungen (XDG_CONFIG_HOME bzw. AppData). */
 export function configDir(env = process.env) {
   return baseDir('config', env);
@@ -158,10 +208,11 @@ export function logDir(env = process.env) {
 export function dshHome(env = process.env) {
   const explicit = absoluteOverride('DSH_HOME', env);
   if (explicit !== null) return explicit;
-  // Zwei Bäume, zwei Homes: der Entwicklerbaum hat `.git`, ein Installat nicht.
+  // Zwei Bäume, zwei Homes: der Entwicklerbaum ist der Arbeitsbaum, das
+  // Installat ist der registrierte Nutzer-Installat oder das Paket unter /opt.
   // Ohne diese Trennung würden Repo und Installat dasselbe Home seeden — und der
   // zweite Start fände die Verknüpfungen des ersten (die niemand überschreibt).
-  const devTree = !isInstalled(env) && existsSync(join(WORKSPACE_ROOT, '.git'));
+  const devTree = !isInstalled(env) && !isInstallat(env) && existsSync(join(WORKSPACE_ROOT, '.git'));
   return join(stateDir(env), devTree ? 'dev-dsh-home' : 'dsh-home');
 }
 
@@ -184,6 +235,7 @@ export function describePaths(env = process.env) {
     workspaceRoot: workspaceRoot(),
     installRoot: installRoot(env),
     installed: isInstalled(env),
+    installat: isInstallat(env),
     configDir: configDir(env),
     dataDir: dataDir(env),
     stateDir: stateDir(env),

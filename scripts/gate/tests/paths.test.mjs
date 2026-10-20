@@ -18,7 +18,8 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { homedir } from 'node:os';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import {
@@ -31,6 +32,7 @@ import {
   dshHome,
   indexRoot,
   installRoot,
+  isInstallat,
   isInstalled,
   isInside,
   ledgerFile,
@@ -139,4 +141,30 @@ test('paths: isInside kennt die Präfix-Falle', () => {
   // ist /opt/opt/x/z und liegt damit AUSSERHALB von /opt/x.
   assert.equal(isInside('/opt/x', '/opt/x/../opt/x/z'), false);
   assert.equal(isInside('/opt/x', resolve('/opt/x/./y')), true, 'ein "." bleibt im Baum');
+});
+
+test('paths: ein registriertes Nutzer-Installat hat sein eigenes Home', () => {
+  // DER BEFUND (2026-10-21): das Nutzer-Installat ist ein KLON und hat .git —
+  // es sah damit wie ein Entwicklerbaum aus, benutzte dessen Home und stolperte
+  // über dessen Verknüpfungen. Der Zustand des Installats entscheidet die
+  // Frage, nicht das Vorhandensein von .git.
+  const base = mkdtempSync(join(tmpdir(), 'shinon-paths-'));
+  const state = join(base, 'state');
+  mkdirSync(join(state, 'shinon'), { recursive: true });
+  const env = { ...CLEAN, XDG_STATE_HOME: state };
+
+  writeFileSync(join(state, 'shinon', 'install-state.json'), JSON.stringify({ schemaVersion: 1, installDir: workspaceRoot() }));
+  assert.equal(isInstallat(env), true, 'dieser Baum ist als Installat registriert');
+  assert.match(dshHome(env), /dsh-home$/);
+  assert.doesNotMatch(dshHome(env), /dev-dsh-home$/, 'das Entwicklerbaum-Home gehört dem Entwicklerbaum');
+
+  // Ein Zustand, der einen ANDEREN Baum nennt, ändert hier nichts.
+  writeFileSync(join(state, 'shinon', 'install-state.json'), JSON.stringify({ schemaVersion: 1, installDir: '/woanders' }));
+  assert.equal(isInstallat(env), false);
+  assert.match(dshHome(env), /dev-dsh-home$/);
+
+  // Ein kaputter Zustand ist kein Zustand: der Baum bleibt Entwicklerbaum.
+  writeFileSync(join(state, 'shinon', 'install-state.json'), '{ kaputt');
+  assert.equal(isInstallat(env), false);
+  assert.match(dshHome(env), /dev-dsh-home$/);
 });

@@ -764,6 +764,15 @@ Belegt: `npm test` Exit 0, statisches Gate 126/126, Verteilungs-Test 92/92,
 Profiltest 4/4 mit 20 Paket-Bundles, `packages/version/test/version.test.mjs` 8/8 und
 `scripts/gate/tests/version-package.test.mjs` 7/7.
 
+Der Tag hatte noch eine zweite Baustelle, und sie kam aus dem Auftrag selbst: das
+Nutzer-Installat ist ein KLON und hat `.git` — die Regel „der Entwicklerbaum hat `.git`,
+ein Installat nicht" galt nur fuer das Paket unter `/opt`. Das Installat erkannte sich
+damit als Entwicklerbaum, nahm dessen Home und stolperte ueber dessen Verknuepfungen;
+die Abnahme blieb rot (`shinon --check Exit 2`). Der Zustand des Installats entscheidet
+die Frage jetzt (`scripts/lib/paths.mjs`, `isInstallat()`), und
+`scripts/gate/tests/paths.test.mjs` pinnt beide Faelle: dieser Baum registriert, dieser
+nicht.
+
 Ausserhalb des Baums war dieser Tag ein Aufräumtag: drei Altbestaende wurden geloescht
 (der 70 Commits alte Klon unter `~/Projekte`, das Duplikat auf der SSD und der
 Notiz-Scratch), die Draft-PRs wurden geschlossen, und uebrig bleiben `main` und der
