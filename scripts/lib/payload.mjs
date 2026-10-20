@@ -191,12 +191,34 @@ export function stageCode({ source, stage }) {
  *
  * @returns {{command: string, prefix: string[]}}
  */
-export function npmCommand(env = process.env) {
+export function npmCommand(env = process.env, platform = process.platform) {
   const execpath = env.npm_execpath;
   if (typeof execpath === 'string' && execpath !== '' && existsSync(execpath)) {
     return { command: process.execPath, prefix: [execpath] };
   }
-  return { command: process.platform === 'win32' ? 'npm.cmd' : 'npm', prefix: [] };
+  return { command: platform === 'win32' ? 'npm.cmd' : 'npm', prefix: [] };
+}
+
+/**
+ * Wie npm gestartet wird — Plattformregel und Shell in EINER Antwort.
+ *
+ * Die zweite Haelfte ist der gemessene Fehler: `npm.cmd` ist unter Windows eine
+ * Stapeldatei, und Node startet Stapeldateien seit dem Sicherheitsfix
+ * (CVE-2024-27980, Node >= 18.20/20.12) NUR noch ueber eine Shell. Ohne `shell`
+ * endet der Start mit `EINVAL` — nicht mit `ENOENT`. Genau das ist im Windows-Bau
+ * der CI passiert (Run 39502642170, Job „Paket bauen (Windows-ZIP)":
+ * `spawnSync npm.cmd EINVAL`), waehrend derselbe Code unter Linux gruen war.
+ *
+ * `shell` gilt deshalb NUR fuer den Stapeldatei-Fall. Laeuft der Aufruf ueber
+ * `npm run`, ist das Programm `process.execPath` (node.exe, keine Stapeldatei)
+ * und kommt ohne Shell aus — eine Shell dort waere eine zweite Auslegung von
+ * Argumenten, die niemand braucht.
+ *
+ * @returns {{command: string, args: string[], shell: boolean}}
+ */
+export function npmSpawn(env = process.env, platform = process.platform) {
+  const { command, prefix } = npmCommand(env, platform);
+  return { command, args: prefix, shell: platform === 'win32' && prefix.length === 0 };
 }
 
 /**
@@ -208,15 +230,14 @@ export function npmCommand(env = process.env) {
  * die Entwicklerpakete mit und ist plattformgebunden (falsche native Dateien
  * auf dem Zielsystem).
  *
- * `spawnSync` statt `execFileSync`: auf Windows ist `npm.cmd` eine Stapel-
- * datei, und der Weg dorthin laeuft ueber die Kommandozeile. `spawnSync`
- * nimmt das ueber libuv an (es startet `cmd.exe /c`), `execFileSync` tut es
- * nicht — daher der gemessene `ENOENT`.
+ * Gestartet wird ueber `spawnSync` mit der Antwort aus `npmSpawn` — nicht mit
+ * `execFileSync`, weil das eine Stapeldatei gar nicht erst aufloest.
  * @param {{stage: string, cwd?: string}} options
  */
 export function installModules({ stage }) {
-  const { command, prefix } = npmCommand();
-  const result = spawnSync(command, [...prefix, 'ci', '--omit=dev', '--no-audit', '--no-fund'], {
+  const { command, args, shell } = npmSpawn();
+  const result = spawnSync(command, [...args, 'ci', '--omit=dev', '--no-audit', '--no-fund'], {
+    shell,
     cwd: stage,
     stdio: ['ignore', 'inherit', 'inherit'],
     env: { ...process.env, npm_config_update_notifier: 'false' },

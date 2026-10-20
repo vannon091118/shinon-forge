@@ -28,7 +28,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, s
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
-  buildPayload, launcherCmd, launcherSh, nodeArchiveName, nodeTarget, npmCommand, payloadViolations,
+  buildPayload, launcherCmd, launcherSh, nodeArchiveName, nodeTarget, npmCommand, npmSpawn, payloadViolations,
 } from '../../lib/payload.mjs';
 import {
   debControl, debDesktopEntry, debPathStarter, debPostinst, installPs1, uninstallPs1,
@@ -245,4 +245,23 @@ test('der Paketbau nimmt das npm, das zu diesem Node gehoert', () => {
   const withExecpath = npmCommand({ npm_execpath: script });
   assert.equal(withExecpath.command, process.execPath, 'der laufende Node startet das npm');
   assert.deepEqual(withExecpath.prefix, [script], 'und zwar genau das genannte npm');
+});
+
+test('die Stapeldatei braucht eine Shell, und nur sie', () => {
+  // Gemessen im Windows-Bau der CI (Run 39502642170, Job „Paket bauen
+  // (Windows-ZIP)"): `spawnSync npm.cmd EINVAL`. Node startet Stapeldateien seit
+  // dem Sicherheitsfix (CVE-2024-27980) nur noch ueber eine Shell; derselbe Code
+  // war unter Linux gruen. Die Regel ist deshalb: Shell GENAU dann, wenn eine
+  // Stapeldatei gestartet wird — nicht pauschal auf Windows.
+  assert.deepEqual(npmSpawn({}, 'win32'), { command: 'npm.cmd', args: [], shell: true }, 'unter Windows: npm.cmd mit Shell');
+  assert.deepEqual(npmSpawn({}, 'linux'), { command: 'npm', args: [], shell: false }, 'unter Linux: npm ohne Shell');
+
+  // Laeuft der Aufruf ueber `npm run`, ist das Programm der laufende Node — eine
+  // ausfuehrbare Datei, keine Stapeldatei. Dann waere eine Shell eine zweite
+  // Auslegung der Argumente, die niemand braucht.
+  const script = join(ROOT, 'scripts', 'lib', 'payload.mjs');
+  const viaNode = npmSpawn({ npm_execpath: script }, 'win32');
+  assert.equal(viaNode.command, process.execPath);
+  assert.deepEqual(viaNode.args, [script]);
+  assert.equal(viaNode.shell, false, 'node.exe braucht keine Shell');
 });
