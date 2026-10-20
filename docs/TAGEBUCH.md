@@ -375,6 +375,15 @@ haette den Tag ohne diesen Abschnitt rot gelassen, weil er fuer jeden Tag mit
 Commits ein Kapitel verlangt: die Geschichte ist hier keine Beigabe, sondern
 eine der Bedingungen, unter denen der Baum ueberhaupt gruen sein darf.
 
+Den Abschluss machte die Pruefung selbst: auf `fdb1cdd` lief `npm run gate:test`
+mit Exit 0 — 780 Tests, 780 bestanden, 0 uebersprungen — und `npm test` mit Exit 0
+(4 gelaufen, 19 geskippt, 0 fehlgeschlagen), beide mit frischem `XDG_STATE_HOME`
+und gelesenem Exit-Status statt behauptetem. Die 767 aus dem Kanon-Abschnitt
+waren der Stand von `38b66cc`; die beiden heute gebuchten Suiten legen die
+Differenz dazu. Deshalb steht die Zahl hier mit ihrem Commit und nicht als
+absolute Wahrheit neben sich: eine Testzahl ohne den Stand, an dem sie gemessen
+wurde, ist wie ein Thermometer ohne Datum.
+
 Heute zusaetzlich: `scripts/lib/diary.mjs`, `scripts/lib/canon.mjs`,
 `scripts/lib/structure.mjs`, `docs/contracts/structure.json`,
 `packages/prompter/assets/pre-step.js`, `packages/prompter/assets/runtime-state.js`,
