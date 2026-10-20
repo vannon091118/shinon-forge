@@ -19,6 +19,7 @@ import { join, relative } from 'path';
 import * as repo from './lib/repo.mjs';
 import { diaryIssues } from './lib/diary.mjs';
 import { canonIssues } from './lib/canon.mjs';
+import { structureIssues } from './lib/structure.mjs';
 
 const DIST = join(repo.ROOT, 'dist');
 
@@ -70,6 +71,7 @@ for (const issue of repo.hostMirrorIssues()) problems.push(`Host-Spiegel: ${issu
 for (const issue of diaryIssues()) problems.push(`Tagebuch: ${issue}`);
 // Kanon: ein Name, eine Schreibweise, eine Definition — Globals, Vertraege, Dienste.
 for (const issue of canonIssues()) problems.push(`Kanon: ${issue}`);
+for (const issue of structureIssues()) problems.push(`Struktur: ${issue}`);
 // Generierte Idiome: dieselbe Regel für die Plugin-Bausteine — die Ableitung in den
 // Paketen muss zeichengenau zu scripts/lib/plugin-idioms.mjs passen.
 for (const half of ['index.js', 'client.js']) {

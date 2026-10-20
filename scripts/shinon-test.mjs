@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import * as repo from './lib/repo.mjs';
 import { diaryHistory, diaryIssues } from './lib/diary.mjs';
 import { canonIssues } from './lib/canon.mjs';
+import { structureIssues } from './lib/structure.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -129,6 +130,10 @@ if (diary.skip) {
 // Dienste und Begriffe stehen in `docs/contracts/canon.json`.
 console.log('\n📖 Kanon:');
 checkIssues('ein Name, eine Schreibweise, eine Definition', () => canonIssues());
+
+// Struktur: Klassen, Grenzen, Eigentum — was waechst, waechst nicht heimlich.
+console.log('\n🧱 Struktur:');
+checkIssues('jede Datei hat eine Klasse, keine ueberschreitet ihre Grenze', () => structureIssues());
 
 console.log('\n🧩 Generierte Idiome:');
 checkIssues('eine Quelle, generierte Blöcke — kein Drift', () => [

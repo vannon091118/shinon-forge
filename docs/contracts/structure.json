@@ -1,0 +1,124 @@
+{
+  "contract": "shinon.structure/v1",
+  "name": "Struktur — Klassen, Grenzen, Eigentum",
+  "status": "IMPLEMENTED",
+  "stand": "2026-10-20",
+  "regel": "Jede Laufzeitdatei gehört genau EINER Klasse. Die Grenze je Klasse ist aus der Messung abgeleitet (Median/max am 2026-10-20), nicht geraten: was darunter liegt, darf nicht wachsen; was darüber liegt, steht namentlich im `bestand` und darf nur sinken.",
+  "rules": [
+    {
+      "positive": "`structureIssues()` ist leer: jede Datei hat eine Klasse, keine überschreitet ihre Grenze, jede Bestandsdatei steht auf ihrem eingefrorenen Wert.",
+      "forbidden": "Eine Datei ohne Klassenmuster, eine Zeile über der Klassengrenze und ein Eintrag im `bestand`, der nicht mehr stimmt.",
+      "fallback": "Fehlt die Registry, endet der Schritt mit einem Befund; es gibt keinen stillen Erfolg und keine geratene Grenze.",
+      "error": "Der Befund nennt Datei, Klasse, Ist-Zeilen und Grenze; Gate und Build enden Exit 1.",
+      "trace": "Jede Klassenzeile trägt `muster`, `grenze` und die Messung (`gemessen`), aus der die Grenze folgt.",
+      "replay": "`node --test scripts/gate/tests/structure.test.mjs` prüft den echten Baum und sieben Mutationen auf einem Miniatur-Baum.",
+      "invariant": "Grenzen bremsen Wachstum, ohne Arbeit zu erfinden: kein Bestandseintrag verlangt heute einen Schnitt, und kein neuer Eintrag entsteht ohne Messung."
+    }
+  ],
+  "klassen": [
+    {
+      "id": "host-entry",
+      "muster": "^packages/[^/]+/index\\.js$",
+      "grenze": 550,
+      "gemessen": {
+        "anzahl": 22,
+        "median": 184,
+        "max": 1526
+      },
+      "vertrag": [
+        "function apply("
+      ]
+    },
+    {
+      "id": "client",
+      "muster": "^packages/[^/]+/client\\.js$",
+      "grenze": 250,
+      "gemessen": {
+        "anzahl": 22,
+        "median": 77,
+        "max": 1988
+      },
+      "vertrag": [],
+      "verboten": [
+        "export const Config"
+      ]
+    },
+    {
+      "id": "core",
+      "muster": "^packages/[^/]+/assets/.*\\.js$",
+      "grenze": 650,
+      "gemessen": {
+        "anzahl": 37,
+        "median": 221,
+        "max": 2220
+      }
+    },
+    {
+      "id": "test",
+      "muster": "^(packages/[^/]+/test/.*|scripts/gate/tests/.*)\\.mjs$",
+      "grenze": 550,
+      "gemessen": {
+        "anzahl": 105,
+        "median": 176,
+        "max": 2212
+      }
+    },
+    {
+      "id": "gate-plugin",
+      "muster": "^scripts/gate/plugins/.*\\.mjs$",
+      "grenze": 100,
+      "gemessen": {
+        "anzahl": 23,
+        "median": 33,
+        "max": 821
+      },
+      "vertrag": [
+        "function check("
+      ]
+    },
+    {
+      "id": "script",
+      "muster": "^(scripts|bin)/.*\\.(js|mjs)$",
+      "grenze": 550,
+      "gemessen": {
+        "anzahl": 64,
+        "median": 180,
+        "max": 1268
+      }
+    }
+  ],
+  "bestand": {
+    "packages/codingmon/client.js": 1988,
+    "packages/codingmon/test/durchstich.test.mjs": 777,
+    "packages/core/client.js": 409,
+    "packages/dashboard/client.js": 479,
+    "packages/markers/client.js": 630,
+    "packages/persona/index.js": 1526,
+    "packages/popup/client.js": 426,
+    "packages/project-index/assets/index-core.js": 2220,
+    "packages/prompter/client.js": 285,
+    "packages/prompter/index.js": 1350,
+    "packages/scoring/assets/scoring-core.js": 784,
+    "packages/task-router/index.js": 797,
+    "packages/token-usage/client.js": 574,
+    "packages/traceability/client.js": 547,
+    "scripts/branding-check.mjs": 660,
+    "scripts/gate/plugins/commit-trailer.mjs": 238,
+    "scripts/gate/plugins/events-spine.mjs": 356,
+    "scripts/gate/plugins/markers.mjs": 234,
+    "scripts/gate/plugins/narrative.mjs": 441,
+    "scripts/gate/plugins/persona.mjs": 216,
+    "scripts/gate/plugins/probe-twin.mjs": 105,
+    "scripts/gate/plugins/scoring.mjs": 821,
+    "scripts/gate/plugins/typescript.mjs": 204,
+    "scripts/gate/tests/client-activation.test.mjs": 608,
+    "scripts/gate/tests/commit-trailer.test.mjs": 609,
+    "scripts/gate/tests/persona-state.test.mjs": 1004,
+    "scripts/gate/tests/project-index.test.mjs": 2154,
+    "scripts/gate/tests/prompter-contract.test.mjs": 2212,
+    "scripts/gate/tests/task-router.test.mjs": 919,
+    "scripts/install-user.mjs": 1187,
+    "scripts/lib/repo.mjs": 1268
+  },
+  "herleitung": "Grenze = 3 × Median der Klasse, auf 50 gerundet, mindestens 100 — Median gemessen am 2026-10-20 über alle Dateien der Klasse; alles darüber steht im bestand."
+}

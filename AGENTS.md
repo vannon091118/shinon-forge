@@ -117,7 +117,9 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   `test:*`-Skripte gehen durch den Wrapper. Dieselben Tests laufen in
   `.github/workflows/commit-guard.yml` auf jedem Push/PR.
 - `node scripts/shinon-test.mjs` → static gate: manifest, name contract, `index.js`,
-  `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution (exit 0/1).
+  `client.js`, `cordis.patch.yml`, legacy-guard, profile resolution, source twins,
+  host-seam core, dev diary, canon and structure (exit 0/1; the counted steps live in
+  `docs/ZAHLEN.md` §2).
 - `node scripts/pack-test.mjs` → per-package distribution test: `npm pack` → unpack →
   isolated `npm install` → load. Optional `--keep` retains `/tmp` work dirs for debugging.
 - `npm run install:user` → user install tool (`scripts/install-user.mjs`):
