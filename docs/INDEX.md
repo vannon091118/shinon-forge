@@ -1,0 +1,50 @@
+# INDEX — die Dokumentationskarte
+
+> **Status:** current · **Stand:** 2026-10-20
+>
+> Diese Datei ist die Karte, nicht die Wahrheit. Sie sagt, welches Dokument
+> wofür zuständig ist — und stillschweigend, wo eine Information **nicht** steht.
+> Harte Zahlen haben genau einen Eigentümer ([`ZAHLEN.md`](ZAHLEN.md)),
+> offene Arbeit genau eine Liste ([`ROADMAP.md`](ROADMAP.md)).
+
+## Wer ist wofür zuständig
+
+| Dokument | Zuständigkeit | Sprache |
+|---|---|---|
+| [`../README.md`](../README.md) | Einstieg: was ist Shinon Forge, Quickstart, Pakettabelle, Statusblock | bilingual DE/EN |
+| [`../AGENTS.md`](../AGENTS.md) | Verbindliche Regeln für Arbeit am Code: Konventionen, Pitfalls, Commit-Pflichten | deutsch |
+| [`ZAHLEN.md`](ZAHLEN.md) | **Einziger** Eigentümer aller harten Zahlen (Bestand §1, Prüfläufe §2, rote Befunde §3) | deutsch |
+| [`TAGEBUCH.md`](TAGEBUCH.md) | Erzählte Timeline; jedes Kapitel an Commit-SHA-Bereiche und Pfade gebunden | deutsch |
+| [`ROADMAP.md`](ROADMAP.md) | **Einzige** Liste offener Arbeit (Release-Freeze v0.4.0, Kandidaten, 1.0.0-Kriterien) | deutsch |
+| [`COMMIT-REGELN.md`](COMMIT-REGELN.md) | Commit-Regeln und ihre Durchsetzung (Hooks, CI, Gate) | deutsch |
+| [`../IDEA.md`](../IDEA.md) | Kurzidee und die drei Prinzipien (Beleg vor Behauptung, Grenzen vor Aktion, eine Quelle) | deutsch |
+| [`../shinon-forge-implementierungsplan.md`](../shinon-forge-implementierungsplan.md) | Historischer Arbeitsplan (Status: **historical**, Stand 2026-10-07) — keine Zahlenquelle mehr | deutsch |
+
+## Nachrichtliche Dokumente (diese Serie)
+
+Diese Dateien beschreiben den **aktuellen Stand des Baums**. Sie nennen keine
+harten Bestandszahlen selbst — sie verweisen auf `ZAHLEN.md` — und sie
+wiederholen keine offenen Punkte — die stehen in `ROADMAP.md`.
+
+| Dokument | Zuständigkeit |
+|---|---|
+| [`ARCHITEKTUR.md`](ARCHITEKTUR.md) | Schichtmodell, Paket-Anatomie, Boot-Kette, Ereignis-Spine, typische Datenflüsse |
+| [`SETUP.md`](SETUP.md) | Installation, Profile, `DSH_HOME`, Schlüssel und Routen, Diagnose, Werkzeuge für Betreiber |
+| [`CI-UND-GATES.md`](CI-UND-GATES.md) | Gate-Engine und ihre Plugins, policy.json, Git-Hooks, die vier GitHub-Workflows, Testpfade |
+| [`PAKETE.md`](PAKETE.md) | Nachschlagewerk zu allen Paketen unter `packages/`: Zweck, Eintritt, Tests, Naht |
+| [`SCRIPTS.md`](SCRIPTS.md) | Nachschlagewerk zu `scripts/` und `bin/`: Zweck jedes Skripts und ob ein npm-Script darauf zeigt |
+
+## Verträge und Proben
+
+| Ort | Inhalt | Regeln |
+|---|---|---|
+| [`contracts/`](contracts/) | JSON-Verträge mit `status`-Feld: Ereignistypen, Namens-Registry, Modellrouten, Commit-Trailer, Struktur u. a. | nur **additiv** ändern (`AGENTS.md`) |
+| [`probes/`](probes/) | Falsifikations-Proben: `id/claim/targets/expect/result/verdict/evidence`, vom Gate `probe-twin` auf Form und Zieldateien geprüft | Proben erzeugen Skripte (`perf-baseline`, `index-cold-cost`, `s6-turn`) oder dokumentierte Live-Läufe |
+
+## Lesereihenfolge für Neue
+
+1. [`IDEA.md`](../IDEA.md) — drei Prinzipien (22 Zeilen).
+2. [`../README.md`](../README.md) — Quickstart und Überblick.
+3. [`ARCHITEKTUR.md`](ARCHITEKTUR.md) — wie der Baum hängt.
+4. [`../AGENTS.md`](../AGENTS.md) — verbindliche Regeln, bevor die erste Änderung entsteht.
+5. [`TAGEBUCH.md`](TAGEBUCH.md) — was wann warum geschah.

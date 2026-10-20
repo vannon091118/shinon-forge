@@ -330,10 +330,13 @@ Shinon-forge/
 │   ├── shinon/                # kanonisches Profil (dsh.profile.bundles, cordis.patch.yml)
 │   └── headless/              # One-shot-Profil (Modell-Route)
 ├── docs/
+│   ├── INDEX.md               # Dokumentationskarte: wer wofür zuständig ist
 │   ├── TAGEBUCH.md            # erzählte Timeline, je Kapitel an Commit und Pfad gebunden
 │   ├── ZAHLEN.md              # einziger Eigentümer aller harten Zahlen
 │   ├── ROADMAP.md             # einzige Liste offener Arbeit
 │   ├── COMMIT-REGELN.md       # Commit-Regeln und Durchsetzung
+│   ├── ARCHITEKTUR.md SETUP.md CI-UND-GATES.md   # Nachricht: wie der Baum hängt, wie man ihn aufsetzt, wie geprüft wird
+│   ├── PAKETE.md SCRIPTS.md   # Nachschlagewerk: Pakete und Skripte im Detail
 │   ├── contracts/             # Verträge (JSON, mit Statusfeld)
 │   ├── probes/                # Falsifikations-Proben (JSON, mit Datum)
 ├── IDEA.md · shinon-forge-implementierungsplan.md   # current bzw. historical (Statusblock im Kopf)
@@ -342,8 +345,10 @@ Shinon-forge/
 └── profiles/shinon/          # out-of-tree-Profil (package.json, cordis.patch.yml, cordis.yml)
 ```
 
-`docs/` hat vier Dokumente — Tagebuch (Geschichte), Zahlen (Zahlen), Roadmap (offen),
-Commit-Regeln (Durchsetzung) — dazu `contracts/` und `probes/`.
+`docs/` hat vier **Betriebsdokumente** — Tagebuch (Geschichte), Zahlen (Zahlen),
+Roadmap (offen), Commit-Regeln (Durchsetzung) — dazu `contracts/` und `probes/`.
+Die **Nachricht** zum aktuellen Stand des Baums trägt `docs/INDEX.md` als Karte:
+`ARCHITEKTUR.md`, `SETUP.md`, `CI-UND-GATES.md`, `PAKETE.md`, `SCRIPTS.md`.
 
 ---
 
