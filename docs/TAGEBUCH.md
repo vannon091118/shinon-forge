@@ -410,7 +410,7 @@ Heute zusaetzlich: `scripts/lib/diary.mjs`, `scripts/lib/canon.mjs`,
 `packages/prompter/assets/pre-step.js`, `packages/prompter/assets/runtime-state.js`,
 `packages/prompter/assets/trace-report.js`, `scripts/gate/tests/prompter-split.test.mjs`.
 
-**Anker:** `d0691b2..1a5b1d4` · Tag: 17 Commits · Belege: `packages/seams/assets/seams.js`, `packages/seams/assets/seams.json`, `scripts/gate/tests/seams-core.test.mjs`, `docs/contracts/structure.json`, `packages/prompter/assets/pre-step.js`
+**Anker:** `d0691b2..1a5b1d4` · Tag: 17 Commits bis `1a5b1d4` · Belege: `packages/seams/assets/seams.js`, `packages/seams/assets/seams.json`, `scripts/gate/tests/seams-core.test.mjs`, `docs/contracts/structure.json`, `packages/prompter/assets/pre-step.js`
 
 ---
 
