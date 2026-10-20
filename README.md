@@ -337,6 +337,7 @@ Shinon-forge/
 │   ├── COMMIT-REGELN.md       # Commit-Regeln und Durchsetzung
 │   ├── ARCHITEKTUR.md SETUP.md CI-UND-GATES.md   # Nachricht: wie der Baum hängt, wie man ihn aufsetzt, wie geprüft wird
 │   ├── PAKETE.md SCRIPTS.md   # Nachschlagewerk: Pakete und Skripte im Detail
+│   ├── WISSENS-RUNTIME-PLAN.md # Implementierungsplan zur Wissens-Runtime (Weg zu ROADMAP K8)
 │   ├── contracts/             # Verträge (JSON, mit Statusfeld)
 │   ├── probes/                # Falsifikations-Proben (JSON, mit Datum)
 ├── IDEA.md · shinon-forge-implementierungsplan.md   # current bzw. historical (Statusblock im Kopf)

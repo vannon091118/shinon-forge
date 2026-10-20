@@ -64,10 +64,10 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 
 - Live-429-Rotation gegen den echten Anbieter mit echten Schlüsseln (Kette bis zum Loopback-Draht ist belegt).
 - Mobile-first-Prototyp: eigenes schlankes Mobile-Profil, responsive Client-Schicht, Profil-/UI-/Security-CI-Gates, validierte Android-Runtime-Strategie (Details aus dem gefalteten Mobile-Plan: zuerst Profil + Web-UI im Repo, App-Shell erst nach reproduzierbarem Android-Proof; kein globaler Paket-Cut vor Messung; Fremdvergleich `dsh-io/dsh-mobile` als Spike prüfen).
-- `LAST_VERIFIED_FACT` (§19): Loop Guard / Progress Evaluator als alleiniger Produzent, Gate pinnt Ereignis, Produzent, Herkunft und fail-closed-Fälle.
+- `LAST_VERIFIED_FACT` (§19): Loop Guard / Progress Evaluator als alleiniger Produzent, Gate pinnt Ereignis, Produzent, Herkunft und fail-closed-Fälle. Produzenten-Regel wird im Wissens-Runtime-Plan (`docs/WISSENS-RUNTIME-PLAN.md`, Zug 4) als Fakt mit gepinntem Produzenten fortgeführt.
 - Codingmon-Folge: Ereignis-Adapter an echten Lauf-Ereignissen (6.1/6.2-Rest), Kampfende am Agent-Ende (6.4).
 - Bedienung ohne Doku (7.1), Lokalisierung ohne Fallback-Tabellen (7.2), QoL-Liste mit Status je Punkt (7.3, wartet auf die Nutzerliste), Design aus Token-Datei (7.4).
-- Scoring-Folge: K8 Fakten-Store (Konsolidierung, hartes Limit; Ablage liegt bereit), K7b taktische Skill-Erzeugung (Schreibweg bricht K4 — braucht Entscheidung; Ablage `generated-skills/` steht).
+- Scoring-Folge: K8 Fakten-Store (Weg konkretisiert in `docs/WISSENS-RUNTIME-PLAN.md`, Züge 1–4 mit Probe je Zug; Konsolidierung, hartes Limit; Ablage liegt bereit), K7b taktische Skill-Erzeugung (Schreibweg bricht K4 — braucht Entscheidung; Ablage `generated-skills/` steht).
 - `profiles/`-Umbau auf Code-Konfiguration (3.6) — nur wenn ein fremder Boot daraus liest/schreibt; derzeit angehalten.
 - Overlay-MVP (3.8) — blockiert, bis die drei Upstream-Punkte entschieden sind (Slot-Definition, Launcher-only-Patch, Remote-Listen-Extensibilität).
 - Onboarding (Eignerentscheidung): keine fest verdrahteten Modell-/Provider-Defaults — der Nutzer entscheidet beim Einstieg, ob der Prompter dasselbe Modell und denselben Schlüssel nutzt oder eigene; Anker ist die DSH-seitige API-Key-Abfrage beim First-Start.

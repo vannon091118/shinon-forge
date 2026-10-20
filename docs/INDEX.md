@@ -16,6 +16,7 @@
 | [`ZAHLEN.md`](ZAHLEN.md) | **Einziger** Eigentümer aller harten Zahlen (Bestand §1, Prüfläufe §2, rote Befunde §3) | deutsch |
 | [`TAGEBUCH.md`](TAGEBUCH.md) | Erzählte Timeline; jedes Kapitel an Commit-SHA-Bereiche und Pfade gebunden | deutsch |
 | [`ROADMAP.md`](ROADMAP.md) | **Einzige** Liste offener Arbeit (Release-Freeze v0.4.0, Kandidaten, 1.0.0-Kriterien) | deutsch |
+| [`WISSENS-RUNTIME-PLAN.md`](WISSENS-RUNTIME-PLAN.md) | Implementierungsplan zur persistenten Wissens-Runtime (Weg zu K8; Verifikationsregister, vier Züge, Messprogramm) | deutsch |
 | [`COMMIT-REGELN.md`](COMMIT-REGELN.md) | Commit-Regeln und ihre Durchsetzung (Hooks, CI, Gate) | deutsch |
 | [`../IDEA.md`](../IDEA.md) | Kurzidee und die drei Prinzipien (Beleg vor Behauptung, Grenzen vor Aktion, eine Quelle) | deutsch |
 | [`../shinon-forge-implementierungsplan.md`](../shinon-forge-implementierungsplan.md) | Historischer Arbeitsplan (Status: **historical**, Stand 2026-10-07) — keine Zahlenquelle mehr | deutsch |
