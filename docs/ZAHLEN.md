@@ -59,7 +59,7 @@ heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
 
 | Zahl | Wert | Befehl | Exit |
 |---|---|---|---|
-| Code-Dateien unter `packages/` + `scripts/` + `bin/` | **276** | `node -e "import('./scripts/lib/structure.mjs').then(m => console.log(m.structureIssues()))"` | 0 |
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | **278** | `find packages scripts bin -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) \| grep -vE '(^\|/)(node_modules\|dist\|dev-dsh-home\|\.git)(/\|$)' \| wc -l` — dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` | 0 |
 | Klassen | **6** (host-entry, client, core, test, gate-plugin, script) | dieselbe Registry lesen | 0 |
 | Benannte Bestandsdateien (über ihrer Klassengrenze) | **30** | Registry lesen (`bestand`) | 0 |
 | Dateien ohne Klasse | **0** | `npm test` (Schritt „Struktur“) | 0 |
@@ -88,12 +88,12 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 
 | Lauf | Ergebnis | Exit | Befehl |
 |---|---|---|---|
-| Volle Kette | **Exit 0** — Paket-Suiten → statisches Gate → Fixtures → Distribution → Profilboot, in dieser Reihenfolge (nur CI/auf Zuruf) | 0 | `npm run test:full` |
+| Volle Kette | **Exit 0** — Paket-Suiten → statisches Gate → Fixtures → Distribution → Profilboot, in dieser Reihenfolge (nur CI/auf Zuruf); zusammengesetzt aus **8** Paket-Suiten (46/50/13/198/13/13/17/12 Tests), Gate **121**, Fixtures **9**, Distribution **88**, Profilboot **4** | 0 | `npm run test:full` |
 | Schneller Pfad (lokal) | **Exit 0** — statisches Gate + lokale Engine-Slices, in dieser Reihenfolge | 0 | `npm test` |
 | Gate (statisch) | **121** bestanden, **0** fehlgeschlagen | 0 | `npm test` bzw. `node scripts/run-with-node.mjs scripts/shinon-test.mjs` |
-| Regel-Fixtures | **9** bestanden, **0** fehlgeschlagen (Kontrolle + 8 Regelbrüche, je Gate *und* Build rot) | 0 | `node scripts/run-with-node.mjs scripts/validate-test.mjs` |
+| Regel-Fixtures | **9** bestanden, **0** fehlgeschlagen (Kontrolle + 8 Regelbrüche, je Gate *und* Build rot); die Kopie trägt `docs/`, weil Kanon und Struktur dort ihre Registries lesen | 0 | `node scripts/run-with-node.mjs scripts/validate-test.mjs` |
 | Distributionstest | **88** bestanden, **0** fehlgeschlagen (22 Pakete × 4 Stufen; jedes Isolat bekommt seine lokalen `@shinon/*`-Abhängigkeiten als Tarball daneben) | 0 | `npm test` bzw. `scripts/pack-test.mjs` |
-| Profiltest | **3** bestanden, **0** fehlgeschlagen — **24** Layer, **19** Repo-Bundles | 0 | `node scripts/run-with-node.mjs scripts/shinon-profile-test.mjs` |
+| Profiltest | **4** bestanden, **0** fehlgeschlagen — **24** Layer, **19** Repo-Bundles; der vierte Fall ist ein Ladebeweis, kein Auflösungsbeweis: eigener Prozess mit `profiles/shinon` als cwd, `@shinon/prompter` über den Profil-Link, die drei geteilten Prompter-Module und `@shinon/seams/core` aus dem Root-`node_modules` | 0 | `node scripts/run-with-node.mjs scripts/shinon-profile-test.mjs` |
 | Profil-Dump im echten Boot | **58** Layer-Köpfe, **215** Einträge; `shinon-task-router.activate: false`, `permission.defaultPreset: workspace-write`, `agent-default-model: prompter/agnes-2.5-flash` (die gespeicherte Wahl des Nutzers — der Config-Editor schreibt sie in die Profil-Ebene, ein Dump kann je Installation abweichen) | 0 | `DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config` |
 | Frischklon-Repro S3 | Klon @ `d8999ab` Exit 0, `npm ci` Exit 0, 29 Links Exit 0, Dump 60/210 Exit 0, Build 185 Dateien Exit 0, UI HTTP 200 (41 314 Bytes HTML, ohne Token 401), gate 546/546 | 0 | `docs/TAGEBUCH.md`, Kapitel 2026-10-17 (Commit `d8999ab`) |
 | Gate-Engine `--full` | **23** Gates gelaufen, **23** grün, **1** `NOT_APPLICABLE` (`typescript`: keine First-Party-TS-Datei), **0** fehlgeschlagen, **0** geskippt; Branding ohne Flag sichtbar übersprungen | 0 | `npm run gate:full` |

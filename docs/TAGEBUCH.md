@@ -363,8 +363,8 @@ wurden sie zu Commits, und das aenderte ihre Beweislage: `c0d99cf` schnitt die
 Akten (73 Dateien, 10040 Zeilen) und reparierte 35 Verweise; `a2a80f4` gab dem
 Tagebuch seinen Riegel (`scripts/lib/diary.mjs`) und nahm ihm damit die
 Moeglichkeit, sich selbst zu glauben; `38b66cc` buchte den Kanon samt Registry
-und den drei Umbenennungen; `68d7b14` setzte die Struktur-Grenzen mit 31
-benannten Bestandsdateien; `89f6daa` loeste den ersten davon ein, indem der
+und den drei Umbenennungen; `68d7b14` setzte die Struktur-Grenzen (die Zahl der benannten
+Bestandsdateien steht in `docs/ZAHLEN.md` §1.2, nicht hier); `89f6daa` loeste den ersten davon ein, indem der
 Prompter-Einstieg von 1350 auf 256 Zeilen schrumpfte und Lauf, Zustand und
 Ausgang eigene Module bekamen; `ca10572` zog die Zahlen nach.
 
@@ -384,18 +384,39 @@ Differenz dazu. Deshalb steht die Zahl hier mit ihrem Commit und nicht als
 absolute Wahrheit neben sich: eine Testzahl ohne den Stand, an dem sie gemessen
 wurde, ist wie ein Thermometer ohne Datum.
 
+Der gepushte Stand war damit aber nur halb belegt: `npm run build`, `npm run
+test:full`, `npm run gate:full` und `pack-test` waren auf `4529db7` nie
+gelaufen. Der erste volle Durchgang machte sofort einen echten Fehler sichtbar,
+und zwar einen, den kein Test behauptet hatte — die Regel-Fixtures kopieren
+`scripts`, `packages`, `profiles` und `package.json`, aber nicht `docs`. Seit
+dem Kanon und dem Struktur-Riegel liegen die Registries in `docs/contracts/`;
+im Fixture fehlten sie, und die unveraenderte Kontrolle war rot, obwohl am Baum
+nichts falsch war. Eine Kontrollgruppe ohne ihren Massstab misst nur sich
+selbst. Die Ursache war die Kopierliste, nicht die Regel: `1a5b1d4` nimmt
+`docs` in `SOURCES` auf, und die Fixtures stehen wieder bei neun von neun.
+
+Derselbe Commit macht aus dem Profiltest einen Ladebeweis statt eines
+Aufloesungsbeweises: ein eigener Prozess mit dem Profilverzeichnis als cwd loest
+`@shinon/prompter` ueber den Profil-Link auf `packages/prompter/index.js` auf,
+laedt die drei geteilten Module und danach `@shinon/seams/core` aus dem
+Root-`node_modules`. Vorher wusste nur der Dump, dass die Layer existieren;
+jetzt weiss es der Prozess, der sie laedt — eine Aufloesung ist wie ein
+Strassenschild, das Laden ist der Weg. Die Zaehlungen aller vier Laeufe stehen
+in `docs/ZAHLEN.md` §2, jeder mit Exit 0; die einzige Ausnahme bleibt die
+Branding-Messung, die ohne Chromium sichtbar uebersprungen wird.
+
 Heute zusaetzlich: `scripts/lib/diary.mjs`, `scripts/lib/canon.mjs`,
 `scripts/lib/structure.mjs`, `docs/contracts/structure.json`,
 `packages/prompter/assets/pre-step.js`, `packages/prompter/assets/runtime-state.js`,
 `packages/prompter/assets/trace-report.js`, `scripts/gate/tests/prompter-split.test.mjs`.
 
-**Anker:** `d0691b2..ca10572` · Tag: 14 Commits · Belege: `packages/seams/assets/seams.js`, `packages/seams/assets/seams.json`, `scripts/gate/tests/seams-core.test.mjs`, `docs/contracts/structure.json`, `packages/prompter/assets/pre-step.js`
+**Anker:** `d0691b2..1a5b1d4` · Tag: 17 Commits · Belege: `packages/seams/assets/seams.js`, `packages/seams/assets/seams.json`, `scripts/gate/tests/seams-core.test.mjs`, `docs/contracts/structure.json`, `packages/prompter/assets/pre-step.js`
 
 ---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
 
-**Was fiel:** 72 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`
+**Was fiel:** 73 Dateien. `docs/audit/` (9), `docs/analysis/` (2), `docs/archive/`
 (50, samt `legacy-goose-prompts/`, `legacy-profiles/web/` und `session-eval-2026-10-17/`),
 die Messpapiere `docs/S3-*` (3), `docs/S4-DOCTOR`, `docs/S5-RELEASE`,
 `docs/S6-MODELLTURN-AUDIT-CI`, `docs/S6-RUNBOOK`, dazu `docs/INDEX.md`,
