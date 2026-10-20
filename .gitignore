@@ -18,6 +18,12 @@ dev-dsh-home/
 # liegt außerhalb des Baums. Der Ordner selbst liegt als .shinon/.gitkeep im
 # Baum, damit ein frischer Klon ihn hat.
 
+# Der Blueprint-Kit zum CodingMon-50-Rework (Plan, Specs, ArtPack mit 50
+# Creature-SVGs, Katalogseiten, Kontaktboegen, PNG-Vorschauen) liegt als
+# SCRATCH-Material lokal: die SVGs sind die Quelle fuer die spaetere
+# Asset-Einbettung auf dem Feature-Branch, der Kit selbst ist kein Produkt.
+.shinon/tmp-blueprint/
+
 # Messausgaben des Auslastungs-Werkzeugs (.shinon/dev/auslastung.mjs): pro Lauf
 # eine JSONL-Spur und eine Zusammenfassung. Belege, die bleiben sollen, wandern
 # kuratiert nach docs/probes/ — der rohe Lauf ist Zustand, keine Quelle.

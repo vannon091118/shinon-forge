@@ -1,6 +1,6 @@
 # Shinon Forge
 
-> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-17
+> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-20 (aktualisiert: neue Skripte ergänzt, Inhalt sonst unverändert)
 > **Einstieg:** diese Datei · **Geschichte:** `docs/TAGEBUCH.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 An independent fork of the DeepSeek Harness (DSH). It ships the `@shinon/*` Cordis
@@ -321,6 +321,20 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   is the byte limit (`maxFileBytes = 262144`): anything over it is NOT indexed and
   stands in the report with the reason `ZU_GROSS` — a silent cut would be an index
   lying about its coverage. Before/after numbers: `docs/probes/index-konsolidierung.json`.
+
+## Neue / ergänzte Befehle (seit 2026-10-17)
+- `npm run notes:check` (`scripts/notes-check.mjs`) — Notizen-Integrität prüfen.
+- `npm run dev:web` / `npm run dev:mobile` — Profil-Starts mit festen Ports/URLs.
+- `npm run test:mobile-profile` / `npm run dev:web` — Mobile-Profil-Kontrakt (`profiles/mobile`).
+- `npm run test:codingmon` (bereits genannt), zusätzlich: `test:scoring`, `test:token`, `test:prompter`, `test:narrative`, `test:popup`, `test:key-router`, `test:traceability`, `test:hook` — Paket-eigene Slicen; alle über `scripts/run-with-node.mjs`.
+- `npm run s6:check` / `s6:boot` / `s6:stop` — Turn-Zyklus (S6) Steuerung (`scripts/s6-turn.mjs`).
+- `npm run perf:baseline` (`scripts/perf-baseline.mjs`), `index:warm` / `index:cold-cost` / `index:match-eq` — Index-Leistungsnachweise.
+- `npm run desktop:launcher` / `desktop:launcher:uninstall` — Desktop-Installer (`scripts/desktop-launcher.mjs`).
+- `npm run uninstall:user` — Nutzer-Deinstall (`scripts/install-user.mjs uninstall`).
+- `npm run verify:panel` (`scripts/panel-check.mjs`) — Panel-Prüfung (braucht laufenden Host + Token).
+- `npm run typecheck` — Gate-Engine `--only typescript` (derzeit `NOT_APPLICABLE`, keine First-Party-TS-Datei).
+- `npm run stages` (`scripts/stages.mjs`) — Stufe-Übersicht.
+Alle Skripte laufen über `scripts/run-with-node.mjs` (verifizierter Node ≥ 22, `node_modules/.bin` vor PATH); ein nacktes `node --test …` bleibt der ungeschützte Weg. Keine erfundenen Aufrufe — alle stammen aus `package.json`.
 
 ## Pitfalls
 - Ein Profil-Bündel löst über `profiles/<name>/node_modules` auf — **vor** dem Root-`node_modules`.
