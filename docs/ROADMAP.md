@@ -79,7 +79,7 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 - Overlay-MVP (3.8) — blockiert, bis die drei Upstream-Punkte entschieden sind (Slot-Definition, Launcher-only-Patch, Remote-Listen-Extensibilität).
 - Onboarding (Eignerentscheidung): keine fest verdrahteten Modell-/Provider-Defaults — der Nutzer entscheidet beim Einstieg, ob der Prompter dasselbe Modell und denselben Schlüssel nutzt oder eigene; Anker ist die DSH-seitige API-Key-Abfrage beim First-Start.
 - Persona-Einstieg teilen (Voraussetzung, nicht der Schnitt): `packages/persona/index.js`
-  hält 1501 Zeilen und 18 `let`-Bindungen in EINEM `apply`-Closure — der Prompter-Schnitt
+  hält 1500 Zeilen und 18 `let`-Bindungen in EINEM `apply`-Closure — der Prompter-Schnitt
   (2026-10-20) ging, weil dort schon ein `runtime`-Objekt der alleinige Zustand war. Hier
   steht zuerst der Zustands-Eigentümer auf dem Programm; erst danach dieselbe Teilung.
   Danach die **Eigentümerfrage**: heute steuert die Haltung das Verhalten

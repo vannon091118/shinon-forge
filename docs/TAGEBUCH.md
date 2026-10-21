@@ -734,7 +734,7 @@ nirgends, welcher Commit lief — nach einem Update, einem Rollback oder einem H
 in den Klon war das eine Vermutung, und eine Vermutung, die man fuer einen Zustand
 haelt, ist schlimmer als eine Luege, weil sie keiner nachfragt.
 
-**Anker:** `dd5d319` · Belege: `packages/version/index.js`, `packages/version/client.js`, `packages/version/assets/version-probe.js`, `scripts/lib/desktop-entry.mjs`, `scripts/lib/payload.mjs`, `scripts/gate/tests/version-package.test.mjs`, `assets/icon.svg`, `assets/banner.svg`, `assets/readme-banner.svg`, `README.md`, `scripts/desktop-launcher.mjs`, `scripts/lib/huelle.mjs`, `packages/prompter/assets/capabilities.json`, `docs/probes/h5-entscheidung.json`
+**Anker:** `dd5d319`, `a090ab7` · Belege: `packages/version/index.js`, `packages/version/client.js`, `packages/version/assets/version-probe.js`, `scripts/lib/desktop-entry.mjs`, `scripts/lib/payload.mjs`, `scripts/gate/tests/version-package.test.mjs`, `assets/icon.svg`, `assets/banner.svg`, `assets/readme-banner.svg`, `README.md`, `scripts/desktop-launcher.mjs`, `scripts/lib/huelle.mjs`, `packages/prompter/assets/capabilities.json`, `docs/probes/h5-entscheidung.json`, `packages/persona/assets/interaction-core.js`, `packages/prompter/assets/skill-lifecycle.js`, `scripts/gate/tests/spine-wiring.test.mjs`
 
 Das neue Paket `@shinon/version` hat drei Schichten, und die Trennung ist der eigentliche
 Inhalt: die Messung fragt `git` und liest den Bau-Schatten, die Formel rechnet daraus
@@ -838,10 +838,54 @@ trotzdem rot: die Frage enthielt keinen ihrer eigenen Begriffe, also fand
 `matchCapability` nichts und die Zuordnung blieb leer. Die Frage nennt den Begriff jetzt
 im Text, und die Karte ist wieder eine Landkarte und kein Wunschzettel.
 
+Der Abend brachte dann noch die unangenehmste Sorte Befund: drei Verdrahtungen, die
+nicht kaputt waren, sondern **taub**. Keine Ausnahme, kein roter Test, keine Zeile im
+Log — nur Wirkungen, die ausblieben, und ein Zustand, der sich nie bewegte. Gefunden
+wurden sie nicht durch Lesen, sondern durch Fahren: die drei Pfade wurden mit den
+echten Bundles, der echten `apply()`-Schnittstelle und dem echten Event-Spine
+nachgestellt, und danach war die Ursache jedes Mal eine falsche Annahme ueber die Form,
+in der die Welt ankommt.
+
+Die erste: die Persona las den Text einer menschlichen Nachricht als String. DSH
+schreibt `user/message` aber als Blockliste (`content: [{ type: 'text', text }]`), und
+auf dem Kanal heisst das Ereignis `message.received`. Der Leser bekam also `''` —
+User-Lage, Anrede und der Gedaechtnis-Beleg fielen still aus, waehrend der Abschnitt
+selbst munter weiter im Prompt stand. Bezahlt hat das niemand mit einem Fehler, sondern
+mit einem Prompt, der sich ruhig anfuehlte und nichts ueber den Menschen wusste. Das
+Lesen liegt jetzt in `packages/persona/assets/interaction-core.js`, importfrei, und der
+Host verlor dabei 25 Zeilen (1526 → 1501 im Commit `a090ab7`).
+
+Die zweite war ein Kanal, der nicht der gemeinte war. Der Skill-Lebenszyklus haengt an
+`shinon/event`, dort tragen die Ereignisse aber die normalisierten Namen (`turn.end`,
+`feedback.rated`, `message.received`). Verglichen wurde mit den ROHEN (`turn/end`,
+`feedback/message-put`) — auf diesem Kanal erscheinen sie nie. Der Lebenszyklus konnte
+deshalb nie feuern; kein Skill entstand, und niemand vermisste ihn, weil ein
+Lebenszyklus, der nicht laeuft, genauso aussieht wie einer, der nichts zu lernen fand.
+
+Die dritte war die klassische Einbahnstrasse: `relation.updated` hatte drei Konsumenten
+(Persona-Zustand, Narrative Engine, Scoring) und keinen Produzenten. Die Beziehung stand
+damit fuer immer auf `known` und `fresh_pair` — eine gebaute Schicht, die nur gelesen
+wurde. Die Persona bietet jetzt den Dienst `shinon_persona_relation`, den Vertrag
+`shinon.persona-relation/v1` und die Route `/shinon/persona/relation` an; geprueft wird
+gegen die Stufen des Zustandsvertrags, emittiert wird nur das Signal, und ohne Sitzung
+bleibt die Route fail-closed (`MISSING_SESSION`). Ein Automatismus ist das ausdruecklich
+nicht: die Stufe setzt ein Mensch.
+
+Der Test, der diese drei Luecken haelt, faehrt keinen nachgebauten Kanal:
+`scripts/gate/tests/spine-wiring.test.mjs` laedt die echten Bundles in ein Isolat und
+schickt echte Sitzungsereignisse durch den Spine. Er prueft die Blockliste (User-Lage
+„frustriert“, Anrede „wer bist du“, Gedaechtnis-Beleg), den Lebenszyklus (drei
+abgeschlossene Zuege schreiben den Skill, eine negative Bewertung erzeugt nach 1,5 s
+einen Korrektur-Auftrag) und die Beziehung (Route → Dienst → Signal → Persona und
+Narrative, `known`/`fresh_pair` wird zu `trusted`/`established_duo`).
+
 Belegt: `npm test` Exit 0 (statisches Gate 126/126), `npm run gate:test` 812/812,
 `npm run gate:full` 23 Gates gruen, `npm run test:full` Exit 0 (Paket-Suiten 46/50/13/
 240/13/13/17/12, Fixtures 9, Distribution 92, Profilboot 4/4), `npm run build` Exit 0
 (23 Pakete, 221 Dateien, 1 919 370 Bytes) und `npm run zahlen:check` deckungsgleich.
+Nach dem Verdrahtungs-Commit am Abend: `npm run gate:test` 827/827, statisches Gate
+126/126, `gate --full` 23 Gates gruen, `npm run build` Exit 0 (222 Dateien,
+1 926 865 Bytes) und `zahlen:check` deckungsgleich.
 
 ---
 

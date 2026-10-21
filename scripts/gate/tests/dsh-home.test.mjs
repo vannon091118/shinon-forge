@@ -19,11 +19,22 @@ import { seedDshHome } from '../../lib/dsh-home.mjs';
 
 const temp = (prefix) => mkdtempSync(join(tmpdir(), prefix));
 
-/** Ein Miniatur-Arbeitsbaum mit Profil, Sitzungen und Schlüsseldateien. */
+/**
+ * Ein Miniatur-Arbeitsbaum mit Profil, Sitzungen und Schlüsseldateien.
+ *
+ * Die `cordis.patch.yml` ist nicht Dekoration: ein Quellbaum ERKENNT sich an
+ * ihr (Form: `profiles/<name>/cordis.patch.yml`). Nur so kann der Seeder einen
+ * Verknüpfung, die in einen anderen Quellbaum zeigt, von einem fremden Link
+ * unterscheiden — der Unterschied entscheidet, ob umgehängt oder gemeldet wird.
+ */
 function sourceTree() {
   const dir = temp('shinon-source-');
   mkdirSync(join(dir, 'profiles', 'shinon'), { recursive: true });
   writeFileSync(join(dir, 'profiles', 'shinon', 'package.json'), JSON.stringify({ name: '@shinon/profile-shinon' }));
+  writeFileSync(join(dir, 'profiles', 'shinon', 'cordis.patch.yml'), 'id: shinon\nname: @shinon/shinon\n');
+  // Die Datei, die DSH bei jedem Start ueberschreibt — sie muss im Home eine
+  // Kopie sein, sonst traegt ein schreibgeschuetzter Quellbaum sie nicht.
+  writeFileSync(join(dir, 'profiles', 'shinon', 'cordis.yml'), '# dsh profile root\n');
   mkdirSync(join(dir, 'sessions'), { recursive: true });
   writeFileSync(join(dir, '.env'), 'BEISPIEL=1\n');
   writeFileSync(join(dir, '.credentials.yaml'), 'beispiel: 1\n');
@@ -107,6 +118,48 @@ test('seedDshHome: Link auf das Mount eines frueheren AppImage-Laufs wird auf di
 // Eine schreibgeschützte Quelle (AppImage-Mount, /opt): DSH schreibt cordis.yml in den Profilordner.
 const readOnly = () => false;
 
+// Der Quellbaum wechselt: dasselbe Home, eine andere Installation (AppImage →
+// /opt → Arbeitsbaum). Die Links zeigen in den ALTEN Quellbaum — das ist OURS
+// (der Seeder hat sie gesetzt) und wird umgehängt, nicht gemeldet. Gemessen
+// 2026-10-21: der Start des AppImage scheiterte an genau diesen Links.
+
+test('seedDshHome: ein Link in einen anderen Quellbaum wird umgehängt, nicht gemeldet', () => {
+  const alt = sourceTree();
+  const source = sourceTree();
+  const home = temp('shinon-home-');
+  seedDshHome(home, alt);
+
+  const result = seedDshHome(home, source);
+  assert.deepEqual(result.issues, [], 'ein alter Quellbaum ist kein fremder Link');
+  assert.ok(result.created.includes('profiles'));
+  assert.equal(readlinkSync(join(home, 'profiles')), join(source, 'profiles'));
+});
+
+test('seedDshHome: bei schreibgeschützter Quelle werden die Einträge eines alten Quellbaums umgehängt', () => {
+  const alt = sourceTree();
+  const source = sourceTree();
+  const home = temp('shinon-home-');
+  seedDshHome(home, alt, { isWritable: readOnly });
+
+  const result = seedDshHome(home, source, { isWritable: readOnly });
+  assert.deepEqual(result.issues, [], 'ein alter Quellbaum ist kein fremder Link');
+  assert.equal(readlinkSync(join(home, 'profiles', 'shinon', 'package.json')), join(source, 'profiles', 'shinon', 'package.json'));
+  // Die eigene Kopie von cordis.yml bleibt eine Datei — DSH überschreibt sie.
+  assert.equal(lstatSync(join(home, 'profiles', 'shinon', 'cordis.yml')).isFile(), true);
+});
+
+test('seedDshHome: ein Link in einen ENTFERNTEN Quellbaum wird über den Stempel umgehängt', () => {
+  const alt = sourceTree();
+  const source = sourceTree();
+  const home = temp('shinon-home-');
+  seedDshHome(home, alt);
+  rmSync(alt, { recursive: true, force: true }); // der alte Quellbaum ist weg, der Link ist tot
+
+  const result = seedDshHome(home, source);
+  assert.deepEqual(result.issues, [], 'der Stempel beweist, dass der Link unser war');
+  assert.equal(readlinkSync(join(home, 'profiles')), join(source, 'profiles'));
+});
+
 test('seedDshHome: schreibgeschützte Quelle → beschreibbarer Profilordner mit Verknüpfungen', () => {
   const source = sourceTree();
   writeFileSync(join(source, 'profiles', 'shinon', 'cordis.yml'), 'quelle: 1\n');
@@ -136,6 +189,31 @@ test('seedDshHome: schreibgeschützte Quelle, zweiter Lauf ist idempotent', () =
   assert.deepEqual(again.issues, []);
   assert.ok(again.kept.includes('profiles'));
   assert.ok(!again.created.includes('profiles'));
+});
+
+test('seedDshHome: die Profilschicht gehört dem HOME — echte Datei, kein Link', () => {
+  const source = sourceTree();
+  const home = temp('shinon-home-');
+  seedDshHome(home, source, { isWritable: readOnly });
+
+  const layer = join(home, 'profiles', 'shinon', 'cordis.patch.yml');
+  // DSH schreibt hier (der config-editor der UI), also darf kein Link den
+  // Schreibzugriff in die Quelle tragen.
+  assert.equal(lstatSync(layer).isSymbolicLink(), false, 'die Profilschicht ist keine Verknüpfung');
+  assert.equal(lstatSync(layer).isFile(), true, 'die Profilschicht ist eine echte Datei');
+});
+
+test('seedDshHome: die Modellwahl des Benutzers in der Profilschicht bleibt erhalten', () => {
+  const source = sourceTree();
+  const home = temp('shinon-home-');
+  seedDshHome(home, source, { isWritable: readOnly });
+  const layer = join(home, 'profiles', 'shinon', 'cordis.patch.yml');
+  // Der Benutzer waehlt im UI ein Modell — der config-editor schreibt es hierher.
+  writeFileSync(layer, 'provider: openrouter\n');
+
+  const again = seedDshHome(home, source, { isWritable: readOnly });
+  assert.deepEqual(again.issues, [], 'eine vom Benutzer beschriebene Datei ist kein fremder Eintrag');
+  assert.equal(readFileSync(layer, 'utf8'), 'provider: openrouter\n', 'die Wahl bleibt stehen');
 });
 
 test('seedDshHome: schreibgeschützte Quelle ersetzt einen toten Mount-Link durch einen Ordner', () => {
