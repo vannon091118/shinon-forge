@@ -1,6 +1,14 @@
 {
-  "contract": "shinon.skill-migration-probe/v1",
+  "id": "skill-lifecycle/konsolidierung-in-skill-md",
   "claim": "Zwei JSON-Zettel werden in bestehende SKILL.md konsolidiert. ERGEBNIS-EHRLICHKEIT: die automatische Dublettenpruefung des Kerns findet fuer keinen der beiden Zettel eine Dublette (checkVerdict candidate, BELEG_ZU_DUENN). Die Zielwahl ist daher eine MANUELLE Entscheidung des Menschen/Agenten und ist hier so dokumentiert; die Konsolidierung selbst ist idempotent (zweiter Lauf aendert nichts).",
+  "targets": [
+    ".agents/skills/shinon-dev-workflow/SKILL.md",
+    ".agents/skills/shinon-bug-muster/SKILL.md",
+    "docs/probes/skill-lifecycle-migration/gate-datei-whitelist.json",
+    "docs/probes/skill-lifecycle-migration/konzept-toter-mechanismus.json"
+  ],
+  "expect": "Jeder Zettel wandert genau einmal in seine Zieldatei, der Ziel-Hash danach ist anders als vorher, ein zweiter Lauf aendert nichts (idempotent), und der Dublettencheck des Kerns nennt sein Ergebnis ehrlich — auch dann, wenn er keine Dublette findet und die Zielwahl damit eine manuelle Entscheidung bleibt.",
+  "contract": "shinon.skill-migration-probe/v1",
   "migrations": [
     {
       "source": "generated-skills/gate-datei-whitelist.json",
@@ -28,5 +36,7 @@
       "belegLine": "- zettel · legacy-json · docs/probes/skill-lifecycle-migration/konzept-toter-mechanismus.json",
       "idempotent": true
     }
-  ]
+  ],
+  "result": "BESTAETIGT",
+  "verdict": "WRITE"
 }

@@ -526,6 +526,28 @@
       ]
     },
     {
+      "id": "versionsstand-sichtbar",
+      "frage": "Wo steht der Versionsstand des laufenden Commits?",
+      "owner": "version",
+      "seam": {
+        "kind": "global",
+        "name": "__DSH_VERSION_INFO__"
+      },
+      "terms": [
+        "versionsstand",
+        "installierter commit",
+        "neuester commit",
+        "vorsprung"
+      ],
+      "notAnswers": [
+        "kein prompt-Baustein",
+        "keine Modellwahl"
+      ],
+      "evidence": [
+        "packages/version/index.js"
+      ]
+    },
+    {
       "id": "host-naht-kern",
       "frage": "Wo liegt der Naht-Kern für eine gemeinsame Definition?",
       "owner": "seams",

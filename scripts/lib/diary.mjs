@@ -18,7 +18,7 @@ const read = (file) => readFileSync(file, 'utf8');
 export const DIARY_FILE = 'docs/TAGEBUCH.md';
 
 /** Praefixe, die als Beleg zaehlen — und deshalb im Baum existieren muessen. */
-const DIARY_PATH_PREFIXES = ['packages/', 'scripts/', 'docs/', 'profiles/', 'bin/', '.github/', 'vendor/'];
+const DIARY_PATH_PREFIXES = ['packages/', 'scripts/', 'docs/', 'profiles/', 'bin/', '.github/', 'vendor/', 'assets/'];
 /** Dateien im Root tragen keinen Praefix, sind aber genauso Belege. */
 const DIARY_ROOT_FILES = new Set(['package.json', 'package-lock.json', 'AGENTS.md', 'README.md', 'IDEA.md', 'LICENSE']);
 

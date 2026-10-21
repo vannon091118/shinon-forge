@@ -238,14 +238,22 @@ export function apply(ctx, config) {
   // ── Der Zustand in die Seite ─────────────────────────────────────────────
   // Der Global traegt den Zustand UND das Boot-Token: die Route vergleicht
   // das Token, ohne das Token wäre die Nachfuehrung ein offenes Tor.
-  ctx.on(INDEX_INJECT, (table) => {
-    if (!Array.isArray(table)) return;
-    table.push({
-      kind: 'global',
-      name: VERSION_GLOBAL,
-      value: { ...versionPayload(state), token, endpoint },
+  //
+  // Ohne `ctx.on` (Tests, fremde Hosts) bleibt die Seite ohne Spiegel — das
+  // ist fail-open wie im Rest des Hosts: der Client sieht keinen Global und
+  // zeichnet nichts, statt eine Zahl zu erfinden. Dieselbe Prüfung wie bei
+  // @shinon/markers.
+  const canInject = typeof ctx?.on === 'function';
+  if (canInject) {
+    ctx.on(INDEX_INJECT, (table) => {
+      if (!Array.isArray(table)) return;
+      table.push({
+        kind: 'global',
+        name: VERSION_GLOBAL,
+        value: { ...versionPayload(state), token, endpoint },
+      });
     });
-  });
+  }
 
   // >>> shinon:dsh-idiom settings-registration — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test)
   // Registriert die Einstellungs-Form dieses Pakets beim Settings-Dienst.
@@ -256,10 +264,26 @@ export function apply(ctx, config) {
 
   // Die Messung wiederholt sich, damit der Stand nicht veraltet: ein Badge,
   // der nach einem Tag eine veraltete Zahl zeigt, ist schlimmer als keiner.
-  const timer = ctx.setInterval(() => {
+  //
+  // Der Cordis-Timer haengt sich an den Kontext und endet mit ihm: zuerst
+  // `ctx.interval` (der aktuelle Name), dann `ctx.setInterval` (der
+  // abgeschwaechte Alias, den der Timer-Dienst noch mitbringt). Fehlt der Dienst
+  // (Tests, fremde Hosts), nimmt der globale Timer die Aufgabe — mit `unref`,
+  // damit er den Prozess nicht am Leben haelt, und mit eigener Aufraeumung,
+  // sofern der Kontext sie anbietet.
+  const refresh = () => {
     try { measure({ fetch: false }); } catch { /* der naechste Versuch misst erneut */ }
-  }, Math.max(60000, config.refreshMs));
-  ctx.effect?.(() => () => clearInterval(timer));
+  };
+  const delay = Math.max(60000, config.refreshMs);
+  if (typeof ctx?.interval === 'function') {
+    ctx.interval(refresh, delay);
+  } else if (typeof ctx?.setInterval === 'function') {
+    ctx.setInterval(refresh, delay);
+  } else {
+    const timer = setInterval(refresh, delay);
+    timer.unref?.();
+    ctx.effect?.(() => () => clearInterval(timer));
+  }
 
   console.log(
     `[shinon-version] Aktiviert — Wurzel ${root}, installiert ${state?.installed?.slice(0, 12) ?? 'unbekannt'} ` +

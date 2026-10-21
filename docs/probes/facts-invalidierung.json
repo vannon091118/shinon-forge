@@ -1,4 +1,12 @@
 {
+  "id": "wissens-runtime/zug-2-extraktion-und-invalidierung",
+  "claim": "Extraktion und Invalidierung sind deterministisch, richtig begrenzt und schnell genug fuer eine Kaskade: dieselbe Quelle ergibt denselben Hash, die Abhaengigkeitskaskade trifft jeden abhaengigen Fakt genau einmal, und die gebuendelte Kaskade kostet je Faktor eine Transaktion statt einer.",
+  "targets": [
+    "packages/project-index/assets/facts-extract.js",
+    "packages/project-index/assets/facts-invalidate.js",
+    "packages/project-index/assets/facts-store.js"
+  ],
+  "expect": "Zwei Laeufe derselben Extraktion liefern denselben Hash, eine Kaskade markiert alle abhaengigen Faktzeilen genau einmal (keine Doppelmarkierung, kein Ueberspringen), und die gebuendelte Kaskade liegt um eine Groessenordnung unter der ungebendelten.",
   "probe": "wissens-runtime/zug-2-extraktion-und-invalidierung",
   "date": "2026-10-20",
   "question": "Sind Extraktion und Invalidierung deterministisch, richtig begrenzt und schnell genug für eine Kaskade?",
@@ -27,5 +35,7 @@
     "invalidation": "packages/project-index/assets/facts-invalidate.js",
     "store": "packages/project-index/assets/facts-store.js",
     "tests": "packages/project-index/test/facts-pipeline.test.mjs"
-  }
+  },
+  "result": "BESTAETIGT",
+  "verdict": "WRITE"
 }

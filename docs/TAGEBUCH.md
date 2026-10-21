@@ -734,7 +734,7 @@ nirgends, welcher Commit lief — nach einem Update, einem Rollback oder einem H
 in den Klon war das eine Vermutung, und eine Vermutung, die man fuer einen Zustand
 haelt, ist schlimmer als eine Luege, weil sie keiner nachfragt.
 
-**Anker:** `dd5d319` · Belege: `packages/version/index.js`, `packages/version/client.js`, `packages/version/assets/version-probe.js`, `scripts/lib/desktop-entry.mjs`, `scripts/lib/payload.mjs`, `scripts/gate/tests/version-package.test.mjs`
+**Anker:** `dd5d319` · Belege: `packages/version/index.js`, `packages/version/client.js`, `packages/version/assets/version-probe.js`, `scripts/lib/desktop-entry.mjs`, `scripts/lib/payload.mjs`, `scripts/gate/tests/version-package.test.mjs`, `assets/icon.svg`, `assets/banner.svg`, `assets/readme-banner.svg`, `README.md`, `scripts/desktop-launcher.mjs`, `scripts/lib/huelle.mjs`, `packages/prompter/assets/capabilities.json`, `docs/probes/h5-entscheidung.json`
 
 Das neue Paket `@shinon/version` hat drei Schichten, und die Trennung ist der eigentliche
 Inhalt: die Messung fragt `git` und liest den Bau-Schatten, die Formel rechnet daraus
@@ -777,6 +777,71 @@ Ausserhalb des Baums war dieser Tag ein Aufräumtag: drei Altbestaende wurden ge
 (der 70 Commits alte Klon unter `~/Projekte`, das Duplikat auf der SSD und der
 Notiz-Scratch), die Draft-PRs wurden geschlossen, und uebrig bleiben `main` und der
 CodingMon-Zweig.
+
+
+Dieser Tag hat dem Repo sein Gesicht gegeben und dabei dem Versprechen widersprochen, das
+die Doku seit dem ersten Commit trug. Das alte README war ein Statusblatt in Prosa: eine
+Fassungszahl im Abzeichen, ein Quickstart, eine Pakettabelle, ein Schluss mit „Projekt
+Status" — und dazwischen der Satz, ein Harness sei eine Maschine. Das war nicht falsch.
+Es war nur eine Anleitung fuer jemanden, der das Repo bereits kannte. Wer zum ersten Mal
+hineinlaeuft, bekam statt eines Grundes eine Inventarliste.
+
+Der neue Text rechnet ab. Er beginnt mit den drei Forumstabs, in denen jemand erklaert,
+sein Agent habe die Codebase analysiert, und endet dort, wo die Frage wirklich laeuft:
+was dieses Werkzeug tut, was es ausdruecklich **nicht** tut, wie man es installiert, ohne
+dass die Zeilen an den Pfaden des Nutzers scheitern, und welche sieben Fragen man hat,
+bevor man die erste stellt. Die harte Abgrenzung ist der Kern: kein Refactoring im
+Hintergrund, kein Ersatz fuer Tests, keine erfundenen Zahlen, keine Cloud. Ein Agent,
+der ohne Schluessel laeuft, sagt `MISSING_CREDENTIAL` und nennt die aktive Route — er
+wechselt nicht still auf eine andere. Zwei Sprachsektionen tragen dieselben Aussagen:
+der deutsche Teil den Ton, der englische dieselben Sache nuechtern. Die Zahlen bleiben
+dort, wo sie hingehoeren — `docs/ZAHLEN.md` — und das Abzeichen im README nennt keine
+Fassung mehr, sondern verweist auf ihren Besitzer.
+
+Zu der Prosa kamen drei Bilder, alle handgemacht und alle als SVG im Baum unter
+`assets/`: `assets/icon.svg` (Amboss und Hammer, quadratisch — es ist ein App-Symbol, kein
+Ladezettel) ersetzt das breite Banner als Menue-Icon, `assets/banner.svg` traegt die Marke
+und drei Zeilen ohne Zahlen, `assets/readme-banner.svg` ist das Terminalfenster, in dem
+ein Agent ehrlich Auskunft gibt. Alle drei wurden in Chromium gerendert und angesehen, in
+64, 128 und 256 Pixeln; der Icon-Satz las sich erst nach einer Trennung der Geometrie
+als Amboss mit Hammer statt als Klumpen.
+
+
+Der Tag hatte noch eine zweite, unangenehme Seite: der Baum war an zwei Stellen rot, und
+beide Stellen waren ehrlich. Der `plugin-idioms`-Test pruft, dass jede Host-Haelfte
+genau einmal `settings.configure` registriert — er verglich dabei die **gesamte**
+Aufrufliste und verlangte damit nebenbei, dass eine Host-Haelfte ausser der
+Settings-Registrierung nichts tun darf. Der Versionsspiegel mountet aber eine Route; sein
+`inject ["webServer"]` stand in der Liste und machte den Test rot. Der Test wurde nicht
+geweicht, sondern praeziser: er misst jetzt die Registrierung selbst — genau ein
+`inject ["settings"]`, genau ein `configure {"auto":false} fiber=ROOT_FIBER`, genau ein
+Effekt — und zaehlt die Settings-Injektionen ausdruecklich. Die Paket-Haelfte haengt
+sich ausserdem an `ctx.interval` (der aktuelle Name des Cordis-Timers) statt an den
+abgeschwaechten Alias `ctx.setInterval`; fehlt der Timer-Dienst, uebernimmt der globale
+Timer mit `unref` und eigener Aufraeumung.
+
+Und die Fuenf Proben aus dem 2026-10-20-Zug trugen die Pflichtform des `probe-twin`-Gates
+nicht: `id`, `claim`, `targets` und `expect` fehlten, `result` und `verdict` auch. Sie
+bekamen diese Felder additiv, ohne dass eine Messung angefasst wurde. Die H5-Probe
+verliert dabei ihr `verdict: NOT_MEASURED` — das war eine Vermischung zweier Dinge: das
+Falsify_Me-Verdikt sagt, was als naechstes passiert (`RESEARCH: messen`), die Messlage
+sagt, ob ueberhaupt ein Messwert vorliegt. Beide zu vermischen hiesse: eine fehlende
+Messung sieht wie eine Entscheidung aus. Die Probe traegt die Messlage jetzt in
+`messwert_status`, das Gate liest dort, und der Test
+`scripts/gate/tests/task-router-h5.test.mjs` folgt der Messlage statt der Schalterlage.
+
+Dasselbe gilt fuer die Faehigkeitskarte: `@shinon/version` war dort nicht genannt, und
+`scripts/gate/tests/capabilities.test.mjs` verlangt, dass **jedes** Paket mindestens
+einmal einen Eigentuemer hat. Der Eintrag `versionsstand-sichtbar` kam additiv dazu — mit
+der Naht `__DSH_VERSION_INFO__` woertlich im Eigentuemer-Paket. Beim ersten Lauf war er
+trotzdem rot: die Frage enthielt keinen ihrer eigenen Begriffe, also fand
+`matchCapability` nichts und die Zuordnung blieb leer. Die Frage nennt den Begriff jetzt
+im Text, und die Karte ist wieder eine Landkarte und kein Wunschzettel.
+
+Belegt: `npm test` Exit 0 (statisches Gate 126/126), `npm run gate:test` 812/812,
+`npm run gate:full` 23 Gates gruen, `npm run test:full` Exit 0 (Paket-Suiten 46/50/13/
+240/13/13/17/12, Fixtures 9, Distribution 92, Profilboot 4/4), `npm run build` Exit 0
+(23 Pakete, 221 Dateien, 1 919 370 Bytes) und `npm run zahlen:check` deckungsgleich.
 
 ---
 

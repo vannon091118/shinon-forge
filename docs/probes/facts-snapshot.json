@@ -1,4 +1,13 @@
 {
+  "id": "wissens-runtime/zug-3-snapshot-und-handoff",
+  "claim": "Der Fakten-Snapshot ist fuer jeden Schritt schnell genug, und der Wissensblock erreicht den Hauptagenten unabhaengig davon, ob der One-Shot-Veredler laeuft: er erscheint auch im abgelehnten One-Shot und im Direktpfad, und ohne Dienst bleibt der Prompt bytegleich.",
+  "targets": [
+    "packages/project-index/assets/facts-snapshot.js",
+    "packages/project-index/assets/facts-service.js",
+    "packages/prompter/assets/knowledge-block.js",
+    "packages/prompter/assets/pre-step.js"
+  ],
+  "expect": "Kompilieren und Rendern einer gültigen Faktensammlung liegen im Millisekundenbereich, derselbe Schluessel liefert denselben Snapshot-Hash, und der gerenderte Block steht im finalen messages-Array in allen drei Ausgaengen (angenommen, abgelehnt, Direktpfad); fehlt der Dienst, bleibt der Prompt unveraendert.",
   "probe": "wissens-runtime/zug-3-snapshot-und-handoff",
   "date": "2026-10-20",
   "question": "Ist der Snapshot schnell genug für jeden Schritt, und erreicht der Block den Hauptagenten unabhängig vom One-Shot?",
@@ -30,6 +39,11 @@
     "service": "packages/project-index/assets/facts-service.js",
     "renderer": "packages/prompter/assets/knowledge-block.js",
     "host_path": "packages/prompter/assets/pre-step.js",
-    "tests": ["packages/project-index/test/facts-snapshot.test.mjs", "packages/prompter/test/knowledge-block.test.mjs"]
-  }
+    "tests": [
+      "packages/project-index/test/facts-snapshot.test.mjs",
+      "packages/prompter/test/knowledge-block.test.mjs"
+    ]
+  },
+  "result": "BESTAETIGT",
+  "verdict": "WRITE"
 }

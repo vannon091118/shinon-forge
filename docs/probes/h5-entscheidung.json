@@ -1,8 +1,16 @@
 {
+  "id": "task-router/h5-entscheidung",
+  "claim": "Solange H5 (Benchmark 4.6 aus docs/ROADMAP.md §2.3) nicht gemessen ist, bleibt die automatische Goal-Aktivierung im Profil aus: der Schalter folgt der Messlage, nicht dem Wunsch. Ein fehlender Messwert ist kein gruener Wert.",
+  "targets": [
+    "packages/task-router/index.js",
+    "profiles/shinon/cordis.patch.yml",
+    "scripts/gate/tests/task-router-h5.test.mjs"
+  ],
+  "expect": "Das ausgelieferte Profil schaltet `activate` nicht ein, solange kein H5-Messwert vorliegt; die Rundengrenze ist eine Obergrenze gegen Endlosigkeit; und die Gate-Zusage liest Profil und Probe gemeinsam, statt die Schalterlage abzuschreiben.",
   "probe": "task-router/h5-entscheidung",
+  "messwert_status": "NOT_MEASURED",
   "date": "2026-10-20",
   "question": "Darf der Task-Router Goals automatisch aktivieren, oder bleibt der Schalter aus, bis H5 (Benchmark 4.6) mit einem Messwert entschieden ist?",
-  "verdict": "NOT_MEASURED",
   "why": "H5 ist der Benchmark 4.6 aus docs/ROADMAP.md §2.3: Aufgaben-Set, DSH-Baseline, Shinon-Messung, Feature-Entscheidung mit Messwert. Es gibt in diesem Repo kein Aufgaben-Set und keine Baseline, also auch keinen Messwert — und ohne Messwert keine Entscheidung. Der Schalter bleibt deshalb aus; das ist die Entscheidung, nicht ihr Fehlen.",
   "method": "Kein Lauf, sondern eine Bestandsaufnahme: das Profil gelesen, die Rundengrenze gelesen, die vorhandenen Proben nach einem H5-Messwert durchsucht und die Aktivierungsbedingung im Code geprüft (activateGoal). Der Gate-Test task-router-h5.test.mjs liest Profil und diese Datei und vergleicht sie, damit die Zusage nicht nur im Text steht.",
   "measurement": {
@@ -25,5 +33,7 @@
     "profil": "profiles/shinon/cordis.patch.yml",
     "test": "scripts/gate/tests/task-router-h5.test.mjs",
     "roadmap": "docs/ROADMAP.md"
-  }
+  },
+  "result": "UNKLAR",
+  "verdict": "RESEARCH"
 }

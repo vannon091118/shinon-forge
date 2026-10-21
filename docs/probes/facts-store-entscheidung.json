@@ -1,4 +1,12 @@
 {
+  "id": "wissens-runtime/zug-1-speicherentscheidung",
+  "claim": "Fakten gehoeren in eine eigene Datei (facts.sqlite) mit eigener Versionsleiter, nicht in dieselbe SQLite wie der Projektindex: die Index-Loeschliste und das `vacuum` des Index-Rebuilds duerfen die geurteilten Aussagen nicht mitloeschen.",
+  "targets": [
+    "packages/project-index/assets/facts-store.js",
+    "packages/project-index/assets/facts-core.js",
+    "docs/contracts/facts.json"
+  ],
+  "expect": "Die Faktentabelle liegt in einer eigenen Datei mit eigener Versionsleiter (FACTS_VERSION ueber PRAGMA user_version); der Index-Rebuild (PRIMARY_TABLES + vacuum) beruehrt sie nicht, und die Faktenzeile ueberlebt ein Schliessen und Wiederoeffnen.",
   "probe": "wissens-runtime/zug-1-speicherentscheidung",
   "date": "2026-10-20",
   "question": "Fakten in dieselbe SQLite wie der Projektindex oder in eine eigene Faktendatei?",
@@ -7,7 +15,14 @@
     "index": {
       "schema_version": 2,
       "primary_tables": 6,
-      "drop_list_on_version_mismatch": ["files", "symbols", "edges", "references", "touches", "chunks"],
+      "drop_list_on_version_mismatch": [
+        "files",
+        "symbols",
+        "edges",
+        "references",
+        "touches",
+        "chunks"
+      ],
       "runs_vacuum_on_rebuild": true,
       "version_key": "meta.schema_version"
     },
@@ -45,5 +60,7 @@
     "store": "packages/project-index/assets/facts-store.js",
     "tests": "packages/project-index/test/facts.test.mjs",
     "contract": "docs/contracts/facts.json"
-  }
+  },
+  "result": "BESTAETIGT",
+  "verdict": "WRITE"
 }

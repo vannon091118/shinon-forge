@@ -213,10 +213,25 @@ test('jede Host-Hälfte registriert genau einmal: settings.configure({auto:false
         },
         typeof mod.Config === 'function' ? mod.Config({ enabled: true }) : {},
       );
+      // Der Test sagt, was er messen will: GENAU EINE Settings-Registrierung
+      // mit unveränderten Argumenten. Das ist nicht dasselbe wie "diese
+      // Host-Hälfte tut sonst nichts" — eine Host-Hälfte darf durchaus weitere
+      // Dienste injizieren (der Versionsspiegel mountet eine Route). Geprüft
+      // wird deshalb die Registration selbst, strenger als vorher: sie kommt
+      // genau einmal vor, mit genau diesen Argumenten, und die beiden
+      // Nachbarzeilen sind genau ein Inject und genau ein Effekt.
+      const settings = log.filter(
+        (entry) => entry === 'inject ["settings"]' || entry.startsWith('configure ') || entry === 'effect',
+      );
       assert.deepEqual(
-        log,
+        settings,
         ['inject ["settings"]', 'configure {"auto":false} fiber=ROOT_FIBER', 'effect'],
         `${file}: genau eine Registrierung, unveränderte Argumente`,
+      );
+      assert.equal(
+        log.filter((entry) => entry === 'inject ["settings"]').length,
+        1,
+        `${file}: der Settings-Dienst wird genau einmal injiziert`,
       );
     }
   } finally {

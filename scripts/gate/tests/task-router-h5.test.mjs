@@ -100,7 +100,11 @@ test('H5: der Profil-Schalter folgt der Messlage, nicht dem Wunsch', () => {
   assert.ok(rounds, 'das Profil nennt die Rundengrenze ausdrücklich');
   assert.equal(router.goalRoundsVerdict(Number(rounds[1])).ok, true, `Profilwert ${rounds[1]} liegt im erlaubten Band`);
 
-  if (probe.verdict === 'NOT_MEASURED') {
+  // Die MESSLAGE steht in `messwert_status` — nicht in `verdict`: das
+  // Falsify_Me-Verdikt sagt, was als naechstes passiert (RESEARCH: messen),
+  // die Messlage sagt, ob ueberhaupt ein Messwert vorliegt. Beide zu
+  // vermischen hiesse: eine fehlende Messung sieht wie eine Entscheidung aus.
+  if (probe.messwert_status === 'NOT_MEASURED') {
     assert.equal(switchedOn, false, 'ohne H5-Messung bleibt die Aktivierung aus');
     assert.match(probe.why, /4\.6|H5/, 'die Probe nennt den Benchmark, der fehlt');
   } else {
