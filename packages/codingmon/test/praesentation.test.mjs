@@ -252,13 +252,13 @@ describe('S2c — die Konfiguration kennt kein Feld ohne Leser', () => {
   });
 });
 
-describe('S2e — eine Art ohne eigenes Sprite zeigt das ihrer Familie', () => {
-  test('der Aufloesungsweg ist: eigenes Gitter, sonst Familie, sonst Notfall', () => {
+describe('S2e — der Gitter-Rueckfall bleibt bei der eigenen Familie', () => {
+  test('der Aufloesungsweg des Gitters ist: eigenes Gitter, sonst Familie, sonst Notfall', () => {
     const sim = boot();
     const families = new Map();
     for (const id of sim.api.species()) {
       const species = host.SPECIES[id];
-      const key = sim.api.spriteFor(id, 'front');
+      const key = sim.api.spriteKey(id, 'front');
       assert.ok(typeof key === 'string' && key.length > 0, `kein Sprite fuer ${id}`);
       if (!families.has(species.family)) families.set(species.family, new Set());
       families.get(species.family).add(key.split('-')[0]);
@@ -279,10 +279,17 @@ describe('S2e — eine Art ohne eigenes Sprite zeigt das ihrer Familie', () => {
     for (const id of sim.api.species()) {
       const family = host.SPECIES[id].family;
       for (const side of ['front', 'back']) {
-        const key = sim.api.spriteFor(id, side);
+        const key = sim.api.spriteKey(id, side);
         assert.equal(host.SPECIES[key.split('-')[0]]?.family, family,
           `${id}/${side} zeigt ein Sprite aus einer anderen Familie`);
       }
+    }
+  });
+
+  test('die Anzeige selbst nimmt die Kunst, nicht den Rueckfall', () => {
+    const sim = boot();
+    for (const id of sim.api.species()) {
+      assert.equal(sim.api.spriteFor(id, 'front'), `art:${id}`, `${id}: Anzeige ohne eigene Kunst`);
     }
   });
 });

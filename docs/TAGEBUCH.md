@@ -1003,6 +1003,63 @@ und im Regeltext benannt).
 Belegt: `npm run test:codingmon` PASS Exit 0 mit 77 von 77 Tests (vorher 63),
 `npm test` Exit 0, `npm run zahlen:check` Exit 0.
 
+### Ein Bild je Art — 50 Sprites, die es vorher nicht gab
+
+Die 50 Arten waren am Tag zuvor da, ihre Bilder nicht: zehn Arten hatten
+handgezeichnete 32x32-Gitter, die anderen vierzig zeigten die Figur ihrer
+Familie. Das war ehrlich (der Rueckfall hiess Rueckfall), aber es hiess auch:
+IndexImp und BoundaryBeast sahen gleich aus, obwohl der Katalog sie als zwei
+Arten mit zwei Rollen fuehrt. Die Kunst lag die ganze Zeit daneben — das
+CodingMon-50-ArtPack bringt eine SVG-Datei je Art.
+
+**Die Entscheidung, die den Ausschlag gab:** das Gitter ist eine
+Identitaetsaussage (fuenf Farben, alle Arten violett) und taugt bei 16 px fuer
+die Marke; eine Illustration traegt bei 64 px die Art. Deshalb zeigen Arena,
+wilder Gegner und Kampf jetzt die Kunst, und die kleine Marke im Panel bleibt
+Pixel art. Kein Familien-Fallback mehr in der Anzeige, aber auch keine
+weggeraeumte Regel: `resolveGridKey` bleibt im Code, weil eine 51. Art ohne
+Bild sonst wieder auf der ersten Art der Liste landen wuerde.
+
+**Der Befund, den man dem Markup nicht ansieht:** alle 50 Dateien definieren
+dieselben vier IDs — `body`, `metal`, `core`, `glow`. Unveraendert
+teingebettet, gewaenne im Browser die erste Definition, und 49 Arten wuerden mit
+den Farben einer Art gezeichnet: ein stiller Fehler, der wie Kunst aussieht.
+Der Generator setzt deshalb `cm-<art>-` vor jede ID, schreibt jeden
+`url(#…)`-Verweis mit um und verweigert eine Datei, deren Verweis aus der
+eigenen Datei herauszeigt. Geprueft wird das im Buendel, nicht im Gefuehl: 200
+Definitionen, jede genau einmal.
+
+**Der Drift, den die Kunst braucht:** der Katalog
+(`packages/codingmon/assets/data/codingmon-50.json`) ist die Liste, die Dateien
+sind die Antwort — in beide Richtungen. Eine Art ohne Datei ist rot, eine Datei
+ohne Art ist rot, und die Einbettung in `client.js` ist deckungsgleich mit dem,
+was `buildArt()` aus den Dateien baut. Wer eine Art umbenennt, ohne ihr Bild
+mitzunehmen, merkt es beim naechsten Lauf.
+
+Zwei Kleinigkeiten, die Absicht sind und deshalb hier stehen: die Kunst traegt
+`aria-hidden` statt des ArtPack-`aria-label`, weil der Name im Panel ohnehin als
+Text daneben steht und zweimal vorlesen Laerm ist; und die Rueckseite ist eine
+Spiegelung, keine zweite Zeichnung — das ArtPack malt eine Ansicht je Art, und
+eine erfundene Rueckseite waere eine Luege mit schoenen Linien.
+
+Der Preis ist gemessen und benannt: 50 Dateien mit 199 KB, im Buendel 202 000
+Zeichen, eine Zeile je Art (damit der Diff lesbar bleibt).
+`packages/codingmon/client.js` waechst dadurch auf 2587 Zeilen und 433 KB; die
+Zahl steht in `docs/contracts/structure.json` im Bestand und im Regeltext, wie
+es die Client-Haelfte verlangt. Dass eine Client-Haelfte nicht teilbar ist, gilt
+auch fuer Daten.
+
+Belegt: `npm run test:codingmon` PASS Exit 0 mit **84 von 84** Tests (vorher 77;
+12 davon im Sprite-Vertrag), `npm test` Exit 0 (statisch 126 bestanden),
+`npm run gate:full` PASS 23/23, `npm run zahlen:check` Exit 0, `npm run build`
+Exit 0 (dist traegt 50 Kunstdateien). Browser: die Galerie aus
+`api.spriteMarkup()` des echten Bundles in Chromium — 100 SVG-Elemente, keines
+ohne Flaeche, `observoid` fuellt mit `url("#cm-observoid-body")`, also der
+eigenen Definition (`docs/probes/codingmon-sprites-2026-10-21-familien.png`,
+Zahlen in `docs/probes/codingmon-sprites.json`). **Nicht** gemessen: das
+Rendering im DSH-Panel selbst — das gehoert zur Buehne (B09/BROWSER-01) und
+braucht einen laufenden Host; der Mint-Smoke bleibt ebenfalls offen.
+
 ---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb

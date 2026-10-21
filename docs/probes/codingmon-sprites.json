@@ -1,0 +1,17 @@
+[
+  {
+    "id": "codingmon-50-eigenes-bild-je-art",
+    "claim": "Jede der 50 kanonischen CodingMon-Arten hat im selbsttragenden Client-Buendel ein EIGENES Bild; keine Art zeigt die Figur einer anderen Art oder die ihrer Familie.",
+    "targets": [
+      "packages/codingmon/assets/art",
+      "packages/codingmon/assets/data/codingmon-50.json",
+      "scripts/assets/build-sprites.mjs",
+      "packages/codingmon/client.js",
+      "packages/codingmon/test/sprites.test.mjs"
+    ],
+    "expect": "Der Katalog ist die Liste, die Kunst ist die Antwort: 50 Artdateien, keine Art ohne Datei, keine Datei ohne Art. Im Buendel traegt jede Farbdefinition den Praefix ihrer Art, keine ID ist doppelt, und jede Art loest auf `art:<art>` auf statt auf ein Gitter der Familie. Eine 51. Art ohne Datei faellt sichtbar auf das Gitter ihrer Familie zurueck, nie auf die erste Art der Liste.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN in zwei Schritten. (1) VERTRAG: `packages/codingmon/test/sprites.test.mjs` prueft 50 Kunstdateien gegen `packages/codingmon/assets/data/codingmon-50.json` in beide Richtungen, die Umbennung der vier Farb-IDs je Art (`body`, `metal`, `core`, `glow` -> `cm-<art>-…`) samt aller `url(#…)`-Verweise, die Eindeutigkeit im Buendel (200 Definitionen, jede genau einmal), die Deckungsgleichheit von Quelldatei und Einbettung, die Abwesenheit von Skript/Bild/externem Verweis, `aria-hidden` statt doppelt vorgelesener Namen, und die Spiegelung der Rueckseite; `npm run test:codingmon` PASS Exit 0 mit 84 von 84 Tests (vorher 77), davon 12 im Sprite-Vertrag. `npm test` Exit 0 (statisches Gate 126 bestanden, 0 fehlgeschlagen), `npm run zahlen:check` Exit 0, `npm run gate:full` PASS. (2) BROWSER: eine Galerie aus genau dem Markup, das `api.spriteMarkup()` des echten Bundles liefert, in Chromium gerendert — 100 SVG-Elemente (50 Arten je Vorder- und Rueckseite), 0 ohne Flaeche, 0 doppelte IDs JE ART, 200 Wiederholungen derselben Art-Definitionen (Vorder- und Rueckseite derselben Art teilen ihre Farben, weil es dieselbe Zeichnung ist), 401 definierte IDs inklusive des Report-Elements; die Koerperfuellung von `observoid` berechnet sich zu `url(\"#cm-observoid-body\")`, also auf die EIGENE Definition, nicht auf die erste im Dokument. Screenshot: `docs/probes/codingmon-sprites-2026-10-21-familien.png`. NICHT gemessen und deshalb nicht behauptet: das Rendering im DSH-Panel selbst (Composer-Dock, Animationsbudget, 60 fps) — dieser Nachweis gehoert zur Stage (B09/BROWSER-01) und braucht einen laufenden Host; und der Installations-/Mint-Smoke. Die 16-px-Marke bleibt absichtlich Pixel art (`speciesGlyph`), weil eine 512er-Illustration bei 16 px nicht lesbar ist; die drei Evolutionsstufen sind dort Silhouetten, die eine einzelne Kunstdatei nicht ausdruecken kann."
+  }
+]

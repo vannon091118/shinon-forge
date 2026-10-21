@@ -9,6 +9,22 @@
  * Zeile zusammengefasst) und PRUEFT dabei das Format: genau 32 Zeilen zu je
  * 32 Zeichen, nur Palettenzeichen, hoechstens fuenf Farben je Sprite.
  *
+ * DIE KUNST DER 50 ARTEN (`assets/art/*.svg`) liegt daneben und gehoert zum
+ * selben Vertrag, aber zu einer anderen Frage: die Gitter sind handgezeichnete
+ * Pixel art fuer die ZEHN Arten der ersten Fassung (und fuer die drei
+ * Familien), die Kunst ist eine Datei je kanonischer Art-ID aus dem
+ * CodingMon-50-ArtPack. Beides landet im Buendel, aber die Kunst gewinnt: eine
+ * Art mit eigener Datei wird als Kunst gezeichnet, das Gitter bleibt der
+ * dokumentierte Rueckfall (siehe `resolveGridKey` im Client).
+ *
+ * Was `normalizeArt()` dabei tun MUSS und warum: die 50 Dateien definieren alle
+ * dieselben vier IDs (`body`, `metal`, `core`, `glow`). Unveraendert
+ * nebeneinandergestellt wuerde im Browser die erste Definition gewinnen und
+ * jede weitere Art mit den Farben der ersten zeichnen — ein stiller Fehler, der
+ * wie Kunst aussieht. Deshalb bekommt jede ID den Praefix `cm-<art>-`, und
+ * jeder `url(#…)`-Verweis wird mit umgeschrieben. Der Test prueft beides:
+ * keine ID doppelt im Buendel, jeder Verweis innerhalb der eigenen Datei.
+ *
  * Aufruf:
  *   node scripts/assets/build-sprites.mjs [--check] [--embed]
  * Ohne Flag schreibt es `packages/codingmon/assets/sprites/*.svg` neben die
@@ -17,7 +33,8 @@
  * selbststaendig und kann keine Datei aus `assets/` laden). Exit 1 bei
  * Verletzung. Der Gate-Test (`packages/codingmon/test/sprites.test.mjs`)
  * nutzt denselben Vertrag: jede Spezies hat Vorder- und Rueckseite, jedes SVG
- * ist gueltig, jede Farbe stammt aus der Palette, die Einbettung ist deckungsgleich.
+ * ist gueltig, jede Farbe stammt aus der Palette, die Einbettung ist deckungsgleich,
+ * und die Kunst deckt GENAU die Arten des kanonischen Katalogs ab.
  *
  * STILHINWEIS (fuer kuenftige Aenderungen): Diese Datei nutzt bewusst nur
  * `indexOf`/`slice`/`endsWith` und `String.fromCharCode(10)` statt
@@ -32,6 +49,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 const SPRITE_DIR = join(ROOT, 'packages', 'codingmon', 'assets', 'sprites');
 const UI_DIR = join(ROOT, 'packages', 'codingmon', 'assets', 'ui');
+const ART_DIR = join(ROOT, 'packages', 'codingmon', 'assets', 'art');
+const CATALOG_FILE = join(ROOT, 'packages', 'codingmon', 'assets', 'data', 'codingmon-50.json');
 const CLIENT_FILE = join(ROOT, 'packages', 'codingmon', 'client.js');
 
 const LF = String.fromCharCode(10);
@@ -111,6 +130,82 @@ export function gridToSvg(rows) {
  */
 export const SPRITE_REGION = 'generated-sprites';
 export const UI_REGION = 'generated-ui';
+export const ART_REGION = 'generated-art';
+
+/** Die Kantenlaenge, auf die jede ArtPack-Datei gemalt ist. */
+export const ART_VIEW = 512;
+
+/** Die kanonischen Art-IDs — die Kunst darf keine andere Menge behaupten. */
+export function catalogIds() {
+  const data = JSON.parse(readFileSync(CATALOG_FILE, 'utf8'));
+  const ids = data.species.map((species) => species.id).sort();
+  if (ids.length !== 50 || new Set(ids).size !== 50) {
+    throw new Error('Katalog muss 50 eindeutige Art-IDs nennen (' + ids.length + ' gelesen)');
+  }
+  return ids;
+}
+
+/**
+ * Was in einem Markup nichts zu suchen hat: Skripte, eingebettete Bilder,
+ * externe Verweise, `data:`-URLs und Event-Attribute. Das Buendel setzt den
+ * Text per `dangerouslySetInnerHTML` in die Seite — eine Datei, die selbst
+ * etwas nachlaedt, waere hier kein Bild, sondern Code.
+ */
+const ART_FORBIDDEN = /<script|<foreignObject|<image|\son[a-z]+\s*=|href=|xlink:|data:/i;
+
+/**
+ * Eine ArtPack-Datei pruefen und als Buendel-Markup aufbereiten.
+ *
+ * Die Reihenfolge ist eine Zusage: erst die Form (SVG-Wurzel, 512er-viewBox),
+ * dann die Sicherheit (nichts Nachladendes), dann die IDs (eindeutig, mit
+ * Art-Praefix umgeschrieben), dann die Verweise (jeder `url(#…)` zeigt in die
+ * eigene Datei), zuletzt die Verdichtung (Zeilenumbrueche und Einrueckung sind
+ * fuer die Lesbarkeit der Quelle da, nicht fuer das Buendel).
+ *
+ * @returns das fertige Markup, byte-gleich in Quelle und Einbettung erwartet.
+ */
+export function normalizeArt(text, speciesId) {
+  const name = speciesId + '.svg';
+  if (!text.startsWith('<svg ')) throw new Error(name + ': keine SVG-Wurzel');
+  if (!text.includes('viewBox="0 0 ' + ART_VIEW + ' ' + ART_VIEW + '"')) {
+    throw new Error(name + ': viewBox ist nicht ' + ART_VIEW + 'x' + ART_VIEW);
+  }
+  if (ART_FORBIDDEN.test(text)) throw new Error(name + ': verbotene Konstruktion (Skript, Bild, externer Verweis, Event)');
+  const ids = [...text.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+  if (ids.length === 0) throw new Error(name + ': keine Definition (Farben fehlen)');
+  if (new Set(ids).size !== ids.length) throw new Error(name + ': doppelte ID in einer Datei');
+  const prefix = 'cm-' + speciesId + '-';
+  let markup = text.replace(/ role="img"/g, '').replace(/ aria-label="[^"]*"/g, '');
+  for (const id of ids) {
+    markup = markup.split('id="' + id + '"').join('id="' + prefix + id + '"')
+      .split('url(#' + id + ')').join('url(#' + prefix + id + ')');
+  }
+  const known = new Set(ids.map((id) => prefix + id));
+  for (const ref of [...markup.matchAll(/url\(#([^)]+)\)/g)].map((match) => match[1])) {
+    if (!known.has(ref)) throw new Error(name + ': Verweis auf unbekannte ID ' + ref);
+  }
+  markup = markup.replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
+  if (!markup.endsWith('</svg>')) throw new Error(name + ': SVG-Wurzel nicht geschlossen');
+  return markup;
+}
+
+/**
+ * Die Kunst aller Arten, nach kanonischer ID. Fail-closed in beide Richtungen:
+ * eine Art ohne Datei und eine Datei ohne Art sind beide ein Befund — der
+ * Katalog ist die Liste, die Dateien sind die Antwort darauf.
+ */
+export function buildArt() {
+  const ids = catalogIds();
+  const owners = readdirSync(ART_DIR).filter((file) => file.endsWith('.svg'))
+    .map((file) => file.slice(0, file.length - '.svg'.length)).sort();
+  const missing = ids.filter((id) => owners.indexOf(id) === -1);
+  const orphans = owners.filter((id) => ids.indexOf(id) === -1);
+  if (missing.length > 0) throw new Error('Art ohne Kunst: ' + missing.join(', '));
+  if (orphans.length > 0) throw new Error('Kunst ohne Art im Katalog: ' + orphans.join(', '));
+  const art = {};
+  for (const id of ids) art[id] = normalizeArt(readFileSync(join(ART_DIR, id + '.svg'), 'utf8'), id);
+  return art;
+}
 
 /** Erwartete Einbettung aus den Quelldateien bauen (fuer `--embed` und Test). */
 export function buildEmbed() {
@@ -125,7 +220,7 @@ export function buildEmbed() {
   for (const file of uiFiles) {
     ui[file.slice(0, file.length - '.svg'.length)] = readFileSync(join(UI_DIR, file), 'utf8');
   }
-  return { grids, ui };
+  return { grids, ui, art: buildArt() };
 }
 
 /**
@@ -151,12 +246,15 @@ export function readEmbedRegion(text, region, constName) {
 export function embedIntoClient() {
   const built = buildEmbed();
   const pairs = [
-    [SPRITE_REGION, 'SPRITE_GRIDS', built.grids],
-    [UI_REGION, 'UI_SVG', built.ui],
+    [SPRITE_REGION, 'SPRITE_GRIDS', built.grids, false],
+    [UI_REGION, 'UI_SVG', built.ui, false],
+    // Die Kunst bekommt eine Zeile je Art: 50 Eintraege a vier Kilobyte auf
+    // einer Zeile waeren im Diff und im Editor nicht mehr lesbar.
+    [ART_REGION, 'SPRITE_ART', built.art, true],
   ];
   let text = readFileSync(CLIENT_FILE, 'utf8');
   let changed = false;
-  for (const [region, constName, value] of pairs) {
+  for (const [region, constName, value, oneLinePerKey] of pairs) {
     const openAt = text.indexOf('// >>> ' + region);
     if (openAt === -1) throw new Error('Block "' + region + '" ohne Startmarke');
     const bodyStart = text.indexOf(LF, openAt) + 1;
@@ -169,7 +267,15 @@ export function embedIntoClient() {
       if (ch !== ' ' && ch !== String.fromCharCode(9)) break;
       indent += ch;
     }
-    const next = indent + 'const ' + constName + ' = ' + JSON.stringify(value) + ';' + LF + indent;
+    let next;
+    if (oneLinePerKey) {
+      const keys = Object.keys(value);
+      const lines = keys.map((key, index) => indent + '  ' + JSON.stringify(key) + ': ' + JSON.stringify(value[key])
+        + (index === keys.length - 1 ? '' : ','));
+      next = indent + 'const ' + constName + ' = {' + LF + lines.join(LF) + LF + indent + '};' + LF + indent;
+    } else {
+      next = indent + 'const ' + constName + ' = ' + JSON.stringify(value) + ';' + LF + indent;
+    }
     const updated = text.slice(0, bodyStart) + next + text.slice(closeAt);
     if (updated !== text) changed = true;
     text = updated;
@@ -194,12 +300,16 @@ function main() {
     rects += svg.split('<rect').length - 1;
     if (!checkOnly && !embed) writeFileSync(join(SPRITE_DIR, file.slice(0, file.length - '.grid'.length) + '.svg'), svg);
   }
+  const art = buildArt();
+  const artIds = Object.keys(art).length;
+  const artBytes = Object.values(art).reduce((sum, markup) => sum + markup.length, 0);
   if (embed) {
     const changed = embedIntoClient();
-    console.log('OK ' + files.length + ' Sprites geprueft, Einbettung ' + (changed ? 'geschrieben' : 'deckungsgleich'));
+    console.log('OK ' + files.length + ' Sprites und ' + artIds + ' Kunstdateien (' + artBytes + ' Zeichen) geprueft, Einbettung ' + (changed ? 'geschrieben' : 'deckungsgleich'));
     return;
   }
-  console.log('OK ' + files.length + ' Sprites geprueft' + (checkOnly ? '' : ' und geschrieben') + ' (' + rects + ' Rechtecke)');
+  console.log('OK ' + files.length + ' Sprites und ' + artIds + ' Kunstdateien geprueft'
+    + (checkOnly ? '' : ' und geschrieben') + ' (' + rects + ' Rechtecke)');
 }
 
 const invoked = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
