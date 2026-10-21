@@ -5,9 +5,15 @@
  * den reinen Kern (skill-lifecycle-core.js) rechnen lassen und das Ergebnis
  * schreiben. Der Host entscheidet nichts selbst; er fuehrt nur aus.
  *
- * Ausloeser (Ereignisse, nie je Schritt):
- *   - feedback/message-put mit negativer Bewertung  -> Korrektur (starkes Signal)
- *   - turn/end mit reason `completed`                -> Wiederholung (schwaches Signal)
+ * Ausloeser (Ereignisse, nie je Schritt) — NORMALISIERTE Namen, weil dieser
+ * Host auf `shinon/event` lauscht und nicht auf dem rohen `session/event`:
+ *   - feedback.rated mit negativer Bewertung  -> Korrektur (starkes Signal)
+ *   - turn.end mit reason `completed`         -> Wiederholung (schwaches Signal)
+ *
+ * Die Zuordnung roh -> normalisiert ist der Event-Spine (`feedback/message-put`
+ * -> `feedback.rated`, `feedback/record` -> `feedback.noted`, `turn/end` ->
+ * `turn.end`). Bis 2026-10-21 standen hier die ROHEN Namen; der Host hoerte damit
+ * auf einen Kanal, auf dem sie nie erscheinen, und der Lebenszyklus feuerte nie.
  *
  * Hintergrund: die Arbeit laeuft in einer Warteschlange mit `maxConcurrent` = 1,
  * `maxQueue` Plaetzen und `maxPerSession` Auftraegen je Sitzung. Jeder Auftrag
@@ -295,9 +301,9 @@ export function createSkillLifecycle({ ctx, rules, noteRules, route, log = conso
       const data = dataOf(payload);
       const buffer = bufferOf(sessionId);
 
-      if (type === 'user/message' && data?.source?.kind === 'user') {
+      if (type === 'message.received' && data?.source?.kind === 'user') {
         buffer.prompt = clip(textOf(data.content), budget.maxPromptChars);
-      } else if (type === 'assistant/message') {
+      } else if (type === 'message.completed') {
         buffer.answer = clip(textOf(data.message?.content ?? data.content), budget.maxEvidenceChars);
       } else if (type === trigger.correction.event) {
         const item = data.item ?? {};
@@ -310,7 +316,7 @@ export function createSkillLifecycle({ ctx, rules, noteRules, route, log = conso
         if (buffer.pendingCorrection !== null && typeof data.text === 'string') {
           buffer.correctionText = clip(data.text, budget.maxEvidenceChars);
         }
-      } else if (type === 'turn/end') {
+      } else if (type === 'turn.end') {
         if (data.reason?.kind !== trigger.completed.reason) return;
         buffer.completed += 1;
         const turn = data.turn;

@@ -16,13 +16,13 @@
   "trigger": {
     "note": "Zwei Ereignisarten erzeugen einen Kandidaten. Korrektur ist das stärkste Signal (der Mensch hat den Zug verworfen). Wiederholung ist das schwächere (abgeschlossene Züge derselben Sitzung): ein Kandidat ohne Korrektur wird erst veröffentlicht, wenn sein Fingerabdruck in genug abgeschlossenen Zügen wiederkehrt.",
     "correction": {
-      "event": "feedback/message-put",
+      "event": "feedback.rated",
       "rating": "negative",
-      "recordEvent": "feedback/record",
+      "recordEvent": "feedback.noted",
       "settleMs": 1500
     },
     "completed": {
-      "event": "turn/end",
+      "event": "turn.end",
       "reason": "completed"
     }
   },

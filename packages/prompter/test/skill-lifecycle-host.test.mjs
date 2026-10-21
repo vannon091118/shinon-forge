@@ -87,23 +87,23 @@ const skillFile = (name) => join(project, '.agents', 'skills', name, 'SKILL.md')
 const ledgerFile = () => join(project, '.shinon', 'skill-ledger.json');
 
 const userMessage = (session, text) => ({
-  envelope: { event_type: 'user/message', session_id: session },
+  envelope: { event_type: 'message.received', session_id: session },
   payload: { data: { source: { kind: 'user' }, content: [{ type: 'text', text }] } },
 });
 const assistantMessage = (session, text) => ({
-  envelope: { event_type: 'assistant/message', session_id: session },
+  envelope: { event_type: 'message.completed', session_id: session },
   payload: { data: { message: { content: [{ type: 'text', text }] } } },
 });
 const negativeFeedback = (session, messageId) => ({
-  envelope: { event_type: 'feedback/message-put', session_id: session },
+  envelope: { event_type: 'feedback.rated', session_id: session },
   payload: { data: { item: { rating: 'negative', messageId } } },
 });
 const feedbackText = (session, text) => ({
-  envelope: { event_type: 'feedback/record', session_id: session },
+  envelope: { event_type: 'feedback.noted', session_id: session },
   payload: { data: { text } },
 });
 const turnEnd = (session, turn, kind = 'completed') => ({
-  envelope: { event_type: 'turn/end', session_id: session },
+  envelope: { event_type: 'turn.end', session_id: session },
   payload: { data: { turn, reason: { kind } } },
 });
 

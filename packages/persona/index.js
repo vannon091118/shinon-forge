@@ -4,6 +4,10 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, isAbsolute, resolve, relative } from 'node:path';
 import { emptySelfModel, observeDecision, observeError, decaySelfModel, selfModelSummary, selfModelView, validateSelfModel } from './assets/self-model.js';
 import { MEMORY_CONTRACT, acceptedCommitments, decideProposal, decayMemory, emptyMemory, memoryView, proposeFromMemory, rememberDecision, rememberEvent, renderCommitments, renderMemory, selectMemories, validateMemory } from './assets/memory-core.js';
+// Das Lesen einer MENSCHLICHEN Nachricht und der explizite Beziehungs-Produzent
+// liegen im importfreien Kern: dieselbe Rechnung im Host, im Test ohne
+// node_modules und in der Probe gegen den echten Spine.
+import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, RELATION_SIGNAL, TRIGGERS, detectUserMood, matchTrigger, relationUpdate, renderUserLage, textOf } from './assets/interaction-core.js';
 // Die Host-Nähte (Narrative-Kanal, Entscheidungskanal des Veredlers) haben EINE
 // Definition: `@shinon/seams`. Der Kern ist importfrei — der Import zieht keine
 // zweite Engine mit, und genau das war der Grund für die früheren Literale.
@@ -563,89 +567,11 @@ export function eventTypeOf(payload) {
   return null;
 }
 
-/**
- * Triggerwoerter fuer die Selbstauskunft. Eine Frage nach der eigenen Person
- * ist eine ANREDE, keine Wissensabfrage — sie darf nicht wie ein Formular
- * beantwortet werden. Abgleich ist absichtlich tolerant: klein geschrieben und
- * als Teilstring, damit "Shinon?", "wer bist du eigentlich" und "sag mir wer
- * du bist" alle greifen.
- */
-export const TRIGGERS = [
-  'shinon',
-  'wer bist du',
-  'wer bist denn du',
-  'wer seid ihr',
-  'was bist du',
-  'was kannst du',
-  'was kannst du eigentlich',
-  'stell dich vor',
-  'stell dich mal vor',
-  'sag mir wer du bist',
-  'wie heisst du',
-  'wie heißt du',
-  'dein name',
-  'was machst du hier',
-];
-
-/** Erster passender Trigger oder null. Reine Funktion, kein Zustand. */
-export function matchTrigger(text, triggers = TRIGGERS) {
-  if (typeof text !== 'string' || text.trim() === '') return null;
-  const haystack = text.toLowerCase();
-  return triggers.find((trigger) => haystack.includes(trigger.toLowerCase())) ?? null;
-}
-
-/** Wortmarken der erkannten User-Stimmung — klein, deutsch, fail-closed. */
-const MOOD_FRUSTRIERT = [
-  'genervt', 'frust', 'nervt', 'läuft alles schief', 'laeuft alles schief',
-  'keine nerven', 'ärger', 'aeger', 'sauer', 'wütend', 'wuetend', 'kotzt',
-  'scheiße', 'scheisse', 'kein bock', 'dauert zu lang', 'hängt', 'haengt', 'spinnt',
-];
-const MOOD_ERFREUT = [
-  'großes lob', 'grosses lob', 'richtig nice', 'läuft schon super',
-  'laeuft schon super', 'exakt richtig', 'super gemacht', 'genau so',
-  'freu mich', 'bock heute', 'perfekt', 'danke',
-];
-
-/** Die Stimmung des Menschen aus seinem Text — frustriert, erfreut oder null. */
-export function detectUserMood(text) {
-  if (typeof text !== 'string' || text.trim() === '') return null;
-  const haystack = text.toLowerCase();
-  if (MOOD_FRUSTRIERT.some((mark) => haystack.includes(mark))) return 'frustriert';
-  if (MOOD_ERFREUT.some((mark) => haystack.includes(mark))) return 'erfreut';
-  return null;
-}
-
-/** Die erkannte Stimmung als System-Abschnitt — ein Satz Wirkung, kein Gutachten. */
-export function renderUserLage(mood) {
-  if (mood === 'frustriert') {
-    return [
-      '## User-Lage: frustriert',
-      '',
-      'Der Mensch ist genervt — das steht im Text, nicht zwischen den Zeilen.',
-      'Ein Satz Anerkennung vorn, dann sachlich liefern. Kein Trost, keine',
-      'Therapie, keine Gefuehlsnachfrage. Die Arbeit bleibt optimal.',
-    ].join('\n');
-  }
-  if (mood === 'erfreut') {
-    return [
-      '## User-Lage: erfreut',
-      '',
-      'Lob oder Schwung im Text — kurz annehmen, nicht feiern, nicht bremsen.',
-      'Kein Sykophantismus: Lob aendert die Arbeitsweise nicht, nur das Tempo bleibt.',
-    ].join('\n');
-  }
-  return null;
-}
-
-/** Text aus einem Event-Envelope ziehen. Nur Lesen, nichts wird veraendert. */
-export function textOf(payload) {
-  if (typeof payload === 'string') return payload;
-  if (payload === null || typeof payload !== 'object') return '';
-  for (const key of ['text', 'message', 'content', 'prompt', 'body', 'userText']) {
-    if (typeof payload[key] === 'string') return payload[key];
-  }
-  return '';
-}
+// Die Lese-Regeln (Trigger, Stimmung, Text aus Blocklisten) und ihre
+// oeffentlichen Namen kommen aus `assets/interaction-core.js`. Sie bleiben hier
+// als Paket-Aussenflaeche sichtbar — Abnehmer und Tests lesen sie unveraendert
+// ueber `@shinon/persona`.
+export { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, TRIGGERS, matchTrigger, detectUserMood, renderUserLage, textOf };
 
 /**
  * Die Materialübersicht. Sie beschreibt, WAS da ist — und schreibt
@@ -1401,6 +1327,12 @@ export function apply(ctx, config) {
     req.on('error', () => resolve({ ok: false, error: 'BODY_UNREADABLE' }));
   });
 
+  /** Eine JSON-Antwort — ein Weg fuer alle schreibenden Routen. */
+  const sendJson = (res, status, value) => {
+    res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(value));
+  };
+
   const mountUiRoute = (webCtx) => {
     const webServer = typeof webCtx?.get === 'function' ? webCtx.get('webServer') : undefined;
     if (typeof webServer?.register !== 'function') return;
@@ -1424,22 +1356,41 @@ export function apply(ctx, config) {
       kind: 'exact',
       path: REVIEW_ROUTE,
       handler: async (req, res) => {
-        const json = (status, value) => {
-          res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-          res.end(JSON.stringify(value));
-        };
-        if (req.method === 'GET') { json(200, reviewService.review()); return; }
-        if (req.method !== 'POST') { json(405, { ok: false, error: 'METHOD_NOT_ALLOWED' }); return; }
+        if (req.method === 'GET') { sendJson(res, 200, reviewService.review()); return; }
+        if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }); return; }
         const body = await readJsonBody(req);
-        if (!body.ok) { json(400, { ok: false, error: body.error }); return; }
+        if (!body.ok) { sendJson(res, 400, { ok: false, error: body.error }); return; }
         const id = typeof body.value?.id === 'string' ? body.value.id : '';
         const decision = body.value?.decision;
         if (id === '' || (decision !== 'accepted' && decision !== 'rejected')) {
-          json(400, { ok: false, error: 'INVALID_REQUEST' });
+          sendJson(res, 400, { ok: false, error: 'INVALID_REQUEST' });
           return;
         }
         const result = reviewService.decide(id, decision);
-        json(result.ok ? 200 : 409, result);
+        sendJson(res, result.ok ? 200 : 409, result);
+      },
+    }));
+    // Die Beziehungsstufe ist ein AUSDRUECKLICHER Akt des Menschen, kein
+    // abgeleitetes Urteil: GET zeigt Stufen und Stand, POST setzt genau eine.
+    // Der Handler emittiert das Signal; den Rest (Validierung, `relation.updated`)
+    // machen Spine, Persona-Zustand und Narrative Engine.
+    routeDisposers.push(webServer.register({
+      kind: 'exact',
+      path: RELATION_ROUTE,
+      handler: async (req, res) => {
+        if (req.method === 'GET') {
+          sendJson(res, 200, {
+            contract: RELATION_CONTRACT,
+            levels: relationService.levels(),
+            current: persona.snapshot().relation,
+          });
+          return;
+        }
+        if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }); return; }
+        const body = await readJsonBody(req);
+        if (!body.ok) { sendJson(res, 400, { ok: false, error: body.error }); return; }
+        const result = relationService.set(body.value);
+        sendJson(res, result.ok ? 200 : 400, result);
       },
     }));
     // Die Routen haengen am Fiber, nicht am Prozess.
@@ -1485,6 +1436,29 @@ export function apply(ctx, config) {
     console.warn(`[shinon-persona] ${REVIEW_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`);
   }
 
+  // ── Der Produzent der Beziehungsstufe ─────────────────────────────────────
+  // Vorher gab es den KONSUMENTEN (`relation.updated` in Persona, Narrative und
+  // Scoring), aber keinen Produzenten: die Stufe blieb fuer immer `known`,
+  // `fresh_pair`. Hier steht der schmale Weg — eine ausdrueckliche Stufe plus
+  // Sitzung, geprueft gegen die Levels des Zustandsvertrags, emittiert als
+  // SIGNAL. Den normalisierten Envelope baut der Spine; dieses Paket kennt
+  // keinen zweiten Event-Bau.
+  const relationService = {
+    contract: RELATION_CONTRACT,
+    levels: () => [...(contract.relation?.levels ?? [])],
+    set: (input) => {
+      const result = relationUpdate(contract, input);
+      if (!result.ok) return result;
+      if (typeof ctx?.emit !== 'function') return { ok: false, error: 'NO_EMITTER' };
+      ctx.emit(RELATION_SIGNAL, result.payload);
+      return { ok: true, level: result.payload.relation };
+    },
+  };
+  const releaseRelation = typeof ctx.provide === 'function' ? ctx.provide(RELATION_SERVICE, relationService) : null;
+  if (releaseRelation === null) {
+    console.warn(`[shinon-persona] ${RELATION_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`);
+  }
+
   // Der Sitzungs-Scope: `agent/pre-step` umschließt den ganzen Schritt, also auch
   // die Assembly des System-Prompts. Was hier gesetzt wird, gilt nur für diesen
   // Schritt und nur in diesem Async-Kontext.
@@ -1519,6 +1493,7 @@ export function apply(ctx, config) {
     if (typeof errorDisposer === 'function') errorDisposer();
     if (typeof uiInjectDisposer === 'function') uiInjectDisposer();
     if (typeof releaseReview === 'function') releaseReview();
+    if (typeof releaseRelation === 'function') releaseRelation();
     for (const response of uiClients) { try { response.end(); } catch { /* weg */ } }
     uiClients.clear();
     console.log('[shinon-persona] Deaktiviert');

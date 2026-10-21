@@ -100,7 +100,7 @@ test('DSH entdeckt einen vom Lebenszyklus geschriebenen Skill im Projekt-Root', 
     lifecycle = createSkillLifecycle({ ctx: { llm }, rules: fast, noteRules, route: { provider: 'p', model: 'm' }, log: { log: (m) => lines.push(m), warn: (m) => lines.push(m) } });
 
     const started = performance.now();
-    lifecycle.observe({ event_type: 'feedback/message-put', session_id: 'probe' }, { data: { item: { rating: 'negative', messageId: 'probe-1' } } });
+    lifecycle.observe({ event_type: 'feedback.rated', session_id: 'probe' }, { data: { item: { rating: 'negative', messageId: 'probe-1' } } });
     // Gemessen wird der KATALOG-Pfad, den das Modell sieht: snapshot() mit Cache.
     // Dessen Ungueltigmachung kommt vom Datei-Watcher des Providers.
     let catalogComplete = false;

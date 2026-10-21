@@ -93,7 +93,7 @@
     "packages/core/client.js": 409,
     "packages/dashboard/client.js": 479,
     "packages/markers/client.js": 630,
-    "packages/persona/index.js": 1526,
+    "packages/persona/index.js": 1501,
     "packages/popup/client.js": 426,
     "packages/project-index/assets/index-core.js": 2220,
     "packages/prompter/client.js": 285,
