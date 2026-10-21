@@ -57,7 +57,7 @@ export const UEBERGABE_PARAMETER = 'snapshot';
  */
 export const SNAPSHOT_FIELDS = [
   'schemaVersion', 'species', 'xp', 'wins', 'losses', 'round', 'damageTotal', 'hits', 'loot', 'savedAt',
-  'completions', 'wild',
+  'completions', 'wild', 'breeding',
 ];
 
 /**

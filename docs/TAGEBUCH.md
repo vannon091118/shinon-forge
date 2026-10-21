@@ -734,7 +734,7 @@ nirgends, welcher Commit lief — nach einem Update, einem Rollback oder einem H
 in den Klon war das eine Vermutung, und eine Vermutung, die man fuer einen Zustand
 haelt, ist schlimmer als eine Luege, weil sie keiner nachfragt.
 
-**Anker:** `dd5d319`, `a090ab7` · Belege: `packages/version/index.js`, `packages/version/client.js`, `packages/version/assets/version-probe.js`, `scripts/lib/desktop-entry.mjs`, `scripts/lib/payload.mjs`, `scripts/gate/tests/version-package.test.mjs`, `assets/icon.svg`, `assets/banner.svg`, `assets/readme-banner.svg`, `README.md`, `scripts/desktop-launcher.mjs`, `scripts/lib/huelle.mjs`, `packages/prompter/assets/capabilities.json`, `docs/probes/h5-entscheidung.json`, `packages/persona/assets/interaction-core.js`, `packages/prompter/assets/skill-lifecycle.js`, `scripts/gate/tests/spine-wiring.test.mjs`
+**Anker:** `dd5d319`, `a090ab7`, `bfc7001` · Belege: `packages/version/index.js`, `packages/version/client.js`, `packages/version/assets/version-probe.js`, `scripts/lib/desktop-entry.mjs`, `scripts/lib/payload.mjs`, `scripts/gate/tests/version-package.test.mjs`, `assets/icon.svg`, `assets/banner.svg`, `assets/readme-banner.svg`, `README.md`, `scripts/desktop-launcher.mjs`, `scripts/lib/huelle.mjs`, `packages/prompter/assets/capabilities.json`, `docs/probes/h5-entscheidung.json`, `packages/persona/assets/interaction-core.js`, `packages/prompter/assets/skill-lifecycle.js`, `scripts/gate/tests/spine-wiring.test.mjs`, `packages/codingmon/assets/data/codingmon-50.json`, `packages/codingmon/assets/katalog.js`, `packages/codingmon/assets/zucht.js`, `packages/codingmon/assets/migration.js`, `packages/codingmon/test/katalog.test.mjs`, `packages/codingmon/test/zucht-core.test.mjs`, `scripts/assets/build-codingmon.mjs`, `docs/contracts/structure.json`
 
 Das neue Paket `@shinon/version` hat drei Schichten, und die Trennung ist der eigentliche
 Inhalt: die Messung fragt `git` und liest den Bau-Schatten, die Formel rechnet daraus
@@ -886,6 +886,65 @@ Belegt: `npm test` Exit 0 (statisches Gate 126/126), `npm run gate:test` 812/812
 Nach dem Verdrahtungs-Commit am Abend: `npm run gate:test` 827/827, statisches Gate
 126/126, `gate --full` 23 Gates gruen, `npm run build` Exit 0 (222 Dateien,
 1 926 865 Bytes) und `zahlen:check` deckungsgleich.
+
+### Der CodingMon-Zug kommt auf main, und zwar als Puzzleteile
+
+Der 50-Arten-Zug lag drei Tage still, während `main` weiterlief. Der Abstand sah
+groß aus: der Zweig war sieben Commits voraus und vierzehn hinterher, und ein
+blinder Merge hätte den neuen `main` wieder zerlegt. Gemessen wurde er nicht
+nach Commitzahl, sondern nach Datei: der Abgleich des Merge-Commits gegen seinen
+zweiten Elternteil ergab 24 Dateien und 5703 Zeilen — alles `packages/codingmon`,
+der Generator `scripts/assets/build-codingmon.mjs` und ein Gate-Test. Die 488
+Dateien, die der Vergleich gegen den ersten Elternteil zeigt, sind die
+Hauptgeschichte, die der Merge mitträgt, und keine neue Arbeit.
+
+Übernommen wurde deshalb pfadweise, nicht als Merge. Der Grund ist nicht
+Geschmack: `docs/ZAHLEN.md` im Zweig trug einen ungelösten Konfliktmarker
+(`<<<<<<< HEAD`, Zeile 37) im generierten Bestandsblock und Zahlen, die von
+einem anderen Baum stammen. Ein solcher Block gehört dem Generator, nicht dem
+Branch — `npm run zahlen:sync` schreibt ihn, also wurde er neu geschrieben.
+Die drei Commits, die zwischen dem Zweig und dem heutigen `main` lagen, haben
+`packages/codingmon` nicht angefasst (`git diff --name-only 4afcd6a fe1bba2 --
+packages/codingmon` ist leer), der Konfliktpunkt lag also woanders.
+
+Die Daten kommen aus EINER Quelle: `packages/codingmon/assets/data/codingmon-50.json`
+mit 50 Arten, 101 Fähigkeiten, 50 Lineage-Einträgen, Elementchart, Buffs und
+Loottable. Gelesen wird sie nur über `assets/katalog.js`; die Zucht liegt in
+`assets/zucht.js`, `assets/zucht-glueck.js` und `assets/zucht-xp.js`, der Zufall in
+`assets/zufall.js`, die Migration alter Stände in `assets/migration.js`, und
+`assets/leiter.js` trägt die gedeckelte lineare Kurve (D49) neben der verzweigten
+Nachkommenauswahl (D48). Dass der Client nichts davon doppelt führt, ist
+behauptet und gemessen: `node scripts/assets/build-codingmon.mjs --check` vergleicht
+die Datenregionen des Bundles gegen die JSON-Quelle und bricht bei Drift ab.
+
+Zwei Zahlen des Struktur-Riegels mussten dabei steigen, und das ist die
+unangenehme Hälfte des Tages. `packages/codingmon/client.js` wuchs mit dem
+Zucht-Spiegel von 1988 auf 2371 Zeilen. Teilen geht hier nicht: eine Client-Hälfte
+ist ein selbsttragendes Bündel, sie kann nicht relativ importieren, und genau
+deshalb trägt die Klasse `client` einen eigenen Bestand statt einer Grenze, die
+sie nie erreicht. Die Alternative — 380 Zeilen lebende Spiellogik löschen, damit
+eine Zahl hält — wäre die schlechtere Lüge. `packages/codingmon/test/durchstich.test.mjs`
+wuchs von 777 auf 784 Zeilen, weil die Paritätstests jetzt 50 statt 10 Spezies
+prüfen. Beide Zahlen stehen in `docs/contracts/structure.json` mit dieser
+Herleitung, und der Regeltext nennt die Ausnahme jetzt ausdrücklich, statt sie zu
+verschweigen.
+
+Der 214 Zeilen lange Implementierungsvertrag aus dem Oktober ist dabei entfallen:
+er beschrieb einen Plan („Produktionscode ist noch nicht integriert"), den der
+Zweig selbst widerlegt. Was daran bindend bleibt, steht als zwei Zeilen in
+`docs/ROADMAP.md` §2.2.
+
+Belegt: `npm run test:codingmon` PASS Exit 0 mit 63 von 63 Tests (vor der Übernahme
+46), `node scripts/assets/build-codingmon.mjs --check` Exit 0 mit „50 Arten, 101
+Fähigkeiten", `npm run gate:test` 887/887, statisches Gate 10 gelaufen und 0
+fehlgeschlagen, `npm run build` Exit 0, `npm run zahlen:check` Exit 0.
+
+Offen bleibt und in `docs/ROADMAP.md` §2.2 benannt: der visuelle Nachweis im
+echten Browser, ein Installationsnachweis auf einem echten System und die
+Fangen des Branchs — Picker-ID gegen Species-ID, HP-Balken gegen effektive
+Werte, `wildLimit`/`idleAfterMs` gegen eine Config, die sie wirklich
+durchreicht, die Animationsfolge gegen die tatsächlichen Präsentationszustände
+und der Spritespiegel je kanonischer Art-ID.
 
 ---
 

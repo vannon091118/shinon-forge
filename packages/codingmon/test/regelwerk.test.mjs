@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import {
   ABILITIES, BUFFS, CATEGORY, ELEMENTS, ELEMENT_CHART, ELEMENT_LOSS, ELEMENT_WIN,
   LINEAGE, NEUTRAL_BUFF, SPECIES, SPECIES_IDS, SYNERGY,
-  abilitiesFor, buffFor, damage, inheritedAbilities, resolveAttack, statsAt,
+  abilitiesFor, buffFor, damage, inheritedAbilities, powerAt, resolveAttack, rewardFor, statsAt,
 } from '../assets/mechanik.js';
 
 /**
@@ -184,15 +184,15 @@ describe('Die Schadenskette: fuenf Nachschlagevorgaenge, keine Fallunterscheidun
     const defender = defenderAt('stackoverflow', 12);
 
     const full = resolveAttack(tackle, attackerAt('nullpointer', 12, 1), defender);
-    assert.equal(full.base, 325.2, 'BaseDamage = Kraft x Waffenwert / 10');
+    assert.equal(full.base, 27.6, 'BaseDamage = Kraft x Waffenwert / 10');
     assert.equal(full.element, ELEMENT_WIN, 'Spark schlaegt Byte');
     assert.equal(full.synergy, SYNERGY['spark:physisch']);
     assert.equal(full.defFactor, CATEGORY.physisch.defFactor);
     assert.equal(full.buff.id, 'uebertaktet');
-    assert.equal(full.dealt, 409);
+    assert.equal(full.dealt, 35);
 
-    assert.equal(resolveAttack(tackle, attackerAt('nullpointer', 12, 0.5), defender).dealt, 336, 'neutral');
-    assert.equal(resolveAttack(tackle, attackerAt('nullpointer', 12, 0.1), defender).dealt, 580, 'nichts zu verlieren');
+    assert.equal(resolveAttack(tackle, attackerAt('nullpointer', 12, 0.5), defender).dealt, 29, 'neutral');
+    assert.equal(resolveAttack(tackle, attackerAt('nullpointer', 12, 0.1), defender).dealt, 49, 'nichts zu verlieren');
   });
 
   test('unabhaengig nachgerechnet ueber Level, Spezies, Faehigkeiten und Lagen', () => {
@@ -240,9 +240,9 @@ describe('Die Schadenskette: fuenf Nachschlagevorgaenge, keine Fallunterscheidun
 });
 
 describe('Faehigkeiten und Vererbung sind geschlossen, nicht behauptet', () => {
-  test('21 Faehigkeiten, genau zwei je Spezies, jede nennt eine echte Spezies und Wertespalte', () => {
-    assert.equal(SPECIES_IDS.length, 10);
-    assert.equal(ABILITIES.length, 21, '1 Grundfaehigkeit + 2 je Spezies');
+  test('101 Faehigkeiten und 50 Spezies bleiben vollständig referenziert', () => {
+    assert.equal(SPECIES_IDS.length, 50);
+    assert.equal(ABILITIES.length, 101, '1 Grundfaehigkeit + 2 je Spezies');
     assert.equal(ABILITIES.filter((entry) => entry.species === null).length, 1, 'genau eine Grundfaehigkeit');
     const statKeys = Object.keys(statsAt(SPECIES_IDS[0], 1));
     for (const entry of ABILITIES) {
@@ -257,16 +257,16 @@ describe('Faehigkeiten und Vererbung sind geschlossen, nicht behauptet', () => {
     }
   });
 
-  test('jeder Ahn existiert, die Generation waechst, jede Erbfaehigkeit gehoert zur Linie des Ahnen', () => {
+  test('jeder Ahn existiert, die statische Abstammungstiefe wächst, Erbfaehigkeiten bleiben referenziert', () => {
     for (const [speciesId, entry] of Object.entries(LINEAGE)) {
       assert.ok(SPECIES[speciesId], `${speciesId}: Linie ohne Spezies`);
       if (entry.ancestor === null) {
-        assert.equal(entry.generation, 1, `${speciesId}: ohne Ahnen ist die Generation 1`);
+        assert.equal(entry.depth, 1, `${speciesId}: ohne Ahnen ist die Generation 1`);
         continue;
       }
       const ancestor = LINEAGE[entry.ancestor];
       assert.ok(ancestor, `${speciesId}: Ahn ${entry.ancestor} existiert nicht`);
-      assert.equal(entry.generation, ancestor.generation + 1, `${speciesId}: Generation folgt dem Ahnen`);
+      assert.equal(entry.depth, ancestor.depth + 1, `${speciesId}: Generation folgt dem Ahnen`);
       for (const id of entry.inherits) {
         const inherited = ABILITIES.find((candidate) => candidate.id === id);
         assert.ok(inherited, `${speciesId}: Erbfaehigkeit ${id} existiert nicht`);
@@ -286,4 +286,19 @@ describe('Faehigkeiten und Vererbung sind geschlossen, nicht behauptet', () => {
     }
     assert.deepEqual(late, ['tackle', 'boundary-slip', 'base-case', 'infinite-descent']);
   });
+});
+
+
+test('D49: Kampfbelohnung folgt dem naechsten gedeckelten Basis-20-Statwert', () => {
+  const table = [
+    [1, 250, 22], [2, 500, 24], [3, 750, 27], [5, 1250, 32],
+    [10, 2500, 44], [25, 6250, 80], [49, 12250, 137],
+    [50, 12500, 137], [51, 12500, 137],
+  ];
+  for (const [level, formerReward, expected] of table) {
+    assert.equal(rewardFor(level), expected, `L${level}: D49 reward`);
+    assert.equal(rewardFor(level), powerAt(20, Math.min(50, Math.max(1, Math.floor(level) + 1))));
+    assert.ok(rewardFor(level) <= formerReward, `L${level}: der Balancesprung bleibt sichtbar`);
+  }
+  assert.deepEqual(table.map(([level, formerReward, reward]) => [level, formerReward, reward]), table);
 });

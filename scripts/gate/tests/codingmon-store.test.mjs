@@ -19,7 +19,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -98,7 +98,12 @@ test('Zusage: der Stand geht durch einen NEUSTART nicht verloren', { skip }, asy
   const first = await boot(medium);
   const firstStore = await store.openPetStore(first, fixedClock);
   const written = await firstStore.write(snapshot());
-  assert.deepEqual(written, { ...snapshot(), storedAt: '2026-10-08T12:00:00.000Z' }, 'der Stand kommt validiert zurueck');
+  assert.equal(written.schemaVersion, 3, 'ein erfolgreicher v2-Write wird als v3 persistiert');
+  assert.equal(written.breeding.schemaVersion, 3, 'der persistierte Stand hat einen validierten Kader');
+  assert.equal(written.breeding.creatures.length, 1, 'der alte Stand erzeugt genau einen deterministischen Gründer');
+  assert.equal(written.breeding.creatures[0].species, 'nullpointer');
+  assert.equal(written.breeding.creatures[0].xp, 1200);
+  assert.equal(written.storedAt, '2026-10-08T12:00:00.000Z');
   assert.deepEqual(firstStore.read(), written, 'und liegt sofort im Speicher der Domain');
   await firstStore.close();
 
@@ -107,11 +112,25 @@ test('Zusage: der Stand geht durch einen NEUSTART nicht verloren', { skip }, asy
   assert.deepEqual(readdirSync(medium), ['codingmon_pet.json']);
   const file = JSON.parse(readFileSync(join(medium, 'codingmon_pet.json'), 'utf8'));
   assert.equal(JSON.stringify(file).includes('"454"'), true, 'der Lebenslauf steht als Ziffernfolge in der Datei, nicht gerundet');
+  assert.equal(file.tables.snapshots.state.schemaVersion, 3, 'das Medium enthält tatsächlich v3');
 
-  // Prozess 2: neuer Kontext, neues Medium-Handle, derselbe Stand.
+  // Simuliere einen älteren Host-Datensatz direkt auf dem Medium. read() darf
+  // ihn migrieren, aber erst der nächste erfolgreiche Write macht v3 dauerhaft.
+  const oldRow = { ...file.tables.snapshots.state, schemaVersion: 2 };
+  delete oldRow.breeding;
+  file.tables.snapshots.state = oldRow;
+  writeFileSync(join(medium, 'codingmon_pet.json'), JSON.stringify(file));
   const second = await boot(medium);
   const secondStore = await store.openPetStore(second, fixedClock);
-  assert.deepEqual(secondStore.read(), written, 'derselbe Stand, ohne dass jemand ihn mitgeschleppt hat');
+  const migrated = secondStore.read();
+  assert.equal(migrated.schemaVersion, 3, 'ein gespeicherter v2-Stand ist sofort als v3 lesbar');
+  assert.equal(migrated.breeding.creatures[0].species, 'nullpointer');
+  assert.equal(JSON.parse(readFileSync(join(medium, 'codingmon_pet.json'), 'utf8')).tables.snapshots.state.schemaVersion, 2,
+    'read-only migration ändert das Medium nicht');
+  const rewritten = await secondStore.write(migrated);
+  assert.deepEqual(secondStore.read(), rewritten, 'der v3-Rewrite ist dauerhaft und wieder lesbar');
+  assert.equal(JSON.parse(readFileSync(join(medium, 'codingmon_pet.json'), 'utf8')).tables.snapshots.state.schemaVersion, 3,
+    'der nächste erfolgreiche Write schließt die Migration auf Platte ab');
   await secondStore.close();
 });
 

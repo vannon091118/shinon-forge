@@ -135,7 +135,14 @@ aktiviert). Eigenes README im Paket.
 
 **`@shinon/codingmon`** — Gamification-Pet: 1 XP je Token, Level, Werte,
 Attacken, Idle-Kämpfe; dauerhafter Zustand, SVG-Sprites, Naht
-Client→Host. Größtes Client-Bundle des Baums.
+Client→Host. Größtes Client-Bundle des Baums. Seit dem CodingMon-50-Zug
+kommen 50 Arten aus EINER Quelle (`assets/data/codingmon-50.json`, gelesen
+über `assets/katalog.js`), Zucht mit Eier-Ledger (`assets/zucht.js`,
+`assets/zucht-glueck.js`, `assets/zucht-xp.js`), Snapshot-Schema v3
+(`assets/snapshot-schema.js`) und die Migration alter Stände
+(`assets/migration.js`) dazu. Kein relatives Importieren im Client: was er
+braucht, spiegelt er und prüft es gegen den Host (`test/uebergabe.test.mjs`,
+`test/durchstich.test.mjs`).
 
 **`@shinon/key-router`** — Multi-API-Key-Pool mit 429-Rotation und
 Eskalationsdelays; Kern importfrei in `assets/pool-core.js`. Werkzeuge
