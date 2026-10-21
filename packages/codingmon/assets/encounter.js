@@ -346,6 +346,14 @@ const stateIssues = (state) => {
   if (state === null || typeof state !== 'object' || Array.isArray(state)) return 'STATE_NOT_OBJECT';
   if (state.contract !== ENCOUNTER_CONTRACT) return 'STATE_CONTRACT';
   if (!ENCOUNTER_STATES.includes(state.status)) return 'STATE_STATUS';
+  // `lastPhase` traegt den Zustand, aus dem der letzte Wechsel kam. Er ist die
+  // einzige Spur, wenn ein Turn im Terminal endet: `aborted` sagt nicht, ob
+  // waehrend des Vorflugs oder der Pruefung abgebrochen wurde.
+  // Ein Zustand aus der Zeit vor diesem Feld hat `lastPhase` gar nicht — das
+  // ist kein Fehler, sondern eine aeltere Form. Nur ein GESETZTER, unbekannter
+  // Wert ist einer.
+  if (state.lastPhase !== undefined && state.lastPhase !== null
+    && !ENCOUNTER_STATES.includes(state.lastPhase)) return 'STATE_LAST_PHASE';
   if (!Array.isArray(state.seen)) return 'STATE_SEEN';
   // Die verschachtelten Beobachtungen werden gebraucht, bevor sie gelesen
   // werden: ein halber Zustand wuerde sonst im `apply` werfen statt hier mit
@@ -418,9 +426,14 @@ export function reduceEncounter(state, event) {
   const definition = ENCOUNTER_EVENTS[event.type];
   if (!definition.from.includes(state.status)) return result(state, 'REJECTED', 'INVALID_TRANSITION');
 
+  const nextStatus = definition.to ?? state.status;
   const base = {
     ...state,
-    status: definition.to ?? state.status,
+    status: nextStatus,
+    // Nur ein echter Zustandswechsel schreibt die Spur; Beobachtungen
+    // (`to: null`) lassen sie stehen, sonst ueberschriebe das letzte Tool die
+    // Herkunft des Abschlusses.
+    lastPhase: nextStatus === state.status ? state.lastPhase : state.status,
     turnId: event.turnId,
     sessionId: event.sessionId,
     applied: state.applied + 1,
@@ -438,6 +451,7 @@ export function createEncounterState() {
   return {
     contract: ENCOUNTER_CONTRACT,
     status: 'closed',
+    lastPhase: null,
     turnId: null,
     sessionId: null,
     applied: 0,

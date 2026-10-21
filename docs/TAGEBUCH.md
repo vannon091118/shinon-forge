@@ -1124,6 +1124,65 @@ gate:test` 889/889, `npm run gate:full` PASS 23/23, `npm run build` Exit 0,
 **Nicht** gemessen: die Verdrahtung an echte Laufzeit-Signale und die Buehne im
 Composer-Dock (S5/B02) — der Vertrag ist die Grundlage, nicht der Beweis.
 
+### Die Buehne haelt nichts — sie fragt den Reducer
+
+S5 ist der Slice, in dem der Vertrag aus S4 zum ersten Mal auf einem Bildschirm
+steht. Die Versuchung war klar umrissen: eine Komponente mit `useState`, ein
+paar Phasen, Animationen dazwischen — und schon haette die Anzeige ihren
+eigenen Fortschritt. Stattdessen gilt: der Encounter-Zustand ist genau der
+Rueckgabewert von `reduceEncounter`, jede Aenderung geht durch ihn, und die
+Buehne liest ihn beim Rendern. Das Protokoll daneben (Typ, Ausgang, Grund) ist
+Eingabe-Gedaechtnis, keine zweite Wahrheit.
+
+**Der Spiegel, der keiner ist.** Das Bundle kann `assets/` nicht importieren.
+Die Wahl stand zwischen einem zweiten Reducer im Browser (zwei Wahrheiten, die
+auseinanderlaufen — genau der Fehler, den die Repo-Regel verbietet) und einem
+generierten Block. `scripts/assets/build-encounter-client.mjs` schneidet den
+Kern aus `assets/encounter.js` heraus, streicht nur die Kommentare, laesst den
+Code zeichengleich und schreibt ihn zwischen zwei Marker. `--check` und der
+Test vergleichen Block UND Verhalten: dieselbe Folge durch beide Fassungen
+ergibt denselben Zustand, dieselbe Absage, denselben Grund. 390 Zeilen im
+Bundle, aber eine Quelle.
+
+**Was der Playtest gefunden hat, waehrend er das tat, was ein Erstnutzer tut.**
+Drei Dinge, die kein Unit-Test behauptet hatte:
+
+1. **Die Vertragsluecke.** Ein Abbruch im Vorflug landete im Terminal
+   `aborted` — und der Zustand wusste nicht mehr, ob er im Vorflug oder in der
+   Pruefung abgebrochen wurde. Die Buehne haette raten muessen (sie tat es
+   zuerst: jedes Terminal markierte „Pruefung“). Die Reparatur sitzt in der
+   Tabelle, nicht in der Buehne: `lastPhase` traegt den Zustand, aus dem der
+   letzte Wechsel kam; Beobachtungen (`to: null`) schreiben die Spur nicht um,
+   alte Staende ohne das Feld bleiben gueltig.
+2. **Der Doppelklick.** In den ersten Millisekunden steht der Status noch auf
+   `closed`, waehrend der Uebungszug schon laeuft. Ein zweiter Klick haette
+   einen zweiten Satz Timer mit fremder `turnId` gestartet — der Reducer haette
+   jedes zweite Ereignis als `FOREIGN_TURN` abgewiesen, und der Nutzer saehe
+   eine Absage fuer seinen eigenen Klick. Jetzt ist `encounterTimers.size` die
+   Wache, und ein Test faehrt zwei Starts hintereinander.
+3. **Die Sprache.** „1 Ereignisse“ und `Pruefung` in einer Oberflaeche, die
+   sonst „Faehigkeiten“ und „Rueckzug“ schreibt: ein Plural-Helfer und echte
+   Umlaute, dazu deutsche Bilanzworte statt `contract-passed` im Satz (der
+   Vertragsname bleibt im `title`).
+
+**Was die Messung im schmalen Dock gezeigt hat.** Bei 280, 340 und 480 px
+kein horizontaler Ueberlauf (`scrollWidth == clientWidth` fuer Kopf, Schiene
+und Karte); die Metazeile bricht um, statt zu klemmen. Zwei Zustandsszenarien
+wurden durchgeklickt: voller Lauf (Vorflug -> Lauf -> Pruefung -> Abschluss ->
+verdichtet, 14 Ereignisse) und Abbruch nach 1,2 s (Schiene bleibt auf dem
+Vorflug, Knopf wird „Neu“). Ein Neuladen mitten im Lauf hinterlaesst keinen
+Phantomzustand: die Buehne startet wieder auf `closed`, ohne Timer.
+
+Belegt: `npm run test:codingmon` PASS mit **124 von 124** Tests (vorher 107;
+17 neu: 16 Buehne/Spiegel, einer fuer `lastPhase`), `npm test` Exit 0,
+`npm run build` Exit 0 (289 Dateien, 2 679 693 Bytes), `npm run gate:full`
+PASS 23/23. Der Playtest lief durch das ECHTE Bundle in Chromium mit einem
+DOM-Schreib-Schema fuer die Elementbaeume (kein React): gemessen sind Zustaende,
+Klassen, Breiten und Klicks, **nicht** das Rendern im DSH-Dock. Offen bleiben
+deshalb: echte Host-Signale (der Uebungszug ist kein Modell-Turn), der
+React-Pfad und die Live-Abnahme am Dev-Server. Zahlen und Screenshots:
+`docs/probes/encounter-stage.json`.
+
 ---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb

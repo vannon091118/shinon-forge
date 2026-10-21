@@ -421,6 +421,408 @@ window.__ModuleLoader__.load({
      */
     const roundDelayMs = PACING.delayMs;
 
+    // ── Encounter-Kern (S5) — EINE Quelle: assets/encounter.js ───────────────
+    // Das Bundle ist selbststaendig und kann `assets/` nicht importieren; der
+    // Kern wird deshalb WOERTLICH eingebettet (Kommentare gestrichen), nicht
+    // nachgebaut. Schreiben: `node scripts/assets/build-encounter-client.mjs`,
+    // pruefen: derselbe Aufruf mit `--check` — der Test
+    // `test/encounter-client.test.mjs` vergleicht Block und Verhalten.
+    // >>> generated-encounter-core — source: assets/encounter.js
+    const ENCOUNTER_CORE = (() => {
+      const ENCOUNTER_CONTRACT = 'shinon.encounter/event-v1';
+
+      const ENCOUNTER_STATES = Object.freeze([
+        'closed',
+        'preflight',
+        'running',
+        'validating',
+        'completed',
+        'rejected',
+        'aborted',
+        'recoverable-error',
+        'compact',
+      ]);
+
+      const ENCOUNTER_TERMINAL_STATES = Object.freeze([
+        'completed',
+        'rejected',
+        'aborted',
+        'recoverable-error',
+      ]);
+
+      const ENCOUNTER_EVENT_MEMORY = 64;
+
+      const ENCOUNTER_SOURCE_KINDS = Object.freeze(['spine', 'internal', 'unavailable']);
+
+      const isAllowedValue = (value) => value === null
+        || typeof value === 'string'
+        || typeof value === 'number'
+        || typeof value === 'boolean'
+        || (Array.isArray(value) && value.every((entry) => typeof entry === 'string'));
+
+      const registry = {};
+      const define = (type, definition) => {
+        registry[type] = Object.freeze(definition);
+      };
+
+      define('encounter.turn.started', {
+        from: ['closed'],
+        to: 'preflight',
+        source: { kind: 'spine', ref: 'turn.start', owner: '@shinon/events' },
+        payload: [],
+        apply: (state) => state,
+      });
+
+      define('encounter.task.classified', {
+        from: ['preflight'],
+        to: null,
+        source: { kind: 'internal', ref: 'goal-policy', owner: '@shinon/task-router' },
+        payload: ['taskClass', 'taskLabel'],
+        apply: (state, payload) => ({
+          ...state,
+          task: { taskClass: payload.taskClass ?? null, taskLabel: payload.taskLabel ?? null },
+        }),
+      });
+
+      define('encounter.index.progress', {
+        from: ['preflight', 'running'],
+        to: null,
+        source: { kind: 'internal', ref: 'index-query', owner: '@shinon/project-index' },
+        payload: ['phase', 'count'],
+        apply: (state, payload) => ({
+          ...state,
+          index: {
+            phase: typeof payload.phase === 'string' ? payload.phase : state.index.phase,
+            count: Number.isSafeInteger(payload.count) ? payload.count : state.index.count,
+          },
+        }),
+      });
+
+      define('encounter.fact.validated', {
+        from: ['preflight', 'running'],
+        to: null,
+        source: { kind: 'internal', ref: 'facts-snapshot', owner: '@shinon/project-index' },
+        payload: ['snapshotId', 'valid', 'untrusted', 'unknown'],
+        apply: (state, payload) => ({
+          ...state,
+          facts: {
+            snapshotId: typeof payload.snapshotId === 'string' ? payload.snapshotId : state.facts.snapshotId,
+            valid: Number.isSafeInteger(payload.valid) ? payload.valid : state.facts.valid,
+            untrusted: Number.isSafeInteger(payload.untrusted) ? payload.untrusted : state.facts.untrusted,
+            unknown: Number.isSafeInteger(payload.unknown) ? payload.unknown : state.facts.unknown,
+          },
+        }),
+      });
+
+      define('encounter.block.selected', {
+        from: ['preflight'],
+        to: null,
+        source: { kind: 'internal', ref: 'block-select', owner: '@shinon/prompter' },
+        payload: ['blocks'],
+        apply: (state, payload) => ({
+          ...state,
+          preflight: { ...state.preflight, blocks: Array.isArray(payload.blocks) ? payload.blocks.slice() : state.preflight.blocks },
+        }),
+      });
+
+      define('encounter.preflight.ready', {
+        from: ['preflight'],
+        to: null,
+        source: { kind: 'internal', ref: 'pre-step', owner: '@shinon/prompter' },
+        payload: [],
+        apply: (state) => ({ ...state, preflight: { ...state.preflight, ready: true } }),
+      });
+
+      define('encounter.route.selected', {
+        from: ['preflight', 'running'],
+        to: null,
+        source: { kind: 'spine', ref: 'request.header', owner: '@shinon/events' },
+        payload: ['provider', 'model'],
+        apply: (state, payload) => ({
+          ...state,
+          preflight: {
+            ...state.preflight,
+            route: {
+              provider: typeof payload.provider === 'string' ? payload.provider : null,
+              model: typeof payload.model === 'string' ? payload.model : null,
+            },
+          },
+        }),
+      });
+
+      define('encounter.run.started', {
+        from: ['preflight'],
+        to: 'running',
+        source: { kind: 'spine', ref: 'step.start', owner: '@shinon/events' },
+        payload: ['step'],
+        apply: (state, payload) => ({
+          ...state,
+          step: Number.isSafeInteger(payload.step) ? payload.step : state.step,
+        }),
+      });
+
+      define('encounter.tool.started', {
+        from: ['running'],
+        to: null,
+        source: { kind: 'spine', ref: 'tool.requested', owner: '@shinon/events' },
+        payload: ['callId', 'name'],
+        apply: (state, payload) => ({
+          ...state,
+          tools: {
+            open: state.tools.open + 1,
+            calls: state.tools.calls + 1,
+            last: typeof payload.name === 'string' ? payload.name : state.tools.last,
+          },
+        }),
+      });
+
+      define('encounter.tool.completed', {
+        from: ['running'],
+        to: null,
+        source: { kind: 'spine', ref: 'tool.completed', owner: '@shinon/events' },
+        payload: ['callId', 'ok'],
+        apply: (state) => ({
+          ...state,
+          tools: { ...state.tools, open: Math.max(0, state.tools.open - 1) },
+        }),
+      });
+
+      define('encounter.key.rotated', {
+        from: ['running', 'recoverable-error'],
+        to: null,
+        source: { kind: 'internal', ref: 'rotation', owner: '@shinon/key-router' },
+        payload: ['reason'],
+        apply: (state, payload) => ({
+          ...state,
+          keyRotation: {
+            count: state.keyRotation.count + 1,
+            reason: typeof payload.reason === 'string' ? payload.reason : state.keyRotation.reason,
+          },
+        }),
+      });
+
+      define('encounter.answer.received', {
+        from: ['running'],
+        to: 'validating',
+        source: { kind: 'spine', ref: 'message.completed', owner: '@shinon/events' },
+        payload: [],
+        apply: (state) => state,
+      });
+
+      define('encounter.result-contract.passed', {
+        from: ['running', 'validating'],
+        to: 'validating',
+        source: { kind: 'internal', ref: 'result-contract', owner: '@shinon/prompter' },
+        payload: ['contract'],
+        apply: (state, payload) => ({
+          ...state,
+          outcome: { kind: 'contract-passed', contract: typeof payload.contract === 'string' ? payload.contract : null, reason: null },
+        }),
+      });
+
+      define('encounter.result-contract.failed', {
+        from: ['running', 'validating'],
+        to: 'rejected',
+        source: { kind: 'internal', ref: 'result-contract', owner: '@shinon/prompter' },
+        payload: ['reason'],
+        apply: (state, payload) => ({
+          ...state,
+          outcome: { kind: 'contract-failed', contract: null, reason: typeof payload.reason === 'string' ? payload.reason : null },
+        }),
+      });
+
+      define('encounter.abort', {
+        from: ['preflight', 'running', 'validating'],
+        to: 'aborted',
+        source: { kind: 'internal', ref: 'abort-core', owner: '@shinon/prompter' },
+        payload: ['reason'],
+        apply: (state, payload) => ({
+          ...state,
+          outcome: { kind: 'aborted', contract: null, reason: typeof payload.reason === 'string' ? payload.reason : null },
+        }),
+      });
+
+      define('encounter.turn.completed', {
+        from: ['running', 'validating'],
+        to: 'completed',
+        source: { kind: 'spine', ref: 'turn.end', owner: '@shinon/events' },
+        payload: ['reason'],
+        apply: (state) => ({
+          ...state,
+          outcome: state.outcome ?? { kind: 'neutral', contract: null, reason: null },
+        }),
+      });
+
+      define('encounter.turn.failed', {
+        from: ['running', 'validating'],
+        to: 'recoverable-error',
+        source: { kind: 'spine', ref: 'turn.end', owner: '@shinon/events' },
+        payload: ['reason'],
+        apply: (state, payload) => ({
+          ...state,
+          outcome: { kind: 'error', contract: null, reason: typeof payload.reason === 'string' ? payload.reason : null },
+        }),
+      });
+
+      define('encounter.salvage.available', {
+        from: ['running', 'validating', 'recoverable-error'],
+        to: null,
+        source: { kind: 'internal', ref: 'salvage-store', owner: '@shinon/prompter' },
+        payload: ['recordId'],
+        apply: (state, payload) => ({
+          ...state,
+          salvage: { recordId: typeof payload.recordId === 'string' ? payload.recordId : null },
+        }),
+      });
+
+      define('encounter.skill.proposed', {
+        from: ['running', 'validating', 'completed'],
+        to: null,
+        source: { kind: 'internal', ref: 'skill-lifecycle', owner: '@shinon/prompter' },
+        payload: ['skillId', 'status'],
+        apply: (state, payload) => ({
+          ...state,
+          skill: {
+            skillId: typeof payload.skillId === 'string' ? payload.skillId : null,
+            status: 'proposed',
+          },
+        }),
+      });
+
+      define('encounter.receipt.compacted', {
+        from: ENCOUNTER_TERMINAL_STATES,
+        to: 'compact',
+        source: { kind: 'internal', ref: 'receipt', owner: '@shinon/popup' },
+        payload: [],
+        apply: (state) => state,
+      });
+
+      const ENCOUNTER_EVENTS = Object.freeze(registry);
+
+      const ENCOUNTER_SOURCE_MAP = Object.freeze(Object.fromEntries(
+        Object.entries(ENCOUNTER_EVENTS).map(([type, definition]) => [type, Object.freeze({ ...definition.source })]),
+      ));
+
+      const ENCOUNTER_EVENT_TYPES = Object.freeze(Object.keys(ENCOUNTER_EVENTS));
+
+      const stateIssues = (state) => {
+        if (state === null || typeof state !== 'object' || Array.isArray(state)) return 'STATE_NOT_OBJECT';
+        if (state.contract !== ENCOUNTER_CONTRACT) return 'STATE_CONTRACT';
+        if (!ENCOUNTER_STATES.includes(state.status)) return 'STATE_STATUS';
+        if (state.lastPhase !== undefined && state.lastPhase !== null
+          && !ENCOUNTER_STATES.includes(state.lastPhase)) return 'STATE_LAST_PHASE';
+        if (!Array.isArray(state.seen)) return 'STATE_SEEN';
+        for (const key of ['preflight', 'facts', 'index', 'tools', 'keyRotation']) {
+          if (state[key] === null || typeof state[key] !== 'object' || Array.isArray(state[key])) return `STATE_SHAPE:${key}`;
+        }
+        if (!Array.isArray(state.preflight.blocks)) return 'STATE_SHAPE:preflight.blocks';
+        if (!Number.isSafeInteger(state.applied) || !Number.isSafeInteger(state.step)) return 'STATE_SHAPE:counter';
+        return null;
+      };
+
+      const eventIssues = (event) => {
+        if (event === null || typeof event !== 'object' || Array.isArray(event)) return 'EVENT_NOT_OBJECT';
+        if (event.contract !== ENCOUNTER_CONTRACT) return 'EVENT_CONTRACT';
+        for (const field of ['eventId', 'type', 'sessionId', 'turnId', 'source']) {
+          if (typeof event[field] !== 'string' || event[field].trim() === '') return `EVENT_FIELD:${field}`;
+        }
+        const definition = ENCOUNTER_EVENTS[event.type];
+        if (definition === undefined) return 'UNKNOWN_EVENT_TYPE';
+        if (definition.source.owner !== event.source) return `SOURCE_MISMATCH:${event.type}`;
+        const payload = event.payload;
+        if (payload !== undefined && (payload === null || typeof payload !== 'object' || Array.isArray(payload))) return 'PAYLOAD_NOT_OBJECT';
+        for (const key of Object.keys(payload ?? {})) {
+          if (!definition.payload.includes(key)) return `PAYLOAD_UNKNOWN_FIELD:${key}`;
+          if (!isAllowedValue(payload[key])) return `PAYLOAD_UNSUPPORTED_VALUE:${key}`;
+        }
+        return null;
+      };
+
+      const result = (state, outcome, reason = null) => ({ state, outcome, reason });
+
+      function reduceEncounter(state, event) {
+        const brokenState = stateIssues(state);
+        if (brokenState !== null) return result(state, 'REJECTED', brokenState);
+
+        const brokenEvent = eventIssues(event);
+        if (brokenEvent === 'UNKNOWN_EVENT_TYPE') return result(state, 'IGNORED', brokenEvent);
+        if (brokenEvent !== null) return result(state, 'REJECTED', brokenEvent);
+
+        if (state.seen.includes(event.eventId)) return result(state, 'IGNORED', 'DUPLICATE_EVENT');
+        if (state.turnId !== null && state.turnId !== event.turnId) return result(state, 'REJECTED', 'FOREIGN_TURN');
+
+        const definition = ENCOUNTER_EVENTS[event.type];
+        if (!definition.from.includes(state.status)) return result(state, 'REJECTED', 'INVALID_TRANSITION');
+
+        const nextStatus = definition.to ?? state.status;
+        const base = {
+          ...state,
+          status: nextStatus,
+          lastPhase: nextStatus === state.status ? state.lastPhase : state.status,
+          turnId: event.turnId,
+          sessionId: event.sessionId,
+          applied: state.applied + 1,
+        };
+        const applied = definition.apply(base, event.payload ?? {});
+        const seen = [...state.seen, event.eventId];
+        return result(
+          { ...applied, seen: seen.length > ENCOUNTER_EVENT_MEMORY ? seen.slice(seen.length - ENCOUNTER_EVENT_MEMORY) : seen },
+          'APPLIED',
+        );
+      }
+
+      function createEncounterState() {
+        return {
+          contract: ENCOUNTER_CONTRACT,
+          status: 'closed',
+          lastPhase: null,
+          turnId: null,
+          sessionId: null,
+          applied: 0,
+          step: 0,
+          seen: [],
+          task: null,
+          preflight: { ready: false, blocks: [], route: null },
+          facts: { snapshotId: null, valid: 0, untrusted: 0, unknown: 0 },
+          index: { phase: null, count: 0 },
+          tools: { calls: 0, open: 0, last: null },
+          keyRotation: { count: 0, reason: null },
+          salvage: null,
+          skill: null,
+          outcome: null,
+        };
+      }
+
+      function foldEncounter(state, events) {
+        const journal = [];
+        let current = state;
+        for (const event of Array.isArray(events) ? events : []) {
+          const step = reduceEncounter(current, event);
+          journal.push({ type: typeof event?.type === 'string' ? event.type : null, outcome: step.outcome, reason: step.reason });
+          current = step.state;
+        }
+        return { state: current, journal };
+      }
+
+      function encounterEvent(type, { eventId, turnId, sessionId, payload, source } = {}) {
+        const definition = ENCOUNTER_EVENTS[type];
+        if (definition === undefined) throw new Error(`Unbekannter Encounter-Typ: ${type}`);
+        return {
+          contract: ENCOUNTER_CONTRACT,
+          eventId: eventId ?? `${type}#1`,
+          type,
+          sessionId: sessionId ?? 'session-test',
+          turnId: turnId ?? 'turn-test',
+          source: source ?? definition.source.owner,
+          payload: payload ?? {},
+        };
+      }
+      return Object.freeze({ ENCOUNTER_CONTRACT, ENCOUNTER_STATES, ENCOUNTER_TERMINAL_STATES, ENCOUNTER_EVENT_MEMORY, ENCOUNTER_SOURCE_KINDS, ENCOUNTER_EVENTS, ENCOUNTER_SOURCE_MAP, ENCOUNTER_EVENT_TYPES, createEncounterState, reduceEncounter, foldEncounter, encounterEvent });
+    })();
+    // Gebunden wird nur, was die Buehne liest — der Kern bleibt vollstaendig.
+    const { ENCOUNTER_CONTRACT, ENCOUNTER_EVENTS, ENCOUNTER_EVENT_TYPES, ENCOUNTER_SOURCE_MAP, ENCOUNTER_STATES, ENCOUNTER_TERMINAL_STATES, createEncounterState, reduceEncounter, encounterEvent } = ENCOUNTER_CORE;
+    // <<< generated-encounter-core
+
     // ── 4. LOOT (gewichteter Wurf in Basispunkten) ──────────────────────────
     // >>> generated-codingmon-loot — source: assets/data/codingmon-50.json
     const LOOT_TABLE = [{"id":"schrott","label":"Schrott","weight":8500,"xp":0},{"id":"brauchbar","label":"Brauchbares Teil","weight":1400,"xp":25},{"id":"shiny","label":"Shiny God-Tier","weight":100,"xp":2500}];
@@ -2143,6 +2545,230 @@ window.__ModuleLoader__.load({
             egg.bonuses.length ? h('p', { className: '__cm_sub' }, egg.bonuses.map((bonus) => `${bonus.id} +${bonus.value}`).join(' · ')) : null))));
     }
 
+    // ── Encounter-Buehne (S5) ────────────────────────────────────────────────
+    /**
+     * Die Buehne haelt KEINEN zweiten Zustand. `encounter` ist genau das, was
+     * `reduceEncounter` zurueckgibt — jede Aenderung geht durch den Reducer,
+     * und gerendert wird, was er liefert. `encounterLog` ist das Protokoll der
+     * EINGABEN (Typ, Ergebnis, Grund), keine Zustandsquelle: wer den Zustand
+     * sucht, liest ihn aus `encounter`, nicht aus der Liste.
+     *
+     * Der Uebungszug ist ein LOKALER Erzeuger von Vertragsereignissen, kein
+     * Modell-Turn: der Host meldet echte Signale erst in einem spaeteren
+     * Schnitt. Deshalb steht "Uebungszug" an der Buehne, und deshalb kann die
+     * Buehne auch still bleiben, wenn niemand sie startet.
+     */
+    let encounter = createEncounterState();
+    let encounterLog = [];
+    let encounterSeq = 0;
+    /** Timer des Uebungszugs. Ausserhalb des Zustands, wie jeder Handle. */
+    const encounterTimers = new Set();
+
+    const ENCOUNTER_TITLES = {
+      closed: 'bereit',
+      preflight: 'Vorflug',
+      running: 'läuft',
+      validating: 'Prüfung',
+      completed: 'abgeschlossen',
+      rejected: 'abgewiesen',
+      aborted: 'abgebrochen',
+      'recoverable-error': 'Fehler',
+      compact: 'verdichtet',
+    };
+    const ENCOUNTER_RAIL = [
+      { status: 'preflight', label: 'Vorflug' },
+      { status: 'running', label: 'Lauf' },
+      { status: 'validating', label: 'Prüfung' },
+      { status: 'completed', label: 'Abschluss' },
+    ];
+    /** Die Bilanz in Worten — der Vertragsname bleibt im `title`, nicht im Satz. */
+    const ENCOUNTER_OUTCOMES = {
+      'contract-passed': 'Vertrag bestanden',
+      'contract-failed': 'Vertrag verfehlt',
+      neutral: 'neutral abgeschlossen',
+      aborted: 'abgebrochen',
+      error: 'Fehler',
+    };
+    const ENCOUNTER_VERDICTS = { APPLIED: 'angewandt', IGNORED: 'ignoriert', REJECTED: 'abgewiesen' };
+    // Die Schiene liest den Zustand, nicht die Terminal-Farbe: `aborted` und
+    // `rejected` tragen ihre Herkunft in `lastPhase` (Vertrag, nicht Buehnen-
+    // Wissen). Vorher stand hier fuer jedes Terminal pauschal "Pruefung" — eine
+    // Anzeige, die einen Abbruch im Vorflug als Pruefungsabbruch verkaufte.
+    const ENCOUNTER_PHASE = {
+      closed: -1, preflight: 0, running: 1, validating: 2, completed: 3, compact: 3,
+      rejected: -1, aborted: -1, 'recoverable-error': -1,
+    };
+
+    /**
+     * Der Uebungszug als DATEN. Jede Zeile ist ein Vertragsereignis aus der
+     * Tabelle; die Buehne erfindet keines und schreibt keine zweite Liste —
+     * `ENCOUNTER_EVENTS` bleibt die Quelle, hier steht nur die Reihenfolge.
+     * Die Nutzlast haelt sich an die Allowlist des jeweiligen Ereignisses.
+     */
+    const ENCOUNTER_DRILL = [
+      ['encounter.turn.started', {}],
+      ['encounter.task.classified', { taskClass: 'fix', taskLabel: 'Reparatur' }],
+      ['encounter.index.progress', { phase: 'scan', count: 12 }],
+      ['encounter.fact.validated', { snapshotId: 'snap-uebung', valid: 3, untrusted: 1, unknown: 0 }],
+      ['encounter.block.selected', { blocks: ['persona-identity-core', 'enhancer-system-policy'] }],
+      ['encounter.preflight.ready', {}],
+      ['encounter.route.selected', { provider: 'lokal', model: 'uebungszug' }],
+      ['encounter.run.started', { step: 1 }],
+      ['encounter.tool.started', { callId: 'call-1', name: 'read_file' }],
+      ['encounter.tool.completed', { callId: 'call-1', ok: true }],
+      ['encounter.answer.received', {}],
+      ['encounter.result-contract.passed', { contract: 'shinon.result/v1' }],
+      ['encounter.turn.completed', { reason: 'completed' }],
+      ['encounter.receipt.compacted', {}],
+    ];
+    const ENCOUNTER_TICK_MS = 650;
+
+    /**
+     * Ein Ereignis durch den Reducer schicken. Das Ergebnis (outcome, reason)
+     * ist die Antwort an den Aufrufer; der Zustand selbst ist danach der neue
+     * `encounter`. Kein Wurf, kein stiller Fall: ein abgewiesenes Ereignis
+     * nennt seinen Grund.
+     */
+    function encounterFeed(event) {
+      const step = reduceEncounter(encounter, event);
+      encounter = step.state;
+      encounterLog = [{
+        id: typeof event?.eventId === 'string' ? event.eventId : null,
+        type: typeof event?.type === 'string' ? event.type : '?',
+        outcome: step.outcome,
+        reason: step.reason,
+        at: Date.now(),
+      }, ...encounterLog].slice(0, 8);
+      emit();
+      return { outcome: step.outcome, reason: step.reason, status: encounter.status };
+    }
+
+    /** Die naechste Huelle — gebaut vom Kern, damit Form und ID-Regel eine Quelle haben. */
+    const encounterNext = (type, turnId, payload) => encounterEvent(type, {
+      eventId: `enc-${(encounterSeq += 1)}`,
+      turnId,
+      sessionId: typeof store.sessionId === 'string' ? store.sessionId : 'lokal',
+      payload,
+    });
+
+    /** Jeden laufenden Timer des Uebungszugs abraeumen (Abbruch, Neustart, Abbau). */
+    function encounterStop() {
+      for (const id of encounterTimers) window.clearTimeout(id);
+      encounterTimers.clear();
+    }
+
+    /** Den Uebungszug starten. Nur aus `closed` — sonst gibt es nichts zu starten. */
+    function encounterStart() {
+      // `encounterTimers.size` ist die Wache gegen den Doppelklick: der Status
+      // steht in den ersten Millisekunden noch auf `closed`, waehrend der
+      // Uebungszug schon laeuft. Ein zweiter Klick wuerde einen zweiten Zug mit
+      // fremder turnId starten — der Reducer wiese jedes zweite Ereignis als
+      // FOREIGN_TURN ab, und der Nutzer saehe eine Absage fuer seinen eigenen
+      // Klick. Also: solange etwas laeuft, gibt es nichts zu starten.
+      if (encounter.status !== 'closed' || encounterTimers.size > 0) return null;
+      encounterStop();
+      const turnId = `turn-${Date.now()}`;
+      ENCOUNTER_DRILL.forEach(([type, payload], index) => {
+        const id = window.setTimeout(() => {
+          encounterTimers.delete(id);
+          encounterFeed(encounterNext(type, turnId, payload));
+        }, index * ENCOUNTER_TICK_MS + 1);
+        encounterTimers.add(id);
+      });
+      return { turnId, steps: ENCOUNTER_DRILL.length, tickMs: ENCOUNTER_TICK_MS };
+    }
+
+    /** Abbrechen: der Reducer entscheidet `aborted`, die Buehne raeumt nur die Timer. */
+    function encounterAbort() {
+      if (encounter.status === 'closed' || ENCOUNTER_TERMINAL_STATES.includes(encounter.status)) return null;
+      encounterStop();
+      return encounterFeed(encounterNext('encounter.abort', encounter.turnId ?? 'turn-abort', { reason: 'Nutzer' }));
+    }
+
+    /** Zurueck auf Anfang. `silent` fuer den Start, der ohnehin gleich rendert. */
+    function encounterReset(silent = false) {
+      encounterStop();
+      encounter = createEncounterState();
+      encounterLog = [];
+      if (!silent) emit();
+    }
+
+    /** Die Kurzzeile unter dem Titel — was der Zustand hergibt, nichts daneben. */
+    function encounterSummary(s) {
+      const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+      if (s.status === 'closed') return `Übungszug · ${ENCOUNTER_DRILL.length} Schritte · wartet auf Start`;
+      if (s.status === 'compact') {
+        return `Bilanz: ${ENCOUNTER_OUTCOMES[s.outcome?.kind] ?? 'ohne Ergebnis'} · ${count(s.applied, 'Ereignis', 'Ereignisse')}`;
+      }
+      const parts = [count(s.applied, 'Ereignis', 'Ereignisse')];
+      if (s.preflight.route !== null) parts.push(`${s.preflight.route.provider}/${s.preflight.route.model}`);
+      if (s.preflight.blocks.length > 0) parts.push(count(s.preflight.blocks.length, 'Block', 'Blöcke'));
+      if (s.tools.calls > 0) parts.push(`${count(s.tools.calls, 'Werkzeug', 'Werkzeuge')}${s.tools.open > 0 ? ` (${s.tools.open} offen)` : ''}`);
+      if (s.facts.valid > 0) parts.push(count(s.facts.valid, 'Fakt', 'Fakten'));
+      return parts.join(' · ');
+    }
+
+    /**
+     * Die Buehne: eine Kopfzeile mit Status und Bedienung, eine Vier-Stufen-
+     * Schiene und das letzte Ereignis mit seinem Ausgang. Sie steht im
+     * Composer-Dock, also in jeder Sitzung; sie ist trotzdem still, solange
+     * niemand einen Zug startet.
+     */
+    function EncounterStage() {
+      useStore();
+      const s = encounter;
+      const finished = s.status === 'completed' || s.status === 'compact';
+      const terminal = s.status === 'compact' || ENCOUNTER_TERMINAL_STATES.includes(s.status);
+      const phase = finished ? 3 : (ENCOUNTER_PHASE[s.status] ?? -1) >= 0
+        ? ENCOUNTER_PHASE[s.status]
+        : (ENCOUNTER_PHASE[s.lastPhase] ?? -1);
+      const last = encounterLog[0] ?? null;
+      const buttons = [];
+      if (s.status === 'closed') {
+        buttons.push(h('button', {
+          key: 'start', type: 'button', className: '__cm_enc-btn',
+          title: 'Übungszug starten: 14 Vertragsereignisse durch den Reducer',
+          onClick: () => encounterStart(),
+        }, 'Zug starten'));
+      } else if (!terminal) {
+        buttons.push(h('button', {
+          key: 'abort', type: 'button', className: '__cm_enc-btn',
+          title: 'Zug abbrechen (encounter.abort)',
+          onClick: () => encounterAbort(),
+        }, 'Abbrechen'));
+      } else {
+        buttons.push(h('button', {
+          key: 'reset', type: 'button', className: '__cm_enc-btn',
+          title: 'Bühne zurücksetzen (neuer Zustand, keine Altlast)',
+          onClick: () => encounterReset(),
+        }, 'Neu'));
+      }
+      return h('div', {
+        className: '__cm_enc',
+        'data-plugin': PLUGIN,
+        'data-status': s.status,
+        title: 'Encounter: der Lauf eines Auftrags in vier Stufen (Vorflug, Lauf, Prüfung, Abschluss). Der Übungszug zeigt die Bühne ohne Modell-Turn.',
+      },
+        h('div', { className: '__cm_enc-head' },
+          h('span', { className: '__cm_enc-title' }, 'Encounter'),
+          h('span', { className: '__cm_enc-chip', 'data-status': s.status }, ENCOUNTER_TITLES[s.status] ?? s.status),
+          h('span', { className: '__cm_enc-meta', role: 'status', 'aria-live': 'polite' }, encounterSummary(s)),
+          h('span', { className: '__cm_enc-actions' }, buttons)),
+        h('ol', { className: '__cm_enc-rail' },
+          ENCOUNTER_RAIL.map((step, index) => h('li', {
+            key: step.status,
+            className: '__cm_enc-step',
+            'data-state': finished ? 'done' : index < phase ? 'done' : index === phase ? 'active' : 'open',
+          },
+            h('span', { className: '__cm_enc-dot', 'aria-hidden': 'true' }),
+            h('span', null, step.label)))),
+        last === null ? null : h('p', {
+          className: '__cm_enc-log',
+          title: `${last.type} · ${last.outcome}${last.reason === null ? '' : ` (${last.reason})`}`,
+        }, `${last.type.replace('encounter.', '')} · ${ENCOUNTER_VERDICTS[last.outcome] ?? last.outcome}${last.reason === null ? '' : ` · ${last.reason}`}`),
+      );
+    }
+
     function CodingmonPanel() {
       const s = useStore();
       const lvl = levelFor(s.xp);
@@ -2229,6 +2855,37 @@ window.__ModuleLoader__.load({
       .__cm_move-meta { font-size: 10px; color: var(--dsw-alias-label-secondary, #9aa); }
       .__cm_log { list-style: none; margin: 0; padding: 0; font-size: 12px; }
       .__cm_log li { padding: 2px 0; color: var(--dsw-alias-label-secondary, #9aa); }
+
+      /* Encounter-Buehne (S5): eine Zeile Kopf, eine Schiene, ein Log. */
+      .__cm_enc { display: flex; flex-direction: column; gap: 5px; width: 100%;
+        padding: 6px 8px; margin-bottom: 6px; border-radius: 6px;
+        background: color-mix(in srgb, var(--shinon-void, #0B0F14) 45%, transparent);
+        border: 1px solid color-mix(in srgb, var(--shinon-violet, #7C3AED) 35%, transparent);
+        font-family: var(--shinon-font-body, ui-sans-serif, system-ui, sans-serif); font-size: 11px; }
+      .__cm_enc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .__cm_enc-title { font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 10px; }
+      .__cm_enc-chip { padding: 1px 7px; border-radius: 999px; font-size: 10px; letter-spacing: .06em;
+        text-transform: uppercase; border: 1px solid rgba(255,255,255,.18); color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_enc-chip[data-status="running"], .__cm_enc-chip[data-status="validating"] {
+        color: #A855F7; border-color: rgba(168,85,247,.55); }
+      .__cm_enc-chip[data-status="completed"], .__cm_enc-chip[data-status="compact"] {
+        color: #22c55e; border-color: rgba(34,197,94,.55); }
+      .__cm_enc-chip[data-status="aborted"], .__cm_enc-chip[data-status="rejected"],
+      .__cm_enc-chip[data-status="recoverable-error"] { color: #f59e0b; border-color: rgba(245,158,11,.55); }
+      .__cm_enc-meta { flex: 1; min-width: 120px; color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_enc-actions { display: flex; gap: 6px; }
+      .__cm_enc-btn { font-size: 11px; padding: 3px 9px; border-radius: 5px; cursor: pointer;
+        background: rgba(124,58,237,.18); color: inherit; border: 1px solid rgba(124,58,237,.45); }
+      .__cm_enc-rail { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
+      .__cm_enc-step { display: flex; align-items: center; gap: 4px; font-size: 10px;
+        color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_enc-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.2); }
+      .__cm_enc-step[data-state="done"] { color: var(--dsw-alias-label-primary, #E0E7FF); }
+      .__cm_enc-step[data-state="done"] .__cm_enc-dot { background: #7C3AED; }
+      .__cm_enc-step[data-state="active"] { color: #A855F7; }
+      .__cm_enc-step[data-state="active"] .__cm_enc-dot { background: #A855F7; box-shadow: 0 0 6px #A855F7; }
+      .__cm_enc-log { margin: 0; font-size: 10px; color: var(--dsw-alias-label-secondary, #9aa);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
       /* Globale EXP-Leiste im Composer-Dock: sichtbar in jeder Sitzung. */
       .__cm_expbar { display: flex; align-items: center; gap: 8px; width: 100%;
@@ -2442,6 +3099,23 @@ window.__ModuleLoader__.load({
           host: () => ({ ...hostMirror }),
           /** Die Uebergabe von Hand ausloesen — dieselbe Naht, die jeder Zug nimmt. */
           mirror: () => toHost(),
+          /**
+           * Die Encounter-Buehne, wie eine Probe sie faehrt: Zustand lesen,
+           * Ereignisse schicken, den Uebungszug starten. `state()` gibt eine
+           * KOPIE (JSON-Form), damit kein Aufrufer den Reducer-Zustand von
+           * aussen veraendert — der einzige Weg hinein ist `feed`.
+           */
+          encounter: {
+            contract: ENCOUNTER_CONTRACT,
+            state: () => JSON.parse(JSON.stringify(encounter)),
+            log: () => encounterLog.map((entry) => ({ ...entry })),
+            events: () => ENCOUNTER_EVENT_TYPES.slice(),
+            sourceMap: () => JSON.parse(JSON.stringify(ENCOUNTER_SOURCE_MAP)),
+            feed: (event) => encounterFeed(event),
+            start: () => encounterStart(),
+            abort: () => encounterAbort(),
+            reset: () => encounterReset(),
+          },
           /** Das Regelwerk, wie das Panel es liest. */
           rulebook: () => ({
             elements: Object.keys(ELEMENTS),
@@ -2552,6 +3226,14 @@ window.__ModuleLoader__.load({
           id: 'shinon-wild-dock',
           order: 21,
         }, WildDock));
+        // Die Encounter-Buehne (S5): Ereignisse rein, Zustand raus. Sie steht
+        // im selben Dock wie Ball und EXP-Leiste, weil der Zustand dorthin
+        // gehoert, wo gearbeitet wird — und nicht in ein eigenes Panel.
+        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+          name: 'conversation.composer.dock',
+          id: 'shinon-encounter-stage',
+          order: 22,
+        }, EncounterStage));
         ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
           name: 'conversation.chat.turnTail',
           id: 'shinon-battle-result',
@@ -2564,6 +3246,9 @@ window.__ModuleLoader__.load({
 
         ctx.effect?.(() => () => {
           window.clearInterval(activityTimer);
+          // Die Buehne raeumt ihre Timer mit: ein abgebautes Bundle darf keinen
+          // Uebungszug weiterlaufen lassen, der in ein fremdes Panel malt.
+          encounterStop();
           // Ein laufender Zug haengt an einem Timer, und der Abbau nimmt ihn mit.
           // Sonst feuerte `settle` in ein Bundle, das es nicht mehr gibt, und der
           // Zustand behauptete eine Sperre ohne Uhr — eine Wartezeit ohne Ende.

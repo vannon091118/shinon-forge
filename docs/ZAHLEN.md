@@ -31,10 +31,10 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | pnpm-Artefakte (getrackt) | 0 | `git ls-files '*pnpm-workspace.yaml' '*pnpm-lock.yaml' \| wc -l` (Aufrufe: Gate-Prüfung „pnpm-Reste“) | 0 |
 | Markdown-Dokumente (getrackt) | 32 | `git ls-files '*.md' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | 13 | `ls docs/contracts/*.json \| wc -l` | 0 |
-| Proben unter `docs/probes/` | 46 | `ls docs/probes/*.json \| wc -l` | 0 |
+| Proben unter `docs/probes/` | 47 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 17 Blöcke in 13 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 23 Pakete, 289 Dateien, 2647474 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 23 Pakete, 289 Dateien, 2679693 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,

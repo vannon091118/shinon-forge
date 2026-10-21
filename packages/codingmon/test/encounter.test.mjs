@@ -313,6 +313,30 @@ describe('definiertes Verhalten fuer alles, was nicht passt', () => {
     assert.equal(late.reason, 'INVALID_TRANSITION');
   });
 
+  test('ein Terminal merkt sich, WO es geendet hat (lastPhase)', () => {
+    // Der Befund aus dem Playtest: `aborted` allein sagt nicht, ob im Vorflug
+    // oder in der Pruefung abgebrochen wurde. Die Buehne darf das nicht raten.
+    const early = reduceEncounter(stateAt('preflight'), nextEvent('encounter.abort', { payload: { reason: 'Nutzer' } }));
+    assert.equal(early.outcome, 'APPLIED');
+    assert.equal(early.state.status, 'aborted');
+    assert.equal(early.state.lastPhase, 'preflight');
+
+    const late = reduceEncounter(stateAt('validating'), nextEvent('encounter.abort', { payload: { reason: 'Nutzer' } }));
+    assert.equal(late.state.lastPhase, 'validating');
+
+    // Eine Beobachtung (`to: null`) schreibt die Spur NICHT um — auch nicht
+    // ueber eine echte Bahn (turn.started -> run.started -> tool.started).
+    const walked = reduceEncounter(
+      reduceEncounter(stateAt('preflight'), nextEvent('encounter.run.started', { payload: { step: 1 } })).state,
+      nextEvent('encounter.tool.started', { payload: { callId: 'c9', name: 'grep' } }),
+    );
+    assert.equal(walked.state.status, 'running');
+    assert.equal(walked.state.lastPhase, 'preflight');
+
+    // Und der leere Zustand behauptet keine Herkunft.
+    assert.equal(createEncounterState().lastPhase, null);
+  });
+
   test('parallele Turns bleiben getrennt: zwei Zustaende, zwei Encounter', () => {
     const a = stateAt('running', 'turn-a');
     const b = stateAt('running', 'turn-b');
