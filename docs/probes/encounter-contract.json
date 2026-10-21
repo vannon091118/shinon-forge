@@ -1,0 +1,16 @@
+[
+  {
+    "id": "encounter-vertrag-und-reiner-reducer",
+    "claim": "Der Zustand der Encounter-Buehne folgt aus bestaetigten Ereignissen: EINE Tabelle definiert jedes Ereignis samt Herkunft, und ein reiner Reducer macht aus (Zustand, Ereignis) deterministisch den naechsten Zustand — ohne Uhr, DOM, Netz oder Zufall, also ohne Host pruefbar.",
+    "targets": [
+      "packages/codingmon/assets/encounter.js",
+      "packages/codingmon/test/encounter.test.mjs",
+      "packages/events/assets/event-spine.json",
+      "packages/codingmon/index.js"
+    ],
+    "expect": "Jedes definierte Ereignis geht einmal durch den Reducer und erreicht genau den Zielzustand der Tabelle. Der Eingabezustand bleibt unveraendert (tief eingefroren, Vorher/Nachher gleich). Ein unbekanntes Ereignis wird IGNORED und liefert DENSELBEN Zustand zurueck; doppelte, fremde und verspaetete Ereignisse werden abgewiesen statt geraten. Jede native Quelle existiert im geprueften Event-Spine, jede interne in einem Paketordner des Baums — kein erfundener DSH-Typ.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN, ohne DSH und ohne Browser: `npm run test:codingmon` PASS Exit 0 mit **107 von 107** Tests (vorher 84; 23 davon im Encounter-Vertrag), `npm test` Exit 0 (statisches Gate 126 bestanden, 0 fehlgeschlagen), `npm run gate:test` 889/889, `npm run gate:full` PASS 23/23, `npm run build` Exit 0, `npm run zahlen:check` Exit 0. Inhaltlich belegt der Test: (1) 20 Ereignisse, jedes einmal angewandt, Zielzustand == Tabelle; (2) tief eingefrorener Zustand ueberlebt jedes Ereignis, und eine Kopie ist byte-gleich geblieben; (3) unbekannter Typ -> `IGNORED` mit `state === eingabe`; (4) acht kaputte Huellen (falscher Vertrag, leere eventId, fehlender Turn, gefaelschte Quelle, fremdes Payload-Feld, Objekt als Payload-Wert, Array als Payload) -> `REJECTED` mit eigenem Code und unveraendertem Zustand; (5) doppelte eventId wirkt genau einmal (die Erinnerung ist auf 64 IDs gedeckelt); (6) ein Ereignis eines fremden Turns wird abgewiesen; (7) nach dem Terminal wirkt nur noch `receipt.compacted` und `skill.proposed`; (8) zwei parallele Encounter bleiben getrennt; (9) der Quelltext des Kerns enthaelt keinen Import, kein `Date`, keinen Timer, kein `Math.random`, kein `window`/`document`/`fetch`/`process.env`; (10) jeder `kind:'spine'`-Verweis steht in `packages/events/assets/event-spine.json`, jeder `kind:'internal'`-Besitzer ist ein vorhandener Paketordner. NEBENBEFUND (Startschluessel): `.env` im Repo ist eine VORLAGE mit leeren Werten; der Arbeitsschluessel liegt im Zugangsspeicher des DSH-Homes (`$DSH_HOME/.credentials.yaml`, Abschnitt `refs:`). `shinon --check` und `shinon doctor` melden jetzt Name und QUELLE (`Umgebung`, `.env`, `Zugangsdatei des DSH-Homes`) und lesen den Wert nie — gemessen auf dieser Maschine: `AGNES_API_KEY` und `PROMPTER_API_KEY` je `gesetzt (Zugangsdatei des DSH-Homes)`; die Datei selbst enthaelt unter `records:` weiterhin die beiden zur Rotation offenen Geheimnisse, die dieser Leser bewusst NICHT anfasst (`refs:` only). NICHT gemessen und deshalb offen: die Verdrahtung an echte Laufzeit-Signale und die Buehne im Composer-Dock (S5/B02), der Browser-Nachweis, und ein echter Modell-Turn mit dieser Route."
+  }
+]

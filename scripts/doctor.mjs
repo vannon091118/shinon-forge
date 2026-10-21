@@ -29,18 +29,14 @@ import * as repo from './lib/repo.mjs';
 import { dshBinary, dshSource } from './lib/dsh.mjs';
 import { resolveRuntime } from './lib/runtime.mjs';
 import { check as doctorCheck } from './gate/plugins/doctor.mjs';
+import { PRESENCE_KEYS, credentialNames, envNames, keyPresence } from './lib/secrets.mjs';
+import { describePaths } from './lib/paths.mjs';
 
 /** Schlüssel, deren Anwesenheit gemeldet wird — nie deren Werte. */
-export const PRESENCE_KEYS = ['AGNES_API_KEY', 'PROMPTER_API_KEY'];
+export { PRESENCE_KEYS };
 
-function presence(env = process.env) {
-  const out = {};
-  for (const name of PRESENCE_KEYS) {
-    const raw = env[name];
-    out[name] = typeof raw === 'string' && raw.trim() !== '';
-  }
-  return out;
-}
+/** Nur die Ja/Nein-Sicht der Anwesenheit (die Quelle steht daneben). */
+const flagsOf = (keys) => Object.fromEntries(Object.entries(keys).map(([name, entry]) => [name, entry.present]));
 
 function probeDsh(runtime) {
   const binary = dshBinary();
@@ -114,6 +110,13 @@ export function diagnose({ root = repo.ROOT, env = process.env } = {}) {
   }
 
   const status = environmentError !== null ? 'error' : findings.length > 0 ? 'findings' : 'ok';
+  const envFile = join(root, '.env');
+  // Der Zugangsspeicher liegt im DSH-Home (Zustand, nicht im Repo) — dort
+  // schreibt DSH den Schlüssel, den die UI annimmt.
+  // Der Pfad kommt aus der ECHTEN Umgebung: `env` ist die Sonde für die
+  // Schlüsselnamen, kein Ersatz für die Zustandsordner des Prozesses.
+  const credentialsFile = join(describePaths().dshHome, '.credentials.yaml');
+  const keys = keyPresence(env, envFile, credentialsFile);
   return {
     status,
     exitCode: status === 'ok' ? 0 : status === 'findings' ? 1 : 2,
@@ -122,7 +125,12 @@ export function diagnose({ root = repo.ROOT, env = process.env } = {}) {
     dsh: { ok: dsh.ok, version: dsh.version, source: dsh.kind, root: dsh.root },
     profile: { name: profileName, patchPresent: profilePatchPresent, bundleIssues },
     findings,
-    keys: presence(env),
+    // `keys` bleibt die Ja/Nein-Sicht; `keySources` nennt die Herkunft, damit
+    // "gesetzt" nicht die Frage offen laesst, WOHER der Start ihn bekommt.
+    keys: flagsOf(keys),
+    keySources: Object.fromEntries(Object.entries(keys).map(([name, entry]) => [name, entry.source])),
+    envFile: { path: envFile, present: existsSync(envFile), names: [...envNames(envFile)].length },
+    credentials: { path: credentialsFile, present: existsSync(credentialsFile), names: [...credentialNames(credentialsFile)].length },
   };
 }
 
@@ -136,7 +144,12 @@ function renderHuman(report) {
   for (const issue of report.findings) lines.push(`     - ${issue}`);
   lines.push('   Schlüssel (nur Anwesenheit, nie Werte):');
   for (const [name, present] of Object.entries(report.keys)) {
-    lines.push(`     ${present ? '●' : '○'} ${name}: ${present ? 'gesetzt' : 'fehlt'}`);
+    const source = report.keySources?.[name];
+    const where = source === 'env' ? ' (Umgebung)' : source === 'env-file' ? ' (.env)' : source === 'credentials' ? ' (Zugangsdatei des DSH-Homes)' : '';
+    lines.push(`     ${present ? '●' : '○'} ${name}: ${present ? `gesetzt${where}` : 'fehlt'}`);
+  }
+  if (report.envFile !== undefined && !report.envFile.present) {
+    lines.push(`     · ${report.envFile.path} fehlt — ein Start ohne Schlüssel meldet MISSING_CREDENTIAL`);
   }
   if (report.environmentError !== null) lines.push(`   Umgebung: ${report.environmentError}`);
   lines.push(`   Exit:    ${report.exitCode} (0 gesund · 1 Befunde · 2 Umgebung)`);

@@ -40,11 +40,13 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { constants as osConstants } from 'node:os';
+import { join } from 'node:path';
 import * as repo from '../scripts/lib/repo.mjs';
 import { dshBinary, dshSource } from '../scripts/lib/dsh.mjs';
 import { resolveRuntime, runtimeFailure } from '../scripts/lib/runtime.mjs';
 import { childEnv, describePaths } from '../scripts/lib/paths.mjs';
 import { seedDshHome } from '../scripts/lib/dsh-home.mjs';
+import { PRESENCE_KEYS, credentialNames, envNames } from '../scripts/lib/secrets.mjs';
 
 const ROOT = repo.ROOT;
 const args = process.argv.slice(2);
@@ -187,6 +189,21 @@ async function main() {
     console.log(`   dsh:       ${dshVersion}`);
     console.log(`   Herkunft:  ${source.kind} — ${source.root}`);
     console.log(`   Profil:    ${profileName}`);
+    // Der Schluessel wird NICHT hier geladen — `dsh` liest `.env` beim Start
+    // selbst, und der Seeder hat die Datei eben ins Home verlinkt. Diese Zeile
+    // beantwortet deshalb nur die Frage "bekommt der Start einen Schluessel?"
+    // und nennt Name plus Quelle; der Wert wird nie gelesen und nie gedruckt.
+    const keyFile = join(ROOT, '.env');
+    const keyNames = envNames(keyFile);
+    // Dritte Quelle: der Zugangsspeicher des DSH-Homes (`refs:`), in dem DSH
+    // die per `apiKeyEnv` adressierten Schlüssel ablegt. Genau dort liegt der
+    // Arbeitsschlüssel dieser Maschine — `.env` im Repo ist die Vorlage.
+    const storeNames = credentialNames(join(paths.dshHome, '.credentials.yaml'));
+    for (const name of PRESENCE_KEYS) {
+      const fromEnv = typeof process.env[name] === 'string' && process.env[name].trim() !== '';
+      const where = fromEnv ? 'Umgebung' : keyNames.has(name) ? '.env' : storeNames.has(name) ? 'Zugangsdatei des DSH-Homes' : null;
+      console.log(`   Schluessel: ${name} ${where === null ? 'FEHLT — ohne Schluessel meldet der Start MISSING_CREDENTIAL' : `gesetzt (${where}; Wert nicht gelesen)`}`);
+    }
     console.log(`   DSH_HOME:  ${paths.dshHome}`);
     console.log(`   Index:     ${paths.indexRoot}   (Cache — wiederherstellbar)`);
     console.log(`   Ledger:    ${paths.ledgerFile}   (Daten — nicht wegwerfbar)`);

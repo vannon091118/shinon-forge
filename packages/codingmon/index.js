@@ -19,6 +19,10 @@ export * from './assets/mechanik.js';
 // Die NAMEN der Naht Client -> Host (Paket, Namespace, Methode, Endpunkt,
 // Feldliste) stehen in `assets/uebergabe.js` — eine Quelle fuer beide Haelften.
 export * from './assets/uebergabe.js';
+// Der Encounter-Vertrag (S4): Ereignisdefinition, Source Map und der reine
+// Reducer. Gleiche Regel wie `mechanik.js` — der Kern kennt keine
+// Host-Abhaengigkeit und wird hier nur weitergegeben.
+export * from './assets/encounter.js';
 
 export const Config = z.object({
   /** XP-Basis der ersten Stufe (kumulativ und quadratisch). */

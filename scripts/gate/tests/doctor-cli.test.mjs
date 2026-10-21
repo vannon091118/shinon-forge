@@ -25,6 +25,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+// Aus der Bibliothek und NICHT aus `doctor.mjs`: das Skript fuehrt beim Import
+// seine Diagnose aus (es ist ein CLI, kein Modul) und wuerde die Testdatei beenden.
+import { credentialNames, keyPresence } from '../../lib/secrets.mjs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -86,6 +89,44 @@ test('doctor: presence-only — ein Fake-Schlüssel wird nie ausgegeben, nur gem
   const report = JSON.parse(run.stdout);
   assert.equal(report.keys.AGNES_API_KEY, true, 'gesetzter Schlüssel wird nicht als gesetzt gemeldet');
   assert.equal(typeof report.keys.PROMPTER_API_KEY, 'boolean');
+  assert.equal(report.keySources.AGNES_API_KEY, 'env', 'die Umgebung schlägt die Datei');
+});
+
+test('doctor: ein Schlüssel NUR in .env wird gemeldet — als Datei, nicht als Umgebung', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shinon-doctor-env-'));
+  const file = join(dir, '.env');
+  const secret = 'ENV-DATEI-GEHEIM-1a2b3c';
+  writeFileSync(file, `# nur Namen zaehlen\nexport AGNES_API_KEY="${secret}"\nPROMPTER_API_KEY=\nFREMDE_ZEILE=egal\n`);
+  const keys = keyPresence({}, file);
+  assert.equal(keys.AGNES_API_KEY.present, true, 'ein Wert in .env gilt als gesetzt');
+  assert.equal(keys.AGNES_API_KEY.source, 'env-file');
+  assert.equal(keys.PROMPTER_API_KEY.present, false, 'ein LEERER Wert ist nicht gesetzt');
+  assert.equal(keys.PROMPTER_API_KEY.source, null);
+  assert.equal(JSON.stringify(keys).includes(secret), false, 'der Wert steht im Ergebnis');
+});
+
+test('doctor: der Zugangsspeicher des DSH-Homes ist die dritte Quelle — nur der Name zählt', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shinon-doctor-store-'));
+  const file = join(dir, '.credentials.yaml');
+  const secret = 'STORE-GEHEIM-7c6b5a';
+  writeFileSync(file, [
+    'version: 1',
+    'records:',
+    '  client-connection/browser-session:',
+    '    kind: cookie',
+    'refs:',
+    `  AGNES_API_KEY: '${secret}'`,
+    '  PROMPTER_API_KEY:',
+    '  SHINON_API_KEY: "anderer-wert"',
+    'nicht-refs:',
+    '  FALSCH: "zaehlt nicht"',
+  ].join('\n'));
+  assert.deepEqual([...credentialNames(file)].sort(), ['AGNES_API_KEY', 'SHINON_API_KEY'], 'nur refs, nur nicht-leere Werte');
+  const keys = keyPresence({}, null, file);
+  assert.equal(keys.AGNES_API_KEY.present, true);
+  assert.equal(keys.AGNES_API_KEY.source, 'credentials');
+  assert.equal(keys.PROMPTER_API_KEY.present, false, 'ein leerer Eintrag ist kein Schlüssel');
+  assert.equal(JSON.stringify({ keys, names: [...credentialNames(file)] }).includes(secret), false, 'der Wert steht im Ergebnis');
 });
 
 test('doctor: --help nennt Usage und endet mit Exit 0, ohne Diagnose', () => {

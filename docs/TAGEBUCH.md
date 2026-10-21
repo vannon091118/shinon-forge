@@ -1060,6 +1060,62 @@ Zahlen in `docs/probes/codingmon-sprites.json`). **Nicht** gemessen: das
 Rendering im DSH-Panel selbst — das gehoert zur Buehne (B09/BROWSER-01) und
 braucht einen laufenden Host; der Mint-Smoke bleibt ebenfalls offen.
 
+### Der Encounter lernt falten — und der Schluessel zeigt, wo er liegt
+
+S4 ist der Slice, der keine Buehne baut, sondern die Bedingung dafuer: einen
+Zustand, der aus Ereignissen folgt. Die Buehne selbst (S5) wuerde sonst eine
+Animation malen und den Fortschritt daraus ableiten — genau die Umkehrung, die
+den Plan unbrauchbar macht. Also zuerst der Vertrag: eine Tabelle mit **20
+Ereignissen** in 492 Zeilen und eine Funktion, die nichts tut als falten.
+
+**Warum das CodingMon-Paket.** Der Encounter ist kein zweites Spiel. Begleiter,
+Gegnerwahl (`arenaFor`) und Praesentationszustand (`presentationState`) liegen
+schon hier; die Buehne zeigt den Kampf des Pets gegen die diagnostische Rolle
+der Aufgabe. Ein Encounter-Zustand in `@shinon/popup` haette die Tier-Seite von
+der Tier-Anzeige getrennt — dafuer gibt es keinen Grund, nur eine Naht mehr.
+
+**Eine Tabelle, alles andere abgeleitet.** `packages/codingmon/assets/encounter.js`
+traegt in `ENCOUNTER_EVENTS` je Ereignis: Namen, Quelle (Art, Referenz,
+Besitzer-Paket), die erlaubten Herkunftsstaende, den Zielzustand, die
+Payload-Allowlist und die Wirkung. Die Source Map ist daraus abgeleitet
+(`Object.fromEntries` ueber dieselbe Tabelle) — keine zweite Liste, die
+auseinanderlaufen kann. Die
+Zustaende sind geschlossen: `closed → preflight → running → validating →
+{completed, rejected, aborted, recoverable-error} → compact`.
+
+**Was der Reducer NICHT kann, ist die eigentliche Zusage.** Keine Uhr, kein DOM,
+kein Netz, kein `Math.random`, kein Import. Ein Test liest den Quelltext und
+verbietet genau das — nicht als Stilfrage, sondern weil eine Funktion, die die
+Uhr liest, ohne Host nicht pruefbar ist und mit Host nicht reproduzierbar.
+Derselbe `(Zustand, Ereignis)`-Paar ergibt immer denselben naechsten Zustand;
+das steht als eigener Test da.
+
+**Was passiert, wenn etwas nicht passt** — jeder Fall hat seinen Namen:
+`IGNORED` bei unbekanntem Typ und doppelter `eventId` (derselbe Zustand zurueck,
+identisch, nicht kopiert), `REJECTED` bei kaputter Huelle, gefaelschter Quelle,
+fremdem Turn, unerlaubtem Payload-Feld und unerlaubtem Uebergang. Verspaetete
+Ereignisse nach dem Terminal kommen nicht mehr durch, ausser der Bergung und dem
+Skill-Vorschlag — und beide sind Unterzustaende: sie aendern den Status nicht.
+`turn.completed` ohne Ergebnisvertrag ergibt `neutral`, nicht `gewonnen`.
+
+**Der Schluessel, und wo er wirklich liegt.** Der Auftrag verlangte, den
+Startweg mit aufzunehmen — und die Messung hat eine alte Annahme korrigiert:
+`.env` in diesem Repo ist eine **Vorlage**, elf Namen mit leeren Werten. Der
+Arbeitsschluessel liegt im Zugangsspeicher des DSH-Homes
+(`$DSH_HOME/.credentials.yaml`, Abschnitt `refs:`) — dort loest DSH die per
+`apiKeyEnv` adressierten Namen auf. `shinon --check` und `shinon doctor` melden
+jetzt Name und QUELLE (`Umgebung`, `.env`, `Zugangsdatei des DSH-Homes`) und
+lesen den Wert nie; ein leerer Eintrag zaehlt nicht als Schluessel. Was dieser
+Leser bewusst **nicht** anfasst: `records:` — dort stehen die beiden zur
+Rotation offenen Geheimnisse (Session-Cookie, Zugriffstoken).
+
+Belegt: `npm run test:codingmon` PASS Exit 0 mit **107 von 107** Tests (vorher
+84; 23 im Encounter-Vertrag), `npm test` Exit 0 (statisch 126), `npm run
+gate:test` 889/889, `npm run gate:full` PASS 23/23, `npm run build` Exit 0,
+`npm run zahlen:check` Exit 0. Zahlen und Grenzen: `docs/probes/encounter-contract.json`.
+**Nicht** gemessen: die Verdrahtung an echte Laufzeit-Signale und die Buehne im
+Composer-Dock (S5/B02) — der Vertrag ist die Grundlage, nicht der Beweis.
+
 ---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
