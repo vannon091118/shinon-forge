@@ -2605,14 +2605,25 @@ window.__ModuleLoader__.load({
      * `ENCOUNTER_EVENTS` bleibt die Quelle, hier steht nur die Reihenfolge.
      * Die Nutzlast haelt sich an die Allowlist des jeweiligen Ereignisses.
      */
-    const ENCOUNTER_DRILL = [
+    const ENCOUNTER_BLOCKS = ['persona-identity-core', 'enhancer-system-policy'];
+
+    /**
+     * Der Vorflug endet mit `preflight.ready` — an dieser Stelle oeffnet das
+     * Pre-Flight-Deck (B04) sein Eingriffsfenster. Die Route steht VOR dem
+     * Ready: sie ist die Route, die der Anfrage mitgegeben wird, und das Deck
+     * zeigt sie, bevor der Lauf beginnt (nicht danach).
+     */
+    const ENCOUNTER_PRE = [
       ['encounter.turn.started', {}],
       ['encounter.task.classified', { taskClass: 'fix', taskLabel: 'Reparatur' }],
       ['encounter.index.progress', { phase: 'scan', count: 12 }],
       ['encounter.fact.validated', { snapshotId: 'snap-uebung', valid: 3, untrusted: 1, unknown: 0 }],
-      ['encounter.block.selected', { blocks: ['persona-identity-core', 'enhancer-system-policy'] }],
-      ['encounter.preflight.ready', {}],
+      ['encounter.block.selected', { blocks: ENCOUNTER_BLOCKS.slice() }],
       ['encounter.route.selected', { provider: 'lokal', model: 'uebungszug' }],
+      ['encounter.preflight.ready', {}],
+    ];
+    /** Was nach der Freigabe (oder nach Ablauf des Fensters) laeuft. */
+    const ENCOUNTER_POST = [
       ['encounter.run.started', { step: 1 }],
       ['encounter.tool.started', { callId: 'call-1', name: 'read_file' }],
       ['encounter.tool.completed', { callId: 'call-1', ok: true }],
@@ -2621,7 +2632,10 @@ window.__ModuleLoader__.load({
       ['encounter.turn.completed', { reason: 'completed' }],
       ['encounter.receipt.compacted', {}],
     ];
+    const ENCOUNTER_DRILL = [...ENCOUNTER_PRE, ...ENCOUNTER_POST];
     const ENCOUNTER_TICK_MS = 650;
+    /** Das Eingriffsfenster des Decks. Nur ein UX-Fenster, keine Modellzeit. */
+    const ENCOUNTER_HOLD_MS = 2000;
 
     /**
      * Ein Ereignis durch den Reducer schicken. Das Ergebnis (outcome, reason)
@@ -2651,10 +2665,85 @@ window.__ModuleLoader__.load({
       payload,
     });
 
+    /**
+     * Der Treiber des Uebungszugs — bewusst hier und nicht im Reducer: Zeit
+     * und Timer gehoeren zur Buehne, der Zustand nicht.
+     *
+     * `encounterHolding` ist das offene Eingriffsfenster: es beginnt mit
+     * `preflight.ready` und endet mit dem Klick auf «Lauf starten» oder
+     * nach `ENCOUNTER_HOLD_MS`. Der Timeout-Pfad ist der DEFAULT-Pfad: es geht
+     * mit genau der Auswahl weiter, die der Zustand schon traegt — kein
+     * Sonderfall, keine stille Aenderung.
+     */
+    let encounterHolding = false;
+    let encounterHoldTimer = null;
+    let encounterTurn = null;
+
     /** Jeden laufenden Timer des Uebungszugs abraeumen (Abbruch, Neustart, Abbau). */
     function encounterStop() {
       for (const id of encounterTimers) window.clearTimeout(id);
       encounterTimers.clear();
+      encounterHolding = false;
+      encounterHoldTimer = null;
+      encounterTurn = null;
+    }
+
+    /** Eine Ereignisfolge mit festem Takt einplanen. */
+    function encounterSchedule(steps, turnId, offsetMs) {
+      steps.forEach(([type, payload], index) => {
+        const id = window.setTimeout(() => {
+          encounterTimers.delete(id);
+          if (type === 'encounter.preflight.ready') encounterOpenHold(turnId);
+          encounterFeed(encounterNext(type, turnId, payload));
+        }, offsetMs + index * ENCOUNTER_TICK_MS + 1);
+        encounterTimers.add(id);
+      });
+    }
+
+    /** Das Eingriffsfenster oeffnen: sichtbar ab dem Ready-Ereignis. */
+    function encounterOpenHold(turnId) {
+      encounterHolding = true;
+      encounterTurn = turnId;
+      encounterHoldTimer = window.setTimeout(() => {
+        encounterTimers.delete(encounterHoldTimer);
+        encounterHoldTimer = null;
+        encounterContinue();
+      }, ENCOUNTER_HOLD_MS);
+      encounterTimers.add(encounterHoldTimer);
+    }
+
+    /**
+     * «Anfrage starten» / Ablauf des Fensters: der Lauf beginnt mit der
+     * Auswahl, die der Zustand traegt. Nur aus dem offenen Vorflug — ein
+     * zweiter Aufruf ist keine zweite Anfrage.
+     */
+    function encounterContinue() {
+      if (!encounterHolding || encounter.status !== 'preflight' || encounter.preflight.ready !== true) return null;
+      encounterHolding = false;
+      if (encounterHoldTimer !== null) {
+        window.clearTimeout(encounterHoldTimer);
+        encounterTimers.delete(encounterHoldTimer);
+        encounterHoldTimer = null;
+      }
+      encounterSchedule(ENCOUNTER_POST, encounterTurn ?? encounter.turnId, 0);
+      emit();
+      return { continued: true };
+    }
+
+    /**
+     * Einen Wissensblock an- oder abwaehlen. Der Weg ist der Vertrag: ein
+     * `encounter.block.selected` mit der NEUEN Liste, gefaltet vom Reducer.
+     * Nur im offenen Fenster; vor `preflight.ready` ist die Auswahl noch nicht
+     * fest, nach `run.started` ist sie eingefroren — der Versuch wird sichtbar
+     * (nicht still) abgewiesen.
+     */
+    function encounterToggleBlock(id) {
+      if (encounter.status !== 'preflight' || encounter.preflight.ready !== true) return null;
+      if (typeof id !== 'string' || id === '') return null;
+      const blocks = encounter.preflight.blocks.includes(id)
+        ? encounter.preflight.blocks.filter((block) => block !== id)
+        : [...encounter.preflight.blocks, id];
+      return encounterFeed(encounterNext('encounter.block.selected', encounter.turnId ?? 'turn-bloecke', { blocks }));
     }
 
     /** Den Uebungszug starten. Nur aus `closed` — sonst gibt es nichts zu starten. */
@@ -2667,15 +2756,14 @@ window.__ModuleLoader__.load({
       // Klick. Also: solange etwas laeuft, gibt es nichts zu starten.
       if (encounter.status !== 'closed' || encounterTimers.size > 0) return null;
       encounterStop();
-      const turnId = `turn-${Date.now()}`;
-      ENCOUNTER_DRILL.forEach(([type, payload], index) => {
-        const id = window.setTimeout(() => {
-          encounterTimers.delete(id);
-          encounterFeed(encounterNext(type, turnId, payload));
-        }, index * ENCOUNTER_TICK_MS + 1);
-        encounterTimers.add(id);
-      });
-      return { turnId, steps: ENCOUNTER_DRILL.length, tickMs: ENCOUNTER_TICK_MS };
+      encounterTurn = `turn-${Date.now()}`;
+      encounterSchedule(ENCOUNTER_PRE, encounterTurn, 0);
+      return {
+        turnId: encounterTurn,
+        steps: ENCOUNTER_DRILL.length,
+        tickMs: ENCOUNTER_TICK_MS,
+        holdMs: ENCOUNTER_HOLD_MS,
+      };
     }
 
     /** Abbrechen: der Reducer entscheidet `aborted`, die Buehne raeumt nur die Timer. */
@@ -2708,11 +2796,99 @@ window.__ModuleLoader__.load({
       return parts.join(' · ');
     }
 
+    /** Eine Zeile des Pre-Flight-Decks: Bezeichnung links, Wert rechts. */
+    function deckRow(label, value) {
+      return h('div', { className: '__cm_deck-row', key: label },
+        h('dt', null, label),
+        h('dd', null, value));
+    }
+
+    /**
+     * Das Pre-Flight-Deck (B04) — eine Ansicht des Encounter-Zustands, keine
+     * eigene Wahrheit.
+     *
+     * Es zeigt die sieben Angaben, die B04 vor dem Token-Burn verlangt:
+     * Aufgabe, Tendenz, Konflikte, Fakten (plus Quellen), Route, Budget und die
+     * endgueltig gezogenen Wissensbloecke. Wo der Vertrag heute KEINE Quelle
+     * hat (Tendenz, Konflikte, Faktenquellen, Budget), steht «nicht gemeldet»
+     * — sichtbar, statt eine Zahl zu erfinden. Die Bloecke sind im Vorflug
+     * schaltbar; der Schalter ist ein `encounter.block.selected` durch den
+     * Reducer. Nach `run.started` ist die Auswahl eingefroren und das Deck sagt
+     * das, statt einen wirkungslosen Klick anzunehmen.
+     */
+    function PreflightDeck({ s }) {
+      // Schaltbar ist das Deck nur im offenen Fenster: `preflight.ready` liegt
+      // vor der Auswahl, `run.started` friert sie ein. Vor dem Ready waere ein
+      // Klick eine Aenderung, die das naechste Ereignis ueberschreibt — lieber
+      // sichtbar gesperrt als scheinbar wirksam.
+      const editable = s.status === 'preflight' && s.preflight.ready === true;
+      const blockIds = [...new Set([...ENCOUNTER_BLOCKS, ...s.preflight.blocks])];
+      const route = s.preflight.route;
+      const facts = s.facts;
+      const missing = (text) => h('span', { className: '__cm_deck-missing' }, text);
+      const value = (text) => h('span', { className: '__cm_deck-value' }, text);
+      return h('section', {
+        className: '__cm_deck',
+        'data-editable': editable ? 'on' : 'off',
+        'aria-label': 'Pre-Flight-Deck',
+      },
+        h('div', { className: '__cm_deck-head' },
+          h('span', { className: '__cm_deck-title' }, 'Pre-Flight-Deck'),
+          h('span', { className: '__cm_deck-note', role: 'status' }, s.status === 'preflight'
+            ? 'Vorschau (lokal) — kein Modellaufruf'
+            : 'Anfrage läuft — Änderungen zu spät'),
+          encounterHolding ? h('span', { className: '__cm_deck-window' },
+            h('span', { className: '__cm_deck-windowbar', style: { animationDuration: `${ENCOUNTER_HOLD_MS}ms` } }),
+            h('span', null, 'Weiter ohne Eingriff')) : null),
+        h('dl', { className: '__cm_deck-grid' },
+          deckRow('Aufgabe', s.task === null
+            ? missing('nicht klassifiziert')
+            : value(`${s.task.taskLabel ?? '—'} · ${s.task.taskClass ?? '—'}`)),
+          deckRow('Tendenz', missing('nicht gemeldet')),
+          deckRow('Konflikte', missing('nicht gemeldet')),
+          deckRow('Fakten', facts.snapshotId === null ? missing('kein Snapshot')
+            : value(`${facts.valid} VALID · ${facts.untrusted} UNTRUSTED · ${facts.unknown} UNKNOWN · ${facts.snapshotId}`)),
+          deckRow('Faktenquellen', missing('nicht gemeldet')),
+          deckRow('Route', route === null ? missing('nicht gewählt')
+            : value(`${route.provider} / ${route.model}`)),
+          deckRow('Budget', missing('nicht gemessen')),
+        ),
+        h('div', { className: '__cm_deck-blocks' },
+          h('span', { className: '__cm_deck-label' }, 'Wissensblöcke'),
+          blockIds.map((id) => h('label', {
+            key: id,
+            className: '__cm_deck-block',
+            'data-block': id,
+            'data-on': s.preflight.blocks.includes(id) ? 'on' : 'off',
+            'data-locked': editable ? 'off' : 'on',
+            title: editable
+              ? `${id} ${s.preflight.blocks.includes(id) ? 'abwählen' : 'wieder aufnehmen'}`
+              : `${id} — eingefroren, die Anfrage ist gestartet`,
+          },
+            h('input', {
+              type: 'checkbox',
+              'data-block': id,
+              checked: s.preflight.blocks.includes(id),
+              disabled: !editable,
+              onChange: () => encounterToggleBlock(id),
+            }),
+            h('span', null, id))),
+          s.preflight.ready ? null : h('span', { className: '__cm_deck-missing' }, 'Auswahl noch nicht fest')),
+        editable && encounterHolding ? h('div', { className: '__cm_deck-actions' },
+          // «Lauf starten» statt «Anfrage starten»: dieser Zug ist ein
+          // Uebungszug, und das Deck sagt im selben Atemzug «kein Modellaufruf».
+          // Ein Knopf, der eine Anfrage behauptet, waehrend keine rausgeht,
+          // waere genau die Sorte stiller Luege, die B04 verhindern soll.
+          h('button', { type: 'button', className: '__cm_enc-btn', onClick: () => encounterContinue() }, 'Lauf starten'),
+          h('span', { className: '__cm_deck-missing' }, 'startet mit genau dieser Auswahl')) : null,
+      );
+    }
+
     /**
      * Die Buehne: eine Kopfzeile mit Status und Bedienung, eine Vier-Stufen-
-     * Schiene und das letzte Ereignis mit seinem Ausgang. Sie steht im
-     * Composer-Dock, also in jeder Sitzung; sie ist trotzdem still, solange
-     * niemand einen Zug startet.
+     * Schiene, das Pre-Flight-Deck und das letzte Ereignis mit seinem Ausgang.
+     * Sie steht im Composer-Dock, also in jeder Sitzung; sie ist trotzdem
+     * still, solange niemand einen Zug startet.
      */
     function EncounterStage() {
       useStore();
@@ -2762,6 +2938,9 @@ window.__ModuleLoader__.load({
           },
             h('span', { className: '__cm_enc-dot', 'aria-hidden': 'true' }),
             h('span', null, step.label)))),
+        s.status === 'preflight' || s.status === 'running' || s.status === 'validating'
+          ? h(PreflightDeck, { s })
+          : null,
         last === null ? null : h('p', {
           className: '__cm_enc-log',
           title: `${last.type} · ${last.outcome}${last.reason === null ? '' : ` (${last.reason})`}`,
@@ -2886,6 +3065,32 @@ window.__ModuleLoader__.load({
       .__cm_enc-step[data-state="active"] .__cm_enc-dot { background: #A855F7; box-shadow: 0 0 6px #A855F7; }
       .__cm_enc-log { margin: 0; font-size: 10px; color: var(--dsw-alias-label-secondary, #9aa);
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+      /* Pre-Flight-Deck (B04): sieben Angaben, schaltbare Bloecke, ein Fenster.
+         Die Fensterleiste animiert NUR transform (Compositor-Regel). */
+      .__cm_deck { display: flex; flex-direction: column; gap: 6px; padding: 7px 8px; border-radius: 6px;
+        background: rgba(255,255,255,.03); border: 1px solid rgba(87,232,255,.28); }
+      .__cm_deck[data-editable="off"] { border-color: rgba(255,255,255,.14); }
+      .__cm_deck-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .__cm_deck-title { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      .__cm_deck-note { flex: 1; min-width: 140px; font-size: 10px; color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_deck-window { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: #57E8FF; }
+      .__cm_deck-windowbar { display: block; width: 60px; height: 4px; border-radius: 2px; background: #57E8FF;
+        transform-origin: left center; animation-name: __cm_enc_window; animation-timing-function: linear;
+        animation-fill-mode: forwards; }
+      @keyframes __cm_enc_window { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+      .__cm_deck-grid { display: grid; grid-template-columns: minmax(96px, auto) 1fr; gap: 3px 10px; margin: 0; font-size: 11px; }
+      .__cm_deck-row { display: contents; }
+      .__cm_deck-grid dt { color: var(--dsw-alias-label-secondary, #9aa); font-size: 10px; letter-spacing: .04em; }
+      .__cm_deck-grid dd { margin: 0; overflow-wrap: anywhere; }
+      .__cm_deck-missing { color: var(--dsw-alias-label-secondary, #9aa); font-style: italic; }
+      .__cm_deck-blocks { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 11px; }
+      .__cm_deck-label { font-size: 10px; letter-spacing: .04em; color: var(--dsw-alias-label-secondary, #9aa); }
+      .__cm_deck-block { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 4px;
+        border: 1px solid rgba(124,58,237,.35); font-size: 10px; }
+      .__cm_deck-block[data-on="off"] { opacity: .55; text-decoration: line-through; }
+      .__cm_deck-block[data-locked="on"] { cursor: not-allowed; }
+      .__cm_deck-actions { display: flex; gap: 8px; align-items: center; }
 
       /* Globale EXP-Leiste im Composer-Dock: sichtbar in jeder Sitzung. */
       .__cm_expbar { display: flex; align-items: center; gap: 8px; width: 100%;
@@ -3016,6 +3221,9 @@ window.__ModuleLoader__.load({
            reduzierte Bewegung laeuft trotzdem. */
         .__cm_expbar-wander[data-wander="on"] svg,
         .__cm_expbar-wander[data-state] svg { animation: none; }
+        /* Das Eingriffsfenster verliert nur seine Bewegung, nicht seine Aussage:
+           der Balken steht voll, der Text nennt weiter den Default. */
+        .__cm_deck-windowbar { animation: none; transform: scaleX(1); }
         .__cm_ball { opacity: 0; }
         .__cm_wild-sprite { opacity: 1; }
       }
@@ -3113,6 +3321,9 @@ window.__ModuleLoader__.load({
             sourceMap: () => JSON.parse(JSON.stringify(ENCOUNTER_SOURCE_MAP)),
             feed: (event) => encounterFeed(event),
             start: () => encounterStart(),
+            continue: () => encounterContinue(),
+            toggleBlock: (id) => encounterToggleBlock(id),
+            holding: () => encounterHolding,
             abort: () => encounterAbort(),
             reset: () => encounterReset(),
           },

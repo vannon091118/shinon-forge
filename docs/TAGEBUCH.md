@@ -1183,6 +1183,56 @@ deshalb: echte Host-Signale (der Uebungszug ist kein Modell-Turn), der
 React-Pfad und die Live-Abnahme am Dev-Server. Zahlen und Screenshots:
 `docs/probes/encounter-stage.json`.
 
+### Das Pre-Flight-Deck zeigt, was es weiss — und was nicht
+
+S6 liest B04 aus dem Planarchiv: ein Deck vor jedem Token-Burn mit Aufgabe,
+Tendenz, Konflikten, gezogenen Bloecken, Faktenquellen, Route und Budget, dazu
+ein Eingriffsfenster, nach dem ein Klick nicht mehr wirkt. Der Bau hat sich an
+die vorhandene Wahrheit gehalten, statt eine neue zu erfinden: das Deck ist eine
+Ansicht von `encounter` und schreibt nur ueber `encounter.block.selected`
+zurueck, durch denselben Reducer. Kein neues Ereignis, keine zweite Liste.
+
+**Was fehlt, steht da.** Tendenz, Konflikte, Faktenquellen und Budget haben in
+diesem Slice keine Quelle. Sie als `nicht gemeldet` / `nicht gemessen`
+anzuzeigen ist die einzige ehrliche Antwort; eine erfundene Zahl waere genau
+die Sorte Fortschritt, die der Plan verbietet. Die Route dagegen gibt es — sie
+wandert im Uebungszug VOR `preflight.ready`, damit das Deck sie vor dem Lauf
+zeigt und nicht danach.
+
+**Das Fenster ist ein Fenster, kein Timer-Trick.** Mit `preflight.ready` oeffnet
+sich das Deck, zwei Sekunden lang ist es schaltbar, der Knopf heisst «Lauf
+starten», der Timeout ist der Default-Pfad: es geht mit genau der Auswahl
+weiter, die der Zustand traegt. Danach ist die Auswahl eingefroren — der
+Schalter ist `disabled`, das Deck sagt «Aenderungen zu spaet», und
+`toggleBlock` gibt `null` statt still zu wirken. Ein Abbruch im offenen Fenster
+schliesst es und laesst keinen Timer stehen.
+
+**Der Playtest durch das echte Bundle** (Chromium, DOM-Schreibschema, kein
+React) hat das Deck im Vorflug mit allen sieben Zeilen gezeigt und gemessen:
+Aufgabe `Reparatur · fix`, Fakten `3 VALID · 1 UNTRUSTED · 0 UNKNOWN ·
+snap-uebung`, Route `lokal / uebungszug`, Tendenz/Konflikte/Quellen/Budget
+sichtbar absent. Ein Klick auf den Block-Schalter nahm `enhancer-system-policy`
+aus der Auswahl (8 Ereignisse, `preflight.blocks` = eine ID, Etikett `data-on`
+= `off`); «Lauf starten» startete den Lauf mit genau dieser Auswahl, das Deck
+wechselte auf «Aenderungen zu spaet», der Schalter wurde `disabled` und
+`toggleBlock` gab `null`. Der Timeout-Pfad lief ohne Eingriff mit den beiden
+Default-Bloecken. Ein Neuladen im offenen Fenster ergab wieder `closed`, ohne
+Deck und ohne Timer. Bei 340 px kein Ueberlauf (Deck, Raster und Blockzeile
+`scrollWidth == clientWidth`).
+
+Ein Befund aus dem Bau, der die Beschriftung betraf: der Knopf hiess zuerst
+«Anfrage starten», waehrend im selben Deck «kein Modellaufruf» steht. Er heisst
+jetzt «Lauf starten» — ein Knopf, der eine Anfrage behauptet, die nicht
+rausgeht, waere die stille Luege, die B04 verhindern soll.
+
+Belegt: `npm run test:codingmon` PASS mit **130 von 130** Tests (vorher 124;
+sechs neu im Deck), `npm test` Exit 0, `npm run build` Exit 0, `npm run
+gate:full` PASS 23/23, `npm run zahlen:check` Exit 0. **B04 bleibt offen:** der
+Request-Diff, die Tokenkosten des Preview-Schritts und ein echter Modellaufruf
+vor/nach dem Fenster sind ohne Prompter-Anbindung nicht messbar; das Deck ist
+die Anzeige- und Bedienhaelfte. Zahlen und Screenshots:
+`docs/probes/preflight-deck.json`.
+
 ---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
