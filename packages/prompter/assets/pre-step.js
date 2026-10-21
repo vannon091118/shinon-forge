@@ -25,7 +25,6 @@ import { addTurnDuration, memorySummary, semanticProfile, weightsFrom } from './
 import { UNDEFINED, expandPrompt, resolveIntent } from './intent-resolver.js';
 import { CONTRACT, DECISION_CHANNEL, FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, NOT_SUPPLIED, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, contextLabel, noContext, resolveMode, withContext } from './mode-core.js';
 import { readSkills, selectSkills } from './prompt-files.js';
-import { renderContext } from './render-context.js';
 import { PROVENANCE_CONTRACT, provenanceRecord } from './provenance.js';
 import { OUTCOME_EFFECTS } from './result-contract.js';
 import { ContextSchema } from './schema.js';
@@ -559,9 +558,6 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   //
   // Die Reihenfolge: der Kontext steht VOR dem Wissensblock — er ist groesser
   // und gehoert naeher an den Auftrag.
-  const contextBlock = supply.context === null || supply.context === undefined
-    ? ''
-    : renderContext(supply.context);
   // DER KONTEXT GEHOERT NUR AUF DEN ROH-PFAD.
   //
   // Wird der Prompt vom One-Shot ERSETZT, hat das Modell den Kontext schon
@@ -582,7 +578,6 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   // zusaetzlicher Block in dieselbe Nachricht. `content[0]` bleibt der Auftrag,
   // `content[1]` ist der Kontext: das Modell sieht beides, der Auftrag bleibt
   // unangetastet, und der Vertrag haelt.
-  const contextBlocks = () => (contextBlock === '' ? [] : [contextBlock]);
   const replacement = effect.replacePrompt && typeof outcome.result?.enhancedPrompt === 'string'
     ? withKnowledge(briefState.rendered === undefined
       ? outcome.result.enhancedPrompt
@@ -610,9 +605,15 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   //
   // Der Kontext und der Wissensblock kommen ueber den Runtime-Context — der
   // Kanal, der unabhaengig vom Veredler laeuft (registerContext unten).
+  // Der WISSENSBLOCK gehoert an den Roh-Prompt, auch wenn der One-Shot
+  // verworfen wurde: er kommt aus der Runtime, nicht aus dem Modell.
+  // Der PROJEKTKONTEXT gehoert NICHT hierher — der kommt ueber den
+  // Runtime-Context-Kanal (context-channel.js), unabhaengig vom Veredler.
   const messages = effect.replacePrompt
     ? replacePrompt(decision?.messages, prompt.message, replacement)
-    : null;
+    : (knowledge.text === ''
+      ? null
+      : replacePrompt(decision?.messages, prompt.message, withKnowledge(prompt.text)));
 
   // Ersetzen kann nur, wer die Nachricht findet. Hier wird aus einem ANGENOMMENEN
   // Ergebnis ein `rejected`-Datensatz — die einzige Stelle, an der sich der

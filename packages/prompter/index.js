@@ -196,7 +196,6 @@ export function apply(ctx, config) {
         // zur Assembly-Zeit noch nicht im Runtime. Der letzte Auftragstext
         // dient als Auswahlfrage — er ist der, um den es geht.
         context: () => {
-          if (runtime.lastIndexContext !== null && runtime.lastIndexContext !== undefined) return runtime.lastIndexContext;
           const service = typeof ctx.get === 'function' ? ctx.get(INDEX_SERVICE) : undefined;
           if (service === undefined || service === null) return null;
           if (service.contract !== INDEX_CONTRACT || typeof service.resolveContext !== 'function') return null;
