@@ -11,7 +11,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WORKSPACE_ROOT, dshHome, stateDir } from '../../lib/paths.mjs';
@@ -89,6 +89,65 @@ test('seedDshHome: ein fremder Link wird gemeldet und NICHT überschrieben', () 
   assert.equal(result.issues.length, 1, result.issues.join(' | '));
   assert.match(result.issues[0], /zeigt auf/);
   assert.equal(readlinkSync(path), other, 'der fremde Link bleibt unangetastet');
+});
+
+test('seedDshHome: Link auf das Mount eines frueheren AppImage-Laufs wird auf diesen Lauf umgehaengt', () => {
+  const source = sourceTree();
+  const home = temp('shinon-home-');
+  const path = join(home, 'profiles');
+  // Tote Verknuepfung aus einem fruheren Lauf: das Mount existiert nicht mehr.
+  symlinkSync('/tmp/.mount_shinonOLD123/usr/lib/shinon-forge/profiles', path);
+
+  const result = seedDshHome(home, source);
+  assert.deepEqual(result.issues, []);
+  assert.ok(result.created.includes('profiles'));
+  assert.equal(readlinkSync(path), join(source, 'profiles'));
+});
+
+// Eine schreibgeschützte Quelle (AppImage-Mount, /opt): DSH schreibt cordis.yml in den Profilordner.
+const readOnly = () => false;
+
+test('seedDshHome: schreibgeschützte Quelle → beschreibbarer Profilordner mit Verknüpfungen', () => {
+  const source = sourceTree();
+  writeFileSync(join(source, 'profiles', 'shinon', 'cordis.yml'), 'quelle: 1\n');
+  const home = join(temp('shinon-home-'), 'home');
+
+  const result = seedDshHome(home, source, { isWritable: readOnly });
+  assert.deepEqual(result.issues, []);
+  assert.ok(result.created.includes('profiles'));
+  // Der Profilordner ist ein eigener Ordner, kein Link auf die Quelle.
+  assert.equal(lstatSync(join(home, 'profiles')).isSymbolicLink(), false);
+  assert.equal(lstatSync(join(home, 'profiles', 'shinon')).isSymbolicLink(), false);
+  assert.equal(readlinkSync(join(home, 'profiles', 'shinon', 'package.json')), join(source, 'profiles', 'shinon', 'package.json'));
+  // cordis.yml ist eine Kopie: DSH darf sie überschreiben, ohne die Quelle zu berühren.
+  assert.equal(lstatSync(join(home, 'profiles', 'shinon', 'cordis.yml')).isFile(), true);
+  writeFileSync(join(home, 'profiles', 'shinon', 'cordis.yml'), 'von DSH geschrieben\n');
+  assert.equal(readFileSync(join(source, 'profiles', 'shinon', 'cordis.yml'), 'utf8'), 'quelle: 1\n');
+  // Die übrigen Schlüssel bleiben unverändert verlinkt.
+  assert.equal(readlinkSync(join(home, '.env')), join(source, '.env'));
+});
+
+test('seedDshHome: schreibgeschützte Quelle, zweiter Lauf ist idempotent', () => {
+  const source = sourceTree();
+  const home = join(temp('shinon-home-'), 'home');
+  seedDshHome(home, source, { isWritable: readOnly });
+
+  const again = seedDshHome(home, source, { isWritable: readOnly });
+  assert.deepEqual(again.issues, []);
+  assert.ok(again.kept.includes('profiles'));
+  assert.ok(!again.created.includes('profiles'));
+});
+
+test('seedDshHome: schreibgeschützte Quelle ersetzt einen toten Mount-Link durch einen Ordner', () => {
+  const source = sourceTree();
+  const home = temp('shinon-home-');
+  const path = join(home, 'profiles');
+  symlinkSync('/tmp/.mount_shinonOLD123/profiles', path);
+
+  const result = seedDshHome(home, source, { isWritable: readOnly });
+  assert.deepEqual(result.issues, []);
+  assert.equal(lstatSync(path).isSymbolicLink(), false);
+  assert.equal(lstatSync(join(path, 'shinon')).isDirectory(), true);
 });
 
 test('seedDshHome: Home = Quelle ist ein Fehler, kein stiller Selbstbezug', () => {
