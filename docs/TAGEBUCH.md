@@ -1233,6 +1233,53 @@ vor/nach dem Fenster sind ohne Prompter-Anbindung nicht messbar; das Deck ist
 die Anzeige- und Bedienhaelfte. Zahlen und Screenshots:
 `docs/probes/preflight-deck.json`.
 
+### Der echte Turn zeigt, wo das Deck noch nicht greift
+
+Vor dem naechsten Bauversuch stand die Frage, ob die B04-Kette im echten
+Dev-Server ueberhaupt traegt. Sie traegt nicht — und der Turn zeigt genau, an
+welcher Stelle. Das ist der wertvollere Befund als ein weiteres Deck-Feature.
+
+**Der Start laedt den Schluessel selbst.** `shinon --check` meldet beide Namen
+als gesetzt, mit der QUELLE (Zugangsdatei des DSH-Homes) und ohne Wert. Die
+gleichnamigen Zeilen in `./.env` existieren, sind aber leer: die Datei ist eine
+Vorlage, nicht der Ort des Schluessels. Der Irrtum ist damit belegt statt
+vermutet. Im Serverlog steht kein Schluessel — 0 Treffer fuer das uebliche
+`sk-`-Muster mit Laenge; die zwei `sk-`-Treffer sind das Wort `task-router`.
+
+**Ein echter Turn lief durch.** Prompt „Antworte nur mit dem Wort: OK", im UI
+als abgeschlossen gemeldet, Hauptroute `prompter/agnes-3.0-flash`. Davor lief
+der One-Shot-Prompter auf `agnes/agnes-2.5-flash` mit gemessenen Tokens und
+gemessener Dauer. Das ist der Beweis, dass der Pfad bis zum Anbieter steht —
+und zugleich der Beweis, dass der Preview zu spaet kommt.
+
+**Die drei offenen Glieder.** (a) Der One-Shot ruft ein Modell auf, BEVOR
+irgendein Deck sichtbar ist; das Deck lebt nur im Uebungszug. Ein
+Zero-Cost-Preview vor jedem Modellaufruf existiert nicht. (b) Die
+Blockauswahl endet im lokalen Reducer: `encounterToggleBlock` schickt ein
+Ereignis an `reduceEncounter`, kein Host-Aufruf, keine Ablage, kein Dienst.
+(c) Der Prompter ruft `selectBlocks` ohne `includeIds`; er kann eine
+Deck-Auswahl also gar nicht lesen. Ein Request-Diff ist strukturell
+unmoeglich — nicht ungemessen, sondern nicht vorhanden. Wer das anders
+darstellt, baut um das Problem herum.
+
+**Die Buehne dagegen steht.** Im echten Dock erscheint sie, sobald eine
+Sitzung existiert (in der leeren Sitzung rendert der Slot nicht — der fruehere
+Eindruck „nicht gemountet" war ein Messfehler, kein Befund). Der Uebungszug
+laeuft im echten Client bis zur Bilanz. Screenshot und Messungen:
+`docs/probes/preflight-live.json`.
+
+**Nebenbefund Modellliste.** `agnes` traegt eine statische Liste im Profil,
+`openrouter` nur einen Schluesselnamen ohne baseURL und ohne Modelle. Der
+Adapter bezieht `listModels()` aus dem Settings-Dokument und verwirft
+dynamische Katalog-Aktualisierung ausdruecklich. Live-Discovery gibt es als
+Host-Operation und Models-Seite; sie schreibt in das Dokument, sie erweitert
+den Katalog nicht. „Live-Fetch bestimmt die Liste" ist deshalb eine
+Schreib-/UI-Aufgabe, keine Adapter-Aufgabe.
+
+**Schluessel-Hygiene.** Im Chat genannte Schluessel wurden nicht gespeichert,
+nicht in eine Datei geschrieben und nicht committet; sie sind als exponiert zu
+behandeln und zu rotieren. Ein Beleg, der einen Wert braucht, ist kein Beleg.
+
 ---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb

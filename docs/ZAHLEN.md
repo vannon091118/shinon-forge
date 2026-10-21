@@ -31,7 +31,7 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | pnpm-Artefakte (getrackt) | 0 | `git ls-files '*pnpm-workspace.yaml' '*pnpm-lock.yaml' \| wc -l` (Aufrufe: Gate-Prüfung „pnpm-Reste“) | 0 |
 | Markdown-Dokumente (getrackt) | 32 | `git ls-files '*.md' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | 13 | `ls docs/contracts/*.json \| wc -l` | 0 |
-| Proben unter `docs/probes/` | 48 | `ls docs/probes/*.json \| wc -l` | 0 |
+| Proben unter `docs/probes/` | 49 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 17 Blöcke in 13 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
 | Build (`dist/packages/`) | 23 Pakete, 289 Dateien, 2691119 Bytes | `npm run build` (Exit 0) | 0 |
