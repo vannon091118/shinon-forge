@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Shinon Forge">
+  <defs>
+    <linearGradient id="ic-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#141228"/>
+      <stop offset="55%" stop-color="#0B0F14"/>
+      <stop offset="100%" stop-color="#170F2C"/>
+    </linearGradient>
+    <radialGradient id="ic-glow" cx="0.5" cy="0.32" r="0.62">
+      <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#7C3AED" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ic-metal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#A855F7"/>
+      <stop offset="55%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+    <linearGradient id="ic-head" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F0F3FF"/>
+      <stop offset="100%" stop-color="#A5B4FC"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="104" fill="url(#ic-bg)"/>
+  <rect width="512" height="512" rx="104" fill="url(#ic-glow)"/>
+
+  <!-- Amboss: Horn links, Hals, Sockel. -->
+  <g fill="url(#ic-metal)">
+    <path d="M74 244 L128 208 H424 V252 H128 Z"/>
+    <path d="M206 252 H336 L314 306 H228 Z"/>
+    <path d="M152 306 H392 L420 344 H124 Z"/>
+  </g>
+  <rect x="124" y="344" width="296" height="34" rx="14" fill="#E0E7FF" fill-opacity="0.20"/>
+
+  <!-- Hammer: Kopf oben rechts, Stiel nach unten links. -->
+  <g transform="rotate(35 256 256)">
+    <rect x="238" y="96" width="118" height="54" rx="14" fill="url(#ic-head)"/>
+    <rect x="288" y="146" width="20" height="226" rx="10" fill="#A855F7" fill-opacity="0.95"/>
+  </g>
+
+  <!-- Funke an der Aufschlagstelle. -->
+  <path d="M318 178 L329 203 L354 214 L329 225 L318 250 L307 225 L282 214 L307 203 Z" fill="#F0F3FF"/>
+  <circle cx="366" cy="176" r="7" fill="#A855F7" fill-opacity="0.9"/>
+  <circle cx="286" cy="166" r="5" fill="#6366F1" fill-opacity="0.85"/>
+</svg>

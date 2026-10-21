@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" height="420" role="img" aria-label="Ein Terminal, in dem ein Agent ehrlich Auskunft gibt">
+  <defs>
+    <linearGradient id="rb-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B0F14"/>
+      <stop offset="60%" stop-color="#111024"/>
+      <stop offset="100%" stop-color="#0B0F14"/>
+    </linearGradient>
+    <linearGradient id="rb-edge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+    <filter id="rb-soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="420" fill="url(#rb-bg)"/>
+  <ellipse cx="1090" cy="70" rx="240" ry="150" fill="#7C3AED" fill-opacity="0.20" filter="url(#rb-soft)"/>
+
+  <!-- Terminal-Fenster -->
+  <g>
+    <rect x="70" y="58" width="1140" height="304" rx="18" fill="#07090D" stroke="url(#rb-edge)" stroke-width="2"/>
+    <path d="M70 76a18 18 0 0 1 18-18h1104a18 18 0 0 1 18 18v26H70Z" fill="#141024"/>
+    <circle cx="108" cy="80" r="7" fill="#F87171" fill-opacity="0.85"/>
+    <circle cx="132" cy="80" r="7" fill="#FBBF24" fill-opacity="0.85"/>
+    <circle cx="156" cy="80" r="7" fill="#34D399" fill-opacity="0.85"/>
+    <text x="182" y="86" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#6366F1">shinon — was der Agent gerade wirklich gemacht hat</text>
+  </g>
+
+  <g font-family="ui-monospace, Menlo, monospace" font-size="17">
+    <text x="106" y="146" fill="#4C5A7A">$ agent "analysiere meine Codebase und optimiere alles"</text>
+    <text x="106" y="176" fill="#F87171" fill-opacity="0.9">  Ich habe deine Codebase analysiert …</text>
+    <text x="106" y="204" fill="#FBBF24" fill-opacity="0.9">  … 14 Dateien gelesen, 3 geändert, 1 kaputt, nichts gemessen.</text>
+    <text x="106" y="240" fill="#E0E7FF">$ shinon doctor</text>
+    <text x="106" y="268" fill="#34D399">  ✓ Node in Range   ✓ DSH gepinnt   ✓ Profil auflösbar</text>
+    <text x="106" y="296" fill="#34D399">  ✓ alle Bundles aufgelöst   ✓ Gate grün   ✓ Belege vorhanden</text>
+    <text x="106" y="332" fill="#A855F7">  Exit 0. Sag's laut, wenn's nicht stimmt.</text>
+  </g>
+</svg>

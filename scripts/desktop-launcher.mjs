@@ -84,8 +84,11 @@ if (!existsSync(node)) fail(`node-Exe nicht gefunden: ${node}`);
 const openScript = resolve(ROOT, 'scripts', 'open.mjs');
 if (!existsSync(openScript)) fail(`open.mjs fehlt: ${openScript}`);
 
-// Icon: assets/banner.svg liegt im Repo — dort verankern (nicht im HOME).
-const iconPath = resolve(ROOT, 'assets', 'banner.svg');
+// Icon: assets/icon.svg liegt im Repo — dort verankern (nicht im HOME).
+// Das ICON ist quadratisch (assets/icon.svg); das breite assets/banner.svg
+// ist das Bild im README und wird NICHT als Menue-Icon missbraucht — ein
+// 1280x320-Bild als App-Symbol sieht aus wie ein umgefallener Ladezettel.
+const iconPath = resolve(ROOT, 'assets', 'icon.svg');
 const hasIcon = existsSync(iconPath);
 
 // Exec-Zeile: die verifizierte Node absolut + open.mjs absolut. Path=ROOT ist

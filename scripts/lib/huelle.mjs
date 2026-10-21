@@ -82,7 +82,7 @@ export function debDesktopEntry({ installRoot }) {
     `Path=${installRoot}`,
     'Terminal=false',
     'StartupNotify=true',
-    `Icon=${installRoot}/assets/banner.svg`,
+    `Icon=${installRoot}/assets/icon.svg`,
     'Categories=Development;IDE;',
     'Keywords=shinon;dsh;agent;',
     '',

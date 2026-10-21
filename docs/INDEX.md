@@ -11,7 +11,7 @@
 
 | Dokument | Zuständigkeit | Sprache |
 |---|---|---|
-| [`../README.md`](../README.md) | Einstieg: was ist Shinon Forge, Quickstart, Pakettabelle, Statusblock | bilingual DE/EN |
+| [`../README.md`](../README.md) | Einstieg: warum es das gibt, harte Abgrenzung, Quickstart, Pakettabelle, FAQ | bilingual DE/EN |
 | [`../AGENTS.md`](../AGENTS.md) | Verbindliche Regeln für Arbeit am Code: Konventionen, Pitfalls, Commit-Pflichten | deutsch |
 | [`ZAHLEN.md`](ZAHLEN.md) | **Einziger** Eigentümer aller harten Zahlen (Bestand §1, Prüfläufe §2, rote Befunde §3) | deutsch |
 | [`TAGEBUCH.md`](TAGEBUCH.md) | Erzählte Timeline; jedes Kapitel an Commit-SHA-Bereiche und Pfade gebunden | deutsch |
