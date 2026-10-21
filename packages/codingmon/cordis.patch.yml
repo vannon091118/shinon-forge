@@ -4,7 +4,9 @@
       config:
         # XP-Basis je Levelstufe; die Kurve ist kumulativ quadratisch.
         xpPerLevel: 250
-        # Wie viele wilde Pets gleichzeitig auf dem Fenster herumlaufen.
-        wildLimit: 3
-        # Zeitfenster, in dem ein Pet als "idle" gilt (ms).
-        idleAfterMs: 4000
+        # `wildLimit` und `idleAfterMs` sind hier entfernt: kein Feld der
+        # Host-Config und kein Weg in den Browser. Sie versprachen mehrere
+        # wilde Pets und ein Idle-Zeitfenster, die es nicht gibt. Ein
+        # Patch-Feld ohne Leser ist eine Zusage ohne Erfuellung — der
+        # Gate-Test `packages/codingmon/test/vertrage.test.mjs` verhindert,
+        # dass so ein Feld wieder entsteht.

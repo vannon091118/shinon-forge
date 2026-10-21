@@ -1034,6 +1034,40 @@ window.__ModuleLoader__.load({
     const stats = () => effectiveStatsFor(store.species, level(), activeCreature());
     const maxHp = () => stats().hp;
 
+    /**
+     * Der Praesentationszustand — ABGELEITET aus dem Zustand, nie gesetzt.
+     *
+     * `idle`    kein Kampf, keine Sperre: der Sprite darf wandern.
+     * `combat`  ein Kampf steht offen, es ist nichts in Arbeit.
+     * `action`  der Zug laeuft (die Sperre steht): etwas wird getan.
+     * `victory` / `defeat` / `flee`  das Ergebnis ist gerade gefallen.
+     *
+     * Die REIHENFOLGE ist die Aussage: die Sperre zuerst. Waehrend eines
+     * Zuges steht die Sperre, und der Kampf steht waehrenddessen oft noch
+     * nicht einmal offen (der Gegner wird erst im Zug aufgestellt). Ohne
+     * diese Reihenfolge stuende die Figur im wichtigsten Moment als "idle"
+     * da und liefe spazieren, waehrend gespielt wird.
+     *
+     * Zwei Regeln, die das Timing betreffen und nicht das Ergebnis: der
+     * Praesentationszustand aendert NICHTS an HP, XP, Beute oder Skillstatus —
+     * die Mechanik steht in `finish()`, und die steht nicht in einer Animation.
+     * Und der Endzustand ist ein Fenster, kein Zustand: nach 1,6 Sekunden
+     * faellt er auf `idle` zurueck, damit eine alte Schlacht nicht ewig als
+     * Sieg herumsteht.
+     */
+    const PRESENTATION_WINDOW_MS = 1600;
+    function presentationState(s, now = Date.now()) {
+      if (s.lock !== null) return 'action';
+      if (s.battle !== null) return 'combat';
+      const result = s.lastResult;
+      if (result && Number.isFinite(result.at) && now - result.at < PRESENTATION_WINDOW_MS) {
+        if (result.outcome === 'win') return 'victory';
+        if (result.outcome === 'flee') return 'flee';
+        return 'defeat';
+      }
+      return 'idle';
+    }
+
     // XP stammen ausschliesslich aus erfolgreichen Host-Completions; Tokens
     // werden weder aus dem DOM gelesen noch als Fortschritt interpretiert.
 
@@ -1499,11 +1533,32 @@ window.__ModuleLoader__.load({
      * Quelle: `scripts/assets/build-sprites.mjs` (PALETTE).
      */
     const GRID_PALETTE = { K: '#0B0F14', V: '#A855F7', P: '#7C3AED', I: '#6366F1', W: '#E0E7FF' };
+    /**
+     * Welches Gitter eine Art wirklich benutzt — die Aufloesung in einer
+     * Stelle, damit sie pruefbar ist.
+     *
+     * Die Reihenfolge ist eine Zusage: eigenes Sprite, dann das Sprite der
+     * FAMILIE, dann der Notfall. Vorher sprang der Notfall direkt auf die
+     * ERSTE Art der Liste — jede Art ohne eigenes Sprite sah aus wie
+     * NullPointer, gleichgueltig ob sie zu einem anderen Elementkreis
+     * gehoert. Die Familie ist die naechstliegende Aussage, die das Bild
+     * ueberhaupt noch tragen kann.
+     */
+    function resolveGridKey(speciesId, side) {
+      const familyId = speciesOfFamily((SPECIES[speciesId] ?? {}).family);
+      const own = `${speciesId}-${side}`;
+      if (SPRITE_GRIDS[own] !== undefined) return own;
+      const family = `${familyId}-${side}`;
+      if (SPRITE_GRIDS[family] !== undefined) return family;
+      const first = `${SPECIES_IDS[0]}-${side}`;
+      if (SPRITE_GRIDS[first] !== undefined) return first;
+      return `${SPECIES_IDS[0]}-front`;
+    }
     function gridSvg(speciesId, side, size) {
       const key = `grid:${speciesId}:${side}:${size}`;
       const cached = spriteCache.get(key);
       if (cached !== undefined) return cached;
-      const grid = SPRITE_GRIDS[`${speciesId}-${side}`] ?? SPRITE_GRIDS[`${SPECIES_IDS[0]}-${side}`] ?? SPRITE_GRIDS[`${SPECIES_IDS[0]}-front`];
+      const grid = SPRITE_GRIDS[resolveGridKey(speciesId, side)];
       const rows = grid.split('\n');
       let pixels = '';
       for (let y = 0; y < rows.length; y += 1) {
@@ -1569,7 +1624,13 @@ window.__ModuleLoader__.load({
       const pct = Math.max(0, Math.min(100, Math.round(((s.xp - prev) / Math.max(1, next - prev)) * 100)));
       // Idle-Wander: der Sprite laeuft HIN UND HER, wenn kein Kampf laeuft und
       // keine Sperre steht (also wirklich idle). Bei Kampf/Sperre steht er.
-      const idle = s.battle === null && s.lock === null;
+      // `data-state` traegt den vollen Praesentationszustand; `data-wander`
+      // bleibt die Traegerbit fuer die Wander-Animation (idle an, sonst aus).
+      const state = presentationState(s);
+      // Das Hoechst-HP kommt aus DERSELBEN Fachfunktion wie im Panel — also mit
+      // Zuchtboni. Vorher stand hier die Basisleiter, waehrend der Kampf und
+      // das Panel die effektiven Werte rechneten: drei Ansichten, zwei Zahlen.
+      const maximum = BigInt(stats().hp);
       return h('div', {
         className: '__cm_expbar',
         title: `${s.name} · ${SPECIES[s.species].label} · Level ${lvl} · ${s.wins} Siege`,
@@ -1577,21 +1638,23 @@ window.__ModuleLoader__.load({
       },
         h('span', {
           className: '__cm_expbar-wander',
-          'data-wander': idle ? 'on' : 'off',
+          'data-wander': state === 'idle' ? 'on' : 'off',
+          'data-state': state,
           'aria-hidden': 'true',
         }, h('span', { className: '__cm_expbar-pet', dangerouslySetInnerHTML: { __html: speciesGlyph(s.species, lvl, 18) } })),
         h('span', { className: '__cm_expbar-lvl' }, `LV ${lvl}`),
         h('span', { className: '__cm_expbar-track' },
           h('span', { className: '__cm_expbar-fill', style: { width: `${pct}%` } })),
         h('span', { className: '__cm_expbar-meta' },
-          // Hoechst-HP aus der exakten Leiter: sonst stuende hier ab Stufe ~120
-          // die Exponentialschreibweise einer Zahl, die es so nicht gibt.
-          `${formatNumber(s.xp)} XP · HP ${formatNumber(Math.max(0, s.hp))}/${formatNumber(statsAtExact(s.species, lvl).hp)} · ${s.wins} Siege · Beute ${s.loot.shiny} shiny`),
+          // Hoechst-HP aus der effektiven Leiter (mit Zuchtboni): sonst stuende
+          // hier ab Stufe ~120 die Exponentialschreibweise einer Zahl, die es so
+          // nicht gibt — und der Balken zeigte eine andere Zahl als der Kampf.
+          `${formatNumber(s.xp)} XP · HP ${formatNumber(Math.max(0, s.hp))}/${formatNumber(maximum)} · ${s.wins} Siege · Beute ${s.loot.shiny} shiny`),
       );
     }
 
     // ── Panel-Bausteine (Kopf / Werte / Arena / Liste / Bilanz) ─────────────
-    /** Kopf: Figur, Spezies-Wahl (alle ZEHN erreichbar), Level und Fortschritt. */
+    /** Kopf: Figur, Kreatur-Wahl (alle erreichbar), Level und Fortschritt. */
     function PetHead({ s, lvl, onPick }) {
       const cur = Object.fromEntries(Object.entries(stats()).map(([key, value]) => [key, BigInt(value)]));
       const next = threshold(lvl + 1);
@@ -1664,7 +1727,7 @@ window.__ModuleLoader__.load({
           h('li', { key: 'threshold' },
             `Schwelle L${lvl + 1}: ${formatNumber(next)} XP (L1 ${formatNumber(threshold(1))}, L20 ${formatNumber(threshold(20))}, L50 ${formatNumber(threshold(50))})`),
           h('li', { key: 'stats' },
-            `Werte L${lvl}: HP ${formatNumber(ladder.hp)} · ATK ${formatNumber(ladder.atk)} — auf L1: HP ${formatNumber(base.hp)} · ATK ${formatNumber(base.atk)} (exakte BigInt-Leiter)`),
+            `Werte L${lvl}: HP ${formatNumber(ladder.hp)} · ATK ${formatNumber(ladder.atk)} — auf L1: HP ${formatNumber(base.hp)} · ATK ${formatNumber(base.atk)} (Basislleiter, exakt)`),
           h('li', { key: 'cap' },
             `Decke: Level ${formatNumber(LEVEL_CAP)} — die Werte skalieren linear; darüber bleibt das Level auf der Decke`),
           h('li', { key: 'hit' }, `Groesster Treffer: ${formatNumber(peak)} (${digitsOf(peak)} Stellen)`),
@@ -1791,7 +1854,10 @@ window.__ModuleLoader__.load({
      */
     function DockBattle({ s, lvl }) {
       const battle = s.battle;
-      const mine = statsAt(s.species, lvl);
+      // Die Arena rechnet mit den EFFEKTIVEN Werten (mit Zuchtboni) — wie der
+      // Kampf selbst und wie das Panel. Vorher stand hier die Basisleiter, und
+      // der eigene Balken war kleiner als das, was der Kampf abzog.
+      const mine = stats();
       const learned = abilitiesFor(lvl, s.species);
       const locked = s.lock !== null;
       const myTurn = battle.over === null && battle.turn === 'challenger';
@@ -1991,7 +2057,7 @@ window.__ModuleLoader__.load({
       // Der Kampf wohnt im Dock (WildDock), nicht hier: `main` zeigt Stand,
       // Regelwerk ohne Tabelle, Beute und Bilanz.
       return h('div', { className: '__cm_panel' },
-        h(PetHead, { s, lvl, onPick: pickSpecies }),
+        h(PetHead, { s, lvl, onPick: selectCreature }),
         h(StatsGrid, { stats: exact }),
         h(BreedingPanel, { s }),
         h(EscalationBlock, { s, lvl }),
@@ -2096,6 +2162,43 @@ window.__ModuleLoader__.load({
         50%  { transform: translateX(34px) scaleX(-1); }
         92%  { transform: translateX(0) scaleX(-1); }
         100% { transform: translateX(0) scaleX(1); } }
+      /* Praesentationszustand: combat, action, victory, defeat und flee sind
+         ABGELEITET (siehe presentationState) und aendern nichts an der
+         Mechanik — die steht in finish(), nicht in einer Animation. Die
+         Endzustaende sind ein Fenster von 1,6 Sekunden, kein Zustand.
+         Nur transform und opacity (Compositor-Regel, siehe animation.test.mjs).
+         Jede Regel traegt [data-state], damit der Schalter
+         prefers-reduced-motion (siehe unten) mit GLEICHER Spezifitaet
+         gewinnen kann — siehe animation.test.mjs. */
+      .__cm_expbar-wander[data-state="combat"] svg {
+        animation-name: __cm_ready; animation-duration: 1.6s;
+        animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+      @keyframes __cm_ready {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); } }
+      .__cm_expbar-wander[data-state="action"] svg {
+        animation-name: __cm_lean; animation-duration: .5s; animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite; }
+      @keyframes __cm_lean {
+        0%, 100% { transform: translateX(0) scaleX(1); }
+        50% { transform: translateX(3px) scaleX(1.04); } }
+      .__cm_expbar-wander[data-state="victory"] svg {
+        animation-name: __cm_victory; animation-duration: .6s; animation-timing-function: ease-out; }
+      @keyframes __cm_victory {
+        0% { transform: translateY(0) scale(1); }
+        40% { transform: translateY(-5px) scale(1.12); }
+        100% { transform: translateY(0) scale(1); } }
+      .__cm_expbar-wander[data-state="defeat"] svg {
+        animation-name: __cm_defeat; animation-duration: .6s; animation-timing-function: ease-in; }
+      @keyframes __cm_defeat {
+        0% { transform: translateY(0) scale(1); opacity: 1; }
+        40% { transform: translateY(4px) scale(.94); opacity: .55; }
+        100% { transform: translateY(0) scale(1); opacity: 1; } }
+      .__cm_expbar-wander[data-state="flee"] svg {
+        animation-name: __cm_flee; animation-duration: .5s; animation-timing-function: ease-in; }
+      @keyframes __cm_flee {
+        0% { transform: translateX(0); opacity: 1; }
+        100% { transform: translateX(26px); opacity: 0; } }
       /* Die Sperre: Balken, Absagesatz, Zaehler der kalten Abweisungen. */
       .__cm_lock { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin-bottom: 10px;
         border-radius: 6px; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35); }
@@ -2155,6 +2258,11 @@ window.__ModuleLoader__.load({
         .__cm_lock-fill { animation: none; transform: scaleX(1); }
         .__cm_ball, .__cm_wild-sprite, .__cm_hit, .__cm_cursor,
         .__cm_expbar-wander svg { animation: none; }
+        /* Gleiche Spezifitaet wie die Zustandsregeln oben — sonst gewinnt
+           [data-state] (0,2,1) gegen diesen Schalter (0,1,1) und die
+           reduzierte Bewegung laeuft trotzdem. */
+        .__cm_expbar-wander[data-wander="on"] svg,
+        .__cm_expbar-wander[data-state] svg { animation: none; }
         .__cm_ball { opacity: 0; }
         .__cm_wild-sprite { opacity: 1; }
       }
@@ -2211,6 +2319,13 @@ window.__ModuleLoader__.load({
           rest,
           pick: (id) => pickSpecies(id),
           selectCreature: (id) => selectCreature(id),
+          /**
+           * Welches Sprite eine Art benutzt — der Schluessel des Gitters. Die
+           * Aufloesung (eigenes Gitter, sonst Familie, sonst Notfall) ist damit
+           * pruefbar statt nur behauptet: eine Art ohne eigenes Gitter muss auf
+           * ein Gitter DIESER Familie zeigen, nicht auf ein fremdes.
+           */
+          spriteFor: (id, side = 'front') => resolveGridKey(id, side),
           pair: (idA, idB, species) => pairCreatures(idA, idB, species),
           breeding: () => ({ ...store.breeding, creatures: store.breeding.creatures.map((creature) => ({ ...creature, bonuses: creature.bonuses.map((bonus) => ({ ...bonus })) })), eggs: store.breeding.eggs.map((egg) => ({ ...egg, parents: egg.parents.slice(), bonuses: egg.bonuses.map((bonus) => ({ ...bonus })) })) }),
           breedCandidates: (idA, idB) => breedingCandidates(store.breeding.creatures.find((creature) => creature.id === idA), store.breeding.creatures.find((creature) => creature.id === idB)),

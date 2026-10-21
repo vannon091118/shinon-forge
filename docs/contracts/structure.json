@@ -3,7 +3,7 @@
   "name": "Struktur — Klassen, Grenzen, Eigentum",
   "status": "IMPLEMENTED",
   "stand": "2026-10-21",
-  "regel": "Jede Laufzeitdatei gehört genau EINER Klasse. Die Grenze je Klasse ist aus der Messung abgeleitet (Median/max am 2026-10-20), nicht geraten: was darunter liegt, darf nicht wachsen; was darüber liegt, steht namentlich im `bestand` und darf nur sinken. Zwei Ausnahmen sind am 2026-10-21 bewusst und benannt: die Client-Hälfte eines Pakets ist ein selbsttragendes Bündel und kann nicht geteilt werden (kein relativer Import im ModuleLoader), und eine Testdatei wächst mit ihren Abnahmefällen. Beide Zahlen wurden mit der CodingMon-50-Funktion angehoben, nicht geglättet; die Herleitung steht in `docs/TAGEBUCH.md` beim 2026-10-21.",
+  "regel": "Jede Laufzeitdatei gehört genau EINER Klasse. Die Grenze je Klasse ist aus der Messung abgeleitet (Median/max am 2026-10-20), nicht geraten: was darunter liegt, darf nicht wachsen; was darüber liegt, steht namentlich im `bestand` und darf nur sinken. Zwei Ausnahmen sind am 2026-10-21 bewusst und benannt: die Client-Hälfte eines Pakets ist ein selbsttragendes Bündel und kann nicht geteilt werden (kein relativer Import im ModuleLoader), und eine Testdatei wächst mit ihren Abnahmefällen. Beide Zahlen wurden mit der CodingMon-50-Funktion angehoben, nicht geglättet; die Herleitung steht in `docs/TAGEBUCH.md` beim 2026-10-21. Dieselbe Ausnahme gilt ein zweites Mal, ebenfalls am 2026-10-21: die CodingMon-Funktionen 0.5.0 (S2 Praesentationszustand, S3 Sprites aller 50 Arten) liegen in derselben Client-Hälfte, weil der ModuleLoader keinen relativen Import kennt — die Anhebung ist deshalb gemessen (Ist-Zeilen nach dem Bau) und nicht geraten, der Durchstich-Test ist dagegen von 784 auf 660 Zeilen GESUNKEN, weil die gemeinsame Attrappe nach `test/harness.mjs` gewandert ist.",
   "rules": [
     {
       "positive": "`structureIssues()` ist leer: jede Datei hat eine Klasse, keine überschreitet ihre Grenze, jede Bestandsdatei steht auf ihrem eingefrorenen Wert.",
@@ -36,7 +36,8 @@
       "gemessen": {
         "anzahl": 22,
         "median": 77,
-        "max": 2371
+        "max": 2486,
+        "gemessen_am": "2026-10-21"
       },
       "vertrag": [],
       "verboten": [
@@ -88,8 +89,8 @@
     }
   ],
   "bestand": {
-    "packages/codingmon/client.js": 2371,
-    "packages/codingmon/test/durchstich.test.mjs": 784,
+    "packages/codingmon/client.js": 2486,
+    "packages/codingmon/test/durchstich.test.mjs": 660,
     "packages/core/client.js": 409,
     "packages/dashboard/client.js": 479,
     "packages/markers/client.js": 630,

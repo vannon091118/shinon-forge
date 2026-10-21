@@ -946,6 +946,63 @@ Werte, `wildLimit`/`idleAfterMs` gegen eine Config, die sie wirklich
 durchreicht, die Animationsfolge gegen die tatsächlichen Präsentationszustände
 und der Spritespiegel je kanonischer Art-ID.
 
+### Die Fangen des Branchs — fünf Zusagen, jede mit einem Befund
+
+Der Plan nannte fünf Fangen, und keine davon war Zierde. Sie waren der Grund, warum
+der Zweig drei Tage still lag: der Code sah fertig aus und war es an fünf Stellen
+nicht. Die Befunde stehen hier, weil sie das Bild vom fertigen Feature korrigieren.
+
+**Der Picker im Panel-Kopf tat nichts.** Er trug `creature.id` in seinen Optionen
+(`c1`, `c2`) und rief eine Funktion auf, die eine *Art*-ID (`nullpointer`,
+`deadlock`) erwartete. `pickSpecies('c2')` fand keine Art, also tat es nichts und
+gab `null` zurueck — ohne Fehler, ohne Meldung: der Auswahl-Knopf sah aus, als
+waere er tot. Zwei IDs, zwei Bedeutungen, und die Verwechslung war still. Jetzt
+ruft der Kopf `selectCreature`, und die Fenster-API haelt die Trennung ausdruecklich:
+`api.pick` nimmt eine Art, `api.selectCreature` nimmt eine Kreatur, und jede
+Verwechslung liefert `null`.
+
+**Drei Ansichten, zwei Zahlen.** Die XP-Leiste und die Arena rechneten die
+*Basislleiter*, das Panel und der Kampf die *effektiven* Werte (mit Zuchtbonus). Wer
+züchtete, sah in der Leiste eine kleinere Zahl als im Kampf — und die Leiste war
+die, die man liest. Jetzt kommt das Hoechst-HP aus einer Fachfunktion
+(`effectiveStatsFor`), und die Eskalationszeile sagt ausdruecklich „Basislleiter",
+weil sie etwas anderes zeigt.
+
+**Zwei Konfigurationsfelder ohne Leser.** `wildLimit: 3` und `idleAfterMs: 4000`
+standen in `packages/codingmon/cordis.patch.yml` und versprachen mehrere wilde Pets
+und ein Idle-Zeitfenster. Das Schema in `packages/codingmon/index.js` kennt beide
+Feldnamen nicht, und im Browser gab es keinen Weg, sie zu setzen. Ein
+Patch-Feld ohne Leser ist eine Zusage ohne Erfuellung: die Felder sind weg, und ein
+Test verhindert, dass ein Feld ohne Leser wieder entsteht.
+
+**Der Spritespiegel zeigte die falsche Art.** `gridSvg` sprang bei einer Art ohne
+eigenes Gitter direkt auf `SPECIES_IDS[0]` — NullPointer. Vierzig der fuenfzig Arten
+sahen aus wie NullPointer, gleichgueltig ob sie zu einem anderen Elementkreis
+gehoerten. Die Aufloesung lautet jetzt: eigenes Gitter, sonst das Gitter der
+*Familie*, sonst der Notfall. Sie steht in einer Funktion (`resolveGridKey`), ist
+ueber die Fenster-API ablesbar (`api.spriteFor`) und damit pruefbar.
+
+**Die Animationen kannten keinen Zustand.** Die Figel lief herum, wenn kein Kampf
+offen war, und stand still, wenn einer offen war — auch dann, wenn gerade ein Zug
+lief. Der Praesentationszustand ist jetzt *abgeleitet* (`presentationState`):
+`idle`, `combat`, `action`, `victory`, `defeat`, `flee`. Die Reihenfolge ist die
+Aussage: die Sperre zuerst, denn waehrend eines Zuges steht der Gegner oft noch
+gar nicht. Das Ergebnis ist ein Fenster von 1,6 Sekunden, kein Zustand — eine alte
+Schlacht darf nicht ewig als Sieg herumstehen. Und der Schalter fuer reduzierte
+Bewegung verliert gegen die neuen Regeln nicht mehr: er hatte eine niedrigere
+Spezifitaet als `data-state` und war deshalb schon vorher wirkungslos.
+
+Der Test dazu liegt in `packages/codingmon/test/praesentation.test.mjs` (14
+Zusagen), und die gemeinsame Attrappe ist nach `packages/codingmon/test/harness.mjs`
+gewandert, damit Durchstich und Zusagen dieselbe fahren — ein zweiter
+Kopie-Aufbau wuerde zwei Wahrheiten erzeugen. `packages/codingmon/test/durchstich.test.mjs`
+ist dadurch von 784 auf 660 Zeilen GESUNKEN, `packages/codingmon/client.js` waechst
+auf 2486 Zeilen (Bestand in `docs/contracts/structure.json` entsprechend gemessen
+und im Regeltext benannt).
+
+Belegt: `npm run test:codingmon` PASS Exit 0 mit 77 von 77 Tests (vorher 63),
+`npm test` Exit 0, `npm run zahlen:check` Exit 0.
+
 ---
 
 ## Der Schnitt vom 2026-10-20 — was fiel, was es las, was blieb
