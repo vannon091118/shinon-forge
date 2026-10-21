@@ -18,6 +18,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import {
   KEY_LABEL_PREFIX,
   authHeaders,
@@ -25,6 +26,7 @@ import {
   buildProbeRequest,
   calcBackoff,
   createResolveOverlay,
+  fetchCatalog,
   keyLabel,
   keysFromEnv,
   markFailed,
@@ -223,6 +225,38 @@ test('key-router: authHeaders tragen den Schlüssel nur im Kopf', () => {
   assert.equal(anthropic['x-api-key'], CANARY);
   assert.equal('authorization' in anthropic, false);
   assert.equal(authHeaders(undefined, CANARY).authorization, `Bearer ${CANARY}`, 'ohne Protokoll gilt openai-compatible');
+  assert.deepEqual(authHeaders({ protocol: 'openai-compatible' }, ''), {}, 'ohne Schluessel kein erfundener Kopf');
+});
+
+test('key-router: fetchCatalog liest die Liste des Anbieters live, ohne erfundenen Authorization-Kopf', async () => {
+  const seen = [];
+  const server = createServer((request, response) => {
+    seen.push(request.headers.authorization ?? null);
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ data: [{ id: 'live-eins' }, { id: 'live-zwei' }] }));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  try {
+    const catalog = await fetchCatalog([
+      { id: 'openrouter', baseUrl: `http://127.0.0.1:${port}/v1`, probePath: '/models' },
+      { id: 'ohne-basis', baseUrl: '' },
+    ], { secrets: [CANARY], now: () => 42 });
+    assert.deepEqual(Object.keys(catalog), ['openrouter'], 'ein Anbieter ohne baseUrl wird nicht gefragt');
+    assert.equal(catalog.openrouter.ok, true);
+    assert.equal(catalog.openrouter.at, 42);
+    assert.deepEqual(catalog.openrouter.models, ['live-eins', 'live-zwei']);
+    assert.deepEqual(seen, [null], 'eine oeffentliche Liste fragt ohne Authorization');
+  } finally {
+    server.close();
+  }
+  const refused = await fetchCatalog([{ id: 'x', baseUrl: 'https://x/v1' }], {
+    fetchImpl: async () => ({ ok: false, status: 429, json: async () => ({ error: CANARY }) }),
+    secrets: [CANARY],
+  });
+  assert.equal(refused.x.ok, false);
+  assert.equal(refused.x.error, 'HTTP 429');
+  assert.equal(JSON.stringify(refused).includes(CANARY), false, 'der Fehlertext traegt keinen Schluessel');
 });
 
 test('key-router: buildProbeRequest ist beschreibbar, ohne den Schlüssel zu zeigen', () => {

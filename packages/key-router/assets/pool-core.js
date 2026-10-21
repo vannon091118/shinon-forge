@@ -325,6 +325,11 @@ export function redact(text, secrets) {
  * @param key - der Schlüsselwert.
  */
 export function authHeaders(provider, key) {
+  // Ohne Schluessel keine erfundene Kopfzeile: manche Modelllisten sind
+  // oeffentlich (OpenRouter), und `Bearer ` mit leerem Wert ist eine Anfrage,
+  // die der Anbieter zu Recht abweist. Der Aufrufer entscheidet, ob er ohne
+  // Schluessel fragt — der Katalog darf es, der Verbindungstest nicht.
+  if (typeof key !== 'string' || key === '') return {};
   const protocol = provider?.protocol ?? 'openai-compatible';
   if (protocol === 'anthropic') {
     return { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' };
@@ -348,6 +353,53 @@ export function buildProbeRequest(provider, key, probePath = '/models') {
   const path = typeof provider?.probePath === 'string' && provider.probePath !== '' ? provider.probePath : probePath;
   const suffix = path.startsWith('/') ? path : `/${path}`;
   return { url: `${base}${suffix}`, method: 'GET', headers: authHeaders(provider, key) };
+}
+
+/**
+ * Den Modellkatalog EINES Anbieters live lesen — die Liste des Anbieters, nicht
+ * die im Profil abgeschriebene.
+ *
+ * WARUM DAS HIER STEHT: eine statische Modellliste ist beim naechsten
+ * Anbieter-Update veraltet, und genau das ist messbar (OpenRouter fuehrt
+ * hunderte Modelle, das Profil nannte keine). Der Abruf ist derselbe wie beim
+ * Verbindungstest — nur ohne Pflicht auf einen Schluessel: oeffentliche Listen
+ * werden ohne `Authorization` gefragt (siehe `authHeaders`).
+ *
+ * Fail-open: ein Anbieter ohne `baseUrl` wird uebersprungen, ein Netzfehler
+ * landet als `{ ok: false, error }` im Ergebnis. Die Funktion mutiert nichts,
+ * kennt keinen Modulzustand und gibt je Anbieter-ID einen Eintrag zurueck;
+ * der Aufrufer entscheidet, ob und wie er ihn ablegt.
+ *
+ * @param providers - die Anbieter-Eintraege der Config.
+ * @param options - { fetchImpl, keyOf, secrets, timeoutMs, now }.
+ * @returns { [providerId]: { ok, at, status?, models?, error? } }
+ */
+export async function fetchCatalog(providers, options = {}) {
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const keyOf = typeof options.keyOf === 'function' ? options.keyOf : () => '';
+  const secrets = Array.isArray(options.secrets) ? options.secrets : [];
+  const timeoutMs = Number.isInteger(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : 5000;
+  const at = typeof options.now === 'function' ? options.now() : Date.now();
+  const catalog = {};
+  if (typeof fetchImpl !== 'function') return catalog;
+  for (const provider of Array.isArray(providers) ? providers : []) {
+    if (provider === null || typeof provider !== 'object' || typeof provider.baseUrl !== 'string' || provider.baseUrl === '') continue;
+    const request = buildProbeRequest(provider, keyOf(provider.id) ?? '', '/models');
+    try {
+      const response = await fetchImpl(request.url, {
+        method: request.method,
+        headers: request.headers,
+        signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined,
+      });
+      const result = await probeResult(response, secrets);
+      catalog[provider.id] = result.ok === true
+        ? { ok: true, at, status: result.status, models: result.models ?? [] }
+        : { ok: false, at, status: result.status, error: result.detail };
+    } catch (error) {
+      catalog[provider.id] = { ok: false, at, error: redact(error?.message ?? 'Netzfehler', secrets) };
+    }
+  }
+  return catalog;
 }
 
 /**

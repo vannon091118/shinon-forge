@@ -52,6 +52,7 @@ import {
   buildEntries,
   buildProbeRequest,
   createResolveOverlay,
+  fetchCatalog,
   keysFromEnv,
   markFailed,
   nextEntry,
@@ -95,6 +96,21 @@ export const Config = z.object({
     maxDelayMs: 60000,
     maxRetries: 5,
   }]),
+  /**
+   * Quellen des LIVE-Katalogs, unabhaengig von den Schluessel-Pools.
+   *
+   * WARUM EIGENES FELD: ein Pool ist eine Aussage ueber Schluessel, ein Katalog
+   * eine ueber Modelle. OpenRouter fuehrt seine Liste oeffentlich — sie braucht
+   * keinen Pool, und ein Provider ohne Schluessel soll trotzdem wissen, welche
+   * Modelle es gibt. Die profileigene `providers`-Liste bleibt unberuehrt.
+   */
+  catalogProviders: z.array(z.object({
+    id: z.string(),
+    baseUrl: z.string().default(''),
+    probePath: z.string().default('/models'),
+  })).default([
+    { id: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1', probePath: '/models' },
+  ]),
 });
 
 // ── Der Zustand: ein Pool je Anbieter, im Prozess ─────────────────────────────
@@ -103,6 +119,15 @@ export const Config = z.object({
 const keyPools = new Map();
 /** @type {Map<string, string>} Der zuletzt benutzte Platz je Anbieter (Ausweis, kein Schlüssel). */
 const activeLabels = new Map();
+/**
+ * Der zuletzt gelesene Modellkatalog je Anbieter — `fetch` oder `fehler`.
+ *
+ * Er ist die ANTWORT des Anbieters, nicht die Liste aus dem Profil: die
+ * statische Liste bleibt als `declared` daneben stehen, damit der Unterschied
+ * sichtbar ist statt geglaettet. Kein Schluessel, keine Kopfzeilen.
+ * @type {Map<string, {ok: boolean, at: number, status?: number, models?: string[], error?: string}>}
+ */
+const catalogState = new Map();
 
 /** Uhr und Zufall als Argumente — die Rechnung bleibt nachrechenbar (siehe pool-core.js). */
 const now = () => Date.now();
@@ -126,6 +151,22 @@ function warn(text) {
 /** Den Anbieter-Eintrag der Config suchen (die Werkzeuge kennen nur die id). */
 function providerOf(config, providerId) {
   return config.providers.find((provider) => provider.id === providerId) ?? null;
+}
+
+/**
+ * Die Quellen des Katalogs: Pools zuerst, dann die reinen Katalog-Provider.
+ * Doppelte IDs zaehlen einmal — wer einen Pool hat, wird mit seinem Schluessel
+ * gefragt; die oeffentliche Liste bleibt fuer alle anderen.
+ */
+function catalogSources(config) {
+  const seen = new Set();
+  const sources = [];
+  for (const provider of [...config.providers, ...(config.catalogProviders ?? [])]) {
+    if (provider === null || typeof provider !== 'object' || seen.has(provider.id)) continue;
+    seen.add(provider.id);
+    sources.push(provider);
+  }
+  return sources;
 }
 
 /**
@@ -178,7 +219,21 @@ const statusTool = {
   execute() {
     const pools = {};
     for (const [id, pool] of keyPools) pools[id] = statusOf(pool, now(), activeLabels.get(id) ?? null);
-    return { ok: true, pools };
+    // Der Katalog kommt aus dem ABRUF, die Zahl daneben aus dem Profil. Ist der
+    // Abruf noch offen, steht das da — nicht die statische Liste als Live-Wert.
+    const catalog = {};
+    for (const provider of catalogSources(probeTool.config)) {
+      const entry = catalogState.get(provider.id);
+      const declared = providerOf(probeTool.config, provider.id)?.models.length ?? 0;
+      catalog[provider.id] = entry === undefined
+        ? { live: null, declared, source: 'offen' }
+        : { live: entry.ok === true ? entry.models.length : null,
+            declared,
+            source: entry.ok === true ? 'fetch' : 'fehler',
+            at: entry.at,
+            ...entry.ok === true ? {} : { error: entry.error } };
+    }
+    return { ok: true, pools, catalog };
   },
 };
 
@@ -244,6 +299,7 @@ export function apply(ctx, config) {
   probeTool.config = config;
   keyPools.clear();
   activeLabels.clear();
+  catalogState.clear();
 
   let keys = 0;
   for (const providerConfig of config.providers) keys += loadPool(providerConfig, ctx);
@@ -256,6 +312,21 @@ export function apply(ctx, config) {
     // überhaupt ein Pool entstand).
     warn(`[shinon-key-router] ohne Schlüssel (Umgebung leer): ${withoutPool.join(', ')}`);
   }
+
+  // Der Katalog wird beim Start EINMAL je Anbieter gelesen (der Anbieter
+  // antwortet, nicht das Profil). Nicht awaited: der Boot haengt nicht am
+  // Netz, ein Ausfall steht als `fehler` im Status statt als Absturz.
+  fetchCatalog(catalogSources(config), {
+    keyOf: (id) => keyPools.get(id)?.[0]?.key ?? '',
+    secrets: allSecrets(),
+  }).then((catalog) => {
+    for (const [id, entry] of Object.entries(catalog)) {
+      catalogState.set(id, entry);
+      const declared = providerOf(config, id)?.models.length ?? 0;
+      if (entry.ok === true) say(`[shinon-key-router] Katalog ${id}: ${entry.models.length} Modelle live (${declared} statisch)`);
+      else warn(`[shinon-key-router] Katalog ${id}: ${entry.error}`);
+    }
+  }).catch((error) => warn(`[shinon-key-router] Katalog nicht geladen — ${error?.message ?? error}`));
 
   // Werkzeug-Registrierung über `inject`: ein direkter Dienst-Zugriff wirft am
   // Cordis-Proxy ohne Deklaration — genau der Fehler, der die Client-Hälften

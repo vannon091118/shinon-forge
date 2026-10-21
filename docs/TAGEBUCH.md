@@ -1233,6 +1233,28 @@ vor/nach dem Fenster sind ohne Prompter-Anbindung nicht messbar; das Deck ist
 die Anzeige- und Bedienhaelfte. Zahlen und Screenshots:
 `docs/probes/preflight-deck.json`.
 
+### Der Katalog kommt vom Anbieter, nicht aus dem Profil
+
+Die statische Modellliste war eine Abschrift, und Abschriften veralten. Der
+Key-Router liest sie jetzt beim Start am Anbieter selbst (`fetchCatalog`):
+`baseUrl + probePath`, oeffentliche Listen ohne `Authorization`, ein Fehler als
+`fehler` im Status statt als erfundene Zahl. Der Live-Wert steht neben dem
+statischen (`declared`), damit der Unterschied sichtbar bleibt.
+
+Der echte Boot misst `[shinon-key-router] Katalog openrouter: 469 Modelle live
+(0 statisch)`; derselbe Abruf direkt gegen den Anbieter ergibt 469 Eintraege.
+Fuer Agnes und Prompter steht `HTTP 401` im Log — nicht, weil der Abruf kaputt
+ist, sondern weil der Router seine Pools aus den Startumgebungs-Schichten
+liest und `.env` die Namen leer fuehrt. Der Weg vom DSH-Zugangsspeicher in den
+Pool ist die offene S12-Arbeit; ohne ihn bleibt der Live-Abruf auf
+oeffentliche Listen beschraenkt.
+
+Bewusst NICHT gebaut: ein Schreiben in das Settings-Dokument des
+`llm-pi-ai`-Adapters. Der DSH-Modellwaehler liest von dort, und ein zweiter
+Schreiber waere genau die zweite Wahrheit, die dieses Repo vermeidet — die
+Models-Seite besitzt diesen Schreibweg bereits. Der Router-Katalog ist die
+Antwort des Anbieters, keine Konfigurationsaenderung.
+
 ### Der echte Turn zeigt, wo das Deck noch nicht greift
 
 Vor dem naechsten Bauversuch stand die Frage, ob die B04-Kette im echten
