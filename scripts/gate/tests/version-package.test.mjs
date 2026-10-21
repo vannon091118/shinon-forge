@@ -25,6 +25,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { bannerModel, choiceModel } from '../../../packages/version/assets/version-state.js';
+import { loadClientBundle, requireStub } from './helpers/client-sandbox.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const PACKAGE_DIR = join(ROOT, 'packages', 'version');
@@ -110,6 +112,116 @@ test('der Host oeffnet die Route, der Client liest den Global', () => {
   assert.match(hostSource, /webserver\/index-inject/);
   assert.match(hostSource, /kind: 'global'/);
   assert.match(clientSource, /window\[VERSION_GLOBAL\]/);
+});
+
+test('die Frage hat zwei Wege — und nennt die Folgen', () => {
+  const behind = choiceModel({ installed: 'a'.repeat(40), latest: 'b'.repeat(40), behind: 3, ahead: 0, canUpdate: true });
+  assert.equal(behind.available, true, 'ein Rueckstand ohne Frage ist der stille Klick von vorher');
+  assert.match(behind.question, /aaaaaaa/);
+  assert.match(behind.question, /bbbbbbb/);
+  assert.equal(behind.now.label, 'Jetzt installieren');
+  assert.equal(behind.next.label, 'Beim nächsten Start');
+  assert.match(behind.now.note, /beendet den laufenden Host/);
+  assert.match(behind.next.note, /nächsten Start/);
+});
+
+test('kein Update heisst keine Frage — sondern ein Grund', () => {
+  const aktuell = choiceModel({ installed: 'c'.repeat(40), latest: 'c'.repeat(40), canUpdate: true });
+  assert.equal(aktuell.available, false);
+  assert.match(aktuell.unavailable, /Bereits aktuell/);
+  // Acht eigene Commits vor main sind kein Rueckstand: ein „Update" waere hier ein Rueckschritt.
+  const voraus = choiceModel({ installed: 'e'.repeat(40), latest: 'd'.repeat(40), behind: 0, ahead: 8, canUpdate: true });
+  assert.equal(voraus.available, false, 'ein Stand vor main bekommt eine Update-Frage');
+  assert.match(voraus.unavailable, /Kein Rückstand/);
+  const keinInstallat = choiceModel({ installed: 'c'.repeat(40), latest: 'd'.repeat(40), canUpdate: false, updateHint: 'Gebautes Paket ohne Git-Baum.' });
+  assert.equal(keinInstallat.available, false);
+  assert.equal(keinInstallat.unavailable, 'Gebautes Paket ohne Git-Baum.');
+});
+
+/** Die Seite so aufbauen, wie der Host sie beliefert — ohne Browser. */
+function clientWith(fetchSpy, state = { installed: 'a'.repeat(40), latest: 'b'.repeat(40), behind: 2, ahead: 0, canUpdate: true }, globals = {}) {
+  const { registration, sandbox: loaded } = loadClientBundle('version', {
+    __DSH_VERSION_INFO__: { contract: 'shinon.version/state-v1', endpoint: '/shinon/version', token: 't0k', state, badge: bannerModel(state) },
+    fetch: fetchSpy,
+    ...globals,
+  });
+  // Der Loader ruft die Fabrik; ohne diesen Schritt gaebe es keine Seite.
+  registration.factory(requireStub()).apply({ slots: { inject() {}, register() {} } });
+  return loaded.sandbox;
+}
+
+/** Die Spiegelzeile im DOM (erster Knoten ist der Spiegel, zweiter das Panel). */
+const badgeLineOf = (page) => page.document.body.children[0].children[1];
+
+const find = (root, className) => root.children.find((child) => child.className === className) ?? null;
+
+test('der Client fragt, statt still zu klicken — beide Wege sind da', () => {
+  const page = clientWith(async () => ({ ok: false, status: 599, json: async () => ({}) }));
+  const ask = find(page.document.body, 'shinon-version__ask');
+  assert.ok(ask !== null, 'keine Frage im DOM');
+  assert.match(ask.children[0].textContent, /Neuer Stand bbbbbbb/);
+  const now = ask.children[1];
+  const next = ask.children[2];
+  assert.equal(now.children[0].textContent, 'Jetzt installieren');
+  assert.equal(next.children[0].textContent, 'Beim nächsten Start');
+  assert.match(now.children[1].textContent, /beendet den laufenden Host/);
+  assert.match(next.children[1].textContent, /beim nächsten Start/);
+});
+
+test('„Jetzt installieren" schickt mode=now, „Beim nächsten Start" mode=next', () => {
+  const calls = [];
+  const spy = async (url, options) => { calls.push({ url, options }); return { ok: false, status: 599, json: async () => ({}) }; };
+  const page = clientWith(spy);
+  const ask = find(page.document.body, 'shinon-version__ask');
+  ask.children[1].children[0].click();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, '/shinon/version/update');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.headers['x-shinon-version-token'], 't0k');
+  assert.equal(JSON.parse(calls[0].options.body).mode, 'now');
+  ask.children[2].children[0].click();
+  assert.equal(JSON.parse(calls[1].options.body).mode, 'next');
+});
+
+test('ohne Rueckstand ueberschreibt der Klick die Spiegelzeile NICHT', () => {
+  // Der Fall von der Werkbank: acht eigene Commits vor main, kein Update.
+  const page = clientWith(async () => ({ ok: false, status: 599, json: async () => ({}) }),
+    { installed: 'e'.repeat(40), latest: 'd'.repeat(40), behind: 0, ahead: 8, canUpdate: true });
+  const line = badgeLineOf(page);
+  const before = line.textContent;
+  assert.match(before, /·/);
+  page.document.body.children[0].click();
+  assert.equal(line.textContent, before, 'der Klick hat die Spiegelzeile ersetzt');
+  const ask = find(page.document.body, 'shinon-version__ask');
+  assert.equal(ask.hidden, false, 'der Klick oeffnet das Panel nicht');
+  assert.match(ask.children[0].textContent, /Kein Rückstand/, 'der Grund steht nicht im Panel');
+});
+
+test('nach einem Lauf zieht die Spiegelzeile den gemessenen Stand nach', async () => {
+  const intervals = [];
+  const state = { installed: 'a'.repeat(40), latest: 'b'.repeat(40), behind: 1, ahead: 0, canUpdate: true };
+  const next = { ...state, installed: 'b'.repeat(40), behind: 0 };
+  const spy = async (url, options) => {
+    if (options?.method === 'POST') return { ok: true, status: 202, json: async () => ({ started: true }) };
+    return { ok: true, status: 200, json: async () => ({ badge: bannerModel(next), job: null }) };
+  };
+  const page = clientWith(spy, state, { setInterval: (fn) => { intervals.push(fn); return intervals.length; }, clearInterval: () => {} });
+  const ask = find(page.document.body, 'shinon-version__ask');
+  ask.children[2].children[0].click();
+  await new Promise((resolve) => { setImmediate(resolve); });
+  assert.equal(intervals.length, 1, 'die Abfrage laeuft nicht');
+  await intervals[0]();
+  assert.match(badgeLineOf(page).textContent, /bbbbbbb/, 'die Zeile zeigt nach dem Lauf den alten Stand');
+  // Der Tooltip haengt am Spiegel selbst, nicht an der Zeile — beide muessen nachziehen.
+  const root = page.document.body.children[0];
+  assert.match(root.title, /neueste Commit bbbbbbb/, 'der Tooltip nennt nach dem Lauf noch den alten Stand');
+  assert.ok(!root.title.includes('aaaaaaa'), 'der Tooltip traegt den alten Stand');
+});
+
+test('der Host nimmt die Antwort an und startet auto mit --now', () => {
+  assert.match(hostSource, /body\.mode === 'now' \? 'now' : 'next'/);
+  assert.match(hostSource, /if \(mode === 'now'\) args\.push\('--now'\)/);
+  assert.match(hostSource, /badge: bannerModel\(state\)/);
 });
 
 test('die Kernmessung ist frei von Fremdabhaengigkeiten', () => {

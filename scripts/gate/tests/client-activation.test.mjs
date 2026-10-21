@@ -560,7 +560,7 @@ test('prompter-client: eine Kanal-Entscheidung landet im Fenster-Spiegel', () =>
   }, 'die Abbruchquote fällt auf dem Weg über den Kanal weg');
 });
 
-test('prompter-panel: Quote und häufigster Grund stehen in der Zeile', () => {
+test('prompter-panel: Quote und häufigster Grund stehen im Klartext', () => {
   // Der Host schreibt den Fensterspiegel; hier steht er VOR dem Mounten (der
   // geladene Stand, nicht der Live-Kanal). Gerendert wird das ausgelieferte
   // Bundle — die Zahl im Text und der Grund im Tooltip.
@@ -601,8 +601,8 @@ test('prompter-panel: Quote und häufigster Grund stehen in der Zeile', () => {
   assert.ok(panel !== undefined, 'das Panel registriert sich nicht im main-Slot');
   const nodes = flatten(render(panel.component({})));
   const text = nodes.map((element) => (Array.isArray(element.children) ? element.children.filter((child) => typeof child === 'string').join('') : '')).join(' ');
-  assert.match(text, /abbr=5\/9 56%/, 'die Quote steht nicht in der Zeile');
-  const quoted = nodes.find((element) => typeof element.props?.title === 'string' && element.props.title.includes('häufigster Grund'));
-  assert.ok(quoted !== undefined, 'der häufigste Grund hat keinen Tooltip');
-  assert.match(quoted.props.title, /5 von 9 Entscheidungen abgebrochen · häufigster Grund: Keine JSON-Antwort/);
+  // Roh-Token sind ersetzt: die Quote steht als Satz da, der Grund daneben statt im zweiten Tooltip.
+  assert.match(text, /Abbrüche: 5 von 9 · häufigster Grund: Keine JSON-Antwort/, 'die Quote steht nicht im Klartext');
+  assert.ok(!text.includes('abbr=') && !text.includes('mode=MAX'), 'die Roh-Token sind wieder da');
+  assert.match(text, /Modus MAX/, 'der Modus wird nicht als Wort genannt');
 });

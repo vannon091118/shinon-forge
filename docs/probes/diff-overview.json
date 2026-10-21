@@ -1,0 +1,60 @@
+{
+  "probe": "diff-overview",
+  "stand": "2026-10-22",
+  "frage": "Kann das Änderungs-Panel (Übersicht im Datei-Browser, Klick = Zeilen) aus dem gebaut werden, was installiert ist — oder ist die ehrliche Antwort eine benannte, gemessene Abwesenheit?",
+  "antwort": "Aus dem, was installiert ist: `git`. Ein Diff-Dienst existiert nicht; `node_modules/diff` liegt nur transitiv im Baum (kein Workspace-Paket deklariert es). Das Paket deklariert deshalb KEINE neue Abhängigkeit und liest Git-Ausgaben.",
+  "umgebung": {
+    "node": "22.23.3",
+    "git": "2.43.0",
+    "wurzel": "/mnt/work/projects/shinon-forge",
+    "route": "GET /shinon/diff, GET /shinon/diff?path=<datei>",
+    "slot": "sidebar.right.tab.files.actions",
+    "vertraege": ["shinon.diff/overview-v1", "shinon.diff/file-v1"]
+  },
+  "abwesenheit": {
+    "diff_paket_im_lock": "1 Treffer `node_modules/diff` — transitiv, von keinem Workspace-Manifest deklariert",
+    "diff_dienst": "keiner im Profil aktiviert",
+    "folge": "kein Import eines nicht deklarierten Pakets, keine eigene Zeilenpaarung"
+  },
+  "messung_arbeitsbaum": {
+    "gemessen_mit": "node -e \"readOverview(process.cwd())\"",
+    "dateien": 42,
+    "hinzu": 712,
+    "entfernt": 306,
+    "mit_zeilenzahl": 26,
+    "ohne_zeilenzahl": 16,
+    "grund_ohne": ["nicht in HEAD (unversioniert)", "binär"],
+    "gegenprobe": "git diff --numstat | awk-Summe: added 712, removed 306"
+  },
+  "echte_oberflaeche": {
+    "host": "http://127.0.0.1:3085 (dsh --profile shinon, Dev-Home geseedet)",
+    "beleg": "document.querySelector('.shinon-diff__chip').textContent",
+    "chip_text": "+712 −306 · 42",
+    "datei_browser": "data-files-body vorhanden, Chip also im Kopf der Dateiliste gerendert",
+    "nicht_gemessen": "Screenshot der aufgeklappten Liste (die Seite verlor nach dem Reload die Sitzung; der Chip-Beleg ist DOM, kein Bild)"
+  },
+  "tests": [
+    { "lauf": "node --test packages/diff-overview/test/diff-core.test.mjs", "tests": 13, "rot": 0, "dauer_s": 0.14 },
+    { "lauf": "node --test scripts/gate/tests/diff-overview.test.mjs", "tests": 14, "rot": 0, "dauer_s": 3.6 },
+    { "lauf": "node scripts/shinon-test.mjs", "tests": 131, "rot": 0 }
+  ],
+  "budget": {
+    "client_zeilen": 249,
+    "grenze": 250,
+    "host_zeilen": 163,
+    "kerne": [200, 179],
+    "quelle": "docs/contracts/structure.json (Klasse `client`, Grenze aus der Messung)",
+    "folge": "keine Anhebung, kein bestand-Eintrag"
+  },
+  "grenzen": {
+    "dateien": "maxFiles (Default 200) — darüber `truncated: {reason: DATEIEN, soll, ist}`",
+    "zeilen": "maxLines (Default 400) je Datei — darüber `truncated: {reason: ZEILEN, soll, ist}`",
+    "zeichen": "maxLineChars (Default 400) je Zeile, sichtbar gekürzt mit `…`",
+    "pfad": "safeInside weist absolut, `..` und Ausbrüche ab (`NICHT_IM_BAUM`)"
+  },
+  "neben_befund_2026-10-22": {
+    "pruef_panel": "das Persona-Panel zeigte nur `1 Auflage · 1 entschieden` ohne den Inhalt — jetzt Abschnitt `Entschieden` mit Ausgang und Behauptung (Screenshot der laufenden Instanz geprüft)",
+    "prompter": "`Wer bist du?` bekam einen `<task_brief>` angehängt (gemessen im laufenden Host) — jetzt: Frage wird klassifiziert, nie erweitert (`brief_reason: FRAGE`)",
+    "modelle": "beim Boot: `[shinon-key-router] Katalog agnes: HTTP 401`, `prompter: HTTP 401`, `openrouter: 468 Modelle live` — der Modell-Wähler zeigt deshalb nur die statische Route; NICHT behoben, nicht gemessen woran der 401 liegt"
+  }
+}

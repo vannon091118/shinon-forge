@@ -2893,6 +2893,8 @@ window.__ModuleLoader__.load({
     function EncounterStage() {
       useStore();
       const s = encounter;
+      // Leerzustand: keine Schiene — die vier Stufen sind eine Aussage über einen Lauf, keine Dekoration.
+      const idle = s.status === 'closed';
       const finished = s.status === 'completed' || s.status === 'compact';
       const terminal = s.status === 'compact' || ENCOUNTER_TERMINAL_STATES.includes(s.status);
       const phase = finished ? 3 : (ENCOUNTER_PHASE[s.status] ?? -1) >= 0
@@ -2927,17 +2929,14 @@ window.__ModuleLoader__.load({
       },
         h('div', { className: '__cm_enc-head' },
           h('span', { className: '__cm_enc-title' }, 'Encounter'),
-          h('span', { className: '__cm_enc-chip', 'data-status': s.status }, ENCOUNTER_TITLES[s.status] ?? s.status),
-          h('span', { className: '__cm_enc-meta', role: 'status', 'aria-live': 'polite' }, encounterSummary(s)),
+          ...(idle ? [] : [h('span', { key: 'chip', className: '__cm_enc-chip', 'data-status': s.status }, ENCOUNTER_TITLES[s.status] ?? s.status), h('span', { key: 'meta', className: '__cm_enc-meta', role: 'status', 'aria-live': 'polite' }, encounterSummary(s))]),
           h('span', { className: '__cm_enc-actions' }, buttons)),
-        h('ol', { className: '__cm_enc-rail' },
-          ENCOUNTER_RAIL.map((step, index) => h('li', {
-            key: step.status,
-            className: '__cm_enc-step',
-            'data-state': finished ? 'done' : index < phase ? 'done' : index === phase ? 'active' : 'open',
-          },
-            h('span', { className: '__cm_enc-dot', 'aria-hidden': 'true' }),
-            h('span', null, step.label)))),
+        idle
+          ? h('p', { className: '__cm_enc-hint', style: { margin: 0, fontSize: 12, opacity: 0.7 } }, 'Noch kein Zug — der Beispielzug zeigt den Ablauf ohne Modellaufruf.')
+          : h('ol', { className: '__cm_enc-rail' }, ENCOUNTER_RAIL.map((step, index) => h('li', {
+              key: step.status, className: '__cm_enc-step',
+              'data-state': finished ? 'done' : index < phase ? 'done' : index === phase ? 'active' : 'open',
+            }, h('span', { className: '__cm_enc-dot', 'aria-hidden': 'true' }), h('span', null, step.label)))),
         s.status === 'preflight' || s.status === 'running' || s.status === 'validating'
           ? h(PreflightDeck, { s })
           : null,

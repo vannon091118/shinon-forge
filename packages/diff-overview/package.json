@@ -1,0 +1,42 @@
+{
+  "name": "@shinon/diff-overview",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "dependencies": {
+    "@shinon/seams": "1.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "3.18.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "meta": {
+    "title": {
+      "en": "Shinon Forge - Change Overview",
+      "de": "Shinon Forge - Änderungs-Übersicht"
+    },
+    "description": {
+      "en": "Changed files against HEAD with line counts, diff lines on click",
+      "de": "Geänderte Dateien gegen HEAD mit Zeilenzahlen, Diff-Zeilen auf Klick"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
+  }
+}

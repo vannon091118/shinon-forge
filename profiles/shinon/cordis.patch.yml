@@ -175,7 +175,7 @@
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
     provider: prompter
-    model: agnes-2.5-flash
+    model: agnes-3.0-flash
 # Shinon-Preset: EIGENE, schmalere Werkzeug-Zusammensetzung.
 #
 # Das DSH liefert vier Presets (standard, ptc, minimal, cordis). 'standard'
@@ -608,3 +608,14 @@
     enabled: true
     maxVisible: 3
     duration: 4000
+- id: subagent
+  name: "@deepseek-ai/dsh-subagent"
+  config:
+    maxActiveSubagents: 2
+- id: subagent-model-selection-settings
+  name: "@deepseek-ai/dsh-tool-subagent/model-selection-settings"
+  config:
+    enabled: true
+    allowedModels:
+      - provider: prompter
+        model: agnes-2.5-flash

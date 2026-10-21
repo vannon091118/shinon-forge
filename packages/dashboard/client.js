@@ -3,8 +3,7 @@
  *
  * DAS FENSTER ZUR SICHTBARKEIT: was laeuft, steht hier. Jede Client-Haelfte
  * meldet sich in `window.__shinonPlugins` an (Konvention, kein Import — Pakete
- * bleiben referenzfrei) und schickt dazu ein `shinon:plugin`-Ereignis. Dieses
- * Panel liest die Liste und stellt sie gegen die ERWARTETEN Bundles: ein
+ * bleiben referenzfrei) und schickt dazu ein `shinon:plugin`-Ereignis. Dieses Panel liest die Liste und stellt sie gegen die ERWARTETEN Bundles: ein
  * erwartetes Plugin, das sich nicht meldet, steht als STILL da und nicht als
  * fehlende Zeile. Genau das ist der Unterschied zwischen „laeuft" und „sieht
  * so aus, als laufe es".
@@ -75,6 +74,7 @@ window.__ModuleLoader__.load({
       { id: '@shinon/project-index', label: 'Project Index', active: true },
       { id: '@shinon/task-router', label: 'Task Router', active: true },
       { id: '@shinon/codingmon', label: 'Codingmon', active: true },
+      { id: '@shinon/diff-overview', label: 'Änderungen', active: true },
       { id: '@shinon/openapi', label: 'OpenAPI', active: false },
     ];
 

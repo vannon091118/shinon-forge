@@ -35,6 +35,7 @@ wiederholen keine offenen Punkte — die stehen in `ROADMAP.md`.
 | [`PAKETE.md`](PAKETE.md) | Nachschlagewerk zu allen Paketen unter `packages/`: Zweck, Eintritt, Tests, Naht |
 | [`SCRIPTS.md`](SCRIPTS.md) | Nachschlagewerk zu `scripts/` und `bin/`: Zweck jedes Skripts und ob ein npm-Script darauf zeigt |
 | [`VISION-ABGLEICH.md`](VISION-ABGLEICH.md) | Befund: die Vision (fünf Organe, ein Kreislauf) gegen den Code-Kern — wo er abweicht, wie tief, und welche Probe fehlt |
+| [`CLEANREPO-AUDIT.md`](CLEANREPO-AUDIT.md) | Großer Audit: Bestand, Hotspots, Extraktionen je Gruppe, Konflikt-Register, Namens- und Sichtbarkeitsregeln, atomare Task-Checkliste, Reihenfolge |
 
 ## Verträge und Proben
 

@@ -180,9 +180,11 @@ describe('S5c — die Buehne im echten Bundle', () => {
   test('leer heisst sichtbar: bereit, mit Start-Knopf, nicht `null`', () => {
     const sim = boot();
     const text = textOf(sim);
-    assert.ok(text.includes('Encounter') && text.includes('bereit'), text.slice(0, 80));
+    assert.ok(text.includes('Encounter') && text.includes('Noch kein Zug'), text.slice(0, 80));
     assert.ok(text.includes('Zug starten'), 'ohne Start-Knopf ist die Buehne eine Sackgasse');
-    assert.ok(text.includes('Übungszug'), 'ohne Kennzeichnung behauptet die Buehne einen echten Turn');
+    assert.ok(text.includes('Übungszug') || text.includes('Beispielzug'), 'ohne Kennzeichnung behauptet die Buehne einen echten Turn');
+    assert.ok(text.includes('Noch kein Zug'), 'der Leerzustand sagt nicht, was er ist');
+    assert.ok(!text.includes('Vorflug'), 'die Schiene steht schon im Leerzustand (Platzhalter-Look)');
   });
 
   test('Start, Lauf und Ende: der Reducer ist der einzige Zustandsbesitzer', () => {
@@ -286,7 +288,7 @@ describe('S5c — die Buehne im echten Bundle', () => {
     assert.equal(sim.api.encounter.state().status, 'closed');
     assert.equal(sim.api.encounter.state().applied, 0);
     assert.deepEqual(plain(sim.api.encounter.log()), []);
-    assert.ok(textOf(sim).includes('bereit'));
+    assert.ok(textOf(sim).includes('Noch kein Zug'));
   });
 
   test('ein fremdes Ereignis wird abgewiesen und der Zustand bleibt derselbe', () => {

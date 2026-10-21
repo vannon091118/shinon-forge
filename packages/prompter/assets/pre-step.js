@@ -22,7 +22,7 @@ import { CAPABILITIES_CONTRACT, appendTaskBrief, briefRecord, matchCapability, r
 import { knowledgeTrace, renderKnowledgeBlock } from './knowledge-block.js';
 import { enhanceGuarded, replacePrompt } from './enhancer.js';
 import { addTurnDuration, memorySummary, semanticProfile, weightsFrom } from './intent-memory.js';
-import { UNDEFINED, expandPrompt, resolveIntent } from './intent-resolver.js';
+import { UNDEFINED, expandPrompt, isQuestion, normalizeIntentText, resolveIntent } from './intent-resolver.js';
 import { CONTRACT, DECISION_CHANNEL, FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, NOT_SUPPLIED, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, contextLabel, noContext, resolveMode, withContext } from './mode-core.js';
 import { readSkills, selectSkills } from './prompt-files.js';
 import { PROVENANCE_CONTRACT, provenanceRecord } from './provenance.js';
@@ -230,6 +230,11 @@ function provenanceFor(record, context) {
  * gekuerzt — ein halber Brief waere eine halbe Zustaendigkeit.
  */
 function briefFor(runtime, text) {
+  // EINE FRAGE WIRD NIE ERWEITERT: ein Aufgabenbrief sagt „so lautet die Aufgabe" —
+  // bei „Wer bist du?" wäre das eine erfundene (gemessen 2026-10-22 im Host: ein
+  // task_brief über Eigentum und Vorschlags-Review). Klassifiziert wird sie
+  // weiterhin; der Trace nennt den Grund `FRAGE`.
+  if (isQuestion(normalizeIntentText(text))) return { reason: 'FRAGE' };
   const read = runtime?.capabilityMap;
   if (read === undefined || read === null || read.map === null) return { reason: read?.reason ?? 'KARTE_FEHLT' };
   const match = matchCapability(text, read.map);

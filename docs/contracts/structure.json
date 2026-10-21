@@ -2,8 +2,8 @@
   "contract": "shinon.structure/v1",
   "name": "Struktur — Klassen, Grenzen, Eigentum",
   "status": "IMPLEMENTED",
-  "stand": "2026-10-21",
-  "regel": "Jede Laufzeitdatei gehört genau EINER Klasse. Die Grenze je Klasse ist aus der Messung abgeleitet (Median/max am 2026-10-20), nicht geraten: was darunter liegt, darf nicht wachsen; was darüber liegt, steht namentlich im `bestand` und darf nur sinken. Zwei Ausnahmen sind am 2026-10-21 bewusst und benannt: die Client-Hälfte eines Pakets ist ein selbsttragendes Bündel und kann nicht geteilt werden (kein relativer Import im ModuleLoader), und eine Testdatei wächst mit ihren Abnahmefällen. Beide Zahlen wurden mit der CodingMon-50-Funktion angehoben, nicht geglättet; die Herleitung steht in `docs/TAGEBUCH.md` beim 2026-10-21. Dieselbe Ausnahme gilt ein zweites Mal, ebenfalls am 2026-10-21: die CodingMon-Funktionen 0.5.0 (S2 Praesentationszustand, S3 Sprites aller 50 Arten) liegen in derselben Client-Hälfte, weil der ModuleLoader keinen relativen Import kennt — die Anhebung ist deshalb gemessen (Ist-Zeilen nach dem Bau) und nicht geraten, der Durchstich-Test ist dagegen von 784 auf 660 Zeilen GESUNKEN, weil die gemeinsame Attrappe nach `test/harness.mjs` gewandert ist. Am selben Tag wuchs dieselbe Hälfte durch S3 auf 2587 Zeilen: 50 Kunstdateien mit zusammen rund 202 000 Zeichen, eine Zeile je Art, damit der Diff lesbar bleibt — auch diese Zahl ist gemessen und im Bestand benannt, nicht geglättet. Die dritte Anhebung am selben Tag gehoert zu S5 (Encounter-Buehne): der Kern aus `assets/encounter.js` liegt als generierter Block in derselben Client-Haelfte (390 Zeilen, Kommentare gestrichen, Quelle bleibt `assets/encounter.js`), dazu die Buehne selbst; gemessen sind 3272 Zeilen und 464 367 Bytes nach dem Bau, und `npm run build` / die Gate-Pruefung lesen dieselbe Zahl. Die Alternative waere ein zweiter Reducer im Browser gewesen — genau die Doppelung, die der Slice verhindern soll. Die vierte Anhebung am selben Tag gehoert zu S6 (Pre-Flight-Deck, B04): das Deck liegt in derselben Client-Haelfte wie die Buehne, weil es ihr Zustand ist und kein zweites Panel; gemessen sind 3483 Zeilen und 475 793 Bytes nach dem Bau. Auch hier ist die Alternative kein anderer Ort, sondern eine zweite Wahrheit — das Deck liest `preflight`, `task`, `facts` und `route` aus dem Reducer-Zustand und schreibt nur ueber `encounter.block.selected` zurueck.",
+  "stand": "2026-10-22",
+  "regel": "Jede Laufzeitdatei gehört genau EINER Klasse. Die Grenze je Klasse ist aus der Messung abgeleitet (Median/max am 2026-10-20), nicht geraten: was darunter liegt, darf nicht wachsen; was darüber liegt, steht namentlich im `bestand` und darf nur sinken. Zwei Ausnahmen sind am 2026-10-21 bewusst und benannt: die Client-Hälfte eines Pakets ist ein selbsttragendes Bündel und kann nicht geteilt werden (kein relativer Import im ModuleLoader), und eine Testdatei wächst mit ihren Abnahmefällen. Beide Zahlen wurden mit der CodingMon-50-Funktion angehoben, nicht geglättet; die Herleitung steht in `docs/TAGEBUCH.md` beim 2026-10-21. Dieselbe Ausnahme gilt ein zweites Mal, ebenfalls am 2026-10-21: die CodingMon-Funktionen 0.5.0 (S2 Praesentationszustand, S3 Sprites aller 50 Arten) liegen in derselben Client-Hälfte, weil der ModuleLoader keinen relativen Import kennt — die Anhebung ist deshalb gemessen (Ist-Zeilen nach dem Bau) und nicht geraten, der Durchstich-Test ist dagegen von 784 auf 660 Zeilen GESUNKEN, weil die gemeinsame Attrappe nach `test/harness.mjs` gewandert ist. Am selben Tag wuchs dieselbe Hälfte durch S3 auf 2587 Zeilen: 50 Kunstdateien mit zusammen rund 202 000 Zeichen, eine Zeile je Art, damit der Diff lesbar bleibt — auch diese Zahl ist gemessen und im Bestand benannt, nicht geglättet. Die dritte Anhebung am selben Tag gehoert zu S5 (Encounter-Buehne): der Kern aus `assets/encounter.js` liegt als generierter Block in derselben Client-Haelfte (390 Zeilen, Kommentare gestrichen, Quelle bleibt `assets/encounter.js`), dazu die Buehne selbst; gemessen sind 3272 Zeilen und 464 367 Bytes nach dem Bau, und `npm run build` / die Gate-Pruefung lesen dieselbe Zahl. Die Alternative waere ein zweiter Reducer im Browser gewesen — genau die Doppelung, die der Slice verhindern soll. Die vierte Anhebung am selben Tag gehoert zu S6 (Pre-Flight-Deck, B04): das Deck liegt in derselben Client-Haelfte wie die Buehne, weil es ihr Zustand ist und kein zweites Panel; gemessen sind 3483 Zeilen und 475 793 Bytes nach dem Bau. Auch hier ist die Alternative kein anderer Ort, sondern eine zweite Wahrheit — das Deck liest `preflight`, `task`, `facts` und `route` aus dem Reducer-Zustand und schreibt nur ueber `encounter.block.selected` zurueck. Die fuenfte Messung, am 2026-10-22, gehoert zu @shinon/diff-overview (Aenderungs-Panel im Datei-Browser): dessen Client-Haelfte liegt mit gemessenen 245 Zeilen UNTER der 250er-Grenze der `client`-Klasse (Median 77), die Host-Haelfte mit 163 unter 550 und die zwei Kerne mit 200/179 unter 650 — keine Anhebung, kein `bestand`-Eintrag, die Grenze selbst bleibt stehen.",
   "rules": [
     {
       "positive": "`structureIssues()` ist leer: jede Datei hat eine Klasse, keine überschreitet ihre Grenze, jede Bestandsdatei steht auf ihrem eingefrorenen Wert.",
@@ -89,13 +89,13 @@
     }
   ],
   "bestand": {
-    "packages/codingmon/client.js": 3483,
+    "packages/codingmon/client.js": 3482,
     "packages/codingmon/test/durchstich.test.mjs": 660,
     "packages/core/client.js": 409,
     "packages/dashboard/client.js": 479,
     "packages/markers/client.js": 630,
     "packages/persona/index.js": 1447,
-    "packages/popup/client.js": 426,
+    "packages/popup/client.js": 425,
     "packages/project-index/assets/index-core.js": 2220,
     "packages/prompter/client.js": 285,
     "packages/scoring/assets/scoring-core.js": 784,
@@ -117,7 +117,7 @@
     "scripts/gate/tests/project-index.test.mjs": 2154,
     "scripts/gate/tests/prompter-contract.test.mjs": 2212,
     "scripts/gate/tests/task-router.test.mjs": 919,
-    "scripts/install-user.mjs": 1069,
+    "scripts/install-user.mjs": 1041,
     "scripts/lib/repo.mjs": 1268
   },
   "herleitung": "Grenze = 3 × Median der Klasse, auf 50 gerundet, mindestens 100 — Median gemessen am 2026-10-20 über alle Dateien der Klasse; alles darüber steht im bestand."

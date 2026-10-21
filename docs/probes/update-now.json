@@ -1,0 +1,69 @@
+{
+  "contract": "shinon.probes/update-now-v1",
+  "name": "Slice 5 — „Jetzt installieren\" von der Frage bis zum neu gestarteten Host",
+  "at": "2026-10-21T22:59:13Z",
+  "was": "Der Nutzer klickt im Banner „Jetzt installieren\". Die Route POST /shinon/version/update nimmt mode=now an, der Host startet `install-user.mjs auto --now`: Kandidat bauen, im Staging abnehmen, laufende Instanz beenden, umschalten, Instanz mit ihrem eigenen Aufruf neu starten.",
+  "wo": {
+    "installat": "/tmp/e2e/prefix (Arbeitsbaum-Kopie, damit die echte Werkbank unberuehrt bleibt)",
+    "quelle": "/tmp/e2e/remote.git (lokales Bare-Repo: der Kandidat ist ein echter Commit mit den Slice-5-Aenderungen)",
+    "staende": {
+      "installiert_vorher": "16db9c131b0100589a99ce8e3fd94c1934344b16",
+      "kandidat": "eb6720f4b2d41024f1a99debeb4f5b4bdca5a34d"
+    },
+    "render": "Chromium auf http://127.0.0.1:3096, Banner unten rechts"
+  },
+  "beobachtet": {
+    "banner_vor_dem_klick": "eb6720f · 16db9c1 · -1 +0",
+    "frage": "Neuer Stand eb6720f — installiert ist 16db9c1.",
+    "knoepfe": [
+      "Jetzt installieren — Lädt und prüft den Kandidaten, beendet den laufenden Host, schaltet um und startet ihn neu.",
+      "Beim nächsten Start — Lädt und prüft den Kandidaten jetzt; umgeschaltet wird beim nächsten Start. Der laufende Host bleibt unberührt."
+    ],
+    "jobzeilen_waehrend_des_laufs": [
+      "npm ci (Lockfile) — 403M Staging",
+      "✅ profile-links --check: 3 Profil(e), 30 Links — kein Link zeigt woandershin"
+    ],
+    "host_weg": "zwischen zwei Abfragen antwortet die Route nicht mehr (der Auftrag hat den Host beendet)",
+    "host_zurueck": "danach antwortet dieselbe Route wieder; neuer Prozess PID 200956, PPID 1, cwd /tmp/e2e/prefix, Port 3096",
+    "banner_nach_dem_klick": "eb6720f · eb6720f · aktuell (die Zeile hat sich ohne Reload nachgezogen)"
+  },
+  "belege": {
+    "prefix_head_nachher": "eb6720f4b2d41024f1a99debeb4f5b4bdca5a34d",
+    "rueckweg": "/tmp/e2e/prefix-previous @ 16db9c131b0100589a99ce8e3fd94c1934344b16",
+    "install_state": {
+      "current": { "sha": "eb6720f4b2d41024f1a99debeb4f5b4bdca5a34d", "ref": "origin/main", "verified": true },
+      "previous": { "sha": "16db9c131b0100589a99ce8e3fd94c1934344b16" },
+      "history": [{ "action": "auto (Umschaltung)", "sha": "eb6720f4" }]
+    },
+    "abnahme": [
+      {
+        "trigger": "stage",
+        "at": "2026-10-21T22:58:22.549Z",
+        "sha": "eb6720f4b2d41024f1a99debeb4f5b4bdca5a34d",
+        "ok": true,
+        "dsh": "0.2.1-rc.2",
+        "bootMs": 41117,
+        "totalMs": 49949,
+        "plugins": 16,
+        "http": { "token": 303, "cookie": 200, "bytes": 45977, "type": "text/html; charset=utf-8" }
+      },
+      {
+        "trigger": "auto (nach Umschaltung)",
+        "at": "2026-10-21T22:59:13.124Z",
+        "sha": "eb6720f4b2d41024f1a99debeb4f5b4bdca5a34d",
+        "ok": true,
+        "dsh": "0.2.1-rc.2",
+        "bootMs": 5724,
+        "totalMs": 9516,
+        "plugins": 16,
+        "http": { "token": 303, "cookie": 200, "bytes": 45969, "type": "text/html; charset=utf-8" }
+      }
+    ]
+  },
+  "bild": "docs/probes/update-now-banner.png — die Frage mit beiden Wegen ueber der Spiegelzeile; docs/probes/update-now-after.png — derselbe Host nach der Umschaltung",
+  "aufgeraeumt": "Die Kopie unter /tmp/e2e (samt der .env des Arbeitsbaums) wurde nach dem Lauf geloescht; die Zahlen oben sind die Messung, nicht ein wiederauffindbarer Ort.",
+  "nicht_gemessen": [
+    "Der Neustart schreibt kein eigenes Protokoll: die Instanz wird mit stdio=ignore gestartet, ihre Ausgabe geht verloren. Belegt sind Port, Prozess, HTTP und die Abnahme danach — nicht ihre Logzeilen.",
+    "Der Weg auf der echten Werkbank (/mnt/work/projects/shinon-forge) wurde NICHT gefahren: dort haette `promote` das Arbeitsverzeichnis umbenannt. Der Lauf fand auf einer Kopie statt."
+  ]
+}

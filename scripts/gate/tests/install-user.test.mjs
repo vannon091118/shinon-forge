@@ -18,7 +18,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -111,6 +111,82 @@ test('install-user: history --json gibt die Rohzeilen aus, --limit begrenzt', ()
   const lines = limited.stdout.split('\n').filter((line) => line.startsWith('{'));
   assert.equal(lines.length, 2);
   assert.equal(JSON.parse(lines[1]).trigger, 'auto-rollback');
+});
+
+test('install-user: --now ist ein Schalter von auto und steht in der Hilfe', () => {
+  const { env } = sandbox();
+  const help = run(['--help'], env);
+  assert.equal(help.status, 0, help.stderr);
+  // Die Hilfe nennt die Folge, nicht nur den Namen: ein Schalter, der Prozesse
+  // beendet, muss vor dem Aufruf sagen, dass er es tut.
+  assert.match(help.stdout, /--now\s+auto schaltet SOFORT um/);
+});
+
+/**
+ * Ein winziges Quell-Repo mit zwei Ständen — Klon, checkout und Abnahme ohne
+ * Netz: leeres Lockfile (npm ci braucht keine Registry), no-op-Profil-Links und
+ * ein `--check`, das absichtlich rot ist.
+ */
+function fixtureSource(dir) {
+  const src = join(dir, 'quelle');
+  mkdirSync(join(src, 'bin'), { recursive: true });
+  mkdirSync(join(src, 'scripts'), { recursive: true });
+  writeFileSync(join(src, 'package.json'), '{"name":"fixture","version":"1.0.0"}\n');
+  writeFileSync(join(src, 'package-lock.json'), '{"name":"fixture","version":"1.0.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"fixture","version":"1.0.0"}}}\n');
+  writeFileSync(join(src, 'bin', 'shinon.mjs'), 'process.exit(1);\n');
+  writeFileSync(join(src, 'scripts', 'profile-links.mjs'), 'process.exit(0);\n');
+  const env = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.invalid', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.invalid' };
+  const gitIn = (args) => spawnSync('git', ['-C', src, ...args], { encoding: 'utf8', env });
+  gitIn(['init', '--initial-branch=main']);
+  gitIn(['add', '-A']);
+  gitIn(['commit', '-m', 'base']);
+  const base = gitIn(['rev-parse', 'HEAD']).stdout.trim();
+  gitIn(['commit', '--allow-empty', '-m', 'neu']);
+  return { src, base, tip: gitIn(['rev-parse', 'HEAD']).stdout.trim(), gitIn };
+}
+
+/** Einen Zustand schreiben, der den laufenden Stand auf `sha` festlegt. */
+function seedState(dir, prefix, sha) {
+  writeFileSync(join(dir, 'state', 'install-state.json'), `${JSON.stringify({
+    schemaVersion: 1, installDir: prefix, source: null, current: { sha, ref: 'origin/main', at: new Date().toISOString(), verified: null },
+  })}\n`);
+}
+
+test('install-user: auto baut den Kandidaten AUCH, waehrend eine Instanz laeuft', async () => {
+  const { dir, env } = sandbox();
+  const { src, base, tip, gitIn } = fixtureSource(dir);
+  const prefix = join(dir, 'installat');
+  const staging = `${prefix}-staging`;
+  spawnSync('git', ['clone', '--quiet', src, prefix], { encoding: 'utf8' });
+  gitIn(['checkout', '--quiet', base], prefix);
+  seedState(dir, prefix, base);
+
+  const live = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 20000)', prefix], { stdio: 'ignore' });
+  try {
+    await new Promise((resolve) => { setTimeout(resolve, 200); });
+    const result = run(['auto', '--prefix', prefix, '--source', src], env);
+    // Die Abnahme des Fixtures ist rot (das ist Absicht) — der Lauf muss aber
+    // den Kandidaten GEBAUT haben, statt vorher abzubrechen.
+    assert.match(result.stdout, /Kandidat bauen/, `der Kandidat wurde nicht gebaut: ${result.stdout}`);
+    assert.ok(!result.stdout.includes('übersprungen'), 'auto hat trotz laufender Instanz abgebrochen');
+    assert.equal(spawnSync('git', ['-C', staging, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim(), tip, 'das Staging steht nicht auf dem Ziel-Stand');
+    assert.equal(result.status, 1, 'ein rotes Kandidaten-Urteil endet nicht mit 1');
+    assert.match(result.stdout + result.stderr, /Umschaltung unterlassen/);
+    // Ohne --now wird die laufende Instanz NICHT beendet.
+    live.kill(0);
+    assert.equal(live.exitCode, null, 'die laufende Instanz wurde ohne --now beendet');
+  } finally {
+    live.kill('SIGKILL');
+  }
+});
+
+test('install-user: auto --now verweigert ohne Installat, ohne etwas zu beenden', () => {
+  const { dir, env } = sandbox();
+  const prefix = join(dir, 'nichts');
+  const result = run(['auto', '--prefix', prefix, '--now'], env);
+  assert.equal(result.status, 2, result.stdout);
+  assert.match(result.stderr, /kein Installat/);
+  assert.equal(existsSync(prefix), false);
 });
 
 test('install-user: auto ohne Installat verweigert mit Exit 2, ohne zu klonen', () => {

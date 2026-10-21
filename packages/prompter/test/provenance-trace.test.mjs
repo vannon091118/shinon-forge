@@ -296,7 +296,10 @@ test('Aufgabenbrief: die Karte hängt den Brief an, die Spur nennt den Eigentüm
   globalThis.window = {};
   let result;
   try {
-    result = await runStep(ctx, 'Wo werden Markierungen begrenzt?');
+    // Ein AUFTRAG, keine Frage: „Wo werden … begrenzt?" bekam früher denselben
+    // Brief — und damit eine Aufgabe, die niemand gestellt hat. Eine Frage
+    // erweitert dieser Lauf nicht (Test direkt darunter).
+    result = await runStep(ctx, 'Prüfe, wo Markierungen begrenzt werden.');
     const trace = globalThis.window.__shinonPrompterTrace;
     assert.equal(trace[0].brief.id, 'markierungen-grenzen');
     assert.equal(trace[0].brief.owner, 'markers');
@@ -327,4 +330,46 @@ test('Aufgabenbrief: die Karte hängt den Brief an, die Spur nennt den Eigentüm
   // Der Blocktext reist in den Prompt, nicht in das Ereignis.
   assert.equal(JSON.stringify(record).includes('<task_brief'), false);
   assert.equal(JSON.stringify(record).includes('keine Inhaltsprüfung'), false);
+});
+
+test('eine Frage wird klassifiziert, aber nie erweitert — kein Aufgabenbrief', async () => {
+  // GEMESSEN am 2026-10-22 im laufenden Host: „Wer bist du?" kam als
+  // „Wer bist du? <task_brief …>Frage: Wer entscheidet über Identität und
+  // Vorschlags-Review? …" beim Modell an. Der Brief war für einen AUFTRAG
+  // gedacht und erfand hier die Aufgabe. Die Regel steht in AGENTS.md: eine
+  // Frage wird klassifiziert, aber nie expandiert.
+  const context = contextFile([{ path: 'src/a.mjs', content: 'export const a = 1;' }]);
+  const ctx = fakeCtx(fakeLlm());
+  const dispose = apply(ctx, Config({
+    provider: 'p',
+    model: 'm',
+    mode: 'MAX',
+    contextPath: context.url,
+    notesPath: '',
+    skillsPath: '',
+    intentPatternsPath: '',
+    blocksLearnedPath: '',
+    trace: true,
+  }));
+
+  globalThis.window = {};
+  let result;
+  try {
+    result = await runStep(ctx, 'Wer bist du?');
+    const trace = globalThis.window.__shinonPrompterTrace;
+    assert.equal(trace[0].brief, null, 'kein Brief für eine Frage');
+    assert.equal(trace[0].brief_reason, 'FRAGE');
+  } finally {
+    delete globalThis.window;
+    dispose();
+    context.cleanup();
+  }
+
+  const text = result.messages[0].content[0].text;
+  assert.equal(text.includes('<task_brief'), false, `Brief in einer Frage: ${text}`);
+  assert.equal(text.includes('Vorschlags-Review'), false);
+  const record = ctx.emitted.find((entry) => entry.channel === DECISION_CHANNEL).record;
+  assert.equal(record.brief, null);
+  assert.equal(record.brief_reason, 'FRAGE');
+  assert.equal(record.provenance.classes.DERIVED, 0);
 });

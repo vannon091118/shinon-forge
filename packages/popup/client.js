@@ -1,10 +1,5 @@
 /**
- * @shinon/popup — Client-Hälfte: DAS OVERLAY (Zug 6).
- *
- * WARUM DIESE DATEI NEU GESCHRIEBEN WURDE — der gemessene Befund: der Kopf dieser
- * Datei sagte selbst, dass sie NICHTS rendert. Ein „Trajectory-Overlay", das nur
- * einen Sidebar-Eintrag malt, ist von einem kaputten nicht zu unterscheiden; das
- * Paket erklärte sich deshalb im eigenen Manifest als inaktiv.
+ * @shinon/popup — Client-Hälfte: DAS OVERLAY (Zug 6) und sein Panel.
  *
  * DER DATENWEG (der einzige, der einem Out-of-Tree-Bundle offensteht): ein
  * Client-Bundle kann KEINEN Host-Endpunkt registrieren — die Remote-Beiträge der
@@ -26,15 +21,12 @@
  *
  * DIE REGEL SELBST steht als bytegleiche Region aus dem Kern
  * (packages/popup/assets/trajectory-core.js): ein Client-Bundle ist eigenständig
- * und zieht kein `import` über die Paketgrenze. Die Region ist die Zusage, dass
- * der Browser dieselbe Rechnung fährt wie die Unit-Tests — geprüft von
- * `scripts/lib/repo.mjs` (Zwilling) bei jedem Gate-Lauf.
+ * und zieht kein `import` über die Paketgrenze; `scripts/lib/repo.mjs` prüft den
+ * Zwilling bei jedem Gate-Lauf.
  *
- * WAS SIE RENDERT: den Fortschritt des laufenden Vorgangs (Schritt, offene
- * Aufrufe, zuletzt benutztes Werkzeug) im Dock über dem Eingabefeld — derselbe
- * Slot, den `@shinon/core` (Info-Leiste) und `@shinon/codingmon` (EXP-Leiste)
- * schon besetzen. Ohne laufenden Turn rendert sie NICHTS (ein leeres Overlay wäre
- * eine Oberfläche, die nichts aussagt) — sichtbar bleibt die Sidebar-Zeile.
+ * WAS SIE RENDERT: den Fortschritt des laufenden Vorgangs im Dock über dem
+ * Eingabefeld (ohne laufenden Turn NICHTS — sichtbar bleibt die Sidebar-Zeile)
+ * und, wenn diese Zeile geklickt wird, dasselbe als Panel mit Werkzeugliste.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/popup',
@@ -264,10 +256,8 @@ function progressReading(reading) {
     // ---------------------------------------------------------------------
 
     /**
-     * Die Sitzungs-Bindung der Sitzung, die die Oberfläche zeigt. Welche das ist,
-     * sagt die Vorgabe-Bindung des Renderers (`SlotScopeAdapter.current`); die
-     * Bindung selbst kommt aus dem Sitzungs-Dienst (`ClientSessions.binding`) —
-     * dieselbe Naht wie in @shinon/token-usage, weil es nur EINE gibt.
+     * Die Bindung der gezeigten Sitzung: `SlotScopeAdapter.current` sagt welche,
+     * `ClientSessions.binding` gibt sie — dieselbe Naht wie in @shinon/token-usage.
      */
     function seamOf(ctx) {
       const shown = ctx.get?.('uiSession')?.adapter?.current?.getSnapshot?.();
@@ -324,9 +314,8 @@ function progressReading(reading) {
     }
 
     /**
-     * Platzhalter fuellen: `{name}` → Wert. Ein fehlender Wert wird zum
-     * Gedankenstrich — „undefined" hat in der Oberfläche nichts zu suchen, und ein
-     * leerer Platzhalter saehe aus wie ein Werkzeug ohne Namen.
+     * Platzhalter fuellen: `{name}` → Wert; fehlt er, wird er zum Gedankenstrich
+     * („undefined" hat in der Oberfläche nichts zu suchen).
      */
     function fill(template, values) {
       return String(template).replace(/\{(\w+)\}/g, (_whole, name) => {
@@ -342,16 +331,23 @@ function progressReading(reading) {
       const text = fill(t(progress.key), progress.values);
       return h('div', {
         className: 'shinon-popup-progress',
-        title: text,
-        'aria-label': text,
-        'aria-live': 'polite',
-        style: {
-          padding: '4px 12px',
-          fontSize: '12px',
-          color: 'var(--dsw-alias-label-secondary)',
-          borderTop: '1px solid var(--dsw-alias-border-l1)'
-        }
+        title: text, 'aria-label': text, 'aria-live': 'polite',
+        style: { padding: '4px 12px', fontSize: '12px', color: 'var(--dsw-alias-label-secondary)', borderTop: '1px solid var(--dsw-alias-border-l1)' }
       }, h('span', { 'aria-hidden': true }, '⏱'), ' ', text);
+    }
+
+    /** Das Panel zur Sidebar-Zeile: derselbe Leseweg wie das Overlay, nur ausführlicher. */
+    function PopupPanel() {
+      const reading = useTrajectory();
+      const aborts = reading.aborts ?? { turns: 0, aborts: 0, quote: 0, topLabel: null };
+      const dim = { fontSize: '11px', color: 'var(--dsw-alias-label-secondary)' };
+      const row = (label, value) => h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px' } }, h('span', { style: dim }, label), h('span', null, value));
+      const tools = reading.tools.map((tool, index) => h('span', { key: `${tool}-${index}`, style: { ...dim, padding: '1px 6px', border: '1px solid var(--dsw-alias-border-l1)', borderRadius: '999px' } }, tool));
+      return h('div', { className: '__pp_panel', style: { padding: '10px 12px', display: 'grid', gap: '6px', alignContent: 'start' } },
+        h('div', { style: { ...dim, textTransform: 'uppercase' } }, 'Popup'),
+        reading.active === true ? h('div', null, row('Schritt', String(reading.step)), row('Offene Aufrufe', String(reading.open)), row('Aufrufe gesamt', String(reading.calls)), row('Zuletzt', reading.running ?? '—')) : h('div', { style: dim }, 'Kein laufender Vorgang.'),
+        tools.length === 0 ? null : h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '4px', maxHeight: '84px', overflowY: 'auto' } }, tools),
+        aborts.turns === 0 ? null : h('div', { style: dim }, `${aborts.aborts} von ${aborts.turns} Entscheidungen abgebrochen${aborts.topLabel === null ? '' : ` · häufigster Grund: ${aborts.topLabel}`}`));
     }
 
     return {
@@ -380,6 +376,9 @@ function progressReading(reading) {
           'Overlay live: Fortschritt des laufenden Vorgangs aus dem Sitzungsfenster '
           + `(Slot ${DOCK_SLOT}, ohne laufenden Turn unsichtbar).`
         );
+
+        // Die Sidebar-Zeile braucht ein Ziel: derselbe Leseweg, nur als Panel.
+        ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, PopupPanel));
 
         ctx.slots.inject(DOCK_SLOT, () => ctx.slots.register({
           name: DOCK_SLOT,

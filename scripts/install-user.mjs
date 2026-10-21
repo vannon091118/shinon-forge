@@ -68,6 +68,7 @@
  * Aufruf:
  *   node scripts/install-user.mjs install  [--prefix DIR] [--ref R] [--source URL] [--no-verify]
  *   node scripts/install-user.mjs update   [--prefix DIR] [--ref R] [--no-verify] [--force]
+ *   node scripts/install-user.mjs auto     [--prefix DIR] [--ref REF] [--now]
  *   node scripts/install-user.mjs rollback [--prefix DIR] [--to SHA] [--no-verify] [--force] [--no-rollback]
  *   node scripts/install-user.mjs status   [--prefix DIR] [--quiet]
  *   node scripts/install-user.mjs history  [--limit N] [--json]
@@ -77,7 +78,7 @@
  * Exit: 0 = Stand installiert und abgenommen · 1 = Abnahme rot · 2 = Bedien- oder Umgebungsfehler
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { createServer, connect } from 'node:net';
@@ -86,6 +87,16 @@ import { resolveRuntime } from './lib/runtime.mjs';
 import { collectSecrets, describeSecrets, readVault, restoreSecrets, writeVault } from './lib/secrets.mjs';
 import { writeInstallDesktopIcon } from './lib/desktop-entry.mjs';
 import { cmdUnits, removeUnits } from './lib/systemd-units.mjs';
+import { instancesUsing, restartInstances, stopInstances } from './lib/instances.mjs';
+import { appendRunLog as appendLogLine, printHistory, readRunLog as readLog } from './lib/verify-log.mjs';
+
+/**
+ * Ein Lauf, der seinen eigenen Elternteil beendet (`auto --now`), schreibt
+ * danach in eine Pipe ohne Leser. EPIPE darf die Umschaltung nicht abbrechen —
+ * sie ist in diesem Moment schon im Gange; der Fortschritt steht im Protokoll.
+ */
+process.stdout.on('error', () => {});
+process.stderr.on('error', () => {});
 
 const DEFAULT_PREFIX = join(homedir(), '.local', 'opt', 'shinon-forge');
 const STATE_FILE = join(paths.stateDir(), 'install-state.json');
@@ -123,6 +134,7 @@ const USAGE = `Aufruf: node scripts/install-user.mjs <install|update|rollback|st
   --prefix DIR     Installationsverzeichnis (Default ${DEFAULT_PREFIX})
   --staging DIR    Kandidaten-Verzeichnis für auto (Default <prefix>-staging)
   --ref REF        Ziel-Ref für install/update/auto (Default origin/main)
+  --now            auto schaltet SOFORT um: laufende Instanzen werden beendet und neu gestartet
   --to SHA         Ziel-SHA für rollback (Default: der vorherige Stand)
   --source URL     Klon-Quelle (Default: origin dieses Repos)
   --port N         Port für die Boot-Abnahme (Default: freier Port)
@@ -158,6 +170,9 @@ const PREFIX = resolve(flag('prefix', DEFAULT_PREFIX));
 const NO_VERIFY = has('no-verify');
 const NO_ROLLBACK = has('no-rollback');
 const FORCE = has('force');
+/** `auto --now`: die Umschaltung wartet nicht auf einen ruhigen Moment, sie
+ *  macht ihn — Instanzen beenden, umschalten, dieselben Aufrufe neu starten. */
+const NOW = has('now');
 /** Tests schreiben in ein anderes XDG_CONFIG_HOME: dann darf systemctl NICHT laufen —
  *  `systemctl --user disable` würde sonst den echten Timer des Nutzers treffen. */
 const NO_SYSTEMD = has('no-systemd');
@@ -249,26 +264,6 @@ function sourceUrl() {
   const own = spawnSync('git', ['-C', paths.workspaceRoot(), 'remote', 'get-url', 'origin'], { encoding: 'utf8' });
   if (own.status === 0 && own.stdout.trim() !== '') return own.stdout.trim();
   return paths.workspaceRoot();
-}
-
-/** Läuft etwas aus dem Zielverzeichnis? (npm ci würde ihm node_modules entreißen.) */
-function instancesUsing(prefix) {
-  if (process.platform !== 'linux') return [];
-  const hits = [];
-  for (const entry of readdirSync('/proc')) {
-    if (!/^\d+$/.test(entry) || Number(entry) === process.pid) continue;
-    let cmdline;
-    try {
-      cmdline = readFileSync(`/proc/${entry}/cmdline`, 'utf8');
-    } catch {
-      continue;
-    }
-    if (!cmdline.includes(prefix)) continue;
-    const readable = cmdline.split('\0').filter(Boolean).join(' ');
-    if (readable.includes('install-user.mjs')) continue;
-    hits.push({ pid: Number(entry), cmdline: readable });
-  }
-  return hits;
 }
 
 /**
@@ -554,9 +549,7 @@ function appendRunLog(report, trigger, meta = {}) {
       ? null
       : { token: report.http.token, cookie: report.http.cookie, type: report.http.type, bytes: report.http.bytes, title: report.http.title },
   };
-  mkdirSync(dirname(RUN_LOG), { recursive: true });
-  appendFileSync(RUN_LOG, `${JSON.stringify(record)}\n`);
-  return RUN_LOG;
+  return appendLogLine(RUN_LOG, record);
 }
 
 function printReport(report) {
@@ -835,24 +828,9 @@ function cmdStatus() {
   return 0;
 }
 
-/** Das dauerhafte Abnahmeprotokoll als Daten — kaputte Zeilen werden gemeldet, nicht verschluckt. */
+/** Das dauerhafte Abnahmeprotokoll als Daten — Besitzer ist `scripts/lib/verify-log.mjs`. */
 function readRunLog() {
-  let raw = '';
-  try {
-    raw = readFileSync(RUN_LOG, 'utf8');
-  } catch {
-    return [];
-  }
-  const rows = [];
-  for (const line of raw.split('\n')) {
-    if (line.trim() === '') continue;
-    try {
-      rows.push(JSON.parse(line));
-    } catch {
-      warn(`unlesbare Zeile im Protokoll übersprungen (${RUN_LOG})`);
-    }
-  }
-  return rows;
+  return readLog(RUN_LOG, { warn });
 }
 
 /**
@@ -938,12 +916,11 @@ async function cmdAuto() {
     console.log(`auto: nichts zu tun — ${target.ref} @ ${target.sha.slice(0, 12)} ist schon der laufende Stand`);
     return 0;
   }
-  const running = instancesUsing(PREFIX);
-  if (running.length > 0) {
-    console.log(`auto: übersprungen — ${running.length} Instanz(en) laufen aus ${PREFIX} (${running.map((hit) => `PID ${hit.pid}`).join(', ')}); nächster Lauf schaltet um`);
-    return 0;
-  }
 
+  // Der Kandidat entsteht IMMER — auch wenn Instanzen laufen. Das ist der
+  // Unterschied zwischen „kein Download" und „Download fertig, Umschaltung
+  // spaeter": der Bau und die Abnahme brauchen das Installat nicht, nur die
+  // beiden Umbenennungen tun es.
   say(`\n🧪 Kandidat bauen: ${target.ref} @ ${target.sha.slice(0, 12)} → ${staging}`);
   ensureCheckout(staging, 'Staging');
   git(['remote', 'set-url', 'origin', sourceUrl()], staging, { allowFail: true });
@@ -959,7 +936,32 @@ async function cmdAuto() {
     return 1;
   }
 
-  return promote(staging, target);
+  const running = instancesUsing(PREFIX);
+  if (running.length > 0 && !NOW) {
+    console.log(`auto: Kandidat ${target.sha.slice(0, 12)} liegt gebaut und abgenommen unter ${staging} — ${running.length} Instanz(en) laufen aus ${PREFIX} (${running.map((hit) => `PID ${hit.pid}`).join(', ')}); die Umschaltung passiert beim nächsten Lauf oder sofort mit --now`);
+    return 0;
+  }
+
+  // `--now`: den ruhigen Moment herstellen, statt auf ihn zu warten. Beendet
+  // werden nur erkannte Instanzen; sie werden nach der Umschaltung mit IHREM
+  // Aufruf neu gestartet — auch wenn das Urteil rot war, damit niemand ohne
+  // Host dasitzt.
+  let stopped = [];
+  if (running.length > 0) {
+    say(`\n⏹  --now: ${running.length} Instanz(en) beenden (` + running.map((hit) => `PID ${hit.pid}`).join(', ') + ')');
+    stopped = await stopInstances(running);
+    say(`   beendet: ${stopped.length} von ${running.length}`);
+  }
+
+  const code = await promote(staging, target);
+  if (stopped.length > 0) {
+    const restarted = restartInstances(stopped, { cwd: PREFIX });
+    for (const entry of restarted) {
+      if (entry.error !== null) console.error(`   Neustart gescheitert (${entry.cmdline.slice(0, 80)}): ${entry.error}`);
+      else console.log(`   neu gestartet: PID ${entry.pid} — ${entry.cmdline.slice(0, 80)}`);
+    }
+  }
+  return code;
 }
 
 /**
@@ -1018,37 +1020,7 @@ function cmdHistory() {
     for (const row of rows.slice(-limit)) say(JSON.stringify(row));
     return 0;
   }
-  const shown = rows.slice(-limit);
-  const seconds = (ms) => (ms == null ? '  —  ' : `${(ms / 1000).toFixed(1)}s`.padStart(6));
-  say('');
-  say('  Datum (UTC)       Stand         Trigger                      Boot    Gesamt  Plugins  Fehler  Bytes   Ergebnis');
-  for (const row of shown) {
-    const when = String(row.at ?? '').slice(0, 16).replace('T', ' ');
-    say(
-      `  ${when.padEnd(17)} ${String(row.sha ?? '—').slice(0, 12).padEnd(13)} ${String(row.trigger ?? '—').slice(0, 28).padEnd(28)} ` +
-        `${seconds(row.bootMs)} ${seconds(row.totalMs)} ${String(row.plugins ?? 0).padStart(7)} ${String(row.errors?.length ?? 0).padStart(7)} ${String(row.http?.bytes ?? 0).padStart(7)}   ${row.ok ? 'grün' : 'rot'}`,
-    );
-  }
-  const boots = rows.map((row) => row.bootMs).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
-  const green = rows.filter((row) => row.ok).length;
-  const median = boots.length === 0 ? null : boots[Math.floor(boots.length / 2)];
-  say('');
-  say(`  ${rows.length} Läufe · ${green} grün · ${rows.length - green} rot`);
-  if (boots.length > 0) say(`  Boot: min ${(boots[0] / 1000).toFixed(1)}s · median ${(median / 1000).toFixed(1)}s · max ${(boots.at(-1) / 1000).toFixed(1)}s (${boots.length} Messungen)`);
-  const byVersion = new Map();
-  for (const row of rows) {
-    const key = row.dsh ?? 'ohne dsh-Angabe';
-    const entry = byVersion.get(key) ?? { runs: 0, green: 0, boots: [] };
-    entry.runs += 1;
-    if (row.ok) entry.green += 1;
-    if (Number.isFinite(row.bootMs) && row.bootMs > 0) entry.boots.push(row.bootMs);
-    byVersion.set(key, entry);
-  }
-  for (const [version, entry] of byVersion) {
-    const best = entry.boots.length === 0 ? '—' : `${(entry.boots.reduce((sum, value) => sum + value, 0) / entry.boots.length / 1000).toFixed(1)}s`;
-    say(`  dsh ${version}: ${entry.runs} Lauf/Läufe, ${entry.green} grün, Ø Boot ${best}`);
-  }
-  return 0;
+  return printHistory({ rows, limit, say });
 }
 
 /* -------------------------------------------------------------------- Start */

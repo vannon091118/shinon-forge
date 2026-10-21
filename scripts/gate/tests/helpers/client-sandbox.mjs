@@ -22,14 +22,25 @@ import vm from 'node:vm';
 const ROOT = new URL('../../../../', import.meta.url);
 const PACKAGES = fileURLToPath(new URL('packages/', ROOT));
 
-/** Ein DOM-Knoten mit genau den Feldern, die die Hälften lesen/schreiben. */
+/**
+ * Ein DOM-Knoten mit genau den Feldern, die die Hälften lesen/schreiben.
+ *
+ * Listener werden GESPEICHERT, nicht verschluckt: ein Test, der einen Knopf
+ * druecken will, muss den Weg gehen, den der Nutzer geht (`click()`), statt die
+ * Handler-Funktion aus dem Bundle zu erraten.
+ */
 export const node = () => ({
   className: '', textContent: '', style: {}, dataset: {}, children: [], innerText: '',
   appendChild(child) { this.children.push(child); return child; },
-  append() {}, setAttribute() {}, removeAttribute() {}, remove() {},
-  addEventListener() {}, removeEventListener() {},
+  append(...children) { this.children.push(...children); },
+  setAttribute(name, value) { (this.attributes ??= {})[name] = value; },
+  removeAttribute() {}, remove() {},
+  addEventListener(type, handler) { (this.listeners ??= {})[type] ??= []; this.listeners[type].push(handler); },
+  removeEventListener() {},
+  dispatch(type, event = {}) { for (const handler of this.listeners?.[type] ?? []) handler({ type, preventDefault() {}, ...event }); },
   classList: { add() {}, remove() {}, contains: () => false, toggle() {} },
-  getAttribute: () => null, focus() {}, blur() {}, click() {},
+  getAttribute(name) { return this.attributes?.[name] ?? null; },
+  focus() {}, blur() {}, click() { this.dispatch('click'); },
 });
 
 /** Der `require`-Vertrag des Modul-Loaders: nur React, sonst ein Befund. */

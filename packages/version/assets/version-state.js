@@ -99,13 +99,48 @@ export function updateLine(state) {
   }
   const cmp = compare(state);
   if (cmp.upToDate) return 'Bereits aktuell — der installierte Stand ist der neueste Commit.';
+  // Eigene Commits sind kein Rückstand: wer vor main liegt, wuerde mit einem
+  // „Update" zurueckfallen. Das Banner bietet das nicht an.
+  if (cmp.behind === 0) return 'Kein Rückstand — der installierte Stand ist nicht älter als der neueste Commit.';
   return 'Update wird vorbereitet: Kandidat bauen, abnehmen, beim nächsten Start übernehmen.';
+}
+
+/**
+ * Die FRAGE, die ein Update stellt — und die zwei Wege, sie zu beantworten.
+ *
+ * WARUM DIE FRAGE HIER STEHT: „jetzt" und „beim naechsten Start" sind zwei
+ * verschiedene Handlungen mit zwei verschiedenen Folgen (ein laufender Host
+ * wird beendet bzw. bleibt unberuehrt). Der Client kennt den Unterschied nicht
+ * — er kennt nur diesen Text. Ein Satz, der an zwei Orten formuliert wird,
+ * sagt irgendwann zwei verschiedene Dinge.
+ * @param {object} state
+ * @returns {{available: boolean, question: string, now: {label: string, note: string}, next: {label: string, note: string}, unavailable: string}}
+ */
+export function choiceModel(state) {
+  const cmp = compare(state);
+  // Nur ein echter Rueckstand ist ein Update; Gleichstand und Voraus-Sein sind es nicht.
+  const available = state?.canUpdate === true && cmp.known && typeof cmp.behind === 'number' && cmp.behind > 0;
+  return {
+    available,
+    question: available
+      ? `Neuer Stand ${shortSha(state.latest)} — installiert ist ${shortSha(state.installed)}.`
+      : '',
+    now: {
+      label: 'Jetzt installieren',
+      note: 'Lädt und prüft den Kandidaten, beendet den laufenden Host, schaltet um und startet ihn neu.',
+    },
+    next: {
+      label: 'Beim nächsten Start',
+      note: 'Lädt und prüft den Kandidaten jetzt; umgeschaltet wird beim nächsten Start. Der laufende Host bleibt unberührt.',
+    },
+    unavailable: available ? '' : updateLine(state),
+  };
 }
 
 /**
  * Das vollständige Banner-Modell — Host und Client rechnen daraus dasselbe.
  * @param {object} state
- * @returns {{contract: string, line: string, title: string, update: string, upToDate: boolean, known: boolean}}
+ * @returns {{contract: string, line: string, title: string, update: string, upToDate: boolean, known: boolean, choice: object}}
  */
 export function bannerModel(state) {
   const cmp = compare(state);
@@ -116,5 +151,6 @@ export function bannerModel(state) {
     update: updateLine(state),
     upToDate: cmp.upToDate,
     known: cmp.known,
+    choice: choiceModel(state),
   };
 }

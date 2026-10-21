@@ -46,6 +46,7 @@
     "test:key-router": "node scripts/run-with-node.mjs node --test packages/key-router/test/*.test.mjs",
     "test:traceability": "node scripts/run-with-node.mjs node --test packages/traceability/test/*.test.mjs",
     "test:version": "node scripts/run-with-node.mjs node --test packages/version/test/*.test.mjs",
+    "test:diff-overview": "node scripts/run-with-node.mjs node --test packages/diff-overview/test/*.test.mjs",
     "notes:check": "node scripts/notes-check.mjs",
     "gate": "node scripts/run-with-node.mjs scripts/gate/engine.mjs",
     "gate:local": "node scripts/run-with-node.mjs scripts/gate/engine.mjs --local",

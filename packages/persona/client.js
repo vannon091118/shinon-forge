@@ -1,12 +1,12 @@
 /**
  * @shinon/persona — Client-Hälfte: Prüf-Panel für Selbstauflagen.
  *
- * Zeigt die OFFENEN Vorschläge mit ihren Belegen und entscheidet genau einen
- * davon über die bestehende Naht: GET `/shinon/persona/review` liefert
- * `review()`, POST dieselbe Route nimmt `{ id, decision }` und ruft `decide()`.
- * Der Host bleibt die einzige Instanz, die eine Auflage erzeugt — das Panel
- * kann nichts annehmen, was der Host nicht als Vorschlag führt, und es schreibt
- * selbst nie in eine Ablage.
+ * Zeigt die OFFENEN Vorschläge mit ihren Belegen, die ENTSCHIEDENEN mit ihrem
+ * Ausgang und entscheidet genau einen offenen über die bestehende Naht: GET
+ * `/shinon/persona/review` liefert `review()`, POST dieselbe Route nimmt
+ * `{ id, decision }` und ruft `decide()`. Der Host bleibt die einzige Instanz,
+ * die eine Auflage erzeugt — das Panel kann nichts annehmen, was der Host nicht
+ * als Vorschlag führt, und es schreibt selbst nie in eine Ablage.
  *
  * Dazu die BEZIEHUNGSSTUFE: sichtbar aus dem Zustands-Global, setzbar per POST
  * `/shinon/persona/relation` — ein ausdruecklicher Akt; die Sitzung setzt der
@@ -66,31 +66,21 @@ window.__ModuleLoader__.load({
     };
 
     const style = {
-      panel: {
-        fontFamily: 'var(--shinon-font-body, ui-sans-serif, system-ui, sans-serif)',
-        fontSize: 13,
-        padding: 16,
-        overflow: 'auto',
-        height: '100%',
-        color: 'var(--dsw-alias-label-primary)',
-      },
+      panel: { fontFamily: 'var(--shinon-font-body, ui-sans-serif, system-ui, sans-serif)', fontSize: 13, padding: 16, overflow: 'auto', height: '100%', color: 'var(--dsw-alias-label-primary)' },
       title: { fontWeight: 700, letterSpacing: '.06em', marginBottom: 4 },
       sub: { fontSize: 12, margin: '0 0 14px', color: 'var(--dsw-alias-label-secondary)' },
       empty: { opacity: 0.65, padding: '8px 0' },
-      entry: {
-        marginBottom: 10,
-        padding: 10,
-        borderRadius: 6,
-        background: 'var(--dsw-alias-bg-layer-1)',
-        borderLeft: '3px solid var(--shinon-violet, #7C3AED)',
-      },
+      entry: { marginBottom: 10, padding: 10, borderRadius: 6, background: 'var(--dsw-alias-bg-layer-1)', borderLeft: '3px solid var(--shinon-violet, #7C3AED)' },
       claim: { marginBottom: 4, fontWeight: 600 },
       evidence: { fontSize: 12, marginBottom: 8, color: 'var(--dsw-alias-label-secondary)' },
       actions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
       button: { fontSize: 12, padding: '3px 10px', cursor: 'pointer' },
+      // Entschiedenes bleibt sichtbar: „was habe ich entschieden" fragt das Protokoll, nicht das Gedächtnis.
+      decidedRow: { display: 'grid', gridTemplateColumns: '86px 1fr', gap: 8, fontSize: 12, padding: '3px 0', borderTop: '1px solid rgba(255,255,255,.06)' },
+      accepted: { fontWeight: 700, color: '#22c55e' },
+      rejected: { fontWeight: 700, color: '#ef4444' },
       levelCurrent: { fontSize: 12, padding: '3px 10px', fontWeight: 700, cursor: 'default' },
-      error: { marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-label-danger, #ef4444)' },
-      note: { marginTop: 12, fontSize: 11, color: 'var(--dsw-alias-label-secondary)' },
+      error: { marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-label-danger, #ef4444)' }, note: { marginTop: 12, fontSize: 11, color: 'var(--dsw-alias-label-secondary)' },
     };
 
     /** Ein offener Vorschlag: Behauptung, Belegzahl, zwei ausdrückliche Wege. */
@@ -190,21 +180,22 @@ window.__ModuleLoader__.load({
 
       if (review === null) {
         return h('div', { className: '__pn_panel', style: style.panel },
-          h('div', { className: '__pn_title', style: style.title }, 'Selbstauflagen prüfen'),
-          h('div', { className: '__pn_empty', style: style.empty }, 'Keine Vorschläge geladen.'),
+          h('div', { className: '__pn_title', style: style.title }, 'Auflagen'),
+          h('div', { className: '__pn_empty', style: style.empty }, 'Auflagen werden geladen.'),
           error === null ? null : h('div', { className: '__pn_error', style: style.error }, error));
       }
 
       const proposals = Array.isArray(review.proposals) ? review.proposals : [];
       const open = proposals.filter((proposal) => proposal.status === 'proposed');
+      const decided = proposals.filter((proposal) => proposal.status !== 'proposed');
       const commitments = Array.isArray(review.commitments) ? review.commitments : [];
       return h('div', { className: '__pn_panel', style: style.panel },
-        h('div', { className: '__pn_title', style: style.title }, `Selbstauflagen prüfen — ${open.length} offen`),
-        h('div', { className: '__pn_sub', style: style.sub },
-          'Ein Vorschlag wird erst durch Annehmen zur Auflage. Ablehnen ist genauso endgültig — '
-          + 'beides läuft über dieselbe Naht, die der Host führt.'),
+        h('div', { className: '__pn_title', style: style.title }, `Auflagen · ${open.length} offen`),
+        open.length === 0 ? null : h('div', { className: '__pn_sub', style: style.sub },
+          'Bestätigte Vorschläge werden zu Regeln. Ablehnen gilt genauso endgültig.'),
         relation === null ? null : h('div', { className: '__pn_relation', style: style.entry },
-          h('div', { className: '__pn_claim', style: style.claim }, `Beziehung — ${relation.current}`),
+          h('div', { className: '__pn_claim', style: style.claim }, `Vertrauensstufe · ${relation.current}`),
+          h('div', { className: '__pn_note', style: style.note }, 'Wie nah die Persona an dir dran ist.'),
           h('div', { className: '__pn_actions', style: style.actions },
             relation.levels.map((level) => h('button', {
               key: level, type: 'button',
@@ -213,18 +204,23 @@ window.__ModuleLoader__.load({
               onClick: () => chooseRelation(level),
             }, relationBusy === level ? '…' : level)))),
         open.length === 0
-          ? h('div', { className: '__pn_empty', style: style.empty },
-              'Nichts zu entscheiden — Vorschläge entstehen aus belegten Wiederholungen.')
+          ? h('div', { className: '__pn_empty', style: style.empty }, 'Keine offenen Vorschläge.')
           : open.map((proposal) => h(ProposalEntry, {
               key: proposal.id,
               proposal,
               busy: busy === null || busy.id !== proposal.id ? null : busy.decision,
               decide,
             })),
+        decided.length === 0 ? null : h('div', { className: '__pn_decided', style: style.entry },
+          h('div', { className: '__pn_claim', style: style.claim }, 'Entschieden'),
+          decided.map((proposal) => h('div', { key: proposal.id, style: style.decidedRow },
+            h('span', { style: proposal.status === 'accepted' ? style.accepted : style.rejected },
+              proposal.status === 'accepted' ? 'angenommen' : 'abgelehnt'),
+            h('span', null, proposal.claim)))),
         error === null ? null : h('div', { className: '__pn_error', style: style.error }, error),
         h('div', { className: '__pn_note', style: style.note },
-          `${commitments.length} angenommene Auflage${commitments.length === 1 ? '' : 'n'} · `
-          + `${proposals.length - open.length} entschieden`));
+          `${commitments.length} Auflage${commitments.length === 1 ? '' : 'n'} · `
+          + `${decided.length} entschieden`));
     }
 
     return {

@@ -139,7 +139,7 @@ test('Pruef-Panel: Route, Startstand und Vertrag sind auf beiden Seiten dasselbe
   assert.match(host, /table\.push\(\{ kind: 'global', name: REVIEW_GLOBAL/, 'der Host legt den Startstand nicht in den Global-Namen');
 });
 
-test('Pruef-Panel: offene Vorschlaege mit Belegzahl, entschiedene nicht', () => {
+test('Pruef-Panel: offene Vorschlaege mit Belegzahl, entschiedene mit ihrem Ausgang', () => {
   const { registered } = mount({ [REVIEW_GLOBAL]: review });
   const panel = registered.find((entry) => entry.options.name === 'main');
   assert.ok(panel, 'das Panel meldet sich nicht im main-Slot an');
@@ -151,9 +151,14 @@ test('Pruef-Panel: offene Vorschlaege mit Belegzahl, entschiedene nicht', () => 
   assert.match(text, /1 offen/, 'die Zahl der offenen Vorschlaege fehlt');
   assert.match(text, /prompter:no_json/, 'der offene Vorschlag nennt seinen Grund nicht');
   assert.match(text, /3 Belege/, 'die Belegzahl fehlt');
-  assert.ok(!text.includes('Schon abgelehnt'), 'ein entschiedener Vorschlag wird weiter angeboten');
-  assert.match(text, /1 angenommene Auflage/, 'die angenommene Auflage wird nicht gezaehlt');
-  assert.equal(buttonsOf(tree).length, 2, 'genau zwei Wege: Annehmen und Ablehnen');
+  // Das Panel muss SAGEN, was entschieden wurde — vorher stand hier nur
+  // „1 Auflage · 1 entschieden" und der Nutzer hatte keine Information über
+  // seine eigene Entscheidung (Feedback 2026-10-22 am laufenden Host).
+  assert.match(text, /Entschieden/, 'die entschiedenen Vorschlaege fehlen ganz');
+  assert.match(text, /Schon abgelehnt/, 'der entschiedene Vorschlag nennt seine Behauptung nicht');
+  assert.match(text, /abgelehnt/, 'der Ausgang der Entscheidung fehlt');
+  assert.match(text, /1 Auflage · 1 entschieden/, 'die angenommene Auflage wird nicht gezaehlt');
+  assert.equal(buttonsOf(tree).length, 2, 'nur offene Vorschlaege bieten Wege an');
 });
 
 test('Pruef-Panel: Annehmen und Ablehnen sind ein POST an dieselbe Route, mit genau { id, decision }', async () => {
@@ -208,7 +213,7 @@ test('Beziehungs-Panel: Stufe sichtbar und als POST auf die bestehende Route set
   });
   const panel = registered.find((entry) => entry.options.name === 'main');
   const tree = expand(render(panel.component));
-  assert.match(textOf(tree), /Beziehung — known/, 'die aktuelle Stufe steht nicht im Panel');
+  assert.match(textOf(tree), /Vertrauensstufe · known/, 'die aktuelle Stufe steht nicht im Panel');
 
   // Die Stufenliste kommt vom Host, nicht aus einer zweiten Tabelle im Bundle.
   const chips = buttonsOf(tree).filter((button) => ['stranger', 'known', 'trusted', 'anchor'].includes(textOf(button)));
@@ -227,6 +232,6 @@ test('Pruef-Panel: ein fremdes Dokument im Startstand wird verworfen (fail-close
   const { registered } = mount({ [REVIEW_GLOBAL]: { contract: 'fremd/v1', proposals: [openProposal('x', 'Fremd.', 9)] } });
   const panel = registered.find((entry) => entry.options.name === 'main');
   const text = textOf(render(panel.component));
-  assert.match(text, /Keine Vorschläge geladen/, 'ein fremdes Dokument wird als eigener Stand angezeigt');
+  assert.match(text, /Auflagen werden geladen/, 'ein fremdes Dokument wird als eigener Stand angezeigt');
   assert.ok(!text.includes('Fremd.'), 'der fremde Vorschlag wird gerendert');
 });

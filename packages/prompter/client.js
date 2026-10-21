@@ -156,6 +156,13 @@ window.__ModuleLoader__.load({
         color: #1a1a1a;
       }
       .__pt_badge.intent { background: transparent; border: 1px solid currentColor; color: inherit; }
+      .__pt_list { max-height: 300px; overflow-y: auto; display: grid; gap: 4px; margin-top: 6px; padding-right: 2px; }
+      .__pt_entry { border: 1px solid var(--dsw-alias-border-l1, rgba(255,255,255,.12)); border-radius: 6px; padding: 4px 6px; }
+      .__pt_entry > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+      .__pt_entry > summary::-webkit-details-marker { display: none; }
+      .__pt_body { margin-top: 5px; display: grid; gap: 3px; font-size: 11px; }
+      .__pt_facts { display: inline-flex; flex-wrap: wrap; gap: 6px; opacity: .75; font-size: 11px; }
+      .__pt_more { font-size: 11px; opacity: .6; margin-top: 4px; }
       .__pt_reason { opacity: 0.7; font-size: 11px; }
       .__pt_raw {
         margin-top: 4px;
@@ -173,12 +180,17 @@ window.__ModuleLoader__.load({
       return h('span', { className: `__pt_badge ${cls}`.trim() }, String(outcome).toUpperCase());
     }
 
+    /**
+     * Das Trace-Panel: die letzten Entscheidungen als aufklappbare Zeilen — die
+     * Zusammenfassung nennt Ergebnis, Intent und Belege, alles Weitere steht im
+     * aufgeklappten Teil. Die Liste scrollt, statt das Panel zu fuellen.
+     */
     function TracePanel() {
       // Der Puffer ist die Quelle; `useState` macht aus dem Schreiben ein Rendern.
       const [trace, setTrace] = React.useState(() => (Array.isArray(window.__shinonPrompterTrace) ? window.__shinonPrompterTrace : []));
       React.useEffect(() => {
         const refresh = () => setTrace(Array.isArray(window.__shinonPrompterTrace) ? [...window.__shinonPrompterTrace] : []);
-        // Das Abo trägt den Live-Fall; das Intervall ist der Fallback, falls die
+        // Das Abo traegt den Live-Fall; das Intervall ist der Fallback, falls die
         // Seite den Puffer auf einem anderen Weg bekommt (Host-Global ohne SSE).
         const timer = setInterval(refresh, 2000);
         window.addEventListener(TRACE_EVENT, refresh);
@@ -188,49 +200,37 @@ window.__ModuleLoader__.load({
       if (trace.length === 0) {
         return h('div', { className: `__pt_panel`, 'data-plugin': PLUGIN },
           h('div', { className: '__pt_title' }, 'Prompter-Trace'),
-          h('div', { className: '__pt_empty' }, 'Noch keine Entscheidung gesehen — der nächste Turn schreibt hier den Roh-Prompt hin.'));
+          h('div', { className: '__pt_empty' }, 'Noch kein Turn beobachtet.'));
       }
+      const shown = trace.slice(0, 10);
+      const facts = (entry) => [
+        h('span', { key: 'mode' }, `Modus ${entry.mode ?? '—'}`),
+        h('span', { key: 'ctx' }, `Kontext: ${entry.context_source ?? 'keiner'}`),
+        entry.provenance ? h('span', { key: 'prov', title: `${entry.provenance.contract ? `${entry.provenance.contract} · ` : ''}${entry.provenance.violations} Verletzung(en)${entry.provenance.complete ? '' : ' · unvollständig'}` }, `${entry.provenance.entries} Belege`) : null,
+      ].filter((part) => part !== null);
       return h('div', { className: `__pt_panel`, 'data-plugin': PLUGIN },
-        h('div', { className: '__pt_title' }, `Prompter-Trace (${trace.length})`),
-        trace.slice(0, 10).map((entry, i) => h('div', {
+        h('div', { className: '__pt_title' }, `Prompter-Trace · ${trace.length}`),
+        trace.length > shown.length ? h('div', { className: '__pt_more' }, `letzte ${shown.length} Entscheidungen — ältere bleiben im Puffer`) : null,
+        h('div', { className: '__pt_list' }, shown.map((entry, i) => h('details', {
           key: i,
           className: `__pt_entry ${entry.outcome === 'accepted' ? '' : entry.outcome}`.trim(),
         },
-          h('div', { className: '__pt_row' },
+          h('summary', { className: '__pt_row' },
             traceBadge(entry.outcome),
             h('span', { className: '__pt_badge intent' }, entry.intent ?? 'UNDEFINED'),
-            h('span', null, `mode=${entry.mode}`),
-            h('span', null, `ctx=${entry.context_source ?? 'none'}`),
-            entry.provenance
-              ? h('span', {
-                  // Kein Vertragsname als Literal im Client: er steht im Host-Kern
-                  // (`assets/provenance.js`) und reist im Datensatz mit. Ein
-                  // zweiter Name waere eine zweite Wahrheit ohne Drift-Test.
-                  title: `${entry.provenance.contract ? `${entry.provenance.contract} · ` : ''}${entry.provenance.violations} Verletzung(en)${entry.provenance.complete ? '' : ' · unvollständig'}`,
-                }, `prov=${entry.provenance.entries}`)
-              : null),
-            i === 0 && entry.abort_quote && entry.abort_quote.turns > 0
-              ? h('span', {
-                  // Quote und häufigster Grund — beides gerechnet, beides aus
-                  // dem Datensatz: das Panel zählt nicht selbst.
-                  title: `${entry.abort_quote.aborts} von ${entry.abort_quote.turns} Entscheidungen abgebrochen · häufigster Grund: ${entry.abort_quote.topLabel ?? '—'}`,
-                }, `abbr=${entry.abort_quote.aborts}/${entry.abort_quote.turns} ${Math.round(entry.abort_quote.quote * 100)}%`)
-              : null,
+            h('span', { className: '__pt_facts' }, facts(entry))),
+          h('div', { className: '__pt_body' },
+            entry.reasons?.length > 0 ? h('div', { className: '__pt_reason' }, `Begründung: ${entry.reasons.join(', ')}`) : null,
+            i === 0 && entry.abort_quote && entry.abort_quote.turns > 0 ? h('div', { className: '__pt_reason' }, `Abbrüche: ${entry.abort_quote.aborts} von ${entry.abort_quote.turns} · häufigster Grund: ${entry.abort_quote.topLabel ?? '—'}`) : null,
             entry.brief
-              ? h('span', { title: `Aufgabenbrief: @shinon/${entry.brief.owner} · ${entry.brief.chars} Zeichen` }, `brief=${entry.brief.id}`)
-              : (entry.brief_reason && entry.outcome === 'accepted'
-                ? h('span', { title: `Kein Aufgabenbrief: ${entry.brief_reason}` }, 'brief=-')
-                : null),
-          entry.reasons?.length > 0
-            ? h('div', { className: '__pt_reason' }, entry.reasons.join(', '))
-            : null,
-          entry.salvage
-            ? h('div', { className: '__pt_reason' }, `Prosa: ${entry.salvage.reason} · ${entry.salvage.chars} Zeichen · ${entry.salvage.count}. Fall dieser Sitzung`)
-            : null,
-          entry.raw_prompt
-            ? h('div', { className: '__pt_raw', title: entry.raw_prompt }, entry.raw_prompt)
-            : null,
-        )));
+              ? h('div', { className: '__pt_reason' }, `Brief: @shinon/${entry.brief.owner} · ${entry.brief.chars} Zeichen`)
+              : null,
+            entry.salvage
+              ? h('div', { className: '__pt_reason' }, `Prosa: ${entry.salvage.reason} · ${entry.salvage.chars} Zeichen · ${entry.salvage.count}. Fall dieser Sitzung`)
+              : null,
+            entry.raw_prompt
+              ? h('div', { className: '__pt_raw', title: entry.raw_prompt }, entry.raw_prompt)
+              : null)))));
     }
 
     return {

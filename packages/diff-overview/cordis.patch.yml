@@ -1,0 +1,9 @@
+- insert:
+    - id: shinon-diff-overview
+      name: '@shinon/diff-overview'
+      config:
+        enabled: true
+        endpoint: '/shinon/diff'
+        maxFiles: 200
+        maxLines: 400
+        maxLineChars: 400

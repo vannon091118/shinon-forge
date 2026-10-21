@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { probe } from './assets/version-probe.js';
-import { VERSION_CONTRACT, badgeLine, badgeTitle, updateLine } from './assets/version-state.js';
+import { VERSION_CONTRACT, badgeLine, bannerModel } from './assets/version-state.js';
 
 /**
  * @shinon/version — der Versionsspiegel: was laeuft, was neu ist, wie weit
@@ -99,11 +99,11 @@ export function versionPayload(state, job = null) {
   return {
     contract: VERSION_CONTRACT,
     state,
-    badge: {
-      line: badgeLine(state),
-      title: badgeTitle(state),
-      update: updateLine(state),
-    },
+    // `badge` ist das Banner-Modell (assets/version-state.js): Zeile, Tooltip,
+    // Updatesatz UND die Frage mit ihren zwei Wegen. Der Client formuliert
+    // keinen der Texte selbst — sonst stuenden zwei Fassungen derselben Frage
+    // in zwei Dateien, die niemand miteinander vergleicht.
+    badge: bannerModel(state),
     job,
   };
 }
@@ -177,11 +177,14 @@ export function apply(ctx, config) {
     const disposeUpdate = webServer.register({
       kind: 'exact',
       path: `${endpoint}/update`,
-      handler: (req, res) => {
+      handler: async (req, res) => {
         if (req.method !== 'POST') { res.writeHead(405); res.end(); return; }
         if (!authorized(req)) { res.writeHead(403); res.end(); return; }
+        const body = await readBody(req);
+        const mode = body.mode === 'now' ? 'now' : 'next';
+        const started = startUpdate(mode);
         res.writeHead(202, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-        res.end(JSON.stringify({ contract: VERSION_CONTRACT, started: startUpdate() }));
+        res.end(JSON.stringify({ contract: VERSION_CONTRACT, started, mode }));
       },
     });
     webCtx.effect?.(() => () => {
@@ -191,19 +194,53 @@ export function apply(ctx, config) {
   };
 
   /**
+   * Die Nutzerfrage in einen Koerper lesen. Fehlt sie oder ist sie kein JSON,
+   * gilt `next`: der vorsichtige Weg, der den laufenden Host in Ruhe laesst.
+   * @param {object} req
+   * @returns {Promise<object>}
+   */
+  const readBody = (req) => new Promise((resolve) => {
+    if (typeof req?.on !== 'function') { resolve({}); return; }
+    let raw = '';
+    req.on('data', (chunk) => {
+      raw += chunk;
+      if (raw.length > 1024) { resolve({}); req.destroy?.(); }
+    });
+    req.on('end', () => {
+      if (raw.trim() === '') { resolve({}); return; }
+      try {
+        const parsed = JSON.parse(raw);
+        resolve(parsed !== null && typeof parsed === 'object' ? parsed : {});
+      } catch {
+        resolve({});
+      }
+    });
+    req.on('error', () => resolve({}));
+  });
+
+  /**
    * Die Nachfuehrung starten. Ein Auftrag laeuft nie zweimal: der zweite
    * Klick bekommt den laufenden Auftrag zurueck, nicht einen zweiten Bau.
+   *
+   * `mode` ist die Antwort auf die Frage, die das Banner stellt:
+   *   - `next` laesst den Host laufen und schaltet beim naechsten Start um;
+   *   - `now`  beendet den laufenden Host, schaltet um und startet ihn neu.
+   * Der Unterschied ist keine Bequemlichkeit: `now` beendet den Prozess, der
+   * diese Route bedient — deshalb steht er im Text VOR dem Klick.
+   * @param {'now'|'next'} [mode]
    * @returns {boolean} true, wenn ein Auftrag gestartet wurde
    */
-  function startUpdate() {
+  function startUpdate(mode = 'next') {
     if (job !== null && job.running === true) return false;
     if (state?.canUpdate !== true) {
-      job = { running: false, state: 'nicht moeglich', lines: [state?.updateHint ?? 'Kein updatefaehiges Installat.'] };
+      job = { running: false, mode, state: 'nicht moeglich', lines: [state?.updateHint ?? 'Kein updatefaehiges Installat.'] };
       return false;
     }
     const lines = [];
-    job = { running: true, state: 'laeuft', lines, startedAt: new Date().toISOString() };
-    const child = spawn(process.execPath, [updater, 'auto', '--prefix', root, '--quiet'], {
+    job = { running: true, mode, state: 'laeuft', lines, startedAt: new Date().toISOString() };
+    const args = [updater, 'auto', '--prefix', root, '--quiet'];
+    if (mode === 'now') args.push('--now');
+    const child = spawn(process.execPath, args, {
       cwd: root,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -217,13 +254,18 @@ export function apply(ctx, config) {
     child.stdout.on('data', collect);
     child.stderr.on('data', collect);
     child.on('error', (error) => {
-      job = { running: false, state: 'Fehler', lines: [...lines, String(error?.message ?? error)] };
+      job = { running: false, mode, startedAt: job?.startedAt ?? null, state: 'Fehler', lines: [...lines, String(error?.message ?? error)] };
     });
     child.on('close', (code) => {
+      // `mode` und `startedAt` ueberleben das Ende: sonst kann der Client im
+      // Ergebnis nicht mehr sagen, WELCHE der beiden Antworten er gegeben hat
+      // (ein „jetzt" sieht in einem nackten Exit-Code wie ein „spaeter" aus).
       job = {
         running: false,
+        mode,
         state: code === 0 ? 'bereit' : 'Fehler',
         exitCode: code,
+        startedAt: job?.startedAt ?? null,
         lines,
         finishedAt: new Date().toISOString(),
       };
