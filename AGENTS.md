@@ -157,7 +157,9 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `npm run build` → `node scripts/build.mjs`: re-validates everything, then wipes and
   regenerates `dist/` (`manifest.json`, `profile.json`, `dist/packages/*`).
 
-- `npm run deb` / `npm run win` → the packaging path: ONE payload, TWO shells.
+- `npm run deb` / `npm run win` / `npm run appimage` → the packaging path: ONE payload, THREE shells
+  (`.deb`, Windows-ZIP, AppImage — the AppImage is `scripts/appimage-build.mjs`, it needs `appimagetool`
+  and exits 1 without it; the CI job `appimage` in `.github/workflows/package-build.yml` is its proof).
   `scripts/lib/payload.mjs` builds the payload (code, production dependencies
   from the lockfile, the BUNDLED Node runtime, relative bundle links, the
   starters); `scripts/lib/huelle.mjs` owns the shell texts (Debian

@@ -14,9 +14,10 @@
  *     Installieren nach, brauchte Netz und ein passendes System-Node, und auf
  *     Mint (Node 18 in der Regel) brach der Start spaeter an `engines`, nicht an
  *     der Installation. Jetzt ist das Paket bei der Installation fertig.
- *   - Kein zweites Installationsformat: kein AppImage, kein Flatpak, keine
- *     Kopie daneben. Ein Weg, ein Root. Der Windows-Weg ist die Huelle um
- *     DIESELBE Nutzlast (`scripts/win-build.mjs`).
+ *   - Kein zweites Installationsformat NEBEN der Nutzlast: kein Flatpak, keine
+ *     Kopie daneben. Ein Inhalt, ein Root. Die Huellen um DIESELBE Nutzlast
+ *     sind `.deb` (hier), AppImage (`scripts/appimage-build.mjs`) und Windows
+ *     (`scripts/win-build.mjs`).
  *
  * Gebaut wird mit `dpkg-deb` (auf Mint vorhanden) und mit denselben
  * Early-Pruning-Regeln wie jeder andere Baumlauf dieses Repos: `node_modules`

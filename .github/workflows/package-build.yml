@@ -1,7 +1,8 @@
 name: Shinon Forge Installationspakete
 
-# WAS DIESER WORKFLOW IST: der BAU der beiden Installationspakete — ein .deb
-# fuer Linux Mint/Ubuntu und ein ZIP fuer Windows. Beide entstehen aus DER
+# WAS DIESER WORKFLOW IST: der BAU der drei Installationspakete — ein .deb
+# fuer Linux Mint/Ubuntu, ein AppImage fuer Linux ohne Paketrecht und ein ZIP
+# fuer Windows. Alle drei entstehen aus DER
 # NUTZLAST (`scripts/lib/payload.mjs`): derselbe Code, dieselben
 # Produktions-Abhaengigkeiten, dieselbe mitgelieferte Node-Laufzeit. Nur die
 # Huelle unterscheidet sich, weil Windows kein `dpkg-deb` hat.
@@ -13,7 +14,10 @@ name: Shinon Forge Installationspakete
 #   - Das Windows-ZIP wird auf einem WINDOWS-Bauhost gebaut, weil die
 #     Abhaengigkeiten dann die Windows-Fassung sind. Auf Linux gebaut, traegt
 #     das Archiv Linux-Binaerdateien — gebaut waere es, lauffaehig nicht.
-#   - Beide bauen aus demselben Commit, und beide legen ihre Pruefsumme ab.
+#   - Das AppImage braucht `appimagetool`; der Job holt es und druckt seine
+#     Pruefsumme. Es laeuft auf dem Linux-Bauhost ohne FUSE
+#     (APPIMAGE_EXTRACT_AND_RUN=1), damit der Nachweis auf dem Runner laeuft.
+#   - Alle bauen aus demselben Commit, und alle legen ihre Pruefsumme ab.
 #
 # Der Trigger ist bewusst "jeder Push auf main": ein Installationspaket ist
 # eine Frage ("welche Fassung bekomme ich?") und keine Samstagsarbeit. Bei
@@ -207,9 +211,89 @@ jobs:
             dist-package/*.zip.sha256
           if-no-files-found: error
 
+  appimage:
+    name: 'AppImage (Linux, x86_64)'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+          cache: npm
+
+      - name: 'Paket-Gate (Nutlast, Starter, Installer-Skripte, AppImage-Huelle)'
+        run: node scripts/run-with-node.mjs node --test scripts/gate/tests/packaging.test.mjs
+
+      # Das Werkzeug gehoert zum BAU, nicht zum Produkt. Es kommt aus dem
+      # continuous-Release von appimagetool. Die Pruefsumme ist gepinnt und
+      # belegt: GitHub meldet fuer das Asset denselben Wert im Feld `digest`
+      # (api.github.com/repos/AppImage/appimagetool/releases/tags/continuous),
+      # und der lokal heruntergeladene Stand hat ihn reproduziert (2026-10-21).
+      # Weicht das Werkzeug ab, bricht der Job ab, statt unbekannten Code zu
+      # benutzen. Ein Wechsel der Pruefsumme ist eine bewusste Aenderung hier.
+      - name: 'appimagetool holen'
+        run: |
+          set -euo pipefail
+          APPIMAGETOOL_SHA256=95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6
+          curl -fsSL -o "$RUNNER_TEMP/appimagetool" \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          echo "$APPIMAGETOOL_SHA256  $RUNNER_TEMP/appimagetool" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          echo "APPIMAGETOOL=$RUNNER_TEMP/appimagetool" >> "$GITHUB_ENV"
+
+      - name: 'AppImage bauen'
+        timeout-minutes: 30
+        run: node scripts/appimage-build.mjs --out dist-appimage
+
+      - name: 'Pruefsumme ablegen'
+        run: |
+          set -euo pipefail
+          cd dist-appimage
+          for f in ./*.AppImage; do sha256sum "$f" > "$f.sha256"; done
+          cat ./*.sha256
+
+      # Der ECHTE Extrakt-Nachweis: das Abbild wird entpackt, die mitgelieferte
+      # Laufzeit laeuft, und AppRun, Menueeintrag und Icon liegen an der Wurzel.
+      - name: 'Abbild-Nachweis: entpacken, Laufzeit, AppRun, Menueeintrag, Icon'
+        run: |
+          set -euo pipefail
+          cd dist-appimage
+          abbild=$(ls ./*.AppImage)
+          chmod +x "$abbild"
+          "$abbild" --appimage-extract >/dev/null
+          test -x squashfs-root/AppRun
+          squashfs-root/usr/lib/shinon-forge/runtime/node/bin/node --version
+          test -f squashfs-root/shinon-forge.desktop
+          grep -q '^Exec=AppRun$' squashfs-root/shinon-forge.desktop
+          test -f squashfs-root/shinon-forge.svg
+          echo "Abbild entpackt, Menueeintrag und Icon vorhanden"
+
+      # Der Start-Nachweis: das Abbild startet seinen Starter ohne FUSE und
+      # ohne Installation; die Nutzerdaten laufen in einem isolierten XDG.
+      - name: 'Start-Nachweis: AppImage --check'
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          cd dist-appimage
+          abbild=$(ls ./*.AppImage)
+          export XDG_CONFIG_HOME=/tmp/appimage-home/config XDG_DATA_HOME=/tmp/appimage-home/data
+          export XDG_STATE_HOME=/tmp/appimage-home/state XDG_CACHE_HOME=/tmp/appimage-home/cache
+          mkdir -p /tmp/appimage-home/config /tmp/appimage-home/data /tmp/appimage-home/state /tmp/appimage-home/cache
+          APPIMAGE_EXTRACT_AND_RUN=1 "$abbild" --check
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shinon-forge-appimage-x64
+          path: |
+            dist-appimage/*.AppImage
+            dist-appimage/*.AppImage.sha256
+          if-no-files-found: error
+
   release:
     name: 'Release-Anhang (nur bei v*-Tags, nur an ein bestehendes Release)'
-    needs: [deb, windows]
+    needs: [deb, windows, appimage]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -229,7 +313,7 @@ jobs:
             echo "Kein Release ${GITHUB_REF_NAME} vorhanden — die Pakete bleiben als Artefakte liegen; es wird nichts veroeffentlicht."
             exit 0
           fi
-          find artifacts -type f \( -name '*.deb' -o -name '*.deb.sha256' -o -name '*.zip' -o -name '*.zip.sha256' \) -print0 \
+          find artifacts -type f \( -name '*.deb' -o -name '*.deb.sha256' -o -name '*.zip' -o -name '*.zip.sha256' -o -name '*.AppImage' -o -name '*.AppImage.sha256' \) -print0 \
             | xargs -0 gh release upload "${GITHUB_REF_NAME}" --clobber
           echo "Angehaengt an ${GITHUB_REF_NAME}:"
           gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name'

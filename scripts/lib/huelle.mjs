@@ -1,5 +1,5 @@
 /**
- * huelle.mjs — die TEXTE der beiden Installationshuellen.
+ * huelle.mjs — die TEXTE der Installationshuellen (.deb, AppImage, Windows).
  *
  * Warum diese Datei getrennt von `payload.mjs` ist: die Nutzlast ist der
  * INHALT (Code, Abhaengigkeiten, Laufzeit, Starter), die Huelle ist das
@@ -23,7 +23,8 @@
  *   - `installPs1` laedt nichts nach und legt Verknuepfungen an — alles mit
  *     dem, was Windows ohnehin kann (PowerShell, COM-Shell).
  *
- * Aufrufer: `scripts/deb-build.mjs`, `scripts/win-build.mjs` und der
+ * Aufrufer: `scripts/deb-build.mjs`, `scripts/appimage-build.mjs`,
+ * `scripts/win-build.mjs` und der
  * Gate-Test `scripts/gate/tests/packaging.test.mjs`.
  */
 
@@ -83,6 +84,39 @@ export function debDesktopEntry({ installRoot }) {
     'Terminal=false',
     'StartupNotify=true',
     `Icon=${installRoot}/assets/icon.svg`,
+    'Categories=Development;IDE;',
+    'Keywords=shinon;dsh;agent;',
+    '',
+  ].join('\n');
+}
+
+/**
+ * Der AppRun des AppImage: startet den Unix-Starter der Nutzlast.
+ *
+ * Das AppImage-Laufzeitsystem mountet das Abbild schreibgeschuetzt und setzt
+ * `$APPDIR`. Der Starter der Nutzlast sucht sich ohnehin selbst (`dirname $0`),
+ * also genuegt der Aufruf — kein zweiter Pfad, der auseinanderlaufen koennte.
+ */
+export function appRunSh({ payloadDir }) {
+  return `#!/bin/sh\n# Von Shinon Forge erzeugt (scripts/lib/huelle.mjs). Der Einstieg des AppImage.\nhere="$(cd "$(dirname "$0")" && pwd)"\nexec "$here/${payloadDir}/shinon" "$@"\n`;
+}
+
+/**
+ * Der Menueeintrag INNERHALB des AppImage. `Exec=AppRun` ist die Konvention:
+ * appimaged und der Desktop-Integrator finden den Einstieg relativ zum Abbild,
+ * ein absoluter Pfad waere nach dem Mount falsch.
+ */
+export function appImageDesktopEntry() {
+  return [
+    '[Desktop Entry]',
+    'Type=Application',
+    'Name=Shinon Forge',
+    'GenericName=Shinon Forge DSH-Shell',
+    'Comment=Startet Shinon Forge (aktives Profil, UI im Browser)',
+    'Exec=AppRun',
+    'Terminal=false',
+    'StartupNotify=true',
+    'Icon=shinon-forge',
     'Categories=Development;IDE;',
     'Keywords=shinon;dsh;agent;',
     '',

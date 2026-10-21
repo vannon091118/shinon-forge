@@ -85,6 +85,7 @@ import * as paths from './lib/paths.mjs';
 import { resolveRuntime } from './lib/runtime.mjs';
 import { collectSecrets, describeSecrets, readVault, restoreSecrets, writeVault } from './lib/secrets.mjs';
 import { writeInstallDesktopIcon } from './lib/desktop-entry.mjs';
+import { cmdUnits, removeUnits } from './lib/systemd-units.mjs';
 
 const DEFAULT_PREFIX = join(homedir(), '.local', 'opt', 'shinon-forge');
 const STATE_FILE = join(paths.stateDir(), 'install-state.json');
@@ -160,6 +161,8 @@ const FORCE = has('force');
 /** Tests schreiben in ein anderes XDG_CONFIG_HOME: dann darf systemctl NICHT laufen —
  *  `systemctl --user disable` würde sonst den echten Timer des Nutzers treffen. */
 const NO_SYSTEMD = has('no-systemd');
+/** Alles, was der Timer-Abbau und `units` von hier brauchen — ein Objekt statt zehn Argumente. */
+const UNITS = { prefix: PREFIX, noSystemd: NO_SYSTEMD, flag, has, say, warn, node: nodeBinary };
 const PORT = flag('port', null) === null ? null : Number(flag('port'));
 const TIMEOUT_S = Number(flag('timeout', String(VERIFY_TIMEOUT_S)));
 if (PORT !== null && (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535)) die('--port muss eine Portnummer sein');
@@ -759,7 +762,7 @@ async function cmdUninstall() {
     }
   }
   say(`\n🧹 Deinstallation: ${PREFIX}`);
-  removeUnits();
+  removeUnits(UNITS);
   // Die Desktop-Verknüpfung kennt nur das Werkzeug, das sie schreibt.
   const launcher = join(PREFIX, 'scripts', 'desktop-launcher.mjs');
   if (existsSync(launcher)) {
@@ -998,133 +1001,6 @@ function liveHeadShort() {
 }
 
 /**
- * `units` — der systemd-User-Timer. Er ruft genau `auto` auf, damit der Timer
- * nicht klüger ist als der Befehl, den ein Mensch von Hand startet.
- */
-/** Der Timer, den `units` schreibt — Abbau geteilt mit `uninstall` (eine Quelle). */
-function removeUnits() {
-  const configHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
-  const dir = join(configHome, 'systemd', 'user');
-  if (!NO_SYSTEMD) {
-    const stopped = systemctl(['disable', '--now', 'shinon-forge-update.timer']);
-    if (stopped.status !== 0) warn(`systemctl disable: ${(stopped.stderr ?? '').trim() || `Exit ${stopped.status}`}`);
-  } else {
-    say('   systemd unangetastet (--no-systemd)');
-  }
-  for (const name of ['shinon-forge-update.service', 'shinon-forge-update.timer']) {
-    const file = join(dir, name);
-    if (!existsSync(file)) continue;
-    rmSync(file, { force: true });
-    say(`   entfernt: ${file}`);
-  }
-  if (!NO_SYSTEMD) systemctl(['daemon-reload']);
-}
-
-async function cmdUnits() {
-  const configHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
-  const dir = join(configHome, 'systemd', 'user');
-  const serviceFile = join(dir, 'shinon-forge-update.service');
-  const timerFile = join(dir, 'shinon-forge-update.timer');
-  const node = nodeBinary();
-  const script = join(paths.workspaceRoot(), 'scripts', 'install-user.mjs');
-
-  if (has('remove')) {
-    removeUnits();
-    say('✅ Timer entfernt (der Aufräumlauf bleibt: node scripts/install-user.mjs units --remove)');
-    return 0;
-  }
-
-  const interval = flag('interval', '1d');
-  const firstDelay = flag('first-delay', '10min');
-  const spread = flag('spread', '1h');
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(serviceFile, `[Unit]
-Description=Shinon Forge: neuen Stand bauen, abnehmen, nur bei grünem Urteil umschalten
-Documentation=file:${join(paths.workspaceRoot(), 'scripts', 'install-user.mjs')}
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-WorkingDirectory=${paths.workspaceRoot()}
-ExecStart=${node} ${script} auto --prefix ${PREFIX} --quiet
-Nice=10
-
-# Kein Neustart bei rotem Urteil: der nächste Timer-Lauf ist der Wiederholungsversuch.
-TimeoutStartSec=900
-`);
-  // ZWEI Zeitgeber, und zwar aus einem gemessenen Grund: `OnUnitActiveSec`
-  // allein plant nichts ein, wenn der Dienst seit dem Aktivieren des Timers
-  // noch nicht gelaufen ist — `NextElapseUSecMonotonic` stand nach dem
-  // Neuladen auf `infinity`, der Timer wäre nie wieder gefeuert. `OnActiveSec`
-  // gibt jedem Aktivieren (und damit jedem Systemstart) einen ersten Termin,
-  // `OnUnitActiveSec` hält danach den Rhythmus.
-  writeFileSync(timerFile, `[Unit]
-Description=Shinon Forge: regelmäßig auf neue Stände prüfen (Umschaltung nur bei grüner Abnahme)
-
-[Timer]
-OnActiveSec=${firstDelay}
-OnUnitActiveSec=${interval}
-RandomizedDelaySec=${spread}
-Persistent=true
-Unit=shinon-forge-update.service
-
-[Install]
-WantedBy=timers.target
-`);
-  say(`\n✅ Units geschrieben:`);
-  say(`   ${serviceFile}`);
-  say(`   ${timerFile}`);
-  say(`   Rhythmus: erster Lauf ${firstDelay} nach Aktivierung bzw. Systemstart, danach alle ${interval}, Streuung bis ${spread} (Persistent=true holt Verpasstes nach)`);
-
-  if (has('no-enable') || NO_SYSTEMD) {
-    say(NO_SYSTEMD ? '   systemd unangetastet (--no-systemd)' : '   Aktivieren von Hand:');
-    say(`   systemctl --user daemon-reload && systemctl --user enable --now shinon-forge-update.timer`);
-    return 0;
-  }
-  const reload = systemctl(['daemon-reload']);
-  const enabled = systemctl(['enable', 'shinon-forge-update.timer']);
-  // `enable --now` lässt einen LAUFENDEN Timer mit alten Werten weiterlaufen —
-  // gemessen: nach dem Ändern der Unit stand `NextElapseUSecMonotonic` auf
-  // `infinity`, erst `restart` bewaffnet ihn mit den neuen Zeitgebern neu.
-  const restarted = systemctl(['restart', 'shinon-forge-update.timer']);
-  if (reload.status !== 0 || enabled.status !== 0) {
-    warn(`systemctl nicht verfügbar oder verweigert (reload ${reload.status}, enable ${enabled.status}) — Units liegen, Aktivierung von Hand:`);
-    if (restarted.status !== 0) warn(`systemctl restart: ${(restarted.stderr ?? '').trim() || `Exit ${restarted.status}`}`);
-    say('   systemctl --user daemon-reload && systemctl --user enable --now shinon-forge-update.timer');
-    return 0;
-  }
-  // Der Termin wird von systemd nicht im selben Augenblick gerechnet: nach dem
-  // `restart` stand er kurz leer, eine Sekunde später stand er. Deshalb fragen,
-  // nicht raten — und begrenzt nachfassen statt einmal und dann behaupten.
-  // Der Termin wird von systemd nicht im selben Augenblick gerechnet: nach dem
-  // `restart` stand er kurz leer, eine Sekunde später stand er. Und Achtung:
-  // `OnActiveSec`/`OnUnitActiveSec` sind MONOTONE Zeitgeber — `Next…Realtime`
-  // bleibt deshalb leer, der Termin steht in `Next…Monotonic`. Beide fragen,
-  // sonst meldet das Werkzeug „kein Termin", obwohl einer läuft.
-  let realtime = '';
-  let monotonic = '';
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    if (attempt > 0) await new Promise((done) => setTimeout(done, 250));
-    const show = systemctl(['show', 'shinon-forge-update.timer', '-p', 'NextElapseUSecRealtime', '-p', 'NextElapseUSecMonotonic', '--value']);
-    const [first = '', second = ''] = (show.stdout ?? '').split('\n');
-    realtime = first.trim();
-    monotonic = second.trim();
-    const hasNext = (realtime !== '' && realtime !== 'n/a') || (monotonic !== '' && monotonic !== 'infinity' && monotonic !== 'n/a');
-    if (hasNext) break;
-  }
-  const hasNext = (realtime !== '' && realtime !== 'n/a') || (monotonic !== '' && monotonic !== 'infinity' && monotonic !== 'n/a');
-  say(hasNext
-    ? `✅ Timer aktiv. Nächster Lauf: ${realtime !== '' && realtime !== 'n/a' ? realtime : `in ${monotonic}`}`
-    : '⚠️  Timer aktiv, aber ohne nächsten Termin — systemctl --user list-timers prüfen');
-  return 0;
-}
-
-function systemctl(args) {
-  return spawnSync('systemctl', ['--user', ...args], { encoding: 'utf8' });
-}
-
-/**
  * `history` — der Vergleich über Versionen: Boot-Dauer, Fehlerzeilen und
  * Ergebnis je Lauf, plus Kennzahlen, die man in Zahlen sehen will (Minimum,
  * Median, Maximum, Erfolgsquote). Ohne `--json` als Tabelle.
@@ -1185,7 +1061,7 @@ else if (command === 'update') code = await cmdUpdate();
 else if (command === 'rollback') code = await cmdRollback();
 else if (command === 'history') code = cmdHistory();
 else if (command === 'auto') code = await cmdAuto();
-else if (command === 'units') code = await cmdUnits();
+else if (command === 'units') code = await cmdUnits(UNITS);
 else if (command === 'selftest') code = await cmdSelftest();
 else if (command === 'uninstall') code = await cmdUninstall();
 else code = cmdStatus();

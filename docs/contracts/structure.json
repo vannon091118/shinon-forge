@@ -116,7 +116,7 @@
     "scripts/gate/tests/project-index.test.mjs": 2154,
     "scripts/gate/tests/prompter-contract.test.mjs": 2212,
     "scripts/gate/tests/task-router.test.mjs": 919,
-    "scripts/install-user.mjs": 1187,
+    "scripts/install-user.mjs": 1069,
     "scripts/lib/repo.mjs": 1268
   },
   "herleitung": "Grenze = 3 × Median der Klasse, auf 50 gerundet, mindestens 100 — Median gemessen am 2026-10-20 über alle Dateien der Klasse; alles darüber steht im bestand."

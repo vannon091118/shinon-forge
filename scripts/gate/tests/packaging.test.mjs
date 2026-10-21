@@ -31,7 +31,7 @@ import {
   buildPayload, launcherCmd, launcherSh, nodeArchiveName, nodeTarget, npmCommand, npmSpawn, payloadViolations,
 } from '../../lib/payload.mjs';
 import {
-  debControl, debDesktopEntry, debPathStarter, debPostinst, installPs1, uninstallPs1,
+  appImageDesktopEntry, appRunSh, debControl, debDesktopEntry, debPathStarter, debPostinst, installPs1, uninstallPs1,
 } from '../../lib/huelle.mjs';
 import { engineRange, floorVersion, satisfiesRange } from '../../lib/runtime.mjs';
 import { workspaceRoot } from '../../lib/paths.mjs';
@@ -225,6 +225,55 @@ test('der Paketbau gehoert in die CI, nicht in den Arbeitsbaum', () => {
   assert.match(manifest.scripts.deb ?? '', /deb-build\.mjs/, 'npm run deb');
   assert.match(manifest.scripts.win ?? '', /win-build\.mjs/, 'npm run win');
   assert.equal(manifest.scripts['package:all'], undefined, 'kein Combined-Bau: der Windows-Bau laeuft auf Windows');
+});
+
+test('das AppImage traegt dieselbe Nutzlast, eine eigene Huelle und ein Icon', () => {
+  // Der AppRun startet den Unix-Starter der Nutzlast — relativ zu sich selbst,
+  // weil das Laufzeitsystem das Abbild nach /tmp mountet.
+  const apprun = appRunSh({ payloadDir: 'usr/lib/shinon-forge' });
+  assert.match(apprun, /^#!\/bin\/sh$/m, 'der AppRun ist ein Shell-Skript');
+  assert.match(apprun, /dirname "\$0"/, 'der AppRun leitet seinen Ort ab');
+  assert.match(apprun, /usr\/lib\/shinon-forge\/shinon"/, 'er startet den Starter der Nutzlast');
+  assert.doesNotMatch(apprun, /\/opt\/shinon-forge|\/tmp\//, 'kein fest verdrahteter Pfad');
+
+  // Der Menueeintrag im Abbild: Exec=AppRun ist die Konvention, Icon=<Name>
+  // muss zu der Datei an der Wurzel passen (assets/icon.svg -> shinon-forge.svg).
+  const desktop = appImageDesktopEntry();
+  assert.match(desktop, /^Exec=AppRun$/m, 'der Eintrag zeigt relativ auf den AppRun');
+  assert.match(desktop, /^Icon=shinon-forge$/m, 'das Icon heisst wie die Datei an der Wurzel');
+  assert.match(desktop, /^Terminal=false$/m);
+  assert.equal(existsSync(join(ROOT, 'assets', 'icon.svg')), true, 'das Icon liegt im Repo');
+
+  // Das AppImage-Skript nutzt dieselbe Nutzlast wie das .deb — kein zweiter
+  // Inhalt. Die Gleichheit ist ueber den gemeinsamen Baumeister gesichert.
+  const appimage = readFileSync(join(ROOT, 'scripts', 'appimage-build.mjs'), 'utf8');
+  assert.match(appimage, /buildPayload\(/, 'das AppImage baut ueber dieselbe Nutzlast');
+  assert.match(appimage, /payloadViolations\(/, 'und prueft dieselben Verbote');
+  assert.match(appimage, /APPIMAGETOOL/, 'das Werkzeug kommt aus APPIMAGETOOL oder dem PATH');
+  assert.match(appimage, /process\.exit\(1\)/, 'ohne Werkzeug endet der Bau mit Befund');
+
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  assert.match(pkg.scripts.appimage ?? '', /appimage-build\.mjs/, 'npm run appimage');
+
+  const ignore = readFileSync(join(ROOT, '.gitignore'), 'utf8');
+  assert.match(ignore, /^dist-appimage\/$/m, 'das Ausgabeverzeichnis ist ignoriert');
+});
+
+test('der AppImage-Bau gehoert in die CI, mit Nachweis und ohne lokalen Bau', () => {
+  const workflow = readFileSync(WORKFLOW, 'utf8');
+  assert.match(workflow, /^  appimage:$/m, 'es gibt einen eigenen AppImage-Job');
+  assert.match(workflow, /node scripts\/appimage-build\.mjs/, 'der Job baut das AppImage');
+  assert.match(workflow, /APPIMAGETOOL/, 'der Job setzt das Werkzeug');
+  // Der Nachweis: das Abbild wird entpackt, die mitgelieferte Laufzeit geprueft
+  // und der Starter im Abbild aufgerufen — ohne FUSE (CI-Runner haben keins).
+  assert.match(workflow, /--appimage-extract/, 'das Abbild wird entpackt');
+  assert.match(workflow, /APPIMAGE_EXTRACT_AND_RUN=1/, 'der Start laeuft ohne FUSE');
+  assert.match(workflow, /squashfs-root\/usr\/lib\/shinon-forge\/runtime\/node\/bin\/node --version/, 'die Laufzeit im Abbild');
+  assert.match(workflow, /shinon-forge-appimage-x64/, 'der Artefakt-Name');
+  // Die Pruefsumme laeuft wie bei den anderen Paketen.
+  assert.match(workflow, /AppImage\.sha256|\.AppImage"\s*>\s*"\$f\.sha256"|sha256sum "\$f"/, 'die Pruefsumme wird abgelegt');
+  // Der Release-Job wartet auf alle drei Pakete.
+  assert.match(workflow, /needs: \[deb, windows, appimage\]/, 'der Release-Anhang wartet auf das AppImage');
 });
 
 test('der Paketbau nimmt das npm, das zu diesem Node gehoert', () => {
