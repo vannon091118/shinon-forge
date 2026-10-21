@@ -1109,6 +1109,14 @@ lesen den Wert nie; ein leerer Eintrag zaehlt nicht als Schluessel. Was dieser
 Leser bewusst **nicht** anfasst: `records:` — dort stehen die beiden zur
 Rotation offenen Geheimnisse (Session-Cookie, Zugriffstoken).
 
+Die Reihenfolge ist nicht geraten, sondern im gepinnten Anbieter gelesen
+(`node_modules/@deepseek-ai/dsh-credentials-local/lib/index.js`, Kopfkommentar):
+`$DSH_HOME/.credentials.yaml` schlaegt die geerbte Umgebung, die schlaegt
+`<cwd>/.env`, die schlaegt `$DSH_HOME/.env`. Genau deshalb traegt der Seeder das
+Home: die Datei im Home ist dieselbe wie im Baum, und der Speicher gewinnt
+gegen jede Shell, die nichts exportiert hat. Der Wert selbst bleibt bei allen
+vier Quellen ungedruckt — gemeldet wird der Name, der gewinnt.
+
 Belegt: `npm run test:codingmon` PASS Exit 0 mit **107 von 107** Tests (vorher
 84; 23 im Encounter-Vertrag), `npm test` Exit 0 (statisch 126), `npm run
 gate:test` 889/889, `npm run gate:full` PASS 23/23, `npm run build` Exit 0,
