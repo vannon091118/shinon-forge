@@ -269,12 +269,9 @@ window.__ModuleLoader__.load({
           id: 'shinon-prompter',
         }, TracePanel));
 
-        ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-          name: 'sidebar.panellist',
-          id: 'shinon-prompter',
-          order: 30,
-          label: () => 'Prompter',
-        }, TracePanel));
+        // Kein `sidebar.panellist`-Eintrag mehr (2026-10-22): die Leiste war mit
+        // acht Panel-Knöpfen überladen, die Workspaces fielen heraus. Die Zahl
+        // steht als Widget in `@shinon/widget-dock`.
 
         ctx.effect?.(() => () => {
           try { source?.close(); } catch { /* schon zu */ }

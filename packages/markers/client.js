@@ -617,12 +617,9 @@ window.__ModuleLoader__.load({
         // <<< shinon:dsh-idiom locale-fallback/menu
 
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, MarkerPanel));
-        ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-          name: 'sidebar.panellist',
-          id: PANEL_ID,
-          order: 30,
-          label: () => t('menu.markers')
-        }, MarkerIcon));
+        // Kein `sidebar.panellist`-Eintrag mehr (2026-10-22): die Leiste war mit
+        // acht Panel-Knöpfen überladen, die Workspaces fielen heraus. Die Zahl
+        // steht als Widget in `@shinon/widget-dock`.
         console.log('[shinon-markers] Spiegel aktiv (m = markieren, Panel: ' + PANEL_ID + ')');
       }
     };

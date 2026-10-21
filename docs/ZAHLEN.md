@@ -17,14 +17,14 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 <!-- zahlen:bestand:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Pakete unter `packages/` | 24 | `ls packages \| wc -l` | 0 |
+| Pakete unter `packages/` | 25 | `ls packages \| wc -l` | 0 |
 | Profile unter `profiles/` | 3 | `git ls-files profiles \| cut -d/ -f2 \| sort -u \| wc -l` | 0 |
-| Bundle-Layer im Profil `shinon` | 26 | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.length"` | 0 |
-| davon eigene (`@shinon/*`) | 21 | dieselbe Liste, gefiltert auf `@shinon/` | 0 |
+| Bundle-Layer im Profil `shinon` | 27 | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.length"` | 0 |
+| davon eigene (`@shinon/*`) | 22 | dieselbe Liste, gefiltert auf `@shinon/` | 0 |
 | davon fremde | 5 | dieselbe Liste, Rest | 0 |
 | Pakete **nicht** im Profil (erklären sich selbst via `dsh.inactive`) | 3 (mobile, openapi, seams) | Manifeste unter `packages/*/package.json` lesen | 0 |
 | Version des Repos | `0.4.0` | `node -p "require('./package.json').version"` | 0 |
-| Paketversionen | 23× `1.0.0`, 1× `0.1.0` | `node -e "…"` über `packages/*/package.json` | 0 |
+| Paketversionen | 24× `1.0.0`, 1× `0.1.0` | `node -e "…"` über `packages/*/package.json` | 0 |
 | DSH-Pin im Root-Manifest | `0.2.1-rc.2` | `node -p "require('./package.json').dependencies['@deepseek-ai/dsh']"` | 0 |
 | Schemastery (deklariert) | `3.18.5` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
 | Node (`engines.node`) | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |

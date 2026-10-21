@@ -412,12 +412,9 @@ function progressReading(reading) {
           };
           // <<< shinon:dsh-idiom locale-fallback/menu
 
-          ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-            name: 'sidebar.panellist',
-            id: PANEL_ID,
-            order: 70,
-            label: () => t('menu.popup')
-          }, PopupIcon));
+          // Kein `sidebar.panellist`-Eintrag mehr (2026-10-22): acht Panel-Knöpfe
+          // hatten die Workspace-Liste aus der Leiste gedrängt. Der Zustand
+          // steht als Widget in `@shinon/widget-dock`.
         }
       },
     };

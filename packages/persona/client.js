@@ -230,15 +230,11 @@ window.__ModuleLoader__.load({
         registry.set(PLUGIN, { label: 'Persona', kind: 'client', panel: PANEL_ID });
         window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: PLUGIN } }));
 
-        // 'main' ist ein keyed-Slot (options.key); die Sidebar-Leiste ist eine
-        // list (options.id) — ohne beide Einträge wäre das Panel nicht erreichbar.
+        // 'main' ist ein keyed-Slot (options.key). KEIN Eintrag in
+        // `sidebar.panellist` mehr (2026-10-22): acht Panel-Knöpfe hatten die
+        // Workspace-Liste aus der Leiste gedrängt. Die Fläche bleibt als Panel
+        // erreichbar, die Zahl steht als Widget in `@shinon/widget-dock`.
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, ReviewPanel));
-        ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-          name: 'sidebar.panellist',
-          id: PANEL_ID,
-          order: 31,
-          label: () => 'Persona',
-        }, ReviewPanel));
       },
     };
   },

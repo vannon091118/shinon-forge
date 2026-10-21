@@ -1374,3 +1374,39 @@ dieses Tagebuch keine Erfolgsliste ist.
 
 Wo eine Zeile keine Quelle mehr hat (weil das Dokument in einer früheren Aufräumwelle
 verschwand), steht der Pfad, der die Behauptung heute trägt — nicht ein erfundenes Zitat.
+
+## 2026-10-22 — Ein Panel, das nur die Zahlen zeigt, und eine Leiste, die wieder atmet
+
+**Was am Ende wirklich passiert ist:** Der Datei-Browser zeigt jetzt, was sich im
+Arbeitsbaum geändert hat — im Kopf erst nur `+712 −306 · 42`, auf Klick die
+scrollbare Liste, je Datei ihre Hunks mit Marken. Das Panel rechnet keinen Diff:
+`node_modules/diff` liegt nur transitiv im Baum, kein Workspace-Manifest
+deklariert es, also fragt das Paket `git` (`status --porcelain`, `diff --numstat
+HEAD`, `diff --unified=2 HEAD -- <pfad>`) und deklariert **keine** neue
+Abhängigkeit. Was Git nicht vergleicht (unversioniert, binär), zählt nicht mit und
+trägt seinen Grund; eine Grenze meldet sich als `truncated: {soll, ist}` — nie
+stilles Kürzen. Belege: 14/14 im Gate-Test, 13/13 im Kern, Chip am laufenden Host
+auf 3085. Die Client-Hälfte steht mit **249** Zeilen unter der 250er-Grenze der
+`client`-Klasse; keine Anhebung, kein Bestandseintrag.
+
+**Zwei Sätze aus dem laufenden Host, die zu Fixes wurden:** Das Prüf-Panel zeigte
+„1 Auflage · 1 entschieden" und sonst nichts — jetzt steht der entschiedene
+Vorschlag mit Ausgang und Behauptung da. Und der Prompter hatte aus „Wer bist du?"
+einen `<task_brief>` über Identität und Vorschlags-Review gemacht; eine Frage wird
+klassifiziert, aber nie erweitert (`brief_reason: FRAGE`).
+
+**Die Leiste:** Acht Panel-Knöpfe drückten die Workspace-Liste aus einem 736-px-
+Fenster. Marker, Prompter, Persona und Popup treten aus `sidebar.panellist` aus;
+ihre Zahlen stehen als Widget-Zeilen in `@shinon/widget-dock` (ein Streifen, drei
+Zeilen, gespeist aus den kanonisch registrierten Globals). Dashboard und Codingmon
+bleiben Panels — sie brauchen die Fläche. Ein Werkzeugkasten, in dem jeder
+Schraubendreher eine eigene Schublade hat, findet nichts; drei Zeilen finden mehr.
+
+**Was offen bleibt:** der Screenshot der aufgeklappten Liste (die Seite verlor nach
+dem Reload die Sitzung), und der Modell-Wähler zeigt weiter nur eine Route — im
+Boot stehen `Katalog agnes: HTTP 401` und `prompter: HTTP 401` bei
+`openrouter: 468 Modelle live`.
+
+**Anker:** `8b1ec95` · Belege: `packages/diff-overview/client.js`,
+`scripts/gate/tests/diff-overview.test.mjs`, `docs/probes/diff-overview.json`,
+`packages/widget-dock/client.js`, `packages/prompter/assets/pre-step.js`

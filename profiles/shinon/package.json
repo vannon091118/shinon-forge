@@ -21,8 +21,9 @@
     "@shinon/task-router": "link:../../packages/task-router",
     "@shinon/token-usage": "link:../../packages/token-usage",
     "@shinon/tooltip": "link:../../packages/tooltip",
+    "@shinon/traceability": "link:../../packages/traceability",
     "@shinon/version": "link:../../packages/version",
-    "@shinon/traceability": "link:../../packages/traceability"
+    "@shinon/widget-dock": "link:../../packages/widget-dock"
   },
   "dsh": {
     "profile": {
@@ -35,6 +36,7 @@
         "@shinon/core",
         "@shinon/locale-de",
         "@shinon/tooltip",
+        "@shinon/widget-dock",
         "@shinon/dashboard",
         "@shinon/better-errors",
         "@shinon/token-usage",
