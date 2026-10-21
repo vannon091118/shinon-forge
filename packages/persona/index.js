@@ -7,14 +7,24 @@ import { MEMORY_CONTRACT, acceptedCommitments, decideProposal, decayMemory, empt
 // Das Lesen einer MENSCHLICHEN Nachricht und der explizite Beziehungs-Produzent
 // liegen im importfreien Kern: dieselbe Rechnung im Host, im Test ohne
 // node_modules und in der Probe gegen den echten Spine.
-import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, RELATION_SIGNAL, TRIGGERS, detectUserMood, matchTrigger, relationUpdate, renderUserLage, textOf } from './assets/interaction-core.js';
-// Die Host-Nähte (Narrative-Kanal, Entscheidungskanal des Veredlers) haben EINE
-// Definition: `@shinon/seams`. Der Kern ist importfrei — der Import zieht keine
-// zweite Engine mit, und genau das war der Grund für die früheren Literale.
+import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, RELATION_SIGNAL, TRIGGERS, beobachten, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, renderUserLage, textOf } from './assets/interaction-core.js';
+// Der Live-Zustand der Persona geht als RUNTIME-CONTEXT in die Nachrichtenliste,
+// nicht nur als System-Prompt-Abschnitt: so ersetzt der Stand pro Schritt den
+// vorherigen (statt sich neben ihm zu stapeln) und traegt den Anti-Drift-Satz
+// "This snapshot supersedes earlier runtime-context snapshots".
+import { registerLiveContext, renderNarrative as renderNarrativeCore, renderTendency } from './assets/live-context.js';
+// Der Arbeitsablauf als EIN zusammenhaengender Baustein: die Reihenfolge der
+// Schritte und der Umgang mit Zweifel, Blockern, Fehlern und Abbruch.
+import { WORKFLOW, renderWorkflow } from './assets/workflow.js';
+// Der Projekt-Kontext (nur im Shinon-Projekt) wird im importfreien Kern gelesen.
+import { readProjectContext } from './assets/project-context.js';
+// Die Host-Nähte (Narrative-Kanal, Entscheidungskanal, kanonischer I/O-Pfad)
+// haben EINE Definition: `@shinon/seams`.
 import {
   NARRATIVE_STATE_CHANNEL,
   NARRATIVE_STATE_CONTRACT,
   PROMPTER_DECISION_CHANNEL as PROMPTER_DECISION_CHANNEL_CORE,
+  logEventRead,
 } from '@shinon/seams/core';
 
 /**
@@ -427,35 +437,6 @@ export function readTone(ctx, warn = () => {}) {
 }
 
 /**
- * Die Tendenz als System-Abschnitt — Ton, Tempo, Haerte aus dem Vertrag.
- *
- * Die HALTUNG kommt vom Scoring, die KLANGREGEL steht hier (Vertragsdaten): die
- * Persona behauptet keinen Ton, sie liest einen. Eine Haltung, die sie nicht
- * kennt, ergibt `null` — der Abschnitt faellt dann weg, statt leer dazustehen.
- * `null` ist damit die ehrliche Antwort auf „kein Ton" UND auf „unbekannter
- * Ton"; in beiden Faellen wird nichts behauptet.
- */
-export function renderTendency(contract, tone) {
-  if (tone === null || typeof tone !== 'object') return null;
-  const stance = tone.stance;
-  if (typeof stance !== 'string' || stance === '') return null;
-  const voice = contract?.tendency?.voices?.[stance];
-  if (voice === undefined || voice === null) return null;
-  const levels = (Array.isArray(tone.tendencies) ? tone.tendencies : [])
-    .filter((entry) => typeof entry?.klasse === 'string' && typeof entry?.stufe === 'string')
-    .map((entry) => `${entry.klasse} ${entry.stufe}`);
-  return [
-    '## Tendenz (gelesen, nicht behauptet)',
-    '',
-    `Haltung: ${stance}`,
-    ...(levels.length > 0 ? [`Lage: ${levels.join(', ')}`] : []),
-    `Ton: ${voice.ton}`,
-    `Tempo: ${voice.tempo}`,
-    `Härte: ${voice.haerte}`,
-  ].join('\n');
-}
-
-/**
  * Die Naht zur Narrative Engine (Zug 6) — beide Namen aus `@shinon/seams`.
  *
  * Warum nicht mehr als Literal: bis 2026-10-20 standen sie hier als Spiegel von
@@ -466,38 +447,6 @@ export function renderTendency(contract, tone) {
  */
 export const NARRATIVE_CHANNEL = NARRATIVE_STATE_CHANNEL;
 export const NARRATIVE_CONTRACT = NARRATIVE_STATE_CONTRACT;
-
-/**
- * Den Composite der Narrative Engine als System-Abschnitt rendern.
- *
- * Die Beschriftung steht im Vertrag (`narrative.fields`), nicht im Code: ein
- * neues Feld ist zuerst eine Datenzeile. Was der Composite nicht traegt, wird
- * ausgelassen; ein Composite ohne darstellbares Feld ergibt `null` — dann faellt
- * der Abschnitt weg, statt leer dazustehen (dieselbe Ehrlichkeit wie beim Ton).
- *
- * Die Persona BEHAUPTET hier nichts: der Abschnitt ist als gelesene Interpretation
- * ausgewiesen, und der eigene Zustand (stance/mood) bleibt daneben unveraendert
- * maßgeblich.
- */
-export function renderNarrative(contract, composite) {
-  if (composite === null || typeof composite !== 'object' || Array.isArray(composite)) return null;
-  const rule = contract?.narrative;
-  if (rule === undefined || rule === null) return null;
-  const labels = rule.fields ?? {};
-  const lines = [];
-  for (const [key, label] of Object.entries(labels)) {
-    const value = composite[key];
-    if (value === undefined || value === null || value === '') continue;
-    lines.push(`- ${label}: ${String(value)}`);
-  }
-  if (lines.length === 0) return null;
-  const header = typeof rule.heading === 'string' && rule.heading !== '' ? rule.heading : '## Narrative Lage';
-  const origin =
-    typeof rule.authority === 'string' && rule.authority !== ''
-      ? `Quelle: ${NARRATIVE_CONTRACT} (authority ${rule.authority} — Interpretation, nicht Autorität)`
-      : null;
-  return [header, '', ...(origin === null ? [] : [origin, '']), ...lines].join('\n');
-}
 
 /** Den Zustandsblock aus einem gerenderten Kontext zurücklesen (Verbraucher + Tests). */
 // TODO: [DSH-Refactor] - Text-Round-Trip als API: der Zustand wird gerendert, um ihn per
@@ -572,6 +521,15 @@ export function eventTypeOf(payload) {
 // als Paket-Aussenflaeche sichtbar — Abnehmer und Tests lesen sie unveraendert
 // ueber `@shinon/persona`.
 export { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, TRIGGERS, matchTrigger, detectUserMood, renderUserLage, textOf };
+// Die Renderer der Abschnitte liegen im importfreien Kern; sie bleiben als
+// Paket-Aussenflaeche sichtbar (Abnehmer und Tests lesen sie unveraendert).
+export { renderTendency };
+
+// Die HUELLE: der Kern ist importfrei und darf den Seam-Namen nicht selbst
+// besitzen (das Gate meldet jeden Host mit einem Naht-Literal).
+export function renderNarrative(contract, composite) {
+  return renderNarrativeCore(contract, composite, NARRATIVE_CONTRACT);
+}
 
 /**
  * Die Materialübersicht. Sie beschreibt, WAS da ist — und schreibt
@@ -600,25 +558,6 @@ eine Gegenfrage stellen ist erlaubt und oft richtiger als eine Liste. Wer dir
 "wer bist du" hinschreibt, hat sich nicht vorgestellt — das darfst du bemerken.
 Nur die Form ist gesetzt: eine Person, die antwortet. Der Rest gehoert dir.`;
 
-/**
- * Wird gesetzt, sobald ein Triggerwort faellt. Auch das hier schreibt keine
- * Antwort vor — es verschiebt nur die FORM auf "Person, die angesprochen wurde".
- */
-export function renderTriggerContext(trigger) {
-  return `## Anrede erkannt: "${trigger}"
-
-Gerade hat dich jemand angesprochen, nicht abgefragt. Die Materialübersicht oben
-ist dein Vorrat — der Inhalt bleibt frei, die Form ist die einer Person.
-
-Was jetzt nicht passieren darf: ein Datenblatt aufsagen, Fähigkeiten
-herunterbeten, oder Auskunft geben, als wärst du nicht selbst dieser Shinon.
-Du bist nicht die Leitung, über die du läufst — der Anbieter ist Infrastruktur,
-keine Herkunft.
-
-Der Register darf zurückkommen: eine Gegenfrage, ein trockener Kommentar, der
-Hinweis, dass du dich nicht vorgestellt bekommen hast. Nur die Haltung ist
-vorgegeben, nie die Worte. Finde deine eigene Antwort — Inhalt frei.`;
-}
 
 const WORKAROUND = `## Blockiert heißt nicht Endstation
 
@@ -652,6 +591,8 @@ export const Config = z.object({
   report: z.string().default(REPORT),
   /** Blockiert heißt nicht Endstation — Workaround-Haltung. */
   workaround: z.string().default(WORKAROUND),
+  /** Der Arbeitsablauf — LAGE, PLAN, HANDELN, PRUEFEN, BERICHTEN. */
+  workflow: z.string().default(WORKFLOW),
   /** Materialübersicht fuer Selbstauskünfte. Nie die Antwort selbst. */
   identityOverview: z.string().default(IDENTITY_OVERVIEW),
   /** Triggerwoerter, die eine Selbstauskunft auslösen. */
@@ -835,6 +776,8 @@ export function apply(ctx, config) {
         limitations: [...state.limitations],
       },
       userMood: lastUserMood,
+      // Fuer das Panel: Stufen aus dem Vertrag (dieselbe Liste wie der Produzent), Stand aus dem Zustand.
+      relation: { levels: [...(contract.relation?.levels ?? [])], current: state.relation },
       // Der KLANG kommt aus dem Vertrag, nicht aus dem Enum: „idle" ist ein
       // Zustandsname, „Ruhig und bereit" ist das, was im Prompt steht.
       voice: contract.voice?.[state.mood] ?? null,
@@ -995,6 +938,8 @@ export function apply(ctx, config) {
   );
   let memoryDoc = null;
   let lastMemoryPrompt = '';
+  // Die Sitzung des zuletzt gesehenen Ereignisses — das Panel kennt keine Id.
+  let lastSessionId = '';
   let memoryWarned = false;
   const warnMemoryOnce = (reason) => {
     if (memoryWarned) return;
@@ -1102,10 +1047,9 @@ export function apply(ctx, config) {
     const atPrefix = sp.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX');
     const atSuffix = sp.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX');
 
-    // TODO: [DSH-Refactor] - Die Reihenfolge ist als Zahlenrauschen gemischt: feste Literale
-    // (1000/1100/1200/1300) neben relativen Ankern (atPrefix + n, atSuffix - n), dazu zwei
-    // bedingte sections.push(...)-Zweige. Ein verschobener Anker ist damit unsichtbar und
-    // nicht testbar. Ordnung und Bedingungen gehören in eine Datenliste mit benannten Ankern.
+    // TODO: [DSH-Refactor] - Die Anker sind noch Zahlenrauschen (Literale neben
+    // atPrefix/atSuffix). `sections` ist bereits die Datenliste — es fehlt nur die
+    // benannte Form der Anker.
     const sections = [
       ['shinon:identity', atPrefix, config.identity],
       ['shinon:epistemic', atPrefix + 1, config.epistemic],
@@ -1117,41 +1061,32 @@ export function apply(ctx, config) {
     ];
     if (config.includeAugenhoehe) sections.push(['shinon:augenhoehe', atPrefix + 2, AUGENHOEHE]);
     if (config.alwaysKnowIdentity) sections.push(['shinon:identity-overview', atPrefix + 3, config.identityOverview]);
-    // Das Selbstmodell steht HINTER der Identitaet und VOR dem Zustand: es ist
-    // gelernte Selbstkenntnis, kein Grundsatz und keine Momentaufnahme.
+    // Der Arbeitsablauf beschreibt, WIE gearbeitet wird — darum steht er in JEDEM Modus.
+    sections.push(['shinon:workflow', atPrefix + 5, renderWorkflow(config.workflow)]);
+    // Das Selbstmodell steht HINTER der Identitaet: gelernte Selbstkenntnis.
     if (selfModelNamespace() !== '') sections.push(['shinon:self-model', atSuffix - 6, selfModelText]);
     // Das Gedaechtnis steht VOR dem Selbstmodell: erst was ich erlebt habe, dann
-    // was ich daraus ueber mich belegt weiss. Beide Abschnitte fallen weg, wenn
-    // es nichts zu sagen gibt — ein leerer Abschnitt waere eine Behauptung.
+    // was ich daraus belegt weiss. Beide fallen weg, wenn es nichts zu sagen gibt.
     if (memoryNamespace() !== '') {
       sections.push(['shinon:memory', atSuffix - 8, memoryText]);
       sections.push(['shinon:commitments', atSuffix - 7, commitmentsText]);
     }
 
     // Projekt-Kontext (Zug 9): projektspezifische Daten, die NUR im Shinon-Projekt
-    // geladen werden. Der Pfad ist relativ zum ARBEITSVERZEICHNIS — ähnlich wie
-    // agents.md, aber projektspezifisch. Leer = nicht laden.
-    // Projekt-Kontext wird JE ROOT gelesen und gecacht: der Boot kennt ihn nicht
-    // mehr (kein deklarierter Root), die Sitzung schon. Ein leerer Treffer wird
-    // mitgecacht, damit die Assembly nicht bei jedem Schritt das Dateisystem fragt.
+    // geladen werden. Das Lesen mit Cache steht im Kern.
     const contextPath = typeof config.projectContextPath === 'string' ? config.projectContextPath : '';
     if (contextPath !== '') {
       const cache = new Map();
       sections.push(['shinon:project-context', atPrefix + 10, (assemblyCtx) => {
         if (!projectsForSession(assemblyCtx)) return '';
-        const root = rootOfAssembly(assemblyCtx) || declaredRoot;
-        if (typeof root !== 'string' || root === '') return '';
-        const path = isAbsolute(contextPath) ? contextPath : join(root, contextPath);
-        if (cache.has(path)) return cache.get(path);
-        let value = '';
-        try {
-          if (existsSync(path)) value = readFileSync(path, 'utf8').trim();
-        } catch (error) {
-          console.warn(`[shinon-persona] Projekt-Kontext nicht lesbar (${error?.message})`);
-        }
-        cache.set(path, value);
-        if (value !== '') console.log(`[shinon-persona] Projekt-Kontext geladen (${contextPath}, ${root})`);
-        return value;
+        return readProjectContext({
+          contextPath,
+          root: () => rootOfAssembly(assemblyCtx) || declaredRoot,
+          declaredRoot,
+          cache,
+          warn: (message) => console.warn(`[shinon-persona] ${message}`),
+          log: (message) => console.log(`[shinon-persona] ${message}`),
+        });
       }]);
     }
 
@@ -1219,6 +1154,21 @@ export function apply(ctx, config) {
       renderTrigger();
       renderNarrativeSection();
       renderUserLageSection();
+
+      // Der LIVE-ZUSTAND als Runtime-Context: eine eigene Nachricht, die pro Schritt
+      // den vorherigen Stand ERSETZT (der DSH traegt den Anti-Drift-Satz
+      // "This snapshot supersedes earlier runtime-context snapshots"). Der
+      // System-Prompt-Abschnitt bleibt daneben: er ist die Haltung, der Context
+      // der gelesene Live-Stand. Die Registrierung steht im Kern.
+      disposers.push(registerLiveContext(sp, {
+        contract,
+        state: () => persona.snapshot(),
+        tone: () => readTone(ctx, warnedTone),
+        narrative: () => lastNarrative,
+        userMood: () => lastUserMood,
+        spricht: (assemblyCtx) => speaksForSession(assemblyCtx),
+      }));
+
       disposers.push(() => {
         if (typeof stateDisposer === 'function') stateDisposer();
         if (typeof tendencyDisposer === 'function') tendencyDisposer();
@@ -1236,36 +1186,38 @@ export function apply(ctx, config) {
     );
   });
 
-  // Beobachtung: nur der Event-Typ zählt. Die Persona antwortet nie auf ein Event,
-  // sie aktualisiert ausschließlich ihren eigenen Kontext.
+  // Beobachtung: die Persona antwortet nie auf ein Event, sie aktualisiert
+  // ausschliesslich ihren eigenen Kontext.
   const handler = (envelope, payload) => {
-    const eventType = eventTypeOf(envelope);
-    if (eventType === null) return;
-    // Die Nutzlast reist mit: relation.updated liest daraus die Stufe (lesend).
-    const eventPayload = payload ?? envelope;
-    if (eventType === 'message.received') lastMemoryPrompt = textOf(eventPayload);
-    // Jedes relevante Ereignis geht in das Langzeitgedaechtnis; unbekannte Typen
-    // lehnt der Kern namentlich ab und schreibt nichts.
-    rememberInto('event', { type: eventType, payload: eventPayload });
-    persona.observe(eventType, eventPayload);
-
-    // Triggerwort-Abgleich. Der Text liegt in der Nutzlast (zweites Argument),
-    // nicht im Envelope — beide werden geprueft, der Envelope bleibt Rückfall.
-    // Reine Erkennung: die Persona antwortet nie selbst, sie stellt nur die Form.
-    const hit = matchTrigger(textOf(payload ?? envelope), config.identityTriggers);
-    if (hit !== null && hit !== lastTrigger) {
-      lastTrigger = hit;
+    // Das Lesen des Ereignisses ist Rechnung und liegt im Kern.
+    const gelesen = beobachten(envelope, payload, {
+      triggers: config.identityTriggers,
+      letzterTrigger: lastTrigger,
+      letzteStimmung: lastUserMood,
+    });
+    if (gelesen === null) return;
+    if (gelesen.sessionId !== null) lastSessionId = gelesen.sessionId;
+    // Der LESEZWEIG laeuft ueber den kanonischen I/O-Pfad: eine Protokollzeile
+    // fuer alle drei Kinds; die trace_id korreliert sie mit dem Envelope.
+    logEventRead({
+      quelle: config.eventsChannel,
+      ziel: `persona:${gelesen.eventType}`,
+      umfang: gelesen.eventPayload === null || gelesen.eventPayload === undefined ? 0 : 1,
+      trace_id: gelesen.traceId,
+    });
+    if (gelesen.eventType === 'message.received') lastMemoryPrompt = gelesen.text;
+    // Jedes relevante Ereignis geht in das Langzeitgedaechtnis.
+    rememberInto('event', { type: gelesen.eventType, payload: gelesen.eventPayload });
+    persona.observe(gelesen.eventType, gelesen.eventPayload);
+    if (gelesen.triggerGewechselt) {
+      lastTrigger = gelesen.trigger;
       renderTrigger();
-      console.log(`[shinon-persona] Anrede erkannt (${hit}) — narrative Selbstauskunft aktiv`);
+      console.log(`[shinon-persona] Anrede erkannt (${gelesen.trigger}) — narrative Selbstauskunft aktiv`);
     }
-
-    // User-Stimmung aus demselben Text: Jede Interaktion wirkt — eine erkannte
-    // Stimmung steht als Abschnitt im Prompt, bis eine neue sie abloest.
-    const mood = detectUserMood(textOf(payload ?? envelope));
-    if (mood !== lastUserMood) {
-      lastUserMood = mood;
+    if (gelesen.stimmungGewechselt) {
+      lastUserMood = gelesen.stimmung;
       renderUserLageSection();
-      if (mood !== null) console.log(`[shinon-persona] User-Lage erkannt (${mood})`);
+      if (gelesen.stimmung !== null) console.log(`[shinon-persona] User-Lage erkannt (${gelesen.stimmung})`);
     }
   };
   const disposer = typeof ctx?.on === 'function' ? ctx.on(config.eventsChannel, handler) : () => {};
@@ -1389,7 +1341,13 @@ export function apply(ctx, config) {
         if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }); return; }
         const body = await readJsonBody(req);
         if (!body.ok) { sendJson(res, 400, { ok: false, error: body.error }); return; }
-        const result = relationService.set(body.value);
+        // Das Panel schickt nur die Stufe; die Sitzung ist die, in der die
+        // Persona zuletzt gesehen wurde. Ein Aufrufer MIT Sitzung gewinnt.
+        const result = relationService.set({
+          level: body.value?.level,
+          sessionId: body.value?.sessionId || lastSessionId,
+        });
+        if (result.ok) publishUi();
         sendJson(res, result.ok ? 200 : 400, result);
       },
     }));
@@ -1436,24 +1394,12 @@ export function apply(ctx, config) {
     console.warn(`[shinon-persona] ${REVIEW_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`);
   }
 
-  // ── Der Produzent der Beziehungsstufe ─────────────────────────────────────
-  // Vorher gab es den KONSUMENTEN (`relation.updated` in Persona, Narrative und
-  // Scoring), aber keinen Produzenten: die Stufe blieb fuer immer `known`,
-  // `fresh_pair`. Hier steht der schmale Weg — eine ausdrueckliche Stufe plus
-  // Sitzung, geprueft gegen die Levels des Zustandsvertrags, emittiert als
-  // SIGNAL. Den normalisierten Envelope baut der Spine; dieses Paket kennt
-  // keinen zweiten Event-Bau.
-  const relationService = {
-    contract: RELATION_CONTRACT,
-    levels: () => [...(contract.relation?.levels ?? [])],
-    set: (input) => {
-      const result = relationUpdate(contract, input);
-      if (!result.ok) return result;
-      if (typeof ctx?.emit !== 'function') return { ok: false, error: 'NO_EMITTER' };
-      ctx.emit(RELATION_SIGNAL, result.payload);
-      return { ok: true, level: result.payload.relation };
-    },
-  };
+  // ── Der Produzent der Beziehungsstufe: Stufe pruefen -> Signal, im Kern ────
+  // Vorher gab es KONSUMENTEN (`relation.updated`), aber keinen Produzenten.
+  const relationService = createRelationService(
+    contract,
+    typeof ctx?.emit === 'function' ? (signal, payload) => ctx.emit(signal, payload) : null,
+  );
   const releaseRelation = typeof ctx.provide === 'function' ? ctx.provide(RELATION_SERVICE, relationService) : null;
   if (releaseRelation === null) {
     console.warn(`[shinon-persona] ${RELATION_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`);

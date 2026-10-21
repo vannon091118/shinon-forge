@@ -4,6 +4,7 @@ import { basename, resolve } from 'node:path';
 import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, createFactsService } from './assets/facts-service.js';
 import { FACTS_FILE_NAME } from './assets/facts-store.js';
 import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
+import { createRefreshService } from './assets/refresh-core.js';
 import {
   CONTRACT,
   DEFAULT_CONTEXT_BUDGET,
@@ -227,11 +228,21 @@ export function createQueryService({
   chunkLines = 40,
   maxFileBytes = 262144,
   trace = true,
+  // Der Haken, der den Index im Hintergrund auffrischt. Die Abfrage ruft ihn,
+  // wenn der Index zu alt ist — der Moment, in dem ein frischer Stand zaehlt.
+  onStale = null,
 }) {
   return {
     contract: QUERY_CONTRACT,
     resolveContext(prompt, options = {}) {
       if (!existsSync(indexFile)) return null;
+      // Der Index ist zu alt: der Hintergrund-Refresh laeuft los, und diese
+      // Abfrage beantwortet den Turn aus dem LETZTEN Stand (der Worker hat
+      // keine Zeit). Das ist der ehrliche Weg: der Aufrufer wartet nicht, und
+      // der naechste Turn hat einen frischen Index.
+      if (typeof onStale === 'function') {
+        try { onStale(prompt); } catch { /* die Wartung darf die Abfrage nicht brechen */ }
+      }
       const budget = Number.isFinite(options?.budgetTokens) ? options.budgetTokens : budgetTokens;
       // S1: die Abfrage ist an DENSELBEN Workspace gebunden wie der Lauf. Ein
       // untergeschobener Index (Kopie, falscher Pfad) hat eine fremde
@@ -297,6 +308,17 @@ export const Config = z.object({
   maxFileBytes: z.number().default(262144),
   /** Fenstergroesse der Chunks in Zeilen. */
   chunkLines: z.number().default(40),
+  /**
+   * Das Alter, ab dem der Index im Hintergrund aufgefrischt wird (ms).
+   *
+   * 0 schaltet den Hintergrund-Refresh AB. Das ist der Default, weil ein
+   * Hintergrundlauf, den niemand angefordert hat, in einem Host, der
+   * gleichmassen beendet wird, nur Rauschen ist. Wer ihn will, stellt eine
+   * Zahl ein — und die Zahl ist die Antwort auf "wie alt darf der Index sein".
+   */
+  refreshMaxAgeMs: z.number().default(0),
+  /** Der Event-Kanal, auf dem der Refresh hoert. Leer = kein Trigger. */
+  eventsChannel: z.string().default('shinon/event'),
   /**
    * Wie der Lauf Unveraendertheit feststellt — die Frage ist, was er ueber eine
    * Datei ANNIMMT:
@@ -409,6 +431,20 @@ export function apply(ctx, config) {
   // ehrlich leer. Ob sie angeboten werden konnte, steht in DERSELBEN
   // Aktivierungszeile — nicht als zweite Meldung: der Mount meldet seinen
   // Zustand einmal, und ein Host ohne `provide` ist kein Fehler des Laufs.
+  // Der Hintergrund-Refresh: eine WARTUNGSFAEHIGkeit, keine Datennahet. Sie
+  // wird NICHT angeboten — der Index bietet genau drei schmale Faehigkeiten
+  // (Abfrage, Ablage, Fakten-Snapshot), und eine vierte wuerde die Regel
+  // brechen, die context-wiring.test.mjs pinnt. Der Refresh laeuft intern:
+  // die Abfrage stoesst ihn an, wenn der Index zu alt ist, und der
+  // workspace.changed-Ereignis stoesst ihn an, wenn sich der Baum aendert.
+  const refreshService = createRefreshService({
+    file,
+    root: options.root,
+    chunkLines: options.chunkLines,
+    maxFileBytes: options.maxFileBytes,
+    maxAgeMs: config.refreshMaxAgeMs,
+    trace: config.trace,
+  });
   const canProvide = typeof ctx?.provide === 'function';
   const releaseQuery = canProvide
     ? ctx.provide(QUERY_SERVICE, createQueryService({
@@ -417,6 +453,9 @@ export function apply(ctx, config) {
       chunkLines: options.chunkLines,
       maxFileBytes: options.maxFileBytes,
       trace: config.trace,
+      onStale: config.refreshMaxAgeMs > 0
+        ? (prompt) => { refreshService.refreshAsync(prompt).catch(() => {}); }
+        : null,
     }))
     : null;
   const releaseStore = canProvide
@@ -427,6 +466,15 @@ export function apply(ctx, config) {
   const releaseFacts = canProvide
     ? ctx.provide(FACTS_SNAPSHOT_SERVICE, createFactsService({ file: factsFile, root: options.root, trace: config.trace }))
     : null;
+  // Der TRIGGER: hat sich der Workspace geaendert, wird der Index im
+  // Hintergrund aufgefrischt — ohne den Turn zu blockieren. Der Aufrufer
+  // bekommt das Promise nicht; es laeuft einfach.
+  const trigger = typeof ctx?.on === 'function' && config.refreshMaxAgeMs > 0
+    ? ctx.on(config.eventsChannel, (payload) => {
+      if (payload?.event_type !== 'workspace.changed' && payload?.type !== 'workspace.changed') return;
+      refreshService.refreshAsync('', { geaendert: true }).catch(() => {});
+    })
+    : () => {};
   const factsState = canProvide
     ? `Fakten ${FACTS_SNAPSHOT_SERVICE} bereitgestellt (${FACTS_SNAPSHOT_CONTRACT}: ${factsFile})`
     : `Fakten ${FACTS_SNAPSHOT_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
@@ -488,5 +536,6 @@ export function apply(ctx, config) {
     if (typeof releaseQuery === 'function') releaseQuery();
     if (typeof releaseStore === 'function') releaseStore();
     if (typeof releaseFacts === 'function') releaseFacts();
+    trigger();
   };
 }

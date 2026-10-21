@@ -341,16 +341,36 @@ test('relation: der ausdrueckliche Akt erreicht Persona und Narrative durch den 
   assert.ok(service, 'der Beziehungs-Produzent wird nicht angeboten');
   assert.deepEqual(service.levels(), ['stranger', 'known', 'trusted', 'anchor']);
 
-  // Der Weg, den ein Aufrufer geht: Route -> Dienst -> Signal -> Spine -> Persona/Narrative.
   const route = routes.find((entry) => entry.path === loaded.persona.RELATION_ROUTE);
   assert.ok(route, 'die Beziehungs-Route fehlt');
-  const res = { status: 0, body: '', writeHead(status) { this.status = status; }, end(value) { this.body = value; } };
-  const req = Readable.from([Buffer.from(JSON.stringify({ level: 'trusted', sessionId: 'sess-1' }))]);
-  req.method = 'POST';
-  await route.handler(req, res);
+  const post = async (payload) => {
+    const res = { status: 0, body: '', writeHead(status) { this.status = status; }, end(value) { this.body = value; } };
+    const req = Readable.from([Buffer.from(JSON.stringify(payload))]);
+    req.method = 'POST';
+    await route.handler(req, res);
+    return { status: res.status, body: JSON.parse(res.body) };
+  };
 
-  assert.equal(res.status, 200, `Route antwortete ${res.status}: ${res.body}`);
-  assert.equal(JSON.parse(res.body).level, 'trusted');
+  // Vor dem ersten Ereignis kennt der Host keine Sitzung — fail-closed.
+  const early = await post({ level: 'trusted' });
+  assert.equal(early.status, 400, 'ohne Sitzung setzt die Route eine Stufe');
+  assert.equal(early.body.error, 'MISSING_SESSION');
+
+  // Danach: das Panel schickt NUR die Stufe; die Sitzung kommt aus dem Ereignis,
+  // das die Persona zuletzt gesehen hat (Route -> Dienst -> Signal -> Spine).
+  host.ctx.emit('session/event', SESSION, humanMessage('Wir arbeiten schon lange zusammen.'));
+  const res = await post({ level: 'trusted' });
+
+  assert.equal(res.status, 200, `Route antwortete ${res.status}: ${JSON.stringify(res.body)}`);
+  assert.equal(res.body.level, 'trusted');
+
+  // Der Startstand des Panels (dieselbe Naht wie der Banner): Stufen aus dem
+  // Vertrag, Stand aus dem Zustand — ohne ihn zeigt das Panel nichts an.
+  const table = [];
+  host.ctx.emit(loaded.persona.INDEX_INJECT, table);
+  const injected = table.find((entry) => entry.kind === 'global' && entry.name === loaded.persona.UI_STATE_GLOBAL);
+  assert.ok(injected, 'der Zustands-Global fehlt');
+  assert.deepEqual(injected.value.relation, { levels: ['stranger', 'known', 'trusted', 'anchor'], current: 'trusted' });
   const state = hub.render(ASSEMBLY).find((section) => section.name === 'shinon:state');
   assert.ok(state, 'Zustands-Abschnitt fehlt');
   assert.match(state.text, /"relation": "trusted"/);

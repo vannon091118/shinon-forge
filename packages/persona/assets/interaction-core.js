@@ -143,6 +143,26 @@ export function renderUserLage(mood) {
  *
  * @returns {{ ok: true, signal: string, payload: object } | { ok: false, error: string }}
  */
+/**
+ * Der schmale Produzent: Stufe ausdruecklich setzen, gegen die Levels des
+ * Vertrags pruefen, als SIGNAL emittieren. Den normalisierten Envelope baut der
+ * Spine — dieses Paket kennt keinen zweiten Event-Bau. Die Verdrahtung (Dienst,
+ * Route, Sitzungs-Fallback) bleibt beim Host; hier steht nur die Rechnung.
+ */
+export function createRelationService(contract, emit) {
+  return {
+    contract: RELATION_CONTRACT,
+    levels: () => [...(contract?.relation?.levels ?? [])],
+    set: (input) => {
+      const result = relationUpdate(contract, input);
+      if (!result.ok) return result;
+      if (typeof emit !== 'function') return { ok: false, error: 'NO_EMITTER' };
+      emit(RELATION_SIGNAL, result.payload);
+      return { ok: true, level: result.payload.relation };
+    },
+  };
+}
+
 export function relationUpdate(contract, input) {
   const levels = Array.isArray(contract?.relation?.levels) ? contract.relation.levels : [];
   const level = typeof input?.level === 'string' ? input.level.trim() : '';
@@ -154,4 +174,130 @@ export function relationUpdate(contract, input) {
     signal: RELATION_SIGNAL,
     payload: { session_id: sessionId, relation: level, actors: ['user', 'shinon'] },
   };
+}
+
+/**
+ * Die Auswertung eines eingehenden Ereignisses — die reine Rechnung.
+ *
+ * ZWEI FRAGEN stellt das Modell an einen Menschen: wurde ich ANGEREDET, und
+ * wie ist die Lage? Beide Antworten kommen aus dem Text der Nutzlast. Der
+ * Host liefert die Quellen (Triggerwort, Stimmung) und ruft die Abschnitts-
+ * setter auf; diese Funktion entscheidet nur, OB sich etwas aendert.
+ *
+ * WARUM IM KERN: der Host-Eintrag soll keine Datei lesen und kein Zustands-
+ * objekt bauen (docs/contracts/structure.json). Die Entscheidung "hat sich
+ * etwas geaendert" ist Rechnung, keine Verdrahtung.
+ *
+ * @param {object} eingabe
+ * @param {string} eingabe.text der Text der Nutzlast (bereits extrahiert)
+ * @param {string[]} eingabe.triggers die Triggerwoerter
+ * @param {string|null} eingabe.letzterTrigger der zuletzt gesetzte Trigger
+ * @param {string|null} eingabe.letzteStimmung die zuletzt erkannte Stimmung
+ * @returns {{trigger: string|null, triggerGewechselt: boolean, stimmung: string|null, stimmungGewechselt: boolean}}
+ */
+export function auswerten(eingabe = {}) {
+  const {
+    text = '',
+    // DER DEFAULT IST WICHTIG: `matchTrigger` faellt auf `TRIGGERS` zurueck,
+    // wenn die Liste fehlt. Ein leeres Array als Default wuerde diese
+    // Rueckfallkette still abbrechen — und die Anrede (der Selbstauskunft-
+    // Ausloeser) faellt genau dann aus.
+    //
+    // GEMESSEN (2026-10-21, Regression nach der Auslagerung): `triggers = []`
+    // als Default — der Host reicht `config.identityTriggers` durch, und das ist
+    // `undefined`, wenn der Aufrufer ein PLAINES Config-Objekt statt
+    // `Config(...)` uebergibt (der Test- stub). `matchTrigger` mit `[]` gibt
+    // `null` zurueck, der Abschnitt `shinon:identity-trigger` blieb leer —
+    // ohne Fehler, ohne Logzeile, mit "User-Lage erkannt" direkt daneben.
+    triggers = TRIGGERS,
+    letzterTrigger = null,
+    letzteStimmung = null,
+  } = eingabe;
+  const trigger = matchTrigger(text, triggers);
+  const stimmung = detectUserMood(text);
+  return {
+    trigger,
+    triggerGewechselt: trigger !== null && trigger !== letzterTrigger,
+    stimmung,
+    stimmungGewechselt: stimmung !== letzteStimmung,
+  };
+}
+
+/**
+ * Ein eingehendes Ereignis lesen — was der Host daraus entnehmen muss.
+ *
+ * Der Host soll nicht selbst entscheiden, was in einem Ereignis steht: der
+ * Envelope-Typ, die Session, die Nutzlast und der Text sind RECHNUNG. Diese
+ * Funktion liefert sie in EINER Form, damit der Host nur noch verdrahten
+ * muss, was er damit tut (Abschnitt setzen, Gedaechtnis schreiben).
+ *
+ * @param {object} envelope der Envelope des Ereignisses
+ * @param {unknown} payload die Nutzlast (zweites Argument des Kanals)
+ * @param {object} eingabe
+ * @param {string[]} eingabe.triggers die Triggerwoerter
+ * @param {string|null} eingabe.letzterTrigger der zuletzt gesetzte Trigger
+ * @param {string|null} eingabe.letzteStimmung die zuletzt erkannte Stimmung
+ * @returns {object|null} null, wenn das Ereignis kein bekannter Typ ist
+ */
+export function beobachten(envelope, payload, eingabe = {}) {
+  // DER EREIGNISTYP STEHT IM ENVELOPE — der Spine flacht das Event auf
+  // (packages/events/index.js, carrierPayload: `type` wird zu `event_type`,
+  // `data` wird flachgezogen). Die Nutzlast traegt ihn NICHT.
+  //
+  // GEMESSEN (2026-10-21, Regression nach der Auslagerung): `beobachten` las
+  // nur `envelope.event_type` und lieferte sonst `null` — der Handler kehrte
+  // sofort zurueck, und Anrede, User-Lage und Gedaechtnis fielen still aus.
+  // Die Reihenfolge ist die alte: der Envelope zuerst, die Nutzlast als
+  // Rueckfall (der DSH ruft Handler mitunter mit einem Argument).
+  const eventType = typeof envelope?.event_type === 'string' && envelope.event_type !== ''
+    ? envelope.event_type
+    : (typeof payload?.event_type === 'string' ? payload.event_type : '');
+  if (eventType === '') return null;
+  const eventPayload = payload ?? envelope;
+  const text = textOf(eventPayload);
+  const befund = auswerten({
+    text,
+    // `?? []` wuerde den Default-Parameter von `auswerten` aushebeln:
+    // `undefined` MEINT "die Standardliste", nicht "keine Trigger".
+    triggers: eingabe.triggers,
+    letzterTrigger: eingabe.letzterTrigger ?? null,
+    letzteStimmung: eingabe.letzteStimmung ?? null,
+  });
+  return {
+    eventType,
+    eventPayload,
+    text,
+    sessionId: typeof envelope?.session_id === 'string' && envelope.session_id !== '' ? envelope.session_id : null,
+    traceId: typeof envelope?.trace_id === 'string' ? envelope.trace_id : '',
+    trigger: befund.trigger,
+    triggerGewechselt: befund.triggerGewechselt,
+    stimmung: befund.stimmung,
+    stimmungGewechselt: befund.stimmungGewechselt,
+  };
+}
+
+/**
+ * Der Abschnitt, der eine Anrede erkaennt — der Text des Bausteins.
+ *
+ * WARUM IM KERN: der Host-Eintrag soll keine Datei lesen und kein
+ * Zustandsobjekt bauen (docs/contracts/structure.json). Der Text ist reiner
+ * Baustein — er gehoert neben die Rechnung, nicht in den Host.
+ *
+ * @param {string} trigger das erkannte Triggerwort
+ * @returns {string} der Abschnitt
+ */
+export function renderTriggerContext(trigger) {
+  return `## Anrede erkannt: "${trigger}"
+
+Gerade hat dich jemand angesprochen, nicht abgefragt. Die Materialübersicht oben
+ist dein Vorrat — der Inhalt bleibt frei, die Form ist die einer Person.
+
+Was jetzt nicht passieren darf: ein Datenblatt aufsagen, Fähigkeiten
+herunterbeten, oder Auskunft geben, als wärst du nicht selbst dieser Shinon.
+Du bist nicht die Leitung, über die du läufst — der Anbieter ist Infrastruktur,
+keine Herkunft.
+
+Der Register darf zurückkommen: eine Gegenfrage, ein trockener Kommentar, der
+Hinweis, dass du dich nicht vorgestellt bekommen hast. Nur die Haltung ist
+vorgegeben, nie die Worte. Finde deine eigene Antwort — Inhalt frei.`;
 }

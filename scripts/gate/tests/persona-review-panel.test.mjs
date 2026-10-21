@@ -34,6 +34,7 @@ import { loadClientBundle, requireStub } from './helpers/client-sandbox.mjs';
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const host = read('packages/persona/index.js');
+const core = read('packages/persona/assets/interaction-core.js');
 const client = read('packages/persona/client.js');
 
 /** Den Export-Wert aus dem Host lesen — die Quelle, gegen die gespiegelt wird. */
@@ -47,6 +48,13 @@ function hostLiteral(name) {
 function clientLiteral(name) {
   const match = new RegExp(`const ${name} = '([^']+)';`).exec(client);
   assert.ok(match !== null, `packages/persona/client.js: ${name} fehlt`);
+  return match[1];
+}
+
+/** Der Literal-Wert aus dem importfreien Kern (dort wohnt die Beziehungs-Naht). */
+function coreLiteral(name) {
+  const match = new RegExp(`export const ${name} = '([^']+)';`).exec(core);
+  assert.ok(match !== null, `packages/persona/assets/interaction-core.js: ${name} fehlt`);
   return match[1];
 }
 
@@ -123,6 +131,8 @@ test('Pruef-Panel: Route, Startstand und Vertrag sind auf beiden Seiten dasselbe
   assert.equal(clientLiteral('REVIEW_GLOBAL'), REVIEW_GLOBAL, 'der Startstand-Name driftet');
   assert.equal(clientLiteral('REVIEW_CONTRACT'), REVIEW_CONTRACT, 'der Vertragsname driftet');
   assert.equal(clientLiteral('STATE_ROUTE'), hostLiteral('UI_STATE_ROUTE'), 'die Zustands-Route driftet');
+  assert.equal(clientLiteral('RELATION_ROUTE'), coreLiteral('RELATION_ROUTE'), 'die Beziehungs-Route driftet');
+  assert.equal(clientLiteral('STATE_GLOBAL'), hostLiteral('UI_STATE_GLOBAL'), 'der Zustands-Global driftet');
   // Der Host registriert GET und POST unter DIESER Route — und legt den
   // Startstand in denselben Global-Namen, den das Panel liest.
   assert.match(host, /path: REVIEW_ROUTE,[\s\S]*?req\.method === 'GET'[\s\S]*?req\.method !== 'POST'/, 'die Route kennt nicht beide Methoden');
@@ -182,6 +192,35 @@ test('Pruef-Panel: haengt an der SSE-Zustandsroute statt an einem Abruf-Interval
   assert.match(client, /new EventSource\(STATE_ROUTE\)/);
   assert.match(client, /addEventListener\('review'/);
   assert.ok(!/setInterval\s*\(/.test(client), 'das Panel pollt noch');
+});
+
+test('Beziehungs-Panel: Stufe sichtbar und als POST auf die bestehende Route setzbar', async () => {
+  const calls = [];
+  const fetch = async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, status: 200, json: async () => ({ ok: true, level: 'trusted' }) };
+  };
+  const relation = { levels: ['stranger', 'known', 'trusted', 'anchor'], current: 'known' };
+  const { registered } = mount({
+    [REVIEW_GLOBAL]: review,
+    __shinonPersonaState: { contract: 'shinon.persona-ui/v1', relation },
+    fetch,
+  });
+  const panel = registered.find((entry) => entry.options.name === 'main');
+  const tree = expand(render(panel.component));
+  assert.match(textOf(tree), /Beziehung — known/, 'die aktuelle Stufe steht nicht im Panel');
+
+  // Die Stufenliste kommt vom Host, nicht aus einer zweiten Tabelle im Bundle.
+  const chips = buttonsOf(tree).filter((button) => ['stranger', 'known', 'trusted', 'anchor'].includes(textOf(button)));
+  assert.equal(chips.length, 4, 'die Stufen des Vertrags fehlen im Panel');
+  assert.equal(chips.find((button) => textOf(button) === 'known').props.disabled, true, 'die aktuelle Stufe ist ein Ziel');
+
+  const trusted = chips.find((button) => textOf(button) === 'trusted');
+  await trusted.props.onClick();
+  const posts = calls.filter((call) => call.options?.method === 'POST');
+  assert.equal(posts.length, 1, 'ein Klick ist genau ein POST');
+  assert.equal(posts[0].url, coreLiteral('RELATION_ROUTE'), 'die Stufe geht an eine andere Route');
+  assert.deepEqual(JSON.parse(posts[0].options.body), { level: 'trusted' }, 'die Sitzung erfindet das Panel nicht');
 });
 
 test('Pruef-Panel: ein fremdes Dokument im Startstand wird verworfen (fail-closed)', () => {

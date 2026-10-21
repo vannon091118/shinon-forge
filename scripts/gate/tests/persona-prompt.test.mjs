@@ -321,3 +321,97 @@ test('Langzeitgedächtnis: Erinnerung und angenommene Selbstauflage stehen im EC
     'Erlebnisse stehen vor den daraus abgeleiteten Auflagen',
   );
 });
+
+// ── Der Arbeitsablauf (shinon:workflow) ──────────────────────────────────────
+//
+// Der Baustein beantwortet eine Frage, die die acht Haltungsabschnitte nicht
+// beantworten: WIE hier gearbeitet wird — die Reihenfolge der Schritte und der
+// Umgang mit Zweifel, Blockern, Fehlern und Abbruch. Die Haltung steht weiterhin
+// in EPISTEMIC, DISCIPLINE und REPORT; der Ablauf VERWEIST auf sie.
+
+test('Workflow: der Ablauf steht im gerenderten System-Prompt — mit den fuenf Schritten in Reihenfolge', async () => {
+  // Der Weg, den das Modell sieht: Boot -> gerenderter System-Prompt.
+  const { prompt, sections, withText } = await systemPromptWith('');
+  assert.ok(sections.includes('shinon:workflow'), `Abschnitt fehlt (${sections.join(', ')})`);
+  const abschnitt = withText.find((section) => section.name === 'shinon:workflow');
+  assert.ok(abschnitt, 'der Workflow-Abschnitt traegt keinen Text');
+  const text = String(abschnitt.text);
+  assert.match(text, /## Der Arbeitsablauf/);
+  assert.match(prompt, /## Der Arbeitsablauf/);
+  // Die REIHENFOLGE ist der Inhalt des Bausteins: LAGE, PLAN, HANDELN, PRÜFEN,
+  // BERICHTEN. Sie wird am Abschnittstext geprüft, nicht am ganzen Prompt — dort
+  // stuenden dieselben Woerter aus anderen Abschnitten dazwischen.
+  const reihenfolge = ['1. LAGE', '2. PLAN', '3. HANDELN', '4. PRÜFEN', '5. BERICHTEN'];
+  let position = -1;
+  for (const schritt of reihenfolge) {
+    const gefunden = text.indexOf(schritt);
+    assert.ok(gefunden > position, `${schritt} steht nicht nach dem vorherigen Schritt`);
+    position = gefunden;
+  }
+  // Die Sonderfaelle, fuer die es vorher keinen Abschnitt gab.
+  for (const sonderfall of ['ZWEIFEL', 'BLOCKER', 'FEHLER', 'ABBRUCH']) {
+    assert.ok(text.includes(sonderfall), `der Sonderfall ${sonderfall} fehlt`);
+  }
+  // Die Platzierung: der Ablauf steht hinter der Identitaet und vor dem Zustand
+  // und dem Bericht — er ist der Weg, nicht die Lage.
+  assert.ok(prompt.indexOf(IDENTITY_MARK) < prompt.indexOf('## Der Arbeitsablauf'), 'der Ablauf steht nicht nach der Identitaet');
+  assert.ok(prompt.indexOf('## Der Arbeitsablauf') < prompt.indexOf('## Persona-Zustand'), 'der Ablauf steht nicht vor dem Zustand');
+});
+
+test('Workflow: der Baustein verweist auf die Haltung, statt sie zu wiederholen', async () => {
+  const { withText } = await systemPromptWith('');
+  const abschnitt = withText.find((section) => section.name === 'shinon:workflow');
+  const text = String(abschnitt.text);
+  // Die Verweise SIND da: der Text benennt die Abschnitte, statt sie zu kopieren.
+  for (const verweis of ['Zuständigkeit, Parallelität, Git', 'Epistemischen Haltung', 'Berichtsstil', 'Blockiert heißt nicht Endstation']) {
+    assert.ok(text.includes(verweis), `der Verweis auf "${verweis}" fehlt`);
+  }
+  // Und die Listen der Haltung stehen NICHT im Ablauf: sonst stuende derselbe
+  // Text zweimal im Prompt — und der Prompt ist das teuerste Gut der Persona.
+  for (const satz of [
+    'Bleib in deinem Auftrag',
+    'Akzeptiere keine Behauptung ohne Beleg',
+    'Widerspruch ist ein normaler Zustand',
+    'Kurze Endberichte',
+  ]) {
+    assert.ok(!text.includes(satz), `der Ablauf wiederholt die Haltung: "${satz}"`);
+  }
+});
+
+test('Workflow: in einem fremden Workspace bleibt der Ablauf leer', async () => {
+  // Ein fremder WORKSPACE: der Mount bricht ab — es wird gar kein Abschnitt
+  // registriert, also steht der Ablauf auch nicht im Prompt.
+  const fremd = mkdtempSync(join(tmpdir(), 'shinon-prompt-workflow-fremd-'));
+  writeFileSync(join(fremd, 'package.json'), JSON.stringify({ name: 'fremdes-projekt' }));
+  const fremdes = await systemPromptWith('', { workspaceRoot: fremd });
+  assert.equal(fremdes.sections.includes('shinon:workflow'), false, 'der Workflow ist im fremden Workspace registriert');
+  assert.equal(fremdes.prompt.includes('## Der Arbeitsablauf'), false, 'der Ablauf steht im fremden Prompt');
+
+  // Eine fremde SITZUNG unter Shinon-Boot: der Abschnitt IST registriert (der
+  // Ablauf gilt in jedem Modus), traegt aber keinen Text — `gated` gibt '' zurueck.
+  // Genau diese Trennung ist die Zusage: vorhanden, aber stumm.
+  const sitzung = await systemPromptWith('', {}, { sessionCwd: fremd });
+  assert.ok(sitzung.sections.includes('shinon:workflow'), 'der Abschnitt fehlt — er muss auch fremd registriert sein');
+  assert.deepEqual(
+    sitzung.withText.filter((section) => section.name === 'shinon:workflow'),
+    [],
+    'der Workflow traegt in fremder Sitzung Text',
+  );
+  assert.equal(sitzung.prompt.includes('## Der Arbeitsablauf'), false, 'der Ablauf steht im fremden Prompt');
+});
+
+test('Workflow: der Renderer gibt einen leeren Text fuer einen leeren Auftrag', async () => {
+  // Der Kern ist importfrei — er laeuft ohne node_modules.
+  const kern = await import(new URL('../../../packages/persona/assets/workflow.js', import.meta.url).href);
+  assert.equal(kern.renderWorkflow(''), '');
+  assert.equal(kern.renderWorkflow('   '), '');
+  assert.equal(kern.renderWorkflow(null), '');
+  assert.equal(kern.renderWorkflow(undefined), '');
+  // Ein konfigurierter Text ohne Ueberschrift bekommt die des Bausteins; mit
+  // Ueberschrift bleibt er unveraendert — so liest sich jeder Abschnitt gleich.
+  const ohne = kern.renderWorkflow('Mein eigener Ablauf.');
+  assert.match(ohne, /^## Der Arbeitsablauf/);
+  assert.match(ohne, /Mein eigener Ablauf\./);
+  const mit = '## Mein Ablauf\n\nText.';
+  assert.equal(kern.renderWorkflow(mit), mit);
+});

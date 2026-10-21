@@ -70,6 +70,63 @@ export async function collectStream(stream) {
  * Gibt `null` zurueck, wenn die Nachricht nicht gefunden wird: dann gilt der
  * Roh-Prompt, statt dass an der falschen Stelle geschrieben wird.
  */
+/**
+ * EIGENE Textbloecke an eine Nachricht anhaengen — ohne ihren Text zu
+ * veraendern.
+ *
+ * WOFUER: der Projektkontext ist Wissen ueber das Projekt, keine Veredelung
+ * des Auftrags. Er muss auch dann ankommen, wenn der Veredler den Auftrag
+ * NICHT zurueckgibt (NO_JSON, abgelehntes Ergebnis) — ueber den Auftragstext
+ * allein verliert er ihn dann.
+ *
+ * Der Auftragstext bleibt unangetastet: `content[0]` ist weiterhin der
+ * Auftrag, die zusaetzlichen Bloecke kommen DANACH. Das haelt den Vertrag
+ * "Roh-Prompt bleibt erhalten" (prompter-contract.test.mjs) und gibt dem
+ * Modell trotzdem den Kontext.
+ *
+ * @param {unknown[]} messages die Nachrichtenliste
+ * @param {object} original die Nachricht, an die angehaengt wird
+ * @param {string[]} bloecke die Kontext-Bloecke (in Reihenfolge)
+ * @param {string} [wissen] der Wissensblock (haengt am Prompt-Text)
+ * @returns {unknown[]|null} die neue Liste, oder null wenn die Nachricht fehlt
+ */
+export function appendBlocks(messages, original, bloecke, wissen = '') {
+  if (!Array.isArray(messages)) return null;
+  const index = messages.indexOf(original);
+  if (index === -1) return null;
+  const message = messages[index];
+  const inhalt = Array.isArray(message.content) ? message.content : [];
+  // Der Wissensblock gehoert ans ENDE des Auftragstexts (er ergaenzt die
+  // Aufgabe); der Kontext ist ein eigener Block DANEBEN.
+  const text = wissen === '' ? null : `${ersterText(inhalt) ?? ''}\\n\\n${wissen}`;
+  const content = [];
+  let ersterTextGebraucht = text !== null;
+  for (const block of inhalt) {
+    if (block?.type === 'text') {
+      if (ersterTextGebraucht) {
+        content.push({ ...block, text });
+        ersterTextGebraucht = false;
+        continue;
+      }
+      content.push(block);
+      continue;
+    }
+    content.push(block);
+  }
+  for (const eigener of bloecke) content.push({ type: 'text', text: eigener });
+  const next = messages.slice();
+  next[index] = { ...message, content };
+  return next;
+}
+
+/** Der Text des ersten Textblocks — oder null, wenn es keinen gibt. */
+function ersterText(inhalt) {
+  for (const block of inhalt) {
+    if (block?.type === 'text' && typeof block.text === 'string') return block.text;
+  }
+  return null;
+}
+
 export function replacePrompt(messages, original, text) {
   if (!Array.isArray(messages)) return null;
   const index = messages.indexOf(original);

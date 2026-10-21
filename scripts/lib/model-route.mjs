@@ -59,8 +59,14 @@ export function readModelRoutes(text) {
     const indent = rawLine.length - rawLine.trimStart().length;
     const line = rawLine.trim();
 
-    if (indent === 0 && line.startsWith('- id:')) {
-      entry = scalar(line.slice('- id:'.length));
+    // Ein Top-Level-Eintag beendet den vorigen. `- id:` benennt den Eintrag;
+    // JEDE andere Top-Level-Liste (z.B. `- insert:`) beendet ihn NACH WEISE
+    // ohne Namen — sonst wuerde der Inhalt eines Inserts (etwa die
+    // `provider:`-Zeile einer Preset-Komposition) dem VORHERIGEN Eintrag
+    // zugeschlagen und die Route faelschlich daraus gelesen. Der echte
+    // Parser (js-yaml) kennt diese Grenze auch.
+    if (indent === 0 && line.startsWith('- ')) {
+      entry = line.startsWith('- id:') ? scalar(line.slice('- id:'.length)) : '';
       inConfig = false;
       inProviders = false;
       providersIndent = -1;

@@ -25,6 +25,7 @@ import { addTurnDuration, memorySummary, semanticProfile, weightsFrom } from './
 import { UNDEFINED, expandPrompt, resolveIntent } from './intent-resolver.js';
 import { CONTRACT, DECISION_CHANNEL, FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, NOT_SUPPLIED, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, contextLabel, noContext, resolveMode, withContext } from './mode-core.js';
 import { readSkills, selectSkills } from './prompt-files.js';
+import { renderContext } from './render-context.js';
 import { PROVENANCE_CONTRACT, provenanceRecord } from './provenance.js';
 import { OUTCOME_EFFECTS } from './result-contract.js';
 import { ContextSchema } from './schema.js';
@@ -539,7 +540,49 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   // uebersprungen wurde und gleich ob der Veredler lief. Ohne Snapshot bleibt
   // der Text unveraendert — ein leerer Block waere eine Behauptung.
   const knowledge = renderKnowledgeBlock(knowledgeSnapshot);
+  // Der Wissensblock geht ebenfalls in den RUNTIME-CONTEXT: er ist Wissen,
+  // keine Veredelung. Vorher hing er am Auftragstext — und fiel damit weg,
+  // sobald der Verwerfer den Auftrag unangetastet liess.
+  runtime.lastKnowledgeText = knowledge.text === '' ? null : knowledge.text;
+  // DER PROJEKTKONTEXT HAENGT AM PROMPT, NICHT AN DER MODELLANTWORT.
+  //
+  // GEMESSEN (2026-10-21, echter Turn): der One-Shot antwortete mit Prosa
+  // statt JSON ("Ich arbeite schrittweise und systematisch: …") — der Grund
+  // NO_JSON. Der Verwerfer arbeitet RICHTIG: er erkennt die Antwort und
+  // verweigert, den Prompt damit zu ersetzen. Aber damit fiel der ganze
+  // Projektkontext weg — 502 Dateien, 3926 Symbole, 2710 Chunks, gemessen
+  // vom Index, und nichts davon kam beim Modell an.
+  //
+  // Der Kontext ist KEINE Veredelung: er ist Wissen ueber das Projekt. Deshalb
+  // kommt er aus der Runtime und nicht aus dem Veredler. Der Veredler darf ihn
+  // zusaetzlich einbauen; dass er es nicht tut, darf den Kontext nicht kosten.
+  //
+  // Die Reihenfolge: der Kontext steht VOR dem Wissensblock — er ist groesser
+  // und gehoert naeher an den Auftrag.
+  const contextBlock = supply.context === null || supply.context === undefined
+    ? ''
+    : renderContext(supply.context);
+  // DER KONTEXT GEHOERT NUR AUF DEN ROH-PFAD.
+  //
+  // Wird der Prompt vom One-Shot ERSETZT, hat das Modell den Kontext schon
+  // gesehen (es stand im Request) und (nach dem Vertrag) eingebaut. Haengt
+  // man ihn dann noch einmal an, steht er doppelt im Prompt — und der Prompt
+  // ist das teuerste Gut.
+  //
+  // Wird der Prompt NICHT ersetzt (Direktweg, abgelehnter One-Shot), faellt der
+  // Kontext sonst GANZ weg — das ist der gemessene Fall vom 2026-10-21: 502
+  // Dateien, 3926 Symbole, 2710 Chunks im Index, und nichts davon beim Modell.
+  // Genau DORT gehoert er hin.
   const withKnowledge = (text) => (knowledge.text === '' ? text : `${text}\n\n${knowledge.text}`);
+  // Der Kontext als EIGENER TEXTBLOCK — nicht im Prompt-Text.
+  //
+  // Der Repo-Vertrag sagt: bei einem verworfenen One-Shot geht der Roh-Prompt
+  // UNVERAENDERT weiter (prompter-contract.test.mjs, "Roh-Prompt bleibt
+  // erhalten"). Der Kontext darf ihn deshalb nicht veraendern — er kommt als
+  // zusaetzlicher Block in dieselbe Nachricht. `content[0]` bleibt der Auftrag,
+  // `content[1]` ist der Kontext: das Modell sieht beides, der Auftrag bleibt
+  // unangetastet, und der Vertrag haelt.
+  const contextBlocks = () => (contextBlock === '' ? [] : [contextBlock]);
   const replacement = effect.replacePrompt && typeof outcome.result?.enhancedPrompt === 'string'
     ? withKnowledge(briefState.rendered === undefined
       ? outcome.result.enhancedPrompt
@@ -549,11 +592,27 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   // abgelehnten One-Shot wird der Roh-Prompt um den Block ergaenzt, ueber
   // dieselbe Identitaets-Ersetzung wie oben. Findet sie die Nachricht nicht,
   // bleibt der Schritt unveraendert (dieselbe Fail-Richtung wie im Paket).
+  // Der Kontext haengt am RUNTIME-CONTEXT, nicht an dieser Nachricht. Der
+  // Vertrag sagt: bei einem verworfenen One-Shot geht die Entscheidung
+  // UNVERAENDERT weiter (decision === downstream) — der Auftrag bleibt, wie er
+  // war. Also wird er hier nicht angefasst.
+  //
+  // Vorher kam der Kontext nur ueber den One-Shot-Request. Verwarf der
+  // Veredler (NO_JSON, gemessen am 2026-10-21), fiel der ganze Kontext weg:
+  // 502 Dateien, 3926 Symbole, 2710 Chunks im Index, nichts davon beim Modell.
+  // Der Runtime-Context ist der Weg, der unabhaengig vom Veredler laeuft.
+  // DER VERWERFUNGSFALL: die Nachricht bleibt, wie sie ist.
+  //
+  // Der Vertrag: "Ein Fehler im Enhancer darf den urspruenglichen Auftrag nicht
+  // ueberschreiben — der Roh-Prompt geht unveraendert weiter" (prompter-
+  // contract.test.mjs). Der Verwerfer arbeitet RICHTIG; er verweigert nur, die
+  // Antwort zum Prompt zu machen. Deshalb wird hier NICHTS geschrieben.
+  //
+  // Der Kontext und der Wissensblock kommen ueber den Runtime-Context — der
+  // Kanal, der unabhaengig vom Veredler laeuft (registerContext unten).
   const messages = effect.replacePrompt
     ? replacePrompt(decision?.messages, prompt.message, replacement)
-    : (knowledge.text === ''
-      ? null
-      : replacePrompt(decision?.messages, prompt.message, withKnowledge(prompt.text)));
+    : null;
 
   // Ersetzen kann nur, wer die Nachricht findet. Hier wird aus einem ANGENOMMENEN
   // Ergebnis ein `rejected`-Datensatz — die einzige Stelle, an der sich der

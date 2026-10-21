@@ -204,6 +204,12 @@ export function reconcileEntries(entries, existsFn) {
  * Relative Projekt-Schreibweise eines absoluten Pfads (für den Index:
  * der Index überlebt einen Umzug, weil er relativ speichert).
  */
+// Der kanonische I/O-Pfad (Lesen, Schreiben, Injizieren) liegt in der
+// Nachbar-Datei und wird hier WEITERGEGEBEN: die Host-Haelften importieren
+// `@shinon/seams/core`, nicht den relativen Pfad. Beide Dateien sind importfrei
+// (nur node:-Module), also bleibt die Eigenschaft erhalten.
+export { IO_CONTRACT, IO_LOG_PREFIX, IO_KINDS, IO_FIELDS, describeIo, ioLogLine, logIo, logEventRead, ioSpinePayload, ioSpineEnvelope } from './io-path.js';
+
 export function toWorkspacePath(root, absolute) {
   const rel = relative(resolve(String(root ?? '')), resolve(String(absolute ?? '')));
   return sep === '/' ? rel : rel.split(sep).join('/');

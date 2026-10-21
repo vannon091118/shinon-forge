@@ -93,6 +93,24 @@
       "verboten": ["shinon.prompter/one-shot-journal/v1"]
     },
     {
+      "art": "vertrag",
+      "kanonisch": "shinon.io/v1",
+      "definiert_in": "packages/seams/assets/io-path.js",
+      "verboten": []
+    },
+    {
+      "art": "vertrag",
+      "kanonisch": "shinon.project-index/refresh-v1",
+      "definiert_in": "packages/project-index/assets/refresh-core.js",
+      "verboten": []
+    },
+    {
+      "art": "vertrag",
+      "kanonisch": "shinon.prompter/context-v1",
+      "definiert_in": "packages/prompter/assets/context-channel.js",
+      "verboten": []
+    },
+    {
       "art": "dienst",
       "kanonisch": "shinon_codingmon_store",
       "definiert_in": "packages/codingmon/index.js",

@@ -23,11 +23,13 @@
 import z from '@deepseek-ai/schemastery';
 import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT } from '@shinon/seams/core';
 import { Config as _imported_config_schema } from './assets/schema.js';
-import { PRE_STEP_EVENT, resolveMode } from './assets/mode-core.js';
+import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, PRE_STEP_EVENT, resolveMode } from './assets/mode-core.js';
 import { PROPOSE_CONTRACT, PROPOSE_SERVICE } from './assets/block-review.js';
 import { notesDir } from './assets/prompt-files.js';
 import { loadRuntime, proposeBlock } from './assets/runtime-state.js';
 import { onPreStep } from './assets/pre-step.js';
+import { renderKnowledgeBlock } from './assets/knowledge-block.js';
+import { registerContext } from './assets/context-channel.js';
 import { createSkillLifecycle, loadLifecycleRules } from './assets/skill-lifecycle.js';
 /** Das Global, in das der Host die letzten Entscheidungen legt (der Client liest es). */
 export const TRACE_GLOBAL = '__shinonPrompterTrace';
@@ -163,6 +165,74 @@ export function apply(ctx, config) {
   runtime.narrativeContract = NARRATIVE_CONTRACT;
 
   const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
+  // DER HAKEN FUER DEN KONTEXT: `agent/inbox/claimed` feuert VOR der Assembly
+  // (agent-loop:906 `claim()` vor :907 `assemble()`). Der Runtime-Context wird in
+  // der Assembly projiziert — der Kontext muss also VORHER im Runtime stehen,
+  // sonst waere der Block leer.
+  //
+  // GEMESSEN (2026-10-21, echter Turn): ohne diesen Haken kam der Projekt-
+  // kontext nicht an, obwohl der Index 502 Dateien, 3926 Symbole und 2710
+  // Chunks hatte — der Kanal lief, war aber leer.
+  const disposeClaimed = ctx.on('agent/inbox/claimed', (payload) => {
+    const message = payload?.message;
+    if (message?.role !== 'user') return;
+    const text = (Array.isArray(message.content) ? message.content : [])
+      .filter((block) => block?.type === 'text' && typeof block.text === 'string')
+      .map((block) => block.text)
+      .join('\n');
+    if (text.trim() !== '') runtime.lastPromptText = text;
+  });
+  // Der RUNTIME-CONTEXT-KANAL: der Projektkontext und das Wissen kommen als
+  // EIGENE Nachricht beim Modell an — unabhaengig davon, was der Veredler
+  // zurueckgibt. Ohne diesen Kanal fiel der Kontext bei jedem verworfenen
+  // One-Shot weg (gemessen 2026-10-21: 502 Dateien, 3926 Symbole, 2710 Chunks
+  // im Index, nichts davon beim Modell).
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['systemPrompt'], (child) => {
+      const sp = child.systemPrompt;
+      const disposeContext = registerContext(sp, {
+        // Der Index-Dienst wird HIER gefragt, nicht im Pre-Step: die Assembly
+        // laeuft vor dem Pre-Step (agent-loop:907 vor :909), der Kontext waere
+        // zur Assembly-Zeit noch nicht im Runtime. Der letzte Auftragstext
+        // dient als Auswahlfrage — er ist der, um den es geht.
+        context: () => {
+          if (runtime.lastIndexContext !== null && runtime.lastIndexContext !== undefined) return runtime.lastIndexContext;
+          const service = typeof ctx.get === 'function' ? ctx.get(INDEX_SERVICE) : undefined;
+          if (service === undefined || service === null) return null;
+          if (service.contract !== INDEX_CONTRACT || typeof service.resolveContext !== 'function') return null;
+          try {
+            return service.resolveContext(runtime.lastPromptText ?? '', { budgetTokens: config.indexBudgetTokens });
+          } catch {
+            // Ein dienstloser oder defekter Dienst ist kein Grund, den Kanal zu
+            // beschaedigen: der Block faellt weg, der Schritt laeuft weiter.
+            return null;
+          }
+        },
+        // Der WISSENSBLOCK wird HIER gelesen, nicht aus dem Runtime: der
+        // Snapshot-Dienst ist der Besitzer, und der Pre-Step laeuft NACH der
+        // Assembly (agent-loop:907 vor :909) — dort waere der Block noch leer.
+        // Das ist derselbe Weg wie der Index-Kontext: der Kanal fragt den
+        // Dienst selbst.
+        wissen: () => {
+          if (runtime.lastKnowledgeText !== null && runtime.lastKnowledgeText !== undefined) return runtime.lastKnowledgeText;
+          const dienst = typeof ctx.get === 'function' ? ctx.get(FACTS_SNAPSHOT_SERVICE) : undefined;
+          if (dienst === undefined || dienst === null) return null;
+          if (dienst.contract !== FACTS_SNAPSHOT_CONTRACT || typeof dienst.snapshot !== 'function') return null;
+          try {
+            const snapshot = dienst.snapshot({ intent: runtime.turn?.resolution?.classification ?? 'UNBEKANNT' });
+            if (snapshot === null || typeof snapshot !== 'object') return null;
+            const block = renderKnowledgeBlock(snapshot);
+            return block.text === '' ? null : block.text;
+          } catch {
+            // Ein defekter Dienst darf den Kanal nicht beschaedigen: der Block
+            // faellt weg, der Schritt laeuft weiter.
+            return null;
+          }
+        },
+      });
+      runtime.disposeContext = disposeContext;
+    });
+  }
   // Das Panel liest den Puffer beim Laden: dieselbe Naht wie Marker/Traceability.
   const disposeInject = ctx.on(INDEX_INJECT, (table) => {
     if (Array.isArray(table)) table.push({ kind: 'global', name: TRACE_GLOBAL, value: runtime.trace });
@@ -242,6 +312,8 @@ export function apply(ctx, config) {
     lifecycle?.dispose();
     if (typeof disposeLifecycle === 'function') disposeLifecycle();
     if (typeof dispose === 'function') dispose();
+    if (typeof disposeClaimed === 'function') disposeClaimed();
+    if (typeof runtime.disposeContext === 'function') runtime.disposeContext();
     if (typeof disposeInject === 'function') disposeInject();
     if (typeof disposeRoute === 'function') disposeRoute();
     for (const response of runtime.sse ?? []) { try { response.end(); } catch { /* weg */ } }
