@@ -265,9 +265,11 @@ export function apply(ctx, config) {
   // Die Messung wiederholt sich, damit der Stand nicht veraltet: ein Badge,
   // der nach einem Tag eine veraltete Zahl zeigt, ist schlimmer als keiner.
   //
-  // Der Cordis-Timer haengt sich an den Kontext und endet mit ihm: zuerst
-  // `ctx.interval` (der aktuelle Name), dann `ctx.setInterval` (der
-  // abgeschwaechte Alias, den der Timer-Dienst noch mitbringt). Fehlt der Dienst
+  // Der Cordis-Timer haengt sich an den Kontext und endet mit ihm. Den Dienst
+  // `timer` darf man nur lesen, wenn er injiziert ist: ein bloßer Zugriff auf
+  // `ctx.interval` wirft ohne `inject` („cannot get property timer without
+  // inject“). Darum fragt die Pruefung den Dienst optional per `ctx.get` ab und
+  // haengt das Intervall ueber `ctx.inject(['timer'], …)` an. Fehlt der Dienst
   // (Tests, fremde Hosts), nimmt der globale Timer die Aufgabe — mit `unref`,
   // damit er den Prozess nicht am Leben haelt, und mit eigener Aufraeumung,
   // sofern der Kontext sie anbietet.
@@ -275,10 +277,9 @@ export function apply(ctx, config) {
     try { measure({ fetch: false }); } catch { /* der naechste Versuch misst erneut */ }
   };
   const delay = Math.max(60000, config.refreshMs);
-  if (typeof ctx?.interval === 'function') {
-    ctx.interval(refresh, delay);
-  } else if (typeof ctx?.setInterval === 'function') {
-    ctx.setInterval(refresh, delay);
+  const hasTimer = typeof ctx?.get === 'function' && Boolean(ctx.get('timer'));
+  if (hasTimer && typeof ctx.inject === 'function') {
+    ctx.inject(['timer'], (child) => { child.interval(refresh, delay); });
   } else {
     const timer = setInterval(refresh, delay);
     timer.unref?.();

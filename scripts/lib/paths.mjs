@@ -104,13 +104,20 @@ export function workspaceRoot() {
 }
 
 /**
- * Das Installat: Override, sonst `/opt/shinon-forge`, wenn dort ein Manifest
- * liegt, sonst der Arbeitsbaum (Entwicklerlauf). Zur Laufzeit ist ein echtes
- * Installat READ-ONLY — wer dort schreiben will, hat den falschen Ort gewählt.
+ * Das Installat: Override, sonst der Arbeitsbaum, wenn er ein Git-Klon ist
+ * (Entwicklerlauf oder registriertes Nutzer-Installat), sonst `/opt/shinon-forge`,
+ * wenn dort ein Manifest liegt. Zur Laufzeit ist ein echtes Installat
+ * READ-ONLY — wer dort schreiben will, hat den falschen Ort gewählt.
+ *
+ * Warum der Klon zuerst kommt (gemessen 2026-10-21): ein /opt-Paket auf dem
+ * Rechner machte JEDEN anderen Baum zum "Installat" — der Repo-Lauf fiel dann
+ * in dasselbe `dsh-home` wie das Installat und stritt sich mit dessen
+ * Verknüpfungen. Ein Klon ist immer seine eigene Wurzel.
  */
 export function installRoot(env = process.env) {
   const override = absoluteOverride('SHINON_INSTALL_ROOT', env);
   if (override !== null) return override;
+  if (existsSync(join(WORKSPACE_ROOT, '.git'))) return WORKSPACE_ROOT;
   if (existsSync(join(DEFAULT_INSTALL_ROOT, 'package.json'))) return DEFAULT_INSTALL_ROOT;
   return WORKSPACE_ROOT;
 }

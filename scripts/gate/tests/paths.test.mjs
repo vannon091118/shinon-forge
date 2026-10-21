@@ -96,6 +96,9 @@ test('paths: das DSH-Home folgt DSH, nicht unserer Erfindung', () => {
   // AGENTS.md als benutzerglobale Anweisung in jeder fremden Sitzung mit.
   assert.equal(dshHome(CLEAN), join(HOME, '.local', 'state', 'shinon', 'dev-dsh-home'));
   assert.notEqual(dshHome(CLEAN), workspaceRoot(), 'der Baum ist nie das Home');
+  // Ein Klon ist seine eigene Wurzel, auch neben einem /opt-Paket (Befund
+  // 2026-10-21: dort fiel der Repo-Lauf sonst ins Installat-Home).
+  assert.equal(installRoot(CLEAN), workspaceRoot(), 'ein Klon ist seine eigene Wurzel');
   // Als Installat ist der Baum gesperrt — dann der Zustandsordner.
   assert.equal(
     dshHome({ ...CLEAN, SHINON_INSTALL_ROOT: '/opt/shinon-forge' }),

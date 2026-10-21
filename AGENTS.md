@@ -2,7 +2,7 @@
 
 > **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-20 (aktualisiert: neue Skripte ergänzt, Inhalt sonst unverändert)
 > **Einstieg:** diese Datei · **Geschichte:** `docs/TAGEBUCH.md` · **Zahlen:** `docs/ZAHLEN.md`
-
+++volltests uschließlich nur nach absprache!!!
 An independent fork of the DeepSeek Harness (DSH). It ships the `@shinon/*` Cordis
 plugin bundles under `packages/`, enabled by the canonical profile `profiles/shinon`
 (which packages are active: `docs/ZAHLEN.md`; owner of that list is
