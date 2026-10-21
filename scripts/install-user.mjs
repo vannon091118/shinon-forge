@@ -407,11 +407,17 @@ async function verify(prefix = PREFIX) {
   const started = Date.now();
   const node = nodeBinary();
   const entry = join(prefix, 'bin', 'shinon.mjs');
+  // Ein Kandidat ist noch nicht registriert: ohne eigenes Home fiele er in das
+  // `dev-dsh-home` des Arbeitsbaums (er hat `.git`) und stritte sich mit dessen
+  // Verknüpfungen. Darum bekommt jeder NICHT-live Kandidat ein eigenes Home.
+  const runEnv = prefix === PREFIX
+    ? process.env
+    : { ...process.env, DSH_HOME: join(paths.stateDir(), 'dsh-home-candidate') };
 
   say(`\n🔎 Abnahme — ${prefix}`);
   // cwd MUSS das geprüfte Verzeichnis sein: der Selbsttest gegen ein Staging
   // darf nicht im Live-Installat stehen, während er den Kandidaten befragt.
-  const check = spawnSync(node, [entry, '--check'], { cwd: prefix, encoding: 'utf8' });
+  const check = spawnSync(node, [entry, '--check'], { cwd: prefix, encoding: 'utf8', env: runEnv });
   const checkText = `${check.stdout ?? ''}${check.stderr ?? ''}`;
   if (check.status !== 0) {
     report.errors.push(`shinon --check Exit ${check.status}`);
@@ -426,7 +432,7 @@ async function verify(prefix = PREFIX) {
   report.stages.check = true;
   say(`   ✓ --check: dsh ${report.dsh}, Herkunft ${report.herkunft}`);
 
-  const doctor = spawnSync(node, [entry, 'doctor'], { cwd: prefix, encoding: 'utf8' });
+  const doctor = spawnSync(node, [entry, 'doctor'], { cwd: prefix, encoding: 'utf8', env: runEnv });
   if (doctor.status !== 0) {
     report.errors.push(`shinon doctor Exit ${doctor.status}`);
     return report;
@@ -444,7 +450,7 @@ async function verify(prefix = PREFIX) {
     // NICHT DSH_HOME=prefix: dann wäre die AGENTS.md des Installats die globale
     // Anweisung jeder Sitzung. Der Einstieg leitet sein Home selbst ab und seedet
     // es aus dem Installat; hier wird nur gesagt, WELCHES Installat gemeint ist.
-    env: { ...process.env, SHINON_INSTALL_ROOT: prefix },
+    env: { ...runEnv, SHINON_INSTALL_ROOT: prefix },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let webUrl = null;
