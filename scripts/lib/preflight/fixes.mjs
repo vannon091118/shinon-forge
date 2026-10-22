@@ -34,7 +34,7 @@ export function applySafeFixes(root) {
   for (const name of PREFLIGHT_BLOCKED_JOBS) {
     const currentJobs = [];
     for (let i = jobsIndex + 1; i < lines.length; i += 1) {
-      const match = /^  ([a-zA-Z0-9_-]+):\\s*(?:#.*)?$/.exec(lines[i]);
+      const match = /^  ([a-zA-Z0-9_-]+):\s*(?:#.*)?$/.exec(lines[i]);
       if (match) currentJobs.push({ name: match[1], index: i });
     }
     const entry = currentJobs.find((job) => job.name === name);
@@ -42,11 +42,11 @@ export function applySafeFixes(root) {
     const next = currentJobs.find((job) => job.index > entry.index);
     const end = next?.index ?? lines.length;
     const block = lines.slice(entry.index, end);
-    const needsIndex = block.findIndex((line) => /^    needs\\s*:/.test(line));
-    const hasAlways = block.some((line) => /^    if:\\s*(?:\\$\\{\\{\\s*)?always\\(\\)/.test(line));
+    const needsIndex = block.findIndex((line) => /^    needs\s*:/.test(line));
+    const hasAlways = block.some((line) => /^    if:\s*(?:\$\{\{\s*)?always\(\)/.test(line));
 
     if (needsIndex < 0 && !hasAlways) {
-      const runsOn = block.findIndex((line) => /^    runs-on\\s*:/.test(line));
+      const runsOn = block.findIndex((line) => /^    runs-on\s*:/.test(line));
       const insertAt = entry.index + (runsOn >= 0 ? runsOn : 1);
       lines.splice(insertAt, 0, '    needs: preflight-docs');
       repairs.push({
@@ -58,13 +58,13 @@ export function applySafeFixes(root) {
       continue;
     }
 
-    if (needsIndex >= 0 && !/^    needs\\s*:\\s*\\S/.test(block[needsIndex])) {
+    if (needsIndex >= 0 && !/^    needs\s*:\s*\S/.test(block[needsIndex])) {
       const nextField = block.findIndex((line, i) =>
-        i > needsIndex && /^    [a-zA-Z][a-zA-Z0-9_-]*\\s*:/.test(line));
+        i > needsIndex && /^    [a-zA-Z][a-zA-Z0-9_-]*\s*:/.test(line));
       const needsEnd = nextField < 0 ? block.length : nextField;
       const needLines = block.slice(needsIndex + 1, needsEnd);
       const namedNeeds = needLines
-        .map((line) => /^\\s{6}-\\s*['"]?([a-zA-Z0-9_-]+)['"]?\\s*$/.exec(line)?.[1])
+        .map((line) => /^\s{6}-\s*['"]?([a-zA-Z0-9_-]+)['"]?\s*$/.exec(line)?.[1])
         .filter(Boolean);
       if (!namedNeeds.includes('preflight-docs')) {
         const start = entry.index + needsEnd;
