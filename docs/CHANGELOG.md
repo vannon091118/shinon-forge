@@ -19,6 +19,7 @@
 - Messbeleg für vermeidbare Kosten: Gate-Run `39711072872` maß rund 16 s für `npm ci` und 17,2 s für die Gate-Suiten. Entfernt wurden nur nachweisbare Duplikate: zweiter `shinon-test.mjs`-Lauf, Installation im Lockfile-Audit und doppelte Literal-Checks zusätzlich zu echtem `git check-ignore`/`git ls-files`.
 
 ### Belege
+- Post-Merge-Gate-Lauf `39838006698` auf `1f97625`: 21/21 Prüfungen grün (0 fehlgeschlagen, 0 übersprungen), Laufzeit 2 min 21 s; Verdict-Job `success`. Der Paketbau `39838006807` lief parallel weiter (Windows-Bau), ist aber nicht Teil der Gate-Abnahme.
 - Lokale Abnahme 2026-10-22: `npm test` Exit 0 (3 s), `npm run gate:test` Exit 0 (948 Tests, 0 rot, 0 geskippt, 14 s; langsamste Datei 5,8 s), `npm run preflight:docs:check` Exit 0, `npm run build` Exit 0, `npm run zahlen:check` Exit 0, Profiltest 4/4 Exit 0. Dev-Server auf Port 3000: UI mit Token HTTP 200 (46 264 Bytes), ohne Token 401, fremder Origin 403.
 - PR #23: https://github.com/vannon091118/shinon-forge/pull/23 · Merge-Commit: `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e`.
 - Gate-Run: https://github.com/vannon091118/shinon-forge/actions/runs/39744957109 · 21/21 Jobs grün, 0 fehlgeschlagen, 0 übersprungen.

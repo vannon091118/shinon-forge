@@ -1433,6 +1433,6 @@ Verbotsliste. Die Testzeit-Regel in `AGENTS.md` steht wieder als Regel da; die
 gemessenen Zahlen und die leere Ausnahmeliste stehen ausschließlich in
 `docs/ZAHLEN.md` §2. Der Dev-Server bootete auf Port 3000 mit 27 Layern, lieferte
 die UI mit Token als HTTP 200 (46 264 Bytes) und verweigerte ohne Token (401) sowie
-bei fremdem Origin (403).
+bei fremdem Origin (403). Der Post-Merge-Gate-Lauf `39838006698` auf `1f97625` bestand 21/21 Prüfungen in 2 min 21 s, ohne übersprungenen Pflichtjob; der Windows-Paketbau lief als eigener Workflow weiter und gehört nicht zur Gate-Abnahme.
 
 **Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · Belege: `.github/workflows/package-build.yml`, `.github/workflows/release.yml`, `.github/workflows/runtime-release.yml`, `scripts/gate/engine.mjs`, `scripts/shinon-test.mjs`, `scripts/gate/tests/narrative.test.mjs`, `AGENTS.md`, `docs/ZAHLEN.md`, `docs/CHANGELOG.md`
