@@ -28,3 +28,19 @@
 - `BLOCKIERT`: externe Voraussetzung fehlt; Blocker und benötigte Aktion nennen.
 - `ERLEDIGT`: belegte Umsetzung, erfolgreicher relevanter Check und referenzierbarer Commit/PR.
 - Ein grüner Teiltest ist kein Release-Pass. Ein Review- oder Security-Check mit Status `skipped`, `cancelled` oder `pending` zählt nicht als grün.
+
+## Automatische Preflight-Abnahme
+
+Der Abschluss gilt nur als angenommen, wenn der GitHub-Job
+**Preflight-Abnahme (fail-closed)** erfolgreich endet. Der Job prueft alle
+Pflichtzweige einschliesslich Dokumentationsvertrag, Dependency-Audit, CodeQL
+und Secret-Scan. `skipped`, `cancelled`, fehlende und unbekannte Resultate
+sind kein Erfolg.
+
+Bei einem Fehler zuerst den konkreten Code und den betroffenen Job im
+`preflight-report.json`-Artefakt lesen. Beispiele sind
+`PREFLIGHT_CODEQL_FAILED`, `PREFLIGHT_DEPENDENCY_AUDIT_FAILED`,
+`PREFLIGHT_SECRET_SCAN_FAILED`, `PREFLIGHT_LINK_BROKEN` und
+`PREFLIGHT_JOB_NOT_REQUIRED`. Run-ID, Commit-SHA und Run-Link gehoeren zum
+Beleg. Kein Agent darf eine rote oder fehlende Abnahme in Dokumentation als
+`ERLEDIGT` umetikettieren.
