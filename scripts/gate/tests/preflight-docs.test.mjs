@@ -22,7 +22,7 @@ test('preflight rejects a dummy command under a required job label', () => {
   const original = readFileSync(WORKFLOW, 'utf8');
   const mutated = original.replace(
     'run: node scripts/preflight-docs.mjs --check-only --json-out preflight-docs-report.json',
-    'run: echo no-op',
+    '# run: node scripts/preflight-docs.mjs --check-only --json-out preflight-docs-report.json\n    run: echo no-op',
   );
   assert.notEqual(mutated, original, 'mutation must replace the actual preflight executor');
   const issues = checkWorkflowContract(mutated);
@@ -31,7 +31,7 @@ test('preflight rejects a dummy command under a required job label', () => {
 
 test('preflight rejects a CodeQL job that only keeps the label but removes the scanner', () => {
   const original = readFileSync(WORKFLOW, 'utf8');
-  const mutated = original.replace('uses: github/codeql-action/analyze@v4', 'run: echo no-codeql');
+  const mutated = original.replace('uses: github/codeql-action/analyze@v4', '# uses: github/codeql-action/analyze@v4\n        run: echo no-codeql');
   assert.notEqual(mutated, original, 'mutation must remove the actual scanner action');
   const issues = checkWorkflowContract(mutated);
   assert.ok(issues.some((d) => d.code === 'PREFLIGHT_CODEQL_ACTION_MISSING' && d.details.includes('github/codeql-action/analyze@v4')));
