@@ -25,6 +25,9 @@ function runVerdict(needs) {
         GITHUB_SHA: '0123456789abcdef0123456789abcdef01234567',
         GITHUB_RUN_ID: '123456789',
         GITHUB_EVENT_NAME: 'pull_request',
+        GITHUB_STEP_SUMMARY: '',
+        GITHUB_SERVER_URL: 'https://github.com',
+        GITHUB_REPOSITORY: 'vannon091118/shinon-forge',
       },
     });
     const report = JSON.parse(readFileSync(join(cwd, 'preflight-report.json'), 'utf8'));
@@ -40,6 +43,7 @@ test('preflight verdict passes only when every required job succeeds', () => {
   assert.equal(run.report.verdict, 'PASS');
   assert.equal(run.report.commit, '0123456789abcdef0123456789abcdef01234567');
   assert.equal(run.report.runId, '123456789');
+  assert.equal(run.report.runUrl, 'https://github.com/vannon091118/shinon-forge/actions/runs/123456789');
   assert.deepEqual(run.report.diagnostics, []);
 });
 
