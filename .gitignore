@@ -114,3 +114,7 @@ dist-appimage/
 
 # Laufzeit-Cache des Paketbaus (die geholte Node-Laufzeit des Archivs).
 .cache/
+
+# CI preflight report is generated per run and uploaded as a workflow artifact.
+/preflight-report.json
+/preflight-docs-report.json
