@@ -135,6 +135,14 @@
           "scripts/gate/tests/scoring.test.mjs",
           "profiles/"
         ]
+      },
+      "slot-ids": {
+        "prefixes": [
+          "packages/",
+          "scripts/gate/plugins/slot-ids.mjs",
+          "scripts/gate/tests/slot-ids.test.mjs",
+          "AGENTS.md"
+        ]
       }
     }
   }

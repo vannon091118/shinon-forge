@@ -146,7 +146,44 @@ Headless (One-Shot, kein Browser):
 SHINON_API_KEY="…" node bin/shinon.mjs --profile headless "Sag nur: OK"
 ```
 
-## 9. Häufige Stolpersteine
+## 9. Abnahme eines echten Modell-Turns (S6)
+
+Die Abnahme braucht einen echten Schlüssel; kein Test ersetzt ihn. Der Lauf
+ist reproduzierbar, und jeder Schritt nennt seinen Beleg:
+
+1. **Route und Schlüsselname lesen** — beides kommt aus dem effektiven Profil,
+   nicht aus diesem Dokument:
+
+   ```bash
+   npm run s6:check
+   ```
+
+   Die Zeile `key:` nennt die Variable, die Zeile `route:` Provider und Modell.
+   Den Wert trägst du selbst in die ungetrackte `.env` (chmod 600) ein — nie in
+   den Baum, nie in ein Log, nie in eine Antwort; Vorlage ist
+   [`.env.example`](../.env.example).
+2. **Preflight** — derselbe Befehl endet mit `Preflight grün — boot ist bereit`
+   (Exit 0). Rot oder ungeprüft ist Exit 2: kein Start.
+3. **Boot** — `npm run s6:boot` startet den Host auf Port 3099 und nennt die
+   PID-Datei; Protokoll und PID-Datei liegen unter `<Zustand>/logs/s6/`.
+4. **Turn in der echten UI** (`http://localhost:3099`): Sitzung anlegen, eine
+   echte Frage stellen, die Antwort abwarten. Das ist der Modellaufruf — kein
+   Übungszug.
+5. **Urteil** — „Good response“ → Kategorie „Task result“ → „Submit“.
+6. **Widerruf** — derselbe Knopf, jetzt „Remove rating“: die Zeile muss wieder
+   weg sein.
+7. **Host-Ende** — `npm run s6:stop` (SIGTERM an die gelogte PID).
+8. **Neustart** — erneut `npm run s6:boot`; der Host lädt den Stand und meldet
+   `[shinon-scoring] Stand geladen: …`.
+
+Bestanden ist die Abnahme nur, wenn (a) eine echte Modellantwort vorliegt,
+(b) das Urteil als Zeile erscheint, (c) der Widerruf genau diese Zeile
+entfernt, (d) der Host sauber endet und (e) der nächste Host den Stand lädt.
+Ein grüner Preflight allein ist kein Turn. Der gemessene Erstlauf mit allen
+Zahlen steht in [ZAHLEN.md](ZAHLEN.md) §2 und
+[probes/store-cost.json](probes/store-cost.json) — hier stehen nur die Schritte.
+
+## 10. Häufige Stolpersteine
 
 | Symptom | Ursache |
 |---|---|

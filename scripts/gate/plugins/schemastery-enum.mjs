@@ -27,9 +27,11 @@ function withoutComments(text) {
 }
 
 export function check(ctx) {
+  // `ctx.root` ist das Manifest, `ctx.repo.ROOT` der Pfad (siehe canon.mjs).
+  const root = typeof ctx.root === 'string' ? ctx.root : ctx.repo.ROOT;
   const issues = [];
   for (const pkg of ctx.packages) {
-    const file = join(ctx.root, 'packages', pkg.dir, 'index.js');
+    const file = join(root, 'packages', pkg.dir, 'index.js');
     if (!existsSync(file)) continue;
     const lines = withoutComments(readFileSync(file, 'utf8')).split('\n');
     lines.forEach((line, index) => {
