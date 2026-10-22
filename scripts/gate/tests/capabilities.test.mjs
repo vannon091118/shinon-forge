@@ -73,7 +73,21 @@ test('jede Naht steht wörtlich im Eigentümer-Paket', () => {
     if (capability.seam === null) continue;
     const files = walk(join(ROOT, 'packages', capability.owner));
     const hit = files.find((file) => readFileSync(file, 'utf8').includes(capability.seam.name));
-    assert.ok(hit, `${capability.id}: Naht ${capability.seam.name} fehlt in packages/${capability.owner}`);
+    if (hit) continue;
+
+    // Shared host seams live in the import-free core. The feature owner must
+    // consume the exported name; copying the literal back into the package
+    // would create the duplicate source this check is meant to prevent.
+    const escapedName = capability.seam.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const shared = walk(join(ROOT, 'packages', 'seams'))
+      .map((file) => ({ file, source: readFileSync(file, 'utf8') }))
+      .map(({ file, source }) => ({ file, source, match: new RegExp(`export const ([A-Z0-9_]+) = ['\"]${escapedName}['\"]`).exec(source) }))
+      .find((entry) => entry.match !== null);
+    assert.ok(shared, `${capability.id}: Naht ${capability.seam.name} fehlt in packages/${capability.owner} und packages/seams`);
+    const symbol = shared.match[1];
+    const escapedSymbol = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.ok(files.some((file) => new RegExp(`import\\s*\\{[^}]*\\b${escapedSymbol}\\b[^}]*\\}\\s*from\\s*['\"]@shinon/seams/core['\"]`).test(readFileSync(file, 'utf8'))),
+      `${capability.id}: packages/${capability.owner} importiert die gemeinsame Naht ${symbol} nicht`);
   }
 });
 

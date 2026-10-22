@@ -144,8 +144,8 @@ test('Pruef-Panel: offene Vorschlaege mit Belegzahl, entschiedene mit ihrem Ausg
   const panel = registered.find((entry) => entry.options.name === 'main');
   assert.ok(panel, 'das Panel meldet sich nicht im main-Slot an');
   assert.equal(panel.options.key, 'shinon-persona', 'main ist ein keyed-Slot (options.key)');
-  assert.ok(registered.some((entry) => entry.options.name === 'sidebar.panellist' && entry.options.id === 'shinon-persona'),
-    'das Panel steht nicht in der Sidebar-Leiste');
+  assert.equal(registered.some((entry) => entry.options.name === 'sidebar.panellist' && entry.options.id === 'shinon-persona'), false,
+    'Persona belegt die Sidebar-Leiste erneut; der Review-Zugang ist im keyed main-Slot');
   const tree = expand(render(panel.component));
   const text = textOf(tree);
   assert.match(text, /1 offen/, 'die Zahl der offenen Vorschlaege fehlt');

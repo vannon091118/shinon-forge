@@ -14,7 +14,6 @@
       },
       "terms": [
         "projektkontext",
-        "welche dateien",
         "kontext für einen schritt"
       ],
       "notAnswers": [
@@ -505,7 +504,8 @@
         "branch und änderungen",
         "shinon status",
         "pluginstatus anzeigen",
-        "arbeitsstand im dock"
+        "arbeitsstand im dock",
+        "shinon-plugins"
       ],
       "notAnswers": [
         "keine Änderungen schreiben",
@@ -529,7 +529,8 @@
         "geänderte dateien",
         "git diff im arbeitsbereich",
         "dateien geändert",
-        "branch und diff"
+        "branch und diff",
+        "im arbeitsbereich geändert"
       ],
       "notAnswers": [
         "keine Dateiinhalte",
