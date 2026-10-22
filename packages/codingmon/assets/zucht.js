@@ -1,5 +1,7 @@
 import { rollBonuses, POOLS } from './zucht-glueck.js';
 import { HATCH_GAIN, BXP_CHILD, PAIR_GAIN, genMods } from './zucht-xp.js';
+import { SPECIES } from './katalog.js';
+import { statsAt } from './leiter.js';
 
 export const BP_PER_COMPLETION = 10;
 export const HATCH_BP = 120;
@@ -147,7 +149,7 @@ export function hatchReady(state) {
     state.creatures.push({
       id: `c${state.nextId}`, species: egg.species, xp: 0, bxp: BXP_CHILD,
       gen: egg.gen, bonuses: egg.bonuses.map((bonus) => ({ ...bonus })), clutch: 0,
-      wins: 0, losses: 0, round: 0, hits: 0, damageTotal: '0',
+      wins: 0, losses: 0, round: 0, hits: 0, damageTotal: '0', hp: statsAt(SPECIES[egg.species], 1).hp,
     });
     state.nextId += 1;
     hatched.push(egg.id);

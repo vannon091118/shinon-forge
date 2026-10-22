@@ -1,7 +1,9 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fnv1a32, randInt, streamFor, weightedPick } from '../assets/zufall.js';
-import { GROWTH_BPS, LEVEL_CAP, levelFor, statAt, threshold } from '../assets/leiter.js';
+import { GROWTH_BPS, LEVEL_CAP, levelFor, statAt, statsAt, threshold } from '../assets/leiter.js';
+import { SPECIES } from '../assets/katalog.js';
+import { SnapshotSchema } from '../assets/snapshot-schema.js';
 import {
   BXP_CHILD, BXP_FOUNDER, HATCH_GAIN, PAIR_GAIN, bxpModBps, effectiveStat, genMods,
 } from '../assets/zucht-xp.js';
@@ -148,9 +150,24 @@ describe('Brut, Schlupf und Loot', () => {
     assert.equal(s.creatures[2].bxp, 0);
     assert.equal(s.creatures[2].gen, 2);
     assert.equal(s.creatures[2].species, 'racecondition');
+    assert.equal(s.creatures[2].hp, statsAt(SPECIES.racecondition, 1).hp);
     assert.ok(s.creatures[2].bonuses.every((bonus) => ['statMod', 'hatchPoints', 'lootLuck'].includes(bonus.effect)));
     assert.equal(s.nextId, 5);
     assert.equal(s.completions, beforeHatch + 1);
+  });
+  test('a hatched pet passes the v3 snapshot contract', () => {
+    const breeding = state();
+    breeding.creatures[0].hp = 20;
+    breeding.creatures[1].hp = 20;
+    pair(breeding, 'c1', 'c2', { lineage, selectedSpecies: 'racecondition' });
+    breeding.eggs[0].bp = HATCH_BP;
+    hatchReady(breeding);
+    const snapshot = SnapshotSchema.safeParse({
+      schemaVersion: 3, species: 'nullpointer', xp: 0, wins: 0, losses: 0,
+      round: 0, damageTotal: '0', hits: 0,
+      loot: { schrott: 0, brauchbar: 0, shiny: 0 }, breeding,
+    });
+    assert.equal(snapshot.success, true, JSON.stringify(snapshot.success ? {} : snapshot.error.issues));
   });
   test('loot luck scales useful drops but leaves scrap unchanged', () => {
     const base = [{ id: 'schrott', weight: 8500 }, { id: 'brauchbar', weight: 1400 }, { id: 'shiny', weight: 100 }];
