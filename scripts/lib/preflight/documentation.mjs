@@ -128,14 +128,13 @@ function checkWorkflowVerdict(root, diagnostics, cache) {
   }
   const needsBlock = content.slice(needsIndex, alwaysIndex);
   for (const job of REQUIRED_CI_JOBS) {
-    if (!new RegExp('^-\\s+' + job.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&') + '\\s*$', 'm').test(needsBlock)) {
+    if (!needsBlock.split(/\r?\n/).some((line) => line.trim() === `- ${job}`)) {
       diagnostics.push(diagnostic('PREFLIGHT_JOB_NOT_REQUIRED', 'Required check is not included in the final verdict', {
         path: relative,
         details: job,
       }));
     }
-  }
-}
+  }}
 
 export function inspectDocumentation(root) {
   const diagnostics = [];
