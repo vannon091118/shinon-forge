@@ -28,6 +28,7 @@
 | `branding-check.mjs` | `branding` | Brand-Marken im Baum; die Engine ruft es bei `--branding` |
 | `vendor-dsh.mjs` | — | aktualisiert `vendor/dsh/` aus dem Registry-Tarball (inkl. `MANIFEST.json`) |
 | `assets/build-sprites.mjs` | — | Grid → SVG-Sprites (Codingmon) |
+| `appimage-build.mjs` | `appimage` | AppImage-Hülle aus derselben Nutzlast wie das `.deb`; braucht `appimagetool`, CI-Job `appimage` |
 | `assets/build-codingmon.mjs` | — | kopiert die Katalogdaten aus `packages/codingmon/assets/data/codingmon-50.json` in die Datenregionen von `client.js` (`--write`); `--check` vergleicht und bricht bei Drift ab, geprüft von `packages/codingmon/test/katalog.test.mjs` |
 
 ## Prüfung und Gates
@@ -66,6 +67,8 @@
 | `store-cost.mjs` | — | Kosten des Stores |
 | `sync-zahlen.mjs` | `zahlen:sync`, `zahlen:check` | schreibt/prüft §1 der [`ZAHLEN.md`](ZAHLEN.md) aus dem Baum |
 | `s6-turn.mjs` | `s6:check`, `s6:boot`, `s6:stop` | Turn-Audit S6 (Boot/Check/Stop) → Proben |
+
+| `spike-resolved-profile.mjs` | — | Spike PLAN 3.3/D3: Profil außerhalb `$DSH_HOME/profiles` laden (Vorbedingung für 3.6) |
 
 ## Installation und Betrieb
 

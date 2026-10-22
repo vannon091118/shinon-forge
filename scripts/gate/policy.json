@@ -20,102 +20,11 @@
       "dsh-singleton"
     ],
     "slices": {
-      "package-drift": {
-        "prefixes": [
-          "package.json",
-          "packages/"
-        ]
-      },
-      "duplicate-plugin": {
-        "prefixes": [
-          "packages/",
-          "profiles/"
-        ]
-      },
-      "dead-package": {
-        "prefixes": [
-          "packages/",
-          "profiles/",
-          "package.json"
-        ]
-      },
-      "registry": {
-        "prefixes": [
-          "packages/",
-          "profiles/"
-        ]
-      },
-      "contracts": {
-        "prefixes": [
-          "docs/",
-          "packages/"
-        ]
-      },
-      "doctor": {
-        "prefixes": [
-          "package.json",
-          "packages/",
-          "profiles/",
-          "scripts/"
-        ]
-      },
-      "probe-twin": {
-        "prefixes": [
-          "docs/probes/",
-          "packages/"
-        ]
-      },
-      "persona": {
-        "prefixes": [
-          "packages/persona/",
-          "profiles/"
-        ]
-      },
-      "narrative": {
-        "prefixes": [
-          "packages/narrative/",
-          "packages/persona/",
-          "profiles/",
-          "scripts/lib/repo.mjs",
-          "scripts/gate/plugins/narrative.mjs",
-          "scripts/gate/tests/narrative.test.mjs"
-        ]
-      },
-      "events-spine": {
-        "prefixes": [
-          "packages/events/",
-          "docs/contracts/events.json",
-          "docs/probes/events-spine.json",
-          "profiles/"
-        ]
-      },
-      "scoring": {
-        "prefixes": [
-          "packages/scoring/",
-          "scripts/gate/plugins/scoring.mjs",
-          "scripts/gate/tests/scoring.test.mjs",
-          "profiles/"
-        ]
-      },
-      "markers": {
-        "prefixes": [
-          "packages/markers/",
-          "docs/contracts/markers.json",
-          "profiles/",
-          "scripts/gate/plugins/markers.mjs",
-          "scripts/gate/tests/markers.test.mjs"
-        ]
-      },
       "canon": {
         "prefixes": [
           "packages/",
           "docs/contracts/",
           "profiles/"
-        ]
-      },
-      "schemastery-enum": {
-        "prefixes": [
-          "packages/"
         ]
       },
       "commit-trailer": {
@@ -128,6 +37,103 @@
           "docs/contracts/commit-trailer.json",
           "docs/contracts/commit-policy.json",
           "AGENTS.md"
+        ]
+      },
+      "contracts": {
+        "prefixes": [
+          "docs/",
+          "packages/"
+        ]
+      },
+      "dead-package": {
+        "prefixes": [
+          "packages/",
+          "profiles/",
+          "package.json"
+        ]
+      },
+      "doctor": {
+        "prefixes": [
+          "package.json",
+          "packages/",
+          "profiles/",
+          "scripts/"
+        ]
+      },
+      "duplicate-plugin": {
+        "prefixes": [
+          "packages/",
+          "profiles/"
+        ]
+      },
+      "events-spine": {
+        "prefixes": [
+          "packages/events/",
+          "docs/contracts/events.json",
+          "docs/probes/events-spine.json",
+          "profiles/"
+        ]
+      },
+      "markers": {
+        "prefixes": [
+          "packages/markers/",
+          "docs/contracts/markers.json",
+          "profiles/",
+          "scripts/gate/plugins/markers.mjs",
+          "scripts/gate/tests/markers.test.mjs"
+        ]
+      },
+      "narrative": {
+        "prefixes": [
+          "packages/narrative/",
+          "packages/persona/",
+          "profiles/",
+          "scripts/lib/repo.mjs",
+          "scripts/gate/plugins/narrative.mjs",
+          "scripts/gate/tests/narrative.test.mjs"
+        ]
+      },
+      "package-checklist": {
+        "prefixes": [
+          "packages/",
+          "profiles/"
+        ]
+      },
+      "package-drift": {
+        "prefixes": [
+          "package.json",
+          "packages/"
+        ]
+      },
+      "persona": {
+        "prefixes": [
+          "packages/persona/",
+          "profiles/"
+        ]
+      },
+      "probe-twin": {
+        "prefixes": [
+          "docs/probes/",
+          "packages/"
+        ]
+      },
+      "registry": {
+        "prefixes": [
+          "packages/",
+          "profiles/"
+        ]
+      },
+      "schemastery-enum": {
+        "prefixes": [
+          "packages/"
+        ]
+      },
+      "scoring": {
+        "prefixes": [
+          "packages/scoring/",
+          "scripts/gate/plugins/scoring.mjs",
+          "scripts/gate/tests/scoring.test.mjs",
+          "profiles/"
         ]
       }
     }

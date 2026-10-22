@@ -19,6 +19,7 @@
 | `codingmon` | Pet-/Kampf-System mit dauerhaftem Zustand | ✅ (7) | Client→Host |
 | `core` | Branding-Overlay: Sidebar-, Hero-Marke, Farbverlauf, Pulse | — | Slots |
 | `dashboard` | Status-Panel; liest echte `workspaces`/`sessions`-Dienste | — | Slots |
+| `diff-overview` | Geänderte Dateien gegen `HEAD` mit Zeilenzahlen, Diff-Zeilen auf Klick | ✅ (1) | Slots |
 | `events` | Event-Spine: beobachten, normalisieren, validieren, emittieren | ✅ | `@shinon/seams` |
 | `hook` | Host-Seitige Event-Beobachtung (`agent/pre-step`), Replay-Fixture | ✅ (1) | `@shinon/seams` |
 | `key-router` | Key-Pool mit 429-Rotation | ✅ (1) | Tools |
@@ -37,6 +38,8 @@
 | `token-usage` | Turn- und Sitzungs-Token im Sidebar-Fuß | ✅ (1) | Ereignisse |
 | `tooltip` | Styles für erweiterte Tooltips (keine Logik) | — | — |
 | `traceability` | Flüchtige Tool-Call-Toasts im Chat | ✅ (1) | Config-Global |
+| `version` | Neuester und installierter Commit in der Sidebar, aktualisiert auf Klick | ✅ (1) | Slots |
+| `widget-dock` | Kompakte Widgets statt acht Sidebar-Panels; Dock-Zustand im Browser-Global `__shinonWidgetDock` | — | Slots, Config-Global |
 
 Die Spalte „Tests" nennt die `test/*.test.mjs`-Dateien des Pakets; die
 Auslöser stehen in [`CI-UND-GATES.md`](CI-UND-GATES.md) §3.

@@ -247,6 +247,14 @@ läuft in `test:full`/`gate:full` (CI).
   (project-index: the worker; codingmon: `packages/codingmon/assets/mechanik.js`): only then
   can their unit tests run in CI, which has no `node_modules`. `index.js` re-exports that
   core, so the public names stay the same.
+- **The duties of a package** are listed here because you otherwise meet them only
+  when a gate turns red (`package-checklist` checks P1–P4 together): (P1)
+  `package.json` with `name` and `cordis.patch.yml`, (P2) a class in
+  `docs/contracts/structure.json`, (P3) an entry in `profiles/<name>/package.json`
+  **or** `"dsh": { "inactive": true }`, (P4) at least one capability with
+  `owner: <dir>` in `packages/prompter/assets/capabilities.json`. Conditional: (P5) a
+  `canon.json` entry as soon as the package writes its own browser global — `canon`
+  enforces that; (P6) profile links only via `npm run profile:links`.
 - The active profile is read from the `dev` script's `--profile <name>` (single source of
   truth); do not duplicate it. Effective config values live in the profile entry, not in
   packages; packages hold only schema defaults.

@@ -60,7 +60,7 @@ heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
 <!-- zahlen:struktur:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 379 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 382 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
 | Klassen | 6 | `docs/contracts/structure.json` → `klassen` | 0 |
 | Benannte Bestandsdateien (über ihrer Klassengrenze) | 30 | `docs/contracts/structure.json` → `bestand` | 0 |
 | Dateien ohne Klasse | 0 | `npm test` (Schritt „Struktur“) — gezählt aus `structureIssues()` | 0 |
@@ -99,7 +99,7 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Profil-Dump im echten Boot | **58** Layer-Köpfe, **215** Einträge; `shinon-task-router.activate: false`, `permission.defaultPreset: workspace-write`, `agent-default-model: prompter/agnes-2.5-flash` (die gespeicherte Wahl des Nutzers — der Config-Editor schreibt sie in die Profil-Ebene, ein Dump kann je Installation abweichen) | 0 | `DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config` |
 | Frischklon-Repro S3 | Klon @ `d8999ab` Exit 0, `npm ci` Exit 0, 29 Links Exit 0, Dump 60/210 Exit 0, Build 185 Dateien Exit 0, UI HTTP 200 (41 314 Bytes HTML, ohne Token 401), gate 546/546 | 0 | `docs/TAGEBUCH.md`, Kapitel 2026-10-17 (Commit `d8999ab`) |
 | Gate-Engine `--full` | **23** Gates gelaufen, **23** grün, **1** `NOT_APPLICABLE` (`typescript`: keine First-Party-TS-Datei), **0** fehlgeschlagen, **0** geskippt; Branding ohne Flag sichtbar übersprungen | 0 | `npm run gate:full` |
-| Gate-Tests | **942** Tests, **942** grün, **0** rot, **0** geskippt; **9,5 s** Wanduhr am 2026-10-22; 97 Dateien; langsamste Einzelmessung **4,7 s**, keine über der 20-s-Abbruchgrenze | 0 | `npm run gate:test` |
+| Gate-Tests | **951** Tests, **951** grün, **0** rot, **0** geskippt; **8,9 s** Wanduhr am 2026-10-22; 99 Dateien; langsamste Einzelmessung **4,7 s**, keine über der 20-s-Abbruchgrenze | 0 | `npm run gate:test` |
 | Testzeit-Grenze | 95 Gate-Testdateien, langsamste **5,8 s**; `npm test` **3 s**; **0** Ausnahmen offen (Ziel 10 s, Abbruch 20 s über `--test-timeout=20000`) | 0 | siehe oben |
 | Codingmon-Tests | **134** bestanden, **0** rot, **0** übersprungen (gemessen 2026-10-22, 16,9 s) | 0 | `npm run test:codingmon` |
 | Scoring-Tests (Kern, Signale, Ablage, Block-Gewichte) | **50** bestanden, **0** rot, **0** übersprungen — importfrei, läuft in CI ohne `npm ci`; die Host-Naht des Lernens fährt `scripts/gate/tests/scoring-block-learning.test.mjs` | 0 | `npm run test:scoring` |

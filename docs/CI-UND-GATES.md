@@ -32,7 +32,7 @@ Jedes Plugin meldet `pass` / `not-applicable` / `fail`; Exit 1 bei Issues.
   `package-drift`, `duplicate-plugin`, `dead-package`, `registry`,
   `contracts`, `doctor`, `probe-twin`, `persona`, `narrative`,
   `events-spine`, `scoring`, `markers`, `canon`, `schemastery-enum`,
-  `commit-trailer`.
+  `package-checklist`, `commit-trailer`.
 
 ### Die Plugins in einem Satz
 
@@ -52,6 +52,7 @@ Jedes Plugin meldet `pass` / `not-applicable` / `fail`; Exit 1 bei Issues.
 | `registry` | Bundles: `dsh.bundle.patch` existiert und jedes Profil-Bundle ist in `packages/*` registriert (nicht der Kanon — den prüfen `canon` und das statische Gate) |
 | `canon` | der Kanon (`scripts/lib/canon.mjs`): ein Name, eine Schreibweise, eine Definition — dieselbe Quelle wie das statische Gate |
 | `schemastery-enum` | kein `z.enum(` in `packages/*/index.js` (das deklarierte Schemastery hat keins; Kommentare und `assets/*.js` mit `zod` zählen nicht) |
+| `package-checklist` | die vier Pflichten eines Pakets: Dateien, Struktur-Klasse, Profil-Eintrag oder `dsh.inactive`, Fähigkeit mit `owner` |
 | `contracts` | Vertragsdateien in 7-Punkt-Form |
 | `contracts`-Ziel `probe-twin` | Proben: Form + Zieldateien existieren |
 | `doctor` | Repo-Drift-Scanner (gleiche Familie wie `scripts/doctor.mjs`) |
