@@ -120,7 +120,11 @@ checkIssues('sechs Naehte einmal definiert, keine Host-Spiegel', () => repo.host
 // Ohne git (Fixture, Isolat) ist das ein sichtbarer Skip, kein stilles Gruen.
 console.log('\n📓 Dev-Tagebuch:');
 const diary = diaryHistory();
-if (diary.skip) {
+if (diary.skip && process.env.CI === 'true') {
+  checkIssues('Tagebuch-Historie ist in CI vollständig verfügbar', () => [
+    `CI requires complete Git history; diary anchors were not checked: ${diary.skip}`,
+  ]);
+} else if (diary.skip) {
   console.log(`  ⏭️  ${diary.skip} — Anker nicht pruefbar`);
 } else {
   checkIssues('jedes Kapitel haengt an Commit und Pfad', () => diaryIssues());
