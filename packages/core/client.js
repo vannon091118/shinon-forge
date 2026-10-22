@@ -286,7 +286,7 @@ window.__ModuleLoader__.load({
     }
 
     function bannerStatus(state) {
-      if (state === null || typeof state !== 'object') return 'Noch kein Zustand gemeldet';
+      if (state === null || typeof state !== 'object') return 'Noch kein Zustand gemeldet'; if (state.contract !== 'shinon.persona-ui/v1') return 'Unbekanntes Persona-Format';
       const parts = [];
       const tone = state.tone;
       if (tone !== null && tone !== undefined && typeof tone.stance === 'string') parts.push(`Haltung: ${tone.stance}`);
