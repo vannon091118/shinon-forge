@@ -34,7 +34,7 @@ wiederholen keine offenen Punkte — die stehen in `ROADMAP.md`.
 | [`ARCHITEKTUR.md`](ARCHITEKTUR.md) | Schichtmodell, Paket-Anatomie, Boot-Kette, Ereignis-Spine, typische Datenflüsse |
 | [`SETUP.md`](SETUP.md) | Installation, Profile, `DSH_HOME`, Schlüssel und Routen, Diagnose, Werkzeuge für Betreiber |
 | [`REMOTE-ARBEIT.md`](REMOTE-ARBEIT.md) | frischer Remote-Klon, lokale Freebuff-Metadaten, Task-Worktrees und Rechnerübergabe |
-| [`CI-UND-GATES.md`](CI-UND-GATES.md) | Gate-Engine und ihre Plugins, policy.json, Git-Hooks, die vier GitHub-Workflows, Testpfade |
+| [`CI-UND-GATES.md`](CI-UND-GATES.md) | Gate-Engine und ihre Plugins, policy.json, Git-Hooks, Preflight-Abnahme, Security- und Release-Workflows |
 | [`PAKETE.md`](PAKETE.md) | Nachschlagewerk zu allen Paketen unter `packages/`: Zweck, Eintritt, Tests, Naht |
 | [`SCRIPTS.md`](SCRIPTS.md) | Nachschlagewerk zu `scripts/` und `bin/`: Zweck jedes Skripts und ob ein npm-Script darauf zeigt |
 | [`VISION-ABGLEICH.md`](VISION-ABGLEICH.md) | Befund: die Vision (fünf Organe, ein Kreislauf) gegen den Code-Kern — wo er abweicht, wie tief, und welche Probe fehlt |
