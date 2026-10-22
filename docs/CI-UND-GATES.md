@@ -158,7 +158,7 @@ Verhalten statt Textfragmente: sie mutiert Links und Jobgraphen, erkennt
 nicht deklarierte Jobs und verlangt, dass jede deklarierte Prüfstrecke im
 finalen Verdict landet. Die Prüfer sind
 getrennt: `diagnostics.mjs` formatiert Fehler, `documentation.mjs` prüft
-Dokumentationshoheit/Links/Verdict-Verkabelung, `preflight-docs.mjs` liefert
+Die Policy listet außerdem die installations- und scanintensiven Jobs, die direkt `needs: preflight-docs` verlangen. Ein fehlender Gate-Pfeil oder `if: always()` an so einem Job ist ein Vertragsbruch, weil beides die frühe Abbruchwirkung aushebeln könnte. Lokal repariert `npm test` die einfache fehlende Verdrahtung automatisch; CI ändert nichts und stoppt vor `npm ci`, Build oder Security-Scan.\nDokumentationshoheit/Links/Verdict-Verkabelung, `preflight-docs.mjs` liefert
 den CLI-Exitcode und `preflight-verdict.mjs` baut das Abschlussurteil.
 
 Lokal ist `npm run preflight:docs` der Reparatur-First-Einstieg: nur eindeutige
