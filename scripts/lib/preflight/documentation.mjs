@@ -10,10 +10,10 @@ const TICK = String.fromCharCode(96);
 const REQUIRED_JOB_BEHAVIORS = [
   { job: 'commit-guard', code: 'PREFLIGHT_COMMIT_GUARD_COMMAND_MISSING', message: 'Commit policy must run in CI mode.', contains: ['run: node scripts/commit-guard.mjs --ci'] },
   { job: 'unit', code: 'PREFLIGHT_UNIT_MATRIX_INCOMPLETE', message: 'The installation-free unit matrix must execute the expected package suites.', contains: [
-    MATRIX_RUN, 'packages/codingmon/test/*.test.mjs', 'packages/hook/test/replay.test.mjs',
-    'packages/narrative/test/*.test.mjs', 'packages/scoring/test/*.test.mjs',
-    'packages/token-usage/test/*.test.mjs', 'packages/popup/test/*.test.mjs',
-    'packages/key-router/test/*.test.mjs', 'packages/traceability/test/*.test.mjs',
+    MATRIX_RUN, 'run: node --test packages/codingmon/test/*.test.mjs', 'run: node packages/hook/test/replay.test.mjs',
+    'run: node --test packages/narrative/test/*.test.mjs', 'run: node --test packages/scoring/test/*.test.mjs',
+    'run: node --test packages/token-usage/test/*.test.mjs', 'run: node --test packages/popup/test/*.test.mjs',
+    'run: node --test packages/key-router/test/*.test.mjs', 'run: node --test packages/traceability/test/*.test.mjs',
   ] },
   { job: 'gate-rules', code: 'PREFLIGHT_GATE_TEST_COMMAND_MISSING', message: 'Behavioral gate tests and installed Codemon handoff must execute.', contains: [
     'run: node --test scripts/gate/tests/*.test.mjs',
@@ -25,7 +25,7 @@ const REQUIRED_JOB_BEHAVIORS = [
   { job: 'profile', code: 'PREFLIGHT_PROFILE_COMMAND_MISSING', message: 'The active DSH profile boot test must execute.', contains: ['run: node scripts/shinon-profile-test.mjs'] },
   { job: 'prompter', code: 'PREFLIGHT_PROMPTER_COMMAND_MISSING', message: 'The installed Prompter test suite must execute.', contains: ['run: node --test packages/prompter/test/*.test.mjs'] },
   { job: 'typescript', code: 'PREFLIGHT_TYPESCRIPT_COMMAND_MISSING', message: 'The TypeScript contract runner must execute.', contains: ['run: npm run typecheck'] },
-  { job: 'preflight-docs', code: 'PREFLIGHT_EXECUTOR_MISSING', message: 'The dependency-free preflight must run read-only in CI.', contains: ['run: node scripts/preflight-docs.mjs --check-only'] },
+  { job: 'preflight-docs', code: 'PREFLIGHT_EXECUTOR_MISSING', message: 'The dependency-free preflight must run read-only in CI.', contains: ['run: node scripts/preflight-docs.mjs --check-only --json-out preflight-docs-report.json'] },
   { job: 'dependency-audit', code: 'PREFLIGHT_DEPENDENCY_AUDIT_COMMAND_MISSING', message: 'Production dependencies must be audited at the configured severity.', contains: ['run: npm audit --omit=dev --audit-level=high'] },
   { job: 'codeql', code: 'PREFLIGHT_CODEQL_ACTION_MISSING', message: 'CodeQL must initialize and analyze JavaScript/TypeScript.', contains: ['uses: github/codeql-action/init@v4', 'uses: github/codeql-action/analyze@v4'] },
   { job: 'secret-scan', code: 'PREFLIGHT_SECRET_SCAN_ACTION_MISSING', message: 'The secret scan must use Gitleaks and full history without saved checkout credentials.', contains: ['uses: gitleaks/gitleaks-action@v3', 'fetch-depth: 0', 'persist-credentials: false'] },
@@ -134,8 +134,14 @@ export function checkWorkflowContract(content, relative = '.github/workflows/com
     const entry = jobEntries.find((item) => item.name === behavior.job);
     if (!entry) continue;
     const next = jobEntries.find((item) => item.index > entry.index);
-    const block = lines.slice(entry.index, next?.index ?? lines.length).join('\n');
-    const missing = behavior.contains.filter((fragment) => !block.includes(fragment));
+    const block = lines.slice(entry.index, next?.index ?? lines.length);
+    const activeLines = block
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
+      .map((line) => line.replace(/\s+#.*$/, ''));
+    // Every policy item is an actual YAML key/value line. A comment, echo string,
+    // step name, or stale documentation snippet cannot satisfy a command contract.
+    const missing = behavior.contains.filter((fragment) => !activeLines.includes(fragment));
     if (missing.length) {
       issues.push(diagnostic(behavior.code, behavior.message, {
         path: relative, line: entry.index + 1, details: missing.join('; '),
