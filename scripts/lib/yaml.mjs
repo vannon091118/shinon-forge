@@ -2,10 +2,10 @@
  * yaml.mjs - YAML für Gate und Build.
  *
  * Ersetzt die frühere Zeilen-/Regex-Logik durch einen echten Parser. Der Parser
- * kommt aus dem DSH-Stack (js-yaml ist eine Dependency von @deepseek-ai/dsh) und
- * wird aus der installierten dsh-App aufgelöst - keine neue Dependency, kein
- * node_modules im Repo. `dsh` ist für dieses Repo ohnehin Voraussetzung
- * (Profiltest) und wird im PATH gesucht, nicht hart kodiert.
+ * kommt aus dem DSH-Stack (js-yaml ist eine Dependency von @deepseek-ai/dsh).
+ * Aufgelöst wird zuerst relativ zur installierten DSH-App im PATH, danach
+ * relativ zu diesem Modul aus Repo-node_modules. Es wird keine neue Dependency
+ * eingeführt; mindestens einer dieser beiden Auflösungswege muss vorhanden sein.
  */
 import { createRequire } from 'module';
 import { existsSync, readdirSync, realpathSync } from 'fs';
@@ -77,7 +77,7 @@ export function dshHarnessDir(path) {
 }
 
 let parser;
-/** js-yaml laden: erst aus der dsh-Installation, dann aus node_modules. */
+/** js-yaml laden: erst aus DSH im PATH, dann aus Repo-node_modules. */
 export function yamlParser() {
   if (parser !== undefined) return parser;
   const anchors = [];
@@ -91,7 +91,7 @@ export function yamlParser() {
       /* nächster Anker */
     }
   }
-  throw new Error('YAML-Parser nicht gefunden: js-yaml muss aus der dsh-Installation auflösbar sein (dsh im PATH)');
+  throw new Error('YAML-Parser nicht gefunden: js-yaml muss aus einer DSH-Installation im PATH oder aus Repo-node_modules auflösbar sein');
 }
 
 /** YAML-Text parsen; wirft bei Syntaxfehlern. */

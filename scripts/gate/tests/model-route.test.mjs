@@ -4,8 +4,9 @@
  * Drei Zusagen:
  *   1. Der Profil-Patch nennt einen Provider, den er selbst definiert, und ein
  *      Modell aus dessen Katalog — kein Test pinnt mehr ein Modell-Literal.
- *   2. Der schlanke Extraktor (läuft ohne `npm ci` in CI) liest dieselben Werte
- *      wie `js-yaml`; sonst wäre die Vereinfachung eine stille zweite Wahrheit.
+ *   2. Der schlanke Extraktor liest dieselben Werte wie `js-yaml`; sonst wäre
+ *      die Vereinfachung eine stille zweite Wahrheit. Dieser Test benötigt den
+ *      Parser aus DSH im PATH oder Repo-node_modules.
  *   3. Jeder Formfehler hat einen benannten Befund — ein leeres Feld ist rot,
  *      nicht „keine Route konfiguriert".
  */

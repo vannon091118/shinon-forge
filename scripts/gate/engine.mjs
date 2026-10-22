@@ -16,7 +16,8 @@
  *               sichtbarer Skip mit Grund in der Ausgabe — sie braucht `dist/` und
  *               ein Browser-Binary und ist deshalb kein Gate der schnellen Läufe.
  *
- * Läuft ohne node_modules — nur node:-Module und scripts/lib/repo.mjs.
+ * Benötigt für YAML-Plugins `js-yaml` aus dem DSH-PATH oder Repo-node_modules;
+ * die Engine selbst nutzt zusätzlich nur node:-Module und scripts/lib.
  */
 import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
