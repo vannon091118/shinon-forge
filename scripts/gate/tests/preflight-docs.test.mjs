@@ -56,6 +56,34 @@ test('removing a required job from verdict.needs is detected as a behavior break
   issues.map((d) => `${d.code}: ${d.details ?? ''}`).join('\n'));
 });
 
+test('expensive jobs are rejected if they can start before the preflight passes', () => {
+  const original = readFileSync(WORKFLOW, 'utf8');
+  const gateStart = original.indexOf('  gate-rules:');
+  const gateEnd = original.indexOf('\n  fixtures:', gateStart);
+  assert.ok(gateStart >= 0 && gateEnd > gateStart, 'gate-rules block must exist');
+  const gateBlock = original.slice(gateStart, gateEnd);
+  const mutatedBlock = gateBlock.replace(/^    needs: preflight-docs\s*\n/m, '');
+  assert.notEqual(mutatedBlock, gateBlock, 'mutation must remove the prerequisite, not merely a comment');
+  const mutated = original.slice(0, gateStart) + mutatedBlock + original.slice(gateEnd);
+  const issues = checkWorkflowContract(mutated);
+  assert.ok(issues.some((d) =>
+    d.code === 'PREFLIGHT_JOB_NOT_GATED_BY_PREFLIGHT' && d.details === 'gate-rules'),
+  issues.map((d) => `${d.code}: ${d.details ?? ''}`).join('\n'));
+});
+
+test('always() cannot bypass a preflight dependency on an expensive job', () => {
+  const original = readFileSync(WORKFLOW, 'utf8');
+  const gateStart = original.indexOf('  gate-rules:');
+  const gateEnd = original.indexOf('\n  fixtures:', gateStart);
+  const gateBlock = original.slice(gateStart, gateEnd);
+  const mutatedBlock = gateBlock.replace('    needs: preflight-docs\n', '    needs: preflight-docs\n    if: always()\n');
+  const mutated = original.slice(0, gateStart) + mutatedBlock + original.slice(gateEnd);
+  const issues = checkWorkflowContract(mutated);
+  assert.ok(issues.some((d) =>
+    d.code === 'PREFLIGHT_JOB_BYPASSES_PREFLIGHT' && d.details === 'gate-rules'),
+  issues.map((d) => `${d.code}: ${d.details ?? ''}`).join('\n'));
+});
+
 test('missing job definition is not invented by the checker or auto-fixer', () => {
   const original = readFileSync(WORKFLOW, 'utf8');
   const mutated = original.replace(/\n  secret-scan:\n[\s\S]*?(?=\n  verdict:)/, '');
@@ -85,13 +113,21 @@ test('safe auto-fix repairs missing verdict wiring, then the behavioral contract
     const dir = join(root, '.github/workflows');
     mkdirSync(dir, { recursive: true });
     const original = readFileSync(WORKFLOW, 'utf8');
-    const broken = original
+    let broken = original
       .replace(/^      - preflight-docs\s*$/m, '')
       .replace(/^    if: always\(\)\s*$/m, '');
+
+    const gateStart = broken.indexOf('  gate-rules:');
+    const gateEnd = broken.indexOf('\n  fixtures:', gateStart);
+    const gateBlock = broken.slice(gateStart, gateEnd);
+    broken = broken.slice(0, gateStart) +
+      gateBlock.replace(/^    needs: preflight-docs\s*\n/m, '') +
+      broken.slice(gateEnd);
     writeFileSync(join(dir, 'commit-guard.yml'), broken);
 
     const repairs = applySafeFixes(root);
     assert.ok(repairs.some((d) => d.code === 'PREFLIGHT_AUTO_FIX_NEEDS' && d.details.includes('preflight-docs')));
+    assert.ok(repairs.some((d) => d.code === 'PREFLIGHT_AUTO_FIX_JOB_GATE' && d.details === 'gate-rules'));
     assert.ok(repairs.some((d) => d.code === 'PREFLIGHT_AUTO_FIX_ALWAYS'));
     const repaired = readFileSync(join(dir, 'commit-guard.yml'), 'utf8');
     assert.deepEqual(checkWorkflowContract(repaired), []);
