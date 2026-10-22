@@ -39,7 +39,7 @@ export function diaryHistory(root = ROOT) {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     if (shallow === 'true') return { skip: 'flacher Klon — git log reicht nicht bis zum ersten Commit' };
-    const log = execFileSync('git', ['log', '--date=short', '--pretty=%h %ad'], {
+    const log = execFileSync('git', ['log', '--date=short', '--pretty=%H %ad'], {
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
