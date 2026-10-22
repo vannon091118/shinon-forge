@@ -1409,7 +1409,7 @@ Boot stehen `Katalog agnes: HTTP 401` und `prompter: HTTP 401` bei
 
 **Nachtrag zum Preflight-Merge:** Der Workflow wurde nicht nur umbenannt, sondern auf sein Verhalten geprüft. Der Vertrag weist nach, dass teure Jobs direkt vom günstigen Preflight abhängen, dass Dummy-Kommandos unter gültig klingenden Jobnamen rot werden und dass die finale Abnahme fehlende, übersprungene oder fehlgeschlagene Jobs nicht als Erfolg auslegt. Ein erster grüner Lauf machte außerdem zwei Historie-Skips sichtbar; die doppelte Realbaumprüfung wurde entfernt und der echte Tagebuch-Check im Schnellpfad auf vollständige Git-Historie festgelegt. Der kanonische Checker wurde anschließend auf eine einzige Implementierung zurückgeführt. PR #23 wurde nach 21/21 erfolgreichen Jobs squash-gemergt.
 
-**Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · `e60eca0` · `2b6de38` · Belege: `.github/workflows/commit-guard.yml`, `scripts/lib/preflight/documentation.mjs`, `scripts/lib/preflight/fixes.mjs`, `scripts/gate/tests/preflight-docs.test.mjs`, `scripts/gate/tests/diary.test.mjs`, `scripts/shinon-test.mjs`, `docs/CHANGELOG.md`
+**Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · `e60eca0` · `2b6de38` · `ddde3c0` · Belege: `.github/workflows/commit-guard.yml`, `scripts/lib/preflight/documentation.mjs`, `scripts/lib/preflight/fixes.mjs`, `scripts/gate/tests/preflight-docs.test.mjs`, `scripts/gate/tests/diary.test.mjs`, `scripts/shinon-test.mjs`, `scripts/lib/repo.mjs`, `scripts/gate/plugins/canon.mjs`, `packages/codingmon/assets/encounter.js`, `docs/CHANGELOG.md`
 
 **Nachtrag vom selben Tag — Branch-Integration und Testline:** Der offene PR #22
 (`work/dsh-provenance-docs`) trug zwei Doku-Korrekturen, die vier Commits hinter `main`
@@ -1461,3 +1461,31 @@ Belege: `npm run gate:test` 927/927 grün in 11,15 s, `npm test` Exit 0,
 `docs/CLEANREPO-AUDIT.md` bei T5b-7; die fünf Zeilen tragen ✅.
 
 **Anker:** `e60eca08f890333cc9d96fc5bc72c7b5662e620a` · `2b6de38f825d958c6244d8d3f7344c07ca1f20b3` · Belege: `scripts/gate/engine.mjs`, `scripts/gate/tests/engine.test.mjs`, `.github/workflows/commit-guard.yml`, `docs/CLEANREPO-AUDIT.md`, `docs/ZAHLEN.md`
+
+**Nachtrag vom selben Tag — fünf Riegel, drei echte Lücken:** Die zweite Audit-Runde
+hat fünf Zeilen geschlossen, und drei davon waren keine Formsache. `dependencyIssues()`
+kannte nur „Ziel fehlt" und Zyklen; eine Kante `popup → @shinon/persona` wäre still
+grün geblieben. Jetzt meldet sie jede Kante außer dem importfreien Seam (T5b-1), und
+der echte Baum hat null davon. Das neue Plugin `schemastery-enum` prüft `z.enum(` in
+den Host-Hälften und lässt Kommentare sowie `assets/*.js` in Ruhe — dort gilt `zod`,
+und `zod` hat ein echtes `z.enum` (T5b-3). Der Kanon war nur im statischen Gate
+verdrahtet; als Plugin `canon` liest er nun dieselbe Registry auch in der Engine
+(T5b-9). Am unangenehmsten war T2-13: `ENCOUNTER_SOURCE_MAP` nannte zwölf interne
+Quellen, vier zeigten ins Leere — `goal-policy`, `index-query` und `rotation` hatten
+in ihrem Paket keine Datei dieses Namens, `receipt` hatte gar keine Quelle. Drei
+zeigen jetzt auf `intent-policy`, `index-core` und `pool-core`, `receipt` steht
+sichtbar als `unavailable`; der Test verlangt für jeden Ref eine echte
+`assets/<ref>.js`, der Paketordner allein beweist nichts mehr. T4-7 war dagegen
+bereits gesund: alle 30 `bestand`-Einträge stimmen exakt mit dem Ist-Stand überein,
+und eine angehängte Zeile in `packages/markers/client.js` macht den Riegel sichtbar
+rot („628 Zeilen, Bestand 627").
+
+Gemessen wurde dabei auch die Drift, die **T5b-10** noch automatisch verhindern soll:
+317 Code-Dateien standen in `docs/ZAHLEN.md` §1.2, tatsächlich sind es 378; die
+Gate-Tests stehen bei 937 (9,8 s) statt 948, die Codingmon-Suiten bei 134 statt 46.
+Lokal: `npm test` Exit 0, `npm run gate:test` 937/937, `npm run test:codingmon`
+134/134, `scripts/gate/tests/structure.test.mjs` 10/10, die Encounter-Suiten 48/48,
+`npm run build` und `npm run zahlen:check` Exit 0. Der Gate-Lauf `39846439496` auf
+`ddde3c0` ist grün, Verdict-Job eingeschlossen.
+
+**Anker:** `ddde3c06336192157285b49ffd3cf5a0d468390e` · Belege: `scripts/lib/repo.mjs`, `scripts/gate/plugins/schemastery-enum.mjs`, `scripts/gate/plugins/canon.mjs`, `scripts/gate/tests/package-edges.test.mjs`, `packages/codingmon/assets/encounter.js`, `packages/codingmon/client.js`, `docs/CLEANREPO-AUDIT.md`, `docs/ZAHLEN.md`
