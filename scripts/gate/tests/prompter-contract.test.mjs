@@ -39,6 +39,7 @@ import { codeOnly, findForbidden } from '../../lib/source-scan.mjs';
 // still von der Indexregel abweichen könnte.
 import { listFiles, protectedReason, toProjectPath } from '../../../packages/project-index/assets/index-core.js';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/prompter/', import.meta.url));
 const INDEX_FILE = join(PACKAGE_DIR, 'index.js');
@@ -68,17 +69,6 @@ async function loadBundle() {
 
 const bundle = await loadBundle();
 const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
-
-function quiet(fn) {
-  const saved = { log: console.log, warn: console.warn, error: console.error };
-  console.log = console.warn = console.error = () => {};
-  try {
-    return fn();
-  } finally {
-    Object.assign(console, saved);
-  }
-}
-
 /** Ein Ergebnis, das den Vertrag erfuellt; einzelne Felder werden je Fall ersetzt. */
 const goodResult = (over = {}) => ({
   enhancedPrompt: 'Mach das schnell.',

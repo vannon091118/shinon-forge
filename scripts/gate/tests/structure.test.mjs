@@ -35,12 +35,23 @@ const REGISTRY = {
   ],
   bestand: {},
   bestandAusnahmen: {},
+  // T1-6: die zwei Riegel fuer die Orte ohne Zeilen. Der Fixture-Leser ist eine
+  // Nicht-Code-Datei, damit der Kanon-Riegel nicht mit der Klassenzuordnung
+  // desselben Baums kollidiert (er prueft nur, dass der Leser die Datei NENNT).
+  vertraege: {
+    'docs/contracts/structure.json': { art: 'quelle', leser: ['README.md'] },
+  },
+  profil: { wurzel: 'profiles', pflicht: ['package.json', 'cordis.patch.yml', 'cordis.yml'] },
 };
 
 /** Baut einen Baum aus `{ pfad: inhalt }`, legt die Registry dazu und räumt auf. */
 function baum(files) {
   const root = mkdtempSync(join(tmpdir(), 'shinon-structure-'));
-  for (const [datei, inhalt] of Object.entries({ 'docs/contracts/structure.json': JSON.stringify(REGISTRY), ...files })) {
+  for (const [datei, inhalt] of Object.entries({
+      'docs/contracts/structure.json': JSON.stringify(REGISTRY),
+      'README.md': 'Vertrag: docs/contracts/structure.json\n',
+      ...files,
+    })) {
     const abs = join(root, datei);
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, inhalt);
@@ -184,5 +195,95 @@ test('Bestandseintrag ohne Datei und fehlende Registry sind Befunde', () => {
     assert.match(structureIssues(leer)[0], /docs\/contracts\/structure\.json fehlt/);
   } finally {
     rmSync(leer, { recursive: true, force: true });
+  }
+});
+
+/**
+ * T1-6: die zwei Riegel fuer die Orte ohne Zeilen — `docs/contracts/` und
+ * `profiles/`. Jeder Fall kippt genau eine Regel des Riegels; der Echtbaum-Fall
+ * oben bleibt der teuerste und wichtigste.
+ */
+test('Vertrag ohne Eigentuemer-Eintrag ist ein Befund', () => {
+  const root = baum({ 'packages/a/client.js': GUT_CLIENT, 'docs/contracts/loose.json': '{}\n' });
+  try {
+    const issues = structureIssues(root);
+    assert.equal(issues.length, 1);
+    assert.match(issues[0], /docs\/contracts\/loose\.json: kein Eintrag in `vertraege`/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('`art: quelle` verlangt einen Leser, der die Datei nennt', () => {
+  const ohneNennung = baum({ 'packages/a/client.js': GUT_CLIENT });
+  try {
+    writeFileSync(join(ohneNennung, 'README.md'), 'Hier steht nichts ueber Vertraege.\n');
+    const issues = structureIssues(ohneNennung);
+    assert.equal(issues.length, 1);
+    assert.match(issues[0], /Leser README\.md nennt die Datei nicht/);
+  } finally {
+    rmSync(ohneNennung, { recursive: true, force: true });
+  }
+
+  const ohneLeser = baum({ 'packages/a/client.js': GUT_CLIENT });
+  try {
+    const registry = { ...REGISTRY, vertraege: { 'docs/contracts/structure.json': { art: 'quelle', leser: [] } } };
+    writeFileSync(join(ohneLeser, 'docs/contracts/structure.json'), JSON.stringify(registry));
+    assert.match(structureIssues(ohneLeser)[0], /art=quelle ohne Leser/);
+  } finally {
+    rmSync(ohneLeser, { recursive: true, force: true });
+  }
+});
+
+test('`art: zusammenfassung` verlangt eine existierende Quelle — sonst ist es keine', () => {
+  const root = baum({ 'packages/a/client.js': GUT_CLIENT });
+  try {
+    const registry = {
+      ...REGISTRY,
+      vertraege: {
+        'docs/contracts/structure.json': { art: 'zusammenfassung', quelle: ['packages/a/assets/weg.js'] },
+        'docs/contracts/leer.json': { art: 'zusammenfassung' },
+        'docs/contracts/unklar.json': { art: 'beides' },
+      },
+    };
+    writeFileSync(join(root, 'docs/contracts/structure.json'), JSON.stringify(registry));
+    writeFileSync(join(root, 'docs/contracts/leer.json'), '{}\n');
+    writeFileSync(join(root, 'docs/contracts/unklar.json'), '{}\n');
+    const issues = structureIssues(root);
+    assert.ok(issues.some((issue) => /Quelle packages\/a\/assets\/weg\.js existiert nicht/.test(issue)), 'fehlende Quelle');
+    assert.ok(issues.some((issue) => /art=zusammenfassung ohne `quelle`/.test(issue)), 'Zusammenfassung ohne Quelle');
+    assert.ok(issues.some((issue) => /art muss `quelle` oder `zusammenfassung` sein \(ist: beides\)/.test(issue)), 'unbekannte Art');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('Profil: Logik und fehlende Pflichtdatei sind Befunde, die drei Pflichtdateien sind gruen', () => {
+  const gut = baum({
+    'profiles/shinon/package.json': '{}\n',
+    'profiles/shinon/cordis.patch.yml': 'x\n',
+    'profiles/shinon/cordis.yml': 'x\n',
+    'profiles/shinon/cordis.headless.yml': 'x\n',
+  });
+  try {
+    writeFileSync(join(gut, 'docs/contracts/structure.json'), JSON.stringify({ ...REGISTRY, profil: { ...REGISTRY.profil, erforderlich: true } }));
+    assert.deepEqual(structureIssues(gut), []);
+  } finally {
+    rmSync(gut, { recursive: true, force: true });
+  }
+
+  const schlecht = baum({
+    'profiles/shinon/index.js': 'export default 1;\n',
+    'profiles/shinon/package.json': '{}\n',
+    'profiles/shinon/notizen.txt': 'x\n',
+  });
+  try {
+    writeFileSync(join(schlecht, 'docs/contracts/structure.json'), JSON.stringify({ ...REGISTRY, profil: { ...REGISTRY.profil, erforderlich: true } }));
+    const issues = structureIssues(schlecht);
+    assert.ok(issues.some((issue) => /profiles\/shinon\/index\.js: ein Profil traegt Daten und Links, keine Logik/.test(issue)), 'Code im Profil');
+    assert.ok(issues.some((issue) => /profiles\/shinon: Pflichtdatei cordis\.patch\.yml fehlt/.test(issue)), 'Pflichtdatei');
+    assert.ok(issues.some((issue) => /profiles\/shinon\/notizen\.txt: Datei, die die Profil-Regel nicht kennt/.test(issue)), 'unbekannte Datei');
+  } finally {
+    rmSync(schlecht, { recursive: true, force: true });
   }
 });

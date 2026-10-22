@@ -22,6 +22,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { waitFor } from './helpers/wait.mjs';
 
 const repo = new URL('../../../', import.meta.url);
 const lifecyclePath = new URL('packages/prompter/assets/skill-lifecycle.js', repo);
@@ -47,16 +48,6 @@ const GOOD = {
   immer: 'den Lernstoff als Skill im Projekt festhalten',
   weil: 'der Katalog des Modells nur veroeffentlichte Skills kennt',
 };
-
-async function until(check, ms = 6000) {
-  const deadline = Date.now() + ms;
-  while (Date.now() < deadline) {
-    if (await check()) return true;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  return check();
-}
-
 test('DSH entdeckt einen vom Lebenszyklus geschriebenen Skill im Projekt-Root', { skip: dsh === null ? dshReason : false }, async () => {
   const previousCwd = process.cwd();
   const work = mkdtempSync(join(tmpdir(), 'dsh-skill-discovery-'));
@@ -79,7 +70,7 @@ test('DSH entdeckt einen vom Lebenszyklus geschriebenen Skill im Projekt-Root', 
 
     // Die Plugins montiert Cordis asynchron: erst warten, bis der Dienst und der
     // Provider den vorhandenen Skill sehen (Bereitschaft, kein Raten).
-    const ready = await until(async () => ctx.skills !== undefined && (await ctx.skills.list({ cwd: project })).some((skill) => skill.name === 'vorhanden'));
+    const ready = Boolean(await waitFor(async () => ctx.skills !== undefined && (await ctx.skills.list({ cwd: project })).some((skill) => skill.name === 'vorhanden'), { timeoutMs: 6000 }));
     assert.equal(ready, true, 'der Dienst skills und der Provider sind bereit');
     const before = await ctx.skills.list({ cwd: project });
     assert.ok(before.some((skill) => skill.name === 'vorhanden' && skill.source === 'project-agents'), 'der vorhandene Skill wird nativ entdeckt');
@@ -104,11 +95,11 @@ test('DSH entdeckt einen vom Lebenszyklus geschriebenen Skill im Projekt-Root', 
     // Gemessen wird der KATALOG-Pfad, den das Modell sieht: snapshot() mit Cache.
     // Dessen Ungueltigmachung kommt vom Datei-Watcher des Providers.
     let catalogComplete = false;
-    const visible = await until(async () => {
+    const visible = Boolean(await waitFor(async () => {
       const snapshot = await ctx.skills.snapshot({ cwd: project });
       catalogComplete = snapshot.complete;
       return snapshot.skills.some((skill) => skill.name === GOOD.name);
-    });
+    }, { timeoutMs: 6000 }));
     const elapsedMs = Math.round(performance.now() - started);
     assert.equal(visible, true, `der neue Skill muss im Katalog erscheinen; Log: ${lines.join(' | ')}`);
     assert.equal(catalogComplete, true, 'die Entdeckung ist vollstaendig (kein Teilkatalog)');

@@ -33,6 +33,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/persona/', import.meta.url));
 /** Die Repo-Wurzel — der eine erlaubte Persona-Scope (die Persona spricht nur benannt). */
@@ -62,17 +63,6 @@ const bundle = await loadBundle();
 const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
 const systemPromptModule = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-system-prompt')).href);
 const { default: SystemPrompt, renderPrompt } = systemPromptModule;
-
-function quiet(fn) {
-  const saved = { log: console.log, warn: console.warn, error: console.error };
-  console.log = console.warn = console.error = () => {};
-  try {
-    return fn();
-  } finally {
-    Object.assign(console, saved);
-  }
-}
-
 /** Die Marker, an denen der Aufbau erkennbar ist — kurz und eindeutig. */
 const IDENTITY_MARK = 'PERSONA-IDENTITY-MARKE';
 const CONTEXT_MARK = 'PROJEKT-KONTEXT-MARKE';

@@ -27,6 +27,7 @@ import {
   fixtureIssues,
   staticIssues,
 } from '../plugins/events-spine.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/events/', import.meta.url));
 const ASSET_FILE = join(PACKAGE_DIR, 'assets/event-spine.json');
@@ -49,19 +50,6 @@ async function loadBundle() {
 }
 
 /** Bundle-Ausgaben stumm schalten, Rückgabe trotzdem einsammeln. */
-function quiet(fn) {
-  const log = console.log;
-  const warn = console.warn;
-  console.log = () => {};
-  console.warn = () => {};
-  try {
-    return fn();
-  } finally {
-    console.log = log;
-    console.warn = warn;
-  }
-}
-
 const bundle = await loadBundle();
 
 /** Spine über die echte apply()-Schnittstelle an einen Fake-Host hängen. */

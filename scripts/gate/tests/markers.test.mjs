@@ -32,6 +32,7 @@ import {
   hostIssues,
   modelIssues,
 } from '../plugins/markers.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/markers/', import.meta.url));
 const MODEL_FILE = join(PACKAGE_DIR, 'assets/marker-model.json');
@@ -55,19 +56,6 @@ async function loadBundle() {
 }
 
 /** Ausgaben stumm schalten, Rückgabe trotzdem einsammeln. */
-function quiet(fn) {
-  const log = console.log;
-  const warn = console.warn;
-  console.log = () => {};
-  console.warn = () => {};
-  try {
-    return fn();
-  } finally {
-    console.log = log;
-    console.warn = warn;
-  }
-}
-
 const bundle = await loadBundle();
 const limits = bundle.limitsOf(model);
 

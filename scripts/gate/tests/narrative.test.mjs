@@ -42,6 +42,7 @@ import {
   contractIssues,
   staticIssues,
 } from '../plugins/narrative.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const PERSONA_DIR = join(ROOT, 'packages/persona');
@@ -135,21 +136,6 @@ function createHost() {
   const stateSection = () => sections.find((entry) => entry.name === 'shinon:state');
   return { ctx, handlers, sections, dispatch, narrativeSection, stateSection };
 }
-
-function quiet(fn) {
-  const log = console.log;
-  const warn = console.warn;
-  console.error = () => {};
-  console.log = () => {};
-  console.warn = () => {};
-  try {
-    return fn();
-  } finally {
-    console.log = log;
-    console.warn = warn;
-  }
-}
-
 const connect = () =>
   quiet(() => {
     const host = createHost();

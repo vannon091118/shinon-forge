@@ -132,7 +132,7 @@ export function structureIssues(root = ROOT) {
   if (struktur.contract !== CONTRACT) {
     return [`${STRUCTURE_FILE}: Vertrag ${struktur.contract ?? '(fehlt)'} statt ${CONTRACT}`];
   }
-  for (const key of ['rules', 'klassen', 'bestand', 'bestandAusnahmen']) {
+  for (const key of ['rules', 'klassen', 'bestand', 'bestandAusnahmen', 'vertraege', 'profil']) {
     if (struktur[key] === undefined) issues.push(`${STRUCTURE_FILE}: Feld \`${key}\` fehlt`);
   }
   for (const klasse of struktur.klassen ?? []) {
@@ -179,6 +179,117 @@ export function structureIssues(root = ROOT) {
 
   for (const datei of Object.keys(struktur.bestand ?? {})) {
     if (!gesehen.has(datei)) issues.push(`${datei}: Bestandseintrag ohne Datei — Eintrag entfernen`);
+  }
+  issues.push(...vertragsBefunde(root, struktur), ...profilBefunde(root, struktur));
+  return issues;
+}
+
+/**
+ * Zwei Riegel, die nicht ueber Zeilen laufen — deshalb wohnen sie in derselben
+ * Datei: sie beantworten dieselbe Frage („hat das einen Eigentuemer?") fuer die
+ * zwei Orte, die keine Code-Dateien sind.
+ *
+ * `docs/contracts/` traegt dreizehn Vertraege, von denen heute nur fuenf von
+ * Code gelesen werden (Kanon, Struktur, Commit-Policy, Commit-Trailer,
+ * Faehigkeiten). Die anderen acht sind menschenlesbare Zusammenfassungen —
+ * ihre maschinenlesbare Quelle liegt im Paket. Beides ist in Ordnung, aber
+ * beides muss GESAGT sein: ein Vertrag ohne Eigentuemer ist die Doppelung, die
+ * der Kanon verhindern soll, eine Ebene tiefer. Der Unterschied zwischen
+ * `art: quelle` und `art: zusammenfassung` ist der Unterschied zwischen „der
+ * Code liest das hier" und „der Code liest woanders, das hier erklaert es".
+ * Ein Leser, der die Datei nicht einmal NENNT, ist keine Quelle, sondern eine
+ * Behauptung — deshalb wird der Name im Leser geprueft.
+ *
+ * `profiles/` traegt Daten und Links, keine Logik. Ein `.js` in einem Profil
+ * waere eine zweite Fassung eines Pakets, die kein Gate sieht: der Modul-Loader
+ * loest `profiles/<name>/node_modules` VOR dem Root auf, ein dort liegendes
+ * Skript schattet also das Repo-Paket (genau der Fehler aus den Pitfalls). Die
+ * Pflichtdateien (Manifest und Patch) sind benannt, `cordis.<variante>.yml`
+ * bleibt als Variante erlaubt, alles andere braucht eine Entscheidung.
+ */
+function vertragsBefunde(root, struktur) {
+  const registry = struktur.vertraege;
+  if (registry === undefined || typeof registry !== 'object' || Array.isArray(registry)) {
+    return [`${STRUCTURE_FILE}: Feld \`vertraege\` fehlt — jeder Vertrag braucht einen Eigentuemer`];
+  }
+  const dir = join(root, 'docs/contracts');
+  if (!existsSync(dir)) return ['docs/contracts fehlt — ohne Vertraege kein Kanon'];
+  const dateien = readdirSync(dir).filter((name) => name.endsWith('.json')).sort();
+  const issues = [];
+  for (const name of dateien) {
+    const datei = `docs/contracts/${name}`;
+    const eintrag = registry[datei];
+    if (eintrag === undefined) {
+      issues.push(`${datei}: kein Eintrag in \`vertraege\` — ein Vertrag ohne Eigentuemer`);
+      continue;
+    }
+    const art = eintrag?.art;
+    if (art === 'quelle') {
+      const leser = Array.isArray(eintrag.leser) ? eintrag.leser : [];
+      if (leser.length === 0) {
+        issues.push(`${datei}: art=quelle ohne Leser — wer liest diesen Vertrag?`);
+        continue;
+      }
+      for (const pfad of leser) {
+        const abs = join(root, pfad);
+        if (!existsSync(abs)) {
+          issues.push(`${datei}: Leser ${pfad} existiert nicht`);
+          continue;
+        }
+        if (!readFileSync(abs, 'utf8').includes(name)) {
+          issues.push(`${datei}: Leser ${pfad} nennt die Datei nicht — der Eintrag ist eine Behauptung`);
+        }
+      }
+      continue;
+    }
+    if (art === 'zusammenfassung') {
+      const quellen = Array.isArray(eintrag.quelle) ? eintrag.quelle : [];
+      if (quellen.length === 0) {
+        issues.push(`${datei}: art=zusammenfassung ohne \`quelle\` — dann ist es keine Zusammenfassung`);
+        continue;
+      }
+      for (const pfad of quellen) {
+        if (!existsSync(join(root, pfad))) issues.push(`${datei}: Quelle ${pfad} existiert nicht`);
+      }
+      continue;
+    }
+    issues.push(`${datei}: art muss \`quelle\` oder \`zusammenfassung\` sein (ist: ${String(art)})`);
+  }
+  for (const datei of Object.keys(registry)) {
+    if (!datei.startsWith('docs/contracts/')) {
+      issues.push(`${datei}: Eintrag in \`vertraege\` ausserhalb von docs/contracts/`);
+      continue;
+    }
+    if (!dateien.includes(datei.slice('docs/contracts/'.length))) issues.push(`${datei}: Eintrag ohne Vertragsdatei — Eintrag entfernen`);
+  }
+  return issues;
+}
+
+function profilBefunde(root, struktur) {
+  const cfg = struktur.profil;
+  if (cfg === undefined || typeof cfg !== 'object' || Array.isArray(cfg)) {
+    return [`${STRUCTURE_FILE}: Feld \`profil\` fehlt — ein Profil ohne Riegel ist ein zweiter Paketbaum`];
+  }
+  const wurzel = typeof cfg.wurzel === 'string' && cfg.wurzel !== '' ? cfg.wurzel : 'profiles';
+  const pflicht = Array.isArray(cfg.pflicht) ? cfg.pflicht : [];
+  const dir = join(root, wurzel);
+  if (!existsSync(dir)) return cfg.erforderlich === true ? [`${wurzel} fehlt — das Profil ist der Start des Produkts`] : [];
+  const issues = [];
+  for (const name of readdirSync(dir).filter((entry) => statSync(join(dir, entry)).isDirectory()).sort()) {
+    const ordner = join(dir, name);
+    const dateien = readdirSync(ordner).filter((entry) => statSync(join(ordner, entry)).isFile()).sort();
+    for (const datei of pflicht) {
+      if (!dateien.includes(datei)) issues.push(`${wurzel}/${name}: Pflichtdatei ${datei} fehlt`);
+    }
+    for (const datei of dateien) {
+      if (CODE.test(datei)) {
+        issues.push(`${wurzel}/${name}/${datei}: ein Profil traegt Daten und Links, keine Logik`);
+        continue;
+      }
+      if (!pflicht.includes(datei) && !/^cordis\.[\w-]+\.yml$/.test(datei)) {
+        issues.push(`${wurzel}/${name}/${datei}: Datei, die die Profil-Regel nicht kennt`);
+      }
+    }
   }
   return issues;
 }

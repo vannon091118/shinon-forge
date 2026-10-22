@@ -34,6 +34,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const PACKAGES = ['prompter', 'project-index', 'scoring', 'persona', 'narrative', 'codingmon'];
 const ROOT = new URL('../../../', import.meta.url);
@@ -75,17 +76,6 @@ const narrative = loaded.narrative;
 const codingmon = loaded.codingmon;
 const dshRequire = createRequire(join(dshRoot(), 'package.json'));
 const { Context } = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/cordis')).href);
-
-function quiet(fn) {
-  const saved = { log: console.log, warn: console.warn, error: console.error };
-  console.log = console.warn = console.error = () => {};
-  try {
-    return fn();
-  } finally {
-    Object.assign(console, saved);
-  }
-}
-
 let workCount = 0;
 const tempDirs = [];
 function workDir(label) {

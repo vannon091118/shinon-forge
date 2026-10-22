@@ -33,6 +33,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { codeOnly, findForbidden } from '../../lib/source-scan.mjs';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/hook/', import.meta.url));
 const INDEX_FILE = join(PACKAGE_DIR, 'index.js');
@@ -65,16 +66,6 @@ const bundle = await loadBundle();
 const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
 
 /** Bundle-Ausgaben stumm schalten. */
-function quiet(fn) {
-  const saved = { log: console.log, warn: console.warn, error: console.error };
-  console.log = console.warn = console.error = () => {};
-  try {
-    return fn();
-  } finally {
-    Object.assign(console, saved);
-  }
-}
-
 /** Vollständige Waterfall-Nutzlast, wie der echte Loop sie fährt. */
 const stepPayload = ({ sessionId = 'sess-1', turn = 1, step = 1, messages = [{ role: 'user', content: 'hallo' }] } = {}) => ({
   agent: { session: { id: sessionId } },

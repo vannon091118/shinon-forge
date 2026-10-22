@@ -31,6 +31,7 @@ import {
   stateContractIssues,
   staticIssues,
 } from '../plugins/persona.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/persona/', import.meta.url));
 /** Die Wurzel des Repos, in dem dieses Paket liegt — der EINE erlaubte Persona-Scope. */
@@ -131,20 +132,6 @@ function createHost(services = {}) {
   const stateOf = () => bundle.stateFromContext(stateSection()?.text ?? '');
   return { ctx, handlers, sections, calls, provided, dispatch, stateSection, stateOf };
 }
-
-function quiet(fn) {
-  const log = console.log;
-  const warn = console.warn;
-  console.log = () => {};
-  console.warn = () => {};
-  try {
-    return fn();
-  } finally {
-    console.log = log;
-    console.warn = warn;
-  }
-}
-
 /** Die Config, die jeder Aufbau teilt — ein Test kann einzelne Werte ersetzen. */
 const baseConfig = {
   statePath: './assets/persona-state.json',
@@ -605,10 +592,14 @@ test('Tendenz: ein fremder Dienst unter dem Namen wird gemeldet, nicht gelesen',
   const realError = console.error;
   console.error = (...args) => errors.push(args.join(' '));
   try {
-    const connectForeign = connect({ [bundle.SCORING_SERVICE]: { contract: 'shinon.fremd/v1', read: () => ({ stance: 'kritisch' }) } });
-    assert.equal(connectForeign.sections.some((entry) => entry.name === 'shinon:tendency'), false);
+    // Dieser Aufbau laeuft NICHT ueber `connect`, sondern ueber `quiet` mit
+    // `keep: ['error']`: geprueft wird, dass die Warnung ankommt — ein Helfer,
+    // der genau diesen Kanal stummschaltet, wuerde die Zusage verdecken.
+    const host = createHost({ [bundle.SCORING_SERVICE]: { contract: 'shinon.fremd/v1', read: () => ({ stance: 'kritisch' }) } });
+    quiet(() => { host.dispose = bundle.apply(host.ctx, baseConfig); }, { keep: ['error'] });
+    assert.equal(host.sections.some((entry) => entry.name === 'shinon:tendency'), false);
     assert.ok(errors.some((line) => line.includes('verletzt den Vertrag')), errors.join(' | '));
-    connectForeign.dispose();
+    host.dispose();
   } finally {
     console.error = realError;
   }

@@ -38,6 +38,7 @@ import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const PACKAGES = ['prompter', 'task-router'];
 const ROOT = new URL('../../../', import.meta.url);
@@ -88,17 +89,6 @@ const { Context } = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/
  */
 const goalPackage = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/dsh-goal')).href);
 const { GoalError } = goalPackage;
-
-function quiet(fn) {
-  const saved = { log: console.log, warn: console.warn, error: console.error };
-  console.log = console.warn = console.error = () => {};
-  try {
-    return fn();
-  } finally {
-    Object.assign(console, saved);
-  }
-}
-
 /** Ein Prompter-Datensatz in der Form, die der Enhancer wirklich emittiert. */
 const prompterRecord = (over = {}) => ({
   contract: prompter.CONTRACT,

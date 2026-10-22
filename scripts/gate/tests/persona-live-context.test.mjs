@@ -31,6 +31,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
+import { quiet } from './helpers/console.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/persona/', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -59,17 +60,6 @@ const bundle = await loadBundle();
 const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
 const systemPromptModule = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-system-prompt')).href);
 const { default: SystemPrompt, renderPrompt, renderContextSections, joinContextSections } = systemPromptModule;
-
-function quiet(fn) {
-  const saved = { log: console.log, warn: console.warn, error: console.error };
-  console.log = console.warn = console.error = () => {};
-  try {
-    return fn();
-  } finally {
-    Object.assign(console, saved);
-  }
-}
-
 /** Der Kern des Pakets: der Live-Kontext wird dort gerechnet. */
 const liveCore = await import(new URL('../../../packages/persona/assets/live-context.js', import.meta.url).href);
 

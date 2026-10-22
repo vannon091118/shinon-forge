@@ -1,4 +1,5 @@
 import { describe, test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { fnv1a32, randInt, streamFor, weightedPick } from '../assets/zufall.js';
 import { GROWTH_BPS, LEVEL_CAP, levelFor, statAt, statsAt, threshold } from '../assets/leiter.js';
@@ -186,5 +187,41 @@ describe('Migration v2 to v3', () => {
     assert.equal(migrated.completions, 8);
     assert.equal(migrated.loot.brauchbar, 2);
     assert.deepEqual(migrateToV3(migrated), migrated);
+  });
+});
+
+/**
+ * T2-2 des Clean-Repo-Audits: die Zufalls-Logik der Zucht hat EINE Quelle.
+ *
+ * Die Audit-Tabelle verlangt `rollBonuses` als einzige Stelle, an der die
+ * Bonus-Verlosung eines Eis entsteht — frueher lagen zwei Fassungen im Baum.
+ * Der statische Teil haelt die Definition und den Import; der Stichproben-Teil
+ * beweist am Verhalten, dass `pair()` wirklich DURCH diese Funktion geht: fuer
+ * denselben Seed, dieselbe Ei-ID, Generation und Eltern-BXP kommt genau die
+ * Liste heraus, die `rollBonuses` liefert. Eine zweite, leicht abweichende
+ * Implementierung in `zucht.js` wuerde hier auffallen, auch wenn sie fast
+ * dasselbe rechnet.
+ */
+describe('Zufalls-Logik der Zucht: eine Quelle (T2-2)', () => {
+  const read = (name) => readFileSync(new URL(`../assets/${name}`, import.meta.url), 'utf8');
+
+  test('rollBonuses ist genau einmal definiert, zucht.js importiert es', () => {
+    const glue = read('zucht-glueck.js');
+    const zucht = read('zucht.js');
+    assert.equal([...glue.matchAll(/function rollBonuses\b/g)].length, 1, 'eine Definition');
+    assert.doesNotMatch(zucht, /function rollBonuses\b/, 'zucht.js definiert keine zweite Fassung');
+    assert.match(zucht, /import \{ rollBonuses, POOLS \} from '\.\/zucht-glueck\.js'/, 'die Quelle ist der Import');
+    assert.doesNotMatch(zucht, /weightedPick\(|streamFor\(|randInt\(/, 'zucht.js wuerfelt nicht selbst');
+  });
+
+  test('pair() legt genau die Liste ins Ei, die rollBonuses liefert (25 Stichproben)', () => {
+    for (let i = 0; i < 25; i += 1) {
+      const s = state();
+      s.seed = 2718281828 + i * 7919;
+      const expected = rollBonuses({ seed: s.seed, eggId: 'e3', gen: 2, bxpA: 50, bxpB: 70 });
+      const eggId = pair(s, 'c1', 'c2', { lineage, selectedSpecies: 'deadlock' });
+      assert.equal(eggId, 'e3');
+      assert.deepEqual(s.eggs.at(-1).bonuses, expected, `Stichprobe ${i}`);
+    }
   });
 });

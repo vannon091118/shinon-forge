@@ -13,6 +13,15 @@
       "trace": "Jede Klassenzeile trägt `muster`, `grenze` und die Messung (`gemessen`), aus der die Grenze folgt.",
       "replay": "`node --test scripts/gate/tests/structure.test.mjs` prüft den echten Baum und sieben Mutationen auf einem Miniatur-Baum.",
       "invariant": "Grenzen bremsen Wachstum, ohne Arbeit zu erfinden: kein Bestandseintrag verlangt heute einen Schnitt; Testwachstum braucht eine begründete, datierte Obergrenze."
+    },
+    {
+      "positive": "Jede Datei unter `docs/contracts/` hat einen Eintrag in `vertraege`: `art: quelle` nennt mindestens einen Leser, der die Datei auch nennt, `art: zusammenfassung` nennt mindestens eine existierende Quelle. Jedes Profil traegt seine Pflichtdateien und keine Logik.",
+      "forbidden": "Ein Vertrag ohne Eigentuemer, ein `art: quelle`-Leser, der die Datei nicht nennt, eine Quelle, die es nicht gibt, und jede Code-Datei unter `profiles/`.",
+      "fallback": "Fehlt `vertraege` oder `profil` in der Registry, endet der Schritt mit einem Befund statt mit stillem Erfolg; ein fehlendes `profiles/` ist nur dann ein Befund, wenn `profil.erforderlich` es verlangt (Fixture-Baum).",
+      "error": "Der Befund nennt Vertragsdatei, Art und den fehlenden Leser/die fehlende Quelle; `npm test`, `npm run build` und das Gate enden Exit 1.",
+      "trace": "Die Eintraege stehen in `docs/contracts/structure.json` neben Grenzen und Bestand — eine Datei, eine Entscheidung.",
+      "replay": "`node --test scripts/gate/tests/structure.test.mjs` faehrt beide neuen Riegel auf einem Miniatur-Baum an (fehlender Eintrag, Leser ohne Nennung, fehlende Quelle, Code im Profil, fehlende Pflichtdatei) und prueft den Echtbaum.",
+      "invariant": "Die Doppelung zwischen `docs/contracts/` und `packages/*/assets/` ist entschieden, nicht beseitigt: wer eine Zusammenfassung anlegt, nennt ihre Quelle — und die Quelle bleibt die maschinenlesbare Wahrheit."
     }
   ],
   "klassen": [
@@ -113,10 +122,10 @@
     "scripts/gate/plugins/typescript.mjs": 204,
     "scripts/gate/tests/client-activation.test.mjs": 606,
     "scripts/gate/tests/commit-trailer.test.mjs": 609,
-    "scripts/gate/tests/persona-state.test.mjs": 1004,
+    "scripts/gate/tests/persona-state.test.mjs": 995,
     "scripts/gate/tests/project-index.test.mjs": 2154,
-    "scripts/gate/tests/prompter-contract.test.mjs": 2212,
-    "scripts/gate/tests/task-router.test.mjs": 919,
+    "scripts/gate/tests/prompter-contract.test.mjs": 2202,
+    "scripts/gate/tests/task-router.test.mjs": 909,
     "scripts/install-user.mjs": 1041,
     "scripts/lib/repo.mjs": 1268
   },
@@ -127,5 +136,101 @@
       "datum": "2026-10-22",
       "maxZeilen": 650
     }
+  },
+  "vertraege": {
+    "docs/contracts/abort.json": {
+      "art": "zusammenfassung",
+      "quelle": [
+        "packages/prompter/assets/abort-core.js",
+        "packages/prompter/assets/abort-reasons.json"
+      ]
+    },
+    "docs/contracts/canon.json": {
+      "art": "quelle",
+      "leser": [
+        "scripts/lib/canon.mjs"
+      ]
+    },
+    "docs/contracts/capabilities.json": {
+      "art": "quelle",
+      "leser": [
+        "scripts/gate/plugins/package-checklist.mjs",
+        "scripts/install-hooks.mjs"
+      ]
+    },
+    "docs/contracts/commit-policy.json": {
+      "art": "quelle",
+      "leser": [
+        "scripts/lib/commit-policy-file.mjs"
+      ]
+    },
+    "docs/contracts/commit-trailer.json": {
+      "art": "quelle",
+      "leser": [
+        "scripts/gate/plugins/commit-trailer.mjs"
+      ]
+    },
+    "docs/contracts/core.json": {
+      "art": "zusammenfassung",
+      "quelle": [
+        "packages/core/index.js",
+        "packages/core/client.js"
+      ]
+    },
+    "docs/contracts/events.json": {
+      "art": "zusammenfassung",
+      "quelle": [
+        "packages/events/assets/event-spine.json"
+      ]
+    },
+    "docs/contracts/facts.json": {
+      "art": "quelle",
+      "leser": [
+        "packages/project-index/assets/facts-reconcile.js"
+      ]
+    },
+    "docs/contracts/markers.json": {
+      "art": "zusammenfassung",
+      "quelle": [
+        "packages/markers/assets/marker-model.json",
+        "packages/markers/index.js"
+      ]
+    },
+    "docs/contracts/model-route.json": {
+      "art": "zusammenfassung",
+      "quelle": [
+        "scripts/lib/model-route.mjs",
+        "scripts/dsh-target-versions.json"
+      ]
+    },
+    "docs/contracts/persona.json": {
+      "art": "zusammenfassung",
+      "quelle": [
+        "packages/persona/assets/persona-state.json"
+      ]
+    },
+    "docs/contracts/provenance.json": {
+      "art": "zusammenfassung",
+      "quelle": [
+        "packages/prompter/assets/provenance.js"
+      ]
+    },
+    "docs/contracts/structure.json": {
+      "art": "quelle",
+      "leser": [
+        "scripts/lib/structure.mjs",
+        "scripts/sync-zahlen.mjs"
+      ]
+    }
+  },
+  "profil": {
+    "wurzel": "profiles",
+    "erforderlich": true,
+    "pflicht": [
+      "package.json",
+      "cordis.patch.yml",
+      "cordis.yml"
+    ],
+    "regel": "Ein Profil traegt Daten und Links, keine Logik: genau die Pflichtdateien (Manifest, Patch, Basis-YAML) und optional cordis.<variante>.yml. Ein .js/.mjs/.cjs dort waere eine zweite Fassung eines Pakets, die der Modul-Loader bevorzugt und die kein Gate sieht — deshalb rot."
   }
 }

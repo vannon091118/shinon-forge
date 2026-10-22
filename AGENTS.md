@@ -300,7 +300,11 @@ läuft in `test:full`/`gate:full` (CI).
   guessed; a file above its limit is named in `bestand` and may only shrink, and a
   client half carries no `Config`, a host entry carries `apply`, a gate plugin carries
   `check`. Growing past the limit without an entry, or writing a file no class owns, is
-  a gate finding (`structureIssues`, `npm run build` runs it too). Split by OWNERSHIP
+  a gate finding (`structureIssues`, `npm run build` runs it too). Zwei Orte haben keine
+  Zeilen und stehen deshalb in derselben Registry: `docs/contracts/` je Datei als
+  `art: quelle` (mit einem Leser, der sie nennt) oder `art: zusammenfassung` (mit
+  existierender `quelle`), und `profiles/` als Daten-und-Links-Baum (Pflichtdateien,
+  keine Logik). Split by OWNERSHIP
   when a file carries two: a name table belongs with the seam it names, not with the
   renderer that repeats it. Counts: `docs/ZAHLEN.md` §1.2.
   The worked example is `packages/prompter` (2026-10-20): `index.js` keeps the public

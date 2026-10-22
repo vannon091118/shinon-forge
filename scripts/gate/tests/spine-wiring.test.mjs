@@ -26,6 +26,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
+import { quiet } from './helpers/console.mjs';
+import { waitFor } from './helpers/wait.mjs';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const SESSION = { id: 'sess-spine-1' };
@@ -141,16 +143,6 @@ function systemPromptHub() {
 const ASSEMBLY = { agent: { session: { header: { cwd: ROOT } } } };
 
 /** Logs der Bundles sind Teil ihres Verhaltens, nicht des Tests. */
-function quiet(fn) {
-  const saved = { log: console.log, warn: console.warn, error: console.error };
-  console.log = console.warn = console.error = () => {};
-  try {
-    return fn();
-  } finally {
-    Object.assign(console, saved);
-  }
-}
-
 const EVENTS_CONFIG = {
   schemaPath: './assets/event-spine.json',
   replayPath: './assets/replay/session-created.json',
@@ -190,16 +182,6 @@ const GOOD = {
   immer: 'den Dateinamen in die Whitelist des Gate-Plugins eintragen',
   weil: 'das Gate prueft jede Datei gegen eine feste Liste',
 };
-
-async function until(check, ms = 3000) {
-  const deadline = Date.now() + ms;
-  while (Date.now() < deadline) {
-    if (check()) return true;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  return check();
-}
-
 // ── 1. Persona liest die Blockliste ─────────────────────────────────────────
 
 test('persona: der Text einer echten user/message-Blockliste erreicht User-Lage, Anrede und Gedaechtnis', async () => {
@@ -297,7 +279,7 @@ test('skills: der Lebenszyklus feuert auf turn.end durch den echten Spine und sc
     for (const turn of [1, 2, 3]) send('turn/end', { turn, reason: { kind: 'completed' } });
 
     const file = join(project, '.agents', 'skills', GOOD.name, 'SKILL.md');
-    const written = await until(() => existsSync(file));
+    const written = await waitFor(() => existsSync(file), { timeoutMs: 3000, stepMs: 10 });
     assert.equal(written, true, 'kein Skill geschrieben — der Lebenszyklus hat das normalisierte turn.end nicht gehoert');
     assert.match(readFileSync(file, 'utf8'), /den Dateinamen in die Whitelist des Gate-Plugins eintragen/);
     assert.equal(calls.length, 3, 'genau ein Kandidatenaufruf je abgeschlossenem Zug');
@@ -306,7 +288,7 @@ test('skills: der Lebenszyklus feuert auf turn.end durch den echten Spine und sc
     // muss als `feedback.rated` ankommen, sonst entsteht nie eine Korrektur.
     send('feedback/message-put', { sessionId: SESSION.id, item: { messageId: 'msg-9', rating: 'negative' } });
     send('feedback/record', { text: 'Nein, die Whitelist war nicht der Punkt.' });
-    const corrected = await until(() => calls.length === 4, 5000);
+    const corrected = await waitFor(() => calls.length === 4, { timeoutMs: 5000, stepMs: 10 });
     assert.equal(corrected, true, 'keine Korrektur — der Lebenszyklus hat feedback.rated nicht gehoert');
     assert.match(calls[3].messages[0].content[0].text, /<korrektur>Nein, die Whitelist war nicht der Punkt\.<\/korrektur>/);
   } finally {

@@ -25,6 +25,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
+import { quiet } from './helpers/console.mjs';
+import { waitFor } from './helpers/wait.mjs';
 
 const STORE_FILE = fileURLToPath(new URL('../../../packages/codingmon/assets/pet-store.js', import.meta.url));
 const HOST_FILE = fileURLToPath(new URL('../../../packages/codingmon/index.js', import.meta.url));
@@ -161,38 +163,19 @@ test('Zusage: ein Stand, der den Vertrag verletzt, wirft und beruehrt das Medium
 });
 
 /** Bundle-Ausgaben stumm schalten (der Mount protokolliert absichtlich laut). */
-function quiet(fn) {
-  const saved = { log: console.log, warn: console.warn, error: console.error };
-  console.log = console.warn = console.error = () => {};
-  try {
-    return fn();
-  } finally {
-    Object.assign(console, saved);
-  }
-}
-
 /**
  * `apply` ist per Vertrag synchron (Cordis liest den Rueckgabewert als
  * Disposer), der Spiegel oeffnet aber asynchron. Also warten wir beobachtbar auf
  * den Dienst — mit Grenze, damit ein nie erscheinender Dienst rot wird statt zu
  * haengen.
  */
-async function until(predicate, tries = 200) {
-  for (let index = 0; index < tries; index += 1) {
-    const value = predicate();
-    if (value) return value;
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-  return null;
-}
-
 test('Zusage: die Host-Haelfte oeffnet den Spiegel selbst und gibt ihn als Dienst heraus', { skip }, async () => {
   const medium = mkdtempSync(join(tmpdir(), 'codingmon-host-'));
   const ctx = await boot(medium);
   const bundle = await import(pathToFileURL(HOST_FILE).href);
 
   const dispose = quiet(() => bundle.apply(ctx, bundle.Config({})));
-  const service = await until(() => ctx.get(bundle.CODINGMON_STORE_SERVICE));
+  const service = await waitFor(() => ctx.get(bundle.CODINGMON_STORE_SERVICE), { timeoutMs: 1000, stepMs: 5 });
   assert.ok(service, `${bundle.CODINGMON_STORE_SERVICE} wurde nicht bereitgestellt`);
   assert.equal(service.contract, bundle.CODINGMON_STORE_CONTRACT, 'der Dienst nennt seinen Vertrag');
   assert.deepEqual(service.fields, bundle.SNAPSHOT_FIELDS, 'und die Felder, die er annimmt');
