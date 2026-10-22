@@ -1,16 +1,16 @@
 name: Shinon Forge Gate
 
-# Ein Wächter, der nur manchmal hinsieht, ist kein Wächter: dieser Workflow läuft
-# bei jedem Push und jedem Pull Request, ohne Filter und ohne Bedingung — und auf
-# Zuruf für ein volles Historie-Audit.
+# Der Preflight läuft bei jedem Pull Request, auf Push nach main und auf Zuruf.
+# Feature-Branch-Pushes erhalten keinen zweiten Voll-Lauf neben dem PR-Lauf;
+# neuere PR-Stände ersetzen ältere Läufe, statt CPU-Minuten auf veraltete SHA zu werfen.
 #
 # KEIN MONOLITH. Jeder Vertrag ist ein eigener Zweig mit eigenem Läufer und eigenem
 # Namen in der Oberfläche: eine rote Prüfung benennt damit den gebrochenen Vertrag,
-# statt eine Kette aus neun Stufen zu verstecken, bei der nur die erste rote Zeile
+# statt eine Kette aus Stufen zu verstecken, bei der nur die erste rote Zeile
 # sagt, was wirklich kaputt ist. Die schweren Zweige laufen PARALLEL, deshalb kostet
 # die Aufteilung keine Wanduhr-Zeit — sie gewinnt welche, weil die früheren Läufe
-# fünf Stufen des Vertrags gar nicht gefahren haben (Fixtures, Distribution,
-# Profilboot, Static-Gate, Prompter).
+# mehrere Prüfungen in früheren Läufen doppelt liefen (statisches Gate, Audit-Install
+# und alte PR-Push-Läufe).
 #
 # ZWEI GESCHWINDIGKEITEN, gemessen (leerer Baum aus `git archive`, kein node_modules,
 # kein `dsh` im PATH — genau die Bedingung eines frischen Läufers):
@@ -116,7 +116,7 @@ jobs:
       - name: ${{ matrix.name }}
         run: ${{ matrix.run }}
 
-  # ── Zweig 3: die Gate-Tests (schwerster Zweig, ~90 s) ───────────────────────
+  # ── Zweig 3: Gate-Tests (installationspflichtige Verhaltens- und Mutationsproben) ─
   # Die DSH-abhängigen Tests (uebergabe, store, prompter-contract, …) brauchen
   # `dsh` im PATH; ohne ihn melden sie sichtbar einen Skip (REGEL: ein Skip ist
   # kein Grün). Deshalb hier `npm ci` — und `dsh` liegt danach in
@@ -174,7 +174,7 @@ jobs:
       - name: Fixtures fahren
         run: node scripts/validate-test.mjs
 
-  # ── Zweig 6: die Auslieferung (je Paket packen, isoliert installieren, laden)
+  # ── Zweig 5: Distribution (packen, isoliert installieren, laden) ────────────
   distribution:
     name: Distribution (npm pack → Isolat → Laden)
     needs: preflight-docs
@@ -197,7 +197,7 @@ jobs:
       - name: Distribution fahren
         run: node scripts/pack-test.mjs
 
-  # ── Zweig 7: der Profilboot (jeder Bundle-Layer muss auflösen) ──────────────
+  # ── Zweig 6: Profilboot (jeder Bundle-Layer muss auflösen) ──────────────────
   profile:
     name: Profilboot (dsh --profile shinon --dump-config)
     needs: preflight-docs
@@ -220,7 +220,7 @@ jobs:
       - name: Profilboot fahren
         run: node scripts/shinon-profile-test.mjs
 
-  # ── Zweig 8: der Prompter (braucht Schemastery über ../index.js) ────────────
+  # ── Zweig 7: Prompter (braucht Schemastery über ../index.js) ────────────────
   prompter:
     name: Prompter (Zettel, Skill-Auswahl)
     needs: preflight-docs
@@ -243,7 +243,7 @@ jobs:
       - name: Prompter-Tests fahren
         run: node --test packages/prompter/test/*.test.mjs
 
-  # ── Zweig 9: der Typvertrag (gepinnter Compiler + Quellüberdeckung) ─────────
+  # ── Zweig 8: TypeScript (gepinnter Compiler + Quellüberdeckung) ─────────────
   # Same engine and policy as local checks; missing compiler/config/source coverage fails closed.
   typescript:
     name: TypeScript Gate (gepinnter Compiler + Quellüberdeckung)
@@ -267,7 +267,7 @@ jobs:
       - name: TypeScript Gate fahren
         run: npm run typecheck
 
-  # ── Zweig 10: der schnelle Pfad (Sekunden statt Minuten) ────────────────────
+  # ── Zweig 9: Schnellpfad + DSH-Quellgleichheit (Sekunden statt Minuten) ─────
   # `npm test` ist seit 2026-10-17 bewusst NICHT die volle Kette, sondern der
   # schnelle lokale Pfad (statisches Gate + lokale Engine-Slices). Dieser Zweig
   # pinnt ihn in CI grün; die volle Kette (`test:full`) fahren die übrigen
