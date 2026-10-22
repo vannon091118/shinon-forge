@@ -94,6 +94,29 @@ describe('eine Definition, eine Quelle', () => {
     }
   });
 
+  test('jede interne Quelle nennt einen Kern, den es wirklich gibt', () => {
+    // Der Paketordner allein beweist nichts: `ref: 'rotation'` stand in einem
+    // Paket, das eine `assets/rotation.js` nie hatte. Der Ref ist ein Versprechen
+    // an die Buehne; er muss auf eine Datei zeigen, die den Namen traegt.
+    let internal = 0;
+    for (const [type, source] of Object.entries(ENCOUNTER_SOURCE_MAP)) {
+      if (source.kind !== 'internal') continue;
+      internal += 1;
+      const dir = source.owner.replace('@shinon/', '');
+      const file = join(PACKAGES_DIR, dir, 'assets', `${source.ref}.js`);
+      assert.ok(existsSync(file), `${type}: ${source.owner}/assets/${source.ref}.js fehlt — der Ref zeigt ins Leere`);
+    }
+    assert.ok(internal > 0, 'kein Ereignis nennt eine interne Quelle');
+  });
+
+  test('eine fehlende Beobachtung steht sichtbar als unavailable, nicht als interner Ref', () => {
+    for (const [type, source] of Object.entries(ENCOUNTER_SOURCE_MAP)) {
+      assert.ok(ENCOUNTER_SOURCE_KINDS.includes(source.kind), `${type}: unbekannte Herkunftsart ${source.kind}`);
+    }
+    const unavailable = Object.entries(ENCOUNTER_SOURCE_MAP).filter(([, source]) => source.kind === 'unavailable');
+    assert.ok(unavailable.length > 0, 'der Vertrag nennt keine sichtbare Luecke mehr — dann darf diese Zusage fallen');
+  });
+
   test('der Vertragsname folgt dem Kanon und die Zustaende sind geschlossen', () => {
     assert.match(ENCOUNTER_CONTRACT, /^shinon\.[a-z0-9-]+\/[a-z0-9-]+-v[0-9]+$/);
     assert.equal(createEncounterState().contract, ENCOUNTER_CONTRACT);

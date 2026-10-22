@@ -300,8 +300,10 @@ export function dependencyIssues(packages, scope = readRoot().name.split('/')[0]
     for (const field of ['dependencies', 'peerDependencies']) {
       for (const name of Object.keys(pkg.manifest?.[field] ?? {})) {
         if (!name.startsWith(`${scope}/`)) continue;
-        if (known.has(name)) targets.add(name);
-        else issues.push(`${pkg.dir}: ${field}["${name}"] → kein Paket unter packages/`);
+        if (!known.has(name)) { issues.push(`${pkg.dir}: ${field}["${name}"] → kein Paket unter packages/`); continue; }
+        // Nur der importfreie Host-Seam ist eine erlaubte Kante; jede andere wäre eine zweite Wahrheit.
+        if (name !== `${scope}/seams`) issues.push(`${pkg.dir}: ${field}["${name}"] → Pakete referenzieren einander nicht (Ausnahme: ${scope}/seams)`);
+        targets.add(name);
       }
     }
     edges.set(pkg.want.name, [...targets]);
@@ -315,9 +317,7 @@ export function dependencyIssues(packages, scope = readRoot().name.split('/')[0]
     for (const next of edges.get(name) ?? []) {
       if (state.get(next) === 'offen' && !issues.some((issue) => issue.startsWith('Zyklus'))) {
         issues.push(`Zyklus im Paketgraph: ${[...path.slice(path.indexOf(next)), next].join(' → ')}`);
-      } else if (!state.has(next)) {
-        walk(next);
-      }
+      } else if (!state.has(next)) walk(next);
     }
     path.pop();
     state.set(name, 'fertig');

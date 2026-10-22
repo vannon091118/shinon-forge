@@ -96,7 +96,7 @@ define('encounter.turn.started', {
 define('encounter.task.classified', {
   from: ['preflight'],
   to: null,
-  source: { kind: 'internal', ref: 'goal-policy', owner: '@shinon/task-router' },
+  source: { kind: 'internal', ref: 'intent-policy', owner: '@shinon/task-router' },
   payload: ['taskClass', 'taskLabel'],
   apply: (state, payload) => ({
     ...state,
@@ -107,7 +107,7 @@ define('encounter.task.classified', {
 define('encounter.index.progress', {
   from: ['preflight', 'running'],
   to: null,
-  source: { kind: 'internal', ref: 'index-query', owner: '@shinon/project-index' },
+  source: { kind: 'internal', ref: 'index-core', owner: '@shinon/project-index' },
   payload: ['phase', 'count'],
   apply: (state, payload) => ({
     ...state,
@@ -214,7 +214,7 @@ define('encounter.tool.completed', {
 define('encounter.key.rotated', {
   from: ['running', 'recoverable-error'],
   to: null,
-  source: { kind: 'internal', ref: 'rotation', owner: '@shinon/key-router' },
+  source: { kind: 'internal', ref: 'pool-core', owner: '@shinon/key-router' },
   payload: ['reason'],
   apply: (state, payload) => ({
     ...state,
@@ -322,7 +322,10 @@ define('encounter.skill.proposed', {
 define('encounter.receipt.compacted', {
   from: ENCOUNTER_TERMINAL_STATES,
   to: 'compact',
-  source: { kind: 'internal', ref: 'receipt', owner: '@shinon/popup' },
+  // Es gibt heute weder im Event-Spine noch in `@shinon/popup` eine
+  // Verdichtungs-Quittung. `unavailable` ist die sichtbare Antwort darauf —
+  // ein erfundener Ref waere ein Fortschritt, den niemand beobachtet.
+  source: { kind: 'unavailable', ref: 'receipt', owner: '@shinon/popup' },
   payload: [],
   apply: (state) => state,
 });

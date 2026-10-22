@@ -31,7 +31,8 @@ Jedes Plugin meldet `pass` / `not-applicable` / `fail`; Exit 1 bei Issues.
 - **`slices`** (Präfix-/Contains-Match auf geänderte Pfade):
   `package-drift`, `duplicate-plugin`, `dead-package`, `registry`,
   `contracts`, `doctor`, `probe-twin`, `persona`, `narrative`,
-  `events-spine`, `scoring`, `markers`, `commit-trailer`.
+  `events-spine`, `scoring`, `markers`, `canon`, `schemastery-enum`,
+  `commit-trailer`.
 
 ### Die Plugins in einem Satz
 
@@ -48,7 +49,9 @@ Jedes Plugin meldet `pass` / `not-applicable` / `fail`; Exit 1 bei Issues.
 | `package-drift` | Paket-Quelle und Profil-Kopie auseinandergelaufen? |
 | `duplicate-plugin` | kein Plugin doppelt registriert |
 | `dead-package` | inaktive Pakete tragen `dsh.inactive`, aktive stehen im Profil |
-| `registry` | Bundles: `dsh.bundle.patch` existiert und jedes Profil-Bundle ist in `packages/*` registriert (nicht der Kanon — den prüft das statische Gate) |
+| `registry` | Bundles: `dsh.bundle.patch` existiert und jedes Profil-Bundle ist in `packages/*` registriert (nicht der Kanon — den prüfen `canon` und das statische Gate) |
+| `canon` | der Kanon (`scripts/lib/canon.mjs`): ein Name, eine Schreibweise, eine Definition — dieselbe Quelle wie das statische Gate |
+| `schemastery-enum` | kein `z.enum(` in `packages/*/index.js` (das deklarierte Schemastery hat keins; Kommentare und `assets/*.js` mit `zod` zählen nicht) |
 | `contracts` | Vertragsdateien in 7-Punkt-Form |
 | `contracts`-Ziel `probe-twin` | Proben: Form + Zieldateien existieren |
 | `doctor` | Repo-Drift-Scanner (gleiche Familie wie `scripts/doctor.mjs`) |

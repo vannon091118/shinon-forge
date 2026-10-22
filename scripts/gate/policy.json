@@ -106,6 +106,18 @@
           "scripts/gate/tests/markers.test.mjs"
         ]
       },
+      "canon": {
+        "prefixes": [
+          "packages/",
+          "docs/contracts/",
+          "profiles/"
+        ]
+      },
+      "schemastery-enum": {
+        "prefixes": [
+          "packages/"
+        ]
+      },
       "commit-trailer": {
         "prefixes": [
           "scripts/",

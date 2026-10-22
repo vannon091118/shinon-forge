@@ -34,7 +34,7 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Proben unter `docs/probes/` | 53 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 24 Pakete, 293 Dateien, 2750142 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 24 Pakete, 293 Dateien, 2750371 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -59,7 +59,7 @@ heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
 
 | Zahl | Wert | Befehl | Exit |
 |---|---|---|---|
-| Code-Dateien unter `packages/` + `scripts/` + `bin/` | **317** | `find packages scripts bin -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) \| grep -vE '(^\|/)(node_modules\|dist\|dev-dsh-home\|\.git)(/\|$)' \| wc -l` — dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` | 0 |
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | **378** (gemessen 2026-10-22) | `find packages scripts bin -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) \| grep -vE '(^\|/)(node_modules\|dist\|dev-dsh-home\|\.git)(/\|$)' \| wc -l` — dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` | 0 |
 | Klassen | **6** (host-entry, client, core, test, gate-plugin, script) | dieselbe Registry lesen | 0 |
 | Benannte Bestandsdateien (über ihrer Klassengrenze) | **30** | Registry lesen (`bestand`) | 0 |
 | Dateien ohne Klasse | **0** | `npm test` (Schritt „Struktur“) | 0 |
@@ -88,7 +88,7 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 
 | Lauf | Ergebnis | Exit | Befehl |
 |---|---|---|---|
-| Volle Kette | **Exit 0** — Paket-Suiten → statisches Gate → Fixtures → Distribution → Profilboot, in dieser Reihenfolge (nur CI/auf Zuruf); zusammengesetzt aus **8** Paket-Suiten (46/50/13/240/13/13/17/12 Tests), Gate **126**, Fixtures **9**, Distribution **92**, Profilboot **4** | 0 | `npm run test:full` |
+| Volle Kette | **Exit 0** — Paket-Suiten → statisches Gate → Fixtures → Distribution → Profilboot, in dieser Reihenfolge (nur CI/auf Zuruf); zusammengesetzt aus **8** Paket-Suiten (134/50/13/240/13/13/17/12 Tests), Gate **126**, Fixtures **9**, Distribution **92**, Profilboot **4** | 0 | `npm run test:full` |
 | Schneller Pfad (lokal) | **Exit 0** — statisches Gate + lokale Engine-Slices; **3 s** Wanduhr am 2026-10-22 | 0 | `npm test` |
 | Gate (statisch) | **126** bestanden, **0** fehlgeschlagen | 0 | `npm test` bzw. `node scripts/run-with-node.mjs scripts/shinon-test.mjs` |
 | Regel-Fixtures | **9** bestanden, **0** fehlgeschlagen (Kontrolle + 8 Regelbrüche, je Gate *und* Build rot); die Kopie trägt `docs/`, weil Kanon und Struktur dort ihre Registries lesen | 0 | `node scripts/run-with-node.mjs scripts/validate-test.mjs` |
@@ -97,9 +97,9 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Profil-Dump im echten Boot | **58** Layer-Köpfe, **215** Einträge; `shinon-task-router.activate: false`, `permission.defaultPreset: workspace-write`, `agent-default-model: prompter/agnes-2.5-flash` (die gespeicherte Wahl des Nutzers — der Config-Editor schreibt sie in die Profil-Ebene, ein Dump kann je Installation abweichen) | 0 | `DSH_HOME=$PWD ./node_modules/.bin/dsh --profile shinon --dump-config` |
 | Frischklon-Repro S3 | Klon @ `d8999ab` Exit 0, `npm ci` Exit 0, 29 Links Exit 0, Dump 60/210 Exit 0, Build 185 Dateien Exit 0, UI HTTP 200 (41 314 Bytes HTML, ohne Token 401), gate 546/546 | 0 | `docs/TAGEBUCH.md`, Kapitel 2026-10-17 (Commit `d8999ab`) |
 | Gate-Engine `--full` | **23** Gates gelaufen, **23** grün, **1** `NOT_APPLICABLE` (`typescript`: keine First-Party-TS-Datei), **0** fehlgeschlagen, **0** geskippt; Branding ohne Flag sichtbar übersprungen | 0 | `npm run gate:full` |
-| Gate-Tests | **948** Tests, **948** grün, **0** rot, **0** geskippt; **14 s** Wanduhr am 2026-10-22; 95 Dateien einzeln gemessen, langsamste **5,8 s** (`source-write`), keine über 10 s | 0 | `npm run gate:test` |
+| Gate-Tests | **937** Tests, **937** grün, **0** rot, **0** geskippt; **9,8 s** Wanduhr am 2026-10-22; 96 Dateien; langsamste Einzelmessung **4,9 s**, keine über der 20-s-Abbruchgrenze | 0 | `npm run gate:test` |
 | Testzeit-Grenze | 95 Gate-Testdateien, langsamste **5,8 s**; `npm test` **3 s**; **0** Ausnahmen offen (Ziel 10 s, Abbruch 20 s über `--test-timeout=20000`) | 0 | siehe oben |
-| Codingmon-Tests | **46** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:codingmon` |
+| Codingmon-Tests | **134** bestanden, **0** rot, **0** übersprungen (gemessen 2026-10-22, 16,9 s) | 0 | `npm run test:codingmon` |
 | Scoring-Tests (Kern, Signale, Ablage, Block-Gewichte) | **50** bestanden, **0** rot, **0** übersprungen — importfrei, läuft in CI ohne `npm ci`; die Host-Naht des Lernens fährt `scripts/gate/tests/scoring-block-learning.test.mjs` | 0 | `npm run test:scoring` |
 | Token-Usage-Tests | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:token` |
 | Index warm (Abfrage) | kalt **3 134 ms** (Kaltlauf **3 106 ms** für **490** Dateien, 4 746 913 B gelesen; erster Treffer +27 ms; zweiter Lauf 4 010 ms — Streuung des Kaltlaufs) gegen warm **7,0 ms** Median (5,6–18,7 ms aus 20 Abfragen, **12** Kandidaten geprüft, **0 B** gelesen); Trefferquote direkt nach einer Dateiänderung bei gleicher Größe und zurückgesetzter mtime: **1/1 frisch** (1 Datei neu gelesen, 102 473 B, 217 ms) | 0 | `npm run index:warm` |
