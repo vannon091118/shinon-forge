@@ -158,7 +158,7 @@ Verhalten statt Textfragmente: sie mutiert Links und Jobgraphen, erkennt
 nicht deklarierte Jobs und verlangt, dass jede deklarierte Prüfstrecke im
 finalen Verdict landet. Die Prüfer sind
 getrennt: `diagnostics.mjs` formatiert Fehler, `documentation.mjs` prüft
-Die Policy listet außerdem die installations- und scanintensiven Jobs, die direkt `needs: preflight-docs` verlangen. Ein fehlender Gate-Pfeil oder `if: always()` an so einem Job ist ein Vertragsbruch, weil beides die frühe Abbruchwirkung aushebeln könnte. Lokal repariert `npm test` die einfache fehlende Verdrahtung automatisch; CI ändert nichts und stoppt vor `npm ci`, Build oder Security-Scan.\nDokumentationshoheit/Links/Verdict-Verkabelung, `preflight-docs.mjs` liefert
+Die Policy listet außerdem die installations- und scanintensiven Jobs, die direkt `needs: preflight-docs` verlangen. Ein fehlender Gate-Pfeil oder `if: always()` an so einem Job ist ein Vertragsbruch, weil beides die frühe Abbruchwirkung aushebeln könnte. Lokal repariert `npm test` die einfache fehlende Verdrahtung automatisch; CI ändert nichts und stoppt vor `npm ci`, Build oder Security-Scan. Dokumentationshoheit/Links/Verdict-Verkabelung, `preflight-docs.mjs` liefert
 den CLI-Exitcode und `preflight-verdict.mjs` baut das Abschlussurteil.
 
 Lokal ist `npm run preflight:docs` der Reparatur-First-Einstieg: nur eindeutige
@@ -186,8 +186,9 @@ einen echten Provider-Modellturn.
 
 ### `mobile-profile.yml`
 
-PRs auf `main` + Zuruf: `mobile-profile-contract-test.mjs` +
-`shinon-profile-test.mjs --profile mobile`.
+Aktuell nur `workflow_dispatch`: Mobile/Android ist zurückgestellt und kein
+Pflicht-Gate für Desktop-/Web-PRs. Beim manuellen Lauf prüfen
+`mobile-profile-contract-test.mjs` und `shinon-profile-test.mjs --profile mobile`.
 
 ### `release.yml` (S5)
 
