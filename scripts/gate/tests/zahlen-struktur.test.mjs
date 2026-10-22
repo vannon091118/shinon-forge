@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { strukturZahlen } from '../../lib/structure.mjs';
-import { STRUKTUR_END, STRUKTUR_START, sync } from '../../sync-zahlen.mjs';
+import { STRUKTUR_END, STRUKTUR_START, renderStrukturBlock, sync } from '../../sync-zahlen.mjs';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const ZAHLEN = join(ROOT, 'docs', 'ZAHLEN.md');
@@ -49,7 +49,12 @@ function fixture(text) {
 test('§1.2 ist gemessen: der Block stimmt mit dem Riegel überein', () => {
   const text = readFileSync(ZAHLEN, 'utf8');
   assert.ok(text.includes(STRUKTUR_START) && text.includes(STRUKTUR_END), 'Markerpaar fehlt');
-  assert.equal(sync({ root: ROOT, check: true }).changed, false, 'zahlen:check wäre rot');
+  // NUR der Struktur-Block: der Bestands-Block führt auch `dist/`, und eine
+  // frische CI-Checkout hat keinen Bau. Ein Test, der davon abhängt, wäre in CI
+  // rot, ohne dass eine Zahl falsch ist.
+  const start = text.indexOf(STRUKTUR_START);
+  const end = text.indexOf(STRUKTUR_END);
+  assert.equal(renderStrukturBlock(ROOT), text.slice(start, end + STRUKTUR_END.length), 'zahlen:check wäre rot');
   const zahlen = strukturZahlen(ROOT);
   const block = text.slice(text.indexOf(STRUKTUR_START), text.indexOf(STRUKTUR_END));
   assert.match(block, new RegExp(`\\| Code-Dateien [^|]+\\| ${zahlen.dateien} \\|`));
