@@ -15,6 +15,8 @@
 | [`../AGENTS.md`](../AGENTS.md) | Verbindliche Regeln für Arbeit am Code: Konventionen, Pitfalls, Commit-Pflichten | deutsch |
 | [`ZAHLEN.md`](ZAHLEN.md) | **Einziger** Eigentümer aller harten Zahlen (Bestand §1, Prüfläufe §2, rote Befunde §3) | deutsch |
 | [`TAGEBUCH.md`](TAGEBUCH.md) | Erzählte Timeline; jedes Kapitel an Commit-SHA-Bereiche und Pfade gebunden | deutsch |
+| [`CHANGELOG.md`](CHANGELOG.md) | Kompakte, übertragbare Änderungs- und Agenten-Übergabe mit PR-/CI-Belegen | deutsch |
+| [`AGENT-HANDOFF.md`](AGENT-HANDOFF.md) | Start-/Abschlussprotokoll für Folge-Agenten; Statusregeln und Übergabecheckliste | deutsch |
 | [`ROADMAP.md`](ROADMAP.md) | **Einzige** Liste offener Arbeit (Release-Freeze v0.4.0, Kandidaten, 1.0.0-Kriterien) | deutsch |
 | [`WISSENS-RUNTIME-PLAN.md`](WISSENS-RUNTIME-PLAN.md) | Implementierungsplan zur persistenten Wissens-Runtime (Weg zu K8; Verifikationsregister, vier Züge, Messprogramm) | deutsch |
 | [`COMMIT-REGELN.md`](COMMIT-REGELN.md) | Commit-Regeln und ihre Durchsetzung (Hooks, CI, Gate) | deutsch |
