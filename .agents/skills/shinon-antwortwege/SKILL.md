@@ -1,6 +1,9 @@
 ---
 name: shinon-antwortwege
-description: Wo Antworten zu DSH/Cordis schnell herkommen - Doku-Karte mit Pfaden, Introspektion des installierten DSH (dump-config, cordis_inspect, .d.ts), Terminologie-Glossar, Version-Wahrheit. Nutzen bevor eine DSH-Frage neu erforscht oder geraten wird.
+description: Wo Antworten zu DSH/Cordis schnell herkommen - Doku-Karte mit Pfaden, Introspektion des installierten DSH (dump-config, cordis_inspect, .d.ts), Terminologie-Glossar, Version-Wahrheit.
+use-when: >-
+  beantworte eine DSH- oder Cordis-Frage, prüfe installierte DSH-Version,
+  suche API-Signaturen oder bevor du Verhalten aus Erinnerung ableitest
 ---
 
 # Antwortwege: raten ist langsam, nachschlagen ist schnell

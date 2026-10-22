@@ -1,6 +1,9 @@
 ---
 name: shinon-test-tempo
-description: Schnellster Weg zu echtem Signal - welcher Test wann, Skip-Regeln, real entry path, Mutationsbeweis fuer Guards, Stale-Artifact-Falle. Nutzen vor jedem Testlauf, bei roten Checks oder wenn unklar ist, was ein Gruen ueberhaupt beweist. Ergaenzt shinon-dev-workflow (Befehlskarte) und shinon-bug-muster (Bug-Klassen).
+description: Schnellster Weg zu echtem Signal - welcher Test wann, Skip-Regeln, real entry path, Mutationsbeweis fuer Guards, Stale-Artifact-Falle. Ergaenzt shinon-dev-workflow (Befehlskarte) und shinon-bug-muster (Bug-Klassen).
+use-when: >-
+  wähle einen Testlauf, untersuche einen roten Test,
+  prüfe Testdauer oder bestimme, was ein grüner Test tatsächlich beweist
 ---
 
 # Test-Tempo: Signal statt Aktivität

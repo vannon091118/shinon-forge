@@ -1,6 +1,9 @@
 ---
 name: shinon-beweis-tempo
-description: Beweise einmal fuehren statt doppelt verifizieren - Proben-Praxis (docs/probes JSON: Claim/Targets/Expect/Result/Verdict/Evidence), Mutationsprobe, Abnahmetest, Statusklassen, Commit-Schnellregeln. Nutzen wenn eine Behauptung gerade geprueft wurde oder eine Aenderung Nachweise braucht.
+description: Beweise einmal fuehren statt doppelt verifizieren - Proben-Praxis (docs/probes JSON: Claim/Targets/Expect/Result/Verdict/Evidence), Mutationsprobe, Abnahmetest, Statusklassen, Commit-Schnellregeln.
+use-when: >-
+  prüfe eine Behauptung, dokumentiere einen Nachweis,
+  plane eine Mutationsprobe oder entscheide, ob eine Änderung verifiziert ist
 ---
 
 # Beweis-Tempo: was heute geprüft wird, muss morgen niemand wieder prüfen

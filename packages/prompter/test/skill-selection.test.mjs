@@ -35,6 +35,17 @@ test('readSkills parses description from YAML frontmatter, including folded valu
   assert.equal(result.skills[0].description, 'Quartz runtime dependency resolver');
 });
 
+test('use-when is parsed and can select a skill whose description does not match', () => {
+  const root = skillRoot();
+  const dir = join(root, 'z-triggered');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'SKILL.md'), '---\nname: z-triggered\ndescription: Quartz gardening\nuse-when: >-\n  inspect DSH loader resolution\n  and profile bundle links\n---\n');
+  const read = readSkills({ skillsPath: root }, { reading });
+  assert.equal(read.skills[0].useWhen, 'inspect DSH loader resolution and profile bundle links');
+  const selected = selectSkills(read.skills, ['profile bundle links'], reading);
+  assert.deepEqual(selected.loaded.map((skill) => skill.name), ['z-triggered']);
+});
+
 test('maxSkills is applied after relevance ranking against the full directory', () => {
   const root = skillRoot();
   writeSkill(root, 'a-cordis', 'Cordis architecture patterns');

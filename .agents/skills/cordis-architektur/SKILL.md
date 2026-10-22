@@ -1,6 +1,9 @@
 ---
 name: cordis-architektur
-description: Cordis-Architektur in Shinon Forge ausreizen - Services, inject/provide, Events, Effects, Patch-Layer, Scope-Werkzeuge. Nutzen vor Arbeiten an index.js, cordis.patch.yml, Service-Nahtstellen oder neuen Host-Plugins. Quellen: docs/research/2026-10-09-cordis-dsh-recherche.md (dieses Ziel gibt es in diesem Baum nicht - offener Posten, STAND §6.4).
+description: Cordis-Architektur in Shinon Forge ausreizen - Services, inject/provide, Events, Effects, Patch-Layer, Scope-Werkzeuge. Quellen: docs/research/2026-10-09-cordis-dsh-recherche.md (dieses Ziel gibt es in diesem Baum nicht - offener Posten, STAND §6.4).
+use-when: >-
+  ändere oder prüfe index.js, cordis.patch.yml, Service-Nahtstellen,
+  Events, Effects, Scopes oder neue Host-Plugins
 ---
 
 # Cordis-Architektur ausreizen

@@ -1,6 +1,9 @@
 ---
 name: shinon-dev-workflow
-description: Arbeitsablauf fuer Shinon Forge - welcher Check wann, wo Vertraege geaendert werden, Reihenfolge bei neuen Paketen/Regeln, Commit-Regeln (Vannon-Trailer). Nutzen vor jeder Feature- oder Bugfix-Arbeit im Repo.
+description: Arbeitsablauf fuer Shinon Forge - welcher Check wann, wo Vertraege geaendert werden, Reihenfolge bei neuen Paketen/Regeln, Commit-Regeln (Vannon-Trailer).
+use-when: >-
+  implementiere oder fixe etwas im Shinon-Forge-Repo,
+  ändere einen Vertrag, ein Paket oder eine Gate-Regel
 ---
 
 # Dev-Workflow Shinon Forge

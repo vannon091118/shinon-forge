@@ -1,6 +1,6 @@
 {
   "contract": "shinon.skill-rules/v1",
-  "note": "Die Regeln der Skill-Selektion (Zug 6). Skills liegen im Projekt (.agents/skills/), nicht im Tarball. Die Selektion gleicht die BESCHREIBUNG (name + description + use-when) gegen den Kontext-Haystack ab — Projekt, Pfade, Symbole, Randbedingungen und den Prompt selbst. Ohne Treffer kein Block (fail-closed: ein Skill, dessen Beschreibung niemand auflöst, wird nicht geladen). Kein Modell, keine Uhr — dieselben Skills ergeben dieselbe Auswahl.",
+  "note": "Die Regeln der Skill-Selektion (Zug 6). Skills liegen im Projekt (.agents/skills/), nicht im Tarball. Die Selektion gleicht name, description und das optionale use-when gegen den Kontext-Haystack ab — Projekt, Pfade, Symbole, Randbedingungen und den Prompt selbst. use-when benennt den Einsatzfall; description liefert ergänzende Themenbegriffe. Ohne Treffer kein Block (fail-closed). Kein Modell, keine Uhr — dieselben Skills ergeben dieselbe Auswahl.",
   "format": {
     "dir": ".agents/skills",
     "extension": "SKILL.md",
@@ -8,7 +8,10 @@
       "name",
       "description"
     ],
-    "note": "Ein Skill ist EIN Ordner in .agents/skills/. Die Beschreibung (description) ist das Selektionsfeld; der Inhalt bleibt im Ordner und wird nicht in den Block kopiert — nur der Name und die Beschreibung gehen mit."
+    "optional": [
+      "use-when"
+    ],
+    "note": "Ein Skill ist EIN Ordner in .agents/skills/. name, description und das optionale use-when sind Selektionsfelder; der restliche Inhalt bleibt im Ordner und wird nicht in den Block kopiert."
   },
   "reading": {
     "note": "Die Selektion: wie viele Skills geladen werden und mit welchem Schwellenwert.",

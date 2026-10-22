@@ -127,15 +127,16 @@ export function skillsDir(config) {
  * unangetastet; Skills liefern in diesem Vertrag Metadaten, nicht ihren ganzen
  * Anweisungsinhalt.
  */
-export function readSkillDescription(text) {
+function readSkillField(text, field) {
   const source = String(text ?? '');
   const frontmatter = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(source);
   if (frontmatter) {
     const lines = frontmatter[1].split(/\r?\n/);
-    const index = lines.findIndex((line) => /^description\s*:/i.test(line));
+    const keyPattern = new RegExp(`^${field}\\s*:`, 'i');
+    const index = lines.findIndex((line) => keyPattern.test(line));
     if (index === -1) return '';
 
-    let value = lines[index].replace(/^description\s*:/i, '').trim();
+    let value = lines[index].replace(keyPattern, '').trim();
     if (value === '' || /^[>|][+-]?$/.test(value)) {
       const folded = value.startsWith('>');
       const parts = [];
@@ -167,12 +168,24 @@ export function readSkillDescription(text) {
     .find((line) => line !== '' && line !== '---' && !line.startsWith('#')) ?? '';
 }
 
+export function readSkillDescription(text) {
+  return readSkillField(text, 'description');
+}
+
+/** Optional selection trigger from YAML frontmatter; it never falls back to body text. */
+export function readSkillUseWhen(text) {
+  const source = String(text ?? '');
+  if (!/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.test(source)) return '';
+  return readSkillField(text, 'use-when');
+}
+
 /**
  * Ein Skill lesen: Name + Beschreibung + Use-When aus seinem Ordner.
  *
  * Ein Skill liegt in `.agents/skills/<name>/` mit einer `SKILL.md` (Frontmatter
- * oder freier Text). Das Feld, das die Auswahl steuert, ist die BESCHREIBUNG
- * (name + description + use-when) — nicht der Inhalt. Wie bei den Zetteln gilt:
+ * oder freier Text). Die Auswahl nutzt name, description und das optionale
+ * use-when-Feld — nicht den restlichen Inhalt. use-when liefert den gezielten
+ * Einsatz-Trigger; description liefert ergänzende Themenbegriffe.
  * nur was geladen wird, geht in den Block; was nicht passt, bleibt außen vor.
  *
  * Fail-Richtungen, wie beim Zettel: ein unlesbarer Ordner landet in `skipped`,
@@ -209,7 +222,8 @@ export function readSkills(config, rules) {
       skipped.push({ file: entry, reason: 'BESCHREIBUNG_FEHLT' });
       continue;
     }
-    skills.push({ name: entry, description, path: file });
+    const useWhen = readSkillUseWhen(text);
+    skills.push({ name: entry, description, useWhen, path: file });
   }
   if (skills.length === 0) return { skills: [], skipped, reason: 'SKILLS_EMPTY' };
 
@@ -220,7 +234,7 @@ export function readSkills(config, rules) {
 }
 
 /**
- * Die passenden Skills wählen — über die Beschreibung, nicht über eine Uhr.
+ * Die passenden Skills wählen — über Beschreibung und Einsatz-Trigger, nicht über eine Uhr.
  *
  * Dieselbe Rechnung wie `selectNotes`: Begriffe der Beschreibung müssen im
  * Haystack (Prompt + Kontext) vorkommen. Mehr Treffer zuerst, bei Gleichstand
@@ -247,7 +261,7 @@ export function selectSkills(skills = [], haystack = [], reading = {}) {
       skipped.push({ file: skill, reason: 'KEIN_SKILL' });
       continue;
     }
-    const marks = meaningfulTokens(`${skill.name} ${skill.description}`);
+    const marks = meaningfulTokens(`${skill.name} ${skill.description} ${skill.useWhen ?? ''}`);
     if (marks.length === 0) {
       skipped.push({ file: skill.name, reason: 'SKILL_OHNE_BESCHREIBUNG' });
       continue;
