@@ -3,14 +3,13 @@
  *
  * Was hier geprüft wird, und warum es ohne echte Kapitel rot wäre:
  *
- *   1. Der ECHTE Baum besteht den Schritt — jedes Tageskapitel in
- *      `docs/TAGEBUCH.md` nennt einen Commit-Bereich, dessen SHAs es gibt und die
- *      an genau diesem Tag entstanden sind, plus einen Pfad, der noch existiert.
- *   2. Jeder Tag mit Commits hat ein Kapitel; ein fehlendes Kapitel ist rot.
- *   3. Der Abschnitt „Was die Akten falsch behaupten" lebt — mit Tabellenzeilen,
- *      die je einen echten SHA und einen existierenden Pfad nennen.
- *   4. Die Mutationsproben auf einem Miniatur-Baum: erfundener SHA, falsches
- *      Datum, toter Pfad, fehlender Anker, zu kurze Kapitel, fehlende Akten-Zeilen.
+ *   1. Der echte Repository-Baum wird EINMAL von `scripts/shinon-test.mjs`
+ *      mit voller Historie geprüft; der CI-Schnellpfad erzwingt diesen Klon.
+ *   2. Diese Datei prüft die Regeln mit Miniatur-Bäumen und mutiert jede wichtige
+ *      Invariante: erfundener SHA, falsches Datum, toter Pfad, fehlender Anker,
+ *      zu kurze Kapitel und fehlende Akten-Zeilen.
+ *   3. Die teure Realbaum-Prüfung und die Mutationstests bleiben getrennte Belege,
+ *      statt denselben Live-Zustand zweimal zu prüfen.
  *
  * Der Schritt liest git nur, um zu prüfen — er committet nichts und schreibt nichts.
  */
@@ -25,7 +24,6 @@ import * as diary from '../../lib/diary.mjs';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const read = (file) => readFileSync(file, 'utf8');
-const HISTORY = diary.diaryHistory(ROOT);
 
 /** Ein Miniatur-Baum mit genau den Dateien, die das Tagebuch als Beleg nennt. */
 function miniTree(text) {
@@ -69,20 +67,6 @@ function withTemp(diary, fn) {
     rmSync(root, { recursive: true, force: true });
   }
 }
-
-test('der echte Baum: jedes Kapitel hängt an Commit und Pfad (übersprungen ohne Historie)', { skip: process.env.CI === 'true' ? false : HISTORY.skip }, () => {
-  assert.equal(HISTORY.skip, undefined, `CI requires complete Git history: ${HISTORY.skip ?? ''}`);
-  assert.deepEqual(diary.diaryIssues(ROOT), []);
-});
-
-test('der echte Baum: ein Kapitel je Tag mit Commits (übersprungen ohne Historie)', { skip: process.env.CI === 'true' ? false : HISTORY.skip }, () => {
-  assert.equal(HISTORY.skip, undefined, `CI requires complete Git history: ${HISTORY.skip ?? ''}`);
-  const days = new Set(HISTORY.log.split('\n').map((line) => line.trim().split(/\s+/)[1]).filter(Boolean));
-  const text = read(join(ROOT, diary.DIARY_FILE));
-  const dated = [...text.matchAll(/^## (\d{4}-\d{2}-\d{2}) — /gm)].map((match) => match[1]);
-  assert.equal(new Set(dated).size, dated.length, 'doppeltes Tageskapitel');
-  for (const day of days) assert.ok(dated.includes(day), `Kapitel für ${day} fehlt`);
-});
 
 test('ein vollständiges Miniatur-Tagebuch ist grün', () => {
   withTemp(HEAD + chapter('2026-01-02') + chapter('2026-01-03') + claims(), (root) => {
