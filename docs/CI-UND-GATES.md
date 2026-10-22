@@ -141,12 +141,16 @@ Er läuft mit `if: always()` und scheitert bei `failure`, `cancelled`,
 
 ### Preflight-Vertrag und Fehlercodes
 
-Lokal ausführen:
+Lokaler Reparatur-First-Einstieg:
 
 ```bash
-npm run preflight:docs
-npm run preflight:test
+npm test
 ```
+
+`npm test` führt zuerst `preflight-docs.mjs` mit sicheren Reparaturen und dann
+den bestehenden Kernpfad aus. Reparatur ohne Tests: `npm run preflight:docs`.
+Read-only-Prüfung: `npm run preflight:docs:check`. Die Fault-Injection-Tests
+des Preflight-Vertrags laufen mit `npm run preflight:test` bzw. im Gate-Tests-Job.
 
 `scripts/lib/preflight/policy.mjs` ist die gemeinsame Policy-Quelle für
 Pflichtdokumente, kanonische CI-Jobs und Fehlercode-Namen. Die Prüfung misst
@@ -163,8 +167,9 @@ ist schreibgeschützt; genau diesen Modus nutzt CI. Kaputte Links, fehlende
 Job-Definitionen und abweichende fachliche Bedingungen werden nicht glattgebügelt.
 
 Die Dokumentationsprüfung liefert beispielsweise
-`PREFLIGHT_DOC_MISSING`, `PREFLIGHT_DOC_RULE_MISSING`,
-`PREFLIGHT_LINK_BROKEN`, `PREFLIGHT_JOB_NOT_REQUIRED` und
+`PREFLIGHT_DOC_MISSING`, `PREFLIGHT_LINK_BROKEN`,
+`PREFLIGHT_LINK_ESCAPES_REPO`, `PREFLIGHT_JOB_DEFINITION_MISSING`,
+`PREFLIGHT_NEEDS_UNKNOWN_JOB`, `PREFLIGHT_JOB_NOT_REQUIRED` und
 `PREFLIGHT_VERDICT_FAIL_OPEN`. Die Ergebnisprüfung benennt Job und Status
 konkret, etwa `PREFLIGHT_CODEQL_FAILED`,
 `PREFLIGHT_DEPENDENCY_AUDIT_FAILED`, `PREFLIGHT_SECRET_SCAN_FAILED`,
