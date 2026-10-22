@@ -1568,3 +1568,45 @@ Gate #532 (2 m 51 s) und Installationspakete #64 (7 m 10 s). Das Audit steht
 damit bei 50 von 85 Zeilen.
 
 **Anker:** `e587e59` · Belege: `scripts/lib/structure.mjs`, `docs/contracts/structure.json`, `scripts/gate/tests/helpers/console.mjs`, `scripts/gate/tests/helpers/wait.mjs`, `scripts/gate/tests/index-transaktion.test.mjs`, `packages/codingmon/test/zucht-core.test.mjs`, `scripts/gate/tests/structure.test.mjs`, `docs/CLEANREPO-AUDIT.md`
+
+### Der sechste Block: eine Regel, die seit zwei Tagen dastand
+
+`AGENTS.md` sagt seit dem 2026-10-20, Slot-IDs folgen `<name>-<purpose>`. Geprüft
+hat es niemand — und das ist der Punkt, an dem eine Regel zur Meinung wird. Das
+neue Gate-Plugin `slot-ids` liest jede `slots.register(...)`-Registrierung in
+`packages/*/client.js` und prüft `id` und `key` (nicht `name`: das ist der
+DSH-Slot, in den jemand einhängt, nicht der Eintrag, den das Paket besitzt).
+Bezeichner werden über Datei-Konstanten aufgelöst, weil `PANEL_ID` in der halben
+Bake steht; ein Bezeichner ohne Literal in der Datei ist fail-closed rot, und
+Kommentare zählen nicht, weil `packages/markers/client.js` in einer Erklärung
+zeigt, wie eine Registrierung aussieht. Der Echtbaum ist grün (20 IDs über 11
+Client-Hälften), drei Mutationsfälle sind je einzeln rot, 5/5 Testfälle.
+
+Der wertvollere Teil war der Nebenbefund: `schemastery-enum` hatte denselben
+latenten Fehler wie das neue Plugin — beide lasen `ctx.root`, und das ist im Gate
+das geparste Manifest, nicht der Pfad. Aufgefallen ist das nie, weil die beiden
+Plugins in keinem Slice liefen, der ihre eigenen Dateien berührt; erst `--only`
+zwang sie zum Lauf, und sie warfen `GATE_SLOT_IDS_THREW` wie ein Karren mit
+eckigen Rädern. Beide lesen jetzt `ctx.repo.ROOT` wie `canon.mjs`, und beide
+Slice-Läufe sind PASS. Ein Slice, der nur die geänderten Dateien prüft, prüft
+eben auch nur die Regeln, deren eigener Gegenstand sich geändert hat.
+
+Dazu drei Zeilen Beleg statt Behauptung: T5-1 (`canonIssues()` = 0 auf dem
+Echtbaum), T5-6 (`npm run zahlen:check` Exit 0 UND in
+`.github/workflows/commit-guard.yml` verdrahtet) und T5b-7 (war schon so
+verdrahtet, steht jetzt als Beleg statt als Vermutung). Das Audit steht damit bei
+53 von 85 Zeilen; offen sind vor allem die schweren Schnitte
+(`index-core.js`, `persona/index.js`, `scoring.mjs`) und die UI-Zeilen.
+
+Ehrlich zum Nebenlauf: mit `git add -A scripts docs` ist `docs/SETUP.md` (das
+S6-Runbook der vorigen Aufgabe, das absichtlich uncommittet lag) in `b0eb57e`
+mit eingecheckt worden. Es ist fertige Arbeit und schadet dort nicht — aber es
+stand nicht im Auftrag dieses Commits, und deshalb steht es hier statt im
+Verborgenen.
+
+Lokal: `npm run gate:test` 963/963 in 9,4 s, `npm test` Exit 0,
+`npm run build` Exit 0, `npm run zahlen:check` Exit 0. CI: Gate #534 auf
+`b0eb57e` grün (3 m 8 s); der Paketbau #65 lief zum Zeitpunkt dieses Eintrags
+noch.
+
+**Anker:** `b0eb57e` · Belege: `scripts/gate/plugins/slot-ids.mjs`, `scripts/gate/tests/slot-ids.test.mjs`, `scripts/gate/policy.json`, `scripts/gate/plugins/schemastery-enum.mjs`, `scripts/lib/canon.mjs`, `.github/workflows/commit-guard.yml`, `docs/CLEANREPO-AUDIT.md`, `docs/SETUP.md`
