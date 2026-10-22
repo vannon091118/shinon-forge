@@ -291,8 +291,9 @@ jobs:
           npm ci --no-audit --no-fund
           echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
-      - name: Schnellen Pfad fahren
-        run: npm test
+      # Preflight has already passed in its own required job; do not run it a second time.
+      - name: Schnellen Kernpfad fahren
+        run: npm run test:core
 
       - name: DSH-Versionen gegen Sollquelle, Lock, Vendor, Installat und CLI pruefen
         run: node scripts/check-dsh-versions.mjs
