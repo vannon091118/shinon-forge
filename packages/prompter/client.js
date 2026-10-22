@@ -265,7 +265,7 @@ window.__ModuleLoader__.load({
         }
 
         ctx.slots.inject('main', () => ctx.slots.register({
-          name: 'main',
+          name: 'main', key: 'shinon-prompter',
           id: 'shinon-prompter',
         }, TracePanel));
 

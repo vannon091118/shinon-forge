@@ -119,6 +119,8 @@ test('key-router: der echte Request laeuft mit dem gewaehlten Anbieter und desse
     const dispose = packageModule.apply(ctx, config);
     const byName = new Map(tools.map((tool) => [tool.name, tool]));
     assert.ok(byName.has('key_router_probe'), 'das Probe-Werkzeug ist registriert');
+    assert.ok(byName.has('key_router_catalog'), 'der Live-Katalog ist explizit abrufbar');
+    assert.equal(stub.requests.length, 0, 'apply startet ohne Netzrequest');
 
     // Die Beobachtung ist registriert UND gibt weiter: der Router entscheidet
     // nicht ueber Wiederholungen (`llm-retry` tut das), er zaehlt nur.

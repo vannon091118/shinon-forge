@@ -206,11 +206,12 @@ test('key-router: das ausgelieferte Paket leakt nicht (node_modules nötig)', as
 
   try {
     const dispose = packageModule.apply(ctx, config);
-    assert.equal(registered.length, 3, 'drei Werkzeuge erwartet');
+    assert.equal(registered.length, 4, 'vier Werkzeuge erwartet');
     const byName = new Map(registered.map((tool) => [tool.name, tool]));
+    assert.equal(requests.length, 0, 'der Paketstart fragt keinen Anbieter an');
 
     const results = [];
-    for (const tool of registered) {
+    for (const tool of registered.filter((item) => item.name !== 'key_router_catalog')) {
       const result = await tool.execute(tool.name === 'key_router_probe'
         ? { providerId: 'kanarienvogel', model: '' }
         : tool.name === 'key_router_rotate'
@@ -220,9 +221,14 @@ test('key-router: das ausgelieferte Paket leakt nicht (node_modules nötig)', as
     }
 
     // (a) Der Schlüssel KOMMT an — sonst prüfte der Test nichts.
-    assert.equal(requests.length, 1, 'der Verbindungstest hat genau einmal angefragt');
+    assert.equal(requests.length, 1, 'erst der Verbindungstest fragt genau einmal an');
     assert.equal(requests[0].headers.authorization, `Bearer ${CANARY}`, 'der Schlüssel gehört in den Kopf');
     assert.equal(requests[0].url, 'https://api.example/v1/models');
+
+    const catalogResult = await byName.get('key_router_catalog').execute({});
+    assert.equal(requests.length, 2, 'der Live-Katalog wird erst auf ausdrücklichen Abruf geladen');
+    assert.deepEqual(catalogResult.catalog.kanarienvogel.models, ['m1']);
+    results.push(JSON.stringify(catalogResult));
 
     // (b) Und danach nirgends mehr.
     const visible = [...results, ...logged, JSON.stringify(byName.get('key_router_status').parameters)];

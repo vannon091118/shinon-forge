@@ -38,6 +38,7 @@ sind rot.
 | Begriff | Schreibweise | wo definiert |
 |---|---|---|
 | Plugin-Registry (Browser) | `__shinonPlugins` (Map) | Literal je Client-Hälfte; `packages/core/client.js` |
+| Widget-Dock-Zustand (Browser) | `__shinonWidgetDock` | `packages/widget-dock/client.js` |
 | Panel-Tabelle (Browser) | `__shinonPluginCatalog` (Objekt) | `packages/key-router/client.js` |
 | Prompter-Trace | `__shinonPrompterTrace` | `packages/prompter/index.js` (`TRACE_GLOBAL`) |
 | Persona-Zustand | `__shinonPersonaState`, `__shinonPersonaReview` | `packages/persona/index.js` |

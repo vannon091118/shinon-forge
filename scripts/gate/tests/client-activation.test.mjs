@@ -257,37 +257,35 @@ function stubContext(entries) {
   };
 }
 
+// Seit 2026-10-22 hat markers/popup keinen sidebar.panellist-Eintrag mehr (Zahl steht im Widget).
+const PANELLIST_LABELS = { dashboard: 'Shinon Dashboard', codingmon: 'Codingmon' };
+
 test('das Menü-Label trägt auch an einem Context ohne `get` (repo-eigene Attrappen)', () => {
-  const expected = { dashboard: 'Shinon Dashboard', markers: 'Shinon Marker', codingmon: 'Codingmon', popup: 'Shinon Popup' };
   const problems = [];
-  for (const [dir, expected2] of Object.entries(expected)) {
+  const run = (dir, fn) => {
+    try { fn(); } catch (error) { problems.push(`@shinon/${dir}: apply warf am Attrappen-Context — ${error.message}`); }
+  };
+  for (const dir of ['markers', 'popup']) {
     const entries = [];
-    const { registration } = loadBundle(dir);
-    const plugin = registration.factory(requireStub());
-    try {
-      plugin.apply(stubContext(entries));
+    run(dir, () => loadBundle(dir).registration.factory(requireStub()).apply(stubContext(entries)));
+    if (entries.some((item) => item.options.name === 'sidebar.panellist')) problems.push(`@shinon/${dir}: sidebar.panellist-Anmeldung ist entfernt, aber noch da`);
+  }
+  for (const [dir, label] of Object.entries(PANELLIST_LABELS)) {
+    const entries = [];
+    run(dir, () => {
+      loadBundle(dir).registration.factory(requireStub()).apply(stubContext(entries));
       const entry = entries.find((item) => item.options.name === 'sidebar.panellist');
       if (entry === undefined) problems.push(`@shinon/${dir}: keine sidebar.panellist-Anmeldung`);
-      else if (typeof entry.options.label !== 'function') problems.push(`@shinon/${dir}: Label ist keine Funktion`);
-      else if (entry.options.label() !== expected2) problems.push(`@shinon/${dir}: Label = ${JSON.stringify(entry.options.label())}`);
-    } catch (error) {
-      problems.push(`@shinon/${dir}: apply warf am Attrappen-Context — ${error.message}`);
-    }
+      else if (typeof entry.options.label !== 'function' || entry.options.label() !== label) problems.push(`@shinon/${dir}: Label falsch`);
+    });
   }
-  // Die Token-Anzeige liegt auf demselben Weg (sie rendert `t` erst später).
-  try {
+  // Token-Anzeige: rendert `t` erst später, daher nur der Titel-Fallback.
+  run('token-usage', () => {
     const entries = [];
-    const { registration } = loadBundle('token-usage');
-    registration.factory(requireStub()).apply(stubContext(entries));
+    loadBundle('token-usage').registration.factory(requireStub()).apply(stubContext(entries));
     const entry = entries.find((item) => item.options.name === 'sidebar.footer.action');
-    if (entry === undefined) problems.push('@shinon/token-usage: keine sidebar.footer.action-Anmeldung');
-    else {
-      const rendered = entry.component({ wide: false });
-      if (rendered?.props?.title !== 'Token: --') problems.push(`@shinon/token-usage: title = ${JSON.stringify(rendered?.props?.title)}`);
-    }
-  } catch (error) {
-    problems.push(`@shinon/token-usage: warf am Attrappen-Context — ${error.message}`);
-  }
+    if (entry?.component({ wide: false })?.props?.title !== 'Token: --') problems.push('@shinon/token-usage: Titel falsch oder fehlt');
+  });
   assert.deepEqual(problems, [], problems.join('\n'));
 });
 
@@ -385,7 +383,7 @@ test('das Menü-Label kommt aus der Registry — und ohne Locale-Dienst aus der 
     assert.equal(typeof entry.options.label, 'function', `@shinon/${dir}: Label ist keine Funktion`);
     return entry.options.label();
   };
-  const expected = { dashboard: 'Shinon Dashboard', markers: 'Shinon Marker', codingmon: 'Codingmon', popup: 'Shinon Popup' };
+  const expected = PANELLIST_LABELS;
 
   // Mit Locale-Dienst: der Wert kommt aus dem Wörterbuch des Eigentümers.
   for (const [dir, expected2] of Object.entries(expected)) {

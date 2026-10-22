@@ -111,7 +111,7 @@
     "scripts/gate/plugins/probe-twin.mjs": 105,
     "scripts/gate/plugins/scoring.mjs": 821,
     "scripts/gate/plugins/typescript.mjs": 204,
-    "scripts/gate/tests/client-activation.test.mjs": 608,
+    "scripts/gate/tests/client-activation.test.mjs": 606,
     "scripts/gate/tests/commit-trailer.test.mjs": 609,
     "scripts/gate/tests/persona-state.test.mjs": 1004,
     "scripts/gate/tests/project-index.test.mjs": 2154,

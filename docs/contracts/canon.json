@@ -70,6 +70,13 @@
       "hinweis": "Fläche des Änderungs-Panels im Datei-Browser (open/close/load/state) — die Zahlen liefert der Host."
     },
     {
+      "art": "global",
+      "kanonisch": "__shinonWidgetDock",
+      "definiert_in": "packages/widget-dock/client.js",
+      "verboten": [],
+      "hinweis": "Geteilter Timer- und Drag-Zustand des Client-Docks, damit Mehrfachaktivierung keine Listener stapelt."
+    },
+    {
       "art": "vertrag",
       "kanonisch": "shinon.workspace/v1",
       "definiert_in": "packages/seams/assets/seams.js",

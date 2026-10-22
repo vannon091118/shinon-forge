@@ -4,8 +4,10 @@
  * Warum nicht das Modell pinnen: ein Test, der `agnes-2.5-flash` wörtlich
  * erwartet, ist beim nächsten Modellwechsel rot — und dann wird die Zahl im
  * Test geändert, nicht die Frage geprüft. Die Frage ist: NENNT das Profil einen
- * Provider, den es selbst definiert, und ein Modell, das dieser Provider im
- * Katalog führt? Das ist die Zusage; welches Modell gewählt ist, entscheidet das
+ * Provider, den es selbst definiert, und (falls das Profil einen festen
+ * Modellkatalog pflegt) ein Modell aus dieser Liste? Leere Listen sind
+ * dynamische DSH-Kataloge und werden zur Laufzeit vom Provideradapter geladen.
+ * Das ist die Zusage; welches Modell gewählt ist, entscheidet das
  * Profil (Agnes ist die empfohlene kostenlose Route der Doku, kein Code-Zwang).
  *
  * KEIN `js-yaml` HIER: `scripts/mobile-profile-contract-test.mjs` läuft in CI
@@ -127,8 +129,8 @@ export function readModelRoutes(text) {
  * Die Route gegen den eigenen Katalog prüfen.
  *
  * Geprüft wird die FORM, nicht ein Name: der Provider muss im selben Patch
- * definiert sein, das Modell in seinem Katalog stehen, und der Schlüssel darf
- * nicht als Wert dastehen (nur der NAME der Umgebungsvariable).
+ * definiert sein, das Modell in einer vorhandenen festen Liste stehen, und der
+ * Schlüssel darf nicht als Wert dastehen (nur der NAME der Umgebungsvariable).
  *
  * @returns {string[]} Befunde; leer heißt gültig.
  */
@@ -142,7 +144,8 @@ export function routeIssues(routes) {
   if (provider === '') issues.push('ROUTE_PROVIDER_EMPTY');
   else if (providers[provider] === undefined) issues.push(`ROUTE_PROVIDER_UNKNOWN:${provider}`);
   if (model === '') issues.push('ROUTE_MODEL_EMPTY');
-  else if (providers[provider] !== undefined && !providers[provider].models.includes(model)) {
+  else if (providers[provider] !== undefined && providers[provider].models.length > 0
+    && !providers[provider].models.includes(model)) {
     issues.push(`ROUTE_MODEL_NOT_IN_CATALOG:${provider}/${model}`);
   }
   if (providers[provider] !== undefined && providers[provider].apiKeyEnv.trim() === '') {

@@ -7,7 +7,7 @@
  * Plugin und das Panel ist KEIN schwebendes div, sondern der native Side Panel:
  *
  *   ctx.slots.register({ name: 'main', key: 'shinon-markers' }, MarkerPanel)
- *   ctx.slots.register({ name: 'sidebar.panellist', id: 'shinon-markers', … }, MarkerIcon)
+ *   (der Einstieg in die Seitenleiste ist seit 2026-10-22 entfernt)
  *
  * Gespiegelte Regeln (identisch zum Vertrag in assets/marker-model.json):
  *   - Marke: id, label, selector, text, rect, href, url, ts

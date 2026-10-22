@@ -146,7 +146,8 @@ braucht, spiegelt er und prüft es gegen den Host (`test/uebergabe.test.mjs`,
 
 **`@shinon/key-router`** — Multi-API-Key-Pool mit 429-Rotation und
 Eskalationsdelays; Kern importfrei in `assets/pool-core.js`. Werkzeuge
-`key_router_status` / `key_router_rotate` / `key_router_probe`;
+`key_router_status` / `key_router_rotate` / `key_router_probe` /
+`key_router_catalog` (Live-Katalog nur auf ausdrücklichen Abruf, kein Netz beim Start);
 Provider-Override für konfigurierte Credentials-Referenzen.
 Sicherheitsvertrag: **keine Schlüsselpräfixe in Logs**. Echte
 Provider-Rotation mit realen Schlüsseln ist nicht live geprüft (steht so in

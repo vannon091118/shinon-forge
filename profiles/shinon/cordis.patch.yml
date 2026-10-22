@@ -80,8 +80,9 @@
 #
 # WAS GEPRÜFT WIRD, IST DIE FORM, NICHT DER NAME
 # (`scripts/lib/model-route.mjs`, `scripts/gate/tests/model-route.test.mjs`):
-# der Provider muss in diesem Patch definiert sein, das Modell in seinem
-# Katalog stehen, und `apiKeyEnv` muss einen Namen nennen (nie einen Wert).
+# der Provider muss in diesem Patch definiert sein; eine vorhandene feste
+# Modellliste wird geprüft, eine leere Liste steht für den dynamischen DSH-
+# Katalog. `apiKeyEnv` muss einen Namen nennen (nie einen Wert).
 # Ein Modell-Literal im Test wäre beim nächsten Wechsel rot und würde die Zahl
 # ändern statt die Frage. Hart bleibt nur: eine Route OHNE Schlüssel ist
 # MISSING_CREDENTIAL — die deepseek-official-Route (dsh-llm-deepseek) ist
@@ -114,6 +115,106 @@
         displayName: Shinon Forge
       huggingface:
         apiKeyEnv: HUGGINGFACE_API_KEY
+        displayName: Shinon Forge
+      # Der Katalog kommt vom Anbieter, nicht aus dem Profil: `dsh-llm-pi-ai`
+      # loest die Modelle ueber `catalogModels(provider)` auf, der eingebaute
+      # pi-ai-Katalog fuehrt 42 Anbieter mit rund 1700 Modellen. Was der
+      # Profil-Eintrag beisteuert, ist der SCHLUESSEL (`apiKeyEnv`) und
+      # sonst nichts — ohne ihn liefert `listModels` leer und der Anbieter
+      # faellt aus der Modell-Liste des Hosts (gemessen: `listModels` gibt bei
+      # fehlendem Schluessel `[]` zurueck, und `buildModelCatalog` filtert
+      # genau solche Gruppen weg). Die `baseURL` kommt aus dem Katalog.
+      #
+      # Jeder Eintrag nennt seinen eigenen Umgebungsnamen. Der Name ist
+      # nicht geraten, sondern aus dem Katalog-Modul gelesen
+      # (`@earendil-works/pi-ai/dist/providers/<id>.js`); der Katalog ist
+      # die Quelle, das Profil nur die Schluesselreferenz.
+      ant-ling:
+        apiKeyEnv: ANT_LING_API_KEY
+        displayName: Shinon Forge
+      anthropic:
+        apiKeyEnv: ANTHROPIC_API_KEY
+        displayName: Shinon Forge
+      azure:
+        apiKeyEnv: AZURE_OPENAI_API_KEY
+        displayName: Shinon Forge
+      baseten:
+        apiKeyEnv: BASETEN_API_KEY
+        displayName: Shinon Forge
+      deepseek:
+        apiKeyEnv: DEEPSEEK_API_KEY
+        displayName: Shinon Forge  # Schluessel liegt in .env
+      fireworks:
+        apiKeyEnv: FIREWORKS_API_KEY
+        displayName: Shinon Forge
+      google-vertex:
+        apiKeyEnv: GOOGLE_CLOUD_API_KEY
+        displayName: Shinon Forge
+      kimi-coding:
+        apiKeyEnv: KIMI_API_KEY
+        displayName: Shinon Forge
+      meta:
+        apiKeyEnv: META_API_KEY
+        displayName: Shinon Forge
+      minimax:
+        apiKeyEnv: MINIMAX_API_KEY
+        displayName: Shinon Forge
+      minimax-cn:
+        apiKeyEnv: MINIMAX_CN_API_KEY
+        displayName: Shinon Forge
+      moonshotai:
+        apiKeyEnv: MOONSHOT_API_KEY
+        displayName: Shinon Forge
+      moonshotai-cn:
+        apiKeyEnv: MOONSHOT_API_KEY
+        displayName: Shinon Forge
+      openai:
+        apiKeyEnv: OPENAI_API_KEY
+        displayName: Shinon Forge
+      opencode:
+        apiKeyEnv: OPENCODE_API_KEY
+        displayName: Shinon Forge
+      opencode-go:
+        apiKeyEnv: OPENCODE_API_KEY
+        displayName: Shinon Forge
+      qwen-token-plan:
+        apiKeyEnv: QWEN_TOKEN_PLAN_API_KEY
+        displayName: Shinon Forge
+      qwen-token-plan-cn:
+        apiKeyEnv: QWEN_TOKEN_PLAN_CN_API_KEY
+        displayName: Shinon Forge
+      qwen-token-plan-individual:
+        apiKeyEnv: QWEN_TOKEN_PLAN_API_KEY
+        displayName: Shinon Forge
+      radius:
+        apiKeyEnv: RADIUS_API_KEY
+        displayName: Shinon Forge
+      typesafe:
+        apiKeyEnv: TYPESAFE_API_KEY
+        displayName: Shinon Forge
+      vercel-ai-gateway:
+        apiKeyEnv: AI_GATEWAY_API_KEY
+        displayName: Shinon Forge
+      xai:
+        apiKeyEnv: XAI_API_KEY
+        displayName: Shinon Forge
+      xiaomi:
+        apiKeyEnv: XIAOMI_API_KEY
+        displayName: Shinon Forge
+      xiaomi-token-plan-ams:
+        apiKeyEnv: XIAOMI_TOKEN_PLAN_AMS_API_KEY
+        displayName: Shinon Forge
+      xiaomi-token-plan-cn:
+        apiKeyEnv: XIAOMI_TOKEN_PLAN_CN_API_KEY
+        displayName: Shinon Forge
+      xiaomi-token-plan-sgp:
+        apiKeyEnv: XIAOMI_TOKEN_PLAN_SGP_API_KEY
+        displayName: Shinon Forge
+      zai:
+        apiKeyEnv: ZAI_API_KEY
+        displayName: Shinon Forge
+      zai-coding-cn:
+        apiKeyEnv: ZAI_CODING_CN_API_KEY
         displayName: Shinon Forge
       agnes:
         displayName: Shinon Forge
@@ -174,8 +275,9 @@
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
-    provider: prompter
-    model: agnes-3.0-flash
+    provider: openrouter
+    model: google/gemma-4-31b-it:free
+    reasoningEffort: high
 # Shinon-Preset: EIGENE, schmalere Werkzeug-Zusammensetzung.
 #
 # Das DSH liefert vier Presets (standard, ptc, minimal, cordis). 'standard'

@@ -154,7 +154,8 @@ test('markers: ein Host, der schreibt oder handelt, wird rot', () => {
 test('markers: der Client verdrahtet den nativen Side Panel', () => {
   assert.deepEqual(clientIssues(clientSource, model), []);
   assert.ok(clientSource.includes("ctx.slots.inject('main'"), 'main-Slot fehlt');
-  assert.ok(clientSource.includes('sidebar.panellist'), 'Side-Panel-Eintrag fehlt');
+  // Seit 2026-10-22 kein sidebar.panellist-Eintrag mehr (Leiste überladen, Zahl im Widget).
+  assert.ok(!/name:\s*'sidebar\.panellist'/.test(clientSource), 'sidebar.panellist-Registrierung ist entfernt und darf nicht zurückkehren');
 });
 
 test('markers: ein Client ohne Panel oder mit DOM-Injektion wird rot', () => {

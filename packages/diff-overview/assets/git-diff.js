@@ -101,13 +101,17 @@ export function readOverview(root, options = {}) {
   if (scope === null) {
     return { ...base, scope: null, reason: 'KEIN_GIT', files: [], totals: { files: 0, added: 0, removed: 0, counted: 0, uncounted: 0 }, truncated: null };
   }
+  // Der Branchname: `symbolic-ref` liefert ihn, bei losgelöstem HEAD scheitert
+  // der Aufruf — dann ist der Branch `null` und wird nicht erfunden.
+  const symbolic = runGit(scope.repoRoot, ['symbolic-ref', '--short', '-q', 'HEAD']);
+  const branch = symbolic.ok && symbolic.stdout.trim() !== '' ? symbolic.stdout.trim() : null;
   const head = runGit(scope.repoRoot, ['rev-parse', '--verify', 'HEAD']);
   if (!head.ok) {
-    return { ...base, scope: scope.scope, reason: 'KEIN_HEAD', files: [], totals: { files: 0, added: 0, removed: 0, counted: 0, uncounted: 0 }, truncated: null };
+    return { ...base, branch, scope: scope.scope, reason: 'KEIN_HEAD', files: [], totals: { files: 0, added: 0, removed: 0, counted: 0, uncounted: 0 }, truncated: null };
   }
   const status = runGit(scope.repoRoot, ['status', '--porcelain=v1', '-z', '--no-renames', '--untracked-files=all']);
   if (!status.ok) {
-    return { ...base, scope: scope.scope, reason: 'NICHT_LESBAR', detail: status.stderr, files: [], totals: { files: 0, added: 0, removed: 0, counted: 0, uncounted: 0 }, truncated: null };
+    return { ...base, branch, scope: scope.scope, reason: 'NICHT_LESBAR', detail: status.stderr, files: [], totals: { files: 0, added: 0, removed: 0, counted: 0, uncounted: 0 }, truncated: null };
   }
   // `git diff HEAD` ist der Vergleich, den der Nutzer meint: gestagte UND
   // unstaged Änderungen gegen den letzten Commit.
@@ -117,7 +121,7 @@ export function readOverview(root, options = {}) {
     numstatText: numstat.ok ? numstat.stdout : '',
     maxFiles: options.maxFiles,
   });
-  return { ...base, scope: scope.scope, reason: null, ...overview };
+  return { ...base, branch, scope: scope.scope, reason: null, ...overview };
 }
 
 /**

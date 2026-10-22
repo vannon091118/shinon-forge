@@ -28,7 +28,7 @@ window.__ModuleLoader__.load({
 
 
     const LABEL = 'Key-Router';
-    const ROLE = 'Schluessel-Pool des Hosts (Werkzeuge: status, rotate, probe)';
+    const ROLE = 'Schluessel-Pool und Live-Modellkatalog des Hosts (Werkzeuge: status, rotate, probe, catalog)';
 
     function announce(detail) {
       const table = window.__shinonPluginCatalog ?? (window.__shinonPluginCatalog = {});

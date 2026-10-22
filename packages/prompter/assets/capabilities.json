@@ -494,6 +494,54 @@
       ]
     },
     {
+      "id": "arbeitsstand-und-pluginstatus",
+      "frage": "Wo sehe ich Branch, Änderungen und den Status der Shinon-Plugins?",
+      "owner": "widget-dock",
+      "seam": {
+        "kind": "contract",
+        "name": "shinon.diff/overview-v1"
+      },
+      "terms": [
+        "branch und änderungen",
+        "shinon status",
+        "pluginstatus anzeigen",
+        "arbeitsstand im dock"
+      ],
+      "notAnswers": [
+        "keine Änderungen schreiben",
+        "keine Sitzungsverwaltung",
+        "keine Persona-Entscheidung"
+      ],
+      "evidence": [
+        "packages/widget-dock/client.js",
+        "packages/diff-overview/assets/git-diff.js"
+      ]
+    },
+    {
+      "id": "datei-aenderungen-ueberblick",
+      "frage": "Welche Dateien wurden im Arbeitsbereich geändert?",
+      "owner": "diff-overview",
+      "seam": {
+        "kind": "contract",
+        "name": "shinon.diff/overview-v1"
+      },
+      "terms": [
+        "geänderte dateien",
+        "git diff im arbeitsbereich",
+        "dateien geändert",
+        "branch und diff"
+      ],
+      "notAnswers": [
+        "keine Dateiinhalte",
+        "keine Änderung ausführen",
+        "keine Commit-Historie"
+      ],
+      "evidence": [
+        "packages/diff-overview/index.js",
+        "packages/diff-overview/assets/git-diff.js"
+      ]
+    },
+    {
       "id": "openapi-vertrag",
       "frage": "Gibt es einen OpenAPI-Server?",
       "owner": "openapi",

@@ -30,6 +30,26 @@ test('jedes Profil nennt eine Route, die sein eigener Katalog führt', () => {
   }
 });
 
+test('dynamische DSH-Kataloge sind zulässig, feste Kataloge bleiben geprüft', () => {
+  const dynamic = {
+    providers: { openrouter: { apiKeyEnv: 'SHINON_API_KEY', models: [] } },
+    route: { provider: 'openrouter', model: 'google/gemma-4-31b-it:free' },
+  };
+  assert.deepEqual(routeIssues(dynamic), []);
+  assert.deepEqual(routeIssues({
+    providers: { openrouter: { apiKeyEnv: 'SHINON_API_KEY', models: ['known-model'] } },
+    route: { provider: 'openrouter', model: 'missing-model' },
+  }), ['ROUTE_MODEL_NOT_IN_CATALOG:openrouter/missing-model']);
+});
+
+test('die gewählte Shinon-Route ist im eingebauten Katalog des gepinnten DSH', async () => {
+  const { getBuiltinModels } = await import('@earendil-works/pi-ai/providers/all');
+  const routes = readModelRoutes(read('shinon'));
+  assert.ok(routes.providers[routes.route.provider].models.length === 0, 'Probe muss den dynamischen Provider abdecken');
+  const models = getBuiltinModels(routes.route.provider);
+  assert.ok(models.some((entry) => entry.id === routes.route.model), `${routes.route.provider}/${routes.route.model} fehlt im DSH-Katalog`);
+});
+
 test('der Extraktor liest, was der echte Parser liest', () => {
   for (const profile of PROFILES) {
     const text = read(profile);

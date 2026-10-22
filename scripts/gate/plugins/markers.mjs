@@ -33,9 +33,9 @@ export const SOURCE_REPO = 'vannon091118/brutalord-the-feral-cycle';
 /** Die acht Marken-Felder, in Vertragsreihenfolge. */
 export const MARK_FIELDS = ['id', 'label', 'selector', 'text', 'rect', 'href', 'url', 'ts'];
 
-/** Native DSH-Slots: `main` ist der Panel-Platz, `sidebar.panellist` der Einstieg. */
+/** Native DSH-Slots: `main` ist der Panel-Platz. Der Einstieg `sidebar.panellist` ist seit 2026-10-22 entfernt (Leiste überladen, Zahl im Widget). */
 export const PANEL_ID = 'shinon-markers';
-export const PANEL_SLOTS = ['main', 'sidebar.panellist'];
+export const PANEL_SLOTS = ['main'];
 
 /** Speicherschlüssel des Originals — der Spiegel benutzt dieselben. */
 export const STORAGE_KEYS = ['__mk.marks', '__mk.comments'];

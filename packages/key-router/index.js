@@ -183,10 +183,21 @@ function catalogSources(config) {
  * Leer ist ein Befund, kein Fehler.
  */
 function loadPool(providerConfig, ctx) {
+  // Die Naht: `launchEnvironment` traegt drei Schichten (Prozess, Projekt-`.env`,
+  // Benutzer-`.env`). Der Dienst wird auf dem ROOT-Kontext bereitgestellt
+  // (`hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, …)`), und ein Plugin sieht ihn
+  // ueber `ctx.get` — aber nur, wenn dieser Aufruf im selben Kontext passiert.
+  // Fehlt er (undefined ODER null), gilt die unterste Schicht: `process.env`.
+  // Das ist keine Bequemlichkeit, sondern dieselbe Regel, die `llm-pi-ai`
+  // anwendet (`launchEnvironmentOf` = `ctx.get(…) ?? snapshot(process.env)`).
+  // Vorher stand hier `launch === undefined`, und `null` lief in den
+  // `valuesFromLayers`-Zweig, der ohne Naht nichts liefert — der Pool blieb
+  // leer, obwohl der Schluessel auf der Platte lag.
   const launch = typeof ctx?.get === 'function' ? ctx.get('launchEnvironment') : undefined;
-  const named = launch === undefined
-    ? keysFromEnv(process.env, { names: providerConfig.envNames, prefix: '' })
-    : Object.values(valuesFromLayers(launch, providerConfig.envNames));
+  const naht = launch === undefined || launch === null
+    ? { get: (name) => (typeof process.env[name] === 'string' ? { value: process.env[name], source: 'process' } : undefined) }
+    : launch;
+  const named = Object.values(valuesFromLayers(naht, providerConfig.envNames));
   const scanned = keysFromEnv(process.env, { names: [], prefix: providerConfig.envPrefix });
   const entries = buildEntries([...named, ...scanned]);
   if (entries.length > 0) keyPools.set(providerConfig.id, entries);
@@ -234,6 +245,21 @@ const statusTool = {
             ...entry.ok === true ? {} : { error: entry.error } };
     }
     return { ok: true, pools, catalog };
+  },
+};
+
+const catalogTool = {
+  name: 'key_router_catalog',
+  description: 'Fragt die Modellkataloge der konfigurierten Anbieter jetzt live ab. Gibt Modelle und Fehler zurück, nie Schlüssel.',
+  parameters: z.object({}),
+  async execute() {
+    const config = probeTool.config;
+    const catalog = await fetchCatalog(catalogSources(config), {
+      keyOf: (id) => keyPools.get(id)?.[0]?.key ?? '',
+      secrets: allSecrets(),
+    });
+    for (const [id, entry] of Object.entries(catalog)) catalogState.set(id, entry);
+    return { ok: Object.values(catalog).every((entry) => entry.ok === true), catalog };
   },
 };
 
@@ -313,27 +339,13 @@ export function apply(ctx, config) {
     warn(`[shinon-key-router] ohne Schlüssel (Umgebung leer): ${withoutPool.join(', ')}`);
   }
 
-  // Der Katalog wird beim Start EINMAL je Anbieter gelesen (der Anbieter
-  // antwortet, nicht das Profil). Nicht awaited: der Boot haengt nicht am
-  // Netz, ein Ausfall steht als `fehler` im Status statt als Absturz.
-  fetchCatalog(catalogSources(config), {
-    keyOf: (id) => keyPools.get(id)?.[0]?.key ?? '',
-    secrets: allSecrets(),
-  }).then((catalog) => {
-    for (const [id, entry] of Object.entries(catalog)) {
-      catalogState.set(id, entry);
-      const declared = providerOf(config, id)?.models.length ?? 0;
-      if (entry.ok === true) say(`[shinon-key-router] Katalog ${id}: ${entry.models.length} Modelle live (${declared} statisch)`);
-      else warn(`[shinon-key-router] Katalog ${id}: ${entry.error}`);
-    }
-  }).catch((error) => warn(`[shinon-key-router] Katalog nicht geladen — ${error?.message ?? error}`));
-
   // Werkzeug-Registrierung über `inject`: ein direkter Dienst-Zugriff wirft am
   // Cordis-Proxy ohne Deklaration — genau der Fehler, der die Client-Hälften
   // schon einmal die Aktivierung gekostet hat.
   ctx.inject(['tools'], (child) => {
     child.tools.register(rotateTool);
     child.tools.register(statusTool);
+    child.tools.register(catalogTool);
     child.tools.register(probeTool);
   });
 
