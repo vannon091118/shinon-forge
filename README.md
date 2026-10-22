@@ -60,8 +60,8 @@ git clone https://github.com/vannon091118/shinon-forge.git
 cd shinon-forge
 npm ci
 npm run profile:links
-npm test
 npm run preflight:docs
+npm test
 git status --short
 ```
 
