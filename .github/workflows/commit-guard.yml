@@ -328,7 +328,16 @@ jobs:
       - name: Dokumentationsvertrag mit Fehlercodes pruefen
         run: node scripts/preflight-docs.mjs --json-out preflight-docs-report.json
       - name: Dokumentationsvertrag als maschinell getesteten Pfad pruefen
+        if: always()
         run: node --test scripts/gate/tests/preflight-docs.test.mjs
+      - name: Dokumentationsbefund sichern
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: preflight-docs-report-${{ github.run_id }}
+          path: preflight-docs-report.json
+          if-no-files-found: error
+          retention-days: 30
 
   dependency-audit:
     name: Preflight (Production Dependency Audit)
