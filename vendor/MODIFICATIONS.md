@@ -1,6 +1,6 @@
 # vendor/ — herkunftsbelegter Fremdbaum
 
-> **Status:** current — welche Fassung hier liegt und wer sie liest. **Stand:** 2026-10-18
+> **Status:** current — welche Fassung hier liegt und wer sie liest. **Stand:** 2026-10-22
 > **Einstieg:** `AGENTS.md` · **Zahlen des Repos:** `docs/ZAHLEN.md`
 > **Nachweis mit den wörtlichen Befehlsausgaben:** Commit `23eee83`, Datei `docs/archive/A4_DSH_FASSUNG_2026-10-17.md` (im Schnitt entfallen: `git show 23eee83:<pfad>`)
 
@@ -37,8 +37,10 @@ Die Frage ist beantwortet, und die Antwort hat drei Teile:
    `<Root>/node_modules/@deepseek-ai/dsh` (existiert, gewinnt) und
    `<Root>/starter/vendor/@deepseek-ai/dsh` (`starter/` existiert im Baum nicht — dort
    legt erst Stufe 2 des Starter-Plans den Sidecar ab). `vendor/dsh` steht **nicht** auf
-   der Liste. Der Startpfad meldet deshalb `Herkunft: Repo-Installat` und
-   `dsh: 0.2.1-alpha.1` aus dem Installat, nicht aus `vendor/`.
+   der Liste. Der aktuelle Startpfad meldet deshalb `Herkunft: Repo-Installat` und
+   `dsh: 0.2.1-rc.2` aus `node_modules`, nicht aus `vendor/`. Diese aktuelle Fassung
+   ist durch Sollmatrix, Root-Pin, Lock und `vendor/dsh/MANIFEST.json` belegt; die
+   Tabelle oben dokumentiert den Abgleich dieser Quellen.
 3. **Die Herkunfts-Klasse `Vendor` ist für `starter/` gebaut.** `dshSource()` stuft
    Wurzeln unter `<Root>/vendor` oder `<Root>/starter` als `Vendor` ein; über die lokalen
    Kandidaten ist `ROOT/vendor` dafür nicht erreichbar (nur über einen PATH-Shim dorthin,
@@ -56,9 +58,11 @@ Der Baum trug bis zum 2026-10-17 die Fassung `0.2.1-alpha.2`: Pin und Lock nannt
 `0.2.1-alpha.1`, die Laufzeit lud `0.2.1-alpha.1` — und `vendor/dsh` stand daneben als
 zweite Fassung im Weg. Drei gemessene Gründe haben die Richtung entschieden:
 
-- **Es läuft die Pin-Fassung.** `node bin/shinon.mjs --check` meldet Herkunft
-  `Repo-Installat` und `dsh: 0.2.1-alpha.1`; `0.2.1-alpha.1` ist damit die Fassung, gegen
-  die jede Messung dieses Repos entstanden ist.
+- **Historischer Messpunkt vor dem Umzug auf `0.2.1-rc.2`:**
+  `node bin/shinon.mjs --check` meldete damals Herkunft `Repo-Installat` und
+  `dsh: 0.2.1-alpha.1`. Diese Aussage beschreibt den früheren Laufzeitstand bis zum
+  2026-10-17 und ist kein Beleg für die aktuelle Fassung. Der aktuelle Stand ist in
+  der Tabelle oben dokumentiert; `scripts/check-dsh-versions.mjs` prüft die Quellen.
 - **Eine Zusage hängt hart an der Fassung.** `scripts/gate/tests/message-ingress.test.mjs`
   liest die geprüfte Fassung inzwischen aus `scripts/dsh-target-versions.json` und
   **verweigert** die Zusage, wenn der geladene Harness eine andere Fassung ist. Seit dem
