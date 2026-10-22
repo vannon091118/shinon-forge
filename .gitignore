@@ -57,6 +57,18 @@ __pycache__/
 # Freebuff workspace metadata.
 .freebuff/
 
+# Agent scratch is local work state, not source. Keep project instructions such
+# as AGENTS.md and curated evidence under docs/probes/ versioned; ignore only
+# dedicated root-level scratch/output locations and disposable probe scripts.
+/.agent-work/
+/.agent-cache/
+/agent-output/
+/scratch/
+/tmp/
+/temp/
+/.pi-katalog-probe.mjs
+/.facts-perf-probe.mjs
+
 # OS- und Editor-Kram.
 .DS_Store
 Thumbs.db
