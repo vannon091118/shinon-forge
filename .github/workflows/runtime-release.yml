@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22.19.0"
 
@@ -46,8 +46,8 @@ jobs:
     needs: mobile-gate
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22.19.0"
 
@@ -137,7 +137,7 @@ jobs:
           ls -lh shinon-runtime-arm64.tar.zst
 
       - name: Artefakte ablegen
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shinon-runtime-arm64-${{ steps.pin.outputs.short_sha }}
           path: |

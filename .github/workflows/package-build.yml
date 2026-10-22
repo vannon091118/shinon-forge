@@ -29,10 +29,21 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    # Die Nutzlast traegt Code und README, aber nichts unter docs/ — ein reiner
+    # Doku-Push aendert kein Paket und muss die drei Bauhosts nicht wecken.
+    paths-ignore:
+      - 'docs/**'
+      - 'AGENTS.md'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# Ein neuerer main-Stand ersetzt den alten Paketbau. Tag-Bauten haben eine eigene
+# Gruppe und werden nie von einem Branch-Push abgebrochen.
+concurrency:
+  group: shinon-packages-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deb:
@@ -40,9 +51,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.19.0'
           cache: npm
@@ -110,7 +121,7 @@ jobs:
           echo "--- Nutzerdaten unberuehrt? ---"
           ls /tmp/pkg-home/state/shinon 2>/dev/null && echo "Nutzerdaten liegen noch da (gewuenscht)"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: shinon-forge-deb-x64
           path: |
@@ -123,9 +134,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.19.0'
           cache: npm
@@ -203,7 +214,7 @@ jobs:
           }
           Write-Host 'Deinstallation ok: Installat und Startmenue-Eintraege weg'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: shinon-forge-win32-x64
           path: |
@@ -216,9 +227,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.19.0'
           cache: npm
@@ -283,7 +294,7 @@ jobs:
           mkdir -p /tmp/appimage-home/config /tmp/appimage-home/data /tmp/appimage-home/state /tmp/appimage-home/cache
           APPIMAGE_EXTRACT_AND_RUN=1 "$abbild" --check
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: shinon-forge-appimage-x64
           path: |
@@ -300,7 +311,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
