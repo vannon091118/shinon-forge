@@ -111,8 +111,9 @@ Einmal pro Klon: `npm run hooks:install` (`scripts/install-hooks.mjs`).
 
 ### `commit-guard.yml` — „Shinon Forge Gate"
 
-Läuft bei **jedem Push, jedem PR** und auf Zuruf. Zehn parallele Zweige plus
-ein `verdict`-Zweig:
+Läuft bei **jedem Push, jedem PR** und auf Zuruf. Die zehn bestehenden Prüfzweige
+laufen neben vier zusätzlichen Preflight-/Security-Prüfern. Ein letzter
+`Preflight-Abnahme (fail-closed)`-Zweig fasst alle Ergebnisse zusammen:
 
 1. `node scripts/commit-guard.mjs --ci` (Trailer/Footer-Regeln)
 2. Unit-Matrix (acht Pakete, ohne Install)
@@ -124,10 +125,48 @@ ein `verdict`-Zweig:
 8. Prompter-Tests
 9. `npm run typecheck`
 10. `npm test` (Schnellpfad)
+11. Dokumentationsvertrag (Pflichtdateien, Quellenhoheit, Übergabelinks, Verdict-Verkabelung)
+12. Dependency-Audit (`npm audit --omit=dev --audit-level=high`)
+13. CodeQL für JavaScript/TypeScript
+14. Gitleaks über die vollständige Git-Historie
 
-Alle Install-Zweige: `npm ci`, danach `node_modules/.bin` via
-`$GITHUB_PATH`. **`verdict` ist rot bei `failure`, `cancelled` und
-`skipped`** — ein stillschweigend übersprungener Zweig zählt als Bruch.
+Alle Install-Zweige: lockfile-treues `npm ci`; der Audit-Zweig überspringt
+Lifecycle-Skripte. Der Finaljob heißt **`Preflight-Abnahme (fail-closed)`**.
+Er läuft mit `if: always()` und scheitert bei `failure`, `cancelled`,
+`skipped`, unbekanntem Status oder fehlendem Pflichtjob. Ein stillschweigend
+übersprungener Zweig zählt als Bruch.
+
+### Preflight-Vertrag und Fehlercodes
+
+Lokal ausführen:
+
+```bash
+npm run preflight:docs
+npm run preflight:test
+```
+
+`scripts/lib/preflight/policy.mjs` ist die gemeinsame Policy-Quelle für
+Pflichtdokumente, kanonische CI-Jobs und Fehlercode-Namen. Die Prüfer sind
+getrennt: `diagnostics.mjs` formatiert Fehler, `documentation.mjs` prüft
+Dokumentationshoheit/Links/Verdict-Verkabelung, `preflight-docs.mjs` liefert
+den CLI-Exitcode und `preflight-verdict.mjs` baut das Abschlussurteil.
+
+Die Dokumentationsprüfung liefert beispielsweise
+`PREFLIGHT_DOC_MISSING`, `PREFLIGHT_DOC_RULE_MISSING`,
+`PREFLIGHT_LINK_BROKEN`, `PREFLIGHT_JOB_NOT_REQUIRED` und
+`PREFLIGHT_VERDICT_FAIL_OPEN`. Die Ergebnisprüfung benennt Job und Status
+konkret, etwa `PREFLIGHT_CODEQL_FAILED`,
+`PREFLIGHT_DEPENDENCY_AUDIT_FAILED`, `PREFLIGHT_SECRET_SCAN_FAILED`,
+`PREFLIGHT_DOCUMENTATION_SKIPPED` oder
+`PREFLIGHT_REQUIRED_JOB_MISSING`.
+
+Jeder Lauf erzeugt eine maschinenlesbare `preflight-report.json` mit Commit-SHA,
+Run-ID, Run-Link, den Ergebnissen aller Pflichtjobs und Diagnosen. Die Datei
+wird auch nach einem fehlgeschlagenen Urteil als Run-Artefakt hochgeladen und
+die Zusammenfassung erscheint in GitHub Actions unter **Summary**. Nur
+`verdict: PASS` mit ausschließlich erfolgreichen Pflichtjobs ist eine
+Abnahme. Das ist CI-Abnahme, kein automatisches Release und kein Beleg für
+einen echten Provider-Modellturn.
 
 ### `mobile-profile.yml`
 
