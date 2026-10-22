@@ -25,6 +25,7 @@
 - Messbeleg für vermeidbare Kosten: Gate-Run `39711072872` maß rund 16 s für `npm ci` und 17,2 s für die Gate-Suiten. Entfernt wurden nur nachweisbare Duplikate: zweiter `shinon-test.mjs`-Lauf, Installation im Lockfile-Audit und doppelte Literal-Checks zusätzlich zu echtem `git check-ignore`/`git ls-files`.
 
 ### Belege
+- Gate-Läufe: `39848906103` auf `39a4364` **rot** (der Zahlen-Test verglich auch den `dist`-Block; Ursache und Fix im Tagebuch), `39849567339` auf `ad20bcc` **grün**, `39850004309` auf `5800515` **grün** — jeweils Verdict-Job eingeschlossen.
 - Gate-Test nach dem dritten Block: **942/942** grün in 9,5 s (97 Dateien); nach dem vierten Block **951/951** in 8,9 s (99 Dateien).
 - Gate-Lauf `39846439496` auf `ddde3c0`: **success**, Verdict-Job eingeschlossen (Workflow „Shinon Forge Gate").
 - Lokale Abnahme 2026-10-22 (zweiter Audit-Block): `npm test` Exit 0 (4 Gates gelaufen, 21 geskippt, 0 rot), `npm run gate:test` Exit 0 (**937/937**, 9,8 s, 96 Dateien), `npm run test:codingmon` Exit 0 (**134/134**, 16,9 s), `node scripts/gate/engine.mjs --only canon` PASS, `scripts/gate/tests/structure.test.mjs` 10/10, `packages/codingmon/test/encounter*.test.mjs` 48/48, `node scripts/assets/build-encounter-client.mjs --check` deckungsgleich.

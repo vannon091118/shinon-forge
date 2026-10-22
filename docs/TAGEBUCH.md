@@ -1409,7 +1409,7 @@ Boot stehen `Katalog agnes: HTTP 401` und `prompter: HTTP 401` bei
 
 **Nachtrag zum Preflight-Merge:** Der Workflow wurde nicht nur umbenannt, sondern auf sein Verhalten geprüft. Der Vertrag weist nach, dass teure Jobs direkt vom günstigen Preflight abhängen, dass Dummy-Kommandos unter gültig klingenden Jobnamen rot werden und dass die finale Abnahme fehlende, übersprungene oder fehlgeschlagene Jobs nicht als Erfolg auslegt. Ein erster grüner Lauf machte außerdem zwei Historie-Skips sichtbar; die doppelte Realbaumprüfung wurde entfernt und der echte Tagebuch-Check im Schnellpfad auf vollständige Git-Historie festgelegt. Der kanonische Checker wurde anschließend auf eine einzige Implementierung zurückgeführt. PR #23 wurde nach 21/21 erfolgreichen Jobs squash-gemergt.
 
-**Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · `e60eca0` · `2b6de38` · `ddde3c0` · Belege: `.github/workflows/commit-guard.yml`, `scripts/lib/preflight/documentation.mjs`, `scripts/lib/preflight/fixes.mjs`, `scripts/gate/tests/preflight-docs.test.mjs`, `scripts/gate/tests/diary.test.mjs`, `scripts/shinon-test.mjs`, `scripts/lib/repo.mjs`, `scripts/gate/plugins/canon.mjs`, `packages/codingmon/assets/encounter.js`, `docs/CHANGELOG.md`
+**Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · `e60eca0` · `2b6de38` · `ddde3c0` · `39a4364` · `ad20bcc` · `5800515` · Belege: `.github/workflows/commit-guard.yml`, `scripts/lib/preflight/documentation.mjs`, `scripts/lib/preflight/fixes.mjs`, `scripts/gate/tests/preflight-docs.test.mjs`, `scripts/gate/tests/diary.test.mjs`, `scripts/shinon-test.mjs`, `scripts/lib/repo.mjs`, `scripts/gate/plugins/canon.mjs`, `packages/codingmon/assets/encounter.js`, `docs/CHANGELOG.md`
 
 **Nachtrag vom selben Tag — Branch-Integration und Testline:** Der offene PR #22
 (`work/dsh-provenance-docs`) trug zwei Doku-Korrekturen, die vier Commits hinter `main`
@@ -1489,3 +1489,37 @@ Lokal: `npm test` Exit 0, `npm run gate:test` 937/937, `npm run test:codingmon`
 `ddde3c0` ist grün, Verdict-Job eingeschlossen.
 
 **Anker:** `ddde3c06336192157285b49ffd3cf5a0d468390e` · Belege: `scripts/lib/repo.mjs`, `scripts/gate/plugins/schemastery-enum.mjs`, `scripts/gate/plugins/canon.mjs`, `scripts/gate/tests/package-edges.test.mjs`, `packages/codingmon/assets/encounter.js`, `packages/codingmon/client.js`, `docs/CLEANREPO-AUDIT.md`, `docs/ZAHLEN.md`
+
+**Nachtrag vom selben Tag — drei Blöcke, ein roter Test, zwei neue Riegel:** Der
+dritte Block hat die Zahlen und Formen geschlossen. §1.2 in `docs/ZAHLEN.md`
+steht jetzt zwischen eigenen Markern; `strukturZahlen()` liest dieselbe
+Dateiauswahl wie der Riegel, und `zahlen:sync`/`zahlen:check` führen zwei Blöcke.
+`WORD_MIN` bleibt die eine Quelle für die Wortregel, und die Policy-Datei wird
+darauf geprüft, statt nur daneben zu stehen. `formen.dienst` prüft
+`shinon_…`-Literale — der erste Lauf war rot, weil mein eigener Kommentar ein
+Großbuchstaben-Beispiel enthielt; das ist der ehrlichste Beleg, dass der Riegel
+liest. Die 18-Bindings-Zahl ist aus `AGENTS.md` verschwunden, nicht korrigiert.
+`diff-overview` war seit `8b1ec95` scharf, `dead-package` und `registry` belegen
+es.
+
+Der erste CI-Lauf dieses Blocks (`39848906103` auf `39a4364`) war rot: der neue
+Zahlen-Test verglich `sync({check:true})` und damit auch den Bestands-Block, der
+`dist/` führt — in der Gate-Test-Job-Checkout gibt es keinen Bau, also kippte
+„nicht gebaut" gegen die gemessenen Bytes. Der Test liest jetzt nur den
+Struktur-Block (`renderStrukturBlock`) und ist ohne `dist/` 3/3 grün; Lauf
+`39849567339` auf `ad20bcc` ist grün, Verdict-Job eingeschlossen.
+
+Der vierte Block hat die Pflichten eines Pakets sichtbar gemacht: `AGENTS.md`
+nennt P1–P4 (Dateien, Struktur-Klasse, Profil-Eintrag oder `dsh.inactive`,
+Fähigkeit mit `owner`), und `package-checklist` prüft sie zusammen; P5 bleibt bei
+`canon`, damit nicht zwei Riegel dieselbe Zusage doppelt führen. `docs/PAKETE.md`
+fehlten drei Pakete, `docs/SCRIPTS.md` zwei Skripte — beide sind nachgezogen und
+werden von `docs-inventory.test.mjs` gehalten. Drei Zeilen waren bereits erledigt
+und stehen jetzt mit Beleg statt Behauptung: T4-6, T2-3 (`b902a3d`) und T3-4.
+
+Lokal: `npm run gate:test` **951/951** in 8,9 s (99 Dateien), `npm test` Exit 0,
+`npm run build` Exit 0, `npm run zahlen:check` Exit 0,
+`npm run preflight:docs:check` PASS. Der Gate-Lauf `39850004309` auf `5800515`
+ist grün.
+
+**Anker:** `39a4364` · `ad20bcc` · `5800515` · Belege: `scripts/sync-zahlen.mjs`, `scripts/lib/structure.mjs`, `scripts/lib/canon.mjs`, `scripts/gate/plugins/package-checklist.mjs`, `scripts/gate/tests/docs-inventory.test.mjs`, `docs/PAKETE.md`, `docs/SCRIPTS.md`, `docs/ZAHLEN.md`
