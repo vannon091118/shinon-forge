@@ -109,11 +109,11 @@ export function checkWorkflowContract(content, relative = '.github/workflows/com
     if (!entry) continue;
     const next = jobEntries.find((item) => item.index > entry.index);
     const jobBlock = lines.slice(entry.index, next?.index ?? lines.length);
-    const needsIndex = jobBlock.findIndex((line) => /^    needs\\s*:/.test(line));
+    const needsIndex = jobBlock.findIndex((line) => /^    needs\s*:/.test(line));
     let hasPreflightNeed = false;
 
     if (needsIndex >= 0) {
-      const inline = /^    needs\\s*:\\s*(.*)$/.exec(jobBlock[needsIndex])?.[1]?.trim() ?? '';
+      const inline = /^    needs\s*:\s*(.*)$/.exec(jobBlock[needsIndex])?.[1]?.trim() ?? '';
       if (inline && inline.startsWith('[') && inline.endsWith(']')) {
         hasPreflightNeed = inline.slice(1, -1).split(',').some((item) =>
           item.trim().replace(/^['"]|['"]$/g, '') === 'preflight-docs');
@@ -121,10 +121,10 @@ export function checkWorkflowContract(content, relative = '.github/workflows/com
         hasPreflightNeed = inline.replace(/^['"]|['"]$/g, '') === 'preflight-docs';
       } else {
         const nextField = jobBlock.findIndex((line, i) =>
-          i > needsIndex && /^    [a-zA-Z][a-zA-Z0-9_-]*\\s*:/.test(line));
+          i > needsIndex && /^    [a-zA-Z][a-zA-Z0-9_-]*\s*:/.test(line));
         const needsEnd = nextField < 0 ? jobBlock.length : nextField;
         hasPreflightNeed = jobBlock.slice(needsIndex + 1, needsEnd).some((line) =>
-          /^\\s{6}-\\s*['"]?preflight-docs['"]?\\s*(?:#.*)?$/.test(line));
+          /^\s{6}-\s*['"]?preflight-docs['"]?\s*(?:#.*)?$/.test(line));
       }
     }
 
@@ -136,7 +136,7 @@ export function checkWorkflowContract(content, relative = '.github/workflows/com
       }));
     }
 
-    if (jobBlock.some((line) => /^    if:\\s*(?:\\$\\{\\{\\s*)?always\\(\\)/.test(line))) {
+    if (jobBlock.some((line) => /^    if:\s*(?:\$\{\{\s*)?always\(\)/.test(line))) {
       issues.push(diagnostic('PREFLIGHT_JOB_BYPASSES_PREFLIGHT', 'An always() condition can run this job despite a failed preflight dependency', {
         path: relative,
         line: entry.index + 1,
