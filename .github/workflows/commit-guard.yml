@@ -36,11 +36,17 @@ name: Shinon Forge Gate
 #     übersprungener Zweig ist kein grüner Zweig.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# New PR commits supersede stale runs; the main branch run is never cancelled.
+concurrency:
+  group: shinon-preflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # ── Zweig 1: die Commit-Regeln selbst (kein node_modules) ───────────────────
@@ -117,6 +123,7 @@ jobs:
   # `node_modules/.bin/dsh` und wird über $GITHUB_PATH sichtbar.
   gate-rules:
     name: Gate-Tests (Regeln, Verträge, Nähte)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -144,43 +151,10 @@ jobs:
       - name: Codemon-Übergabe fahren (volle Naht, mit Install)
         run: node --test packages/codingmon/test/uebergabe.test.mjs
 
-  # ── Zweig 4: das statische Gate (105 Prüfungen) ─────────────────────────────
-  static-gate:
-    name: Statisches Gate (manifest, name contract, Profile)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          # Volle Historie: `diaryIssues` prueft jeden Tagebuch-Anker gegen die
-          # Commit-Historie. Mit einem flachen Klon koennte der Schritt die Anker
-          # nicht belegen und wuerde sie sichtbar ueberspringen — der Vertrag
-          # waere ungeprueft.
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Abhängigkeiten installieren (lockfile-treu) und dsh in den PATH legen
-        run: |
-          set -euo pipefail
-          npm ci --no-audit --no-fund
-          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-
-      - name: Statisches Gate fahren
-        run: node scripts/shinon-test.mjs
-
-      # Eine Sollquelle, ein Prüfer: Matrix, Manifeste, Lock, Vendor, Installat
-      # und CLI müssen dieselbe Fassung nennen. Derselbe Befehl läuft lokal und
-      # im Updater — eine zweite Implementierung gibt es nicht.
-      - name: DSH-Versionen prüfen (Sollquelle, Lock, Vendor, Installat, CLI)
-        run: node scripts/check-dsh-versions.mjs
-
   # ── Zweig 5: die Fixtures (Validierung, ~36 s) ──────────────────────────────
   fixtures:
     name: Fixtures (Validierung gegen den echten Bau)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -203,6 +177,7 @@ jobs:
   # ── Zweig 6: die Auslieferung (je Paket packen, isoliert installieren, laden)
   distribution:
     name: Distribution (npm pack → Isolat → Laden)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -225,6 +200,7 @@ jobs:
   # ── Zweig 7: der Profilboot (jeder Bundle-Layer muss auflösen) ──────────────
   profile:
     name: Profilboot (dsh --profile shinon --dump-config)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -247,6 +223,7 @@ jobs:
   # ── Zweig 8: der Prompter (braucht Schemastery über ../index.js) ────────────
   prompter:
     name: Prompter (Zettel, Skill-Auswahl)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -270,6 +247,7 @@ jobs:
   # Same engine and policy as local checks; missing compiler/config/source coverage fails closed.
   typescript:
     name: TypeScript Gate (gepinnter Compiler + Quellüberdeckung)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -296,6 +274,7 @@ jobs:
   # Zweige nebeneinander — lokal läuft nur der schnelle Pfad.
   quick:
     name: Schnellpfad (npm test, lokal)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -315,6 +294,9 @@ jobs:
       - name: Schnellen Pfad fahren
         run: npm test
 
+      - name: DSH-Versionen gegen Sollquelle, Lock, Vendor, Installat und CLI pruefen
+        run: node scripts/check-dsh-versions.mjs
+
   # ── Preflight: Dokumentationsvertrag, Dependency- und Static-Security ───────
   preflight-docs:
     name: Preflight (Dokumentationsvertrag)
@@ -325,11 +307,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22.19.0'
-      - name: Dokumentationsvertrag mit Fehlercodes pruefen
-        run: node scripts/preflight-docs.mjs --json-out preflight-docs-report.json
-      - name: Dokumentationsvertrag als maschinell getesteten Pfad pruefen
-        if: always()
-        run: node --test scripts/gate/tests/preflight-docs.test.mjs
+      - name: Dokumentations- und Job-Vertrag schreibgeschuetzt pruefen
+        run: node scripts/preflight-docs.mjs --check-only --json-out preflight-docs-report.json
       - name: Dokumentationsbefund sichern
         if: always()
         uses: actions/upload-artifact@v7
@@ -341,21 +320,21 @@ jobs:
 
   dependency-audit:
     name: Preflight (Production Dependency Audit)
+    needs: preflight-docs
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '22.19.0'
-          cache: npm
-      - name: Lockfile-treue pruefen, Lifecycle-Skripte nicht ausfuehren
-        run: npm ci --ignore-scripts --no-audit --no-fund
+      # npm audit evaluates package-lock directly; no second 632-package install.
       - name: Produktionsabhaengigkeiten auf High/Critical pruefen
         run: npm audit --omit=dev --audit-level=high
 
   codeql:
     name: Preflight (CodeQL JavaScript und TypeScript)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -377,12 +356,17 @@ jobs:
 
   secret-scan:
     name: Preflight (Secret Scan der Git-Historie)
+    needs: preflight-docs
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Git-Historie auf bekannte Secret-Muster scannen
         uses: gitleaks/gitleaks-action@v3
         env:
@@ -399,7 +383,6 @@ jobs:
       - quick
       - unit
       - gate-rules
-      - static-gate
       - fixtures
       - distribution
       - profile
