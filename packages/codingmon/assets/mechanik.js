@@ -65,6 +65,7 @@ import {
   GROWTH_BPS, LEVEL_CAP, XP_BASE, levelFor as levelFromXp,
   statAt, statsAt as scaleStats, threshold as xpThreshold,
 } from './leiter.js';
+import { lootWeights } from './zucht.js';
 
 export {
   ABILITIES, BUFFS, ELEMENTS, ELEMENT_CHART, LINEAGE, LOOT_TABLE, LOOT_TOTAL,
@@ -270,20 +271,23 @@ export const PACING = {
  * die SELTENSTE Stufe aus — ein kaputter Eingabewert duerfte nicht der Jackpot
  * sein. Der Client spiegelt diese Zeile (client.js, `rollLoot`).
  */
-export function rollLoot(uniform) {
+export function rollLoot(uniform, creature = null) {
+  const table = creature === null ? LOOT_TABLE : lootWeights(LOOT_TABLE, creature);
+  const total = table.reduce((sum, entry) => sum + entry.weight, 0);
   const clamped = Number.isFinite(uniform) ? Math.min(1, Math.max(0, uniform)) : 0;
-  const point = Math.min(LOOT_TOTAL - 1, Math.floor(clamped * LOOT_TOTAL));
+  const point = Math.min(total - 1, Math.floor(clamped * total));
   let acc = 0;
-  for (const entry of LOOT_TABLE) {
+  for (const entry of table) {
     acc += entry.weight;
     if (point < acc) return entry;
   }
-  return LOOT_TABLE[LOOT_TABLE.length - 1];
+  return table[table.length - 1];
 }
 
 /** Die Quote eines Loots in Prozent, wie die Anzeige sie nennt. */
-export function lootOdds(entry) {
-  return Number(((entry.weight / LOOT_TOTAL) * 100).toFixed(2));
+export function lootOdds(entry, creature = null) {
+  const total = creature === null ? LOOT_TOTAL : lootWeights(LOOT_TABLE, creature).reduce((sum, item) => sum + item.weight, 0);
+  return Number(((entry.weight / total) * 100).toFixed(2));
 }
 
 // ── 5. SPAWN (Wild-Spawn aus erfolgreicher Agent-Arbeit) ───────────────────

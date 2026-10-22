@@ -828,23 +828,18 @@ window.__ModuleLoader__.load({
     const LOOT_TABLE = [{"id":"schrott","label":"Schrott","weight":8500,"xp":0},{"id":"brauchbar","label":"Brauchbares Teil","weight":1400,"xp":25},{"id":"shiny","label":"Shiny God-Tier","weight":100,"xp":2500}];
     const LOOT_TOTAL = LOOT_TABLE.reduce((sum, entry) => sum + entry.weight, 0);
     // <<< generated-codingmon-loot
-        /**
-     * Der Wurf: `uniform` aus [0,1) gegen die kumulierten Gewichte. Rein.
-     * Dieselbe Sperrklinke wie in index.js: ein nicht endlicher Wert wird als 0
-     * gelesen, damit ein kaputter Eingabewert nicht die seltenste Stufe gewinnt.
-     */
-    const rollLoot = (uniform) => {
-      const clamped = Number.isFinite(uniform) ? Math.min(1, Math.max(0, uniform)) : 0;
-      const point = Math.min(LOOT_TOTAL - 1, Math.floor(clamped * LOOT_TOTAL));
+    // Die aktive Kreatur liefert ihren Bonus in Wurf und sichtbare Quote.
+    const rollLoot = (uniform, creature = null) => {
+      const table = lootWeightsFor(creature), total = table.reduce((sum, entry) => sum + entry.weight, 0);
+      const clamped = Number.isFinite(uniform) ? Math.min(1, Math.max(0, uniform)) : 0, point = Math.min(total - 1, Math.floor(clamped * total));
       let acc = 0;
-      for (const entry of LOOT_TABLE) {
+      for (const entry of table) {
         acc += entry.weight;
         if (point < acc) return entry;
       }
-      return LOOT_TABLE[LOOT_TABLE.length - 1];
+      return table[table.length - 1];
     };
-    const lootOdds = (entry) => Number(((entry.weight / LOOT_TOTAL) * 100).toFixed(2));
-
+    const lootOdds = (entry, creature = null) => Number(((entry.weight / lootWeightsFor(creature).reduce((sum, item) => sum + item.weight, 0)) * 100).toFixed(2));
     // ── Store ───────────────────────────────────────────────────────────────
     const listeners = new Set();
     /**
@@ -959,6 +954,10 @@ window.__ModuleLoader__.load({
         lootLuck: breedClamp(sum('lootLuck'), 0, LOOTLUCK_CAP_BPS),
         hatchPoints: sum('hatchPoints'),
       };
+    }
+    function lootWeightsFor(creature = null) {
+      const factor = 10000 + breedingMods(creature?.bonuses ?? []).lootLuck;
+      return LOOT_TABLE.map((entry) => ({ ...entry, weight: entry.id === 'schrott' ? entry.weight : Math.floor((entry.weight * factor) / 10000) }));
     }
     function rollBreedingBonuses({ seed, eggId, gen, bxpA, bxpB }) {
       if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError('Zucht-Seed muss uint32 sein');
@@ -1880,11 +1879,12 @@ window.__ModuleLoader__.load({
         const reward = battle.reward;
         const shinyBefore = store.loot.shiny;
         store.battle = null;
-        const drop = rollLoot(Math.random());
+        const luckSource = activeCreature();
+        const drop = rollLoot(Math.random(), luckSource);
         store.loot[drop.id] += 1;
         store.sinceShiny = drop.id === 'shiny' ? 0 : store.sinceShiny + 1;
         store.drops = [{ at: Date.now(), id: drop.id, label: drop.label, level: battle.level }, ...store.drops].slice(0, 20);
-        note(`Sieg gegen ${SPECIES[battle.speciesId].label} L${battle.level} — +${formatNumber(reward)} XP · Beute: ${drop.label} (${lootOdds(drop)} %)`
+        note(`Sieg gegen ${SPECIES[battle.speciesId].label} L${battle.level} — +${formatNumber(reward)} XP · Beute: ${drop.label} (${lootOdds(drop, luckSource)} %)`
           + `${drop.id === 'shiny' ? ' — SHINY!' : ` · ${store.sinceShiny} Siege seit dem letzten Shiny`}`);
         if (drop.id === 'shiny') celebrate('beute', shinyBefore, store.loot.shiny, drop.label);
         if (battle.source === 'wild') addCapturedCreature(battle.speciesId, battle.level);
@@ -2285,8 +2285,8 @@ window.__ModuleLoader__.load({
       return h('div', { className: '__cm_block' },
         h('h3', null, `Beute — ${formatNumber(s.loot.shiny)} shiny`),
         h('ul', { className: '__cm_facts' },
-          LOOT_TABLE.map((entry) => h('li', { key: entry.id },
-            `${entry.label}: ${lootOdds(entry)} % — ${formatNumber(s.loot[entry.id] ?? 0)} gefunden`)),
+          lootWeightsFor(activeCreature()).map((entry) => h('li', { key: entry.id },
+            `${entry.label}: ${lootOdds(entry, activeCreature())} % — ${formatNumber(s.loot[entry.id] ?? 0)} gefunden`)),
           h('li', { key: 'streak' }, `${formatNumber(s.sinceShiny)} Siege seit dem letzten Shiny`)),
         s.drops.length === 0 ? null : h('ul', { className: '__cm_log' },
           s.drops.slice(0, 5).map((drop, index) => h('li', { key: `${index}-${drop.at}` }, `${drop.label} (Gegner L${drop.level})`))));
@@ -3337,7 +3337,7 @@ window.__ModuleLoader__.load({
             pacing: { ...PACING, delayMs: roundDelayMs },
           }),
           /** Die Loot-Tabelle samt Quote und der reine Wurf. */
-          loot: () => ({ table: LOOT_TABLE.map((entry) => ({ ...entry, odds: lootOdds(entry) })), total: LOOT_TOTAL, roll: rollLoot }),
+          loot: (creature = null) => ({ table: lootWeightsFor(creature).map((entry) => ({ ...entry, odds: lootOdds(entry, creature) })), total: lootWeightsFor(creature).reduce((sum, entry) => sum + entry.weight, 0), roll: (uniform) => rollLoot(uniform, creature) }),
           /**
            * Der Vertrag, wie ihn nur der Client nachrechnen kann — dieselben
            * Funktionen, die der Host exportiert. Eine Probe vergleicht beide
@@ -3363,7 +3363,7 @@ window.__ModuleLoader__.load({
               const value = describeValue(base, level);
               return { text: value.text, digits: value.digits, safe: value.safe };
             },
-            rollLoot: (uniform) => rollLoot(uniform).id,
+            rollLoot: (uniform, creature = null) => rollLoot(uniform, creature).id,
             /** Der Wild-Spawn als reine Funktion (Spiegel von mechanik.js). */
             spawnFor: (done, level) => spawnFor(done, level),
             /** Die Typwirkung als Zeichen (Spiegel von mechanik.js). */

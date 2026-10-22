@@ -13,6 +13,8 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LOOT_TABLE, LOOT_TOTAL, lootOdds, rollLoot } from '../assets/mechanik.js';
+import { lootWeights } from '../assets/zucht.js';
+import { boot } from './harness.mjs';
 
 const ids = LOOT_TABLE.map((entry) => entry.id);
 
@@ -40,6 +42,17 @@ describe('Die Gewichte sind Basispunkte, keine gerundeten Prozente', () => {
     const xp = LOOT_TABLE.map((entry) => entry.xp);
     assert.equal(xp[0], 0);
     assert.ok(xp[1] > xp[0] && xp[2] > xp[1], 'seltener ist wertvoller');
+  });
+
+  test('lootLuck verschiebt den echten Host- und Client-Wurf', () => {
+    const creature = { bonuses: [{ slot: 0, id: 'nose', effect: 'lootLuck', value: 5000 }] };
+    const weighted = lootWeights(LOOT_TABLE, creature);
+    assert.deepEqual(weighted.map((entry) => entry.weight), [8500, 2100, 150]);
+    assert.equal(rollLoot(0.989, creature).id, 'shiny', 'die gewichtete Host-Tabelle erreicht Shiny früher');
+    assert.equal(lootOdds(weighted[2], creature), 1.4, 'die angezeigte Quote nutzt den gewichteten Nenner');
+
+    const client = boot().api.contract();
+    assert.equal(client.rollLoot(0.989, creature), rollLoot(0.989, creature).id, 'Client und Host verwenden denselben Bonus');
   });
 });
 
