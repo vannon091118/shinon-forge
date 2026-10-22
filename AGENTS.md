@@ -1,6 +1,6 @@
 # Shinon Forge
 
-> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-20 (aktualisiert: neue Skripte ergänzt, Inhalt sonst unverändert)
+> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-22 (aktualisiert: neue Skripte ergänzt, Inhalt sonst unverändert)
 > **Einstieg:** diese Datei · **Geschichte:** `docs/TAGEBUCH.md` · **Zahlen:** `docs/ZAHLEN.md`
 ## Testumfang und Übergabe
 
@@ -8,6 +8,7 @@
 - **Volltests:** `npm test` / `npm run test:full` nur dann zusätzlich ausführen, wenn die Änderung mehrere Pakete, zentrale Verträge, Laufzeit/Boot, Release-Freigabe oder der konkrete Auftrag es erfordert. Niemals einen Testlauf als bestanden markieren, wenn er nicht ausgeführt wurde.
 - **Übergabe:** offene Arbeit ausschließlich in `docs/ROADMAP.md` pflegen. Fertige Arbeit erst nach belegtem Test/Gate aus der Roadmap entfernen, dann in `docs/CHANGELOG.md` als übertragbare Kurzfassung und in `docs/TAGEBUCH.md` mit Commit-/Pfadankern festhalten.
 - **Pull Request:** Body muss Zweck, Änderungen, Belege/CI-Status, Risiken und nächste Agentenaufgabe nennen. Merge nur bei allen erforderlichen Checks grün, ohne übersprungene Pflichtjobs und ohne offene blockierende Review-Kommentare.
+- **Preflight:** Vor Übergabe lokal `npm run preflight:docs` und `npm run preflight:test` ausführen. Der GitHub-Job `Preflight-Abnahme (fail-closed)` ist die verbindliche maschinelle Abnahme; `failure`, `cancelled`, `skipped`, fehlende oder unbekannte Status zählen als Fehler. Fehlercode, betroffener Job, Run-ID und Commit-SHA sind im Bericht festzuhalten.
 
 An independent fork of the DeepSeek Harness (DSH). It ships the `@shinon/*` Cordis
 plugin bundles under `packages/`, enabled by the canonical profile `profiles/shinon`
