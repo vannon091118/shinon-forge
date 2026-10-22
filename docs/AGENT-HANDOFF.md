@@ -44,3 +44,11 @@ Bei einem Fehler zuerst den konkreten Code und den betroffenen Job im
 `PREFLIGHT_JOB_NOT_REQUIRED`. Run-ID, Commit-SHA und Run-Link gehoeren zum
 Beleg. Kein Agent darf eine rote oder fehlende Abnahme in Dokumentation als
 `ERLEDIGT` umetikettieren.
+
+### Lokale Reparaturen und CI-Vertrag
+
+Lokal ist der Preflight repair-first: `npm run preflight:docs` korrigiert
+eindeutige Verdrahtungsfehler, nicht fachliche Entscheidungen. Fehlende Job-
+Definitionen, kaputte Links, ungültige Bedingungen oder Sicherheitsbefunde
+bleiben Fehler. `npm run preflight:docs:check` ist read-only und wird von CI
+verwendet. Erst die tatsächlichen GitHub-Ergebnisse entscheiden die Abnahme.
