@@ -86,11 +86,14 @@ test('zettel-regeln: README, Regeln und Paket sagen dasselbe', () => {
   assert.ok(readme.includes('notes:check'), 'der Befehl ist benannt');
   assert.equal(manifest.scripts['notes:check'], 'node scripts/notes-check.mjs');
   assert.match(manifest.scripts['test:full'], /packages\/prompter\/test\/\*\.test\.mjs/, 'die Zettel-Tests laufen in der vollen Kette (test:full) mit');
-  // Trennung schnell/lokal vs. voll/CI (2026-10-17): `npm test` ist der schnelle
-  // Pfad, `test:full` die alte Kette. Der langsame Pol (pack-test) darf nie
-  // still in den lokalen Pfad zurückwandern — sonst ist die Trennung nur ein Name.
-  assert.match(manifest.scripts.test, /gate\/engine\.mjs --local/, 'npm test ist der schnelle lokale Pfad');
-  assert.equal(manifest.scripts.test.includes('pack-test.mjs'), false, 'der Distributionstest gehört nicht in npm test');
+  // Der schnelle Pfad bleibt ein expliziter Vertrag, obwohl npm test zuerst
+  // den Preflight aufruft und dann nach test:core delegiert. Prüfe die Verkettung
+  // bis zum eigentlichen Runner, nicht nur einen historischen Teilstring.
+  assert.match(manifest.scripts.test, /preflight-docs\.mjs.*npm run test:core/, 'npm test muss Preflight vor dem schnellen Kern ausführen');
+  assert.match(manifest.scripts['test:core'], /scripts\/shinon-test\.mjs.*scripts\/gate\/engine\.mjs --local/, 'test:core muss statisches Gate und lokale Slices enthalten');
+  assert.equal(manifest.scripts.test.includes('pack-test.mjs'), false, 'Distribution darf nicht in den Default-Pfad rutschen');
+  assert.equal(manifest.scripts['test:core'].includes('pack-test.mjs'), false, 'Distribution darf nicht im schnellen Kern laufen');
+  assert.match(manifest.scripts['test:full'], /scripts\/pack-test\.mjs/, 'die volle Prüfkette behält die Distributionsprobe');
 });
 
 test('zettel-regeln: ein Vertrag ist Pflicht, und neben den Regeln liegt keine zweite Form', () => {
