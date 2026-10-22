@@ -1586,7 +1586,7 @@ export function writeMemory(db, namespace, state = {}) {
       written += 1;
     });
     memos.forEach((memo, index) => {
-      insert.run(namespace, 'memo', String(memo?.id ?? index), 0, JSON.stringify(memo ?? null));
+      insert.run(namespace, 'memo', String(memo?.id ?? index), index, JSON.stringify(memo ?? null));
       written += 1;
     });
     insert.run(namespace, 'summary', '', 0, JSON.stringify(summary));
