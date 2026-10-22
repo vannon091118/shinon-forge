@@ -35,7 +35,7 @@ for (const job of REQUIRED_JOBS) {
 const rows = [];
 for (const [job, payload] of Object.entries(needs)) {
   const result = payload?.result ?? 'unknown';
-  const row = { job, result, required: REQUIRED_JOBS.includes(job) };
+  const row = { job, result, required: REQUIRED_JOBS.includes(job), diagnosticCode: null };
   if (result !== 'success') {
     const jobCode = JOB_DIAGNOSTIC_NAMES[job]
       ?? String(job).toUpperCase().replace(/[^A-Z0-9]+/g, '_');
@@ -46,8 +46,9 @@ for (const [job, payload] of Object.entries(needs)) {
         : result === 'skipped'
           ? 'SKIPPED'
           : 'STATUS_UNRESOLVED';
+    row.diagnosticCode = `PREFLIGHT_${jobCode}_${statusCode}`;
     diagnostics.push({
-      code: `PREFLIGHT_${jobCode}_${statusCode}`,
+      code: row.diagnosticCode,
       severity: 'error',
       message: result === 'skipped'
         ? 'Job was skipped; skipped is not accepted'
@@ -92,9 +93,9 @@ const lines = [
   '',
   '## Job results',
   '',
-  '| Job | Result | Required |',
-  '|---|---|---|',
-  ...rows.map((row) => `| ${row.job} | ${row.result} | ${row.required ? 'yes' : 'included dependency'} |`),
+  '| Job | Result | Required | Diagnostic |',
+  '|---|---|---|---|',
+  ...rows.map((row) => `| ${row.job} | ${row.result} | ${row.required ? 'yes' : 'included dependency'} | ${row.diagnosticCode ?? 'PASS'} |`),
   '',
   '## Diagnostics',
   '',
