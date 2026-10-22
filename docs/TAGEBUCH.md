@@ -1407,6 +1407,6 @@ dem Reload die Sitzung), und der Modell-Wähler zeigt weiter nur eine Route — 
 Boot stehen `Katalog agnes: HTTP 401` und `prompter: HTTP 401` bei
 `openrouter: 468 Modelle live`.
 
-**Anker:** `8b1ec95` · Belege: `packages/diff-overview/client.js`,
-`scripts/gate/tests/diff-overview.test.mjs`, `docs/probes/diff-overview.json`,
-`packages/widget-dock/client.js`, `packages/prompter/assets/pre-step.js`
+**Nachtrag zum Preflight-Merge:** Der Workflow wurde nicht nur umbenannt, sondern auf sein Verhalten geprüft. Der Vertrag weist nach, dass teure Jobs direkt vom günstigen Preflight abhängen, dass Dummy-Kommandos unter gültig klingenden Jobnamen rot werden und dass die finale Abnahme fehlende, übersprungene oder fehlgeschlagene Jobs nicht als Erfolg auslegt. Ein erster grüner Lauf machte außerdem zwei Historie-Skips sichtbar; die doppelte Realbaumprüfung wurde entfernt und der echte Tagebuch-Check im Schnellpfad auf vollständige Git-Historie festgelegt. Der kanonische Checker wurde anschließend auf eine einzige Implementierung zurückgeführt. PR #23 wurde nach 21/21 erfolgreichen Jobs squash-gemergt.
+
+**Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · Belege: `.github/workflows/commit-guard.yml`, `scripts/lib/preflight/documentation.mjs`, `scripts/lib/preflight/fixes.mjs`, `scripts/gate/tests/preflight-docs.test.mjs`, `scripts/gate/tests/diary.test.mjs`, `scripts/shinon-test.mjs`, `docs/CHANGELOG.md`
