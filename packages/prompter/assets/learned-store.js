@@ -9,7 +9,8 @@
  * Aufgabe. Der Prompter liest sonst nur — die Ausnahme steht deshalb hier mit
  * Adresse, und der Isolationstest nennt genau diese Datei.
  */
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join } from 'node:path';
 
 /** JSON schreiben, Verzeichnis bei Bedarf anlegen. Pfade relativ zum cwd. */
@@ -20,7 +21,14 @@ export function writeJsonFile(path, value) {
   } catch {
     /* existiert bereits oder kein Zugriff — writeFileSync meldet den echten Fall */
   }
-  writeFileSync(full, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  const temp = `${full}.tmp-${process.pid}-${randomUUID()}`;
+  try {
+    writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+    renameSync(temp, full);
+  } catch (error) {
+    try { unlinkSync(temp); } catch { /* temporaere Datei ist schon weg */ }
+    throw error;
+  }
 }
 
 /**

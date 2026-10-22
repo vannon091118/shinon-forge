@@ -301,9 +301,11 @@ export function proposeBlock(config, runtime, proposal) {
     const file = isAbsolute(path) ? path : join(process.cwd(), path);
     let current = [];
     try {
-      current = validateLearnedFile(JSON.parse(readFileSync(file, 'utf8'))).blocks;
-    } catch {
-      current = [];
+      const checked = validateLearnedFile(JSON.parse(readFileSync(file, 'utf8')));
+      if (checked.foreign || checked.dropped > 0) return { ok: false, findings: [`ABLAGE_UNGUELTIG:${checked.foreign ? 'FREMDER_VERTRAG' : checked.dropped}`] };
+      current = checked.blocks;
+    } catch (error) {
+      if (error?.code !== 'ENOENT') return { ok: false, findings: [`ABLAGE_UNLESBAR:${error?.message ?? error}`] };
     }
     const next = [...current.filter((entry) => entry.id !== core.block.id), core.block];
     // Der eine Schreibweg (assets/learned-store.js): die Host-Komposition

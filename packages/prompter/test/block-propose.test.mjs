@@ -13,7 +13,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -100,6 +100,7 @@ test('sequenz: Annahme landet in Ablage, Auswahl und Neustart', () => {
     assert.ok(existsSync(overlay), 'Aktivierung schreibt die Ablage');
     const learned = JSON.parse(readFileSync(overlay, 'utf8'));
     assert.ok(learned.blocks.some((entry) => entry.id === 'persona-gate-ritual'));
+    assert.deepEqual(readdirSync(work).filter((name) => name.includes('.tmp-')), [], 'atomarer Rename hinterlaesst keine Temp-Datei');
 
     // Die Auswahl sieht den gelernten Baustein auf seinem Haystack.
     const merged = mergeLearnedBlocks(REGISTRY.blocks, learned.blocks);
@@ -135,6 +136,18 @@ test('sequenz: Annahme landet in Ablage, Auswahl und Neustart', () => {
     assert.equal(themed.ok, false, 'gleiche Marke plus geteilte Begriffe');
     assert.ok(themed.findings.some((finding) => finding.startsWith('doppelt:')));
   } finally { second.dispose(); }
+});
+
+test('Ablage: kaputtes JSON meldet den Fehler und wird beim Vorschlag nicht ueberschrieben', () => {
+  const { dispose, propose, overlay } = mount('kaputt');
+  const damaged = '{"contract":';
+  try {
+    writeFileSync(overlay, damaged, 'utf8');
+    const answer = propose.propose(proposal());
+    assert.equal(answer.ok, false);
+    assert.ok(answer.findings.some((finding) => finding.startsWith('ABLAGE_UNLESBAR:')));
+    assert.equal(readFileSync(overlay, 'utf8'), damaged, 'die alte Historie bleibt als Beleg erhalten');
+  } finally { dispose(); }
 });
 
 test('sequenz: zu spitz fällt durch — Datum, Sitzung, Absolutpfad', () => {
