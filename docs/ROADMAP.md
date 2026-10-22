@@ -1,6 +1,6 @@
 # Roadmap — wohin das Repo geht
 
-> **Status:** plan — die einzige Liste offener Arbeit: Release-Ziele, Abnahmen, zurückgestellte Punkte. **Stand:** 2026-10-18
+> **Status:** plan — die einzige Liste offener Arbeit: Release-Ziele, Abnahmen, zurückgestellte Punkte. **Stand:** 2026-10-22
 > **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Regeln dieser Datei: kein Punkt ohne Abnahme (Befehl oder beobachtbares Ergebnis),
@@ -55,14 +55,14 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 | S3 Quellklon | Frischer Klon ohne globales DSH: nur die dokumentierten Befehle bis zum UI-Start | `docs/TAGEBUCH.md`, 2026-10-17 (`d8999ab`) | belegt |
 | S4 Doctor | `shinon doctor` als Laufzeit-Unterbefehl, read-only, stabile Exitcodes, Schlüssel nur als Anwesenheit | `docs/TAGEBUCH.md`, 2026-10-17 (`dd18824`) | belegt |
 | S5 Schranke | Alle Gates grün, Version/Tag/Lock konsistent, Quellarchiv + SHA-256 | `docs/TAGEBUCH.md`, 2026-10-17 (`c30112c`) | teils — **offen:** Tag `v0.4.0` + Schranken-Lauf darauf |
-| S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel, Security-/Dependency-Audit, finale Doku, CI-Run-ID | `docs/TAGEBUCH.md`, 2026-10-17 (`4db4006`) | **offen** — Audit grün, CI-Run rot (Ursache offen), Modellturn offen |
+| S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel, Security-/Dependency-Audit, finale Doku, CI-Run-ID des Release-Bumps | `docs/TAGEBUCH.md`, 2026-10-17 (`4db4006`) · Gate-Lauf `39711072872` | **offen** — Audit und aktueller Gate-Lauf grün; echter Modellturn, finale Release-Doku und CI-Lauf des Release-Bumps offen |
 
 ## 2. Offene Punkte (vollständig — alles andere ist Folgearbeit oder zurückgestellt)
 
 ### 2.1 v0.4.0-Rest (Release-pflichtig)
 
 - **S5-Schluss:** Tag `v0.4.0` setzen, Schranken-Lauf darauf (Workflow, Tag, Archiv) — erst dann ist S5 belegt.
-- **S6-Schluss:** echter Modellturn mit lokalem Schlüssel (Boot, Urteil, Widerruf, Host-Ende, Neustart, ohne Schlüsselwert im Text; Protokoll unter `docs/probes/`), finale Doku, CI-Run-ID des Release-Bumps.
+- **S6-Schluss:** echter Modellturn mit lokalem Schlüssel (Boot, Urteil, Widerruf, Host-Ende, Neustart, ohne Schlüsselwert im Text; Protokoll unter `docs/probes/`), finale Release-Doku, CI-Run-ID des Release-Bumps. Der Audit-Gate-Lauf `39711072872` auf Commit `e2cf66a` ist grün, ersetzt aber nicht den Release-Bump-Lauf.
 
 ### 2.2 v0.5.0-Kandidaten (keine Versprechen — was landet, entscheidet der Betreiber)
 

@@ -56,6 +56,7 @@
     "commit:check-file": "node scripts/commit-guard.mjs --file",
     "hooks:install": "node scripts/install-hooks.mjs",
     "profile:links": "node scripts/profile-links.mjs",
+    "worktree": "node scripts/remote-worktree.mjs",
     "install:user": "node scripts/install-user.mjs",
     "uninstall:user": "node scripts/install-user.mjs uninstall",
     "backup:retention": "node scripts/backup-retention.mjs",

@@ -1,363 +1,210 @@
 <!-- markdownlint-disable MD033 MD041 -->
 <div align="center">
 
-<img src="assets/banner.svg" alt="Shinon Forge — ein DSH-Fork, der Befehle kennt" width="100%">
+<img src="assets/banner.svg" alt="Shinon Forge" width="100%">
 
-<br/>
+# Shinon Forge
 
-<!-- STATUS BOARD — Zahlen sind hier bewusst NICHT wiederholt; Eigentümer ist docs/ZAHLEN.md -->
-<a href="https://github.com/vannon091118/shinon-forge/releases"><img src="https://img.shields.io/badge/version-SPIEGEL-7C3AED?style=for-the-badge&logo=git&logoColor=white" alt="Version (Spiegel von package.json, Zahl: docs/ZAHLEN.md §1)"/></a>&nbsp;
-<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6B7280?style=for-the-badge" alt="MIT"/></a>&nbsp;
-<a href="package.json"><img src="https://img.shields.io/badge/node-SPIEGEL-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node (Spiegel von package.json, Zahl: docs/ZAHLEN.md §1)"/></a>&nbsp;
-<a href="AGENTS.md"><img src="https://img.shields.io/badge/DOKU-AGENTS-1D4ED8?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Agenten-Regeln"/></a>&nbsp;
-<a href="docs/ZAHLEN.md"><img src="https://img.shields.io/badge/ZAHLEN-belegt-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Zahlen"/></a>
+### Ich mache Agenten-Arbeit nachvollziehbar. `git status` darf mitreden.
 
-<br/><br/>
+[![MIT](https://img.shields.io/badge/license-MIT-6B7280?style=for-the-badge)](LICENSE)
+[![Node](https://img.shields.io/badge/Node-Version%20im%20Manifest-339933?style=for-the-badge&logo=node.js&logoColor=white)](package.json)
+[![Dokumentation](https://img.shields.io/badge/Projektkarte-docs%2FINDEX.md-1D4ED8?style=for-the-badge)](docs/INDEX.md)
 
-<a href="#warum-es-das-hier-gibt"><img src="https://img.shields.io/badge/%F0%9F%94%A5%20WARUM-7C3AED?style=for-the-badge" alt="Warum"/></a>&nbsp;
-<a href="#was-es-tut--was-es-nicht-tut"><img src="https://img.shields.io/badge/%F0%9F%A6%AB%20ABGRENZUNG-1D4ED8?style=for-the-badge" alt="Abgrenzung"/></a>&nbsp;
-<a href="#installation--schnellstart"><img src="https://img.shields.io/badge/%F0%9F%9A%A2%20INSTALL-059669?style=for-the-badge" alt="Installation"/></a>&nbsp;
-<a href="#faq--die-fragen-die-du-jetzt-hast"><img src="https://img.shields.io/badge/%F0%9F%93%A7%20FAQ-DC2626?style=for-the-badge" alt="FAQ"/></a>
+**Ich bin Shinon. DSH ist mein Motor; ich kümmere mich um die Schichten, an denen du täglich ziehst.**
 
 </div>
 
 ---
 
-> **Status:** current — Einstieg in das Repository. **Stand:** siehe `docs/ZAHLEN.md` §2 (gemessene Läufe).
-> **Einstieg:** [`AGENTS.md`](AGENTS.md) · **Geschichte:** [`docs/TAGEBUCH.md`](docs/TAGEBUCH.md) · **Zahlen:** [`docs/ZAHLEN.md`](docs/ZAHLEN.md)
+## Hallo. Ich bin Shinon.
 
----
+Ich bin ein unabhängiger Fork des DeepSeek Harness (DSH). DSH stellt den
+Agenten-Loop, Werkzeuge, Sitzungen, Provider und das Plugin-System. Ich sitze
+darauf wie eine Mechanikerin mit eigenem Werkzeugkasten: kleine `@shinon/*`-
+Pakete, die sich an vorgesehene DSH-Schnittstellen hängen. Den Motor habe ich
+nicht heimlich neu erfunden. Das wäre eine sehr teure Art, einen zweiten Motor
+zu verlieren.
 
-## 🇩🇪 Warum es das hier gibt
+Meine Aufgabe ist angenehm unspektakulär: Ich helfe einem Agenten,
+Projektkontext zu finden, Grenzen einzuhalten und Arbeit nachvollziehbar zu
+machen. Wenn ein Agent sagt „Ich habe die komplette Codebase analysiert“, frage
+ich nach dem Pfad, dem Befehl und dem Exit-Code. Ich bin nicht unhöflich. Ich
+bin nur allergisch gegen Analyseberichte, die bei `git status` schon Ausschlag
+bekommen.
 
-Du hast wahrscheinlich schon drei Foren-Tabs offen, in denen jemand schreibt, wie dessen
-Agent gerade die komplette Codebase „analysiert und optimiert" hat. Du hast dabei
-zweimal `git status` eingerannt, weil du dem Text nicht geglaubt hast. Das ist nicht
-Paranoia. Das ist Erfahrung.
+Ein Beleg ist eine Messung, ein Test oder ein beobachtbarer Lauf. Ohne Beleg
+steht ein Punkt bei mir auf „offen“. „Müsste funktionieren“ ist kein Status,
+sondern ein Wunsch in Arbeitskleidung.
 
-Shinon Forge ist ein **Fork des DeepSeek Harness (DSH)** — und das ist der ganze
-Anspruch. DSH liefert Agent-Loop, Tools, Sessions, Provider-Adapter und ein
-Plugin-System auf Cordis-Basis. Wir bauen die Schicht, die man danach tatsächlich
-anfasst: Branding, deutsche Sprache, einen Projektindex, ein Scoring, eine
-Persona, ein Task-Router, ein Versionsspiegel.
+## Was ich so treibe
 
-Was hier **nicht** passiert: Es gibt keine Superagenten-Orchestrierung, die über
-Nacht deine Architektur „neu erfindet" und dir am Morgen 40 Dateien und einen
-Stolperstein voller Kontextübergaben vorlegt. Es gibt keine „autonome
-Selbstverbesserung", die dein Repo in einen Zustand bringt, den niemand mehr
-erklären kann. Und es gibt keinen Assistenten, der dir beim Debuggen
-„Ich habe deine Codebase analysiert …" entgegenhält, während er drei Dateien
-gelesen hat und sich dann weigert, den Exit-Code zu nennen.
+**Bevor ich antworte**, lasse ich den Project Index im gewählten Arbeitsbereich
+nach passendem Kontext suchen. Der Prompter sortiert die Anfrage und kann
+Hinweise ergänzen. Meine Fähigkeitskarte zeigt, welches Paket für welche Frage
+zuständig ist. Sie ist eine Landkarte, keine Wahrsagerin. Wenn eine Karte
+behauptet, sie könne auch gleich die Reise für dich machen, ist es vielleicht
+eine sehr motivierte Karte. Oder Werbung.
 
-Hier ist die Alternative: ein Harness, das **beweist**, was es tut. Jede
-Behauptung hat eine Zahl, ein Befehl und einen Exit-Code. Wenn etwas nicht
-gemessen wurde, steht „unbekannt" da — nicht eine erfundene Zahl und kein
-flüssiger Absatz.
+**Während der Arbeit** lasse ich Persona, Task-Router und Scoring bei ihren
+eigenen Jobs: Identität, Zielverfolgung und gespeicherte Signale haben getrennte
+Grenzen. Das spart uns die beliebte Agenten-Sportart „ein Modul weiß alles und
+niemand weiß warum“. Der Key-Router verwaltet Schlüssel-Pools und kann bei
+passenden Provider-Antworten rotieren. Ob dein echter Anbieter mit deinem
+Zugang antwortet, entscheidet deine Route und dein Konto. Ein grüner Test kann
+vieles unterschreiben, aber keine fremde Rechnung.
 
-> **🇩🇪 / 🇬🇧 Diese beiden Sprachsektionen sind bewusst zweisprachig.**
-> Der deutsche Teil trägt den Ton, der englische dieselben Aussagen nüchtern.
-> **The two language sections are deliberately bilingual: German carries the tone,
-> English states the same claims plainly.**
+**Nach dem Turn** helfe ich dir beim Nachsehen. Dashboard, Traceability und
+Versionsspiegel zeigen, was aktiv war, welche sichtbaren Schritte liefen und
+welcher Commit installiert ist. Ich mag Fragen wie „Was hat der Agent getan?“
+lieber mit Spuren als mit einer zweiten, noch selbstbewussteren Antwort.
 
----
+Und ja, es gibt Codingmon: ein digitales Haustier mit dauerhaftem Spielstand.
+Es ist die einzige Funktion, bei der „züchten“, „Loot“ und „Begleiter“ keine
+Metaphern für deinen Sprint sind. Dein Pull Request bekommt davon keinen
+Bonus auf Angriff. Ich habe es geprüft.
 
-## 🇬🇧 Why this exists
+Die Details überlasse ich den Fachseiten: [`docs/PAKETE.md`](docs/PAKETE.md)
+ist mein Paketkatalog, [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md) zeigt die
+Verbindungen und [`docs/ZAHLEN.md`](docs/ZAHLEN.md) sammelt Bestand und
+Messwerte. Ich bin sarkastisch, nicht nachlässig.
 
-You have probably had three forum tabs open where somebody explains how their
-agent just "analysed and optimised" the entire codebase. You ran `git status`
-twice, because you did not believe the prose. That is not paranoia, that is
-experience.
+Und noch etwas: Ich mag Aufgaben mit Eigentümer, Dateiumfang, Abnahme und
+Impact. Darum sind meine Audit-Aufträge in Tasks und Sprints zerlegt. Ein Agent,
+der mit „Ich refactore erstmal alles“ ankommt, bekommt von mir eine freundliche
+Frage nach dem Scope. Sie ist freundlich wie ein rotes Gate: klar, sichtbar und
+schwer als Zustimmung misszuverstehen. Planlosigkeit ist keine Architektur,
+auch dann nicht, wenn jemand sie mit Mermaid rendert und „strategisch“ nennt.
 
-Shinon Forge is a **fork of the DeepSeek Harness (DSH)** — and that is the whole
-claim. DSH provides the agent loop, tools, sessions, provider adapters and a
-Cordis-based plugin system. We build the layer you actually touch afterwards:
-branding, German language, a project index, scoring, a persona, a task router,
-a version mirror.
+## Schnellstart
 
-What does **not** happen here: there is no super-agent orchestration that
-reinvents your architecture overnight and hands you forty files and a pile of
-context stubs in the morning. There is no "self-improving autonomy" that leaves
-your repo in a state nobody can explain. And there is no assistant that answers
-your debugging question with "I have analysed your codebase …" after reading
-three files, then refuses to name the exit code.
-
-The alternative: a harness that **proves** what it does. Every claim has a
-number, a command and an exit code. If something was not measured, it says
-"unknown" — not an invented number, not a fluent paragraph.
-
----
-
-## 🩻 Was es tut — was es nicht tut
-
-<img src="assets/readme-banner.svg" alt="Ein Terminal, in dem ein Agent ehrlich Auskunft gibt" width="100%">
-
-**Es tut:**
-
-- **Einen Harness, an dem du arbeiten kannst.** DSH-Loop, Tools, Sessions,
-  Provider —  nicht neu gebaut, sondern in eigener Schicht besetzt. Wir patchen
-  keinen Fremdcode; wir belegen DSHs eigene Slots (`sidebar.brand.mark`,
-  `conversation.hero.brand.mark`, `main`, `sidebar.panellist`).
-- **Pakete, die man einzeln ansehen kann.** Ein Paket ist genau ein Ordner unter
-  `packages/`, mit vier Pflichtdateien. Kein Framework, kein Megalith, kein
-  „Core-Package" mit 3.000 Zeilen und einer Exportliste, die niemand liest.
-- **Gates, die rot werden.** Manifest, Namensvertrag, Legacy-Guard, Profil,
-  Canon, Struktur. Ein Gate, das immer grün ist, ist kein Gate, sondern Deko.
-- **Eine Zahl je Wahrheit.** [`docs/ZAHLEN.md`](docs/ZAHLEN.md) besitzt alle
-  harten Zahlen, jede mit dem Befehl, der sie erzeugt. Der README erfindet
-  keine.
-- **Einen Stand, den du siehst.** `@shinon/version` zeigt in der Ecke den
-  neuesten und den installierten Commit samt Abstand. Ein Klick zieht nach.
-- **Eine Geschichte mit Ankern.** [`docs/TAGEBUCH.md`](docs/TAGEBUCH.md) bindet
-  jeden Tag an einen echten Commit.
-
-**Es tut nicht:**
-
-- Es repariert deinen Code nicht von allein. Kein Refactoring im Hintergrund,
-  kein „ich habe die Architektur neu aufgesetzt".
-- Es ersetzt keine Tests. Kein Gate ersetzt einen Test; es prüft Regeln, die
-  man sonst im Review übersieht.
-- Es erfindet keine Zahlen. Wenn eine Messung fehlt, steht das da.
-- Es ist keine Cloud. Alles läuft lokal; ohne Modellschlüssel laufen die
-  lokalen Prüfungen, der Modellturn nicht.
-- Es ist kein Ersatz für dich. Wenn du keine Ahnung hast, was dein Code tun
-  soll, hilft dir kein Agent dabei, es schneller kaputtzumachen.
-
----
-
-## 🧩 Pakete
-
-Ein Paket ist ein Ordner. Vier Rollendateien sind Pflicht (`index.js`,
-`client.js`, `cordis.patch.yml`, `package.json`); erlaubt sind `assets/`,
-`test/` und benannte Ausnahmen — die **eine** verbindliche Aussage dazu steht
-in [`AGENTS.md`](AGENTS.md), Abschnitt Conventions.
-
-| Paket | Rolle | Profil |
-|---|---|---|
-| **[@shinon/core](packages/core)** | Branding-Overlay: Sidebar- und Hero-Marke, Farbverlauf, Pulse | ✅ |
-| **[@shinon/persona](packages/persona)** | Shinon als Persona-Schicht im DSH-System-Prompt | ✅ |
-| **[@shinon/locale-de](packages/locale-de)** | Deutsche Sprache, Namespace `shinon` | ✅ |
-| **[@shinon/tooltip](packages/tooltip)** | Styles für erweiterte Tooltips (keine Tooltip-Logik) | ✅ |
-| **[@shinon/events](packages/events)** | Hook/Event-Spine: beobachten, normalisieren, validieren, emittieren | ✅ |
-| **[@shinon/hook](packages/hook)** | Event-Beobachtung auf der Host-Seite, Replay-Fixture | ✅ |
-| **[@shinon/markers](packages/markers)** | Marker-Spiegel (Brutalord-Regeln) im nativen Side Panel | ✅ |
-| **[@shinon/dashboard](packages/dashboard)** | Status-Panel; liest die echten `workspaces`/`sessions`-Dienste | ✅ |
-| **[@shinon/prompter](packages/prompter)** | One-Shot Prompt-Enhancer am `agent/pre-step` (Route im Profil leer) | ✅ |
-| **[@shinon/task-router](packages/task-router)** | liest die validierte Klassifikation des Enhancers | ✅ |
-| **[@shinon/project-index](packages/project-index)** | persistenter Projektindex (files, symbols, edges, FTS) außerhalb des Repos | ✅ |
-| **[@shinon/scoring](packages/scoring)** | Scoring-Schicht: Scorecard lesen, nie schreiben (Decay, Relation, Signal-Ohren) | ✅ |
-| **[@shinon/codingmon](packages/codingmon)** | Pet-/Kampf-System mit dauerhaftem Zustand und Client→Host-Naht | ✅ |
-| **[@shinon/key-router](packages/key-router)** | Key-Pool mit 429-Rotation; echte Provider-Rotation mit realen Schlüsseln nicht live geprüft | ✅ |
-| **[@shinon/narrative](packages/narrative)** | Chronicle, Arcs, Relationships, Composite State | ✅ |
-| **[@shinon/version](packages/version)** | Versionsspiegel: neuester und installierter Commit, Abstand, Klick zieht nach | ✅ |
-| **[@shinon/better-errors](packages/better-errors)** | Config-Ebene ohne Logik: `apply()` loggt nur | ✅ |
-| **[@shinon/token-usage](packages/token-usage)** | Token-Zahl des jüngsten Turns und Sitzungssumme, gefaltet aus den eigenen Ereignissen | ✅ |
-| **[@shinon/popup](packages/popup)** | Fortschritts-Overlay im `conversation.composer.dock` | ✅ |
-| **[@shinon/traceability](packages/traceability)** | flüchtige Toasts im Chat: Tool-Calls mit Ergebnis, Schritte und Fehler | ✅ |
-| **[@shinon/openapi](packages/openapi)** | Vertrag (`openapi.yaml`) vorhanden, **kein** Server — bewusst nicht aktiviert | — |
-| **[@shinon/mobile](packages/mobile)** | minimale Viewport-Unterstützung für das erste Android-Runtime-Profil — Vorbereitung | — |
-| **[@shinon/seams](packages/seams)** | importfreier Host-Naht-Kern, von mehreren Paketen benutzt — keine Bundle-Layer | — |
-
-Die Spalte „Profil" ist gemessen aus `profiles/shinon/package.json`; Bestandszahlen
-stehen in [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §1. `mobile`, `openapi` und `seams`
-stehen nicht im Profil und erklären das selbst (`"dsh": { "inactive": true }` im
-eigenen Manifest — `dead-package`-Gate). Wer ein Paket anfasst, ändert nur seinen
-eigenen Ordner; es gibt keine zentrale Paketliste, die man nachpflegen müsste.
-
----
-
-## 🚀 Installation & Schnellstart
-
-> **Bevor du tippst:** Das hier wird **an den Pfaden des Nutzers** scheitern, wenn du
-> die Zeilen überspringst. Nicht, weil die Software empfindlich ist, sondern weil
-> `npm ci` das Lockfile braucht und `profile:links` die Bündel-Links setzt, die
-> das Profil sonst nicht auflöst. Beide Befehle sind idempotent und harmlos — sie
-> tun nur nichts, wenn du sie überspringst.
+Ich führe dich über den belegten Einstieg: einen Quellklon. Du brauchst Git,
+npm und eine Node-Version aus dem Bereich, den ich in
+[`package.json`](package.json) angebe.
 
 ```bash
-# 1. Klonen
 git clone https://github.com/vannon091118/shinon-forge.git
 cd shinon-forge
-
-# 2. Abhängigkeiten aus dem Lockfile — npm ist die einzige Paketquelle.
-#    `npm install` überschreibt dir das Lockfile. `npm ci` nicht.
 npm ci
-
-# 3. Profil-Links setzen: `profiles/shinon` bindet seine Bundles mit `link:`.
-#    Das Werkzeug ist idempotent und verweigert Fremdpfade mit Exit 2.
 npm run profile:links
-#    Nur prüfen, nichts schreiben:  node scripts/profile-links.mjs --check
-
-# 4. Prüfen, ob das Profil auflöst (read-only, kein Server)
-node scripts/shinon-profile-test.mjs
-
-# 5. Starten (Web-UI, öffnet den Browser)
 npm run dev
 ```
 
-**Schritt 5 ohne Terminal:** `npm run install:user` legt ein Nutzer-Installat unter
-`~/.local/opt/shinon-forge` an, nimmt es ab, schreibt die Desktop-Verknüpfung und
-prüft das Ergebnis mit `npm run verify:install` (Exit 0 nur bei 4/4: Check,
-Doctor, Boot, HTTP-Nachweis). Rückweg: `npm run uninstall:user` — die
-Zugangsdateien wandern in einen Tresor, nicht in die Tonne.
+`npm ci` installiert genau das Lockfile. Ich bestehe darauf, weil „bei mir ging
+`npm install`“ schon oft genug ein Lockfile in eine Überraschungstüte verwandelt
+hat. `profile:links` verbindet das lokale Profil mit den Paketen im Klon. Der
+Befehl ist idempotent und verweigert Links nach außerhalb des Repos. Das ist
+kein Misstrauen gegen dich; es ist Misstrauen gegen Links, die heimlich in
+fremde Projekte zeigen. `npm run dev` startet mein Profil `shinon` über den
+Repo-Starter.
 
-**Schlüssel:** liegen in `.env` im Repo-Root, gitignoriert, `chmod 600`. **Nie
-committen, nie in eine Antwort kopieren.** `dsh` lädt die Datei selbst; wer
-selbst startet, setzt die Variable aus der Umgebung. Fehlt ein Schlüssel, nennt
-`MISSING_CREDENTIAL` die aktive Route und die fehlende Referenz — er wechselt
-nicht still auf eine andere. Welche Route es ist, entscheidet allein das Profil
-(`profiles/*/cordis.patch.yml`); die Pakete führen keinen Modellnamen.
+Für Modell-Turns brauchst du Zugangsdaten für die im Profil gewählte Route. Lege
+sie in die lokale `.env` (Vorlage: [`.env.example`](.env.example)); ich halte
+diese Datei von GitHub fern. Lokale Gate-Prüfungen und Profilauflösung laufen
+auch ohne Modellschlüssel. Fehlt ein Schlüssel, wechsle ich nicht heimlich die
+Route. Das wäre ungefähr so hilfreich wie ein Navi, das bei Stau kommentarlos
+dein Ziel ändert.
 
-**`DSH_HOME` ist nicht das Repo-Root.** DSH liest `$DSH_HOME/AGENTS.md` als
-benutzerglobale Anweisung — mit dem Baum als Home wird dessen `AGENTS.md` zur
-globalen Anweisung *fremder* Projekte. Der Starter legt das Home deshalb im
-Zustandsordner an (`dev-dsh-home`, im Installat `dsh-home`) und verlinkt hinein,
-was zusammengehört. Wer das Home selbst setzt, setzt es absolut.
+Wenn du erst prüfen willst, ob die Profil-Bundles auflösen, bevor du den Host
+startest:
 
-**Was hier nicht behauptet wird:** ein echter Modellturn, eine Provider-Rotation
-mit realen Schlüsseln und die Skalierungs- und Packaging-Läufe gehören zu den
-Belegen in [`docs/ZAHLEN.md`](docs/ZAHLEN.md) §2 — dort steht auch, was **nicht**
-geprüft ist. Ein Feature, dessen Beleg fehlt, ist hier als ungeprüft markiert und
-nicht als „works great".
-
----
-
-## ⚙️ Befehle
-
-Aus `package.json` (`scripts`), in der Reihenfolge, in der man sie braucht:
-
-| Befehl | Wirkung |
-|---|---|
-| `npm test` | der Alltagsweg: statisches Gate + lokale Engine-Slices, Sekunden, stoppt beim ersten Fehler |
-| `npm run test:full` | die volle Kette (Paket-Suites → Gate → Fixtures → Distribution → Profil) |
-| `npm run dev` / `npm run dev:web` | DSH mit dem Profil starten (Web-UI; `dev:web` mit festen Ports) |
-| `npm start [-- …]` · `shinon [-- …]` | der Einstieg ([`bin/shinon.mjs`](bin/shinon.mjs)): heilt Node ≥ 22 selbst, findet `dsh` auch außerhalb des PATH und **nennt dessen Herkunft**; `--check` prüft nur die Startfähigkeit |
-| `shinon doctor` | read-only Diagnose mit stabilen Codes 0/1/2, Schlüssel nur als Anwesenheit |
-| `npm run install:user` | Nutzer-Installat mit Abnahme: `install`/`update`/`rollback`/`status`/`history`/`auto`/`units`/`selftest`/`uninstall` |
-| `npm run verify:install` | read-only Selbsttest eines bestehenden Stands (Exit 0 nur bei 4/4) |
-| `npm run uninstall:user` | Rückweg: Desktop-Verknüpfung weg, Zugangsdateien in einen Tresor (0600) |
-| `npm run desktop:launcher` | Desktop-Starter schreiben bzw. prüfen (`--uninstall` nimmt ihn weg) |
-| `npm run gate` / `gate:local` / `gate:full` | modulare Gate-Engine (Slices / lokal / alle Gates) |
-| `npm run gate:test` | reine Gate-Logik (kein DSH nötig) |
-| `npm run test:codingmon` / `test:prompter` / `test:scoring` / `test:version` / … | paketlokale Tests |
-| `npm run build` | regeneriert `dist/` (Manifest, Profil, Paketkopien) |
-| `npm run profile:links` | Profil-Links setzen/prüfen (idempotent, Fremdpfade Exit 2) |
-| `npm run zahlen:sync` / `zahlen:check` | den gemessenen Bestandsblock schreiben bzw. vergleichen (Exit 1 bei Drift) |
-| `npm run commit:guard -- …` | Commit-Regeln prüfen (`--ci`, `--last n`, `--range`, `--all`) |
-| `npm run update` | **DSH-Upstream**-Updater — aktualisiert nicht Shinon Forge |
-| `npm run scale:check` | Skalierungsnachweis (Kopie des Baums + neue Klon-Pakete durch die ganze Kette) |
-
----
-
-## 🧷 Die Architektur, kurz
-
-```text
-                    ┌─────────────────────────┐
-                    │          DSH            │   Runtime: Loop, Tools,
-                    │  (Agent = Model+Harness)│   Sessions, Provider, Cordis
-                    └────────────┬────────────┘
-                                 │  Slots · Events · Bundles
-                    ┌────────────▼────────────┐
-                    │      SHINON FORGE       │   Overlay: Brand, Sprache,
-                    │   @shinon/* Bundles     │   UI-Schichten, Governance
-                    └────────────┬────────────┘
-                                 │
-        ┌────────────────────────┼────────────────────────┐
-        ▼                        ▼                        ▼
-   Governance               Branding                  Schichten
-   scripts/gate/            packages/core             locale-de, tooltip,
-   Gates + Slices           Slots statt Patches       dashboard, events …
+```bash
+node scripts/shinon-profile-test.mjs
 ```
 
-**Regel:** DSH ist die Laufzeit, wir bauen Schichten darauf — kein zweiter Kernel
-daneben. Verbindlich: [`AGENTS.md`](AGENTS.md).
+Die ausführliche Installations- und Schlüssel-Erklärung steht in
+[`docs/SETUP.md`](docs/SETUP.md). `.deb`, Windows-ZIP und AppImage werden in der
+CI gebaut; sie sind noch kein Ersatz für den dokumentierten Quellklon-Weg.
 
----
+## Wenn du am Repo mitarbeitest
 
-## 🗺 Wo die Wahrheit wohnt
+Wenn du meinen Code änderst, fang mit meinem schnellen lokalen Check an:
 
-- [`docs/ZAHLEN.md`](docs/ZAHLEN.md) — **einziger** Eigentümer aller harten Zahlen
-  (Bestand §1, gemessene Prüfläufe §2, rote Befunde §3)
-- [`docs/TAGEBUCH.md`](docs/TAGEBUCH.md) — erzählte Timeline, jeder Tag an einen
-  Commit-SHA gebunden
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — **einzige** Liste offener Arbeit
-- [`docs/INDEX.md`](docs/INDEX.md) — die Karte: wer ist wofür zuständig
-- [`AGENTS.md`](AGENTS.md) — verbindliche Regeln für Arbeit am Code, inklusive der
-  Commit-Pflichten
-- [`docs/COMMIT-REGELN.md`](docs/COMMIT-REGELN.md) — die Commit-Regeln und ihre
-  Durchsetzung
+```bash
+npm test
+```
 
----
+Er führt das statische Gate und die schnellen lokalen Engine-Slices aus. Für
+gezielte Fragen gibt es Paket-Skripte wie `npm run test:prompter` und
+`npm run test:codingmon`. Die lange Kette fährt die CI. Wenn du lokal nur einen
+Test brauchst, starte nicht die ganze Testfamilie. Die Maschine hat auch noch
+andere Gefühle. Vermutlich.
 
-## ❓ FAQ — die Fragen, die du jetzt hast
+Bevor du eine Änderung machst, lies [`AGENTS.md`](AGENTS.md). Es erklärt die
+Paketform, Verträge, Tests und Commit-Regeln. [`docs/CI-UND-GATES.md`](docs/CI-UND-GATES.md)
+beschreibt, was die Gates tatsächlich beweisen. Für weitere parallele oder
+entfernte Arbeit gibt es [`docs/REMOTE-ARBEIT.md`](docs/REMOTE-ARBEIT.md):
+lokale Worktree-Metadaten gehören auf die Maschine, nicht in den Klon auf GitHub.
 
-**„Ich habe drei Stunden gebraucht, um ein npm-Paket zu finden, das gar nicht
-existiert."**
-Das war `pnpm-workspace.yaml`. Das Repo hat pnpm abgeschafft; npm ist die
-einzige Paketquelle, und `package-lock.json` ist die Auflösungsquelle. Wenn du
-`npm install` benutzt hast, hast du dir das Lockfile umgeschrieben — `git diff
-package-lock.json` zeigt es dir, und `npm ci` setzt es zurück.
+## FAQ — ich höre die Fragen schon
 
-**„Warum bootet mein Profil nicht?"**
-Fast immer der Link. `profiles/shinon/node_modules/@shinon/<paket>` muss auf
-`packages/<paket>` zeigen; zeigt er auf einen Pfad außerhalb des Repos,
-beschattet fremder Code das Repo-Paket und der Boot stirbt mit `Cannot read
-properties of undefined (reading 'validate')`. `npm run profile:links` repariert
-das idempotent, `node scripts/profile-links.mjs --check` sagt dir nur, ob es
-kaputt ist. Ein **fehlender** Link ist übrigens kein Befund — ein frischer Klon
-hat kein `profiles/<name>/node_modules`.
+### Ist Shinon Forge ein neuer Agent oder ein zweiter Harness?
 
-**„Mein `dsh` global ist eine andere Version als die im Repo."**
-Ja. Das Repo pinnt seine DSH-Fassung selbst, und `node_modules/.bin` steht **vor**
-dem PATH. Die globale Installation darf abweichen; das Repo verspricht nichts für
-sie. `npm run check:dsh-versions` nennt Soll, Ist und Fundstelle.
+Nein. DSH bleibt die Laufzeit. Ich bin die Schicht aus Plugins, Werkzeugen und
+Regeln darum herum. Der Fork hält DSH auf einem geprüften Stand und ergänzt
+meine Funktionen an vorgesehenen Slots. Ein zweiter Harness wäre nur ein
+zweiter Ort, an dem wir denselben Bug suchen könnten. Ich habe genug Hobbys.
 
-**„Wo ist mein `.env`?"**
-Im Repo-Root, gitignoriert, `chmod 600`. Wenn es fehlt: `.env.example` ist die
-Vorlage. Der Schlüssel gehört **nie** ins Repo, **nie** in eine Antwort, **nie**
-in ein Log. `shinon doctor` zeigt nur *Anwesenheit*, nie Werte.
+### Ändert der Agent mein Repo von allein?
 
-**„Der Agent hat meine Dateien angefasst und ich weiß nicht, welche."**
-Dann gibt es drei Orte: `git status` (was uncommitted ist), der Trace des
-Prompter-Pakets und — falls du den Versionsspiegel nutzt — der installierte
-Commit. Nichts davon rät; alles davon ist lesbar. Der Project-Index liest deinen
-Baum und schreibt nur in seinen eigenen Namespace — dort landet auch das
-Scoring-Ledger (Judgements, Scorecard), niemals in deinem Quellbaum.
+Ein Modellturn kann Werkzeuge benutzen, wenn sie ihm verfügbar sind. Ich starte
+aber keine heimliche Selbstverbesserung und nenne einen Diff nicht „geprüft“,
+nur weil ein Agent den Dateinamen flüchtig angesehen hat. Prüfe `git status`
+und den tatsächlichen Diff. Falls dein Agent darauf beleidigt reagiert, hat er
+vielleicht gerade etwas über sich gelernt.
 
-**„Warum ist die Doku auf Deutsch?"**
-Weil das Repo auf Deutsch erzählt wurde und `docs/INDEX.md` eine Sprachspalte
-führt, die man nicht per Copy-Paste überschreibt. Wer helfen will, darf
-gerne einen Pull Request mit englischem Paralleltext schreiben.
+### Kann ich es ohne API-Schlüssel starten?
 
-**„Kann ich das benutzen, ohne einen Modellschlüssel zu haben?"**
-Für alles Lokale ja: Gates, Profilauflösung, Paket-Tests, Build, Doctor. Der
-Modellturn braucht einen Schlüssel, sonst endet er mit `MISSING_CREDENTIAL` —
-und zwar mit der Nennung der Route, nicht mit einem flapsigen „irgendwas ist
-schief".
+Ja, für lokale Checks, Profilauflösung und Code-Arbeit. Ein echter Modellturn
+braucht ein passendes Credential für die gewählte Route. `shinon doctor` zeigt
+nur, ob eine Zugangsdaten-Variable vorhanden ist; nie ihren Wert.
 
-**„Klingt nach Over-Engineering."**
-Dann lies [`docs/ROADMAP.md`](docs/ROADMAP.md) und [`docs/ZAHLEN.md`](docs/ZAHLEN.md)
-§2: Was hier steht, ist gemessen, was offen ist, steht als offen. Der Unterschied
-zu einem Playground ist genau dieser Absatz — dort wird Zukunft verkauft, hier
-wird Abwesenheit von Zukunft dokumentiert.
+### Warum npm? Mein globales `dsh` funktioniert doch.
 
-**„Ich finde die Antwort nicht."**
-Dann ist sie vermutlich in `docs/`. Die Karte sagt dir, wo: [`docs/INDEX.md`](docs/INDEX.md).
+Ich verwende npm und pinne DSH im Lockfile. Dein globales `dsh` darf eine andere
+Version haben; mein Starter bevorzugt die lokale Installation. So muss ein
+Bugreport nicht erst Ahnenforschung im PATH betreiben.
 
----
+### Was macht der Project Index mit meinen Dateien?
 
-## 🔗 Referenzen (extern, hier nicht geprüft)
+Er indexiert den ausgewählten Arbeitsbereich und hält seinen Zustand außerhalb
+des Quellbaums. Fremde Workspace-Roots und Pfadausbrüche lehne ich ab. Inhalte
+und lokale Arbeitsverzeichnisse gehören nicht als Überraschung in einen
+GitHub-Commit. Die genauen Grenzen stehen in [`AGENTS.md`](AGENTS.md) und den
+Projektindex-Proben.
 
-- [DSH Architektur](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/architecture.md)
-- [Schemastery Config](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/config.md)
-- [Locale Plugin](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/locale/README.md)
-- [Plugin Manager](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.md)
+### Was ist `.freebuff` und warum finde ich es nicht auf GitHub?
+
+Das ist lokales Workspace-Metadatum für die Freebuff-Umgebung. Es wird bereits
+durch `.gitignore` ausgeschlossen; darin können lokale IDs und Arbeitsdaten
+liegen. Für einen neuen Klon ist es nicht erforderlich. Reproduzierbare
+Einrichtung und Worktree-Befehle stehen in [`docs/REMOTE-ARBEIT.md`](docs/REMOTE-ARBEIT.md)
+und `scripts/remote-worktree.mjs`.
+
+### Wo finde ich die offenen Aufgaben?
+
+In [`docs/ROADMAP.md`](docs/ROADMAP.md). Erledigte Arbeit steht in meinem
+[`Entwicklungstagebuch`](docs/TAGEBUCH.md); Messungen und aktuelle Prüfläufe
+stehen in [`docs/ZAHLEN.md`](docs/ZAHLEN.md). Wenn ein Punkt nicht als erledigt
+belegt ist, ist er weiterhin offen — ein überzeugender Absatz zählt nicht als
+CI-Lauf.
+
+## Weiterklicken
+
+- **Neu im Repo:** [`docs/INDEX.md`](docs/INDEX.md)
+- **Installieren und Zugangsdaten:** [`docs/SETUP.md`](docs/SETUP.md)
+- **Pakete und Architektur:** [`docs/PAKETE.md`](docs/PAKETE.md) · [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md)
+- **Roadmap:** [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- **API-Abgleich mit DSH:** [`docs/DSH-API-ABGLEICH.md`](docs/DSH-API-ABGLEICH.md)
+- **Belege und Prüfläufe:** [`docs/ZAHLEN.md`](docs/ZAHLEN.md) · [`docs/CLEANREPO-AUDIT.md`](docs/CLEANREPO-AUDIT.md)
 
 ---
 
 <div align="center">
 
-**Gebaut auf DSH. Entwickelt von einer Person auf einem FX-6300.**
+Ich bin auf DSH gebaut und mit Git, npm und einer gesunden Skepsis gewartet.
+„Müsste funktionieren“ ist übrigens keine meiner unterstützten Routen.
 
-`@shinon/*` · MIT · Node-Fassung und alle weiteren Zahlen: `docs/ZAHLEN.md` §1
+`@shinon/*` · MIT · Lizenz: [`LICENSE`](LICENSE)
 
 </div>

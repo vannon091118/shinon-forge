@@ -1,10 +1,10 @@
 # SCRIPTS — Nachschlagewerk zu `scripts/` und `bin/`
 
-> **Status:** current · **Stand:** 2026-10-20
+> **Status:** current · **Stand:** 2026-10-22
 >
-> Erzählt, was jedes Skript tut und ob ein npm-Script darauf zeigt. Die
-> Befehlstabelle für den Alltag steht im [`../README.md`](../README.md)
-> („Build & Test"); die Prüflogik in [`CI-UND-GATES.md`](CI-UND-GATES.md).
+> Erzählt, was jedes Skript tut und ob ein npm-Script darauf zeigt. Den Einstieg
+> und Quellklon-Weg beschreibt das [`../README.md`](../README.md) und
+> [`SETUP.md`](SETUP.md); die Prüflogik steht in [`CI-UND-GATES.md`](CI-UND-GATES.md).
 > Pfade und Laufzeiten-Namen entstehen **einmal** in `scripts/lib/paths.mjs`.
 
 ## Einstieg und Boot
@@ -23,6 +23,7 @@
 |---|---|---|
 | `build.mjs` | `build` | regeneriert `dist/` (Manifest, Profil, Paketkopien) |
 | `profile-links.mjs` | `profile:links` | setzt/prüft die `link:`-Bundles der Profile (idempotent; Fremdpfade Exit 2) |
+| `remote-worktree.mjs` | `worktree` | erstellt, listet und entfernt Task-Worktrees außerhalb des Klons; Remove ohne `--force` |
 | `sync-idioms.mjs` | `idioms`, `idioms:check` | generiert geteilte Idiome; `--check` ohne Schreiben |
 | `branding-check.mjs` | `branding` | Brand-Marken im Baum; die Engine ruft es bei `--branding` |
 | `vendor-dsh.mjs` | — | aktualisiert `vendor/dsh/` aus dem Registry-Tarball (inkl. `MANIFEST.json`) |

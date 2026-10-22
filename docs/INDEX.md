@@ -1,6 +1,6 @@
 # INDEX — die Dokumentationskarte
 
-> **Status:** current · **Stand:** 2026-10-20
+> **Status:** current · **Stand:** 2026-10-22
 >
 > Diese Datei ist die Karte, nicht die Wahrheit. Sie sagt, welches Dokument
 > wofür zuständig ist — und stillschweigend, wo eine Information **nicht** steht.
@@ -11,7 +11,7 @@
 
 | Dokument | Zuständigkeit | Sprache |
 |---|---|---|
-| [`../README.md`](../README.md) | Einstieg: warum es das gibt, harte Abgrenzung, Quickstart, Pakettabelle, FAQ | bilingual DE/EN |
+| [`../README.md`](../README.md) | Shinons Vorstellung, Quickstart, FAQ und Wegweiser zu den technischen Docs | deutsch |
 | [`../AGENTS.md`](../AGENTS.md) | Verbindliche Regeln für Arbeit am Code: Konventionen, Pitfalls, Commit-Pflichten | deutsch |
 | [`ZAHLEN.md`](ZAHLEN.md) | **Einziger** Eigentümer aller harten Zahlen (Bestand §1, Prüfläufe §2, rote Befunde §3) | deutsch |
 | [`TAGEBUCH.md`](TAGEBUCH.md) | Erzählte Timeline; jedes Kapitel an Commit-SHA-Bereiche und Pfade gebunden | deutsch |
@@ -31,6 +31,7 @@ wiederholen keine offenen Punkte — die stehen in `ROADMAP.md`.
 |---|---|
 | [`ARCHITEKTUR.md`](ARCHITEKTUR.md) | Schichtmodell, Paket-Anatomie, Boot-Kette, Ereignis-Spine, typische Datenflüsse |
 | [`SETUP.md`](SETUP.md) | Installation, Profile, `DSH_HOME`, Schlüssel und Routen, Diagnose, Werkzeuge für Betreiber |
+| [`REMOTE-ARBEIT.md`](REMOTE-ARBEIT.md) | frischer Remote-Klon, lokale Freebuff-Metadaten, Task-Worktrees und Rechnerübergabe |
 | [`CI-UND-GATES.md`](CI-UND-GATES.md) | Gate-Engine und ihre Plugins, policy.json, Git-Hooks, die vier GitHub-Workflows, Testpfade |
 | [`PAKETE.md`](PAKETE.md) | Nachschlagewerk zu allen Paketen unter `packages/`: Zweck, Eintritt, Tests, Naht |
 | [`SCRIPTS.md`](SCRIPTS.md) | Nachschlagewerk zu `scripts/` und `bin/`: Zweck jedes Skripts und ob ein npm-Script darauf zeigt |
