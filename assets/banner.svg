@@ -1,59 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" role="img" aria-label="Shinon Forge — ein DSH-Fork, der Befehle kennt">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="title desc">
+  <title id="title">Shinon Forge</title>
+  <desc id="desc">Eine modulare Agenten-Runtime mit nachvollziehbarem Kontext und überprüfbaren Spuren.</desc>
   <defs>
-    <linearGradient id="bn-bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0B0F14"/>
-      <stop offset="55%" stop-color="#140F26"/>
-      <stop offset="100%" stop-color="#0B0F14"/>
-    </linearGradient>
-    <linearGradient id="bn-metal" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#A855F7"/>
-      <stop offset="60%" stop-color="#7C3AED"/>
-      <stop offset="100%" stop-color="#6366F1"/>
-    </linearGradient>
-    <linearGradient id="bn-title" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#E0E7FF"/>
-      <stop offset="100%" stop-color="#A5B4FC"/>
-    </linearGradient>
-    <radialGradient id="bn-glow" cx="0.18" cy="0.5" r="0.42">
-      <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.42"/>
-      <stop offset="100%" stop-color="#7C3AED" stop-opacity="0"/>
-    </radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#070B16"/><stop offset=".52" stop-color="#10132B"/><stop offset="1" stop-color="#07121E"/></linearGradient>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#A78BFA"/><stop offset=".48" stop-color="#60A5FA"/><stop offset="1" stop-color="#67E8F9"/></linearGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#F8FAFC"/><stop offset=".58" stop-color="#C4B5FD"/><stop offset="1" stop-color="#7DD3FC"/></linearGradient>
+    <radialGradient id="glow" cx=".78" cy=".22" r=".7"><stop stop-color="#4F46E5" stop-opacity=".38"/><stop offset="1" stop-color="#4F46E5" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#93C5FD" stroke-opacity=".07" stroke-width="1"/></pattern>
+    <filter id="soft"><feGaussianBlur stdDeviation="18"/></filter>
   </defs>
-
-  <rect width="1280" height="320" fill="url(#bn-bg)"/>
-  <rect width="1280" height="320" fill="url(#bn-glow)"/>
-
-  <!-- Raster: gerade Linien, kein Effekt. -->
-  <g stroke="#7C3AED" stroke-opacity="0.10" stroke-width="1">
-    <path d="M0 64H1280M0 128H1280M0 192H1280M0 256H1280"/>
-    <path d="M160 0V320M320 0V320M480 0V320M640 0V320M800 0V320M960 0V320M1120 0V320"/>
+  <rect width="1280" height="320" fill="url(#bg)"/><rect width="1280" height="320" fill="url(#glow)"/><rect width="1280" height="320" fill="url(#grid)"/>
+  <ellipse cx="1000" cy="80" rx="220" ry="95" fill="#6366F1" opacity=".12" filter="url(#soft)"/>
+  <g fill="none" stroke-linejoin="round">
+    <path d="M580 248 735 110 800 169 879 65 1018 212 1105 136 1280 245V320H580Z" fill="#121B3A" stroke="#818CF8" stroke-opacity=".34"/>
+    <path d="M670 265 814 171 886 220 978 124 1091 225 1160 181 1280 250V320H670Z" fill="#0D2940" stroke="#67E8F9" stroke-opacity=".24"/>
+    <path d="M879 65 901 112 886 103 868 118 879 65 917 109 901 112" stroke="#C4B5FD" stroke-opacity=".58"/>
+    <path d="M978 124 1000 167 983 158 968 174 978 124" stroke="#7DD3FC" stroke-opacity=".45"/>
   </g>
-
-  <!-- Amboss + Hammer als Zeichen. -->
-  <g transform="translate(84 76) scale(0.3)">
-    <g fill="url(#bn-metal)">
-      <path d="M74 244 L128 208 H424 V252 H128 Z"/>
-      <path d="M206 252 H336 L314 306 H228 Z"/>
-      <path d="M152 306 H392 L420 344 H124 Z"/>
-    </g>
-    <rect x="124" y="344" width="296" height="34" rx="14" fill="#E0E7FF" fill-opacity="0.20"/>
-    <g transform="rotate(35 256 256)">
-      <rect x="238" y="96" width="118" height="54" rx="14" fill="#E0E7FF"/>
-      <rect x="288" y="146" width="20" height="226" rx="10" fill="#A855F7" fill-opacity="0.95"/>
-    </g>
-    <path d="M318 178 L329 203 L354 214 L329 225 L318 250 L307 225 L282 214 L307 203 Z" fill="#F0F3FF"/>
+  <g fill="#E0F2FE" opacity=".8"><circle cx="720" cy="54" r="1.5"/><circle cx="812" cy="42" r="1.2"/><circle cx="1070" cy="55" r="1.5"/><circle cx="1150" cy="83" r="1.1"/><circle cx="1220" cy="38" r="1.2"/><circle cx="940" cy="32" r="1"/></g>
+  <g transform="translate(76 70)">
+    <path d="M79 12 30 40Q14 49 22 66L35 90Q44 105 60 96L98 74Q113 65 104 49L94 33 75 46 84 59 55 76 45 59 83 37Q98 28 90 14Z" fill="url(#neon)"/>
+    <path d="M95 67 113 94Q121 107 107 117L62 145Q48 153 39 138L29 122 49 110 56 121 91 100 78 82Z" fill="url(#neon)" opacity=".9"/>
+    <path d="M49 110 62 101 78 82 95 67 84 59 55 76 45 59 35 90Z" fill="#0B1228" opacity=".96"/>
+    <circle cx="64" cy="78" r="55" fill="none" stroke="#A5B4FC" stroke-opacity=".16"/>
   </g>
-
-  <text x="300" y="128" font-family="Montserrat, Segoe UI, system-ui, sans-serif" font-size="58" font-weight="800" letter-spacing="1.5" fill="url(#bn-title)">SHINON FORGE</text>
-  <text x="302" y="164" font-family="ui-monospace, Menlo, monospace" font-size="19" fill="#A855F7" letter-spacing="1.2">ein DSH-Fork, der Befehle kennt</text>
-
-  <g font-family="ui-monospace, Menlo, monospace" font-size="15">
-    <text x="302" y="212" fill="#C7D2FE">kein Agent-Gerede · ein Harness mit Cordis-Paketen</text>
-    <text x="302" y="240" fill="#818CF8">Exit-Codes statt Versprechen · eine Zahl je Wahrheit</text>
-    <text x="302" y="268" fill="#818CF8">jedes Paket ein Ordner · jedes Gate ein Exit-Code</text>
+  <g font-family="Inter, Segoe UI, Arial, sans-serif">
+    <text x="226" y="129" font-size="62" font-weight="800" letter-spacing="-1.8" fill="url(#title)">Shinon Forge</text>
+    <text x="230" y="169" font-size="18" font-weight="600" letter-spacing="3.4" fill="#A5B4FC">AUTONOMOUS WORKFLOW · TRACEABLE BY DESIGN</text>
+    <path d="M230 195H690" stroke="url(#neon)" stroke-opacity=".72"/>
+    <text x="230" y="230" font-size="22" font-weight="600" fill="#F1F5F9">Agentenarbeit mit Spuren.</text>
+    <text x="230" y="260" font-size="18" fill="#B8C4E0">Kontext, der bleibt. Entscheidungen, die sich prüfen lassen.</text>
+    <text x="230" y="291" font-size="13" letter-spacing="1.8" fill="#7DD3FC">PROMPTER  /  PROJECT INDEX  /  PERSONA  /  TRACEABILITY</text>
   </g>
-
-  <g font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#4C5A7A">
-    <text x="302" y="296">Zahlen, Belege und offene Arbeit: docs/ZAHLEN.md · docs/ROADMAP.md</text>
+  <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="13" fill="#A5B4FC" text-anchor="end">
+    <text x="1210" y="286">DSH ENGINE · SHINON LAYERS</text>
   </g>
+  <path d="M0 319H1280" stroke="url(#neon)" stroke-opacity=".55"/>
 </svg>
