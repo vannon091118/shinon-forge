@@ -35,6 +35,7 @@ const REGISTRY = {
       '^shinon\\.[a-z0-9-]+/unloaded$',
     ],
     global: '^__shinon[A-Za-z0-9]+$',
+    dienst: '^shinon_[a-z0-9]+(?:_[a-z0-9]+)*$',
   },
   namen: [
     { art: 'global', kanonisch: '__shinonPlugins', definiert_in: 'packages/core/client.js' },
@@ -99,6 +100,13 @@ test('eine verbotene Schreibweise ist rot', () => {
   withTree({ 'packages/scoring/client.js': "const x = 'shinon.scoring/ledger/v1';\n" }, (root) => {
     const issues = canon.canonIssues(root);
     assert.ok(issues.some((issue) => issue.includes('verbotene Schreibweise')), issues.join('\n'));
+  });
+});
+
+test('eine gebrochene Dienstform ist rot', () => {
+  withTree({ 'packages/hook/index.js': "export const DIENST = 'shinon_Hook_Preis';\n" }, (root) => {
+    const issues = canon.canonIssues(root);
+    assert.ok(issues.some((issue) => issue.includes('shinon_Hook_Preis') && issue.includes('Dienstform')), issues.join('\n'));
   });
 });
 

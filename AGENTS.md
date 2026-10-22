@@ -303,8 +303,11 @@ läuft in `test:full`/`gate:full` (CI).
   surface stays name-for-name identical — `scripts/gate/tests/prompter-split.test.mjs`
   pins all 99 names, forbids the modules importing `index.js`, and fails on a single
   lost export. Precondition for the next one: a single `runtime`-like owner already
-  exists; a host entry that holds its state in a dozen closure `let`s must get that
-  owner first (`packages/persona/index.js` is the open case, 18 bindings).
+  exists; a host entry that holds its state in closure `let`s must get that
+  owner first (`packages/persona/index.js` is the open case). Numbers about that
+  state belong in `docs/ZAHLEN.md`, not here: a count in this file goes stale the
+  moment someone adds a binding, and an agent who measures it then believes the
+  rulebook is wrong.
 - Client-internal slot ids follow `<name>-<purpose>` (e.g. `shinon-core-brand`,
   `shinon-info-banner`). Packages don't reference each other — with ONE exception:
   `@shinon/seams` (`packages/seams/assets/seams.js`) is the import-free host seam

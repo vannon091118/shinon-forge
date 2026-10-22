@@ -66,7 +66,9 @@ export function canonIssues(root = ROOT) {
   if (names === null || names.length === 0) return [`${CANON_FILE}: namen fehlt oder ist leer`];
   const contractForms = (canon.formen?.vertrag ?? []).map((pattern) => new RegExp(pattern));
   const globalForm = new RegExp(canon.formen?.global ?? '^__shinon[A-Za-z0-9]+$');
+  const serviceForm = canon.formen?.dienst ? new RegExp(canon.formen.dienst) : null;
   if (contractForms.length === 0) issues.push(`${CANON_FILE}: formen.vertrag fehlt`);
+  if (serviceForm === null) issues.push(`${CANON_FILE}: formen.dienst fehlt`);
 
   const files = canonFiles(root).map((file) => ({ file, text: read(file) }));
   const label = (file) => relative(root, file).split(sep).join('/');
@@ -101,6 +103,15 @@ export function canonIssues(root = ROOT) {
     for (const match of text.matchAll(/['"](shinon\.[a-z0-9-]+\/[^'"\n]*)['"]/g)) {
       if (!contractForms.some((form) => form.test(match[1]))) {
         issues.push(`${label(file)}: "${match[1]}" haelt keine kanonische Vertragsform`);
+      }
+    }
+    // Die vierte Form: Dienste heissen klein und mit Unterstrichen
+    // (`shinon_<bereich>_<sache>`). Ohne diesen Riegel wäre jede Schreibweise
+    // erlaubt, weil niemand den Namen liest — dieser Kommentar ist der Beleg:
+    // ein Grossbuchstaben-Beispiel hier hat den Riegel im ersten Lauf rot gemacht.
+    for (const match of text.matchAll(/\bshinon_[A-Za-z0-9_]+/g)) {
+      if (serviceForm !== null && !serviceForm.test(match[0])) {
+        issues.push(`${label(file)}: "${match[0]}" haelt keine kanonische Dienstform`);
       }
     }
   }

@@ -182,3 +182,28 @@ export function structureIssues(root = ROOT) {
   }
   return issues;
 }
+
+/**
+ * Die gemessenen Zahlen des Riegels — EINE Quelle für `docs/ZAHLEN.md` §1.2 und
+ * `npm run zahlen:check`.
+ *
+ * Warum hier und nicht im Doku-Skript: die Zahl der Code-Dateien ist nur dann
+ * dieselbe wie die des Riegels, wenn BEIDE `codeDateien()` lesen. `ohneKlasse`
+ * und `vertragsverstoesse` werden aus den Befunden gezählt, die `npm test` rot
+ * machen — eine Zahl, die den Riegel wiederholt, kann nicht neben ihm driften.
+ *
+ * @returns {{dateien: number, klassen: number, bestand: number, ohneKlasse: number, vertragsverstoesse: number}}
+ */
+export function strukturZahlen(root = ROOT) {
+  const file = join(root, STRUCTURE_FILE);
+  const struktur = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { klassen: [], bestand: {} };
+  const issues = structureIssues(root);
+  const ohneKlasse = issues.filter((issue) => issue.includes('keine Klasse')).length;
+  return {
+    dateien: codeDateien(root).length,
+    klassen: Array.isArray(struktur.klassen) ? struktur.klassen.length : 0,
+    bestand: Object.keys(struktur.bestand ?? {}).length,
+    ohneKlasse,
+    vertragsverstoesse: issues.length - ohneKlasse,
+  };
+}

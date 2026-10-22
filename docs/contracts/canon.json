@@ -21,7 +21,8 @@
       "^shinon\\.[a-z0-9-]+/v[0-9]+$",
       "^shinon\\.[a-z0-9-]+/unloaded$"
     ],
-    "global": "^__shinon[A-Za-z0-9]+$"
+    "global": "^__shinon[A-Za-z0-9]+$",
+    "dienst": "^shinon_[a-z0-9]+(?:_[a-z0-9]+)*$"
   },
   "namen": [
     {
@@ -35,14 +36,18 @@
       "art": "global",
       "kanonisch": "__shinonPluginCatalog",
       "definiert_in": "packages/key-router/client.js",
-      "verboten": ["__shinon_plugins"],
+      "verboten": [
+        "__shinon_plugins"
+      ],
       "hinweis": "Objekt-Tabelle der Panels (id → Label/Rolle), geschrieben von Key-Router, Traceability und Popup."
     },
     {
       "art": "global",
       "kanonisch": "__shinonPrompterTrace",
       "definiert_in": "packages/prompter/index.js",
-      "verboten": ["__SHINON_PROMPTER_TRACE__"]
+      "verboten": [
+        "__SHINON_PROMPTER_TRACE__"
+      ]
     },
     {
       "art": "global",
@@ -60,7 +65,9 @@
       "art": "global",
       "kanonisch": "__shinonTaskRouter",
       "definiert_in": "packages/task-router/client.js",
-      "verboten": ["__shinon_task_router"]
+      "verboten": [
+        "__shinon_task_router"
+      ]
     },
     {
       "art": "global",
@@ -80,7 +87,9 @@
       "art": "vertrag",
       "kanonisch": "shinon.workspace/v1",
       "definiert_in": "packages/seams/assets/seams.js",
-      "verboten": ["shinon.workspace/identitaet-v1"]
+      "verboten": [
+        "shinon.workspace/identitaet-v1"
+      ]
     },
     {
       "art": "vertrag",
@@ -92,7 +101,9 @@
       "art": "vertrag",
       "kanonisch": "shinon.scoring/ledger-v1",
       "definiert_in": "packages/scoring/index.js",
-      "verboten": ["shinon.scoring/ledger/v1"]
+      "verboten": [
+        "shinon.scoring/ledger/v1"
+      ]
     },
     {
       "art": "vertrag",
@@ -104,13 +115,17 @@
       "art": "vertrag",
       "kanonisch": "shinon.codingmon/store-v1",
       "definiert_in": "packages/codingmon/index.js",
-      "verboten": ["shinon.codingmon/store/v1"]
+      "verboten": [
+        "shinon.codingmon/store/v1"
+      ]
     },
     {
       "art": "vertrag",
       "kanonisch": "shinon.prompter/one-shot-journal-v1",
       "definiert_in": "packages/prompter/assets/enhancer.js",
-      "verboten": ["shinon.prompter/one-shot-journal/v1"]
+      "verboten": [
+        "shinon.prompter/one-shot-journal/v1"
+      ]
     },
     {
       "art": "vertrag",
@@ -146,25 +161,35 @@
       "art": "begriff",
       "kanonisch": "Shinon Task Manager",
       "definiert_in": "packages/task-router/index.js",
-      "verboten": ["Task-Manager", "TaskManager"]
+      "verboten": [
+        "Task-Manager",
+        "TaskManager"
+      ]
     },
     {
       "art": "begriff",
       "kanonisch": "Task-Gruppe",
       "definiert_in": "packages/task-router/index.js",
-      "verboten": ["Taskgruppe", "Task Group"]
+      "verboten": [
+        "Taskgruppe",
+        "Task Group"
+      ]
     },
     {
       "art": "begriff",
       "kanonisch": "Persona",
       "definiert_in": "packages/persona/index.js",
-      "verboten": ["Personas"]
+      "verboten": [
+        "Personas"
+      ]
     },
     {
       "art": "begriff",
       "kanonisch": "Begleiter",
       "definiert_in": "packages/prompter/assets/capabilities.json",
-      "verboten": ["Companion"],
+      "verboten": [
+        "Companion"
+      ],
       "hinweis": "UI-Wort für das Pet; im Code heißt die Entität `pet`/`codingmon`."
     }
   ]

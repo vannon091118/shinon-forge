@@ -59,7 +59,16 @@ Zahl. Drei Zusagen, geprüft am Inhalt (ohne Trailer, ohne `#`-Zeilen):
 
 Die Muster stehen in `scripts/lib/commit-text.mjs` (`WORD_MIN`,
 `NAMED_DATA_PATTERNS`, `BILDSPRACHE_MARKERS`, `wordViolations`). Es gibt genau
-eine Quelle; Hook, Gate und CI lesen dieselbe. Der lokale prepare-Hook tauscht
+eine Quelle; Hook, Gate und CI lesen dieselbe.
+
+**Die Zahl 150 steht auch in `docs/contracts/commit-policy.json` — als
+Dokumentation, nicht als zweite Quelle.** `WORD_MIN` im Code ist der Wert, der
+wirkt; `scripts/gate/tests/commit-policy.test.mjs` prüft, dass jedes Preset mit
+einer Wortregel genau diese Zahl nennt. Wer 150 auf 200 ändert, ändert
+`WORD_MIN` und zieht die Datei nach — nicht umgekehrt. Ein Preset wird über
+`--policy <name>` oder `SHINON_COMMIT_POLICY=<name>` gewählt; die optionale
+Projektdatei `.shinon/gate-profile.json` gibt es in diesem Repo nicht, sie ist
+nur für Fremd-Repos da. Der lokale prepare-Hook tauscht
 nur Footer — 150 Wörter schreiben kann er nicht; die Wort-Regel gilt deshalb
 **nur fail-closed** (commit-msg-Hook und CI lehnen ab, niemand repariert).
 

@@ -24,9 +24,15 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from '
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { strukturZahlen } from './lib/structure.mjs';
+
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const START = '<!-- zahlen:bestand:start -->';
 const END = '<!-- zahlen:bestand:end -->';
+// Der zweite Block: die Struktur-Zahlen (§1.2). Sie standen bis 2026-10-22 von
+// Hand im Dokument und waren deshalb schon einmal 61 Dateien alt.
+export const STRUKTUR_START = '<!-- zahlen:struktur:start -->';
+export const STRUKTUR_END = '<!-- zahlen:struktur:end -->';
 
 const readJSON = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const git = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
@@ -141,20 +147,62 @@ export function renderBlock(root = ROOT) {
   ].join('\n');
 }
 
-/** Den markierten Block ersetzen (oder den Ist-Zustand zurückgeben). */
+/** Die gemessenen Struktur-Zeilen — dieselben Zahlen wie der Riegel in `npm test`. */
+export function measureStruktur(root = ROOT) {
+  const zahlen = strukturZahlen(root);
+  return [
+    ['Code-Dateien unter `packages/` + `scripts/` + `bin/`', String(zahlen.dateien), 'dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`)'],
+    ['Klassen', String(zahlen.klassen), '`docs/contracts/structure.json` → `klassen`'],
+    ['Benannte Bestandsdateien (über ihrer Klassengrenze)', String(zahlen.bestand), '`docs/contracts/structure.json` → `bestand`'],
+    ['Dateien ohne Klasse', String(zahlen.ohneKlasse), '`npm test` (Schritt „Struktur“) — gezählt aus `structureIssues()`'],
+    ['Verstöße gegen den Contract der Klasse', String(zahlen.vertragsverstoesse), 'dieselben Befunde, ohne „keine Klasse“'],
+  ];
+}
+
+/** Der Struktur-Block (§1.2). */
+export function renderStrukturBlock(root = ROOT) {
+  const rows = measureStruktur(root).map(([label, value, command]) => `| ${cell(label)} | ${cell(value)} | ${cell(command)} | 0 |`);
+  return [
+    STRUKTUR_START,
+    '| Zahl | Wert | Befehl (Eigentümer) | Exit |',
+    '|---|---|---|---|',
+    ...rows,
+    STRUKTUR_END,
+  ].join('\n');
+}
+
+/**
+ * Die markierten Blöcke ersetzen (oder den Ist-Zustand zurückgeben).
+ *
+ * Zwei Blöcke, ein Weg: `zahlen:sync` schreibt, `zahlen:check` vergleicht nur.
+ * Fehlt ein Markerpaar, bricht der Lauf ab — ein stiller Teil-Erfolg wäre eine
+ * Doku, die halb gemessen ist.
+ */
 export function sync({ root = ROOT, check = false } = {}) {
   const file = join(root, 'docs', 'ZAHLEN.md');
-  const text = readFileSync(file, 'utf8');
-  const start = text.indexOf(START);
-  const end = text.indexOf(END);
-  if (start < 0 || end < 0 || end < start) {
-    throw new Error(`${relative(root, file)}: Marker ${START} … ${END} fehlen — der Block ist ohne sie nicht adressierbar`);
+  let text = readFileSync(file, 'utf8');
+  const blocks = [
+    { start: START, end: END, render: renderBlock },
+    { start: STRUKTUR_START, end: STRUKTUR_END, render: renderStrukturBlock },
+  ];
+  let changed = false;
+  let firstDrift = null;
+  for (const block of blocks) {
+    const start = text.indexOf(block.start);
+    const end = text.indexOf(block.end);
+    if (start < 0 || end < 0 || end < start) {
+      throw new Error(`${relative(root, file)}: Marker ${block.start} … ${block.end} fehlen — der Block ist ohne sie nicht adressierbar`);
+    }
+    const expected = block.render(root);
+    const actual = text.slice(start, end + block.end.length);
+    if (expected === actual) continue;
+    changed = true;
+    if (firstDrift === null) firstDrift = { expected, actual };
+    if (!check) text = `${text.slice(0, start)}${expected}${text.slice(end + block.end.length)}`;
   }
-  const next = `${text.slice(0, start)}${renderBlock(root)}${text.slice(end + END.length)}`;
-  if (next === text) return { changed: false, file };
-  if (check) return { changed: true, file, expected: renderBlock(root), actual: text.slice(start, end + END.length) };
-  writeFileSync(file, next, 'utf8');
-  return { changed: true, file };
+  if (check) return changed ? { changed, file, ...firstDrift } : { changed, file };
+  if (changed) writeFileSync(file, text, 'utf8');
+  return { changed, file };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

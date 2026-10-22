@@ -19,7 +19,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { VANNON_TRAILER, checkMessage, swapTrailer } from '../../lib/commit-text.mjs';
+import { VANNON_TRAILER, WORD_MIN, checkMessage, swapTrailer } from '../../lib/commit-text.mjs';
 import { PolicyError, policyIssues, resolvePreset } from '../../lib/commit-policy.mjs';
 import { ENGINE_ROOT, PROJECT_PROFILE, selectPolicy } from '../../lib/commit-policy-file.mjs';
 import { LONG_BODY, VALID_SAMPLE, policyRuleIssues } from '../plugins/commit-trailer.mjs';
@@ -343,6 +343,18 @@ test('policy: --fix entfernt nur Footer-Zeilen und lässt den Body unangetastet'
   assert.ok(after.startsWith(body), 'der Body wird nicht umgeschrieben');
   assert.equal(after.includes('Codebuff'), false);
   assert.ok(after.trimEnd().endsWith(VANNON_TRAILER));
+});
+
+test('die Policy-Datei dokumentiert WORD_MIN, statt es zu setzen', () => {
+  // Der Code ist die Quelle; die Datei ist Doku. Ohne diesen Vergleich wäre sie
+  // Dekoration, und eine Zahl an zwei Orten, von denen nur einer wirkt, ist ein
+  // Fallstrick für den nächsten Agenten.
+  assert.equal(CONTRACT.presets[CONTRACT.default].words.min, WORD_MIN, 'Default-Preset weicht von WORD_MIN ab');
+  for (const [name, preset] of Object.entries(CONTRACT.presets)) {
+    const min = preset.words?.min;
+    if (!Number.isInteger(min) || min === 0) continue;
+    assert.equal(min, WORD_MIN, `Preset ${name}: words.min ${min} weicht von WORD_MIN ${WORD_MIN} ab`);
+  }
 });
 
 test('policy: strict-evidence repariert nichts — Datei bleibt bytegleich, Exit 1', () => {
