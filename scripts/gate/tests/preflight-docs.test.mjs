@@ -63,6 +63,20 @@ test('missing job definition is not invented by the checker or auto-fixer', () =
   const issues = checkWorkflowContract(mutated);
   assert.ok(issues.some((d) => d.code === 'PREFLIGHT_JOB_DEFINITION_MISSING' && d.details === 'secret-scan'));
   assert.ok(issues.some((d) => d.code === 'PREFLIGHT_NEEDS_UNKNOWN_JOB' && d.details === 'secret-scan'));
+
+  const root = mkdtempSync(join(tmpdir(), 'shinon-preflight-missing-job-'));
+  try {
+    const dir = join(root, '.github/workflows');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'commit-guard.yml'), mutated);
+    applySafeFixes(root);
+    const afterFix = readFileSync(join(dir, 'commit-guard.yml'), 'utf8');
+    assert.doesNotMatch(afterFix, /^  secret-scan:/m, 'safe fixer must not invent a missing validation job');
+    assert.ok(checkWorkflowContract(afterFix).some((d) =>
+      d.code === 'PREFLIGHT_JOB_DEFINITION_MISSING' && d.details === 'secret-scan'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('safe auto-fix repairs missing verdict wiring, then the behavioral contract passes', () => {
@@ -84,6 +98,38 @@ test('safe auto-fix repairs missing verdict wiring, then the behavioral contract
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('safe auto-fix does not overwrite a deliberate job condition', () => {
+  const root = mkdtempSync(join(tmpdir(), 'shinon-preflight-condition-'));
+  try {
+    const dir = join(root, '.github/workflows');
+    mkdirSync(dir, { recursive: true });
+    const deliberate = readFileSync(WORKFLOW, 'utf8').replace(/^    if: always\(\)\s*$/m, '    if: success()');
+    writeFileSync(join(dir, 'commit-guard.yml'), deliberate);
+    applySafeFixes(root);
+    const repaired = readFileSync(join(dir, 'commit-guard.yml'), 'utf8');
+    assert.match(repaired, /^    if: success\(\)$/m);
+    assert.ok(checkWorkflowContract(repaired).some((d) => d.code === 'PREFLIGHT_VERDICT_FAIL_OPEN'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('preflight removes only proven CI duplication, not the local regression suite', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  const workflow = readFileSync(WORKFLOW, 'utf8');
+  const auditStart = workflow.indexOf('  dependency-audit:');
+  const auditEnd = workflow.indexOf('\n  codeql:', auditStart);
+  assert.ok(auditStart >= 0 && auditEnd > auditStart, 'dependency-audit job must be delimited');
+  const audit = workflow.slice(auditStart, auditEnd);
+  assert.match(audit, /npm audit --omit=dev --audit-level=high/);
+  assert.doesNotMatch(audit, /npm ci/, 'lockfile audit must not reinstall all dependencies');
+  assert.doesNotMatch(workflow, /^  static-gate:/m, 'static gate must not repeat the npm test core');
+  assert.match(manifest.scripts.test, /preflight-docs/);
+  assert.match(manifest.scripts['test:core'], /scripts\/shinon-test\.mjs/);
+  assert.match(workflow, /run: npm run test:core/);
+  assert.doesNotMatch(workflow, /run: npm test\s*$/m, 'CI must not run the repair-first wrapper twice');
 });
 
 test('safe auto-fix is idempotent; already-valid workflow is left byte-identical', () => {
