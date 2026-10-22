@@ -31,8 +31,10 @@ const REGISTRY = {
   klassen: [
     { id: 'host-entry', muster: '^packages/[^/]+/index\\.js$', grenze: 10, gemessen: { anzahl: 1, median: 3, max: 3 }, vertrag: ['function apply('] },
     { id: 'client', muster: '^packages/[^/]+/client\\.js$', grenze: 10, gemessen: { anzahl: 1, median: 3, max: 3 }, verboten: ['export const Config'] },
+    { id: 'test', muster: '^scripts/gate/tests/.*\\.mjs$', grenze: 10, gemessen: { anzahl: 1, median: 3, max: 3 } },
   ],
   bestand: {},
+  bestandAusnahmen: {},
 };
 
 /** Baut einen Baum aus `{ pfad: inhalt }`, legt die Registry dazu und räumt auf. */
@@ -132,6 +134,39 @@ test('Bestand ist eine Obergrenze: Wachstum und Schwund sind beide rot', () => {
     assert.match(structureIssues(sinkend)[0], /21 Zeilen, Bestand nennt 25 \(client\) — senke den Eintrag auf 21/);
   } finally {
     rmSync(sinkend, { recursive: true, force: true });
+  }
+});
+
+test('maschinelle Test-Ausnahme erlaubt begrenztes Wachstum und sperrt das Ueberziehen', () => {
+  const root = baum({ 'scripts/gate/tests/case.test.mjs': zeilen(21) });
+  try {
+    const registry = {
+      ...REGISTRY,
+      bestand: { 'scripts/gate/tests/case.test.mjs': 20 },
+      bestandAusnahmen: { 'scripts/gate/tests/case.test.mjs': { grund: 'neue Abnahmefaelle', datum: '2026-10-22', maxZeilen: 25 } },
+    };
+    writeFileSync(join(root, 'docs/contracts/structure.json'), JSON.stringify(registry));
+    assert.deepEqual(structureIssues(root), [], 'Wachstum innerhalb der Ausnahmegrenze ist erlaubt');
+    writeFileSync(join(root, 'scripts/gate/tests/case.test.mjs'), zeilen(26));
+    assert.match(structureIssues(root)[0], /26 Zeilen über der Ausnahmegrenze 25/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('Bestand-Ausnahmen sind nur mit gueltigem Grund und fuer Testdateien erlaubt', () => {
+  const root = baum({ 'packages/a/client.js': GUT_CLIENT });
+  try {
+    writeFileSync(join(root, 'docs/contracts/structure.json'), JSON.stringify({
+      ...REGISTRY,
+      bestand: { 'packages/a/client.js': 1 },
+      bestandAusnahmen: { 'packages/a/client.js': { grund: '', datum: 'gestern', maxZeilen: 2 } },
+    }));
+    const issues = structureIssues(root);
+    assert.ok(issues.some((issue) => /nur für Testdateien zulässig/.test(issue)));
+    assert.ok(issues.some((issue) => /braucht Grund, Datum und maxZeilen/.test(issue)));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

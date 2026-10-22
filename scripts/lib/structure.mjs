@@ -97,6 +97,11 @@ export function dateiBefund({ datei, lines, struktur }) {
   const bestand = struktur.bestand?.[datei];
   if (bestand !== undefined) {
     if (lines > bestand) {
+      const ausnahme = struktur.bestandAusnahmen?.[datei];
+      if (Number.isSafeInteger(ausnahme?.maxZeilen) && ausnahme.maxZeilen > bestand && lines <= ausnahme.maxZeilen) return null;
+      if (Number.isSafeInteger(ausnahme?.maxZeilen) && lines > ausnahme.maxZeilen) {
+        return `${datei}: ${lines} Zeilen über der Ausnahmegrenze ${ausnahme.maxZeilen} (${klasse.id})`;
+      }
       return `${datei}: ${lines} Zeilen, Bestand ${bestand} (${klasse.id}) — der Bestand darf nur sinken`;
     }
     if (lines < bestand) {
@@ -127,7 +132,7 @@ export function structureIssues(root = ROOT) {
   if (struktur.contract !== CONTRACT) {
     return [`${STRUCTURE_FILE}: Vertrag ${struktur.contract ?? '(fehlt)'} statt ${CONTRACT}`];
   }
-  for (const key of ['rules', 'klassen', 'bestand']) {
+  for (const key of ['rules', 'klassen', 'bestand', 'bestandAusnahmen']) {
     if (struktur[key] === undefined) issues.push(`${STRUCTURE_FILE}: Feld \`${key}\` fehlt`);
   }
   for (const klasse of struktur.klassen ?? []) {
@@ -158,6 +163,17 @@ export function structureIssues(root = ROOT) {
     }
     for (const nadel of klasse.verboten ?? []) {
       if (text.includes(nadel)) issues.push(`${datei}: Klasse ${klasse.id} verbietet \`${nadel}\``);
+    }
+  }
+
+  for (const [datei, ausnahme] of Object.entries(struktur.bestandAusnahmen ?? {})) {
+    const klasse = struktur.klassen.find((item) => new RegExp(item.muster).test(datei));
+    if (struktur.bestand?.[datei] === undefined) issues.push(`${datei}: Bestand-Ausnahme ohne Bestandseintrag`);
+    if (klasse?.id !== 'test') issues.push(`${datei}: Bestand-Ausnahme ist nur für Testdateien zulässig`);
+    if (typeof ausnahme?.grund !== 'string' || ausnahme.grund.trim() === ''
+      || typeof ausnahme?.datum !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(ausnahme.datum)
+      || !Number.isSafeInteger(ausnahme?.maxZeilen) || ausnahme.maxZeilen <= (struktur.bestand?.[datei] ?? 0)) {
+      issues.push(`${datei}: Bestand-Ausnahme braucht Grund, Datum und maxZeilen über dem Bestand`);
     }
   }
 
