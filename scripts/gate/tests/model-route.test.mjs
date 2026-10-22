@@ -43,12 +43,20 @@ test('dynamische DSH-Kataloge sind zulässig, feste Kataloge bleiben geprüft', 
   }), ['ROUTE_MODEL_NOT_IN_CATALOG:openrouter/missing-model']);
 });
 
-test('die gewählte Shinon-Route ist im eingebauten Katalog des gepinnten DSH', async () => {
+test('die gewählte Shinon-Route ist bedienbar: eigener Katalog oder DSH-Katalog', async () => {
   const { getBuiltinModels } = await import('@earendil-works/pi-ai/providers/all');
   const routes = readModelRoutes(read('shinon'));
-  assert.ok(routes.providers[routes.route.provider].models.length === 0, 'Probe muss den dynamischen Provider abdecken');
-  const models = getBuiltinModels(routes.route.provider);
-  assert.ok(models.some((entry) => entry.id === routes.route.model), `${routes.route.provider}/${routes.route.model} fehlt im DSH-Katalog`);
+  const provider = routes.providers[routes.route.provider];
+  assert.ok(provider !== undefined, `Provider "${routes.route.provider}" steht nicht im Profil`);
+  // ZWEI Wege, beide bedienbar: ein Anbieter MIT eigener `models`-Liste
+  // bedient genau diese Liste (resolveRouteModels), ein Anbieter OHNE Liste
+  // bedient den eingebauten Katalog des gepinnten DSH. Der Test sagt, welcher
+  // Weg gilt, statt einen anzunehmen — das Modell `minimax/minimax-m3.1-flash:free`
+  // steht z. B. nur in der Profil-Liste, weil der DSH-Katalog es nicht kennt.
+  const served = provider.models.length > 0
+    ? provider.models
+    : getBuiltinModels(routes.route.provider).map((entry) => entry.id);
+  assert.ok(served.includes(routes.route.model), `${routes.route.provider}/${routes.route.model} steht in keinem der beiden Kataloge`);
 });
 
 test('der Extraktor liest, was der echte Parser liest', () => {
@@ -145,6 +153,45 @@ test('der S6-Preflight fragt die Route, die er anzeigt', () => {
   // wählbaren Route beantwortet die falsche Frage (der Fall vom 2026-10-20).
   assert.doesNotMatch(script, /process\.env\[\s*['"]?AGNES_API_KEY/);
   assert.doesNotMatch(script, /keySource\(\s*\)/);
+});
+
+test('ein Modelleintrag mit verschachtelten Feldern ist kein Anbieter', () => {
+  // Der Katalogeintrag eines Modells traegt Felder mit eigener Liste (`input:`,
+  // `reasoningEfforts:`). Der Extraktor muss sie als EIGENSCHAFT des
+  // Modelleintrags lesen, nicht als weiteren Anbieter — sonst faellt der
+  // Katalog nach dem ersten solchen Feld weg (gemessen am 2026-10-22: der
+  // Leser baute einen Anbieter `input` und schnitt den Katalog ab).
+  const dump = [
+    '- id: llm-pi-ai',
+    '  config:',
+    '    providers:',
+    '      openrouter:',
+    '        apiKeyEnv: SHINON_API_KEY',
+    '        displayName: OpenRouter',
+    '        models:',
+    '          - id: anthropic/claude-fable-5',
+    '            name: "Anthropic: Claude Fable 5"',
+    '            contextWindow: 1000000',
+    '            input:',
+    '              - text',
+    '              - image',
+    '          - id: minimax/minimax-m3.1-flash:free',
+    '            name: "MiniMax M3.1 Flash (free)"',
+    '- id: agent-default-model',
+    '  config:',
+    '    provider: openrouter',
+    '    model: minimax/minimax-m3.1-flash:free',
+  ].join('\n');
+  const routes = readModelRoutes(dump);
+  assert.deepEqual(Object.keys(routes.providers), ['openrouter'], 'ein verschachteltes Feld darf kein Anbieter werden');
+  assert.deepEqual(
+    routes.providers.openrouter.models,
+    ['anthropic/claude-fable-5', 'minimax/minimax-m3.1-flash:free'],
+    'der Katalog muss vollstaendig gelesen werden',
+  );
+  assert.equal(routes.providers.openrouter.apiKeyEnv, 'SHINON_API_KEY');
+  assert.deepEqual(routes.route, { provider: 'openrouter', model: 'minimax/minimax-m3.1-flash:free' });
+  assert.deepEqual(routeIssues(routes), [], 'die Route muss gueltig sein');
 });
 
 test('Formfehler werden benannt, nicht still hingenommen', () => {

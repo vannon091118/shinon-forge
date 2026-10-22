@@ -53,6 +53,7 @@ export function readModelRoutes(text) {
   let inConfig = false;
   let inProviders = false;
   let providersIndent = -1;
+  let providerIndent = -1;
   let provider = '';
   let inModels = false;
 
@@ -72,6 +73,7 @@ export function readModelRoutes(text) {
       inConfig = false;
       inProviders = false;
       providersIndent = -1;
+      providerIndent = -1;
       provider = '';
       inModels = false;
       continue;
@@ -85,6 +87,7 @@ export function readModelRoutes(text) {
     if (line === 'providers:') {
       inProviders = true;
       providersIndent = indent;
+      providerIndent = -1;
       provider = '';
       inModels = false;
       continue;
@@ -92,7 +95,7 @@ export function readModelRoutes(text) {
     if (inProviders) {
       if (indent <= providersIndent) {
         inProviders = false;
-      } else if (line === 'models:') {
+      } else if (line === 'models:' && indent === providerIndent + 2) {
         if (provider !== '') providers[provider].models = providers[provider].models ?? [];
         inModels = provider !== '';
         continue;
@@ -100,7 +103,14 @@ export function readModelRoutes(text) {
         const id = scalar(line.slice('- id:'.length));
         if (inModels && provider !== '' && id !== '') providers[provider].models.push(id);
         continue;
-      } else if (!line.startsWith('-') && line.endsWith(':')) {
+      } else if (!line.startsWith('-') && line.endsWith(':')
+        && (providerIndent < 0 || indent === providerIndent)) {
+        // Ein ANBIETER-Schluessel steht auf der Ebene der Anbieter. Alles
+        // TIEFERE ist eine Eigenschaft des Modelleintrags (`input:`,
+        // `reasoningEfforts:`) und KEIN weiterer Anbieter — vorher hat der
+        // Leser daraus einen Anbieter `input` gebaut und den Katalog danach
+        // abgeschnitten (gemessen am 2026-10-22: der Gate-Test war rot).
+        if (providerIndent < 0) providerIndent = indent;
         const name = scalar(line.slice(0, -1));
         if (name !== '' && name !== 'models') {
           provider = name;
@@ -110,7 +120,7 @@ export function readModelRoutes(text) {
         continue;
       }
     }
-    if (line.startsWith('apiKeyEnv:') && provider !== '') {
+    if (line.startsWith('apiKeyEnv:') && provider !== '' && indent === providerIndent + 2) {
       providers[provider].apiKeyEnv = scalar(line.slice('apiKeyEnv:'.length));
       continue;
     }

@@ -90,132 +90,135 @@
   name: '@deepseek-ai/dsh-llm-pi-ai'
   config:
     providers:
-      openrouter:
-        apiKeyEnv: SHINON_API_KEY
-        displayName: Shinon Forge
-      nvidia:
-        apiKeyEnv: NVIDIA_API_KEY
-        displayName: Shinon Forge
-      groq:
-        apiKeyEnv: GROQ_API_KEY
-        displayName: Shinon Forge
-      cerebras:
-        apiKeyEnv: CEREBRAS_API_KEY
-        displayName: Shinon Forge
-      google:
-        apiKeyEnv: GOOGLE_API_KEY
-        displayName: Shinon Forge
-      mistral:
-        apiKeyEnv: MISTRAL_API_KEY
-        displayName: Shinon Forge
-      together:
-        apiKeyEnv: TOGETHER_API_KEY
-        displayName: Shinon Forge
-      huggingface:
-        apiKeyEnv: HUGGINGFACE_API_KEY
-        displayName: Shinon Forge
       # Der Katalog kommt vom Anbieter, nicht aus dem Profil: `dsh-llm-pi-ai`
       # loest die Modelle ueber `catalogModels(provider)` auf, der eingebaute
-      # pi-ai-Katalog fuehrt 42 Anbieter mit rund 1700 Modellen. Was der
-      # Profil-Eintrag beisteuert, ist der SCHLUESSEL (`apiKeyEnv`) und
-      # sonst nichts — ohne ihn liefert `listModels` leer und der Anbieter
+      # pi-ai-Katalog fuehrt 42 Anbieter. Was der Profil-Eintrag beisteuert, ist
+      # der SCHLUESSEL (`apiKeyEnv`), der ANZEIGENAME und die DRAHTFORM des
+      # Endpunkts (`api`, `baseURL`) — ohne die beiden letzten kann das
+      # Modell-Panel des Hosts kein Modell eintragen, das der eingebaute
+      # Katalog nicht kennt (`needs an api`). Eine `models`-Liste wuerde den
+      # GESAMTEN Katalog ersetzen (resolveRouteModels), deshalb steht hier
+      # keine: der Katalog des Anbieters bleibt der Katalog.
+      #
+      # Ohne gesetzten Schluessel liefert `listModels` leer und der Anbieter
       # faellt aus der Modell-Liste des Hosts (gemessen: `listModels` gibt bei
       # fehlendem Schluessel `[]` zurueck, und `buildModelCatalog` filtert
-      # genau solche Gruppen weg). Die `baseURL` kommt aus dem Katalog.
-      #
-      # Jeder Eintrag nennt seinen eigenen Umgebungsnamen. Der Name ist
-      # nicht geraten, sondern aus dem Katalog-Modul gelesen
-      # (`@earendil-works/pi-ai/dist/providers/<id>.js`); der Katalog ist
-      # die Quelle, das Profil nur die Schluesselreferenz.
+      # genau solche Gruppen weg). Jeder Eintrag nennt seinen eigenen
+      # Umgebungsnamen — der Name ist nicht geraten, sondern aus dem
+      # Katalog-Modul gelesen (`@earendil-works/pi-ai/dist/providers/<id>.js`);
+      # der Katalog ist die Quelle, das Profil nur die Schluesselreferenz.
+      openrouter:
+        apiKeyEnv: SHINON_API_KEY
+        displayName: OpenRouter
+        api: openai-completions
+        baseURL: https://openrouter.ai/api/v1
+      nvidia:
+        apiKeyEnv: NVIDIA_API_KEY
+        displayName: NVIDIA
+      groq:
+        apiKeyEnv: GROQ_API_KEY
+        displayName: Groq
+      cerebras:
+        apiKeyEnv: CEREBRAS_API_KEY
+        displayName: Cerebras
+      google:
+        apiKeyEnv: GOOGLE_API_KEY
+        displayName: Google
+      mistral:
+        apiKeyEnv: MISTRAL_API_KEY
+        displayName: Mistral
+      together:
+        apiKeyEnv: TOGETHER_API_KEY
+        displayName: Together AI
+      huggingface:
+        apiKeyEnv: HUGGINGFACE_API_KEY
+        displayName: Hugging Face
       ant-ling:
         apiKeyEnv: ANT_LING_API_KEY
-        displayName: Shinon Forge
+        displayName: Ant Ling
       anthropic:
         apiKeyEnv: ANTHROPIC_API_KEY
-        displayName: Shinon Forge
+        displayName: Anthropic
       azure:
         apiKeyEnv: AZURE_OPENAI_API_KEY
-        displayName: Shinon Forge
+        displayName: Azure OpenAI
       baseten:
         apiKeyEnv: BASETEN_API_KEY
-        displayName: Shinon Forge
+        displayName: Baseten
       deepseek:
         apiKeyEnv: DEEPSEEK_API_KEY
-        displayName: Shinon Forge # Schluessel liegt in .env
+        displayName: DeepSeek
       fireworks:
         apiKeyEnv: FIREWORKS_API_KEY
-        displayName: Shinon Forge
+        displayName: Fireworks
       google-vertex:
         apiKeyEnv: GOOGLE_CLOUD_API_KEY
-        displayName: Shinon Forge
+        displayName: Google Vertex
       kimi-coding:
         apiKeyEnv: KIMI_API_KEY
-        displayName: Shinon Forge
+        displayName: Kimi Coding
       meta:
         apiKeyEnv: META_API_KEY
-        displayName: Shinon Forge
+        displayName: Meta
       minimax:
         apiKeyEnv: MINIMAX_API_KEY
-        displayName: Shinon Forge
+        displayName: MiniMax
       minimax-cn:
         apiKeyEnv: MINIMAX_CN_API_KEY
-        displayName: Shinon Forge
+        displayName: MiniMax CN
       moonshotai:
         apiKeyEnv: MOONSHOT_API_KEY
-        displayName: Shinon Forge
+        displayName: Moonshot AI
       moonshotai-cn:
         apiKeyEnv: MOONSHOT_API_KEY
-        displayName: Shinon Forge
+        displayName: Moonshot AI CN
       openai:
         apiKeyEnv: OPENAI_API_KEY
-        displayName: Shinon Forge
+        displayName: OpenAI
       opencode:
         apiKeyEnv: OPENCODE_API_KEY
-        displayName: Shinon Forge
+        displayName: OpenCode
       opencode-go:
         apiKeyEnv: OPENCODE_API_KEY
-        displayName: Shinon Forge
+        displayName: OpenCode Go
       qwen-token-plan:
         apiKeyEnv: QWEN_TOKEN_PLAN_API_KEY
-        displayName: Shinon Forge
+        displayName: Qwen Token Plan
       qwen-token-plan-cn:
         apiKeyEnv: QWEN_TOKEN_PLAN_CN_API_KEY
-        displayName: Shinon Forge
+        displayName: Qwen Token Plan CN
       qwen-token-plan-individual:
         apiKeyEnv: QWEN_TOKEN_PLAN_API_KEY
-        displayName: Shinon Forge
+        displayName: Qwen Token Plan Individual
       radius:
         apiKeyEnv: RADIUS_API_KEY
-        displayName: Shinon Forge
-      typesafe:
-        apiKeyEnv: TYPESAFE_API_KEY
-        displayName: Shinon Forge
+        displayName: Radius
       vercel-ai-gateway:
         apiKeyEnv: AI_GATEWAY_API_KEY
-        displayName: Shinon Forge
+        displayName: Vercel AI Gateway
       xai:
         apiKeyEnv: XAI_API_KEY
-        displayName: Shinon Forge
+        displayName: xAI
       xiaomi:
         apiKeyEnv: XIAOMI_API_KEY
-        displayName: Shinon Forge
+        displayName: Xiaomi
       xiaomi-token-plan-ams:
         apiKeyEnv: XIAOMI_TOKEN_PLAN_AMS_API_KEY
-        displayName: Shinon Forge
+        displayName: Xiaomi Token Plan AMS
       xiaomi-token-plan-cn:
         apiKeyEnv: XIAOMI_TOKEN_PLAN_CN_API_KEY
-        displayName: Shinon Forge
+        displayName: Xiaomi Token Plan CN
       xiaomi-token-plan-sgp:
         apiKeyEnv: XIAOMI_TOKEN_PLAN_SGP_API_KEY
-        displayName: Shinon Forge
+        displayName: Xiaomi Token Plan SGP
       zai:
         apiKeyEnv: ZAI_API_KEY
-        displayName: Shinon Forge
+        displayName: Z.ai
       zai-coding-cn:
         apiKeyEnv: ZAI_CODING_CN_API_KEY
-        displayName: Shinon Forge
+        displayName: Z.ai Coding CN
       agnes:
-        displayName: Shinon Forge
+        displayName: Agnes
         apiKeyEnv: AGNES_API_KEY
         api: openai-completions
         baseURL: https://apihub.agnes-ai.com/v1
@@ -244,12 +247,14 @@
             name: agnes-image-2.5-flash
           - id: agnes-3.0-pro
             name: agnes-3.0-pro
-      # MiniMax M3.1 Flash (free) fehlt im eingebauten pi-ai-Katalog. Ein
-      # `models`-Eintrag am `openrouter`-Anbieter wuerde dessen gesamten Katalog
-      # ersetzen (resolveRouteModels), daher ein eigener Anbieter mit nur diesem
-      # Modell. Gleicher Schluessel wie `openrouter`, Endpunkt von OpenRouter.
+      # MiniMax M3.1 Flash (free) fehlt im eingebauten pi-ai-Katalog (gemessen
+      # am 2026-10-22: der OpenRouter-Katalog fuehrt 396 Modelle, die
+      # minimax-Familie endet bei `minimax/minimax-m3`). Eine `models`-Liste am
+      # Anbieter `openrouter` wuerde dessen gesamten Katalog ersetzen
+      # (resolveRouteModels), daher ein eigener Anbieter mit nur diesem Modell.
+      # Gleicher Schluessel wie `openrouter`, Endpunkt von OpenRouter.
       openrouter-free:
-        displayName: Shinon Forge
+        displayName: OpenRouter Free
         apiKeyEnv: SHINON_API_KEY
         api: openai-completions
         baseURL: https://openrouter.ai/api/v1
@@ -257,7 +262,7 @@
           - id: minimax/minimax-m3.1-flash:free
             name: MiniMax M3.1 Flash (free)
       prompter:
-        displayName: Shinon Forge
+        displayName: Prompter
         apiKeyEnv: PROMPTER_API_KEY
         api: openai-completions
         baseURL: https://apihub.agnes-ai.com/v1
@@ -285,9 +290,8 @@
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
-    provider: openrouter
-    model: openrouter/free
-    reasoningEffort: high
+    provider: openrouter-free
+    model: minimax/minimax-m3.1-flash:free
 # Shinon-Preset: EIGENE, schmalere Werkzeug-Zusammensetzung.
 #
 # Das DSH liefert vier Presets (standard, ptc, minimal, cordis). 'standard'
