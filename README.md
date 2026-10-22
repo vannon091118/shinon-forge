@@ -60,10 +60,11 @@ git clone https://github.com/vannon091118/shinon-forge.git
 cd shinon-forge
 npm ci
 npm run profile:links
-npm run preflight:docs
 npm test
 git status --short
 ```
+
+`npm test` startet lokal zuerst den sicheren Dokumentations-/Workflow-Preflight und repariert nur eindeutige Verdrahtungsfehler; danach laufen die bestehenden Kernprüfungen. Den reinen, schreibgeschützten Vertrag kannst du mit `npm run preflight:docs:check` prüfen.
 
 Nach diesen Schritten soll `git status --short` leer bleiben, sofern du selbst keine Projektdateien geändert hast. `.freebuff/`, Credentials, Sitzungslogs, Workspace-Zustand, Cache-Dateien und rohe Messdaten bleiben lokal. Kuratierte Proben und Screenshots unter `docs/probes/` bleiben dagegen versioniert, wenn sie einen konkreten Vertrag oder Prüflauf belegen. Details: [Remote-Arbeit und Worktrees](docs/REMOTE-ARBEIT.md).
 
