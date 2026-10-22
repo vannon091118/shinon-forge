@@ -24,6 +24,7 @@
 - [Schnellstart und Clean Clone](#schnellstart-und-clean-clone)
 - [Release-Status](#release-status)
 - [Dokumentation](#weiterklicken)
+- [Agenten-Übergabe und Änderungsspur](docs/AGENT-HANDOFF.md)
 
 ### Was Shinon ergänzt
 
