@@ -19,6 +19,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 import * as diary from '../../lib/diary.mjs';
 
@@ -72,6 +73,23 @@ test('ein vollständiges Miniatur-Tagebuch ist grün', () => {
   withTemp(HEAD + chapter('2026-01-02') + chapter('2026-01-03') + claims(), (root) => {
     assert.deepEqual(diary.diaryIssues(root, { log: 'aaaaaaa 2026-01-02\nbbbbbbb 2026-01-03\n' }), []);
   });
+});
+
+
+test('die Historientabelle liefert volle SHAs für vollständige Tagebuchanker', () => {
+  const root = mkdtempSync(join(tmpdir(), 'shinon-diary-history-'));
+  try {
+    execFileSync('git', ['init', '--quiet'], { cwd: root });
+    mkdirSync(join(root, 'packages', 'hook'), { recursive: true });
+    writeFileSync(join(root, 'packages', 'hook', 'index.js'), '// history fixture\n');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['-c', 'user.name=Gate Test', '-c', 'user.email=gate@example.invalid', 'commit', '--quiet', '-m', 'fixture'], { cwd: root });
+    const history = diary.diaryHistory(root);
+    assert.ok(history.log, history.skip ?? 'Historie sollte verfügbar sein');
+    assert.match(history.log, /^[0-9a-f]{40} \d{4}-\d{2}-\d{2}$/m);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('ein Tag ohne Kapitel ist rot', () => {
