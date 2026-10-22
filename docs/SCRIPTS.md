@@ -47,6 +47,8 @@
 | `commit-guard.mjs` | `commit:guard`, `commit:check-file` | Commit-Regeln (`--ci`, `--last n`, `--range`, `--all`, `--file`, `--fix`) |
 | `install-hooks.mjs` | `hooks:install` | legt die drei Git-Hooks aus `.githooks/` |
 | `notes-check.mjs` | `notes:check` | Zettel in `generated-skills/` gegen `prompter/assets/note-rules.json` (fail-closed) |
+| `preflight-docs.mjs` | `preflight:docs` | Pflichtdokumente, Quellenhoheit, relative Links und Verdict-Verkabelung; stabile `PREFLIGHT_*` Fehlercodes und optional JSON-Bericht |
+| `preflight-verdict.mjs` | in GitHub Actions | fasst `needs`-Resultate fail-closed zusammen; schreibt Commit/Run/Job-Status und Fehlercodes in `preflight-report.json` und GitHub Summary |
 | `check-dsh-versions.mjs` | `check:dsh-versions` | `package.json`-Pin gegen `dsh-target-versions.json` |
 | `run-with-node.mjs` | — | Wrapper: führt Befehle mit der geheilten Node-Fassung |
 
@@ -81,7 +83,7 @@
 - **Pfade/Repo:** `paths`, `repo`, `yaml`, `structure`, `canon`, `diary` (Tagebuch-Prüfung `diaryIssues()`), `source-scan`
 - **Pakete:** `payload` (die Nutzlast: Code, Prod-Abhängigkeiten, mitgelieferte Node-Laufzeit, relative Bundle-Links), `huelle` (die Texte der beiden Verpackungshüllen: Debian `control`/`postinst`/Menüeintrag/PATH-Starter, Windows `install.ps1`/`uninstall.ps1`), `runtime` (die EINE Node-Auflösung: `engines.node` → Untergrenze → Archivname → Prüfsumme)
 - **Boot:** `runtime` (Node-Heilung), `dsh` (Auflösung), `dsh-home`, `dsh-versions`, `port`
-- **Regeln:** `model-route` (Routen-Formprüfung), `plugin-idioms`, `commit-text`, `commit-policy`, `commit-policy-file`, `ci-range`, `pr-promotion`
+- **Regeln:** `model-route` (Routen-Formprüfung), `plugin-idioms`, `commit-text`, `commit-policy`, `commit-policy-file`, `ci-range`, `pr-promotion`, `preflight/diagnostics`, `preflight/documentation`, `preflight/policy`
 - **Sonstiges:** `perf-stats`, `secrets` (Tresor-Disziplin der Nutzer-Installation)
 
 ## E2E (`scripts/e2e/`, kein npm-Script)
