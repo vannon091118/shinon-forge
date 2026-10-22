@@ -8,11 +8,13 @@
 ## Unreleased
 
 ### Geändert
-- README-/Banner-/Clean-Clone-Hygiene, Security-Workflow und Agenten-Übergabe werden über PR #23 zusammengeführt. Status erst nach grünen Pflicht-Gates und Merge als abgeschlossen markieren.
+- README/Banner/Clean-Clone-Hygiene plus permanente Agenten-Übergabe werden in PR #23 zusammengeführt.
+- Modularer Preflight ergänzt mit zentraler Policy (`scripts/lib/preflight/policy.mjs`), formatierbaren Diagnosen, Dokumentations-/Linkprüfung, job-spezifischen `PREFLIGHT_*` Fehlercodes und maschinenlesbarer Abnahme (`scripts/preflight-verdict.mjs`).
+- Der Abschlussjob bewertet alle 14 Pflichtzweige; `failure`, `cancelled`, `skipped`, fehlende und unbekannte Resultate sind rot. Der Report enthält Commit-SHA, Run-ID, Logs-Link und Status je Job. Diese Änderung ist noch nicht als angenommen markiert, bevor die tatsächlichen GitHub-Checks grün sind.
 
 ### Belege
 - PR: https://github.com/vannon091118/shinon-forge/pull/23
-- CI: vor Merge aus dem tatsächlichen PR-Check-Status übernehmen; niemals einen erwarteten Lauf als bestanden eintragen.
+- CI: lokal nicht als ausgeführt behaupten. Auf den GitHub-Check `Preflight-Abnahme (fail-closed)` und das `preflight-report.json`-Artefakt warten; den tatsächlichen Status erst danach eintragen.
 
 ### Übergabe an den nächsten Agenten
 - Zuerst PR-Checks und Security-Workflow prüfen, Fehler beheben und den Merge erst bei erfüllten Pflicht-Gates ausführen.
