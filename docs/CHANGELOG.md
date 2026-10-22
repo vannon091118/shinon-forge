@@ -10,7 +10,8 @@
 ### Geändert
 - README/Banner/Clean-Clone-Hygiene plus permanente Agenten-Übergabe werden in PR #23 zusammengeführt.
 - Modularer Preflight ergänzt mit zentraler Policy (`scripts/lib/preflight/policy.mjs`), formatierbaren Diagnosen, Dokumentations-/Linkprüfung, job-spezifischen `PREFLIGHT_*` Fehlercodes und maschinenlesbarer Abnahme (`scripts/preflight-verdict.mjs`).
-- Der Abschlussjob bewertet alle 14 Pflichtzweige; `failure`, `cancelled`, `skipped`, fehlende und unbekannte Resultate sind rot. Der Report enthält Commit-SHA, Run-ID, Logs-Link und Status je Job. Diese Änderung ist noch nicht als angenommen markiert, bevor die tatsächlichen GitHub-Checks grün sind.
+- Der Abschlussjob bewertet alle 13 Pflichtjobs und bindet jede deklarierte Prüfstrecke ein; `failure`, `cancelled`, `skipped`, fehlende und unbekannte Resultate sind rot. Der Report enthält Commit-SHA, Run-ID, Logs-Link und Status je Job. Diese Änderung ist noch nicht angenommen, bevor die tatsächlichen GitHub-Checks grün sind.
+- Messbeleg für vermeidbare Kosten: Gate-Run `39711072872` maß rund 16 s für `npm ci` und 17,2 s für die Gate-Suiten. Entfernt wurden nur nachweisbare Duplikate: zweiter `shinon-test.mjs`-Lauf, Installation im Lockfile-Audit und doppelte Literal-Checks zusätzlich zu echtem `git check-ignore`/`git ls-files`.
 
 ### Belege
 - PR: https://github.com/vannon091118/shinon-forge/pull/23
