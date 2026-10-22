@@ -89,7 +89,10 @@ test('Regression: Quelltext als Text in einem Template macht das Gate nicht blin
   assert.deepEqual(findForbidden(source, ['fetch(']), ['fetch('], 'und verbotene Aufrufe danach werden gefunden');
 
   // Und am echten Paket, das den Fall ausgelöst hat.
-  const core = read('packages/project-index/assets/index-core.js');
+  // Der Kern liegt seit T2-5 in fuenf Dateien; der Fall gilt fuer den Kern als
+  // Ganzes, nicht fuer die Datei, die zufaellig den Namen trug.
+  const coreFiles = ['index-core.js', 'index-format.js', 'index-extract.js', 'index-store.js', 'index-run.js', 'index-context.js'];
+  const core = coreFiles.map((name) => read(`packages/project-index/assets/${name}`)).join('\n');
   assert.deepEqual(findMissing(codeOnly(core), ['new DatabaseSync']), [], 'die Kontrolle im Vertrag des Index ist aussagekräftig');
   assert.ok(codeOnly(core).includes('const db = new DatabaseSync(file);'), 'die Zeile selbst steht im Ergebnis');
 });

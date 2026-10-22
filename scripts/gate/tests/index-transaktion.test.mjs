@@ -34,7 +34,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const CORE = fileURLToPath(new URL('../../../packages/project-index/assets/index-core.js', import.meta.url));
+// `openIndex` und `setMetaMany` wohnen seit T2-5 im Ablage-Modul des Kerns.
+const CORE = fileURLToPath(new URL('../../../packages/project-index/assets/index-store.js', import.meta.url));
 const source = readFileSync(CORE, 'utf8');
 
 /**

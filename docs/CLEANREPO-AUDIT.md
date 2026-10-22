@@ -101,12 +101,11 @@ Bei Widerspruch zur Matrix: anhalten und melden, nicht improvisieren.
 
 ## 2. Hotspots — der Bestand aus der eigenen Struktur-Registry
 
-`docs/contracts/structure.json` ist die Schuld-Inventur. **Null Live-Verstöße** (0 Dateien über Grenze ohne Eintrag im `bestand`). Aber 30 eingefrorene Ausnahmen, jede 3–4× über ihrer Grenze:
+`docs/contracts/structure.json` ist die Schuld-Inventur. **Null Live-Verstöße** (0 Dateien über Grenze ohne Eintrag im `bestand`). Aber 29 eingefrorene Ausnahmen, jede 3–4× über ihrer Grenze (`index-core.js` ist am 2026-10-22 aus dieser Liste herausgeteilt worden, siehe T2-5):
 
 | Datei | Ist | Grenze | Klasse | Faktor |
 |---|---:|---:|---|---:|
 | `packages/codingmon/client.js` | 3 482 | 250 | client | 13,9× |
-| `packages/project-index/assets/index-core.js` | 2 220 | 650 | core | 3,4× |
 | `scripts/gate/tests/prompter-contract.test.mjs` | 2 212 | 550 | test | 4,0× |
 | `scripts/gate/tests/project-index.test.mjs` | 2 154 | 550 | test | 3,9× |
 | `packages/persona/index.js` | 1 447 | 550 | host-entry | 2,6× |
@@ -296,7 +295,7 @@ Der einzige harte Import ist `@shinon/seams/core`; alles andere ist Naht + Diens
 |---|---|---|---|
 | 1 | `scoring/index.js:542` → Host + `assets/scoring-store.js` (importfrei, deterministisch) | 542 → ~340, Luft 8 → ~210 | niedrig |
 | 2 | `task-router/index.js:456-690` (235 Z, §18) → `assets/task-micro-state.js` | 770 → ~535 | mittel |
-| 3 | `project-index/assets/index-core.js` (2 220) → 5 Module: Schema/Parsers, Secrets/Schutz, DB+Migration, Warm-Pfad, MAX-Kontext | 2 220 → 5×~440 | mittel |
+| 3 | **erledigt 2026-10-22** — `project-index/assets/index-core.js` (2 220) → fuenf Eigentuemer-Dateien (`index-format` 420, `index-extract` 459, `index-store` 388, `index-run` 409, `index-context` 549) plus ein Barrel mit 69 Namen | 2 220 → 5× unter 650 | erledigt |
 | 4 | `facts-core.js:147 wouldCreateCycle` + `facts-invalidate.js:30 findCycle` → **ein** Zyklus-Modul | Duplikat raus | niedrig |
 
 **Nicht extrahieren:** `narrative` (258 Z, 0 Imports, Gate erzwingt Importfreiheit) · `hook`/`events` (Paketgrenze scharf; die offene Stelle ist der doppelte Envelope-Bauer, nicht die Dateiform) · `facts-extract`/`facts-reconcile` (je importfrei und korrekt geschnitten — das Problem ist ihr Fehlen im Betrieb, nicht ihre Form).
@@ -700,7 +699,7 @@ Das ist die Formulierung, die in den Plan gehört, weil sie **prüfbar** ist: de
 | **T2-2** | **Erledigt am 2026-10-22:** `rollBonuses` lebt genau einmal, in `packages/codingmon/assets/zucht-glueck.js`; `zucht.js` importiert es und würfelt nicht selbst. Der Riegel steht seit heute in `packages/codingmon/test/zucht-core.test.mjs`: eine Definitionsstelle, kein zweiter Würfel in `zucht.js`, und 25 Stichproben, in denen `pair()` die Bonusliste GENAU so ins Ei legt, wie `rollBonuses` sie für denselben Seed liefert. | `packages/codingmon/assets/zucht.js`, `packages/codingmon/test/zucht-core.test.mjs` | 0 Abweichungen in 25 Stichproben | F | ✅ |
 | **T2-3** | **Erledigt am 2026-10-22 (belegt in `b902a3d`, T0-2):** der Memory-Store trägt `blockWeights` und `blockAttributions` in der vorhandenen Summary-Zeile; `packages/project-index/assets/index-core.js` liest beide beim Laden mit additiven Defaults (`:1558`) und schreibt sie beim Speichern (`:1578`). Die Probe in `scripts/gate/tests/scoring-memory-learning.test.mjs` fährt Save→Load wertgleich. | `packages/project-index/assets/index-core.js` | Schema trägt die Felder; Altstände lesen Defaults | B | ✅ |
 | **T2-4** | Fakten-Pipeline anbinden (`facts-extract`, `facts-reconcile` haben 0 Importeure) | `packages/project-index/assets/facts-*.js` | entweder verdrahtet oder entfernt | B | ◆ |
-| **T2-5** | `index-core.js` (2 220 Z) teilen — 4 Module | `packages/project-index/assets/index-core.js` | jede Datei unter Grenze 650 | B | ◆ |
+| **T2-5** | **Erledigt am 2026-10-22:** `index-core.js` (2 219 Zeilen) ist in fuenf Eigentuemer-Dateien geteilt (`index-format.js` 420, `index-extract.js` 459, `index-store.js` 388, `index-run.js` 409, `index-context.js` 549 — alle unter der Kerngrenze 650) plus ein Barrel mit 25 Zeilen, das die **69 öffentlichen Namen** namentlich re-exportiert (kein Stern-Re-Export, damit innere Helfer innen bleiben). Der Bestandseintrag ist gelöscht (30 → 29). Der Riegel: `scripts/gate/tests/index-split.test.mjs` pinnt die 69 Namen, verbietet den Import des Barrels aus einem Teil und die Grenze; die bestehenden Index-Suiten (55/55) und die statischen Quelltext-Prüfungen lesen jetzt die ganze Kernfamilie statt einer Datei. | `packages/project-index/assets/index-*.js`, `scripts/gate/tests/index-split.test.mjs` | jede Datei unter 650; 5/5 Split-Tests | B | ✅ |
 | **T2-6** | Persona: `apply()`-Scope aufräumen — der Zustand braucht einen Eigentümer | `packages/persona/index.js` | Bindings in einem Zustandsobjekt | D | ◆ |
 | **T2-7** | `claim-core.js` verdrahten (`adoptClaim` hat 0 Aufrufer) | `packages/persona/assets/claim-core.js` | verdrahtet oder entfernt | D | ◆ |
 | **T2-8** | Dashboard/Registry: eine Tabelle für alle Pakete | `packages/dashboard/client.js` | alle 24 Pakete sichtbar | E | ◆ |

@@ -6,7 +6,7 @@
  *
  * DER DEFekt, den diese Datei behebt (gemessen 2026-10-21, echter Index, Root
  * /opt/shinon-forge, Prompt 'Wie kommen Persona und Skills beim main model
- * an?'): `resolveContext` (packages/project-index/assets/index-core.js:2155)
+ * an?'): `resolveContext` (packages/project-index/assets/index-context.js)
  * fuellt den Datei-INHALT bis zum Zeichen-Budget. Danach kommen die Metadaten
  * unbegrenzt dazu — `symbols` (bis 200, Zeile 2196), `touches` (2199) und
  * `dependencies` (2203) — und der Renderer (render-context.js:75) setzt darueber

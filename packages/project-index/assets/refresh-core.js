@@ -229,9 +229,12 @@ import(workerData.module).then(
 /**
  * Den Warm-Pfad im Worker ausfuehren: Kandidaten suchen, nur Geaendertes lesen.
  *
- * WARUM EIGENE DATEI: `index-core.js` ist im Bestand (2 220 Zeilen) und darf
- * nicht wachsen. Die Ausfuehrung gehoert trotzdem nicht in den Host — der
- * Host soll entscheiden, WANN, und der Kern soll ausfuehren.
+ * WARUM EIGENE DATEI: die Ausfuehrung gehoert nicht in den Host — der Host soll
+ * entscheiden, WANN, und der Kern soll ausfuehren. (Der Grund von damals, ein
+ * Bestandseintrag fuer 2 220 Zeilen in `index-core.js`, ist seit dem Schnitt vom
+ * 2026-10-22 weg: der Kern liegt jetzt in fuenf Dateien unter 650 Zeilen. Die
+ * Trennung bleibt trotzdem richtig, weil sie nicht Groesse, sondern Eigentum
+ * folgt.)
  *
  * @param {object} eingabe
  * @param {string} eingabe.file der Index-Pfad

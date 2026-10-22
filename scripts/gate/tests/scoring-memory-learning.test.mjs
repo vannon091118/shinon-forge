@@ -2,7 +2,7 @@
 /** Save→Load-Beweis für die Scoring-Lernfelder im echten SQLite-Memory-Store. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -15,7 +15,10 @@ test('project-index memory: Gewichte und Attributionsbelege überleben Save→Lo
   try {
     const assets = join(work, 'project-index/assets');
     mkdirSync(assets, { recursive: true });
-    for (const name of ['index-core.js', 'workspace.js']) cpSync(new URL(name, source), join(assets, name));
+    // Der Kern ist seit T2-5 ein Barrel plus fuenf Eigentuemer-Dateien — die
+    // Kopie muss die ganze Familie mitnehmen, sonst bricht der Import im Sandkasten.
+    const coreFiles = readdirSync(source).filter((name) => name === 'workspace.js' || /^index-[a-z]+\.js$/.test(name));
+    for (const name of coreFiles) cpSync(new URL(name, source), join(assets, name));
     provideSeamCore(work);
     const core = await import(pathToFileURL(join(assets, 'index-core.js')).href);
     const db = core.openIndex(join(work, 'ledger.sqlite'));

@@ -3,7 +3,7 @@
  * Die Budget-Wahrheit des MAX-Kontexts — bis in den fertigen One-Shot-Request.
  *
  * ANLASS (gemessen 2026-10-21, echter Index, Root /opt/shinon-forge):
- * `resolveContext` (packages/project-index/assets/index-core.js:2155) begrenzt
+ * `resolveContext` (packages/project-index/assets/index-context.js) begrenzt
  * den ZEICHEN-Budget fuer den Datei-INHALT. Danach kommen die Metadaten
  * unbegrenzt dazu — `symbols` (bis 200, Zeile 2196), `touches` (2199),
  * `dependencies` (2203) — und der Render-Schritt setzt darueber das Markup

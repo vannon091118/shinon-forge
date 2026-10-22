@@ -47,7 +47,16 @@ const ROOT_SKIP = AS_ROOT ? 'als root (uid 0) greifen Dateirechte nicht' : false
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/project-index/', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const INDEX_FILE = join(PACKAGE_DIR, 'index.js');
-const CORE_FILE = join(PACKAGE_DIR, 'assets/index-core.js');
+// Der Kern besteht seit T2-5 aus fuenf Eigentuemer-Dateien; `index-core.js` ist
+// nur noch das Barrel, das dieselben Namen namentlich re-exportiert. Die
+// statischen Pruefungen unten meinen den KERN, nicht eine bestimmte Datei —
+// deshalb lesen sie alle Teile zusammen, in Dateinamen-Reihenfolge.
+const CORE_FILES = readdirSync(join(PACKAGE_DIR, 'assets'))
+  .filter((name) => name === 'index-core.js' || /^index-[a-z]+\.js$/.test(name))
+  .sort()
+  .map((name) => join(PACKAGE_DIR, 'assets', name));
+/** Der ganze Kern als EIN Text — fuer die Zeichenpruefungen, nicht fuer den Lauf. */
+const readCore = () => CORE_FILES.map((file) => readFileSync(file, 'utf8')).join('\n');
 
 const root = dshRoot();
 assert.ok(root !== null, 'dsh muss im PATH liegen (dshRoot() ist null) — wie beim Profiltest');
@@ -1180,7 +1189,7 @@ test('Grenze: der Lauf schreibt nichts ins Projekt', () => {
   assert.ok(readFileSync(file).length > 0, 'und existiert wirklich');
 
   // Beide Haelften: die Host-Haelfte (Mount) und der Kern (Engine, im Worker).
-  const sources = { 'index.js': readFileSync(INDEX_FILE, 'utf8'), 'assets/index-core.js': readFileSync(CORE_FILE, 'utf8') };
+  const sources = { 'index.js': readFileSync(INDEX_FILE, 'utf8'), 'assets/index-*.js': readCore() };
   for (const [name, source] of Object.entries(sources)) {
     for (const tokens of [
       ['writeFileSync', 'appendFileSync', 'rmSync', 'unlinkSync', 'renameSync'],
@@ -1190,7 +1199,7 @@ test('Grenze: der Lauf schreibt nichts ins Projekt', () => {
       assert.deepEqual(findForbidden(source, tokens), [], `${name}: ${tokens.join(', ')}`);
     }
   }
-  assert.deepEqual(findMissing(codeOnly(sources['assets/index-core.js']), ['new DatabaseSync']), [], 'der Index ist wirklich SQLite');
+  assert.deepEqual(findMissing(codeOnly(sources['assets/index-*.js']), ['new DatabaseSync']), [], 'der Index ist wirklich SQLite');
   assert.deepEqual(
     findForbidden(sources['index.js'], ['DatabaseSync'], { mode: 'module' }),
     [],
@@ -1214,7 +1223,7 @@ test('Öffnen: die sieben Meta-Zeilen gehen in einer Transaktion raus', () => {
 
   // Der Grund ist der Preis: sieben Commits waren sieben fsyncs. Gepinnt wird
   // die Form, nicht die Dauer — die hängt an Maschine und Last.
-  const source = codeOnly(readFileSync(CORE_FILE, 'utf8'));
+  const source = codeOnly(readCore());
   const start = source.indexOf('export function openIndex');
   const body = source.slice(start, source.indexOf('export function indexMeta', start));
   assert.ok(start !== -1 && body.length > 0, 'openIndex ist auffindbar');
@@ -1244,7 +1253,7 @@ test('Update: eine bekannte Datei wird vor dem Neuschreiben geleert — keine Do
 });
 
 test('Kaltlauf: eine neue Datei braucht kein Leeren — forgetFile läuft nur für bekannte Pfade', () => {
-  const source = codeOnly(readFileSync(CORE_FILE, 'utf8'));
+  const source = codeOnly(readCore());
   // Der Durchgang weiß, ob die Datei Zeilen hatte: dieses Wissen geht mit hinein.
   assert.match(source, /indexFile\(db, root, absolute, file, \{ chunkLines, stamp, known: before !== undefined \}\)/, 'der Aufruf übergibt das Wissen über Vorzeilen');
   // indexFile leert nur dann — auf einer frischen Datei kann nichts liegen.
