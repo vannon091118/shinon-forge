@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matchesSlice, shouldRun, shouldRunLocal, normalizePluginResult, failureCode } from '../engine.mjs';
+import { matchesSlice, shouldRun, shouldRunLocal, normalizePluginResult, failureCode, pluginFromModule } from '../engine.mjs';
 import { parsePolicy, validateCoverage, validateLocalSubset } from '../policy.mjs';
 
 const policy = {
@@ -43,6 +43,20 @@ test('shouldRun: forceFull überschreibt Slices', () => {
 test('shouldRunLocal: nur die lokale Menge', () => {
   assert.equal(shouldRunLocal('manifest', policy), true);
   assert.equal(shouldRunLocal('contract', policy), false);
+});
+
+test('pluginFromModule: ein Modul ohne check() wird zum benannten Befund statt zu einer Lücke', () => {
+  const plugin = pluginFromModule({ id: 'stumm' }, 'stumm.mjs');
+  assert.equal(plugin.id, 'stumm');
+  const result = plugin.check({});
+  assert.equal(result.status, 'fail');
+  assert.ok(result.issues.some((issue) => issue.includes('stumm.mjs') && issue.includes('check()')));
+});
+
+test('pluginFromModule: ein echtes check() bleibt unverändert', () => {
+  const check = () => [{ issue: 'x' }];
+  const plugin = pluginFromModule({ id: 'echt', check }, 'echt.mjs');
+  assert.equal(plugin.check, check);
 });
 
 test('parsePolicy: akzeptiert gültige Policy', () => {

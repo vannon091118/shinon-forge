@@ -92,13 +92,32 @@ export function normalizePluginResult(result) {
   return { issues: ['Plugin returned neither an issue array nor a valid result object'], status: 'fail', detail: '' };
 }
 
+/**
+ * Ein Plugin-Modul wird zu genau einem Gate — auch wenn es kein `check()` hat.
+ *
+ * Der frühere `continue` übersprang ein solches Modul STILL: die Engine meldete
+ * eine kleinere Plugin-Zahl und am Ende PASS. Ein grünes Gate, das ein Gate
+ * verschluckt, ist die gefährlichste Fehlerform — deshalb wird der fehlende
+ * Export zu einem benannten Befund statt zu einer Lücke in der Zählung.
+ */
+export function pluginFromModule(mod, file) {
+  const id = mod?.id ?? file.replace(/\.mjs$/, '');
+  if (typeof mod?.check === 'function') return { id, check: mod.check };
+  return {
+    id,
+    check: () => ({
+      issues: [`${file}: kein check()-Export — das Plugin darf nicht still entfallen`],
+      status: 'fail',
+    }),
+  };
+}
+
 export async function loadPlugins() {
   const files = readdirSync(PLUGIN_DIR).filter((f) => f.endsWith('.mjs')).sort();
   const plugins = [];
   for (const file of files) {
     const mod = await import(pathToFileURL(join(PLUGIN_DIR, file)).href);
-    if (typeof mod.check !== 'function') continue;
-    plugins.push({ id: mod.id ?? file.replace(/\.mjs$/, ''), check: mod.check });
+    plugins.push(pluginFromModule(mod, file));
   }
   return plugins;
 }

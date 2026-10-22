@@ -301,6 +301,12 @@ jobs:
       - name: DSH-Versionen gegen Sollquelle, Lock, Vendor, Installat und CLI pruefen
         run: node scripts/check-dsh-versions.mjs
 
+      # Der Bestandsblock driftet sonst unbemerkt: der Hook prueft ihn lokal,
+      # die CI-Kette tat es bisher nicht. Ein toter Ausnahmefall oder eine
+      # gewachsene Dateizahl faellt hier auf, nicht erst beim naechsten Audit.
+      - name: Gemessene Zahlen gegen den Baum pruefen
+        run: npm run zahlen:check
+
   # ── Preflight: Dokumentationsvertrag, Dependency- und Static-Security ───────
   preflight-docs:
     name: Preflight (Dokumentationsvertrag)

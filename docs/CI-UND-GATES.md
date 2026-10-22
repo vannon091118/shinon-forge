@@ -48,7 +48,7 @@ Jedes Plugin meldet `pass` / `not-applicable` / `fail`; Exit 1 bei Issues.
 | `package-drift` | Paket-Quelle und Profil-Kopie auseinandergelaufen? |
 | `duplicate-plugin` | kein Plugin doppelt registriert |
 | `dead-package` | inaktive Pakete tragen `dsh.inactive`, aktive stehen im Profil |
-| `registry` | Namens-Registry ([`contracts/canon.json`](contracts/canon.json)) gegen den Baum |
+| `registry` | Bundles: `dsh.bundle.patch` existiert und jedes Profil-Bundle ist in `packages/*` registriert (nicht der Kanon — den prüft das statische Gate) |
 | `contracts` | Vertragsdateien in 7-Punkt-Form |
 | `contracts`-Ziel `probe-twin` | Proben: Form + Zieldateien existieren |
 | `doctor` | Repo-Drift-Scanner (gleiche Familie wie `scripts/doctor.mjs`) |
@@ -129,7 +129,7 @@ wartet auf alle 13 Pflichtjobs.
 7. Profilboot
 8. Prompter-Tests
 9. TypeScript-Gate
-10. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag
+10. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag und `npm run zahlen:check`
 11. Dependency-Audit direkt aus `package-lock.json`
 12. CodeQL für JavaScript/TypeScript
 13. Gitleaks über die vollständige Git-Historie

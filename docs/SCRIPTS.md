@@ -85,7 +85,7 @@
 - **Pfade/Repo:** `paths`, `repo`, `yaml`, `structure`, `canon`, `diary` (Tagebuch-Prüfung `diaryIssues()`), `source-scan`
 - **Pakete:** `payload` (die Nutzlast: Code, Prod-Abhängigkeiten, mitgelieferte Node-Laufzeit, relative Bundle-Links), `huelle` (die Texte der beiden Verpackungshüllen: Debian `control`/`postinst`/Menüeintrag/PATH-Starter, Windows `install.ps1`/`uninstall.ps1`), `runtime` (die EINE Node-Auflösung: `engines.node` → Untergrenze → Archivname → Prüfsumme)
 - **Boot:** `runtime` (Node-Heilung), `dsh` (Auflösung), `dsh-home`, `dsh-versions`, `port`
-- **Regeln:** `model-route` (Routen-Formprüfung), `plugin-idioms`, `commit-text`, `commit-policy`, `commit-policy-file`, `ci-range`, `pr-promotion`, `preflight/diagnostics`, `preflight/documentation`, `preflight/fixes`, `preflight/policy`
+- **Regeln:** `model-route` (Routen-Formprüfung), `plugin-idioms`, `commit-text`, `commit-policy`, `commit-policy-file`, `ci-range`, `preflight/diagnostics`, `preflight/documentation`, `preflight/fixes`, `preflight/policy`
 - **Sonstiges:** `perf-stats`, `secrets` (Tresor-Disziplin der Nutzer-Installation)
 
 ## E2E (`scripts/e2e/`, kein npm-Script)
