@@ -1,9 +1,9 @@
-name: Shinon Security
+name: Shinon Security (periodic)
 
+# Die verbindlichen PR-/Push-Security-Jobs laufen im Preflight aus
+# commit-guard.yml und werden dort in das finale Urteil eingespeist.
+# Dieser Workflow hält zusätzlich den planmäßigen Audit außerhalb von PRs bereit.
 on:
-  push:
-    branches: [main]
-  pull_request:
   schedule:
     - cron: '23 7 * * 1'
   workflow_dispatch:
@@ -15,35 +15,36 @@ jobs:
   dependency-audit:
     name: Production dependency audit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.19.0'
           cache: npm
-      - name: Install lockfile dependencies
-        run: npm ci
+      - name: Install lockfile dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Audit production dependency tree
         run: npm audit --omit=dev --audit-level=high
 
   codeql:
     name: CodeQL JavaScript and TypeScript
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       actions: read
       contents: read
+      pull-requests: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           build-mode: none
       - name: Analyze
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: /language:javascript-typescript
 
@@ -52,10 +53,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Scan repository history for secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
