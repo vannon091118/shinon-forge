@@ -1610,3 +1610,44 @@ Lokal: `npm run gate:test` 963/963 in 9,4 s, `npm test` Exit 0,
 noch.
 
 **Anker:** `b0eb57e` · Belege: `scripts/gate/plugins/slot-ids.mjs`, `scripts/gate/tests/slot-ids.test.mjs`, `scripts/gate/policy.json`, `scripts/gate/plugins/schemastery-enum.mjs`, `scripts/lib/canon.mjs`, `.github/workflows/commit-guard.yml`, `docs/CLEANREPO-AUDIT.md`, `docs/SETUP.md`
+
+### Der siebte Block: ein Regal wird zu fünf Fächern
+
+`index-core.js` war 2 219 Zeilen. Das ist keine Datei, die jemand am Stück liest
+— das ist ein Regal, in das alles gestellt wurde, was den Index ausmacht:
+Vertrag, Secret-Muster, DDL, Baumspaziergang, Parser-Heuristik, Datenbank,
+inkrementeller Lauf, Worker, Warm-Pfad und die Rangfolge für MAX. Die Grenze des
+Struktur-Riegels liegt bei 650; der Bestandseintrag war die Erlaubnis, es nicht
+anzufassen. Seit heute ist er weg: `index-format.js` (420 Zeilen),
+`index-extract.js` (459), `index-store.js` (388), `index-run.js` (409),
+`index-context.js` (549) — und ein Barrel mit 25 Zeilen, das die **69
+öffentlichen Namen** namentlich re-exportiert. Kein Stern-Re-Export: die neun
+inneren Helfer, die über eine Modulgrenze wandern mussten (`readText`,
+`metaValue`, `setMeta`, `forgetFile`, `indexFile`, `resolveTouches`, `byPath`,
+`errorCodeOf`, `readTextWithReason`), bleiben damit innen — sonst wäre die Fläche
+größer geworden, ohne dass jemand das beschlossen hätte.
+
+Der Schnitt ist maschinell gefahren und trotzdem nicht blind: er nimmt je
+Deklaration den Dokumentationsblock mit, löst die Importkanten aus dem TEXT ohne
+Kommentare auf und hat genau an einer Stelle gelogen — beim Spread-Operator
+`...PRIMARY_TABLES`, den die Kantenberechnung als Eigenschaftszugriff las. Der
+erste Index-Testlauf war rot, weil `forgetFile` die Tabelle nicht mehr kannte,
+und die Korrektur war eine Zeile in der Erkennung. Das ist der ehrliche Teil:
+eine Zerlegung, die beim ersten Lauf grün ist, war meistens zu flach.
+
+Teurer war die zweite Hälfte. Vier Tests lasen den Kern als **Text** und suchten
+`new DatabaseSync`, `openIndex` oder die Zeile `forgetFile` in einer bestimmten
+Datei. Sie lesen jetzt die Kernfamilie — `readCore()` für die statischen
+Prüfungen, die ganze Kopie im Sandkasten für den Speicher-Test. Ein Test, der
+eine Datei prüft, prüft seit heute den falschen Gegenstand; das gilt für jeden
+weiteren Schnitt. Der neue Riegel `scripts/gate/tests/index-split.test.mjs` hält
+das Gegenteil fest: 69 Namen Name für Name, kein Import des Barrels aus einem
+Teil (das wäre ein Zyklus wie eine Treppe, die in sich selbst mündet), jede Datei
+unter 650.
+
+Belege: `npm run gate:test` **968/968** in 9,2 s, `npm test` Exit 0,
+`npm run build` Exit 0, `npm run zahlen:check` Exit 0,
+`npm run preflight:docs:check` PASS, `structureIssues()` leer, Bestand 29 statt
+30. CI: Gate #536 auf `b069617` grün (2 m 55 s).
+
+**Anker:** `b069617` · Belege: `packages/project-index/assets/index-core.js`, `packages/project-index/assets/index-format.js`, `packages/project-index/assets/index-extract.js`, `packages/project-index/assets/index-store.js`, `packages/project-index/assets/index-run.js`, `packages/project-index/assets/index-context.js`, `scripts/gate/tests/index-split.test.mjs`, `docs/contracts/structure.json`

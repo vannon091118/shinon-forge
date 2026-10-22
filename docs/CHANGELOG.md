@@ -31,6 +31,7 @@
 - Messbeleg für vermeidbare Kosten: Gate-Run `39711072872` maß rund 16 s für `npm ci` und 17,2 s für die Gate-Suiten. Entfernt wurden nur nachweisbare Duplikate: zweiter `shinon-test.mjs`-Lauf, Installation im Lockfile-Audit und doppelte Literal-Checks zusätzlich zu echtem `git check-ignore`/`git ls-files`.
 
 ### Belege
+- Lauf zum Index-Schnitt: Commit `b069617`; Gate #536 auf `b069617` **success** (2 m 55 s), Verdict-Job eingeschlossen; Paketbau #66 lief zum Eintragszeitpunkt noch. Lokal: `npm run gate:test` 968/968 in 9,2 s, `npm test` Exit 0, `npm run build` Exit 0, `npm run zahlen:check` Exit 0, `npm run preflight:docs:check` PASS, Bestand 29.
 - Lauf zum Slot-ID-Block: Commit `b0eb57e`; Gate #534 auf `b0eb57e` **success** (3 m 8 s), Verdict-Job eingeschlossen; Paketbau #65 lief zum Eintragszeitpunkt noch. Lokal: `npm run gate:test` 963/963 in 9,4 s, `npm test` Exit 0, `npm run build` Exit 0, `npm run zahlen:check` Exit 0.
 - Lauf zum Block der zwei Orte ohne Zeilen: Commit `e587e59`; Gate #532 (2 m 51 s) und Installationspakete #64 (7 m 10 s) auf `e587e59` **success**, Verdict-Job eingeschlossen. Lokal: `npm run gate:test` 958/958 in 9,6 s, `npm test` Exit 0, `npm run build` Exit 0, `npm run zahlen:check` Exit 0, `npm run preflight:docs:check` PASS.
 - Gate-Läufe: `39848906103` auf `39a4364` **rot** (der Zahlen-Test verglich auch den `dist`-Block; Ursache und Fix im Tagebuch), `39849567339` auf `ad20bcc` **grün**, `39850004309` auf `5800515` **grün** — jeweils Verdict-Job eingeschlossen.
