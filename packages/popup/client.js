@@ -49,19 +49,11 @@ window.__ModuleLoader__.load({
 
     /** Sichtbarkeit (Schritt 1): meldet dieses Bundle bei der System-Uebersicht an. */
     const LABEL = 'Shinon Popup';
-    const ROLE = 'Trajectory-Overlay (Fortschritt aus dem Sitzungsfenster)';
 
     function announce(detail) {
-      const table = window.__shinonPluginCatalog ?? (window.__shinonPluginCatalog = {});
-      table[PLUGIN] = {
-        id: PLUGIN,
-        label: LABEL,
-        role: ROLE,
-        status: 'beobachtet',
-        detail,
-        mounted: new Date().toISOString()
-      };
-      window.dispatchEvent(new CustomEvent('shinon:plugin-registered', { detail: { id: PLUGIN } }));
+      const registry = (window.__shinonPlugins ??= new Map());
+      registry.set(PLUGIN, { label: LABEL, kind: 'client', panel: PANEL_ID, detail });
+      window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: PLUGIN } }));
     }
 
     function PopupIcon() {

@@ -75,7 +75,7 @@ window.__ModuleLoader__.load({
       { id: '@shinon/task-router', label: 'Task Router', active: true },
       { id: '@shinon/codingmon', label: 'Codingmon', active: true },
       { id: '@shinon/diff-overview', label: 'Änderungen', active: true },
-      { id: '@shinon/widget-dock', label: 'Shinon', active: true }, { id: '@shinon/openapi', label: 'OpenAPI', active: false },
+      { id: '@shinon/widget-dock', label: 'Shinon', active: true }, { id: '@shinon/openapi', label: 'OpenAPI', active: false }, { id: '@shinon/popup', label: 'Shinon Popup', active: true }, { id: '@shinon/traceability', label: 'Traceability-Toasts', active: true },
     ];
 
     function insertStyles(tag, css) {

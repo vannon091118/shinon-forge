@@ -48,20 +48,12 @@ window.__ModuleLoader__.load({
     /** Kennung des Slot-Eintrags (Inhaber dieser Datei; der Slot selbst ist `shell.overlay`). */
     const SLOT_ID = 'shinon-traceability-toasts';
     const LABEL = 'Traceability-Toasts';
-    const ROLE = 'LS-Popup-Toasts im Chat (Tool-Calls, Schritte, Fehler)';
 
     /** Sichtbarkeit in der Plugin-Liste (Konvention, kein Import). */
     function announce(detail) {
-      const table = window.__shinonPluginCatalog ?? (window.__shinonPluginCatalog = {});
-      table[PLUGIN] = {
-        id: PLUGIN,
-        label: LABEL,
-        role: ROLE,
-        status: 'beobachtet',
-        detail,
-        mounted: new Date().toISOString(),
-      };
-      window.dispatchEvent(new CustomEvent('shinon:plugin-registered', { detail: { id: PLUGIN } }));
+      const registry = (window.__shinonPlugins ??= new Map());
+      registry.set(PLUGIN, { label: LABEL, kind: 'client', panel: SLOT_ID, detail });
+      window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: PLUGIN } }));
     }
 
     // >>> shinon:dsh-idiom locale-fallback/static — EINE Quelle: scripts/lib/plugin-idioms.mjs (generiert; schreiben: `npm run idioms`, prüfen: Gate + dsh-test) params={"table":"TOAST_DE","key":"toast.error","label":"Fehler: {message}"}
