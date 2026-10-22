@@ -1,16 +1,16 @@
 name: Shinon Forge Gate
 
-# Ein Wächter, der nur manchmal hinsieht, ist kein Wächter: dieser Workflow läuft
-# bei jedem Push und jedem Pull Request, ohne Filter und ohne Bedingung — und auf
-# Zuruf für ein volles Historie-Audit.
+# Der Preflight läuft bei jedem Pull Request, auf Push nach main und auf Zuruf.
+# Feature-Branch-Pushes erhalten keinen zweiten Voll-Lauf neben dem PR-Lauf;
+# neuere PR-Stände ersetzen ältere Läufe, statt CPU-Minuten auf veraltete SHA zu werfen.
 #
 # KEIN MONOLITH. Jeder Vertrag ist ein eigener Zweig mit eigenem Läufer und eigenem
 # Namen in der Oberfläche: eine rote Prüfung benennt damit den gebrochenen Vertrag,
-# statt eine Kette aus neun Stufen zu verstecken, bei der nur die erste rote Zeile
+# statt eine Kette aus Stufen zu verstecken, bei der nur die erste rote Zeile
 # sagt, was wirklich kaputt ist. Die schweren Zweige laufen PARALLEL, deshalb kostet
 # die Aufteilung keine Wanduhr-Zeit — sie gewinnt welche, weil die früheren Läufe
-# fünf Stufen des Vertrags gar nicht gefahren haben (Fixtures, Distribution,
-# Profilboot, Static-Gate, Prompter).
+# mehrere Prüfungen in früheren Läufen doppelt liefen (statisches Gate, Audit-Install
+# und alte PR-Push-Läufe).
 #
 # ZWEI GESCHWINDIGKEITEN, gemessen (leerer Baum aus `git archive`, kein node_modules,
 # kein `dsh` im PATH — genau die Bedingung eines frischen Läufers):
@@ -36,11 +36,17 @@ name: Shinon Forge Gate
 #     übersprungener Zweig ist kein grüner Zweig.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# New PR commits supersede stale runs; the main branch run is never cancelled.
+concurrency:
+  group: shinon-preflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # ── Zweig 1: die Commit-Regeln selbst (kein node_modules) ───────────────────
@@ -49,13 +55,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Volle Historie: der Wächter muss bis zur PR-Basis (und im Zweifel bis
           # zum ersten Commit) zurücksehen können.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -101,28 +107,29 @@ jobs:
           - name: Traceability-Kern (Toast-Fenster)
             run: node --test packages/traceability/test/*.test.mjs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
       - name: ${{ matrix.name }}
         run: ${{ matrix.run }}
 
-  # ── Zweig 3: die Gate-Tests (schwerster Zweig, ~90 s) ───────────────────────
+  # ── Zweig 3: Gate-Tests (installationspflichtige Verhaltens- und Mutationsproben) ─
   # Die DSH-abhängigen Tests (uebergabe, store, prompter-contract, …) brauchen
   # `dsh` im PATH; ohne ihn melden sie sichtbar einen Skip (REGEL: ein Skip ist
   # kein Grün). Deshalb hier `npm ci` — und `dsh` liegt danach in
   # `node_modules/.bin/dsh` und wird über $GITHUB_PATH sichtbar.
   gate-rules:
     name: Gate-Tests (Regeln, Verträge, Nähte)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -144,49 +151,16 @@ jobs:
       - name: Codemon-Übergabe fahren (volle Naht, mit Install)
         run: node --test packages/codingmon/test/uebergabe.test.mjs
 
-  # ── Zweig 4: das statische Gate (105 Prüfungen) ─────────────────────────────
-  static-gate:
-    name: Statisches Gate (manifest, name contract, Profile)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Volle Historie: `diaryIssues` prueft jeden Tagebuch-Anker gegen die
-          # Commit-Historie. Mit einem flachen Klon koennte der Schritt die Anker
-          # nicht belegen und wuerde sie sichtbar ueberspringen — der Vertrag
-          # waere ungeprueft.
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Abhängigkeiten installieren (lockfile-treu) und dsh in den PATH legen
-        run: |
-          set -euo pipefail
-          npm ci --no-audit --no-fund
-          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-
-      - name: Statisches Gate fahren
-        run: node scripts/shinon-test.mjs
-
-      # Eine Sollquelle, ein Prüfer: Matrix, Manifeste, Lock, Vendor, Installat
-      # und CLI müssen dieselbe Fassung nennen. Derselbe Befehl läuft lokal und
-      # im Updater — eine zweite Implementierung gibt es nicht.
-      - name: DSH-Versionen prüfen (Sollquelle, Lock, Vendor, Installat, CLI)
-        run: node scripts/check-dsh-versions.mjs
-
   # ── Zweig 5: die Fixtures (Validierung, ~36 s) ──────────────────────────────
   fixtures:
     name: Fixtures (Validierung gegen den echten Bau)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -200,15 +174,16 @@ jobs:
       - name: Fixtures fahren
         run: node scripts/validate-test.mjs
 
-  # ── Zweig 6: die Auslieferung (je Paket packen, isoliert installieren, laden)
+  # ── Zweig 5: Distribution (packen, isoliert installieren, laden) ────────────
   distribution:
     name: Distribution (npm pack → Isolat → Laden)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -222,15 +197,16 @@ jobs:
       - name: Distribution fahren
         run: node scripts/pack-test.mjs
 
-  # ── Zweig 7: der Profilboot (jeder Bundle-Layer muss auflösen) ──────────────
+  # ── Zweig 6: Profilboot (jeder Bundle-Layer muss auflösen) ──────────────────
   profile:
     name: Profilboot (dsh --profile shinon --dump-config)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -244,15 +220,16 @@ jobs:
       - name: Profilboot fahren
         run: node scripts/shinon-profile-test.mjs
 
-  # ── Zweig 8: der Prompter (braucht Schemastery über ../index.js) ────────────
+  # ── Zweig 7: Prompter (braucht Schemastery über ../index.js) ────────────────
   prompter:
     name: Prompter (Zettel, Skill-Auswahl)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -266,16 +243,17 @@ jobs:
       - name: Prompter-Tests fahren
         run: node --test packages/prompter/test/*.test.mjs
 
-  # ── Zweig 9: der Typvertrag (gepinnter Compiler + Quellüberdeckung) ─────────
+  # ── Zweig 8: TypeScript (gepinnter Compiler + Quellüberdeckung) ─────────────
   # Same engine and policy as local checks; missing compiler/config/source coverage fails closed.
   typescript:
     name: TypeScript Gate (gepinnter Compiler + Quellüberdeckung)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -289,19 +267,23 @@ jobs:
       - name: TypeScript Gate fahren
         run: npm run typecheck
 
-  # ── Zweig 10: der schnelle Pfad (Sekunden statt Minuten) ────────────────────
+  # ── Zweig 9: Schnellpfad + DSH-Quellgleichheit (Sekunden statt Minuten) ─────
   # `npm test` ist seit 2026-10-17 bewusst NICHT die volle Kette, sondern der
   # schnelle lokale Pfad (statisches Gate + lokale Engine-Slices). Dieser Zweig
   # pinnt ihn in CI grün; die volle Kette (`test:full`) fahren die übrigen
   # Zweige nebeneinander — lokal läuft nur der schnelle Pfad.
   quick:
     name: Schnellpfad (npm test, lokal)
+    needs: preflight-docs
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          # The diary contract checks real SHAs and every commit day; shallow history is not acceptable here.
+          fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -312,44 +294,130 @@ jobs:
           npm ci --no-audit --no-fund
           echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
-      - name: Schnellen Pfad fahren
-        run: npm test
+      # Preflight has already passed in its own required job; do not run it a second time.
+      - name: Schnellen Kernpfad fahren
+        run: npm run test:core
+
+      - name: DSH-Versionen gegen Sollquelle, Lock, Vendor, Installat und CLI pruefen
+        run: node scripts/check-dsh-versions.mjs
+
+  # ── Preflight: Dokumentationsvertrag, Dependency- und Static-Security ───────
+  preflight-docs:
+    name: Preflight (Dokumentationsvertrag)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.19.0'
+      - name: Dokumentations- und Job-Vertrag schreibgeschuetzt pruefen
+        run: node scripts/preflight-docs.mjs --check-only --json-out preflight-docs-report.json
+      - name: Dokumentationsbefund sichern
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: preflight-docs-report-${{ github.run_id }}
+          path: preflight-docs-report.json
+          if-no-files-found: error
+          retention-days: 30
+
+  dependency-audit:
+    name: Preflight (Production Dependency Audit)
+    needs: preflight-docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.19.0'
+      # npm audit evaluates package-lock directly; no second 632-package install.
+      - name: Produktionsabhaengigkeiten auf High/Critical pruefen
+        run: npm audit --omit=dev --audit-level=high
+
+  codeql:
+    name: Preflight (CodeQL JavaScript und TypeScript)
+    needs: preflight-docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: CodeQL initialisieren
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+      - name: CodeQL analysieren
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:javascript-typescript
+
+  secret-scan:
+    name: Preflight (Secret Scan der Git-Historie)
+    needs: preflight-docs
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Git-Historie auf bekannte Secret-Muster scannen
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── Verdikt: der EINE Name, den eine Branch-Regel verlangen kann ────────────
   # `if: always()` ist der Punkt: ohne ihn würde dieser Job bei einem roten Zweig
   # gar nicht starten, und die Zusammenfassung wäre bei genau den Läufen stumm,
   # für die sie gebaut ist. Rot bei failure, cancelled UND skipped.
   verdict:
-    name: Verdikt (fail-closed)
+    name: Preflight-Abnahme (fail-closed)
     needs:
       - commit-guard
       - quick
       - unit
       - gate-rules
-      - static-gate
       - fixtures
       - distribution
       - profile
       - prompter
       - typescript
+      - preflight-docs
+      - dependency-audit
+      - codeql
+      - secret-scan
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Alle Zweige müssen grün sein
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.19.0'
+
+      - name: Maschinenlesbare Abnahme erzeugen (Commit, Run, Jobs, Fehlercodes)
         env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          node -e '
-            const needs = JSON.parse(process.env.NEEDS);
-            const rows = Object.entries(needs).map(([job, run]) => `${job}=${run.result}`);
-            console.log(`Zweige: ${rows.join(", ")}`);
-            const bad = rows.filter((row) => !row.endsWith("=success"));
-            if (bad.length > 0) {
-              console.error(`ROT ODER ÜBERSPRUNGEN: ${bad.join(", ")}`);
-              console.error("Ein übersprungener Zweig ist kein grüner Zweig: erst grün, wenn alle laufen und bestehen.");
-              process.exit(1);
-            }
-            console.log(`Alle ${rows.length} Zweige grün.`);
-          '
+          PREFLIGHT_NEEDS: ${{ toJSON(needs) }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/preflight-verdict.mjs
+
+      - name: Preflight-Bericht als Run-Artefakt ablegen
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: preflight-report-${{ github.run_id }}
+          path: preflight-report.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,8 +1,15 @@
 # Shinon Forge
 
-> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-20 (aktualisiert: neue Skripte ergänzt, Inhalt sonst unverändert)
+> **Status:** current — Arbeitsregeln für Agenten in diesem Repo. **Stand:** 2026-10-22 (aktualisiert: neue Skripte ergänzt, Inhalt sonst unverändert)
 > **Einstieg:** diese Datei · **Geschichte:** `docs/TAGEBUCH.md` · **Zahlen:** `docs/ZAHLEN.md`
-++volltests uschließlich nur nach absprache!!!
+## Testumfang und Übergabe
+
+- **Default:** betroffene Gate-Slices und passende fokussierte Tests ausführen; Ergebnis und exakte Befehle dokumentieren.
+- **Volltests:** `npm test` / `npm run test:full` nur dann zusätzlich ausführen, wenn die Änderung mehrere Pakete, zentrale Verträge, Laufzeit/Boot, Release-Freigabe oder der konkrete Auftrag es erfordert. Niemals einen Testlauf als bestanden markieren, wenn er nicht ausgeführt wurde.
+- **Übergabe:** offene Arbeit ausschließlich in `docs/ROADMAP.md` pflegen. Fertige Arbeit erst nach belegtem Test/Gate aus der Roadmap entfernen, dann in `docs/CHANGELOG.md` als übertragbare Kurzfassung und in `docs/TAGEBUCH.md` mit Commit-/Pfadankern festhalten.
+- **Pull Request:** Body muss Zweck, Änderungen, Belege/CI-Status, Risiken und nächste Agentenaufgabe nennen. Merge nur bei allen erforderlichen Checks grün, ohne übersprungene Pflichtjobs und ohne offene blockierende Review-Kommentare.
+- **Preflight:** `npm test` startet lokal zuerst den Dokumentations-/Workflow-Preflight und repariert dabei standardmäßig nur sichere Verdrahtungsfehler (fehlende `verdict.needs`-Referenzen, Duplikate, fehlendes `if: always()` ohne andere Bedingung). Danach läuft der bestehende Kernpfad. Für eine Reparatur ohne Tests `npm run preflight:docs`; für einen schreibgeschützten Check `npm run preflight:docs:check`. CI ruft nur den Read-only-Preflight einmal vor den teuren Jobs auf und nutzt danach `npm run test:core`, um die Doku nicht doppelt zu prüfen. `npm run preflight:test` testet echte Fehler- und Reparaturpfade. Keine fehlenden Jobs erfinden und kein fachliches `if` überschreiben. Abnahme ausschließlich über `Preflight-Abnahme (fail-closed)`; fehlende, rote, abgebrochene oder übersprungene Pflichtjobs zählen nicht als Erfolg.
+
 An independent fork of the DeepSeek Harness (DSH). It ships the `@shinon/*` Cordis
 plugin bundles under `packages/`, enabled by the canonical profile `profiles/shinon`
 (which packages are active: `docs/ZAHLEN.md`; owner of that list is

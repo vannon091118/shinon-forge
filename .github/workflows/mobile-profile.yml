@@ -1,10 +1,9 @@
 name: Shinon Mobile Profile
 
+# Mobile/Android ist aktuell kein Release-Gate (Desktop-/Web-Fundament zuerst).
+# Die Profile-Prüfung bleibt manuell aufrufbar, erzeugt aber keinen redundanten
+# Pflichtlauf für jeden PR, solange Mobile-Arbeit zurückgestellt ist.
 on:
-  # Der frühere Push-Trigger zeigte auf mobile/runtime-profile-0.01; den Branch
-  # gibt es auf origin nicht mehr (git ls-remote --heads origin 'mobile/*').
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,8 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.19.0'
           cache: npm

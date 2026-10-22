@@ -104,6 +104,10 @@ function run(script, root) {
     const stdout = execFileSync(process.execPath, [join(root, 'scripts', script)], {
       cwd: root,
       encoding: 'utf8',
+      // The copied fixture deliberately has no .git history. It tests rule behavior
+      // on an isolated tree, not whether the real CI checkout is shallow. Keep the
+      // real CI history contract enabled only in the actual repository checkout.
+      env: { ...process.env, CI: 'false' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     return { exit: 0, output: stdout };

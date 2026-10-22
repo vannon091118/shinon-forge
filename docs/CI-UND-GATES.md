@@ -1,6 +1,6 @@
 # CI-UND-GATES — Prüfungen, Hooks, Workflows
 
-> **Status:** current · **Stand:** 2026-10-20
+> **Status:** current · **Stand:** 2026-10-22
 >
 > Erzählt, **wie** geprüft wird. **Was** in einem Durchlauf herauskam
 > (Exit-Codes, Zählungen, rote Befunde) steht ausschließlich in
@@ -111,28 +111,89 @@ Einmal pro Klon: `npm run hooks:install` (`scripts/install-hooks.mjs`).
 
 ### `commit-guard.yml` — „Shinon Forge Gate"
 
-Läuft bei **jedem Push, jedem PR** und auf Zuruf. Zehn parallele Zweige plus
-ein `verdict`-Zweig:
+Läuft bei **Push auf main, jedem PR und auf Zuruf**. Feature-Branch-Pushes
+lösen keinen zweiten vollständigen Lauf zusätzlich zum PR aus. Neue PR-Commits
+brechen überholte PR-Läufe ab; der Lauf auf `main` wird nicht abgebrochen.
 
-1. `node scripts/commit-guard.mjs --ci` (Trailer/Footer-Regeln)
-2. Unit-Matrix (acht Pakete, ohne Install)
-3. Gate-Tests (`scripts/gate/tests/`)
-4. `shinon-test.mjs` + `check-dsh-versions.mjs`
-5. Fixtures (`validate-test.mjs`)
-6. Distribution (`pack-test.mjs`)
-7. Profilboot (`shinon-profile-test.mjs`)
+Die Prüfjobs laufen parallel, soweit sie unabhängig sind. `preflight-docs` ist
+der günstige, installationsfreie Gatekeeper: fehlerhafte Doku oder Workflow-
+Verdrahtung blockiert die Installations-/Build-Jobs. Der finale Verdict-Job
+wartet auf alle 13 Pflichtjobs.
+
+1. Commit-Wächter (`node scripts/commit-guard.mjs --ci`)
+2. Unit-Matrix (acht Paket-Suiten, ohne `npm ci`)
+3. Dokumentations-/Workflow-Preflight (aktive Befehle, echte Links, Jobgraph)
+4. Gate-Tests plus installierte Codemon-Übergabe
+5. Fixtures gegen den realen Bau
+6. Distribution: Packen, isoliert installieren und laden
+7. Profilboot
 8. Prompter-Tests
-9. `npm run typecheck`
-10. `npm test` (Schnellpfad)
+9. TypeScript-Gate
+10. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag
+11. Dependency-Audit direkt aus `package-lock.json`
+12. CodeQL für JavaScript/TypeScript
+13. Gitleaks über die vollständige Git-Historie
 
-Alle Install-Zweige: `npm ci`, danach `node_modules/.bin` via
-`$GITHUB_PATH`. **`verdict` ist rot bei `failure`, `cancelled` und
-`skipped`** — ein stillschweigend übersprungener Zweig zählt als Bruch.
+Das frühere separate `static-gate` ist entfernt: `test:core` enthält das
+statische Gate bereits. Der CI-Schnellpfad verwendet `test:core`, nicht erneut
+`npm test`, damit der lokale Reparatur-Preflight nicht ein zweites Mal läuft.
+Der Dependency-Audit installiert keine zweite Kopie der Abhängigkeiten: `npm
+audit --omit=dev --audit-level=high` wertet den Lockfile direkt aus. Die
+installationspflichtigen Tests nutzen weiterhin lockfile-treues `npm ci`.
+
+Der Finaljob heißt **`Preflight-Abnahme (fail-closed)`**. Er läuft mit
+`if: always()` und scheitert bei `failure`, `cancelled`, `skipped`, unbekanntem
+Status oder fehlendem Pflichtjob. Jobs, die wegen eines fehlgeschlagenen
+Dokumentations-Preflights nicht gestartet wurden, werden als blockiert erklärt,
+aber niemals als erfolgreiche Abnahme gezählt.
+
+### Preflight-Vertrag und Fehlercodes
+
+Lokaler Reparatur-First-Einstieg:
+
+```bash
+npm test
+```
+
+`npm test` führt zuerst `preflight-docs.mjs` mit sicheren Reparaturen aus und
+delegiert dann an den bestehenden Kernpfad. Reparatur ohne Tests:
+`npm run preflight:docs`. Read-only-Prüfung: `npm run preflight:docs:check`.
+Fault-Injection-Tests: `npm run preflight:test` und der Gate-Tests-Job.
+
+`scripts/lib/preflight/policy.mjs` ist die gemeinsame Policy-Quelle für
+Pflichtdateien, Pflichtjobs und Diagnosepräfixe. Der Prüfer validiert aktive
+YAML-Befehle und Actions, echte relative Linkziele und den tatsächlichen Jobgraphen.
+Er prüft außerdem, dass jede deklarierte Prüflinie im finalen Verdict landet und
+dass install-/scanintensive Jobs direkt `needs: preflight-docs` haben.
+Kommentierte Beispiele, Echo-Strings oder reine Jobnamen erfüllen keinen
+Ausführungsvertrag. Absichtliche Mutationen beweisen, dass Dummy-Kommandos und
+fehlende Gate-Abhängigkeiten rot werden.
+
+Lokal korrigiert der Preflight nur eindeutige Verdrahtungsfehler. Er erfindet
+keine fehlenden Jobs und überschreibt keine fachliche `if`-Bedingung. CI bleibt
+schreibgeschützt und bricht vor `npm ci`, Build oder Security-Scan ab.
+
+Die Dokumentationsprüfung liefert beispielsweise `PREFLIGHT_DOC_MISSING`,
+`PREFLIGHT_LINK_BROKEN`, `PREFLIGHT_LINK_ESCAPES_REPO`,
+`PREFLIGHT_JOB_DEFINITION_MISSING`, `PREFLIGHT_JOB_NOT_GATED_BY_PREFLIGHT`,
+`PREFLIGHT_JOB_BYPASSES_PREFLIGHT`, `PREFLIGHT_NEEDS_UNKNOWN_JOB` und
+`PREFLIGHT_VERDICT_FAIL_OPEN`. Ausführungsfehler werden jobbezogen gemeldet,
+etwa `PREFLIGHT_CODEQL_ACTION_MISSING`,
+`PREFLIGHT_DEPENDENCY_AUDIT_COMMAND_MISSING` oder
+`PREFLIGHT_SECRET_SCAN_ACTION_MISSING`.
+
+Jeder Lauf erzeugt `preflight-report.json` mit Commit-SHA, Run-ID, Run-Link,
+jedem Pflichtjob und Diagnosecodes. Das Artefakt wird auch nach einem
+fehlgeschlagenen Urteil hochgeladen; die Zusammenfassung steht in GitHub Actions
+unter **Summary**. Nur `verdict: PASS` mit erfolgreichen Pflichtjobs ist
+eine Abnahme. Es ist keine automatische Release-Freigabe und kein Beleg für einen
+echten Provider-Modellturn.
 
 ### `mobile-profile.yml`
 
-PRs auf `main` + Zuruf: `mobile-profile-contract-test.mjs` +
-`shinon-profile-test.mjs --profile mobile`.
+Aktuell nur `workflow_dispatch`: Mobile/Android ist zurückgestellt und kein
+Pflicht-Gate für Desktop-/Web-PRs. Beim manuellen Lauf prüfen
+`mobile-profile-contract-test.mjs` und `shinon-profile-test.mjs --profile mobile`.
 
 ### `release.yml` (S5)
 
@@ -140,6 +201,21 @@ Nur Tags `v*`: Tag = `package.json`-Version, `npm ci`,
 `profile-links --check`, statisches Gate, `gate:test`, dann ein
 **reproduzierbares** `git archive`-Tarball mit SHA-256 (Zweitlauf muss
 identisch sein) als Artefakt. **Publiziert nichts** (`contents: read`).
+
+### `package-build.yml`
+
+Bei Push auf `main`, Tag `v*` oder manuellem Start: baut .deb, AppImage und
+Windows-ZIP auf passenden Runnern, prueft Inhalte, Installation/Starter und
+Pruefsummen und lädt die Ergebnisse als Artefakte hoch. Dies ist ein eigener
+Paketbau, nicht der abschliessende PR-Preflight.
+
+### `security.yml` (periodisch)
+
+Woechentlicher und manueller Sicherheitsscan: Production dependency audit,
+CodeQL und Gitleaks. Die gleichartigen Security-Prüfungen für PR/Push laufen
+verbindlich als Jobs im `commit-guard.yml` und werden in dessen finale
+Preflight-Abnahme eingespeist. Die periodische Fassung ist ein zusätzlicher
+Sicherheitslauf, kein Ersatz für die PR-Abnahme.
 
 ### `runtime-release.yml`
 

@@ -17,6 +17,63 @@
 
 ---
 
+## Auf einen Blick
+
+- [Was Shinon ergänzt](#was-shinon-ergänzt)
+- [Arbeitsfluss](#arbeitsfluss)
+- [Schnellstart und Clean Clone](#schnellstart-und-clean-clone)
+- [Release-Status](#release-status)
+- [Dokumentation](#weiterklicken)
+- [Agenten-Übergabe und Änderungsspur](docs/AGENT-HANDOFF.md)
+
+### Was Shinon ergänzt
+
+| Schicht | Aufgabe |
+|---|---|
+| **Prompter** | Ordnet die Anfrage ein und ergänzt passenden Kontext für den Modellturn. |
+| **Project Index** | Sucht im ausgewählten Workspace nach relevanten Quellen und hält die Workspace-Grenze ein. |
+| **Persona und Task-Router** | Trennen Identität, Zielverfolgung und gespeicherte Signale. |
+| **Key-Router** | Verwaltet konfigurierte Schlüssel-Pools und Rotationsregeln, ohne stillschweigend die Modellroute zu wechseln. |
+| **Traceability** | Macht aktive Komponenten und beobachtete Schritte besser nachvollziehbar. |
+| **Codingmon** | Ein Begleiter mit persistentem Spielstand. Niedlich, aber kein Ersatz für Tests. |
+
+### Arbeitsfluss
+
+```mermaid
+flowchart LR
+  A[Aufgabe] --> B[Prompter]
+  B --> C[Project Index]
+  C --> D[Kontext und Quellen]
+  D --> E[DSH Agentenlauf]
+  E --> F[Werkzeuge und Workspace]
+  F --> G[Traceability und Ergebnis]
+```
+
+Das Diagramm zeigt den beabsichtigten Ablauf, nicht den Beweis für jeden möglichen Modellpfad. Für konkrete Prüfaussagen siehe [CI und Gates](docs/CI-UND-GATES.md), [Messwerte](docs/ZAHLEN.md) und die [Roadmap](docs/ROADMAP.md).
+
+### Schnellstart und Clean Clone
+
+Ein frischer Klon ist der reproduzierbare Ausgangspunkt. Persönliche Sandbox-Zuordnungen, Sitzungsdaten und temporäre Agenten-Ausgaben gehören nicht in GitHub.
+
+```bash
+git clone https://github.com/vannon091118/shinon-forge.git
+cd shinon-forge
+npm ci
+npm run profile:links
+npm test
+git status --short
+```
+
+`npm test` startet lokal zuerst den sicheren Dokumentations-/Workflow-Preflight und repariert nur eindeutige Verdrahtungsfehler; danach laufen die bestehenden Kernprüfungen. Den reinen, schreibgeschützten Vertrag kannst du mit `npm run preflight:docs:check` prüfen.
+
+Nach diesen Schritten soll `git status --short` leer bleiben, sofern du selbst keine Projektdateien geändert hast. `.freebuff/`, Credentials, Sitzungslogs, Workspace-Zustand, Cache-Dateien und rohe Messdaten bleiben lokal. Kuratierte Proben und Screenshots unter `docs/probes/` bleiben dagegen versioniert, wenn sie einen konkreten Vertrag oder Prüflauf belegen. Details: [Remote-Arbeit und Worktrees](docs/REMOTE-ARBEIT.md).
+
+### Release-Status
+
+Shinon Forge befindet sich in der Abnahme für **v0.4.0** und ist noch kein Stable-Release. Die offenen Freigabekriterien stehen in [docs/ROADMAP.md](docs/ROADMAP.md). Ein einzelner grüner Test oder Modellturn ersetzt nicht die vollständige Release-Abnahme.
+
+---
+
 ## Hallo. Ich bin Shinon.
 
 Ich bin ein unabhängiger Fork des DeepSeek Harness (DSH). DSH stellt den
