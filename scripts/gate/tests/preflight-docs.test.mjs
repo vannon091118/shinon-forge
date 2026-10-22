@@ -5,25 +5,38 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { inspectDocumentation } from '../../lib/preflight/documentation.mjs';
+import { formatDiagnostic } from '../../lib/preflight/diagnostics.mjs';
 
 const root = resolve(fileURLToPath(new URL('../../../', import.meta.url)));
 const script = join(root, 'scripts/preflight-docs.mjs');
 
-test('preflight accepts the repository handoff contract', () => {
-  const run = spawnSync(process.execPath, [script], { cwd: root, encoding: 'utf8' });
-  assert.equal(run.status, 0, `Expected preflight pass.\nstdout:\n${run.stdout}\nstderr:\n${run.stderr}`);
-  assert.match(run.stdout, /PRE-FLIGHT DOCUMENT CONTRACT: PASS/);
+test('repository handoff and verdict wiring satisfy the preflight contract', () => {
+  const result = inspectDocumentation(root);
+  assert.equal(result.ok, true, result.diagnostics.map(formatDiagnostic).join('\n'));
+  assert.equal(result.contract, 'shinon.preflight.documentation/v1');
 });
 
-test('preflight fails closed when required documentation is absent', () => {
+test('missing files produce stable actionable error codes', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'shinon-preflight-'));
   try {
-    mkdirSync(join(fixture, '.github/workflows'), { recursive: true });
-    mkdirSync(join(fixture, 'docs'), { recursive: true });
+    const result = inspectDocumentation(fixture);
+    const missing = result.diagnostics.filter((item) => item.code === 'PREFLIGHT_DOC_MISSING');
+    assert.ok(missing.some((item) => item.path === 'README.md'));
+    assert.ok(missing.some((item) => item.path === 'docs/ROADMAP.md'));
+    assert.match(formatDiagnostic(missing[0]), /^ERROR PREFLIGHT_DOC_MISSING:/);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('CLI returns a non-zero exit and names the specific missing-file code', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'shinon-preflight-cli-'));
+  try {
     const run = spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' });
-    assert.equal(run.status, 1, `Expected fail-closed exit.\nstdout:\n${run.stdout}\nstderr:\n${run.stderr}`);
-    assert.match(run.stderr, /missing required file: README\.md/);
-    assert.match(run.stderr, /missing required file: docs\/ROADMAP\.md/);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /PREFLIGHT DOC/);
+    assert.match(run.stderr, /ERROR PREFLIGHT_DOC_MISSING: Required file is missing \(README\.md\)/);
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
