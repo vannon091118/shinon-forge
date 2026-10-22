@@ -70,11 +70,13 @@ function withTemp(diary, fn) {
   }
 }
 
-test('der echte Baum: jedes Kapitel hängt an Commit und Pfad (übersprungen ohne Historie)', { skip: HISTORY.skip }, () => {
+test('der echte Baum: jedes Kapitel hängt an Commit und Pfad (übersprungen ohne Historie)', { skip: process.env.CI === 'true' ? false : HISTORY.skip }, () => {
+  assert.equal(HISTORY.skip, undefined, `CI requires complete Git history: ${HISTORY.skip ?? ''}`);
   assert.deepEqual(diary.diaryIssues(ROOT), []);
 });
 
-test('der echte Baum: ein Kapitel je Tag mit Commits (übersprungen ohne Historie)', { skip: HISTORY.skip }, () => {
+test('der echte Baum: ein Kapitel je Tag mit Commits (übersprungen ohne Historie)', { skip: process.env.CI === 'true' ? false : HISTORY.skip }, () => {
+  assert.equal(HISTORY.skip, undefined, `CI requires complete Git history: ${HISTORY.skip ?? ''}`);
   const days = new Set(HISTORY.log.split('\n').map((line) => line.trim().split(/\s+/)[1]).filter(Boolean));
   const text = read(join(ROOT, diary.DIARY_FILE));
   const dated = [...text.matchAll(/^## (\d{4}-\d{2}-\d{2}) — /gm)].map((match) => match[1]);
