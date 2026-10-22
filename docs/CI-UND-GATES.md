@@ -111,9 +111,12 @@ Einmal pro Klon: `npm run hooks:install` (`scripts/install-hooks.mjs`).
 
 ### `commit-guard.yml` — „Shinon Forge Gate"
 
-Läuft bei **jedem Push, jedem PR** und auf Zuruf. Die zehn bestehenden Prüfzweige
-laufen neben vier zusätzlichen Preflight-/Security-Prüfern. Ein letzter
-`Preflight-Abnahme (fail-closed)`-Zweig fasst alle Ergebnisse zusammen:
+Läuft bei **Push auf main, jedem PR und auf Zuruf**. Branch-Pushes führen nicht
+noch einen vollständigen zweiten Lauf neben dem PR aus. Neue Commits ersetzen
+überholte PR-Läufe; der Lauf auf `main` wird nicht abgebrochen. Die schlanke,
+abhängigkeitsfreie Dokumentationsprüfung läuft zuerst und blockiert kostspielige
+Jobs nur dann, wenn sie einen echten Vertragsbruch findet. Der letzte
+`Preflight-Abnahme (fail-closed)`-Job fasst alle Ergebnisse zusammen:
 
 1. `node scripts/commit-guard.mjs --ci` (Trailer/Footer-Regeln)
 2. Unit-Matrix (acht Pakete, ohne Install)
@@ -146,10 +149,18 @@ npm run preflight:test
 ```
 
 `scripts/lib/preflight/policy.mjs` ist die gemeinsame Policy-Quelle für
-Pflichtdokumente, kanonische CI-Jobs und Fehlercode-Namen. Die Prüfer sind
+Pflichtdokumente, kanonische CI-Jobs und Fehlercode-Namen. Die Prüfung misst
+Verhalten statt Textfragmente: sie mutiert Links und Jobgraphen, erkennt
+nicht deklarierte Jobs und verlangt, dass jede deklarierte Prüfstrecke im
+finalen Verdict landet. Die Prüfer sind
 getrennt: `diagnostics.mjs` formatiert Fehler, `documentation.mjs` prüft
 Dokumentationshoheit/Links/Verdict-Verkabelung, `preflight-docs.mjs` liefert
 den CLI-Exitcode und `preflight-verdict.mjs` baut das Abschlussurteil.
+
+Lokal ist `npm run preflight:docs` der Reparatur-First-Einstieg: nur eindeutige
+Workflow-Verdrahtungsfehler werden automatisch behoben. `npm run preflight:docs:check`
+ist schreibgeschützt; genau diesen Modus nutzt CI. Kaputte Links, fehlende
+Job-Definitionen und abweichende fachliche Bedingungen werden nicht glattgebügelt.
 
 Die Dokumentationsprüfung liefert beispielsweise
 `PREFLIGHT_DOC_MISSING`, `PREFLIGHT_DOC_RULE_MISSING`,
