@@ -1409,7 +1409,7 @@ Boot stehen `Katalog agnes: HTTP 401` und `prompter: HTTP 401` bei
 
 **Nachtrag zum Preflight-Merge:** Der Workflow wurde nicht nur umbenannt, sondern auf sein Verhalten geprüft. Der Vertrag weist nach, dass teure Jobs direkt vom günstigen Preflight abhängen, dass Dummy-Kommandos unter gültig klingenden Jobnamen rot werden und dass die finale Abnahme fehlende, übersprungene oder fehlgeschlagene Jobs nicht als Erfolg auslegt. Ein erster grüner Lauf machte außerdem zwei Historie-Skips sichtbar; die doppelte Realbaumprüfung wurde entfernt und der echte Tagebuch-Check im Schnellpfad auf vollständige Git-Historie festgelegt. Der kanonische Checker wurde anschließend auf eine einzige Implementierung zurückgeführt. PR #23 wurde nach 21/21 erfolgreichen Jobs squash-gemergt.
 
-**Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · Belege: `.github/workflows/commit-guard.yml`, `scripts/lib/preflight/documentation.mjs`, `scripts/lib/preflight/fixes.mjs`, `scripts/gate/tests/preflight-docs.test.mjs`, `scripts/gate/tests/diary.test.mjs`, `scripts/shinon-test.mjs`, `docs/CHANGELOG.md`
+**Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · `e60eca0` · `2b6de38` · Belege: `.github/workflows/commit-guard.yml`, `scripts/lib/preflight/documentation.mjs`, `scripts/lib/preflight/fixes.mjs`, `scripts/gate/tests/preflight-docs.test.mjs`, `scripts/gate/tests/diary.test.mjs`, `scripts/shinon-test.mjs`, `docs/CHANGELOG.md`
 
 **Nachtrag vom selben Tag — Branch-Integration und Testline:** Der offene PR #22
 (`work/dsh-provenance-docs`) trug zwei Doku-Korrekturen, die vier Commits hinter `main`
@@ -1436,3 +1436,28 @@ die UI mit Token als HTTP 200 (46 264 Bytes) und verweigerte ohne Token (401) so
 bei fremdem Origin (403). Der Post-Merge-Gate-Lauf `39838006698` auf `1f97625` bestand 21/21 Prüfungen in 2 min 21 s, ohne übersprungenen Pflichtjob; der Windows-Paketbau lief als eigener Workflow weiter und gehört nicht zur Gate-Abnahme.
 
 **Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · Belege: `.github/workflows/package-build.yml`, `.github/workflows/release.yml`, `.github/workflows/runtime-release.yml`, `scripts/gate/engine.mjs`, `scripts/shinon-test.mjs`, `scripts/gate/tests/narrative.test.mjs`, `AGENTS.md`, `docs/ZAHLEN.md`, `docs/CHANGELOG.md`
+
+**Nachtrag vom selben Tag — fünf Clean-Code-Tasks, ein roter Lauf, ein Riegel mehr:**
+Die ersten fünf Zeilen der Audit-Task-Liste sind abgearbeitet. Zwei tote Zwillinge
+sind weg: `skill-registry-core.js` (T3-7, sieben Exporte, ein Importeur — der eigene
+Test) und `pr-promotion.mjs` (T1-5, null Produktionsimporteure); `systemd-units.mjs`
+bleibt, weil `scripts/install-user.mjs` es wirklich aufruft. Die Engine überspringt
+ein Plugin ohne `check()` nicht mehr still, sondern meldet es als `status: fail`
+(T5b-2) — vorher war ein grünes Gate möglich, das ein Gate verschluckt. Die
+`registry`-Zeile in `docs/CI-UND-GATES.md` sagt jetzt, was das Plugin prüft
+(Bundle-Patch und Profil-Registrierung, nicht den Kanon; T5-3). Und
+`npm run zahlen:check` steht im Schnellpfad der CI (T5b-7).
+
+Der erste CI-Lauf `39842890831` machte den Fehler sofort sichtbar: der Schritt fiel,
+weil der Bestandsblock auch die `dist`-Zahlen führt und ein frischer Klon kein
+`dist/` hat. Daraufhin baut der `quick`-Job vor der Prüfung; der Block wurde mit dem
+frischen Bau neu gemessen (24 Pakete, 293 Dateien, 2 750 142 Bytes statt 294 und
+2 759 107 — genau die eine Datei aus T3-7). Der Lauf `39843936326` auf `2b6de38`
+ist grün, Verdict-Job eingeschlossen.
+
+Belege: `npm run gate:test` 927/927 grün in 11,15 s, `npm test` Exit 0,
+`npm run preflight:docs:check` Exit 0, `npm run build` Exit 0,
+`npm run zahlen:check` Exit 0. Der rote Lauf und seine Ursache stehen in
+`docs/CLEANREPO-AUDIT.md` bei T5b-7; die fünf Zeilen tragen ✅.
+
+**Anker:** `e60eca08f890333cc9d96fc5bc72c7b5662e620a` · `2b6de38f825d958c6244d8d3f7344c07ca1f20b3` · Belege: `scripts/gate/engine.mjs`, `scripts/gate/tests/engine.test.mjs`, `.github/workflows/commit-guard.yml`, `docs/CLEANREPO-AUDIT.md`, `docs/ZAHLEN.md`
