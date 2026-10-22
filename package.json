@@ -48,6 +48,8 @@
     "test:version": "node scripts/run-with-node.mjs node --test packages/version/test/*.test.mjs",
     "test:diff-overview": "node scripts/run-with-node.mjs node --test packages/diff-overview/test/*.test.mjs",
     "notes:check": "node scripts/notes-check.mjs",
+    "preflight:docs": "node scripts/preflight-docs.mjs",
+    "preflight:test": "node --test scripts/gate/tests/preflight-docs.test.mjs scripts/gate/tests/preflight-verdict.test.mjs",
     "gate": "node scripts/run-with-node.mjs scripts/gate/engine.mjs",
     "gate:local": "node scripts/run-with-node.mjs scripts/gate/engine.mjs --local",
     "gate:full": "node scripts/run-with-node.mjs scripts/gate/engine.mjs --full",
