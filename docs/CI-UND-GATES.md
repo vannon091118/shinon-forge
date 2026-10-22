@@ -111,33 +111,41 @@ Einmal pro Klon: `npm run hooks:install` (`scripts/install-hooks.mjs`).
 
 ### `commit-guard.yml` — „Shinon Forge Gate"
 
-Läuft bei **Push auf main, jedem PR und auf Zuruf**. Branch-Pushes führen nicht
-noch einen vollständigen zweiten Lauf neben dem PR aus. Neue Commits ersetzen
-überholte PR-Läufe; der Lauf auf `main` wird nicht abgebrochen. Die schlanke,
-abhängigkeitsfreie Dokumentationsprüfung läuft zuerst und blockiert kostspielige
-Jobs nur dann, wenn sie einen echten Vertragsbruch findet. Der letzte
-`Preflight-Abnahme (fail-closed)`-Job fasst alle Ergebnisse zusammen:
+Läuft bei **Push auf main, jedem PR und auf Zuruf**. Feature-Branch-Pushes
+lösen keinen zweiten vollständigen Lauf zusätzlich zum PR aus. Neue PR-Commits
+brechen überholte PR-Läufe ab; der Lauf auf `main` wird nicht abgebrochen.
 
-1. `node scripts/commit-guard.mjs --ci` (Trailer/Footer-Regeln)
-2. Unit-Matrix (acht Pakete, ohne Install)
-3. Gate-Tests (`scripts/gate/tests/`)
-4. `shinon-test.mjs` + `check-dsh-versions.mjs`
-5. Fixtures (`validate-test.mjs`)
-6. Distribution (`pack-test.mjs`)
-7. Profilboot (`shinon-profile-test.mjs`)
+Die Prüfjobs laufen parallel, soweit sie unabhängig sind. `preflight-docs` ist
+der günstige, installationsfreie Gatekeeper: fehlerhafte Doku oder Workflow-
+Verdrahtung blockiert die Installations-/Build-Jobs. Der finale Verdict-Job
+wartet auf alle 13 Pflichtjobs.
+
+1. Commit-Wächter (`node scripts/commit-guard.mjs --ci`)
+2. Unit-Matrix (acht Paket-Suiten, ohne `npm ci`)
+3. Dokumentations-/Workflow-Preflight (aktive Befehle, echte Links, Jobgraph)
+4. Gate-Tests plus installierte Codemon-Übergabe
+5. Fixtures gegen den realen Bau
+6. Distribution: Packen, isoliert installieren und laden
+7. Profilboot
 8. Prompter-Tests
-9. `npm run typecheck`
-10. `npm test` (Schnellpfad)
-11. Dokumentationsvertrag (Pflichtdateien, Quellenhoheit, Übergabelinks, Verdict-Verkabelung)
-12. Dependency-Audit (`npm audit --omit=dev --audit-level=high`)
-13. CodeQL für JavaScript/TypeScript
-14. Gitleaks über die vollständige Git-Historie
+9. TypeScript-Gate
+10. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag
+11. Dependency-Audit direkt aus `package-lock.json`
+12. CodeQL für JavaScript/TypeScript
+13. Gitleaks über die vollständige Git-Historie
 
-Alle Install-Zweige: lockfile-treues `npm ci`; der Audit-Zweig überspringt
-Lifecycle-Skripte. Der Finaljob heißt **`Preflight-Abnahme (fail-closed)`**.
-Er läuft mit `if: always()` und scheitert bei `failure`, `cancelled`,
-`skipped`, unbekanntem Status oder fehlendem Pflichtjob. Ein stillschweigend
-übersprungener Zweig zählt als Bruch.
+Das frühere separate `static-gate` ist entfernt: `test:core` enthält das
+statische Gate bereits. Der CI-Schnellpfad verwendet `test:core`, nicht erneut
+`npm test`, damit der lokale Reparatur-Preflight nicht ein zweites Mal läuft.
+Der Dependency-Audit installiert keine zweite Kopie der Abhängigkeiten: `npm
+audit --omit=dev --audit-level=high` wertet den Lockfile direkt aus. Die
+installationspflichtigen Tests nutzen weiterhin lockfile-treues `npm ci`.
+
+Der Finaljob heißt **`Preflight-Abnahme (fail-closed)`**. Er läuft mit
+`if: always()` und scheitert bei `failure`, `cancelled`, `skipped`, unbekanntem
+Status oder fehlendem Pflichtjob. Jobs, die wegen eines fehlgeschlagenen
+Dokumentations-Preflights nicht gestartet wurden, werden als blockiert erklärt,
+aber niemals als erfolgreiche Abnahme gezählt.
 
 ### Preflight-Vertrag und Fehlercodes
 
@@ -147,42 +155,39 @@ Lokaler Reparatur-First-Einstieg:
 npm test
 ```
 
-`npm test` führt zuerst `preflight-docs.mjs` mit sicheren Reparaturen und dann
-den bestehenden Kernpfad aus. Reparatur ohne Tests: `npm run preflight:docs`.
-Read-only-Prüfung: `npm run preflight:docs:check`. Die Fault-Injection-Tests
-des Preflight-Vertrags laufen mit `npm run preflight:test` bzw. im Gate-Tests-Job.
+`npm test` führt zuerst `preflight-docs.mjs` mit sicheren Reparaturen aus und
+delegiert dann an den bestehenden Kernpfad. Reparatur ohne Tests:
+`npm run preflight:docs`. Read-only-Prüfung: `npm run preflight:docs:check`.
+Fault-Injection-Tests: `npm run preflight:test` und der Gate-Tests-Job.
 
 `scripts/lib/preflight/policy.mjs` ist die gemeinsame Policy-Quelle für
-Pflichtdokumente, kanonische CI-Jobs und Fehlercode-Namen. Die Prüfung misst
-Verhalten statt Textfragmente: sie mutiert Links und Jobgraphen, erkennt
-nicht deklarierte Jobs und verlangt, dass jede deklarierte Prüfstrecke im
-finalen Verdict landet. Die Prüfer sind
-getrennt: `diagnostics.mjs` formatiert Fehler, `documentation.mjs` prüft
-Die Policy listet außerdem die installations- und scanintensiven Jobs, die direkt `needs: preflight-docs` verlangen. Ein fehlender Gate-Pfeil oder `if: always()` an so einem Job ist ein Vertragsbruch, weil beides die frühe Abbruchwirkung aushebeln könnte. Lokal repariert `npm test` die einfache fehlende Verdrahtung automatisch; CI ändert nichts und stoppt vor `npm ci`, Build oder Security-Scan. Dokumentationshoheit/Links/Verdict-Verkabelung, `preflight-docs.mjs` liefert
-den CLI-Exitcode und `preflight-verdict.mjs` baut das Abschlussurteil.
+Pflichtdateien, Pflichtjobs und Diagnosepräfixe. Der Prüfer validiert aktive
+YAML-Befehle und Actions, echte relative Linkziele und den tatsächlichen Jobgraphen.
+Er prüft außerdem, dass jede deklarierte Prüflinie im finalen Verdict landet und
+dass install-/scanintensive Jobs direkt `needs: preflight-docs` haben.
+Kommentierte Beispiele, Echo-Strings oder reine Jobnamen erfüllen keinen
+Ausführungsvertrag. Absichtliche Mutationen beweisen, dass Dummy-Kommandos und
+fehlende Gate-Abhängigkeiten rot werden.
 
-Lokal ist `npm run preflight:docs` der Reparatur-First-Einstieg: nur eindeutige
-Workflow-Verdrahtungsfehler werden automatisch behoben. `npm run preflight:docs:check`
-ist schreibgeschützt; genau diesen Modus nutzt CI. Kaputte Links, fehlende
-Job-Definitionen und abweichende fachliche Bedingungen werden nicht glattgebügelt.
+Lokal korrigiert der Preflight nur eindeutige Verdrahtungsfehler. Er erfindet
+keine fehlenden Jobs und überschreibt keine fachliche `if`-Bedingung. CI bleibt
+schreibgeschützt und bricht vor `npm ci`, Build oder Security-Scan ab.
 
-Die Dokumentationsprüfung liefert beispielsweise
-`PREFLIGHT_DOC_MISSING`, `PREFLIGHT_LINK_BROKEN`,
-`PREFLIGHT_LINK_ESCAPES_REPO`, `PREFLIGHT_JOB_DEFINITION_MISSING`,
-`PREFLIGHT_NEEDS_UNKNOWN_JOB`, `PREFLIGHT_JOB_NOT_REQUIRED` und
-`PREFLIGHT_VERDICT_FAIL_OPEN`. Die Ergebnisprüfung benennt Job und Status
-konkret, etwa `PREFLIGHT_CODEQL_FAILED`,
-`PREFLIGHT_DEPENDENCY_AUDIT_FAILED`, `PREFLIGHT_SECRET_SCAN_FAILED`,
-`PREFLIGHT_DOCUMENTATION_SKIPPED` oder
-`PREFLIGHT_REQUIRED_JOB_MISSING`.
+Die Dokumentationsprüfung liefert beispielsweise `PREFLIGHT_DOC_MISSING`,
+`PREFLIGHT_LINK_BROKEN`, `PREFLIGHT_LINK_ESCAPES_REPO`,
+`PREFLIGHT_JOB_DEFINITION_MISSING`, `PREFLIGHT_JOB_NOT_GATED_BY_PREFLIGHT`,
+`PREFLIGHT_JOB_BYPASSES_PREFLIGHT`, `PREFLIGHT_NEEDS_UNKNOWN_JOB` und
+`PREFLIGHT_VERDICT_FAIL_OPEN`. Ausführungsfehler werden jobbezogen gemeldet,
+etwa `PREFLIGHT_CODEQL_ACTION_MISSING`,
+`PREFLIGHT_DEPENDENCY_AUDIT_COMMAND_MISSING` oder
+`PREFLIGHT_SECRET_SCAN_ACTION_MISSING`.
 
-Jeder Lauf erzeugt eine maschinenlesbare `preflight-report.json` mit Commit-SHA,
-Run-ID, Run-Link, den Ergebnissen aller Pflichtjobs und Diagnosen. Die Datei
-wird auch nach einem fehlgeschlagenen Urteil als Run-Artefakt hochgeladen und
-die Zusammenfassung erscheint in GitHub Actions unter **Summary**. Nur
-`verdict: PASS` mit ausschließlich erfolgreichen Pflichtjobs ist eine
-Abnahme. Das ist CI-Abnahme, kein automatisches Release und kein Beleg für
-einen echten Provider-Modellturn.
+Jeder Lauf erzeugt `preflight-report.json` mit Commit-SHA, Run-ID, Run-Link,
+jedem Pflichtjob und Diagnosecodes. Das Artefakt wird auch nach einem
+fehlgeschlagenen Urteil hochgeladen; die Zusammenfassung steht in GitHub Actions
+unter **Summary**. Nur `verdict: PASS` mit erfolgreichen Pflichtjobs ist
+eine Abnahme. Es ist keine automatische Release-Freigabe und kein Beleg für einen
+echten Provider-Modellturn.
 
 ### `mobile-profile.yml`
 
