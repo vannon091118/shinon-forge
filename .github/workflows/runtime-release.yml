@@ -137,7 +137,7 @@ jobs:
           ls -lh shinon-runtime-arm64.tar.zst
 
       - name: Artefakte ablegen
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shinon-runtime-arm64-${{ steps.pin.outputs.short_sha }}
           path: |
