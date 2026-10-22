@@ -61,6 +61,7 @@ cd shinon-forge
 npm ci
 npm run profile:links
 npm test
+npm run preflight:docs
 git status --short
 ```
 
