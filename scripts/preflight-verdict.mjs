@@ -70,6 +70,9 @@ const report = {
   runId: env.GITHUB_RUN_ID ?? 'unknown',
   event: env.GITHUB_EVENT_NAME ?? 'unknown',
   generatedAt: new Date().toISOString(),
+  runUrl: env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID
+    ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`
+    : null,
   requiredJobs: REQUIRED_JOBS,
   jobs: rows,
   diagnostics,
@@ -85,6 +88,7 @@ const lines = [
   `- **Commit:** ${report.commit}`,
   `- **Run:** ${report.runId}`,
   `- **Event:** ${report.event}`,
+  ...(report.runUrl ? [`- **Run logs:** [open job details](${report.runUrl})`] : []),
   '',
   '## Job results',
   '',
@@ -95,7 +99,7 @@ const lines = [
   '## Diagnostics',
   '',
   ...(diagnostics.length
-    ? diagnostics.map((item) => `- **${item.code}** (${item.job ?? 'workflow'}): ${item.message}${item.result ? ` [${item.result}]` : ''}`)
+    ? diagnostics.map((item) => `- **${item.code}** (${item.job ?? 'workflow'}): ${item.message}${item.result ? ` [${item.result}]` : ''}${report.runUrl ? ` · [run logs](${report.runUrl})` : ''}`)
     : ['No acceptance errors. All required and included jobs succeeded.']),
   '',
 ];
