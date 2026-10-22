@@ -68,7 +68,7 @@ test('desktop: Exec nennt eine VERIFIZIERTE Node, nicht den Interpreter des Aufr
     // Mit dem SYSTEM-Node starten, wenn es ihn gibt: dann ist beweisbar, dass
     // nicht der Interpreter dieses Aufrufs im Eintrag landet.
     const interpreter = existsSync(SYSTEM_NODE) ? SYSTEM_NODE : process.execPath;
-    const brokenRange = !satisfiesRange(execFileSync(interpreter, ['--version'], { encoding: 'utf8' }).trim(), engineRange());
+    const brokenRange = !satisfiesRange(engineRange(), execFileSync(interpreter, ['--version'], { encoding: 'utf8' }).trim());
     const run = spawnSync(interpreter, [LAUNCHER], { env, encoding: 'utf8' });
     assert.equal(run.status, 0, `Launcher endete mit ${run.status}: ${run.stderr}`);
 
@@ -81,7 +81,7 @@ test('desktop: Exec nennt eine VERIFIZIERTE Node, nicht den Interpreter des Aufr
 
     // Die Zusage selbst: das genannte Node taugt, das des Aufrufs nicht.
     const version = execFileSync(nodeBin, ['--version'], { encoding: 'utf8' }).trim();
-    assert.equal(satisfiesRange(version, engineRange()), true, `${nodeBin} (${version}) passt nicht zu engines`);
+    assert.equal(satisfiesRange(engineRange(), version), true, `${nodeBin} (${version}) passt nicht zu engines`);
     if (brokenRange) assert.notEqual(nodeBin, interpreter, 'der untaugliche Interpreter darf NICHT im Eintrag stehen');
     assert.equal(dirname(nodeBin), join(process.execPath, '..') === dirname(nodeBin) ? dirname(nodeBin) : dirname(nodeBin));
 

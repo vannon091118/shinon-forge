@@ -21,6 +21,7 @@ import {
   loadMatrix,
   satisfiesRange,
 } from '../../lib/dsh-versions.mjs';
+import { satisfiesRange as runtimeSatisfiesRange } from '../../lib/runtime.mjs';
 import { targetDshVersion } from '../../dsh-update.mjs';
 
 const DSH = '9.9.9';
@@ -98,6 +99,7 @@ const run = (root, options = {}) => checkVersions(root, { runtime, ...options })
 const codes = (result) => result.issues.map((found) => found.code);
 
 test('satisfiesRange: die Range-Formen, die im Repo vorkommen', () => {
+  assert.equal(satisfiesRange, runtimeSatisfiesRange, 'Runtime und DSH-Prüfer verwenden dieselbe Funktion und Argument-Reihenfolge');
   assert.equal(satisfiesRange('4.4.4', '4.4.4'), true);
   assert.equal(satisfiesRange('4.4.4', '4.4.5'), false);
   assert.equal(satisfiesRange('~4.4.4-alpha.1', '4.4.4'), true, 'die Vorab-Range muss die Release-Fassung einschließen');
@@ -112,6 +114,8 @@ test('satisfiesRange: die Range-Formen, die im Repo vorkommen', () => {
   assert.equal(satisfiesRange('^4.0.0 || ^5.0.0', '5.1.0'), true);
   assert.equal(satisfiesRange('~4.5.0', '4.5.0-alpha.1'), false, 'eine Vorabfassung erfüllt nur eine Vorab-Range desselben Kerns');
   assert.equal(satisfiesRange('~4.5.0-alpha.1', '4.5.0-alpha.2'), true);
+  assert.equal(satisfiesRange('unsinn', '4.4.4'), false, 'ungültige Ranges lassen keine Fassung durch');
+  assert.equal(satisfiesRange('', '4.4.4'), false, 'eine leere Range ist kein Freibrief');
   assert.equal(compareSemver('4.4.4-alpha.1', '4.4.4'), -1);
   assert.equal(compareSemver('4.4.4', '4.4.4'), 0);
 });

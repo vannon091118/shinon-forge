@@ -9,6 +9,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { dshBinary } from './dsh.mjs';
+import { compareSemver, parseSemver, satisfiesRange } from './runtime.mjs';
+export { compareSemver, parseSemver, satisfiesRange } from './runtime.mjs';
 import { tokenize } from './source-scan.mjs';
 
 /** Die Sollquelle — relativ zum Repo-Root. */
@@ -30,106 +32,6 @@ const VERSION_SHAPE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const SOURCE_ROOTS = ['bin', 'scripts', 'packages', 'profiles'];
 const SOURCE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.ts', '.yml', '.yaml'];
 const SOURCE_SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.shinon']);
-
-/** `1.2.3` oder `1.2.3-pre` zerlegen (`null` bei unbekannter Form). */
-export function parseSemver(version) {
-  const found = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(String(version ?? '').trim());
-  if (found === null) return null;
-  return { major: Number(found[1]), minor: Number(found[2]), patch: Number(found[3]), pre: found[4] ?? null };
-}
-
-/**
- * Semver-Vergleich (-1/0/1): Kern zuerst, dann Release > Prerelease,
- * Prerelease-Teile numerisch gegen numerisch, Zahl < Text (Semver §11).
- */
-export function compareSemver(left, right) {
-  const a = parseSemver(left);
-  const b = parseSemver(right);
-  if (a === null || b === null) return 0;
-  for (const key of ['major', 'minor', 'patch']) {
-    if (a[key] !== b[key]) return a[key] < b[key] ? -1 : 1;
-  }
-  if (a.pre === b.pre) return 0;
-  if (a.pre === null) return 1;
-  if (b.pre === null) return -1;
-  const partsA = a.pre.split('.');
-  const partsB = b.pre.split('.');
-  for (let i = 0; i < Math.max(partsA.length, partsB.length); i += 1) {
-    if (partsA[i] === undefined) return -1;
-    if (partsB[i] === undefined) return 1;
-    const numA = /^\d+$/.test(partsA[i]) ? Number(partsA[i]) : null;
-    const numB = /^\d+$/.test(partsB[i]) ? Number(partsB[i]) : null;
-    if (numA !== null && numB !== null && numA !== numB) return numA < numB ? -1 : 1;
-    if ((numA === null) !== (numB === null)) return numA === null ? 1 : -1;
-    if (partsA[i] !== partsB[i]) return partsA[i] < partsB[i] ? -1 : 1;
-  }
-  return 0;
-}
-
-/** Obergrenze einer Tilde-Range: gleicher Major/Minor, naechster Minor. */
-function tildeCeiling(base) {
-  return `${base.major}.${base.minor + 1}.0`;
-}
-
-/** Obergrenze einer Caret-Range (0.x zaehlt wie npm: 0.b.c bindet den Minor). */
-function caretCeiling(base) {
-  if (base.major > 0) return `${base.major + 1}.0.0`;
-  if (base.minor > 0) return `0.${base.minor + 1}.0`;
-  return `0.0.${base.patch + 1}`;
-}
-
-/**
- * Prüft EINE Range gegen EINE Fassung. Unterstützt genau die Formen, die in
- * diesem Repo vorkommen: exakt, `~`, `^`, `>=`, `>`, `<=`, `<`, `*` und
- * `||`-Alternativen. Prerelease-Regel wie npm: eine Vorabfassung erfüllt nur
- * eine Range, die selbst eine Vorabfassung desselben Kerns nennt.
- */
-export function satisfiesRange(range, version) {
-  const wanted = parseSemver(version);
-  if (wanted === null) return false;
-  const text = String(range ?? '').trim();
-  if (text === '' || text === '*' || text === 'latest') return text === '' || text === '*' ? wanted.pre === null : false;
-
-  const alternatives = text.split('||').map((part) => part.trim()).filter((part) => part !== '');
-  if (alternatives.length === 0) return false;
-
-  const prereleaseAllowed = (part) => {
-    const base = parseSemver(part.replace(/^[~^]=?/, '').replace(/^(>=|<=|>|<|=)\s*/, ''));
-    return base !== null && base.pre !== null
-      && base.major === wanted.major && base.minor === wanted.minor && base.patch === wanted.patch;
-  };
-
-  return alternatives.some((part) => {
-    if (wanted.pre !== null && !prereleaseAllowed(part)) return false;
-    const comparators = part.split(/\s+/).filter((token) => token !== '');
-    let ok = true;
-    for (const token of comparators) {
-      if (token.startsWith('~')) {
-        const base = parseSemver(token.slice(1));
-        if (base === null) return false;
-        ok = ok && compareSemver(version, `${base.major}.${base.minor}.${base.patch}${base.pre === null ? '' : `-${base.pre}`}`) >= 0
-          && compareSemver(version, tildeCeiling(base)) < 0;
-      } else if (token.startsWith('^')) {
-        const base = parseSemver(token.slice(1));
-        if (base === null) return false;
-        ok = ok && compareSemver(version, `${base.major}.${base.minor}.${base.patch}${base.pre === null ? '' : `-${base.pre}`}`) >= 0
-          && compareSemver(version, caretCeiling(base)) < 0;
-      } else if (token.startsWith('>=')) {
-        ok = ok && compareSemver(version, token.slice(2).trim()) >= 0;
-      } else if (token.startsWith('<=')) {
-        ok = ok && compareSemver(version, token.slice(2).trim()) <= 0;
-      } else if (token.startsWith('>')) {
-        ok = ok && compareSemver(version, token.slice(1).trim()) > 0;
-      } else if (token.startsWith('<')) {
-        ok = ok && compareSemver(version, token.slice(1).trim()) < 0;
-      } else {
-        ok = ok && compareSemver(version, token.replace(/^=/, '')) === 0;
-      }
-      if (!ok) return false;
-    }
-    return ok;
-  });
-}
 
 /** Befund mit Soll, Ist und Fundstelle — die Form, die der CLI ausgibt. */
 function issue(code, where, pkg, expected, actual, message) {

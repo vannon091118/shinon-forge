@@ -47,15 +47,15 @@ test('runtime: die unterstützte Range steht im Root-Manifest, nicht im Code', (
 test('runtime: veraltete und unerlaubte Fassungen werden abgewiesen', () => {
   const range = engineRange();
   // Der Befund: genau diese drei galten vorher als tauglich.
-  assert.equal(satisfiesRange('v22.18.0', range), false, '22.18 liegt unter ^22.19.0');
-  assert.equal(satisfiesRange('v23.1.0', range), false, '23 ist von der Range ausgeschlossen');
-  assert.equal(satisfiesRange('v21.7.3', range), false, '21 liegt unter 22');
+  assert.equal(satisfiesRange(range, 'v22.18.0'), false, '22.18 liegt unter ^22.19.0');
+  assert.equal(satisfiesRange(range, 'v23.1.0'), false, '23 ist von der Range ausgeschlossen');
+  assert.equal(satisfiesRange(range, 'v21.7.3'), false, '21 liegt unter 22');
   // Und die zugelassenen Fassungen bleiben zugelassen.
-  assert.equal(satisfiesRange('v22.19.0', range), true, 'die Untergrenze selbst gilt');
-  assert.equal(satisfiesRange('v22.23.3', range), true, 'die gemessene Fassung gilt');
-  assert.equal(satisfiesRange('v24.0.0', range), true, '>=24.0.0 gilt');
+  assert.equal(satisfiesRange(range, 'v22.19.0'), true, 'die Untergrenze selbst gilt');
+  assert.equal(satisfiesRange(range, 'v22.23.3'), true, 'die gemessene Fassung gilt');
+  assert.equal(satisfiesRange(range, 'v24.0.0'), true, '>=24.0.0 gilt');
   // Ein unbekannter Ausdruck lässt nichts durch (fail-closed).
-  assert.equal(satisfiesRange('v22.19.0', 'unsinn'), false);
+  assert.equal(satisfiesRange('unsinn', 'v22.19.0'), false);
 });
 
 // ── 2. Die Proben am echten Binary ───────────────────────────────────────────
@@ -64,7 +64,7 @@ test('runtime: der verifizierte Kandidat besteht Version UND node:sqlite-Rauchte
   resetRuntimeCache();
   const resolved = resolveRuntime();
   assert.ok(resolved.binary !== null, `kein Kandidat: ${runtimeFailure(resolved)}`);
-  assert.equal(satisfiesRange(resolved.version, resolved.range), true, `${resolved.version} gegen ${resolved.range}`);
+  assert.equal(satisfiesRange(resolved.range, resolved.version), true, `${resolved.version} gegen ${resolved.range}`);
   assert.ok(existsSync(resolved.binary), `Binary existiert: ${resolved.binary}`);
 
   // Die Probe noch einmal einzeln, damit der Test nicht nur dem Resolver glaubt.

@@ -47,52 +47,115 @@ export function engineRange(root = WORKSPACE_ROOT) {
   return range.trim();
 }
 
-/** Eine Fassung als Zahlen-Tripel; `null`, wenn die Form nicht stimmt. */
-function parseVersion(value) {
-  const found = /^v?(\d+)\.(\d+)\.(\d+)/.exec(String(value).trim());
-  return found === null ? null : [Number(found[1]), Number(found[2]), Number(found[3])];
+/** `1.2.3` oder `1.2.3-pre` zerlegen (`null` bei unbekannter Form). */
+export function parseSemver(version) {
+  const found = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(String(version ?? '').trim());
+  if (found === null) return null;
+  return { major: Number(found[1]), minor: Number(found[2]), patch: Number(found[3]), pre: found[4] ?? null };
 }
 
-/** Vergleich zweier Tripel: -1, 0, 1. */
-function compare(left, right) {
-  for (let at = 0; at < 3; at += 1) {
-    if (left[at] !== right[at]) return left[at] < right[at] ? -1 : 1;
+/**
+ * Semver-Vergleich (-1/0/1): Kern zuerst, dann Release > Prerelease,
+ * Prerelease-Teile numerisch gegen numerisch, Zahl < Text (Semver §11).
+ */
+export function compareSemver(left, right) {
+  const a = parseSemver(left);
+  const b = parseSemver(right);
+  if (a === null || b === null) return 0;
+  for (const key of ['major', 'minor', 'patch']) {
+    if (a[key] !== b[key]) return a[key] < b[key] ? -1 : 1;
+  }
+  if (a.pre === b.pre) return 0;
+  if (a.pre === null) return 1;
+  if (b.pre === null) return -1;
+  const partsA = a.pre.split('.');
+  const partsB = b.pre.split('.');
+  for (let i = 0; i < Math.max(partsA.length, partsB.length); i += 1) {
+    if (partsA[i] === undefined) return -1;
+    if (partsB[i] === undefined) return 1;
+    const numA = /^\d+$/.test(partsA[i]) ? Number(partsA[i]) : null;
+    const numB = /^\d+$/.test(partsB[i]) ? Number(partsB[i]) : null;
+    if (numA !== null && numB !== null && numA !== numB) return numA < numB ? -1 : 1;
+    if ((numA === null) !== (numB === null)) return numA === null ? 1 : -1;
+    if (partsA[i] !== partsB[i]) return partsA[i] < partsB[i] ? -1 : 1;
   }
   return 0;
 }
 
-/** EIN Vergleichsausdruck (`>=22.19.0`, `^22.19.0`, `>24.0.0`, `22.19.0`). */
-function matchesOne(version, term) {
-  const match = /^(\^|~|>=|<=|>|<|=)?\s*v?(\d+)\.(\d+)\.(\d+)$/.exec(term.trim());
-  if (match === null) return false;
-  const [, operator = '=', major, minor, patch] = match;
-  const want = [Number(major), Number(minor), Number(patch)];
-  const at = compare(version, want);
-  if (operator === '^') {
-    // Caret: gleiche Hauptversion, nichts darunter (0.x wie npm: bis zur nächsten Minor).
-    return major === '0'
-      ? version[0] === 0 && version[1] === want[1] && at >= 0
-      : version[0] === want[0] && at >= 0;
-  }
-  if (operator === '~') return version[0] === want[0] && version[1] === want[1] && at >= 0;
-  if (operator === '>=') return at >= 0;
-  if (operator === '<=') return at <= 0;
-  if (operator === '>') return at > 0;
-  if (operator === '<') return at < 0;
-  return at === 0;
+/** Obergrenze einer Tilde-Range: gleicher Major/Minor, naechster Minor. */
+function tildeCeiling(base) {
+  return `${base.major}.${base.minor + 1}.0`;
+}
+
+/** Obergrenze einer Caret-Range (0.x zaehlt wie npm: 0.b.c bindet den Minor). */
+function caretCeiling(base) {
+  if (base.major > 0) return `${base.major + 1}.0.0`;
+  if (base.minor > 0) return `0.${base.minor + 1}.0`;
+  return `0.0.${base.patch + 1}`;
 }
 
 /**
- * Die semver-Range aus `engines` — absichtlich klein: `||` trennt Alternativen,
- * Leerzeichen bedeutet UND. Ein unbekannter Ausdruck ergibt `false` (fail-closed),
- * damit ein Tippfehler in der Range keinen Kandidaten durchwinkt.
+ * Prüft EINE Range gegen EINE Fassung. Unterstützt genau die Formen, die in
+ * diesem Repo vorkommen: exakt, `~`, `^`, `>=`, `>`, `<=`, `<`, `*` und
+ * `||`-Alternativen. Prerelease-Regel wie npm: eine Vorabfassung erfüllt nur
+ * eine Range, die selbst eine Vorabfassung desselben Kerns nennt.
  */
-export function satisfiesRange(version, range) {
-  const triple = parseVersion(version);
-  if (triple === null) return false;
-  return range.split('||').some((alternative) => {
-    const terms = alternative.trim().split(/\s+/).filter((term) => term !== '');
-    return terms.length > 0 && terms.every((term) => matchesOne(triple, term));
+export function satisfiesRange(range, version) {
+  const wanted = parseSemver(version);
+  if (wanted === null) return false;
+  const text = String(range ?? '').trim();
+  if (text === '' || text === 'latest') return false;
+  if (text === '*') return wanted.pre === null;
+
+  const alternatives = text.split('||').map((part) => part.trim()).filter((part) => part !== '');
+  if (alternatives.length === 0) return false;
+
+  const prereleaseAllowed = (part) => {
+    const base = parseSemver(part.replace(/^[~^]=?/, '').replace(/^(>=|<=|>|<|=)\s*/, ''));
+    return base !== null && base.pre !== null
+      && base.major === wanted.major && base.minor === wanted.minor && base.patch === wanted.patch;
+  };
+
+  return alternatives.some((part) => {
+    if (wanted.pre !== null && !prereleaseAllowed(part)) return false;
+    const comparators = part.split(/\s+/).filter((token) => token !== '');
+    const compareTo = (bound) => parseSemver(bound) === null ? null : compareSemver(version, bound);
+    let ok = true;
+    for (const token of comparators) {
+      if (token.startsWith('~')) {
+        const base = parseSemver(token.slice(1));
+        if (base === null) return false;
+        ok = ok && compareSemver(version, `${base.major}.${base.minor}.${base.patch}${base.pre === null ? '' : `-${base.pre}`}`) >= 0
+          && compareSemver(version, tildeCeiling(base)) < 0;
+      } else if (token.startsWith('^')) {
+        const base = parseSemver(token.slice(1));
+        if (base === null) return false;
+        ok = ok && compareSemver(version, `${base.major}.${base.minor}.${base.patch}${base.pre === null ? '' : `-${base.pre}`}`) >= 0
+          && compareSemver(version, caretCeiling(base)) < 0;
+      } else if (token.startsWith('>=')) {
+        const compared = compareTo(token.slice(2).trim());
+        if (compared === null) return false;
+        ok = ok && compared >= 0;
+      } else if (token.startsWith('<=')) {
+        const compared = compareTo(token.slice(2).trim());
+        if (compared === null) return false;
+        ok = ok && compared <= 0;
+      } else if (token.startsWith('>')) {
+        const compared = compareTo(token.slice(1).trim());
+        if (compared === null) return false;
+        ok = ok && compared > 0;
+      } else if (token.startsWith('<')) {
+        const compared = compareTo(token.slice(1).trim());
+        if (compared === null) return false;
+        ok = ok && compared < 0;
+      } else {
+        const compared = compareTo(token.replace(/^=/, ''));
+        if (compared === null) return false;
+        ok = ok && compared === 0;
+      }
+      if (!ok) return false;
+    }
+    return ok;
   });
 }
 
@@ -133,13 +196,15 @@ export function floorVersion(range) {
       // ">X.Y.Z" heisst: mindestens X.Y.(Z+1). "<" und "<=" nennen keine
       // Untergrenze, lassen die Alternative aber nach unten offen.
       if (operator === '>') value[2] += 1;
-      if (compare(value, floor) > 0) floor = value;
+      if (compareSemver(value.join('.'), floor.join('.')) > 0) floor = value;
     }
     return floor;
   });
-  const lowest = floors.reduce((left, right) => (compare(right, left) < 0 ? right : left));
+  const lowest = floors.reduce((left, right) => (
+    compareSemver(right.join('.'), left.join('.')) < 0 ? right : left
+  ));
   const version = lowest.join('.');
-  if (!satisfiesRange(version, range)) {
+  if (!satisfiesRange(range, version)) {
     throw new Error(`floorVersion: die Untergrenze ${version} erfuellt die Range "${range}" nicht — Abbruch`);
   }
   return version;
@@ -202,10 +267,10 @@ function managedNodeBinaries(env = process.env) {
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .sort((left, right) => {
-        const a = parseVersion(left);
-        const b = parseVersion(right);
+        const a = parseSemver(left);
+        const b = parseSemver(right);
         if (a === null || b === null) return right.localeCompare(left);
-        return compare(b, a);
+        return compareSemver(right, left);
       })
       .map((name) => join(base, name, 'bin', binary))
       .filter((path) => existsSync(path));
@@ -278,7 +343,7 @@ function resolveUncached({ env, root, range }) {
       tried.push({ ...probe, binary, source });
       continue;
     }
-    if (!satisfiesRange(probe.version, range)) {
+    if (!satisfiesRange(range, probe.version)) {
       tried.push({ ...probe, ok: false, binary, source, reason: `${probe.version} passt nicht zu engines.node "${range}"` });
       continue;
     }

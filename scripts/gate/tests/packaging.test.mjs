@@ -51,7 +51,7 @@ test('die mitgelieferte Node-Fassung ist die Untergrenze aus engines.node', () =
   const range = engineRange(ROOT);
   const floor = floorVersion(range);
   assert.equal(floor, '22.19.0', `die Untergrenze von "${range}"`);
-  assert.equal(satisfiesRange(floor, range), true, 'die mitgelieferte Fassung liegt in der Range');
+  assert.equal(satisfiesRange(range, floor), true, 'die mitgelieferte Fassung liegt in der Range');
   // Und sie ist eine Ableitung, keine zweite Zahl: eine Range ohne lesbaren
   // Ausdruck ist ein Fehler, kein Raten.
   assert.throws(() => floorVersion('unsinn'), /nicht lesbar/);

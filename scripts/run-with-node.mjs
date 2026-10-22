@@ -79,7 +79,7 @@ if (args[0] === '--runtime') {
 // Die laufende Fassung gilt nur, wenn sie die deklarierte Range erfüllt. Die
 // exakte Range steht im Manifest (eine Quelle), nicht als zweite Zahl hier.
 const running = `v${process.versions.node}`;
-const inRange = satisfiesRange(running, engineRange(ROOT));
+const inRange = satisfiesRange(engineRange(ROOT), running);
 
 let binary = process.execPath;
 if (!inRange) {
