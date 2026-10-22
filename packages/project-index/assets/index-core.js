@@ -1555,6 +1555,7 @@ export function readMemory(db, namespace) {
     memos,
     scorecard: summary?.scorecard ?? null,
     notes: typeof summary?.notes === 'number' ? summary.notes : 0,
+    blockWeights: summary?.blockWeights ?? {}, blockAttributions: Array.isArray(summary?.blockAttributions) ? summary.blockAttributions : [],
     broken,
   };
 }
@@ -1568,15 +1569,13 @@ export function readMemory(db, namespace) {
  * Transaktion zurueck: ein halb geschriebener Stand waere schlimmer als der
  * alte, weil er wie ein ganzer aussieht.
  *
- * Die drei Arten sind bewusst die einzigen: `record` (eine Zeile des
- * Protokolls, mit `ordinal` in der Reihenfolge des Eingangs), `memo` (Zustand
- * je Sitzung, geschluesselt nach `ref`) und `summary` (der Stand, der aus dem
- * Protokoll folgt). Ein Dokument ohne Nummer ist hier nicht vorgesehen.
+ * Die drei Arten bleiben `record`, `memo` und `summary`; darin liegen nun auch
+ * Gewichte/Attributionsbelege. Alte Summary-Zeilen lesen ohne Lernfelder leer,
+ * ein Versionswechsel ist nicht noetig.
  */
 export function writeMemory(db, namespace, state = {}) {
-  const records = Array.isArray(state?.records) ? state.records : [];
-  const memos = Array.isArray(state?.memos) ? state.memos : [];
-  const summary = { scorecard: state?.scorecard ?? null, notes: typeof state?.notes === 'number' ? state.notes : 0 };
+  const records = Array.isArray(state?.records) ? state.records : [], memos = Array.isArray(state?.memos) ? state.memos : [];
+  const summary = { scorecard: state?.scorecard ?? null, notes: typeof state?.notes === 'number' ? state.notes : 0, blockWeights: state?.blockWeights ?? {}, blockAttributions: Array.isArray(state?.blockAttributions) ? state.blockAttributions : [] };
   db.exec('begin');
   try {
     db.prepare(`delete from ${MEMORY_TABLE} where namespace = ?`).run(namespace);
