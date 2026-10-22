@@ -84,6 +84,10 @@ export const NARRATIVE_STATE_CHANNEL = 'shinon/narrative/state';
 export const NARRATIVE_STATE_CONTRACT = 'shinon.narrative/v1';
 export const PROMPTER_DECISION_CHANNEL = 'shinon/prompter/decision';
 
+/** Shared durable index store seam, owned here and imported by all host readers. */
+export const INDEX_STORE_SERVICE = 'shinon_index_store';
+export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
+
 /** Vertragsname der Workspace-Identität. */
 export const WORKSPACE_CONTRACT = 'shinon.workspace/v1';
 

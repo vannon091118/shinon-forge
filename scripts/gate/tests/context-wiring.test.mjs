@@ -35,7 +35,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 
-const PACKAGES = ['prompter', 'project-index', 'scoring', 'persona'];
+const PACKAGES = ['prompter', 'project-index', 'scoring', 'persona', 'narrative', 'codingmon'];
 const ROOT = new URL('../../../', import.meta.url);
 
 /** Beide Bundles isoliert laden, mit dem ECHTEN Schemastery der DSH-Installation. */
@@ -71,6 +71,8 @@ const prompter = loaded.prompter;
 const index = loaded['project-index'];
 const scoring = loaded.scoring;
 const persona = loaded.persona;
+const narrative = loaded.narrative;
+const codingmon = loaded.codingmon;
 const dshRequire = createRequire(join(dshRoot(), 'package.json'));
 const { Context } = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/cordis')).href);
 
@@ -133,7 +135,7 @@ test('Index: die angebotenen Faehigkeiten sind schmal und tragen einen Vertragsn
   // Die Regel bleibt: jede Naht ist schmal, keine wird geweitet.
   assert.deepEqual(
     names,
-    [index.QUERY_SERVICE, index.STORE_SERVICE, 'shinon_facts_snapshot'].sort(),
+    [index.QUERY_SERVICE, index.INDEX_STORE_SERVICE, 'shinon_facts_snapshot'].sort(),
     'drei schmale Faehigkeiten',
   );
   const facts = provided.find((entry) => entry.name === 'shinon_facts_snapshot').value;
@@ -143,9 +145,9 @@ test('Index: die angebotenen Faehigkeiten sind schmal und tragen einen Vertragsn
   assert.deepEqual(Object.keys(query).sort(), ['contract', 'resolveContext'], 'schmal: Vertragsname und EINE Operation');
   assert.equal(query.contract, index.QUERY_CONTRACT);
   assert.equal(typeof query.resolveContext, 'function');
-  const store = provided.find((entry) => entry.name === index.STORE_SERVICE).value;
+  const store = provided.find((entry) => entry.name === index.INDEX_STORE_SERVICE).value;
   assert.deepEqual(Object.keys(store).sort(), ['contract', 'load', 'save'], 'die Ablage: zwei Operationen, kein Schema');
-  assert.equal(store.contract, index.STORE_CONTRACT);
+  assert.equal(store.contract, index.INDEX_STORE_CONTRACT);
   assert.equal(typeof store.load, 'function');
   assert.equal(typeof store.save, 'function');
   dispose();
@@ -181,6 +183,16 @@ test('Index: mit Index liefert die Abfrage den Kontextvertrag des Enhancers', ()
 // ── 2. Die Naht als Daten ───────────────────────────────────────────────────
 
 test('Naht: Dienst- und Vertragsname stimmen in beiden Paketen ueberein', () => {
+  assert.equal(index.STORE_SERVICE, undefined, 'kein mehrdeutiger generischer Store-Export');
+  assert.equal(index.STORE_CONTRACT, undefined, 'kein mehrdeutiger generischer Vertrags-Export');
+  assert.equal(narrative.STORE_SERVICE, undefined, 'Narrative exportiert ebenfalls keine generischen Store-Namen');
+  assert.equal(narrative.STORE_CONTRACT, undefined, 'Narrative exportiert ebenfalls keine generischen Store-Namen');
+  assert.equal(codingmon.STORE_SERVICE, undefined, 'Codingmon exportiert keine generischen Store-Namen');
+  assert.equal(codingmon.STORE_CONTRACT, undefined, 'Codingmon exportiert keine generischen Store-Namen');
+  assert.equal(narrative.INDEX_STORE_SERVICE, index.INDEX_STORE_SERVICE, 'Narrative verwendet dieselbe Index-Naht');
+  assert.equal(narrative.INDEX_STORE_CONTRACT, index.INDEX_STORE_CONTRACT, 'Narrative verwendet denselben Index-Vertrag');
+  assert.equal(codingmon.CODINGMON_STORE_SERVICE, 'shinon_codingmon_store');
+  assert.equal(codingmon.CODINGMON_STORE_CONTRACT, 'shinon.codingmon/store-v1');
   assert.equal(prompter.INDEX_SERVICE, index.QUERY_SERVICE, 'derselbe Dienstname');
   assert.equal(prompter.INDEX_CONTRACT, index.QUERY_CONTRACT, 'derselbe Vertragsname');
   assert.equal(prompter.INDEX_BUDGET_TOKENS, index.DEFAULT_CONTEXT_BUDGET, 'dasselbe Budget als Default');
@@ -189,24 +201,24 @@ test('Naht: Dienst- und Vertragsname stimmen in beiden Paketen ueberein', () => 
   // Die zweite Naht (Zug 2): kein Paket liest das andere, also pinnt der Test
   // auch hier beide Seiten — Dienstname, Vertragsname und ein Namensraum, der
   // wirklich einer ist.
-  assert.equal(scoring.INDEX_STORE_SERVICE, index.STORE_SERVICE, 'derselbe Dienstname');
-  assert.equal(scoring.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
+  assert.equal(scoring.INDEX_STORE_SERVICE, index.INDEX_STORE_SERVICE, 'derselbe Dienstname');
+  assert.equal(scoring.INDEX_STORE_CONTRACT, index.INDEX_STORE_CONTRACT, 'derselbe Vertragsname');
   assert.equal(typeof scoring.LEDGER_NAMESPACE, 'string');
   assert.ok(scoring.LEDGER_NAMESPACE.length > 0, 'ohne Namensraum gaebe es keine Adresse');
 
   // Die Persona haengt am SELBEN Dienst, mit einem EIGENEN Raum: ihr
   // Selbstmodell ist gelernte Selbstkenntnis, nicht das Protokoll des Scorings.
-  // Beide Namen sind Literale auf beiden Seiten — hier steht, dass sie stimmen.
-  assert.equal(persona.INDEX_STORE_SERVICE, index.STORE_SERVICE, 'derselbe Dienstname');
-  assert.equal(persona.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
+  // Beide Namen kommen aus derselben Definition in @shinon/seams/core.
+  assert.equal(persona.INDEX_STORE_SERVICE, index.INDEX_STORE_SERVICE, 'derselbe Dienstname');
+  assert.equal(persona.INDEX_STORE_CONTRACT, index.INDEX_STORE_CONTRACT, 'derselbe Vertragsname');
   assert.notEqual(persona.SELF_MODEL_NAMESPACE, scoring.LEDGER_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
 
   // Der Prompter haengt am selben Dienst, ebenfalls mit einem EIGENEN Raum:
   // der SALVAGED_PROSE-Zaehler beschreibt den Lauf (Sitzung), nicht das
-  // Protokoll und nicht das Selbstmodell. Auch hier sind beide Namen Literale
-  // auf beiden Seiten — und der Test ist der Ort, der sie zusammennagelt.
-  assert.equal(prompter.INDEX_STORE_SERVICE, index.STORE_SERVICE, 'derselbe Dienstname');
-  assert.equal(prompter.INDEX_STORE_CONTRACT, index.STORE_CONTRACT, 'derselbe Vertragsname');
+  // Protokoll und nicht das Selbstmodell. Auch hier stammen beide Namen aus
+  // derselben Definition in @shinon/seams/core.
+  assert.equal(prompter.INDEX_STORE_SERVICE, index.INDEX_STORE_SERVICE, 'derselbe Dienstname');
+  assert.equal(prompter.INDEX_STORE_CONTRACT, index.INDEX_STORE_CONTRACT, 'derselbe Vertragsname');
   assert.notEqual(prompter.SALVAGE_NAMESPACE, scoring.LEDGER_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
   assert.notEqual(prompter.SALVAGE_NAMESPACE, persona.SELF_MODEL_NAMESPACE, 'eigener Namensraum, kein geteilter Stand');
   assert.equal(prompter.SALVAGE_CONTRACT, prompter.SALVAGE_NAMESPACE, 'Vertrag und Adresse sind derselbe Name der Form');

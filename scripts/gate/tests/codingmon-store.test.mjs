@@ -192,9 +192,9 @@ test('Zusage: die Host-Haelfte oeffnet den Spiegel selbst und gibt ihn als Diens
   const bundle = await import(pathToFileURL(HOST_FILE).href);
 
   const dispose = quiet(() => bundle.apply(ctx, bundle.Config({})));
-  const service = await until(() => ctx.get(bundle.STORE_SERVICE));
-  assert.ok(service, `${bundle.STORE_SERVICE} wurde nicht bereitgestellt`);
-  assert.equal(service.contract, bundle.STORE_CONTRACT, 'der Dienst nennt seinen Vertrag');
+  const service = await until(() => ctx.get(bundle.CODINGMON_STORE_SERVICE));
+  assert.ok(service, `${bundle.CODINGMON_STORE_SERVICE} wurde nicht bereitgestellt`);
+  assert.equal(service.contract, bundle.CODINGMON_STORE_CONTRACT, 'der Dienst nennt seinen Vertrag');
   assert.deepEqual(service.fields, bundle.SNAPSHOT_FIELDS, 'und die Felder, die er annimmt');
 
   const written = await service.write(snapshot());

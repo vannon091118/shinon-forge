@@ -359,7 +359,7 @@ test('Zusage: der Stand geht durch die Naht und liegt danach validiert auf der P
 
   // Die Host-Haelfte des Pakets montiert sich selbst — inklusive Empfaenger.
   const disposeHost = quiet(() => bundle.apply(host, bundle.Config({})));
-  const service = await until(() => host.get(bundle.STORE_SERVICE));
+  const service = await until(() => host.get(bundle.CODINGMON_STORE_SERVICE));
   assert.ok(service, 'der Spiegel wurde nicht bereitgestellt');
   assert.ok(host.get('typertGateway'), 'das echte Typert-Gateway laeuft nicht');
 
@@ -483,7 +483,7 @@ test('Zusage: nur turn/end mit reason=completed zaehlt XP-Completions in readAct
   const storeFile = join(medium, 'codingmon_pet.json');
 
   const disposeHost = quiet(() => bundle.apply(host, bundle.Config({})));
-  await until(() => host.get(bundle.STORE_SERVICE));
+  await until(() => host.get(bundle.CODINGMON_STORE_SERVICE));
   const client = await bootClient(carrier);
   const unmount = await client.remote.$mount(remote.petRemoteContribution());
   const namespace = await until(() => client.get(`remote.${uebergabe.UEBERGABE_NAMESPACE}`));

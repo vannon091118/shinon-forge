@@ -46,7 +46,7 @@ sind rot.
 | Vertrag mit Sache | `shinon.<bereich>/<sache>-v<N>` | z. B. `packages/codingmon/index.js` (`store-v1`) |
 | Vertrag, Sache = Bereich | `shinon.<bereich>/v<N>` | `packages/seams/assets/seams.js` (`workspace/v1`) |
 | Zustandsmarker | `shinon.<bereich>/unloaded` | `packages/persona/index.js` |
-| Dienst | `shinon_<bereich>_<sache>` | `packages/codingmon/index.js` (`shinon_codingmon_store`) |
+| Dienst | `shinon_<bereich>_<sache>` | `packages/codingmon/index.js` (`shinon_codingmon_store`); gemeinsamer Index-Store `shinon_index_store` in `packages/seams/assets/seams.js` |
 | Produktname des Routers | `Shinon Task Manager` | `packages/task-router/index.js` |
 | Eine Runde mit ihrem Goal | `Task-Gruppe` | `packages/task-router/index.js` |
 | Identitätsschicht | `Persona` | `packages/persona/index.js` |

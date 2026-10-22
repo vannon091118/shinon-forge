@@ -219,13 +219,13 @@ test('memory: die Ablage ist eine zweite, schmale Faehigkeit — die Abfrage ble
   const query = api.host.services.get(index.QUERY_SERVICE);
   assert.deepEqual(Object.keys(query).sort(), ['contract', 'resolveContext'], 'die Abfrage bleibt eine Operation');
   assert.equal(query.contract, index.QUERY_CONTRACT);
-  const store = api.host.services.get(index.STORE_SERVICE);
+  const store = api.host.services.get(index.INDEX_STORE_SERVICE);
   assert.deepEqual(Object.keys(store).sort(), ['contract', 'load', 'save'], 'die Ablage ist genau zwei Operationen');
-  assert.equal(store.contract, index.STORE_CONTRACT);
+  assert.equal(store.contract, index.INDEX_STORE_CONTRACT);
 
   // Die Naht als Daten: kein Paket liest das andere, also pinnt der Test beide Seiten.
-  assert.equal(scoring.INDEX_STORE_SERVICE, index.STORE_SERVICE);
-  assert.equal(scoring.INDEX_STORE_CONTRACT, index.STORE_CONTRACT);
+  assert.equal(scoring.INDEX_STORE_SERVICE, index.INDEX_STORE_SERVICE);
+  assert.equal(scoring.INDEX_STORE_CONTRACT, index.INDEX_STORE_CONTRACT);
   assert.equal(scoring.INDEX_STORE_CONTRACT, store.contract);
   assert.equal(typeof scoring.LEDGER_NAMESPACE, 'string');
   assert.ok(scoring.LEDGER_NAMESPACE.length > 0);

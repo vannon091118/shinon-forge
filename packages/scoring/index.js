@@ -51,16 +51,14 @@ export {
 export { WEIGHTS_CONTRACT, WEIGHTS_SERVICE } from './assets/block-weights.js';
 import { canonicalize, initialState as coreInitialState, createSignalCollector, deriveTendency } from './assets/scoring-core.js';
 import { MAX_ATTRIBUTIONS, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, applyAttribution, cleanBlockIds, polarityOf, readWeights, reverseAttribution, validateAttribution, validateWeights } from './assets/block-weights.js';
+import { INDEX_STORE_SERVICE, INDEX_STORE_CONTRACT } from '@shinon/seams/core';
 
 /**
- * Die Naht zur Ablage (Zug 2) — als Namen an EINER Stelle, weil kein Paket das
- * andere liest: der Projekt-Index fuehrt `STORE_SERVICE`/`STORE_CONTRACT` mit
- * demselben Wortlaut, und `scripts/gate/tests/context-wiring.test.mjs` pinnt die
- * Gleichheit beider Seiten. Ein Literal hier und eines dort waeren zwei
- * Wahrheiten; gepinnt sind sie eine.
+ * Die Naht zur Ablage (Zug 2) kommt aus `@shinon/seams/core`. Der Index,
+ * Scoring, Persona, Narrative und Prompter verwenden denselben exportierten
+ * Namen statt je ein gleichlautendes Literal zu pflegen.
  */
-export const INDEX_STORE_SERVICE = 'shinon_index_store';
-export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
+export { INDEX_STORE_SERVICE, INDEX_STORE_CONTRACT };
 
 /**
  * Der Namensraum der Ablage: EIN Namensraum je Projekt, und der Index gehoert

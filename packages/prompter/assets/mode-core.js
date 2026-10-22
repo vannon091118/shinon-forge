@@ -11,7 +11,7 @@
  * Literal zu fuehren hiesse, eine der drei Kopien zu behalten, die
  * `SOURCE_TWINS` bis 2026-10-20 zusammenhielt.
  */
-import { PROMPTER_DECISION_CHANNEL } from '@shinon/seams/core';
+import { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, PROMPTER_DECISION_CHANNEL } from '@shinon/seams/core';
 
 /** Vertragsname der One-Shot-Antwort. */
 export const CONTRACT = 'shinon.prompter/result-v1';
@@ -46,14 +46,12 @@ export const INDEX_CONTRACT = 'shinon.project-index/query-v1';
 /**
  * Die ZWEITE, schmale Faehigkeit des Project Index: die dauerhafte Ablage.
  *
- * Dieselben Namen wie in `@shinon/scoring` und `@shinon/persona` (jedes Paket
- * traegt sein eigenes Literal; `scripts/gate/tests/context-wiring.test.mjs`
- * pinnt die Gleichheit). Gelesen wird optional ueber `ctx.get`, nie per
+ * Dieselben Namen wie in `@shinon/scoring` und `@shinon/persona`, bezogen aus
+ * `@shinon/seams/core`. Gelesen wird optional ueber `ctx.get`, nie per
  * `inject`: ohne Index bleibt der Prompter montiert, dann zaehlt er nur im
  * Prozess.
  */
-export const INDEX_STORE_SERVICE = 'shinon_index_store';
-export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
+export { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE };
 
 /**
  * Die Ton-Faehigkeit des Scorings (Zug 5) — optional, wie die Abfrage des Index.

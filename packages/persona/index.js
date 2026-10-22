@@ -24,6 +24,7 @@ import {
   NARRATIVE_STATE_CHANNEL,
   NARRATIVE_STATE_CONTRACT,
   PROMPTER_DECISION_CHANNEL as PROMPTER_DECISION_CHANNEL_CORE,
+  INDEX_STORE_SERVICE, INDEX_STORE_CONTRACT,
   fingerprintRoot,
   logEventRead,
 } from '@shinon/seams/core';
@@ -59,16 +60,8 @@ export const PROMPTER_DECISION_CHANNEL = PROMPTER_DECISION_CHANNEL_CORE;
 /** Die Naht des Webservers, ueber die Globals in die Seite kommen. */
 export const INDEX_INJECT = 'webserver/index-inject';
 
-/**
- * Die dauerhafte Ablage — derselbe Dienst, den das Scoring nutzt, als LITERAL.
- *
- * Kein Paket liest ein anderes; `scripts/gate/tests/context-wiring.test.mjs`
- * pinnt die Gleichheit der Namen auf beiden Seiten. Ein zweiter Name waere ein
- * zweites Gedaechtnis, und die Persona schreibt NIE in Projektdateien: sie hat
- * kein Schreibrecht, nur diesen Dienst fuer ihren EIGENEN Namensraum.
- */
-export const INDEX_STORE_SERVICE = 'shinon_index_store';
-export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
+/** Gemeinsamer Project Index Store; Persona nutzt nur ihren eigenen Namensraum. */
+export { INDEX_STORE_SERVICE, INDEX_STORE_CONTRACT };
 
 /** Der Namensraum des Selbstmodells: ein Projekt, ein Stand. */
 export const SELF_MODEL_NAMESPACE = 'shinon.persona-self/v1';

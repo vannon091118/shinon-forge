@@ -84,6 +84,12 @@
     },
     {
       "art": "vertrag",
+      "kanonisch": "shinon.project-index/store-v1",
+      "definiert_in": "packages/seams/assets/seams.js",
+      "verboten": []
+    },
+    {
+      "art": "vertrag",
       "kanonisch": "shinon.scoring/ledger-v1",
       "definiert_in": "packages/scoring/index.js",
       "verboten": ["shinon.scoring/ledger/v1"]
@@ -128,6 +134,12 @@
       "art": "dienst",
       "kanonisch": "shinon_codingmon_store",
       "definiert_in": "packages/codingmon/index.js",
+      "verboten": []
+    },
+    {
+      "art": "dienst",
+      "kanonisch": "shinon_index_store",
+      "definiert_in": "packages/seams/assets/seams.js",
       "verboten": []
     },
     {

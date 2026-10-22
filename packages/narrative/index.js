@@ -2,7 +2,7 @@ import z from '@deepseek-ai/schemastery';
 import { readFileSync } from 'node:fs';
 import { advance, initialState, validateNarrativeState } from './assets/narrative-core.js';
 // Kanal und Vertrag haben EINE Definition: `@shinon/seams` (Host-Naht-Kern).
-import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT } from '@shinon/seams/core';
+import { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT } from '@shinon/seams/core';
 
 /**
  * @shinon/narrative — Narrative Engine (Zug 5: aktiviert).
@@ -86,8 +86,7 @@ export const STATE_CONTRACT = NARRATIVE_STATE_CONTRACT;
 export const STATE_CHANNEL = NARRATIVE_STATE_CHANNEL;
 
 /** Die dauerhafte Ablage — derselbe Dienst wie beim Scoring und der Persona. */
-export const STORE_SERVICE = 'shinon_index_store';
-export const STORE_CONTRACT = 'shinon.project-index/store-v1';
+export { INDEX_STORE_SERVICE, INDEX_STORE_CONTRACT };
 
 /** Der Namensraum des fortgeschriebenen Zustands: eigener Raum, eigenes Memo. */
 export const STATE_NAMESPACE = 'shinon.narrative-state/v1';
@@ -131,14 +130,14 @@ export function apply(ctx, config) {
   const resolveStore = () => {
     let found = null;
     try {
-      found = typeof ctx?.get === 'function' ? ctx.get(STORE_SERVICE) ?? null : null;
+      found = typeof ctx?.get === 'function' ? ctx.get(INDEX_STORE_SERVICE) ?? null : null;
     } catch (error) {
       warnOnce(`Ablage nicht abfragbar (${error?.message ?? error})`);
       return null;
     }
     if (found === null) return null;
-    if (found.contract !== STORE_CONTRACT || typeof found.load !== 'function' || typeof found.save !== 'function') {
-      warnOnce(`fremder Dienst unter ${STORE_SERVICE} (Vertrag ${String(found?.contract)})`);
+    if (found.contract !== INDEX_STORE_CONTRACT || typeof found.load !== 'function' || typeof found.save !== 'function') {
+      warnOnce(`fremder Dienst unter ${INDEX_STORE_SERVICE} (Vertrag ${String(found?.contract)})`);
       return null;
     }
     return found;

@@ -4,6 +4,7 @@ import { basename, resolve } from 'node:path';
 import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, createFactsService } from './assets/facts-service.js';
 import { FACTS_FILE_NAME } from './assets/facts-store.js';
 import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
+import { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE } from '@shinon/seams/core';
 import { createRefreshService } from './assets/refresh-core.js';
 import {
   CONTRACT,
@@ -44,7 +45,7 @@ import {
  *      (`resolveContext`). Das ist die Naht zum Prompt-Enhancer. Kein
  *      Dateihandle, kein Schema, kein Lauf — wer mehr braucht, importiert den
  *      Kern; wer einen Kontext braucht, fragt hier.
- *   2. `STORE_SERVICE` (Zug 2) — zwei Operationen (`load`, `save`) auf einem
+ *   2. `INDEX_STORE_SERVICE` (Zug 2) — zwei Operationen (`load`, `save`) auf einem
  *      Namensraum. Das ist die Naht zum Scoring, und sie ist die Antwort auf
  *      eine gemessene Luecke: der Index war reine Ableitung (Dateien, Symbole,
  *      Kanten — aus dem Projekt wieder herstellbar), dem Scoring fehlte jeder
@@ -79,13 +80,13 @@ export const QUERY_SERVICE = 'shinon_index_query';
 /**
  * Vertragsname der Ablage-Faehigkeit (Zug 2).
  */
-export const STORE_CONTRACT = 'shinon.project-index/store-v1';
+export { INDEX_STORE_CONTRACT };
 
 /**
  * Der Dienstname der Ablage. Bewusst NEBEN `shinon_index_query` und nicht als
  * dessen Erweiterung: der Abfrage-Vertrag ist schmal und gepinnt.
  */
-export const STORE_SERVICE = 'shinon_index_store';
+export { INDEX_STORE_SERVICE };
 
 /** Ein Namensraum ist die Adresse eines Standes — ohne ihn gibt es keine. */
 const validNamespace = (namespace) => typeof namespace === 'string' && namespace.trim() !== '';
@@ -141,7 +142,7 @@ export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }
   };
 
   return {
-    contract: STORE_CONTRACT,
+    contract: INDEX_STORE_CONTRACT,
     /**
      * Den Stand eines Namensraums lesen. Erzeugt KEINEN Index und KEINEN Ledger:
      * fehlt die Datei, ist die Antwort `null` und nicht ein leerer Stand.
@@ -459,7 +460,7 @@ export function apply(ctx, config) {
     }))
     : null;
   const releaseStore = canProvide
-    ? ctx.provide(STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile, workspaceRoot: options.root }))
+    ? ctx.provide(INDEX_STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile, workspaceRoot: options.root }))
     : null;
   // Die dritte, schmale Faehigkeit (Zug 3): der Prompter liest einen Snapshot,
   // nie die Datenbank. Fehlt die Datei, ist der Dienst ehrlich leer.
@@ -484,8 +485,8 @@ export function apply(ctx, config) {
   // Zwei Faehigkeiten, zwei Zeilen: wer im Log liest, dass die Ablage fehlt,
   // soll nicht raten muessen, welche der beiden gemeint ist.
   const storeState = canProvide
-    ? `Ablage ${STORE_SERVICE} bereitgestellt (${STORE_CONTRACT}, ${LEDGER_CONTRACT}: ${options.ledgerFile})`
-    : `Ablage ${STORE_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
+    ? `Ablage ${INDEX_STORE_SERVICE} bereitgestellt (${INDEX_STORE_CONTRACT}, ${LEDGER_CONTRACT}: ${options.ledgerFile})`
+    : `Ablage ${INDEX_STORE_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
 
   /** Ein Bericht ist erst vollstaendig, wenn der Index auch zaehlbar ist. */
   const announce = (report, where) => {

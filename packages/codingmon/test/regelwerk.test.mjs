@@ -83,7 +83,7 @@ describe('Der Kern und die Host-Haelfte bleiben eine Quelle', () => {
     for (const name of Object.keys(core)) assert.ok(name in bundle, `index.js gibt ${name} nicht weiter`);
     assert.equal(typeof bundle.Config, 'function', 'der Config-Vertrag des Hosts');
     assert.equal(typeof bundle.apply, 'function', 'der Mount');
-    assert.equal(typeof bundle.STORE_SERVICE, 'string', 'und die Naht des Spiegels');
+    assert.equal(typeof bundle.CODINGMON_STORE_SERVICE, 'string', 'und die Naht des Spiegels');
   });
 });
 

@@ -59,10 +59,10 @@ export const Config = z.object({
  */
 export const inject = ['storageDomain'];
 
-export const STORE_SERVICE = 'shinon_codingmon_store';
+export const CODINGMON_STORE_SERVICE = 'shinon_codingmon_store';
 
 /** Vertragsname des Spiegels — was der Dienst zusichert, nicht wie er es tut. */
-export const STORE_CONTRACT = 'shinon.codingmon/store-v1';
+export const CODINGMON_STORE_CONTRACT = 'shinon.codingmon/store-v1';
 
 export function apply(ctx, config) {
   // Der Vertrag ist reine Datenweitergabe: keine Zeit, kein Zufall, kein Modell.
@@ -145,8 +145,8 @@ export function apply(ctx, config) {
       // an, nicht bei null — sonst verlöre jeder Host-Neustart die Rate (J2).
       activity.completions = Math.max(0, mirror.read()?.completions ?? 0);
       if (typeof ctx?.provide === 'function') {
-        ctx.provide(STORE_SERVICE, {
-          contract: STORE_CONTRACT,
+        ctx.provide(CODINGMON_STORE_SERVICE, {
+          contract: CODINGMON_STORE_CONTRACT,
           fields: SNAPSHOT_FIELDS.slice(),
           read: () => mirror.read(),
           write: (state) => mirror.write(state),
