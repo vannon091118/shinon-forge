@@ -163,13 +163,12 @@ const STAGES = {
         .join('\n');
       const missing = BUNDLES.filter((bundle) => !preload.includes(`${bundle.name}/client.js`)).map((bundle) => bundle.name);
       if (missing.length > 0) return { green: false, detail: `nicht im Client-Bundle: ${missing.join(', ')}` };
-      if (preload.includes('@shinon/openapi')) return { green: false, detail: '@shinon/openapi ist aktiv, soll es nicht sein' };
       const href = page.body.match(/href="(plugins\/\?\?[^"]+)"/)?.[1].replaceAll('&amp;', '&');
       const module = await fetchPage(new URL(href, server.url).href, page.cookie);
       if (module.status !== 200) return { green: false, detail: `Client-Bundle HTTP ${module.status}` };
       const absent = BUNDLES.filter((bundle) => !module.body.includes(bundle.name)).map((bundle) => bundle.name);
       if (absent.length > 0) return { green: false, detail: `Client-Code fehlt im Bundle: ${absent.join(', ')}` };
-      return { green: true, detail: `${BUNDLES.length} Client-Hälften ausgeliefert, openapi inaktiv` };
+      return { green: true, detail: `${BUNDLES.length} Client-Hälften ausgeliefert` };
     } finally {
       await server.stop();
     }

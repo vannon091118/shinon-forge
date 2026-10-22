@@ -74,11 +74,6 @@ const RULES = [
     },
   },
   {
-    name: 'fehlende Ressource',
-    pattern: /config\.specPath "\.\/openapi\.yaml" fehlt/,
-    break: (root) => rmSync(join(root, 'packages/openapi/openapi.yaml')),
-  },
-  {
     name: 'Ressource falscher Typ',
     pattern: /icon "\.\/assets" ist keine Datei/,
     break: (root) => setField(root, 'packages/core/package.json', 'icon', './assets'),

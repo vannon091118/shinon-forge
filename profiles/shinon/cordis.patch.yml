@@ -2,8 +2,6 @@
 #
 # `dsh.profile.bundles` in package.json activates the currently supported
 # Shinon Forge plugins; each bundle contributes its own patch layer below.
-# OpenAPI is deliberately inactive, not accidentally broken: @shinon/openapi
-# is neither a bundle nor a dependency of this profile.
 #
 # This user layer is applied after every bundle layer - a top-level YAML array
 # of loader patch entries (id-targeted config overrides, disables, and insert

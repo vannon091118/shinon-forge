@@ -543,22 +543,6 @@
       ]
     },
     {
-      "id": "openapi-vertrag",
-      "frage": "Gibt es einen OpenAPI-Server?",
-      "owner": "openapi",
-      "seam": null,
-      "terms": [
-        "openapi",
-        "api vertrag"
-      ],
-      "notAnswers": [
-        "kein laufender Server"
-      ],
-      "evidence": [
-        "packages/openapi/openapi.yaml"
-      ]
-    },
-    {
       "id": "mobile-oberflaeche",
       "frage": "Ist die mobile Oberfläche aktiv?",
       "owner": "mobile",
