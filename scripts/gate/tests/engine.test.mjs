@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matchesSlice, shouldRun, shouldRunLocal, normalizePluginResult } from '../engine.mjs';
+import { matchesSlice, shouldRun, shouldRunLocal, normalizePluginResult, failureCode } from '../engine.mjs';
 import { parsePolicy, validateCoverage, validateLocalSubset } from '../policy.mjs';
 
 const policy = {
@@ -63,6 +63,12 @@ test('validateLocalSubset: local muss Teilmenge von always sein', () => {
   const bad = { version: 1, engine: { always: ['manifest'], local: ['contract'], slices: {} } };
   assert.equal(validateLocalSubset(bad).length, 1);
   assert.equal(validateLocalSubset(policy).length, 0);
+});
+
+test('failureCode names a failed or throwing gate in one stable code', () => {
+  assert.equal(failureCode('dead-package'), 'GATE_DEAD_PACKAGE_FAILED');
+  assert.equal(failureCode('typescript', 'THREW'), 'GATE_TYPESCRIPT_THREW');
+  assert.equal(failureCode('  host half  '), 'GATE_HOST_HALF_FAILED');
 });
 
 test('normalizePluginResult preserves legacy arrays and distinguishes NOT_APPLICABLE', () => {

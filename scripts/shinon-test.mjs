@@ -20,13 +20,21 @@ import { structureIssues } from './lib/structure.mjs';
 let passed = 0;
 let failed = 0;
 
+/** Stable diagnostic code so a red step names its contract, not just a sentence. */
+function stepCode(name) {
+  const slug = String(name)
+    .replace(/ä/g, 'AE').replace(/ö/g, 'OE').replace(/ü/g, 'UE').replace(/ß/g, 'SS')
+    .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return `STATIC_${slug}_FAILED`;
+}
+
 function check(name, fn) {
   try {
     fn();
     console.log(`  ✅ ${name}`);
     passed++;
   } catch (e) {
-    console.log(`  ❌ ${name}: ${e.message}`);
+    console.log(`  ❌ ${name} [${stepCode(name)}]: ${e.message}`);
     failed++;
   }
 }

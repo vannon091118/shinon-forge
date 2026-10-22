@@ -204,52 +204,23 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `npm run dev` → `dsh --profile shinon`.
 - `npm run update` → `node scripts/dsh-update.mjs` (upstream DSH refresh; see Pitfalls).
 
-### Die Testzeit-Grenze (fail-closed, seit 2026-10-22)
+### Die Testzeit-Grenze (fail-closed)
 
-> **Ein Test, der länger als 10 Sekunden braucht, ist zu lang. Der Test ist dann falsch — nicht die Maschine.**
+**10 Sekunden sind das Ziel, 20 Sekunden die harte Grenze.** Ein Test, der länger
+braucht, ist zu langsam — nicht die Maschine. `npm run gate:test` bricht bei 20 s ab
+(`--test-timeout=20000`); die 10-s-Marke bleibt die lokale Zielgröße.
 
-- **Jeder Test hat 10 Sekunden.** Wer danach noch nicht fertig ist, hat **10 Sekunden verbraucht** und
-  nichts bewiesen: der Test ist zu lang, auch wenn er danach grün wird. **Grün nach 15 Sekunden ist
-  kein Erfolg, sondern ein Fehler im Test.**
-- **20 Sekunden sind die harte Obergrenze.** Danach wird der Test **abgebrochen** und zählt als
-  **rot** — nicht als „hat geklappt, war nur lang". Ein Test, der 20 Sekunden braucht, gehört in
-  die **CI-Tier**, nicht in die lokale Kette.
-- **Warum diese Zahl:** ein Test, der auf ein Ereignis wartet, blockiert die ganze Maschine. Auf
-  einer Fx6300 (6 Kerne, 8 GB, langsame NVMe) ist das der Unterschied zwischen „ein Befehl"
-  und „ich arbeite währenddessen". Gemessen am 2026-10-22: `project-index.test.mjs` brauchte
-  **296,8 s** allein — 4 min 57 s für eine Datei, grün, ohne einen einzigen Fehler.
-- **Zwei Ursachen, zwei Antworten — und die Regel deckt beide:**
-  1. **Der Test wartet** (auf ein Ereignis, einen Indexlauf, einen Worker). Dann gehört er in
-     die **CI-Tier** — und seine Frist wird auf **5 s** (die halbe Grenze) gekürzt, damit er
-     **schnell fehlschlagen kann**. Ein Test, der 60 s wartet, um dann grün zu werden, ist
-     schlimmer als ein roter: er verdeckt den Zustand, den er prüfen soll.
-  2. **Der Test rechnet** (eine Schleife explodiert). Dann hilft **kein** CI-Fix — der Test
-     muss **umgebaut** werden: Stichprobe statt vollständiger Kreuzung, oder die Objekte
-     **einmal** vorberechnen statt pro Iteration. **Die Abdeckung bleibt dabei nachgewiesen.**
-     Beispiel vom 2026-10-22: `packages/codingmon/test/regelwerk.test.mjs` brauchte **40,08 s**
-     für **6 312 500** Iterationen (6 Level × 50 Arten × 50 Arten × 101 Fähigkeiten × 5 Verhältnisse)
-     — **völlig korrekt gerechnet, nur viel zu viel.**
-- **Ausnahmen sind KEINE stillen Sonderrechte.** Ein Test über 10 s braucht einen **Antrag**:
-  (1) **Welche** Grenze — 10 s oder 20 s, (2) **warum** er nicht schneller geht, (3) **was** er
-  prüft, das keine schnellere Form prüfen könnte, (4) **in welche CI-Tier** er gehört. Der Antrag
-  wird **begründet angefragt** — beim Autor, nicht beim nächsten Leser der Zahl. Ohne Antrag ist
-  der Test **rot**, nicht erlaubt.
-- **Der Antrag steht in `docs/ZAHLEN.md` §2**, in der Liste der Ausnahmen mit Grund, Testpfad und
-  gemessener Zeit. `npm run zahlen:check` prüft, dass jede gemeldete Ausnahme noch existiert.
-- **Was nach der Regel gilt:** Die lokalen Ketten (`npm test`, `npm run gate:local`,
-  `npm run gate:test`) enthalten **keinen** Test über 10 s. Was über der Grenze liegt, läuft in
-  `npm run test:full` / `npm run gate:full` — also in der CI.
-- **Neue Tests:** ein Test, der eine **Wartezeit** braucht (ein Indexlauf, ein DSH-Boot, ein
-  Worker), wartet **nicht** auf ein Timeout, sondern auf ein **Ereignis mit einer Frist** — und
-  diese Frist ist die halbe Grenze, nicht die volle. Der Test muss **schnell fehlschlagen
-  können**: liefert das Ereignis in 5 s nicht, ist das ein Befund, kein Warten.
+Zwei Ursachen, zwei Antworten: **Warten** (auf Index, Boot oder Worker) gehört in die
+CI-Tier und wartet auf ein **Ereignis mit 5-s-Frist**, nicht auf ein Timeout;
+**Rechnen** wird umgebaut — Stichprobe statt vollständiger Kreuzung, Objekte einmal
+statt pro Iteration. Die Abdeckung bleibt nachgewiesen.
 
-**Stand der Ausnahmen (2026-10-22, gemessen über alle 86 Gate-Testdateien):** 7 Dateien über
-10 s, davon 4 über 20 s — `project-index` (296,8 s), `scoring-memory` (>30 s),
-`context-resolver` (>30 s), `ledger-separation` (20,8 s), `index-warm` (20,0 s),
-`context-wiring` (17,0 s), `source-write` (11,1 s). **Keine davon hat bisher einen Antrag** —
-sie sind nach dieser Regel **noch nicht freigegeben**, und die Testline-Reform (T4-3 bis T4-5 im
-`docs/CLEANREPO-AUDIT.md`) ist die Arbeit, die sie auflöst.
+Ausnahmen sind kein stilles Recht: ein Test über 10 s braucht einen Antrag mit
+Grenze, Grund, Prüfwert und CI-Tier. Der Antrag und die gemessenen Zeiten stehen
+ausschließlich in `docs/ZAHLEN.md` §2; `npm run zahlen:check` prüft, dass jede
+gemeldete Ausnahme noch existiert. Ohne Eintrag ist der Test rot. Die lokalen Ketten
+(`npm test`, `gate:local`, `gate:test`) bleiben unter der Grenze; was darüber liegt,
+läuft in `test:full`/`gate:full` (CI).
 
 ## Conventions
 - Comments live with the code they explain — there is **no length cap** and no

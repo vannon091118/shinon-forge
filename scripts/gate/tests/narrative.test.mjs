@@ -478,8 +478,12 @@ test('narrative: das Gate meldet einen fehlenden Abnehmer (Mutationsprobe über 
   assert.ok(issues.some((issue) => issue.includes('keinen Abnehmer')), issues.join('\n'));
 });
 
-test('narrative: der Vertrag liegt im Paket und wird ausgeliefert', () => {
-  assert.ok(existsSync(NARRATIVE_CONTRACT));
+test('narrative: der ausgelieferte Vertrag traegt seine Regeln und Zustände', () => {
+  const contract = JSON.parse(readFileSync(NARRATIVE_CONTRACT, 'utf8'));
+  assert.equal(contract.contract, 'shinon.narrative/v1');
+  assert.deepEqual(contract.rules.relationshipStates, ['fresh_pair', 'established_duo', 'trusted_team']);
+  assert.deepEqual(contract.forbidden, ['autonomous_action', 'model_call', 'tool_call', 'project_write', 'state_mutation_of_other_systems']);
+  assert.ok(contract.invariants.length >= 5, 'der Vertrag nennt seine Invarianten');
   const manifest = JSON.parse(readFileSync(join(ROOT, 'packages/narrative/package.json'), 'utf8'));
   assert.equal(manifest.exports['./assets/narrative-state.json'], './assets/narrative-state.json');
 });

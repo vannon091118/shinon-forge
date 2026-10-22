@@ -69,6 +69,12 @@ export function shouldRunLocal(id, policy = POLICY) {
 }
 
 /** Normalize legacy issue-array plugins and richer status-bearing plugins. */
+/** Stable machine-readable code for a failed or throwing gate plugin. */
+export function failureCode(id, suffix = 'FAILED') {
+  const slug = String(id).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return `GATE_${slug}_${suffix}`;
+}
+
 export function normalizePluginResult(result) {
   if (Array.isArray(result)) return { issues: result, status: 'pass', detail: '' };
   if (result && typeof result === 'object' && Array.isArray(result.issues)) {
@@ -129,6 +135,7 @@ async function main() {
   console.log(`🦊 Shinon Gate — ${mode} — ${changed.length} geänderte Dateien · ${packages.length} Pakete`);
 
   let failed = 0;
+  const failedCodes = [];
   let ran = 0;
   let skipped = 0;
   let notApplicable = 0;
@@ -146,10 +153,12 @@ async function main() {
     }
     ran++;
     let outcome;
+    let code = null;
     try {
       outcome = normalizePluginResult(plugin.check(ctx));
     } catch (error) {
       outcome = normalizePluginResult([`Plugin-Fehler: ${error.message}`]);
+      code = failureCode(plugin.id, 'THREW');
     }
     const { issues } = outcome;
     if (outcome.status === 'not-applicable' && issues.length === 0) {
@@ -158,7 +167,9 @@ async function main() {
     } else if (issues.length === 0) {
       console.log(`✅ ${plugin.id}`);
     } else {
-      console.error(`💥 ${plugin.id} — ${issues.length} Problem(e)`);
+      code ??= failureCode(plugin.id);
+      failedCodes.push(code);
+      console.error(`💥 ${plugin.id} — ${code} — ${issues.length} Problem(e)`);
       for (const issue of issues) console.error(`   - ${issue}`);
       failed++;
     }
@@ -184,7 +195,8 @@ async function main() {
   console.log(
     `\n${failed + brandingFailed === 0 ? '✅' : '💥'} Verdict: ${failed + brandingFailed === 0 ? 'PASS' : 'FAIL'} — ` +
       `${ran} gelaufen, ${skipped} geskippt, ${notApplicable} nicht anwendbar, ${failed} fehlgeschlagen` +
-      (branding ? `, Branding-Messung ${brandingFailed === 0 ? 'grün' : 'rot'}` : ', Branding-Messung nicht gelaufen'),
+      (branding ? `, Branding-Messung ${brandingFailed === 0 ? 'grün' : 'rot'}` : ', Branding-Messung nicht gelaufen') +
+      (failedCodes.length ? `; Fehlercodes: ${failedCodes.join(', ')}` : ''),
   );
   process.exit(failed + brandingFailed > 0 ? 1 : 0);
 }

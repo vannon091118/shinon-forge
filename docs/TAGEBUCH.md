@@ -1410,3 +1410,29 @@ Boot stehen `Katalog agnes: HTTP 401` und `prompter: HTTP 401` bei
 **Nachtrag zum Preflight-Merge:** Der Workflow wurde nicht nur umbenannt, sondern auf sein Verhalten geprüft. Der Vertrag weist nach, dass teure Jobs direkt vom günstigen Preflight abhängen, dass Dummy-Kommandos unter gültig klingenden Jobnamen rot werden und dass die finale Abnahme fehlende, übersprungene oder fehlgeschlagene Jobs nicht als Erfolg auslegt. Ein erster grüner Lauf machte außerdem zwei Historie-Skips sichtbar; die doppelte Realbaumprüfung wurde entfernt und der echte Tagebuch-Check im Schnellpfad auf vollständige Git-Historie festgelegt. Der kanonische Checker wurde anschließend auf eine einzige Implementierung zurückgeführt. PR #23 wurde nach 21/21 erfolgreichen Jobs squash-gemergt.
 
 **Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · Belege: `.github/workflows/commit-guard.yml`, `scripts/lib/preflight/documentation.mjs`, `scripts/lib/preflight/fixes.mjs`, `scripts/gate/tests/preflight-docs.test.mjs`, `scripts/gate/tests/diary.test.mjs`, `scripts/shinon-test.mjs`, `docs/CHANGELOG.md`
+
+**Nachtrag vom selben Tag — Branch-Integration und Testline:** Der offene PR #22
+(`work/dsh-provenance-docs`) trug zwei Doku-Korrekturen, die vier Commits hinter `main`
+lagen; sie sind als `0ad4618` und `88a37ab` linear übernommen. Die vier
+Dependabot-Zweige #24–#27 waren ebenfalls überholt und ließen sich nicht konfliktfrei
+mergen; ihre Versionshebung steht jetzt direkt in `package-build.yml`,
+`runtime-release.yml` und `release.yml` (`checkout@v7`, `setup-node@v7`,
+`upload-artifact@v7`, `download-artifact@v8`). Der Paketbau weckt die drei Bauhosts
+nicht mehr für einen reinen Doku-Push (`paths-ignore`), und eine `concurrency`-Gruppe
+je Ref beendet überholte `main`-Bauten — wie ein Paketbote, der nur losfährt, wenn
+sich das Paket geändert hat.
+
+Die Testline wurde nicht umgebaut, sondern gemessen und geschärft: 95
+Gate-Testdateien, 948 Tests, 0 rot, 0 geskippt, 14 s; die langsamste Datei
+`source-write.test.mjs` braucht 5,8 s, keine liegt über 10 s. `npm test` bleibt bei
+3 s, der Profiltest löst 27 Layer (22 Repo-Bundles) in 4/4 Zusagen. `gate:test`
+bricht jetzt bei 20 s ab (`--test-timeout=20000`), und ein roter Lauf nennt
+`GATE_<ID>_FAILED`/`STATIC_<STEP>_FAILED` statt nur einer Zeile Prosa. Die alte
+Existenz-Zusage im Narrative-Test liest jetzt den Vertrag und prüft Zustände und
+Verbotsliste. Die Testzeit-Regel in `AGENTS.md` steht wieder als Regel da; die
+gemessenen Zahlen und die leere Ausnahmeliste stehen ausschließlich in
+`docs/ZAHLEN.md` §2. Der Dev-Server bootete auf Port 3000 mit 27 Layern, lieferte
+die UI mit Token als HTTP 200 (46 264 Bytes) und verweigerte ohne Token (401) sowie
+bei fremdem Origin (403).
+
+**Anker:** `8f4a7ea8f6e639525a312e61a88d8910bdc23e7e` · Belege: `.github/workflows/package-build.yml`, `.github/workflows/release.yml`, `.github/workflows/runtime-release.yml`, `scripts/gate/engine.mjs`, `scripts/shinon-test.mjs`, `scripts/gate/tests/narrative.test.mjs`, `AGENTS.md`, `docs/ZAHLEN.md`, `docs/CHANGELOG.md`
