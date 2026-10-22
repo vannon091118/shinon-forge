@@ -129,7 +129,7 @@ wartet auf alle 13 Pflichtjobs.
 7. Profilboot
 8. Prompter-Tests
 9. TypeScript-Gate
-10. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag und `npm run zahlen:check`
+10. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag, `npm run build` und `npm run zahlen:check`
 11. Dependency-Audit direkt aus `package-lock.json`
 12. CodeQL für JavaScript/TypeScript
 13. Gitleaks über die vollständige Git-Historie

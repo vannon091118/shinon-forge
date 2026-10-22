@@ -304,6 +304,11 @@ jobs:
       # Der Bestandsblock driftet sonst unbemerkt: der Hook prueft ihn lokal,
       # die CI-Kette tat es bisher nicht. Ein toter Ausnahmefall oder eine
       # gewachsene Dateizahl faellt hier auf, nicht erst beim naechsten Audit.
+      # Der Block enthaelt auch die dist-Zahlen; ein frischer Klon hat kein dist,
+      # deshalb wird zuerst gebaut — sonst vergleicht die Pruefung zwei Zustaende.
+      - name: Build fuer den Bestandsblock erzeugen
+        run: npm run build
+
       - name: Gemessene Zahlen gegen den Baum pruefen
         run: npm run zahlen:check
 
