@@ -49,13 +49,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Volle Historie: der Wächter muss bis zur PR-Basis (und im Zweifel bis
           # zum ersten Commit) zurücksehen können.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -101,9 +101,9 @@ jobs:
           - name: Traceability-Kern (Toast-Fenster)
             run: node --test packages/traceability/test/*.test.mjs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -120,9 +120,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -150,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Volle Historie: `diaryIssues` prueft jeden Tagebuch-Anker gegen die
           # Commit-Historie. Mit einem flachen Klon koennte der Schritt die Anker
@@ -158,7 +158,7 @@ jobs:
           # waere ungeprueft.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -184,9 +184,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -206,9 +206,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -228,9 +228,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -250,9 +250,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -273,9 +273,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -299,9 +299,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -315,12 +315,76 @@ jobs:
       - name: Schnellen Pfad fahren
         run: npm test
 
+  # ── Preflight: Dokumentationsvertrag, Dependency- und Static-Security ───────
+  preflight-docs:
+    name: Preflight (Dokumentationsvertrag)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.19.0'
+      - name: Dokumentationsvertrag mit Fehlercodes pruefen
+        run: node scripts/preflight-docs.mjs --json-out preflight-docs-report.json
+      - name: Dokumentationsvertrag als maschinell getesteten Pfad pruefen
+        run: node --test scripts/gate/tests/preflight-docs.test.mjs
+
+  dependency-audit:
+    name: Preflight (Production Dependency Audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.19.0'
+          cache: npm
+      - name: Lockfile-treue pruefen, Lifecycle-Skripte nicht ausfuehren
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Produktionsabhaengigkeiten auf High/Critical pruefen
+        run: npm audit --omit=dev --audit-level=high
+
+  codeql:
+    name: Preflight (CodeQL JavaScript und TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: CodeQL initialisieren
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+      - name: CodeQL analysieren
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:javascript-typescript
+
+  secret-scan:
+    name: Preflight (Secret Scan der Git-Historie)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Git-Historie auf bekannte Secret-Muster scannen
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # ── Verdikt: der EINE Name, den eine Branch-Regel verlangen kann ────────────
   # `if: always()` ist der Punkt: ohne ihn würde dieser Job bei einem roten Zweig
   # gar nicht starten, und die Zusammenfassung wäre bei genau den Läufen stumm,
   # für die sie gebaut ist. Rot bei failure, cancelled UND skipped.
   verdict:
-    name: Verdikt (fail-closed)
+    name: Preflight-Abnahme (fail-closed)
     needs:
       - commit-guard
       - quick
@@ -332,24 +396,32 @@ jobs:
       - profile
       - prompter
       - typescript
+      - preflight-docs
+      - dependency-audit
+      - codeql
+      - secret-scan
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Alle Zweige müssen grün sein
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.19.0'
+
+      - name: Maschinenlesbare Abnahme erzeugen (Commit, Run, Jobs, Fehlercodes)
         env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          node -e '
-            const needs = JSON.parse(process.env.NEEDS);
-            const rows = Object.entries(needs).map(([job, run]) => `${job}=${run.result}`);
-            console.log(`Zweige: ${rows.join(", ")}`);
-            const bad = rows.filter((row) => !row.endsWith("=success"));
-            if (bad.length > 0) {
-              console.error(`ROT ODER ÜBERSPRUNGEN: ${bad.join(", ")}`);
-              console.error("Ein übersprungener Zweig ist kein grüner Zweig: erst grün, wenn alle laufen und bestehen.");
-              process.exit(1);
-            }
-            console.log(`Alle ${rows.length} Zweige grün.`);
-          '
+          PREFLIGHT_NEEDS: ${{ toJSON(needs) }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/preflight-verdict.mjs
+
+      - name: Preflight-Bericht als Run-Artefakt ablegen
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: preflight-report-${{ github.run_id }}
+          path: preflight-report.json
+          if-no-files-found: error
+          retention-days: 30
