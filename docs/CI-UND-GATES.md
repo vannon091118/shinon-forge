@@ -1,6 +1,6 @@
 # CI-UND-GATES — Prüfungen, Hooks, Workflows
 
-> **Status:** current · **Stand:** 2026-10-20
+> **Status:** current · **Stand:** 2026-10-22
 >
 > Erzählt, **wie** geprüft wird. **Was** in einem Durchlauf herauskam
 > (Exit-Codes, Zählungen, rote Befunde) steht ausschließlich in
@@ -179,6 +179,21 @@ Nur Tags `v*`: Tag = `package.json`-Version, `npm ci`,
 `profile-links --check`, statisches Gate, `gate:test`, dann ein
 **reproduzierbares** `git archive`-Tarball mit SHA-256 (Zweitlauf muss
 identisch sein) als Artefakt. **Publiziert nichts** (`contents: read`).
+
+### `package-build.yml`
+
+Bei Push auf `main`, Tag `v*` oder manuellem Start: baut .deb, AppImage und
+Windows-ZIP auf passenden Runnern, prueft Inhalte, Installation/Starter und
+Pruefsummen und lädt die Ergebnisse als Artefakte hoch. Dies ist ein eigener
+Paketbau, nicht der abschliessende PR-Preflight.
+
+### `security.yml` (periodisch)
+
+Woechentlicher und manueller Sicherheitsscan: Production dependency audit,
+CodeQL und Gitleaks. Die gleichartigen Security-Prüfungen für PR/Push laufen
+verbindlich als Jobs im `commit-guard.yml` und werden in dessen finale
+Preflight-Abnahme eingespeist. Die periodische Fassung ist ein zusätzlicher
+Sicherheitslauf, kein Ersatz für die PR-Abnahme.
 
 ### `runtime-release.yml`
 
