@@ -2,11 +2,9 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const REQUIRED_JOBS = [
-  'commit-guard', 'quick', 'unit', 'gate-rules', 'static-gate',
-  'fixtures', 'distribution', 'profile', 'prompter', 'typescript',
-  'preflight-docs', 'dependency-audit', 'codeql', 'secret-scan',
-];
+import { REQUIRED_CI_JOBS, JOB_DIAGNOSTIC_NAMES } from './lib/preflight/policy.mjs';
+
+const REQUIRED_JOBS = REQUIRED_CI_JOBS;
 
 const env = process.env;
 let needs;
@@ -39,12 +37,20 @@ for (const [job, payload] of Object.entries(needs)) {
   const result = payload?.result ?? 'unknown';
   const row = { job, result, required: REQUIRED_JOBS.includes(job) };
   if (result !== 'success') {
-    const normalized = String(result).toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    const jobCode = JOB_DIAGNOSTIC_NAMES[job]
+      ?? String(job).toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    const statusCode = result === 'failure'
+      ? 'FAILED'
+      : result === 'cancelled'
+        ? 'CANCELLED'
+        : result === 'skipped'
+          ? 'SKIPPED'
+          : 'STATUS_UNRESOLVED';
     diagnostics.push({
-      code: `PREFLIGHT_JOB_${normalized}`,
+      code: `PREFLIGHT_${jobCode}_${statusCode}`,
       severity: 'error',
       message: result === 'skipped'
-        ? 'Required or included job was skipped; skipped is not accepted'
+        ? 'Job was skipped; skipped is not accepted'
         : result === 'cancelled'
           ? 'Job was cancelled and has no accepted result'
           : result === 'failure'
