@@ -24,6 +24,7 @@ import {
   NARRATIVE_STATE_CHANNEL,
   NARRATIVE_STATE_CONTRACT,
   PROMPTER_DECISION_CHANNEL as PROMPTER_DECISION_CHANNEL_CORE,
+  fingerprintRoot,
   logEventRead,
 } from '@shinon/seams/core';
 
@@ -841,9 +842,8 @@ export function apply(ctx, config) {
   // Ein FEHLENDES Feld heisst "Vorgabe", ein LEERES heisst "aus". Der
   // Unterschied zaehlt: sonst schaltete ein Profil ohne den Schluessel das
   // Gedaechtnis still ab, und niemand saehe den Grund.
-  const selfModelNamespace = () => (
-    typeof config.selfModelNamespace === 'string' ? config.selfModelNamespace : SELF_MODEL_NAMESPACE
-  );
+  const selfModelNamespace = (root = declaredRoot) => { const base = typeof config.selfModelNamespace === 'string' ? config.selfModelNamespace : SELF_MODEL_NAMESPACE;
+    return base === '' || typeof root !== 'string' || root === '' ? base : `${base}/${fingerprintRoot(root).rootId}`; };
 
   /** Den Stand EINMAL schreiben — dieselbe Ablage wie das Scoring, eigener Raum. */
   const persistSelfModel = (entry) => {
@@ -871,7 +871,7 @@ export function apply(ctx, config) {
   const selfModelOf = (root) => {
     const known = selfModels.get(root);
     if (known !== undefined) return known;
-    const namespace = selfModelNamespace();
+    const namespace = selfModelNamespace(root);
     let model = emptySelfModel(new Date().toISOString());
     if (namespace !== '') {
       const store = resolveStore();
@@ -925,7 +925,7 @@ export function apply(ctx, config) {
     if (!speaksForSession(assemblyCtx)) return '';
     const root = rootOfAssembly(assemblyCtx) || declaredRoot;
     if (typeof root !== 'string' || root === '') return '';
-    if (selfModelNamespace() === '') return '';
+    if (selfModelNamespace(root) === '') return '';
     return selfModelSummary(selfModelOf(root).model) ?? '';
   };
 

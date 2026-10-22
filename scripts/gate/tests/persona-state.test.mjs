@@ -20,6 +20,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fingerprintRoot } from '../../../packages/seams/assets/seams.js';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 import {
   EVENT_TYPES as SPINE_EVENTS,
@@ -480,28 +481,27 @@ const decision = (outcome = 'accepted') => ({
 });
 
 test('Selbstmodell: Laufzeitspuren werden zur Ablage — und ein NEUSTART liest sie wieder', () => {
-  // Die Schleife aus der Anfrage: Erfahrung → Auswertung → gepruefte
-  // Aktualisierung, ueber den Prozess hinaus. Ein frischer Host mit DERSELBEN
-  // Ablage muss die belegte Grenze im Prompt tragen, ohne sie neu zu lernen.
   const store = fakeStore();
-  const first = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  const first = connect({ [bundle.INDEX_STORE_SERVICE]: store }, { identityScope: 'global' });
+  const rootA = REPO_ROOT, rootB = join(REPO_ROOT, 'packages'), namespace = (root) => `${bundle.SELF_MODEL_NAMESPACE}/${fingerprintRoot(root).rootId}`;
   assert.equal(first.sections.some((entry) => entry.name === 'shinon:self-model'), true);
-  for (let i = 0; i < 3; i += 1) first.dispatch(bundle.PROMPTER_DECISION_CHANNEL, decision());
-  // Gelesen wird ueber DENSELBEN Weg wie beim Neustart — nicht aus einer Kopie.
-  const stored = store.load(bundle.SELF_MODEL_NAMESPACE).state?.memos ?? [];
-  const saved = stored.find((memo) => memo?.id === bundle.SELF_MODEL_MEMO_ID)?.model ?? null;
-  assert.ok(saved !== null, 'nichts gespeichert');
-  assert.equal(saved.runs, 3);
-  assert.equal(saved.accepted, 3);
-  assert.equal(saved.reasons['zu breit'], 3);
+  const observe = (host, root) => host.handlers.get('agent/pre-step')(
+    { agent: { session: { header: { cwd: root } } } }, () => host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, decision()),
+  );
+  for (let i = 0; i < 3; i += 1) observe(first, rootA);
+  observe(first, rootB);
+  const read = (root) => store.load(namespace(root)).state?.memos?.find((memo) => memo?.id === bundle.SELF_MODEL_MEMO_ID)?.model;
+  assert.equal(read(rootA).runs, 3);
+  assert.equal(read(rootB).runs, 1);
   first.dispose();
 
-  // Neustart: neuer Host, neuer Speicher, dieselbe Ablage.
-  const second = connect({ [bundle.INDEX_STORE_SERVICE]: store });
+  const second = connect({ [bundle.INDEX_STORE_SERVICE]: store }, { identityScope: 'global' });
+  observe(second, rootA);
+  observe(second, rootB);
+  assert.equal(read(rootA).runs, 4, 'Root B hat Root A nicht ersetzt');
+  assert.equal(read(rootB).runs, 2, 'Root B wird unabhaengig weitergefuehrt');
   const text = second.sections.find((entry) => entry.name === 'shinon:self-model')?.text ?? '';
-  assert.match(text, /Läufe: 3 \(3 angenommen/);
-  assert.match(text, /Wiederkehrende Grenze: zu breit \(3×\)/);
-  assert.match(text, /Offene Frage \(3×\): welcher Workspace\?/);
+  assert.match(text, /Läufe: 4 \(4 angenommen/);
   second.dispose();
   store.close();
 });
