@@ -1,0 +1,60 @@
+#!/usr/bin/env sh
+# Shinon pre-push — fail-closed, aber OHNE die lokale Hardware zu blockieren.
+#
+# WARUM ANDERS als pre-commit: der pre-commit faehrt die schnelle lokale
+# Linie (Sekunden). Der pre-push darf die SCHWERE Linie nicht fahren — die
+# macht die CI (test:full, gate:full, build, Distribution). Wer hier die
+# schwere Linie einbaut, zahlt sie bei jedem Push.
+#
+# WAS ER PRUEFT (alles lokal billig, alles fail-closed):
+#   1. Merge-Marker im Baum
+#   2. Whitespace-Fehler im Index
+#   3. npm run zahlen:check   (der generierte Zahlenblock)
+#   4. npm run gate:local    (die statischen Gate-Slices)
+#   5. kein unfertiges Paket (Manifest + Patch + mindestens eine Faehigkeit)
+#
+# WAS ER NICHT PRUEFT (das macht die CI, TIER 4): test:full, gate:full,
+# build, Distribution, Profile-Boot, Branding — und die Testketten ueber
+# 10 s (AGENTS.md, Testzeit-Grenze).
+set -e
+
+say() { printf '%s\n' "pre-push: $*" >&2; }
+die() { say "BLOCKIERT — $*"; exit 1; }
+
+if git grep -lI --quiet -e '^<<<<<<<' -e '^>>>>>>>' -- . 2>/dev/null; then
+  say "Merge-Marker gefunden:"
+  git grep -lI -e '^<<<<<<<' -e '^>>>>>>>' -- . 2>/dev/null >&2
+  die "Konfliktmarker im Baum — erst aufloesen, dann pushen."
+fi
+
+if ! git diff --check --cached 2>/dev/null; then
+  die "Whitespace-Fehler im Index (git diff --check)."
+fi
+
+if ! npm run --silent zahlen:check >/dev/null 2>&1; then
+  die "Der Zahlenblock driftet (npm run zahlen:check). 'npm run zahlen:sync' schreibt ihn."
+fi
+
+if ! npm run --silent gate:local >/dev/null 2>&1; then
+  die "Die lokalen Gate-Slices sind rot (npm run gate:local)."
+fi
+
+if [ -f packages/prompter/assets/capabilities.json ]; then
+  missing=$(node -e '
+    const fs = require("node:fs");
+    const cap = JSON.parse(fs.readFileSync("packages/prompter/assets/capabilities.json", "utf8"));
+    const owned = new Set((cap.capabilities || []).map((c) => c.owner));
+    const miss = [];
+    for (const d of fs.readdirSync("packages")) {
+      const dir = "packages/" + d;
+      if (!fs.statSync(dir).isDirectory()) continue;
+      if (!fs.existsSync(dir + "/package.json")) continue;
+      if (!fs.existsSync(dir + "/cordis.patch.yml")) { miss.push(d + " (kein Patch)"); continue; }
+      if (!owned.has(d)) miss.push(d + " (keine Faehigkeit)");
+    }
+    if (miss.length) { console.error(miss.join(", ")); process.exit(1); }
+  ' 2>&1) || die "Unfertige Pakete: $missing"
+fi
+
+say "lokal ok (Marker, Zahlen, Gate-Slices, Paket-Vollstaendigkeit). Die volle Pruefung laeuft in der CI."
+exit 0
