@@ -1,6 +1,6 @@
 # Third-Party Notices — Shinon Forge
 
-> **Status:** current — Fremdhinweise, getrennt vom eigenen Copyright. **Stand:** 2026-10-17
+> **Status:** current — Fremdhinweise, getrennt vom eigenen Copyright. **Stand:** 2026-10-22
 > **Einstieg:** `AGENTS.md` · **Änderungslog des Vendoring-Stands:** `vendor/MODIFICATIONS.md`
 
 Dieses Repo ist ein Fork und bindet fremde Software ein. Eigener und fremder Text
@@ -10,13 +10,16 @@ umformuliert.
 
 ## 1. DeepSeek Harness (`@deepseek-ai/dsh`) — vendort
 
-- Fassung: **0.2.1-alpha.1** · Lizenz: **MIT** · Herkunft: Registry-Tarball
-  (`https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.2.1-alpha.1.tgz`,
-  `sha512-DJ8pwG/XqzwDrYQTgJXuIga6ku153Z4vJI/B3MzNtudVCkDaOf4O2pUQh1ToroLHPPe4mxhhFeNJ7ttNculqMw==`)
-- Diese Fassung ist **dieselbe wie der Root-Pin, das Lockfile und die installierte
-  Binary** (A4 der Release-Abnahme; welcher Code `vendor/` lädt und warum die frühere
-  `0.2.1-alpha.2` hier nicht mehr liegt: [`vendor/MODIFICATIONS.md`](vendor/MODIFICATIONS.md))
-- Ort der Kopie: [`vendor/dsh/`](vendor/dsh/) — 20 Dateien, byte-identisch zum Tarball
+- Fassung: **0.2.1-rc.2** · Lizenz: **MIT** · Herkunft: Registry-Tarball
+  (`https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.2.1-rc.2.tgz`,
+  `sha512-tvY+yhfKRifthbqPe/OK0AYxM5ZkvqfYq/jMYgJcEUxiRRL1Vwra3Ti5TB6AXgSWQdiPHYh/Vp6SJa9yHwMNuw==`)
+- Diese Fassung entspricht dem Root-Pin, dem Lockfile, `vendor/dsh/MANIFEST.json`
+  und dem installierten CLI-Paket. Der aktuelle Laufzeitresolver verwendet das
+  Repo-Installat aus `node_modules`; `vendor/dsh/` ist der Herkunfts- und
+  Integritätsnachweis und wird derzeit nicht direkt vom Resolver geladen. Die
+  Quellen, Prüfbefehle und diese Laufzeitgrenze sind in
+  [`vendor/MODIFICATIONS.md`](vendor/MODIFICATIONS.md) dokumentiert.
+- Ort der Kopie: [`vendor/dsh/`](vendor/dsh/) — 20 Dateien, byte-identisch zum RC-Tarball
   (`sha256` je Datei in [`vendor/dsh/MANIFEST.json`](vendor/dsh/MANIFEST.json))
 - Lizenztext: übernommen als [`vendor/dsh/LICENSE`](vendor/dsh/LICENSE) und hier
   **wortgleich** wiedergegeben:
@@ -47,8 +50,9 @@ SOFTWARE.
 
 **Befund zum Vendoring (gemessen, nicht vermutet, Beleg: `docs/TAGEBUCH.md`, 2026-10-11):** Der Plan nannte
 `LICENSE` **und** `THIRD_PARTY_NOTICES.md` als unverändert zu übernehmen. Das
-veröffentlichte Paket liefert **kein** `THIRD_PARTY_NOTICES.md` aus: der Tarball hat
-20 Dateien — bei `0.2.1-alpha.1` wie bei `0.2.1-alpha.2`, keine trägt diesen Namen (`lib/*.js`, `lib/types/*.d.ts`, `LICENSE`,
+veröffentlichte Paket liefert **kein** `THIRD_PARTY_NOTICES.md` aus: die damals
+untersuchten Alpha-Tarballs `0.2.1-alpha.1` und `0.2.1-alpha.2` hatten je 20 Dateien;
+keine trug diesen Namen (`lib/*.js`, `lib/types/*.d.ts`, `LICENSE`,
 `package.json`, `README*`). Übernommen wurde deshalb **nur** die `LICENSE`
 unverändert; statt einer erfundenen Datei steht hier der Befund. Ein
 Copyleft-/Attributionskonflikt, der 3.2 stoppen müsste, ist **nicht** entstanden: MIT
