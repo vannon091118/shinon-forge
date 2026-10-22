@@ -1523,3 +1523,48 @@ Lokal: `npm run gate:test` **951/951** in 8,9 s (99 Dateien), `npm test` Exit 0,
 ist grün.
 
 **Anker:** `39a4364` · `ad20bcc` · `5800515` · Belege: `scripts/sync-zahlen.mjs`, `scripts/lib/structure.mjs`, `scripts/lib/canon.mjs`, `scripts/gate/plugins/package-checklist.mjs`, `scripts/gate/tests/docs-inventory.test.mjs`, `docs/PAKETE.md`, `docs/SCRIPTS.md`, `docs/ZAHLEN.md`
+
+### Der fünfte Block: zwei Orte ohne Zeilen, zwei Zusagen ohne Wächter
+
+Der Audit-Stapel, der danach dran war, hatte vier Zeilen mit sehr verschiedenem
+Gewicht — zwei Beleglücken, eine Entscheidung, eine Aufräumarbeit. Die beiden
+Beleglücken waren die interessanten: T2-2 und T4-8 waren **gebaut** und hatten
+**keinen** Wächter. `rollBonuses` lag längst als einzige Fassung in
+`packages/codingmon/assets/zucht-glueck.js`, und `openIndex` schrieb seine
+meta-Zeilen längst über `setMetaMany` in einer Transaktion — was laut
+`docs/probes/perf-baseline.json` den p50 von ~1947 ms auf ~248 ms drückte. Eine
+Zusage ohne Test ist ein Zustand, den der nächste Umbau still zurücknehmen kann,
+ohne dass irgendetwas rot wird; genau das ist jetzt anders.
+
+T1-6 und T5b-6 waren dieselbe Lücke von zwei Seiten. `docs/contracts/` trägt
+dreizehn Verträge, aber nur fünf davon liest Code; die anderen acht sind
+Zusammenfassungen, deren maschinenlesbare Quelle im Paket liegt
+(`packages/persona/assets/persona-state.json` gegen `docs/contracts/persona.json`
+ist das Muster). Diese Doppelung soll der Kanon verhindern — und niemand hat sie
+geprüft. Die Entscheidung steht jetzt maschinenlesbar in
+`docs/contracts/structure.json` → `vertraege`: `art: quelle` nennt einen Leser,
+der die Datei auch **nennt**, `art: zusammenfassung` nennt eine existierende
+`quelle`. Dazu kommt `profiles/` unter denselben Riegel — Pflichtdateien ja,
+Logik nein, weil ein `.js` dort über den Modul-Loader das Repo-Paket schattet
+und kein Gate es sieht. Der Echtbaum ist grün, vier Mutationsfälle sind je
+einzeln rot, `scripts/gate/tests/structure.test.mjs` steht bei 14/14.
+
+T4-2 war die Aufräumarbeit, und sie liest sich wie eine Werkzeugkiste, in der
+dasselbe Stemmeisen dreimal liegt: `quiet()` zwölfmal in drei Fassungen, zwei
+davon ohne Wiederherstellung von `console.error` — ein Test, der danach wirft,
+hätte den Fehler verschluckt. `until()` viermal in drei Bedeutungen. Beide sind
+jetzt je EIN Helfer; der eine Stolperstein ist ehrlich benannt: der Persona-Test,
+der prüft, dass eine Vertragsverletzung **gemeldet** wird, braucht genau diesen
+Kanal — dafür hat `helpers/console.mjs` die Ausnahme `keep`. Der erste Versuch
+ohne sie war sofort rot, und das war richtig: ein Helfer, der die Zusage stumm
+schaltet, verdeckt sie. Drei Prompter-Zeilen (T3-1/2/3) und T3-8 waren schon
+erledigt und sind jetzt mit Messung statt Behauptung abgehakt — 648, 549 und 317
+Zeilen unter der Kerngrenze 650, die 99 Namen gepinnt.
+
+Lokal: `npm run gate:test` **958/958** in 9,6 s, `npm test` Exit 0,
+`npm run build` Exit 0, `npm run zahlen:check` Exit 0,
+`npm run preflight:docs:check` PASS. Der CI-Lauf zum Commit `e587e59` ist grün:
+Gate #532 (2 m 51 s) und Installationspakete #64 (7 m 10 s). Das Audit steht
+damit bei 50 von 85 Zeilen.
+
+**Anker:** `e587e59` · Belege: `scripts/lib/structure.mjs`, `docs/contracts/structure.json`, `scripts/gate/tests/helpers/console.mjs`, `scripts/gate/tests/helpers/wait.mjs`, `scripts/gate/tests/index-transaktion.test.mjs`, `packages/codingmon/test/zucht-core.test.mjs`, `scripts/gate/tests/structure.test.mjs`, `docs/CLEANREPO-AUDIT.md`

@@ -28,6 +28,7 @@
 - Messbeleg für vermeidbare Kosten: Gate-Run `39711072872` maß rund 16 s für `npm ci` und 17,2 s für die Gate-Suiten. Entfernt wurden nur nachweisbare Duplikate: zweiter `shinon-test.mjs`-Lauf, Installation im Lockfile-Audit und doppelte Literal-Checks zusätzlich zu echtem `git check-ignore`/`git ls-files`.
 
 ### Belege
+- Lauf zum Block der zwei Orte ohne Zeilen: Commit `e587e59`; Gate #532 (2 m 51 s) und Installationspakete #64 (7 m 10 s) auf `e587e59` **success**, Verdict-Job eingeschlossen. Lokal: `npm run gate:test` 958/958 in 9,6 s, `npm test` Exit 0, `npm run build` Exit 0, `npm run zahlen:check` Exit 0, `npm run preflight:docs:check` PASS.
 - Gate-Läufe: `39848906103` auf `39a4364` **rot** (der Zahlen-Test verglich auch den `dist`-Block; Ursache und Fix im Tagebuch), `39849567339` auf `ad20bcc` **grün**, `39850004309` auf `5800515` **grün** — jeweils Verdict-Job eingeschlossen.
 - Gate-Test nach dem dritten Block: **942/942** grün in 9,5 s (97 Dateien); nach dem vierten Block **951/951** in 8,9 s (99 Dateien).
 - Gate-Lauf `39846439496` auf `ddde3c0`: **success**, Verdict-Job eingeschlossen (Workflow „Shinon Forge Gate").
