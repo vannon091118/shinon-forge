@@ -5,14 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { REQUIRED_CI_JOBS } from '../../lib/preflight/policy.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const script = join(root, 'scripts/preflight-verdict.mjs');
-const required = [
-  'commit-guard', 'quick', 'unit', 'gate-rules', 'static-gate',
-  'fixtures', 'distribution', 'profile', 'prompter', 'typescript',
-  'preflight-docs', 'dependency-audit', 'codeql', 'secret-scan',
-];
+const required = REQUIRED_CI_JOBS;
 const makeNeeds = (override = {}) => Object.fromEntries(required.map((job) => [
   job, { result: override[job] ?? 'success' },
 ]));
@@ -51,14 +48,14 @@ test('failed security job generates a concrete stable error code and keeps the r
   assert.equal(run.status, 1);
   assert.equal(run.report.verdict, 'FAIL');
   assert.ok(run.report.diagnostics.some((item) =>
-    item.code === 'PREFLIGHT_JOB_FAILURE' && item.job === 'codeql' && item.result === 'failure'));
+    item.code === 'PREFLIGHT_CODEQL_FAILED' && item.job === 'codeql' && item.result === 'failure'));
 });
 
 test('skipped jobs are rejected instead of being silently accepted', () => {
   const run = runVerdict(makeNeeds({ 'preflight-docs': 'skipped' }));
   assert.equal(run.status, 1);
   assert.ok(run.report.diagnostics.some((item) =>
-    item.code === 'PREFLIGHT_JOB_SKIPPED' && item.job === 'preflight-docs'));
+    item.code === 'PREFLIGHT_DOCUMENTATION_SKIPPED' && item.job === 'preflight-docs'));
 });
 
 test('missing required jobs produce explicit missing-job diagnostics', () => {
