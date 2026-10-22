@@ -1116,16 +1116,13 @@ window.__ModuleLoader__.load({
         key, Math.floor((value * (10000 + combined)) / 10000),
       ]));
     }
-    function breedingCandidates(a, b) {
-      if (!a || !b) return [];
-      const set = new Set([
-        ...Object.keys(LINEAGE).filter((id) => LINEAGE[id]?.ancestor === a.species),
-        ...Object.keys(LINEAGE).filter((id) => LINEAGE[id]?.ancestor === b.species),
-      ]);
-      const species = [...set];
-      if (species.length === 0) return [...new Set([a.species, b.species])].sort();
-      return species.sort();
-    }
+    const childChoice = (list) => list.slice().sort((a, b) => (b.bxp - a.bxp) || a.parentId.localeCompare(b.parentId) || a.species.localeCompare(b.species))[0];
+    function breedingCandidateDetails(a, b) { if (!a || !b) return [];
+      const candidates = [...Object.keys(LINEAGE).filter((id) => LINEAGE[id]?.ancestor === a.species).map((species) => ({ species, bxp: a.bxp, parentId: a.id })), ...Object.keys(LINEAGE).filter((id) => LINEAGE[id]?.ancestor === b.species).map((species) => ({ species, bxp: b.bxp, parentId: b.id }))];
+      const source = candidates.length ? candidates : [{ species: a.species, bxp: a.bxp, parentId: a.id }, { species: b.species, bxp: b.bxp, parentId: b.id }], bySpecies = new Map();
+      for (const candidate of source) { const previous = bySpecies.get(candidate.species); if (!previous || childChoice([previous, candidate]) === candidate) bySpecies.set(candidate.species, candidate); }
+      return [...bySpecies.values()].sort((x, y) => x.species.localeCompare(y.species)); }
+    const breedingCandidates = (a, b) => breedingCandidateDetails(a, b).map((candidate) => candidate.species);
     function breedingPairCore(state, idA, idB, selectedSpecies) {
       if (!state || state.schemaVersion !== BREEDING_VERSION || !Array.isArray(state.creatures) || !Array.isArray(state.eggs) || !state.loot) {
         throw new Error('Zucht: Spielstand v3 ist unvollständig');
@@ -3294,6 +3291,7 @@ window.__ModuleLoader__.load({
           pair: (idA, idB, species) => pairCreatures(idA, idB, species),
           breeding: () => ({ ...store.breeding, creatures: store.breeding.creatures.map((creature) => ({ ...creature, bonuses: creature.bonuses.map((bonus) => ({ ...bonus })) })), eggs: store.breeding.eggs.map((egg) => ({ ...egg, parents: egg.parents.slice(), bonuses: egg.bonuses.map((bonus) => ({ ...bonus })) })) }),
           breedCandidates: (idA, idB) => breedingCandidates(store.breeding.creatures.find((creature) => creature.id === idA), store.breeding.creatures.find((creature) => creature.id === idB)),
+          breedCandidateDetails: (a, b) => breedingCandidateDetails(a, b),
           addXp: (xp) => award(xp, `+${xp} XP (manuell)`),
           /** Die laufende Sperre (null = kein Zug). */
           lock: () => lockStatus(),
@@ -3364,6 +3362,7 @@ window.__ModuleLoader__.load({
               return { text: value.text, digits: value.digits, safe: value.safe };
             },
             rollLoot: (uniform, creature = null) => rollLoot(uniform, creature).id,
+            breedCandidateDetails: (a, b) => breedingCandidateDetails(a, b),
             /** Der Wild-Spawn als reine Funktion (Spiegel von mechanik.js). */
             spawnFor: (done, level) => spawnFor(done, level),
             /** Die Typwirkung als Zeichen (Spiegel von mechanik.js). */

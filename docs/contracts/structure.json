@@ -89,7 +89,7 @@
     }
   ],
   "bestand": {
-    "packages/codingmon/client.js": 3482,
+    "packages/codingmon/client.js": 3481,
     "packages/codingmon/test/durchstich.test.mjs": 660,
     "packages/core/client.js": 409,
     "packages/dashboard/client.js": 479,

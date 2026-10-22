@@ -2,7 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fnv1a32, randInt, streamFor, weightedPick } from '../assets/zufall.js';
 import { GROWTH_BPS, LEVEL_CAP, levelFor, statAt, statsAt, threshold } from '../assets/leiter.js';
-import { SPECIES } from '../assets/katalog.js';
+import { LINEAGE, SPECIES } from '../assets/katalog.js';
 import { SnapshotSchema } from '../assets/snapshot-schema.js';
 import {
   BXP_CHILD, BXP_FOUNDER, HATCH_GAIN, PAIR_GAIN, bxpModBps, effectiveStat, genMods,
@@ -10,6 +10,7 @@ import {
 import { POOLS, childGen, luckFactorBps, poolFor, rollBonuses, slotChanceBps, validatePools } from '../assets/zucht-glueck.js';
 import { BP_PER_COMPLETION, HATCH_BP, childSpeciesCandidates, successorsOf, lootWeights, onCompletions, pair, hatchReady } from '../assets/zucht.js';
 import { migrateToV3, legacyLevelFor } from '../assets/migration.js';
+import { boot } from './harness.mjs';
 
 const lineage = {
   nullpointer: { ancestor: null },
@@ -29,6 +30,18 @@ const state = () => ({
 });
 
 describe('CodingMon deterministic stream', () => {
+  test('Client childChoice matches host candidate and tie-break rules', () => {
+    const s = state(), host = childSpeciesCandidates(s.creatures[0], s.creatures[1], LINEAGE);
+    const client = boot().api.contract().breedCandidateDetails(s.creatures[0], s.creatures[1]);
+    assert.equal(JSON.stringify(client), JSON.stringify(host));
+    assert.equal(JSON.stringify(client.map(({ species }) => species)), JSON.stringify(['deadlock', 'nullprism', 'racecondition', 'stackwisp']));
+    const sameLineage = { ...s.creatures[0], id: 'c2', bxp: 80 };
+    const hostChoice = childSpeciesCandidates(s.creatures[0], sameLineage, LINEAGE);
+    const clientChoice = boot().api.contract().breedCandidateDetails(s.creatures[0], sameLineage);
+    assert.equal(JSON.stringify(clientChoice), JSON.stringify(hostChoice));
+    assert.ok(clientChoice.every(({ parentId, bxp }) => parentId === 'c2' && bxp === 80));
+  });
+
   test('FNV-1a vectors and keyed streams repeat exactly', () => {
     assert.equal(fnv1a32(''), 0x811c9dc5);
     assert.equal(fnv1a32('hello'), 0x4f9f2cab);
