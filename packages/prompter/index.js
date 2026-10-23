@@ -25,6 +25,7 @@ import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT, createOrchestrator }
 import { Config as _imported_config_schema } from './assets/schema.js';
 import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, PRE_STEP_EVENT, resolveMode } from './assets/mode-core.js';
 import { PROPOSE_CONTRACT, PROPOSE_SERVICE } from './assets/block-review.js';
+import { createProposeTool } from './assets/propose-tool.js';
 import { notesDir } from './assets/prompt-files.js';
 import { loadRuntime, proposeBlock } from './assets/runtime-state.js';
 import { onPreStep } from './assets/pre-step.js';
@@ -314,6 +315,21 @@ export function apply(ctx, config) {
   };
   const releasePropose = bus.provide(PROPOSE_SERVICE, proposeService);
 
+  // Der Abnehmer der Naht: das Modell-Werkzeug (Audit-Konflikt #23, „tote
+  // Dienstfläche"). Es ruft `proposeService.propose` — denselben Prüfweg, nicht
+  // einen zweiten — und braucht ein eigenes `output` (`schema` + `render`),
+  // sonst verweigert `tools.register` die Definition. Ohne `tools`-Dienst ist
+  // das kein Fehler des Laufs, sondern eine benannte Zeile: derselbe Dienst
+  // bleibt angeboten, und wer ihn lesen will, bekommt den Grund.
+
+  const proposeTool = createProposeTool(proposeService.propose);
+  const proposeToolAsked = bus.demand(['tools'], (child) => {
+    child.tools.register(proposeTool);
+  });
+  console.log(
+    `[shinon-prompter] Werkzeug ${PROPOSE_SERVICE} ${proposeToolAsked ? 'registriert' : 'NICHT registriert (kein tools-Dienst)'} (Vertrag ${PROPOSE_CONTRACT})`,
+  );
+
   // Skill-Lebenszyklus (Zug 7): Ereignisse hoeren, Kandidaten im Hintergrund
   // pruefen, Skills nach .agents/skills schreiben (der Root, den DSH nativ
   // entdeckt). Fail-closed: ohne gueltige Regeln gibt es keinen Lebenszyklus.
@@ -355,10 +371,9 @@ export { renderContext, renderSkillsBlock } from './assets/render-context.js';
 export { loadContext, loadNoteRules, loadSkillRules, readNotes, readSkills, selectSkills } from './assets/prompt-files.js';
 export { standFor, standTrace } from './assets/stand.js';
 export { buildEnhancerRequest, collectStream, replacePrompt } from './assets/enhancer.js';
-export { BLOCKS_CONTRACT, BLOCKS_PATH, DEFAULT_TOTAL_BUDGET, SELF_QUESTION_MARKERS, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, buildHaystack, candidateBlocks, decisionBlocks, matchBlock, selectBlocks, validateRegistry, tokens as blockSelectTokens } from './assets/block-select.js';
+export { BLOCKS_CONTRACT, BLOCKS_PATH, DEFAULT_TOTAL_BUDGET, SELF_QUESTION_MARKERS, WEIGHTS_CONTRACT, WEIGHTS_SERVICE, buildHaystack, decisionBlocks, matchBlock, selectBlocks, validateRegistry, tokens as blockSelectTokens } from './assets/block-select.js';
 export { LEARNED_CONTRACT, LEARNED_DEFAULT_PATH, PROPOSE_CONTRACT, PROPOSE_SERVICE, duplicateVsBlocks, mergeLearnedBlocks, validateBlockCore, validateLearnedFile, validateProposalShell } from './assets/block-review.js';
 export { MAX_SALVAGE_SESSIONS, SALVAGE_CONTRACT, SALVAGE_MEMO_ID, SALVAGE_NAMESPACE, emptySalvage, salvageCountOf, validateSalvage, withSalvageCount } from './assets/salvage-store.js';
-export { MAX_UNCERTAINTY, MIN_UNCERTAINTY, SELECTION_CONTRACT, parseSelection, renderCandidates, selectionSystemBrief } from './assets/selection.js';
 
 // Die beiden Namen, die frueher in dieser Datei definiert waren: sie bleiben
 // hier oeffentlich, weil Abnehmer sie ueber `@shinon/prompter` lesen — der

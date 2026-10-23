@@ -25,6 +25,7 @@ import {
   nextActionFor,
   projectMicroState,
 } from './assets/micro-state.js';
+import { createMicroStateTool } from './assets/micro-state-tool.js';
 
 export {
   CONTRACT,
@@ -442,10 +443,25 @@ export function apply(ctx, config) {
   // ohne eigenen Zustand und ohne zusätzlichen Listener. Ein Host ohne
   // `provide` ist kein Fehler des Laufs (dieselbe Haltung wie beim Query-Dienst
   // des Project Index); er bekommt die Aussage in derselben Aktivierungszeile.
-  const releaseMicroState = bus.provide(MICRO_STATE_SERVICE, createMicroStateService(ctx));
+  const microState = createMicroStateService(ctx);
+  const releaseMicroState = bus.provide(MICRO_STATE_SERVICE, microState);
   const microStateInfo = releaseMicroState !== null
     ? `Projektion ${MICRO_STATE_SERVICE} bereitgestellt (${MICRO_STATE_CONTRACT})`
     : `Projektion ${MICRO_STATE_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
+
+  // Der Abnehmer der Projektion (Audit-Konflikt #23, „tote Dienstfläche"): ein
+  // Modell-Werkzeug, das `state(agent)` auf DEMSELBEN Dienstobjekt ruft. Es
+  // hält keinen Zustand — jeder Aufruf liest frisch aus `ctx.goals`, die
+  // Leseoperation bleibt Eigentum der Projektion. `output` (`schema` + `render`)
+  // ist Pflicht, sonst verweigert `tools.register`; ohne `tools`-Dienst bleibt
+  // die Projektion angeboten und die Zeile nennt den Grund.
+  const microStateTool = createMicroStateTool(microState);
+  const microStateToolAsked = bus.demand(['tools'], (child) => {
+    child.tools.register(microStateTool);
+  });
+  console.log(
+    `[shinon-task-router] Werkzeug ${microStateTool.name} ${microStateToolAsked ? 'registriert' : 'NICHT registriert (kein tools-Dienst)'} (Vertrag ${MICRO_STATE_CONTRACT})`,
+  );
 
   // Der Dienst wird NICHT hier gesucht, sondern je Entscheidung. Grund, im
   // echten Boot gemessen: DSH stellt die Goal-Domaene erst NACH unseren

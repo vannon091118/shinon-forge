@@ -182,7 +182,44 @@ export function clientIssues(pkg) {
   if (!existsSync(file)) return ['client.js fehlt'];
   const issues = syntaxIssues(file);
   if (!read(file).includes('__ModuleLoader__')) issues.push('ModuleLoader fehlt');
+  issues.push(...clientEffectIssues(file));
   return issues;
+}
+
+/** Die Selbstauskunft, mit der eine Client-Hälfte ohne Wirkung erlaubt ist. */
+export const CLIENT_NO_EFFECT_DECLARATION = 'Nichts zu rendern';
+
+/**
+ * Wirkungen, die eine Client-Hälfte haben kann. Alle sind gemessen, nicht
+ * erdacht — jede Zeile hat im Baum mindestens einen Vertreter:
+ *
+ *   - `slots.register`  — ein Panel/Abschnitt (`token-usage`, `popup`, `persona`, …)
+ *   - `createElement`   — ein `<style>` oder ein DOM-Knoten (`mobile`, `version`, …)
+ *   - `__shinonPlugins`  — die gemeinsame Sichtbarkeitsliste (`tooltip`, `narrative`, …)
+ *
+ * Der Grund für den Riegel: `@shinon/narrative` trug bis 2026-10-23 einen
+ * `apply()`, der NUR `console.log` rief, unter einem Dateikopf, der „zeigt den
+ * aktuellen Narrative-State im UI an" behauptete. Ein Test kann das nicht an der
+ * Absicht erkennen, aber an der Wirkung: wer nichts rendert, registriert, färbt
+ * oder schreibt, hat keine — und muss das dann selbst sagen
+ * (`CLIENT_NO_EFFECT_DECLARATION`, der Fall `@shinon/seams`, dessen Kern Host-Code
+ * ist). Eine stille Ausnahme gibt es nicht.
+ */
+export function clientEffectIssues(file) {
+  const raw = read(file);
+  if (raw.includes(CLIENT_NO_EFFECT_DECLARATION)) return [];
+  // Kommentare zählen nicht: eine Wirkung, die nur im Kopf steht, ist keine.
+  const code = raw
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  const effects = [
+    /\.slots\.register\(/,
+    /createElement\(/,
+    /__shinonPlugins|__shinonPluginCatalog/,
+  ];
+  if (effects.some((pattern) => pattern.test(code))) return [];
+  return ['client.js ohne Wirkung (kein Slot, kein DOM, keine Plugin-Liste) —'
+    + ' entweder rendern oder im Kopf `' + CLIENT_NO_EFFECT_DECLARATION + '` begründen'];
 }
 
 /**

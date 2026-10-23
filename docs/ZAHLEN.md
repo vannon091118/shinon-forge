@@ -33,7 +33,7 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Verträge unter `docs/contracts/` | 14 | `ls docs/contracts/*.json \| wc -l` | 0 |
 | Proben unter `docs/probes/` | 53 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 15 Blöcke in 11 Dateien | `npm run idioms:check` (Exit 0) | 0 |
-| Build (`dist/packages/`) | 23 Pakete, 317 Dateien, 2827637 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 23 Pakete, 318 Dateien, 2836540 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -59,7 +59,7 @@ heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
 <!-- zahlen:struktur:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 505 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 510 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
 | Klassen | 7 | `docs/contracts/structure.json` → `klassen` | 0 |
 | Generierte Dateien (Kopfmarke `GENERIERT aus`, ohne Zeilengrenze) | 8 | `generiertMarke()` in `scripts/lib/structure.mjs` — Bytegleichheit prüft `scripts/build-client.mjs --check --all` | 0 |
 | Dateien ohne Klasse | 0 | `npm test` (Schritt „Struktur“) — gezählt aus `structureIssues()` | 0 |

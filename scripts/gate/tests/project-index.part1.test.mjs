@@ -101,10 +101,14 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/provenance.js' },
       { kind: 'import', target: './assets/stand.js' },
       { kind: 'import', target: './assets/enhancer.js' },
-      // Die Injection-Runtime (Phase 1-4 + Selektionsvertrag): eigene Kerne.
+      // Die Injection-Runtime (Phase 1-4, ohne Selektionsagent seit 2026-10-23):
+      // eigene Kerne; der Agent samt `selection.js` ist entfernt, der
+      // deterministische Selektor bleibt der eine Weg.
       { kind: 'import', target: './assets/block-select.js' },
       { kind: 'import', target: './assets/block-review.js' },
-      { kind: 'import', target: './assets/selection.js' },
+      // Der Abnehmer der Naht `shinon_block_propose` (2026-10-23): ein
+      // Modell-Werkzeug mit eigenem `output`, importfrei wie der Kern daneben.
+      { kind: 'import', target: './assets/propose-tool.js' },
       // Der SALVAGED_PROSE-Zaehler und der Runtime-Context-Kanal (2026-10-21):
       // der Kontext kommt als EIGENE Nachricht an, sonst faellt er bei NO_JSON weg.
       { kind: 'import', target: './assets/salvage-store.js' },

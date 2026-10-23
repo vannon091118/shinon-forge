@@ -56,7 +56,9 @@ export {
 } from './repo-basis.mjs';
 export {
   ARTIFACT_SKIP,
+  CLIENT_NO_EFFECT_DECLARATION,
   artifactFiles,
+  clientEffectIssues,
   clientIssues,
   copyArtifacts,
   composeIssues,

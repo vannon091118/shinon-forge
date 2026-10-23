@@ -197,31 +197,44 @@ test('Gedächtnis: ohne Ablage bleibt der Abschnitt leer — keine erfundene Eri
   assert.match(host.sections.find((entry) => entry.name === 'shinon:memory').text, /korrektur:kürzer/);
   host.dispose();
 });
-test('Selbstverbesserung: Vorschlag aus Belegen, Annahme ist ein eigener Akt', () => {
+test('Selbstverbesserung: Vorschlag aus Belegen, Annahme ist ein eigener Akt', async () => {
+  // Seit 2026-10-23 gibt es den Review-DIENST nicht mehr: er hatte keinen Leser,
+  // die Naht ist die Route (GET zeigt, POST entscheidet). Derselbe Ablauf, ohne
+  // zweite Tür — deshalb liest und entscheidet dieser Test über `reviewRoute`.
   const store = fakeStore();
-  const host = connect({ [bundle.INDEX_STORE_SERVICE]: store });
-  const review = host.provided[bundle.REVIEW_SERVICE];
-  assert.ok(review !== undefined, 'Prüf-Naht fehlt');
-  assert.equal(review.contract, bundle.REVIEW_CONTRACT);
+  const routes = [];
+  const host = connect({
+    webServer: { register(options) { routes.push(options); return () => {}; } },
+    [bundle.INDEX_STORE_SERVICE]: store,
+  });
+  const reviewRoute = routes.find((entry) => entry.path === bundle.REVIEW_ROUTE);
+  assert.ok(reviewRoute, 'die Prüf-Route ist nicht registriert');
+  const review = async () => (await routeRequest(reviewRoute)).json();
+  assert.equal((await review()).contract, bundle.REVIEW_CONTRACT);
 
   // Zwei Ablehnungen: unter der Schwelle — kein Vorschlag.
   for (let index = 0; index < 2; index += 1) {
     host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
   }
-  assert.equal(review.review().proposals.filter((entry) => entry.status === 'proposed').length, 0);
+  assert.equal((await review()).proposals.filter((entry) => entry.status === 'proposed').length, 0);
 
   // Dritter Beleg: Vorschlag, aber KEINE Auflage im Prompt.
   host.dispatch(bundle.PROMPTER_DECISION_CHANNEL, { outcome: 'rejected', reasons: ['NO_JSON'] });
-  const proposals = review.review().proposals.filter((entry) => entry.status === 'proposed');
+  const proposals = (await review()).proposals.filter((entry) => entry.status === 'proposed');
   assert.equal(proposals.length, 1);
   assert.equal(host.sections.find((entry) => entry.name === 'shinon:commitments').text, '');
 
   // Unbekannte Id und falsche Entscheidung: fail-closed.
-  assert.equal(review.decide('gibt-es-nicht', 'accepted').ok, false);
-  assert.equal(review.decide(proposals[0].id, 'vielleicht').ok, false);
+  const unknown = await routeRequest(reviewRoute, { method: 'POST', body: { id: 'gibt-es-nicht', decision: 'accepted' } });
+  assert.equal(unknown.status, 409);
+  assert.equal(unknown.json().ok, false);
+  const wrong = await routeRequest(reviewRoute, { method: 'POST', body: { id: proposals[0].id, decision: 'vielleicht' } });
+  assert.equal(wrong.status, 400);
 
   // Ausdrückliche Annahme: jetzt steht die Auflage im Prompt — und überlebt den Neustart.
-  assert.equal(review.decide(proposals[0].id, 'accepted').ok, true);
+  const accepted = await routeRequest(reviewRoute, { method: 'POST', body: { id: proposals[0].id, decision: 'accepted' } });
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.json().ok, true);
   assert.match(host.sections.find((entry) => entry.name === 'shinon:commitments').text, /Selbstauflagen \(geprüft und angenommen\)/);
   assert.match(host.sections.find((entry) => entry.name === 'shinon:commitments').text, /3 Belege/);
   host.dispose();

@@ -331,12 +331,21 @@ test('relation: der ausdrueckliche Akt erreicht den Zustand — nicht den Prompt
   }));
   quiet(() => loaded.narrative.apply(host.ctx, { stateNamespace: '', eventsChannel: 'shinon/event' }));
 
-  const service = host.provided.get(loaded.persona.RELATION_SERVICE);
-  assert.ok(service, 'der Beziehungs-Produzent wird nicht angeboten');
-  assert.deepEqual(service.levels(), ['stranger', 'known', 'trusted', 'anchor']);
-
+  // KEIN Dienst mehr (2026-10-23): die Naht ist die Route; das Dienst-Angebot
+  // hatte keinen Leser. Gelesen wird der Vertrag jetzt über GET auf derselben
+  // Route, die das Panel benutzt.
   const route = routes.find((entry) => entry.path === loaded.persona.RELATION_ROUTE);
   assert.ok(route, 'die Beziehungs-Route fehlt');
+  const get = async () => {
+    const res = { status: 0, body: '', writeHead(status) { this.status = status; }, end(value) { this.body = value; } };
+    const req = Readable.from([]);
+    req.method = 'GET';
+    await route.handler(req, res);
+    return { status: res.status, body: JSON.parse(res.body) };
+  };
+  const listed = await get();
+  assert.equal(listed.status, 200);
+  assert.deepEqual(listed.body.levels, ['stranger', 'known', 'trusted', 'anchor']);
   const post = async (payload) => {
     const res = { status: 0, body: '', writeHead(status) { this.status = status; }, end(value) { this.body = value; } };
     const req = Readable.from([Buffer.from(JSON.stringify(payload))]);
@@ -372,12 +381,14 @@ test('relation: der ausdrueckliche Akt erreicht den Zustand — nicht den Prompt
   assert.equal(rendered.includes('shinon:narrative-arc'), false, 'kein Narrativ-Abschnitt mehr');
   assert.equal((hub.rawContext('shinon:persona-live')?.text ?? '').includes('trusted'), false, 'keine Stufe im Live-Block');
 
-  // Fail-closed: eine erfundene Stufe und eine fehlende Sitzung aendern nichts.
-  assert.deepEqual(service.set({ level: 'erfunden', sessionId: 'sess-1' }), { ok: false, error: 'UNKNOWN_RELATION' });
-  assert.deepEqual(service.set({ level: 'trusted', sessionId: '' }), { ok: false, error: 'MISSING_SESSION' });
+  // Fail-closed: eine erfundene Stufe aendert nichts, ein fremder Koerper auch nicht.
+  const invented = await post({ level: 'erfunden' });
+  assert.equal(invented.status, 400, 'die Route setzt eine erfundene Stufe');
+  assert.equal(invented.body.error, 'UNKNOWN_RELATION');
 
   // Und der naechste ausdrueckliche Akt hebt die Stufe weiter — ohne einen zweiten Weg.
-  service.set({ level: 'anchor', sessionId: 'sess-1' });
+  const next = await post({ level: 'anchor' });
+  assert.equal(next.status, 200, `Route antwortete ${next.status}: ${JSON.stringify(next.body)}`);
   const later = [];
   host.ctx.emit(loaded.persona.INDEX_INJECT, later);
   const after = later.find((entry) => entry.kind === 'global' && entry.name === loaded.persona.UI_STATE_GLOBAL);

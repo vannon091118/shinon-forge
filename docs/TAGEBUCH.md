@@ -262,9 +262,11 @@ eigenem Selektionsvertrag (`c00c2fe`, `cb448c2`), das dauerhafte Scoring-Ledger
 Doku in ein Archiv (`87fc5fe`).
 
 Heute: `bin/shinon.mjs`, `scripts/doctor.mjs`, `docs/probes/store-cost.json`,
-`scripts/dsh-target-versions.json`, `packages/prompter/assets/selection.js`.
+`scripts/dsh-target-versions.json`, `packages/prompter/assets/block-select.js` —
+der letzte Pfad trug am 2026-10-17 noch den Namen `selection.js`; seit 2026-10-23
+ist die Auswahl dort allein (siehe den Eintrag zu T3-5).
 
-**Anker:** `8c9da4e..1fd90f9` · Tag: 50 Commits · Belege: `scripts/doctor.mjs`, `docs/probes/store-cost.json`, `scripts/dsh-target-versions.json`, `packages/prompter/assets/selection.js`
+**Anker:** `8c9da4e..1fd90f9` · Tag: 50 Commits · Belege: `scripts/doctor.mjs`, `docs/probes/store-cost.json`, `scripts/dsh-target-versions.json`, `packages/prompter/assets/block-select.js`
 
 ---
 
@@ -2058,3 +2060,161 @@ für die Client-Hälfte, wo ein Test die Bytegleichheit nachrechnet.
 99/99 (7,9 s), `npm run test:full` Exit 0 (Gate 127, Fixtures 8, Distribution
 92, Profilboot 4), `npm run test:codingmon` 137/137, `npm run gate:full` 27/27
 PASS, `npm run build` Exit 0 (23 Pakete, 317 Dateien).
+
+**Etappe 7, und zwei Client-Hälften, die nur so aussahen, als täten sie etwas.**
+Der Tooltip-Client injizierte eine Regel für `.dsh-tooltip` — eine Klasse, die
+im Baum niemand setzt; die Regel war toter Text, der wie Gestaltung aussah, und
+CSS wirft bei einem falschen Namen keinen Fehler, es ignoriert ihn. Der
+Narrative-Client rief `console.log('[shinon-narrative] Client aktiviert')` unter
+einem Dateikopf, der „zeigt den aktuellen Narrative-State im UI an" behauptete.
+Beides ist jetzt an der Wirkung gemessen statt an der Absicht: der Tooltip färbt
+die Design-Token, die DSH wirklich liest (`--dsw-alias-tooltip-bg`,
+`--dsw-alias-tooltip-key-bg`) auf `body` und `body[data-ds-dark-theme]` — die
+Themeschicht setzt dieselben Selektoren, gleiche Spezifität, spätere Einfügung
+gewinnt —, und die Narrative-Hälfte meldet sich in `__shinonPlugins` an, mit
+`detail: 'decision-trace:prompter'`; der Composite bleibt ein Datensatz in der
+Spur, keine zweite Anzeige. Der alte Kopf behauptete eine Persona-Sektion
+`shinon:narrative-arc`, die es laut `narrative.test.mjs` nie gab — ein Kommentar,
+der eine Fähigkeit beschreibt, die der Vertrag ausdrücklich nicht hat.
+
+Die dritte Lücke war größer: `selection.js` war eine Antwortprüfung für einen
+Selektionsagenten ohne einen einzigen Produktionsaufrufer, dazu `candidateBlocks`
+und eine `includeIds`-Tür in `selectBlocks` — drei Teile einer Mechanik, die sich
+wie eine Fähigkeit las. Entschieden ist ENTFERNT, nicht verdrahtet: ein zweiter
+Modellaufruf je Schritt ist eine Messung, nicht eine Option. Die öffentliche
+Fläche des Prompters fällt damit von 99 auf 92 Namen; die Zahl ist gepinnt.
+
+Jede der drei Lücken hat ihren Gate-Test, und jede wurde gegen eine ECHTE
+Quellmutation rot gesehen — nicht nur gegen die Probe, die im Test selbst steht:
+ein Log-only-`apply` macht `client-effect` rot, ein Token-Tippfehler macht
+`tooltip-client` rot, eine zurückgeholte `selection.js` macht
+`selection-single-path` rot. Beim Aufräumen fiel ein älterer Fehler auf: das
+Kapitel vom 2026-10-17 führte die gelöschte Datei als Beleg, und der Tagebuch-
+Riegel meldet jeden Anker, den es heute nicht mehr gibt — der Pfad zeigt jetzt
+auf `block-select.js`, den Träger der Auswahl, mit dem Grund daneben.
+
+**Anker:** `107f40b` · Pfade: `packages/tooltip/client.js`,
+`packages/narrative/client.js`, `packages/prompter/assets/block-select.js`,
+`packages/prompter/index.js`, `scripts/gate/tests/tooltip-client.test.mjs`,
+`scripts/gate/tests/client-effect.test.mjs`,
+`scripts/gate/tests/selection-single-path.test.mjs`,
+`scripts/gate/test-lanes.json` · Belege: `npm test` Exit 0 (statisches Gate
+127/127), `npm run gate:test` 946/946 (111 Dateien), `npm run test:full` Exit 0
+(Distribution 92, Profilboot 4), die drei neuen Dateien 13/13, `npm run build`
+Exit 0 (23 Pakete, 316 Dateien), `npm run zahlen:check` Exit 0; Mutationsproben
+einzeln rot (2, 3 und 2 Fälle).
+
+**Die vier Constructor-/Vertragsstellen waren vier Diensttüren — und zwei davon
+gingen ins Leere.** Der Audit nennt sie unter Konflikt #23 als „tote
+Dienstfläche": zehn `ctx.provide`, vier ohne einen einzigen Abnehmer im Baum.
+Zwei davon waren leicht zu erkennen und leicht zu schließen: `shinon_persona_review`
+und `shinon_persona_relation` waren der zweite Zugang zu einem Objekt, das
+längst eine Tür hatte — die Route (`REVIEW_ROUTE`, `RELATION_ROUTE`, GET und
+POST) samt `REVIEW_GLOBAL`/`UI_STATE_GLOBAL` und dem SSE-Ereignis `review`. Ein
+Dienst neben einer offenen Route ist wie ein zweites Schloss an derselben Tür:
+es sieht nach Zugang aus und ist nur mehr Metall. Beide `bus.provide` sind weg,
+die Fähigkeit `identitaet-und-review` zeigt jetzt auf das Global, das die
+Prüfstände wirklich tragen; die Tests lesen über die Route, nicht über den
+entfernten Dienst.
+
+Die anderen zwei sind nicht still, sondern deklariert. `shinon_block_propose`
+und `shinon_goal_micro_state` haben ihren Abnehmer außerhalb dieses Baums: ein
+Client-Beitrag kann sich nicht selbst montieren (die Remotes-Liste ist
+kompiliert), und ein Modell-Werkzeug braucht einen eigenen `output`-Vertrag samt
+Messung — das ist eine Etappe, keine Zeile. Also steht ab jetzt der Grund im
+Gate statt im Gefühl: `scripts/gate/tests/provided-seams.test.mjs` liest jedes
+`bus.provide` aus dem Quelltext, verlangt je Naht einen benannten Leser (Datei
+plus Symbol) oder die Deklaration samt existierender Fähigkeit und ist rot bei
+einer neuen Naht ohne Leser, einem verschwundenen Leser oder einem wieder
+angebotenen entfernten Dienst. `shinon_codingmon_store` steht in derselben
+Deklaration — die Grenze war lange in AGENTS.md beschrieben, jetzt ist sie
+geprüft.
+
+Nebenbei ist die Audit-Tabelle auf den gemessenen Stand gezogen: fünf Zeilen
+sind erledigt und belegt (`repo.mjs` ist eine 95-Zeilen-Fassade über sechs
+Eigentümer, der Profilpatch kommt aus elf Fragmenten, `pre-step` importiert
+`kuerzeAufBudget`, alle sechs Skills tragen `use-when`, `scoring.mjs` ist 62
+Zeilen), vier sind nachgemessen weiter offen (die Fakten-Pipeline ohne
+Produktionsimporteur, `adoptClaim` ohne Aufrufer, 17 von 23 Paketen in der
+Dashboard-Tabelle, keine direkten Kerntests für die drei Prompter-Dateien).
+Offen heißt offen: die Zeilen tragen jetzt die Zahl, die sie behaupten.
+
+**Anker:** `107f40b` · Pfade: `packages/persona/index.js`,
+`packages/prompter/assets/capabilities.json`,
+`scripts/gate/tests/provided-seams.test.mjs`, `scripts/gate/test-lanes.json`,
+`docs/CLEANREPO-AUDIT.md` · Belege: `npm test` Exit 0 (statisches Gate 127/127),
+`npm run gate:test` 951/951 (112 Dateien), `npm run test:full` Exit 0,
+`provided-seams.test.mjs` 5/5, Persona-Familie 46/46, `npm run build` Exit 0
+(23 Pakete, 316 Dateien), `npm run gate:test:slow` 99/99, `npm run zahlen:check`
+Exit 0. Der CI-Tier fand dabei eine stehengebliebene Erwartung aus der
+`selection`-Entfernung (`project-index.part1` erwartete weiter den Import
+`./assets/selection.js`) — genau die Sorte Rest, die eine Bahn nur zeigt, wenn
+man sie fährt.
+
+**Die zwei deklarierten Dienste bekamen ihren Abnehmer — und der Abnehmer ist der Agent.**
+`shinon_block_propose` und `shinon_goal_micro_state` standen am Abend als
+„extern“ im Gate, mit Grund und Fähigkeit, aber ohne Leser. Die Begründung war
+halb richtig: ein Client-Beitrag montiert sich nicht selbst, weil die
+Remotes-Liste des Harness kompiliert ist. Sie war halb falsch, weil der
+Abnehmer die ganze Zeit im selben Baum saß — es war nur niemand, der ihn
+anschließt: ein Modell erreicht einen Dienst ausschließlich über ein Werkzeug,
+und `tools.register` verweigert jede Definition ohne `output = { schema, render }`.
+Genau dieser fehlende Vertrag war der Grund, aus dem die zwei Türen keine Leser
+hatten, und nicht das Fehlen eines Lesers.
+
+Beide Werkzeuge sind jetzt **Abnehmer, nicht zweite Zugänge**: das Vorschlags-
+Werkzeug ruft `proposeService.propose`, also denselben Prüfweg (`parseNote`,
+`reviewNotes`, `duplicateVsBlocks`, `validateBlockCore`), und das
+Mikrostand-Werkzeug ruft `state(agent)` auf demselben Dienstobjekt — jeder
+Aufruf liest frisch, nichts wird zwischengespeichert, weil das Werkzeug sonst
+die zweite Session-Historie wäre, die §18 verbietet. Die Definitionen sind
+Daten statt `defineTool`: rohes JSON-Schema plus zwei reine Funktionen, weil die
+Assets dieses Pakets ohne bare Imports auskommen müssen — und weil DSHs eigene
+Prüfer (`assertSupportedJsonSchema`, `validateJsonSchemaValue`, `renderToolsSdk`)
+im Abnahmetest mehr beweisen als eine selbstgebaute Nachbildung der Regeln.
+Die Namen werden nirgends abgeschrieben: `name` ist `PROPOSE_SERVICE` bzw.
+`MICRO_STATE_SERVICE`, der Vertrag steht als `const` im Schema, und das
+Mikrostand-Schema wird aus `MICRO_STATE_FIELDS` GEBAUT — ein sechstes Feld
+müsste erst den Vertrag ändern, bevor es im Werkzeug ankommt.
+
+Die Argumente des Vorschlags sind absichtlich schmal. `ausloeser` wird nicht als
+freies Objekt durchgereicht, sondern aus `haystack`, `intentKlassen` und
+`ohneAnlass` gebaut — genau den Achsen, die `matchBlock` liest. Ein Modell, das
+einen Schlüssel erfindet, den niemand auswertet, schriebe einen Baustein, der
+nie lädt; die Prüfung wäre grün und die Wirkung null. `quelle` ist fest
+`gelernt`, weil ein Vorschlag ein gelernter Baustein IST und keine Aussage über
+eine fremde Quelle. Fail-closed blieb fail-closed: ein Wurf wird ein Befund,
+ein fremder Vertrag unter dem richtigen Dienstnamen wird `UNAVAILABLE` — nie
+`NO_GOAL`, denn „ich kann nicht lesen“ ist eine andere Aussage als „es gibt
+keins“.
+
+Ein älterer Riegel musste dabei um eine benannte Ausnahme wachsen, statt
+weichzuwerden: `prompter-contract.part2` verbietet im Laufzeitcode jedes
+`tools`-Vorkommen, und der Host-Eintrag gibt jetzt eines. Erlaubt ist genau die
+Registrierungsform (`child.tools.register(`, `bus.demand(['tools']`), jede
+andere Werkzeug-Zeile bleibt rot — und die Zeile darüber hält weiterhin fest,
+dass der One-Shot-Aufruf selbst kein `tools`-Feld trägt. Ein Werkzeug im
+KATALOG ist nicht ein Werkzeug im AUFRUF; das ist die Grenze, die der Test
+schon immer meinte.
+
+Der neue Riegel `scripts/gate/tests/tool-seams.test.mjs` prüft zehn Zusagen und
+wurde gegen eine ECHTE Quellmutation rot gesehen: `const` aus dem
+Mikrostand-Schema entfernt → zwei Fälle rot (Vertragsprüfung und Mutationsprobe),
+danach wiederhergestellt und 10/10 grün. Die stärkste Probe ist die letzte: beide
+Werkzeuge werden in einen ECHTEN `ToolRuntime` des gepinnten Harness registriert
+und stehen danach unter ihren Namen im Katalog — eine Definition ohne `output`
+wird dort mit `must declare output { schema, render }` abgewiesen, und genau
+diese Verweigerung war der Befund. `provided-seams.test.mjs` führt die zwei
+Nähte jetzt als Leser statt als Deklaration; deklariert bleibt allein
+`shinon_codingmon_store`, dessen Grenze wirklich außerhalb des Baums liegt.
+
+**Anker:** `107f40b` · Pfade: `packages/prompter/assets/propose-tool.js`,
+`packages/task-router/assets/micro-state-tool.js`, `packages/prompter/index.js`,
+`packages/task-router/index.js`, `packages/prompter/assets/capabilities.json`,
+`scripts/gate/tests/tool-seams.test.mjs`,
+`scripts/gate/tests/provided-seams.test.mjs`,
+`scripts/gate/tests/prompter-contract.part2.test.mjs` · Belege: `npm test` Exit 0
+(statisches Gate 127/127), `npm run gate:test` 961/961 (113 Dateien, Exit 0),
+`npm run build` Exit 0 (23 Pakete, 318 Dateien, 2 836 540 Bytes),
+`npm run zahlen:check` Exit 0, `tool-seams.test.mjs` 10/10,
+`provided-seams.test.mjs` 5/5.

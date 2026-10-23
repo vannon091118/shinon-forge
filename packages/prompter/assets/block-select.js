@@ -175,28 +175,6 @@ function sourceReady(block, available) {
 }
 
 /**
- * Die KANDIDATEN einer Situation: alles, was Modus und Quelle zulassen —
- * unabhängig davon, ob ein Auslöser gerade feuert.
- *
- * Genau diese Liste bekommt der Selektionsagent (ohne Inhalt, nur id/lage/
- * budget/ausloeser): er darf nur wählen, was die Runtime ohnehin freigegeben
- * hat. Dieselben zwei Achsen wie `matchBlock` — eine zweite Wahrheit über die
- * Freigabe gäbe es sonst, und der Agent könnte einen Modus- oder Quellensperre
- * umgehen, indem er die id einfach nennt.
- */
-export function candidateBlocks(registry, opts = {}) {
-  const blocks = Array.isArray(registry?.blocks) ? registry.blocks : [];
-  const candidates = [];
-  for (const block of blocks) {
-    if (typeof block?.id !== 'string' || block.id === '') continue;
-    if (typeof opts.mode === 'string' && Array.isArray(block.modus) && !block.modus.includes(opts.mode)) continue;
-    if (!sourceReady(block, opts.available).ready) continue;
-    candidates.push(block);
-  }
-  return candidates;
-}
-
-/**
  * EINEN Baustein matchen — rein, ohne Modell, ohne Uhr.
  * @returns { selected, hits, reason } — `hits` zählt Haystack-Treffer (Ranking).
  */
@@ -312,21 +290,21 @@ function weightScore(weights, id) {
  *
  * @param registry - validierte Registry (`validateRegistry`).
  * @param opts - { mode, promptText, context, intentClass, stance, available,
- *   weights, totalBudgetTokens, includeIds } — `available`: { contextPresent,
- *   notesOn, skillsOn, intentOn, narrative, recentEvents }; `weights`: gelernte
- *   Zähler ({ id: { up, down } }), wirken nur als Gleichstands-Brecher nach
- *   Treffern; `includeIds`: der Vorschlag des Selektionsagenten (nur IDs aus
- *   `candidateBlocks`).
+ *   weights, totalBudgetTokens } — `available`: { contextPresent, notesOn,
+ *   skillsOn, intentOn, narrative, recentEvents }; `weights`: gelernte Zähler
+ *   ({ id: { up, down } }), wirken nur als Gleichstands-Brecher nach Treffern.
  * @returns { selected: [{ id, quelle, hits, reason, budgetTokens }],
  *   skipped: [{ id, quelle, reason }], totalTokens }
  *
- * Die Agentenwahl ist der EINE zweite Weg in die Auswahl, und sie ist kein
- * Freifahrtschein: Pflicht steht immer, Modus und Quelle sperren weiter (der
- * Agent sah nur Kandidaten), das Budget bleibt hart, und jede nicht gewählte
- * Kandidatur wird mit `AGENT_ABGELEHNT` benannt statt still zu verschwinden.
- * Ohne `includeIds` (leer, unbekannt, fehlend) gilt unverändert der rein
- * deterministische Weg — der Rückfall ist kein Sonderfall, sondern derselbe
- * Code.
+ * ES GIBT GENAU EINEN WEG in die Auswahl (2026-10-23): Matcher, Pflicht,
+ * Reihung, Budget. Bis zu diesem Tag trug dieselbe Funktion eine zweite Tür für
+ * einen Selektionsagenten (`includeIds`) — der Agent existierte nie, seine
+ * Antwortprüfung (`assets/selection.js`) hatte null Produktionsaufrufer, und
+ * `candidateBlocks` lieferte ihm eine Kandidatenliste, die niemand anforderte.
+ * Drei Teile einer Mechanik, die sich wie eine Fähigkeit las. Wer den Agenten
+ * will, baut ihn MIT Messung des zweiten Modellaufrufs pro Schritt und bringt
+ * die Tür im selben Commit zurück (Vertrag: `shinon.selection/v1`) — nicht als
+ * Option, die kein Aufrufer setzt.
  */
 export function selectBlocks(registry, opts = {}) {
   const blocks = Array.isArray(registry?.blocks) ? registry.blocks : [];
@@ -335,14 +313,6 @@ export function selectBlocks(registry, opts = {}) {
   const total = typeof opts.totalBudgetTokens === 'number' && opts.totalBudgetTokens > 0
     ? opts.totalBudgetTokens
     : DEFAULT_TOTAL_BUDGET;
-
-  const requested = Array.isArray(opts.includeIds)
-    ? new Set(opts.includeIds.filter((id) => typeof id === 'string' && id !== ''))
-    : null;
-  const agentDecides = requested !== null && requested.size > 0;
-  const candidates = agentDecides
-    ? new Set(candidateBlocks(registry, { mode: opts.mode, available: opts.available }).map((block) => block.id))
-    : null;
 
   const scored = [];
   const skipped = [];
@@ -358,47 +328,18 @@ export function selectBlocks(registry, opts = {}) {
     });
     const base = { id: block?.id ?? null, quelle: block?.quelle ?? null };
     if (!match.selected) {
-      // Der Agent darf einen NICHT ausgelösten Kandidaten wählen — das ist sein
-      // Beitrag. Eine fehlende Quelle oder ein fremder Modus bleibt gesperrt:
-      // beides stand nicht in seiner Kandidatenliste.
-      if (agentDecides && requested.has(block?.id) && candidates.has(block?.id)) {
-        scored.push({
-          ...base,
-          hits: match.hits,
-          reason: 'AGENT',
-          budgetTokens: block.budgetTokens,
-          must: false,
-          weight: weightScore(opts.weights, block.id),
-        });
-      } else {
-        skipped.push({ ...base, reason: match.reason });
-      }
-      continue;
-    }
-    if (agentDecides && match.reason !== 'PFLICHT' && !requested.has(block.id)) {
-      skipped.push({ ...base, reason: 'AGENT_ABGELEHNT' });
+      skipped.push({ ...base, reason: match.reason });
       continue;
     }
     scored.push({
       id: block.id,
       quelle: block.quelle ?? null,
       hits: match.hits,
-      reason: agentDecides && match.reason !== 'PFLICHT' ? 'AGENT' : match.reason,
+      reason: match.reason,
       budgetTokens: block.budgetTokens,
       must: match.reason === 'PFLICHT',
       weight: weightScore(opts.weights, block.id),
     });
-  }
-
-  if (agentDecides) {
-    // Eine ID, die die Registry nicht kennt, ist keine Auswahl: sie wird
-    // benannt, nicht still fallen gelassen (dieselbe Fail-closed-Regel wie in
-    // `parseSelection`).
-    const known = new Set(blocks.map((block) => block?.id).filter((id) => typeof id === 'string'));
-    for (const id of requested) {
-      if (known.has(id)) continue;
-      skipped.push({ id, quelle: null, reason: 'AGENT_UNBEKANNT' });
-    }
   }
 
   // Reihung ist Vertrag: Pflicht zuerst, dann Treffer absteigend, dann das

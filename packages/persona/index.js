@@ -504,10 +504,12 @@ export function apply(ctx, config) {
   });
   if (!bus.demand(['webServer'], (webCtx) => surface.mount(webCtx))) surface.mount(ctx);
 
-  const releaseReview = bus.provide(REVIEW_SERVICE, reviewService);
-  if (releaseReview === null) {
-    console.warn(`[shinon-persona] ${REVIEW_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`);
-  }
+  // KEIN `bus.provide(REVIEW_SERVICE, …)` (2026-10-23): der Dienst hatte keinen
+  // Leser im Baum — weder ein Host-Paket noch ein Client. Die lebende Naht ist
+  // die Route (`REVIEW_ROUTE`, GET und POST) samt `REVIEW_GLOBAL` und dem
+  // SSE-Ereignis `review`; ein zweiter Zugang zum selben Objekt wäre eine zweite
+  // Tür, die niemand öffnet. Die Konstante bleibt als Name der Fähigkeit
+  // (`capabilities.json`), die Anzeige läuft über das Global.
 
   // ── Der Produzent der Beziehungsstufe: Stufe pruefen -> Signal, im Kern ────
   // Vorher gab es KONSUMENTEN (`relation.updated`), aber keinen Produzenten.
@@ -515,10 +517,10 @@ export function apply(ctx, config) {
     contract,
     typeof ctx?.emit === 'function' ? (signal, payload) => ctx.emit(signal, payload) : null,
   );
-  const releaseRelation = bus.provide(RELATION_SERVICE, relationService);
-  if (releaseRelation === null) {
-    console.warn(`[shinon-persona] ${RELATION_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`);
-  }
+  // Auch die Beziehung wird NICHT als Dienst angeboten (2026-10-23): gelesen
+  // wird sie über `UI_STATE_GLOBAL` (Feld `relation`) und gesetzt über
+  // `RELATION_ROUTE`; der Produzent (`relationService`) bleibt der eine Ort der
+  // Prüfung. Ein Dienst ohne Abnehmer wäre eine ausgestellte Vollmacht.
 
   // Der Sitzungs-Scope: `agent/pre-step` umschließt den ganzen Schritt, also auch
   // die Assembly des System-Prompts. Was hier gesetzt wird, gilt nur für diesen
@@ -536,8 +538,6 @@ export function apply(ctx, config) {
     if (typeof decisionDisposer === 'function') decisionDisposer();
     if (typeof errorDisposer === 'function') errorDisposer();
     if (typeof uiInjectDisposer === 'function') uiInjectDisposer();
-    if (typeof releaseReview === 'function') releaseReview();
-    if (typeof releaseRelation === 'function') releaseRelation();
     surface.close();
     console.log('[shinon-persona] Deaktiviert');
   };

@@ -404,12 +404,15 @@ läuft in `test:full`/`gate:full` (CI).
   both sides by `scripts/gate/tests/context-wiring.test.mjs`; the one-shot runs on
   a SEPARATE llm provider with its own key (`PROMPTER_API_KEY`, host-side
   fallback to `agnes` — no `!!js` in this repo's profile file, the gate parser
-  does not know that tag). This route also serves the SELECTION agent of the
-  block-injection runtime: its strict answer contract is
-  `shinon.selection/v1` (`packages/prompter/assets/selection.js`) — unknown
-  IDs, disallowed blocks, out-of-range uncertainty and unparsable answers are
-  rejected fail-closed, and the deterministic selector stays the fallback; the
-  agent proposes, the runtime enforces budgets, modes and permissions.
+  does not know that tag). Block selection has **exactly one path**: the
+  deterministic selector (matcher, Pflicht, ranking, budget). Der Selektionsagent
+  (`shinon.selection/v1`, `packages/prompter/assets/selection.js`) ist am
+  2026-10-23 mit `candidateBlocks` und der `includeIds`-Tür entfernt worden: er
+  hatte null Produktionsaufrufer, und ein zweiter Modellaufruf je Schritt ist
+  eine Messung, nicht eine Option. Wer ihn will, bringt ihn MIT Zeit-/Token-
+  Messung zurück — und dann ist der Vertrag `shinon.selection/v1` wieder die
+  fail-closed Antwortprüfung, der deterministische Selektor bleibt der Rückfall.
+  Was nicht zurückkommt: eine Fähigkeit, die nur ihr eigener Test fährt.
   The intent expansion (`packages/prompter/assets/intent-rules.json`) is DATA too:
   a trigger is an imperative phrase, never a bare topic word, and a question is
   classified but **never** expanded — otherwise the agent answers its own invented

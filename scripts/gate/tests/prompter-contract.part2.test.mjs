@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dshRoot } from '../../lib/yaml.mjs';
-import { codeOnly, findForbidden } from '../../lib/source-scan.mjs';
+import { codeOnly, findForbidden, stripComments } from '../../lib/source-scan.mjs';
 import { listFiles, protectedReason, toProjectPath } from '../../../packages/project-index/assets/index-core.js';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 import { quiet } from './helpers/console.mjs';
@@ -89,7 +89,29 @@ test('Isolation: der Laufzeitcode oeffnet weder Dateisystem noch Netz und gibt k
     assert.deepEqual(findForbidden(source, forbidden, { mode: 'module' }), [], `${file}: Werkzeug im Laufzeitcode`);
     assert.deepEqual(findForbidden(source, forbidden), [], `${file}: Werkzeug im Laufzeitcode (Textlauf)`);
     // Die Grenze selbst: nirgends wird ein Werkzeugkatalog gebaut oder uebergeben.
-    assert.equal(codeOnly(source).includes('tools'), false, `kein tools-Feld im Laufzeitcode (${file})`);
+    //
+    // EINE benannte Ausnahme seit 2026-10-23: der Host-Eintrag GIBT ein Werkzeug
+    // (das Modell-Werkzeug der Naht `shinon_block_propose`, `assets/propose-tool.js`)
+    // — ein Werkzeug im KATALOG ist nicht ein Werkzeug im One-Shot-Aufruf, und die
+    // Zeile darueber haelt fest, dass der Aufruf weiterhin keins traegt. Erlaubt
+    // ist genau die Registrierungsform; jeder andere `tools`-Code im Eintrag
+    // waere ein zweiter Katalog und bleibt rot.
+    const toolLines = codeOnly(source).split('\n').filter((line) => /\btools\b/.test(line));
+    if (file === INDEX_FILE) {
+      // Nur der ZUGRIFF auf den Dienst ist Code; der Dienstname in
+      // `bus.demand(['tools']` ist ein String und wird hier nicht gezaehlt.
+      const access = /child\.tools\.register\(/;
+      for (const line of toolLines) {
+        assert.match(line, access, `${file}: Werkzeug-Code ausserhalb der Registrierung: ${line.trim()}`);
+      }
+      assert.ok(toolLines.length >= 1, `${file}: keine Werkzeug-Registrierung fuer die Naht`);
+      assert.ok(
+        stripComments(source).includes("bus.demand(['tools']"),
+        `${file}: der tools-Dienst wird nicht angefordert`,
+      );
+    } else {
+      assert.equal(toolLines.length, 0, `kein tools-Feld im Laufzeitcode (${file})`);
+    }
   }
 });
 test('Laden: das Bundle registriert sich am echten Waterfall', async () => {

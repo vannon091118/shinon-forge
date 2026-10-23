@@ -152,7 +152,8 @@
         "keine automatische Aktivierung ohne Prüfung"
       ],
       "evidence": [
-        "packages/prompter/index.js"
+        "packages/prompter/index.js",
+        "packages/prompter/assets/propose-tool.js"
       ]
     },
     {
@@ -196,7 +197,8 @@
         "keine Dauerbeobachtung"
       ],
       "evidence": [
-        "packages/task-router/index.js"
+        "packages/task-router/index.js",
+        "packages/task-router/assets/micro-state-tool.js"
       ]
     },
     {
@@ -204,8 +206,8 @@
       "frage": "Wer entscheidet über Identität und Vorschlags-Review?",
       "owner": "persona",
       "seam": {
-        "kind": "service",
-        "name": "shinon_persona_review",
+        "kind": "global",
+        "name": "__shinonPersonaReview",
         "contract": "shinon.persona-review/v1"
       },
       "terms": [

@@ -126,10 +126,36 @@ nennt ihre Abnahme, und keine gilt ohne Exit-Code und benannten Lauf.
   einer Bahn in `scripts/gate/test-lanes.json`.
   Abnahme: `npm run gate:test` grün mit unveränderter Testzahl, `npm run gate:test:slow`
   grün.
-- **Etappe 7 — Rest der Funktionslücken:** Tooltip- und Narrative-Client prüfen,
-  `selection.js` verdrahten oder entfernen (T3-5), `skill-registry-core.js`
-  entscheiden, die vier Constructor-/Vertragsstellen aus dem Audit schließen.
-  Abnahme: je Lücke ein Gate-Test mit einer Mutation, die rot wird.
+- **Etappe 7 — Rest der Funktionslücken (2026-10-23 im Arbeitsbaum geschlossen):**
+  Tooltip- und Narrative-Client sind geprüft und repariert, `selection.js` ist
+  ENTFERNT statt verdrahtet (T3-5), `skill-registry-core.js` war mit T3-7 schon
+  entschieden. Abnahme je Lücke, drei neue Gate-Tests: `tooltip-client.test.mjs`
+  (4 Fälle — Token-Namen gegen die installierte DSH-Themeschicht, beide
+  Theme-Blöcke, kein `.dsh-tooltip`; Mutationen: Tippfehler, fehlender Dark-Block,
+  tote Klasse sind je rot), `client-effect.test.mjs` (4 Fälle — Anmeldung in
+  `__shinonPlugins` plus `shinon:plugin`-Update für beide Hälften, eine Log-only-
+  Hälfte ist rot, keine zweite Kopie des Composites) und
+  `selection-single-path.test.mjs` (5 Fälle — Datei und Test weg, kein
+  `shinon.selection/v1`-Literal, kein Name wieder öffentlich, `includeIds` im
+  Verhalten wirkungslos). Belege: `npm test` Exit 0 (127 Schritte),
+  `npm run gate:test` 946/946 (111 Dateien), `npm run zahlen:check` Exit 0;
+  jede der drei Dateien wurde gegen eine ECHTE Quellmutation rot gesehen
+  (Log-only-Narrative, Token-Tippfehler, zurückgeholte `selection.js`).
+  **Die vier Constructor-/Vertragsstellen sind identifiziert und geschlossen**
+  (Audit-Konflikt #23, „tote Dienstfläche"): es sind die vier `bus.provide`-Türen
+  ohne Abnehmer — `shinon_persona_review`, `shinon_persona_relation`,
+  `shinon_block_propose`, `shinon_goal_micro_state`. Zwei sind **entfernt** (die
+  Route war die lebende Naht, der Dienst der zweite Zugang zum selben Objekt;
+  `identitaet-und-review` zeigt jetzt auf `__shinonPersonaReview`), die anderen
+  zwei sind **verdrahtet**: ihr Abnehmer ist der Agent, also je ein
+  Modell-Werkzeug mit eigenem `output`-Vertrag (`packages/prompter/assets/propose-tool.js`,
+  `packages/task-router/assets/micro-state-tool.js`), gepinnt von
+  `scripts/gate/tests/tool-seams.test.mjs` (10 Fälle); nur `shinon_codingmon_store`
+  bleibt als **externe Naht deklariert** (Client-Beitrag, Grund und Fähigkeit im
+  Gate). `scripts/gate/tests/provided-seams.test.mjs` liest die Angebote aus dem
+  Quelltext: neue Naht ohne Leser, verschwundener Leser oder wieder angebotener
+  entfernter Dienst ist rot. Messung: 5/5 Fälle; Belege `npm test` Exit 0,
+  `npm run gate:test` 961/961.
 - **Etappe 8 — restliche Audit-Tiers:** die offenen Zeilen aus
   `docs/CLEANREPO-AUDIT.md` §8.1 abarbeiten (u. a. T2-6, T2-7, T3-0, T3-5, T3-6)
   und die Audit-Tabelle auf den gemessenen Stand ziehen.
@@ -229,10 +255,10 @@ und befreite damit eine beliebige große Datei von der Grenze; sie gilt jetzt
 nur im Kopfkommentar und nur für die Client-Hälfte. Geschützt durch
 `scripts/gate/tests/client-montage.test.mjs` (11 Fälle: Echtbaum,
 Miniatur-Baum, verschluckende Marke, unbalancierter Split) und
-`scripts/gate/tests/structure.test.mjs` (14 Fälle).
-- **Weiterhin offen:** Etappe 6 (Gate-Tests nach Fachbereich — mit Etappe 3
-erledigt, siehe `docs/CHANGELOG.md`), Etappe 7 (Rest der Funktionslücken) und
-Etappe 8 (restliche Audit-Tiers aus `docs/CLEANREPO-AUDIT.md` §8.1).
+`scripts/gate/tests/structure.test.mjs` (14 Fälle).- **Weiterhin offen:** Etappe 8 (restliche Audit-Tiers aus
+  `docs/CLEANREPO-AUDIT.md` §8.1: u. a. T2-4, T2-7, T2-8, T3-0, T3b-3).
+  Etappe 6 ist mit Etappe 3 erledigt, Etappe 7 mit diesem Stand (siehe
+  `docs/CHANGELOG.md`).
 
 ### 2.3 Zurückgestellt (gated — wird erst bei erfüllter Bedingung gebaut)
 
