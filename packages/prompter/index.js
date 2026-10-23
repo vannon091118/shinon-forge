@@ -207,6 +207,15 @@ export function apply(ctx, config) {
             return null;
           }
         },
+        // Der AUFGABENBRIEF wird HIER gelesen, aus dem Runtime: der Pre-Step
+        // legt ihn nach der Entscheidung ab (`runtime.lastBriefText`), und die
+        // naechste Assembly projiziert ihn — unabhaengig davon, ob der
+        // Veredler den Prompt ersetzt hat. Nur bei eindeutigem Treffer steht
+        // er da; sonst entfaellt er, und der Grund steht im Datensatz.
+        brief: () => {
+          const brief = runtime.lastBriefText ?? null;
+          return typeof brief === 'string' && brief !== '' ? brief : null;
+        },
         // Der WISSENSBLOCK wird HIER gelesen, nicht aus dem Runtime: der
         // Snapshot-Dienst ist der Besitzer, und der Pre-Step laeuft NACH der
         // Assembly (agent-loop:907 vor :909) — dort waere der Block noch leer.

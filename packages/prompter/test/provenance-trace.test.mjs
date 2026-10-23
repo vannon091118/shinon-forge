@@ -310,14 +310,12 @@ test('Aufgabenbrief: die Karte hängt den Brief an, die Spur nennt den Eigentüm
     context.cleanup();
   }
 
-  // Der Brief hängt HINTER dem veredelten Prompt und ist als Hinweis markiert.
+  // Der Brief ist NICHT Teil des Nutzertexts: Routing-Metadaten gehören in den
+  // Runtime-Kontext (Channel-Test), nicht in den ersetzten Prompt. Der Text
+  // endet nach dem, was der Veredler geschrieben hat.
   const text = result.messages[0].content[0].text;
-  assert.ok(text.startsWith('Bitte pruefe src/a.mjs.'), text);
-  assert.ok(text.includes('<task_brief contract="shinon.capabilities/v1" class="DERIVED">'), text);
-  assert.ok(text.includes('Frage: Wo werden Markierungen begrenzt?'), text);
-  assert.ok(text.includes('Fähigkeit: @shinon/markers — Global __DSH_MARKERS_CONFIG__'), text);
-  assert.ok(text.includes('Grenze: keine Inhaltsprüfung; keine Prompt-Bausteine'), text);
-  assert.ok(text.trimEnd().endsWith('</task_brief>'), text);
+  assert.equal(text.trimEnd(), 'Bitte pruefe src/a.mjs.', text);
+  assert.equal(text.includes('<task_brief'), false, 'der Brief steht im Nutzertext');
 
   const record = ctx.emitted.find((entry) => entry.channel === DECISION_CHANNEL).record;
   assert.equal(record.brief.contract, CAPABILITIES_CONTRACT);

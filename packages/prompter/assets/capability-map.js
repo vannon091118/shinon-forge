@@ -249,18 +249,12 @@ export function renderTaskBrief(brief, options = {}) {
   return { ok: true, text, chars: text.length };
 }
 
-/** Den Brief an einen Prompt hängen — als eigener Block, nicht hineinmontiert. */
-export function appendTaskBrief(text, rendered) {
-  if (typeof text !== 'string' || rendered?.ok !== true || typeof rendered.text !== 'string') return text;
-  return `${text}\n\n${rendered.text}`;
-}
-
 /**
  * Die Kurzform für den Entscheidungsdatensatz: Adresse und Länge, kein Text.
  *
- * Der Brief selbst reist in den Prompt; die Spur nennt nur, WELCHER Brief es
- * war. Ein Blocktext im Ereignis wäre derselbe Fehler wie ein Prompt-Text im
- * Provenienz-Datensatz.
+ * Der Brief reist als Runtime-Context, NICHT im Nutzertext; die Spur nennt nur,
+ * WELCHER Brief es war. Ein Blocktext im Ereignis wäre derselbe Fehler wie ein
+ * Prompt-Text im Provenienz-Datensatz.
  */
 export function briefRecord(capability, rendered) {
   return {

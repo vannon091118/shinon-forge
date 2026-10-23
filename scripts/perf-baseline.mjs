@@ -226,7 +226,7 @@ cases.push({
         tokensEstimated: Math.ceil(JSON.stringify(request).length / 4),
       },
       run: async () => {
-        const outcome = await enhanceGuarded(fakeLlm, MIN, oneShotConfig, PROMPT, null, null, null, undefined);
+        const outcome = await enhanceGuarded(fakeLlm, MIN, oneShotConfig, PROMPT, null, null, undefined);
         return { outcome: outcome.outcome, reasons: outcome.reasons.join(','), hasResult: outcome.result !== null };
       },
     };
@@ -253,7 +253,7 @@ cases.push({
   prepare: () => ({
     input: { bytes: Buffer.byteLength(PROMPT) },
     run: async () => {
-      const outcome = await enhanceGuarded(brokenLlm, MIN, oneShotConfig, PROMPT, null, null, null, undefined);
+      const outcome = await enhanceGuarded(brokenLlm, MIN, oneShotConfig, PROMPT, null, null, undefined);
       return { outcome: outcome.outcome, reasons: outcome.reasons.join(','), hasResult: outcome.result !== null };
     },
   }),

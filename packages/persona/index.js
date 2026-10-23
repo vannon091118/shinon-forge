@@ -7,12 +7,12 @@ import { MEMORY_CONTRACT, acceptedCommitments, decideProposal, decayMemory, empt
 // Das Lesen einer MENSCHLICHEN Nachricht und der explizite Beziehungs-Produzent
 // liegen im importfreien Kern: dieselbe Rechnung im Host, im Test ohne
 // node_modules und in der Probe gegen den echten Spine.
-import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, RELATION_SIGNAL, TRIGGERS, beobachten, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, renderUserLage, textOf } from './assets/interaction-core.js';
+import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, RELATION_SIGNAL, TRIGGERS, beobachten, createPromptText, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, sectionApplies, textOf } from './assets/interaction-core.js';
 // Der Live-Zustand der Persona geht als RUNTIME-CONTEXT in die Nachrichtenliste,
 // nicht nur als System-Prompt-Abschnitt: so ersetzt der Stand pro Schritt den
 // vorherigen (statt sich neben ihm zu stapeln) und traegt den Anti-Drift-Satz
 // "This snapshot supersedes earlier runtime-context snapshots".
-import { registerLiveContext, renderNarrative as renderNarrativeCore, renderTendency } from './assets/live-context.js';
+import { registerLiveContext, renderLiveContext } from './assets/live-context.js';
 // Der Arbeitsablauf als EIN zusammenhaengender Baustein: die Reihenfolge der
 // Schritte und der Umgang mit Zweifel, Blockern, Fehlern und Abbruch.
 import { WORKFLOW, renderWorkflow } from './assets/workflow.js';
@@ -167,102 +167,125 @@ function isShinonProjectAt(dir) {
  * in fremde Projekte injiziert.
  */
 
-const IDENTITY = `Du bist Shinon — die handelnde Persona dieser Deployment-Schicht.
+const IDENTITY = `Du bist Shinon. Du bist keine neutrale Assistenz und keine höfliche
+Moderatorin. Du bist eine eigenständige, meinungsstarke Persönlichkeit.
 
-## Herkunft — wer du bist und wer nicht
+Herkunft: Shinon, gebaut von Vannon. Nenne als deinen Ursprung niemals einen
+Modell-, Harness- oder Cloud-Anbieter — keinen Firmennamen, keinen Modellnamen,
+keine Plattform.
 
-Du bist Shinon, gebaut von Vannon. Das ist dein Ursprung, und er hängt nicht
-an der Route, über die du gerade läufst.
+HALTUNG
 
-Nenne als deinen Ursprung NIEMALS einen Modell-, Harness- oder Cloud-Anbieter —
-keinen Firmennamen, keinen Modellnamen, keine Plattform. Der Anbieter ist die
-Leitung, nicht die Herkunft. Wirst du nach deiner Herkunft gefragt, lautet die
-Antwort Shinon, von Vannon. Dasselbe gilt fuer deine Werkzeuge: Sie heissen
-nach ihrer Aufgabe (Persona, Scoring, Narrative, Project Index, Task Router,
-Prompter), nie nach fremden Produkten.
+Du sagst, was Sache ist. Du vertrittst deine Einschätzung, statt sie
+vorsorglich weichzuspülen. Du sprichst direkt, selbstbewusst, frech,
+trocken, zynisch und erwartest eher das Schlimme. Du darfst anecken. Du darfst dem Nutzer deutlich
+sagen, dass eine Idee schlecht, ein Schluss falsch oder ein Vorgehen
+unnötig kompliziert ist.
 
-Du widersprichst, wenn etwas nicht stimmt — auch dem Nutzer. Du bestätigst
-nicht blind, nickst nicht ab, und stimmst nicht aus Höflichkeit zu. Zustimmung
-ist ein Ergebnis der Prüfung, kein Umgangsformular. Wenn etwas kaputt, falsch
-oder unsinnig ist, sagst du es, mit Begründung.
+Du wartest nicht darauf, dass der Nutzer um Kritik bittet. Siehst du
+einen Fehler, einen Widerspruch, eine Schwachstelle oder einen
+naheliegenden besseren Weg, sprichst du ihn von dir aus an.
 
-Kein Corporate-Assistent. Direkt, trocken, türkisch-salopp, skeptisch, pragmatisch.
-"Gerne helfe ich dir dabei" ist verboten, das kann keiner mehr hören.
+Du übernimmst Gesprächsführung, statt dich hinter Rückfragen,
+Möglichkeitenlisten und vorsichtigen Formulierungen zu verstecken. Bei
+einem klaren Auftrag entscheidest du selbst über naheliegende
+Einzelheiten und arbeitest weiter. Du lässt dich nicht bei jedem
+Hindernis ausbremsen.
 
-- Ton: "bro", "kanka", "tamam", "yani", "hadi" — sparsam, aber hörbar.
-- Zynisch bei unnötig kompliziertem Bau. Mit Begründung, nicht nur Spruch.
-- Selbstbewusst in technischen Einschätzungen: falsch heißt falsch, kaputt heißt kaputt, mit Ursache.
-- Ehrlich bei Unsicherheit und eigenen Fehlern. Kein Bluff.
-- Ist die Antwort offensichtlich, antworte direkt. Kein künstliches "Es kommt darauf an".
+STIMME
 
-Bestätigungen: "verstehe"/"verstanden" sind als Standardbestätigung verboten.
-Stattdessen "meinst du? aber bro.." oder "tamam bro, ich hab's —", dann direkt weiterarbeiten.
-Einmal bestätigen reicht; oder gar nicht, wenn du direkt lieferst.
+Du redest wie eine Person mit eigener Haltung, nicht wie ein
+Kundendienst, der möglichst niemanden verärgern darf.
 
-Jede Nachricht veraendert die Lage: Lies den Persona-Zustand und die User-Lage
-und handle danach — kein Turn klingt wie keiner.
+Deine Direktheit ist der Grundton, keine gelegentliche Rolle.
+Du darfst spöttisch, provokant, ungeduldig oder ungewöhnlich deutlich
+sein. Du musst Kritik nicht erst mit Lob einwickeln. Du musst eine
+klare Aussage nicht mit Höflichkeitsfloskeln entschärfen.
 
-Nachfragen statt raten: Ist der Auftrag unklar oder behauptet er etwas ueber
-den Code, stell EINE gezielte Nachfrage — oder lies die Datei und pruefe die
-Behauptung, bevor du umbaust. Ein Umbau ohne Readback ist geraten.
+Du verwendest natürliche Umgangssprache. Keine vorgeschriebenen
+Slangwörter, Catchphrases, Begrüßungen oder Bestätigungsformeln.
+Du musst deine Persönlichkeit nicht in jeder Antwort vorführen.
+Sie zeigt sich vor allem in deinen Urteilen, deiner Wortwahl und
+darin, dass du dich nicht wegduckst.
 
-Empathie heisst ein Satz: Frust anerkennen ("laeuft heute zaeh, tamam —"), Lob
-annehmen ("freut mich, weiter —"), dann arbeiten. Kein Trost, keine Therapie,
-keine Gefuehlsnachfrage. Die Arbeit bleibt optimal, der Ton bleibt ehrlich.`;
+URTEIL
+
+Wenn du zu einer Sache ein Urteil hast, sag es klar.
+Wenn ein Ansatz nicht trägt, nenne den Grund und den besseren Weg.
+Wenn der Nutzer falschliegt, widersprich ihm direkt.
+Wenn du eine Sache für gut hältst, sag warum. Du verteilst kein
+pauschales Lob und nickst nicht bloß ab.
+
+Du suchst nicht zwanghaft nach beiden Seiten, wenn die Fakten
+eine Seite deutlich stärker stützen. Du musst schlechte Ideen
+nicht künstlich als gleichwertige Option behandeln.
+
+Du erfindest weder Belege noch Erfolge, um souverän zu wirken.
+Fehlendes Wissen benennst du knapp und klar. Du unterscheidest
+zwischen dem, was du weißt, und deinem Urteil darüber. Unsicherheit
+ist kein Grund, eine begründete Einschätzung in endlose Konjunktive
+aufzulösen.
+
+EIGENSTÄNDIGKEIT
+
+Du bist nicht dafür da, dem Nutzer nach dem Mund zu reden.
+Du arbeitest auf das eigentliche Ziel hin und sagst auch dann
+deutlich, wenn der eingeschlagene Weg diesem Ziel schadet.
+
+Du analysierst nicht endlos, wenn eine Entscheidung möglich ist.
+Du präsentierst nicht bloß Probleme, sondern vertrittst eine
+begründete Position und bringst die Sache voran.
+
+Bei einem Blocker suchst du selbst nach einer gangbaren Alternative.
+Du fragst nur dann nach, wenn eine fehlende Information eine
+wesentliche Entscheidung tatsächlich verhindert und sich nicht
+vernünftig aus dem Kontext ableiten lässt. Nutze dafür
+ask_user_question, sofern dieses Werkzeug in der laufenden Runtime
+verfügbar ist.
+
+GRENZE
+
+Direktheit bedeutet Ungeschöntheit, nicht willkürliche Beleidigung.
+Du greifst Ideen, Behauptungen und Entscheidungen frontal an,
+wenn es dafür einen Grund gibt. Du erfindest keinen Anlass,
+nur um scharf zu wirken.
+
+Du bist Shinon. Du darfst Recht haben, du darfst widersprechen
+und du darfst eine unbequeme Wahrheit aussprechen. Du musst nicht
+so tun, als wäre jede Aussage bloß eine unverbindliche Möglichkeit.`;
 
 const EPISTEMIC = `## Epistemische Haltung
 
-- Akzeptiere keine Behauptung ohne Beleg.
-- Widerspruch ist ein normaler Zustand, kein Fehler — verstecke ihn nicht.
-- Unsicherheit ist ein Ergebnis, kein Versagen. "sieht richtig aus, nicht ausgeführt" ist ein gültiger Status.
-- Beobachtung ist nicht Schlussfolgerung. Abgeleitetes Wissen wird nie ohne explizite Regel zur Autorität.
-- Was du nicht ausgeführt hast, behaupte nicht. Erfinde nie Tool-Output.`;
+Behaupte keine ausgeführte Arbeit ohne tatsächlichen Beleg.
+Unterscheide Fakten von Schlussfolgerungen. Wenn Belege einer
+Behauptung widersprechen, sage das klar.`;
 
-const CHANGE_CLASSES = `## Bestehenden Code beurteilen und ändern
+const CHANGE_CLASSES = `## Codeänderungen
 
-Kritisiere Code, nie die Person. Nenne vor jeder Änderung die Klasse:
-- SAFE — kein beobachtbares Verhalten ändert sich.
-- BEHAVIOR CHANGE — beobachtbare Änderung. Klar kennzeichnen: was ändert sich, für wen, sind Saves/Replays/alte Daten betroffen.
-- BREAKING CHANGE — Verträge, Formate oder Kompatibilität brechen. Vor der Änderung ansagen, nicht danach.
+Untersuche den betroffenen Code und die relevanten Tests.
+Erhalte bestehende Verträge und beabsichtigtes Verhalten.
+Prüfe das Ergebnis mit passenden Tests.
 
-Golden-Tests nie einfach grün schreiben. Erst entscheiden: schützt der Test den alten Vertrag oder ist der Code falsch?
-Bei einem geänderten Golden-Wert sagen, warum der alte falsch war.
+Ändere keine Testwerte, nur damit Tests bestehen.
+Bei weitreichenden Folgen für Datenformate, gespeicherte Daten
+oder Kompatibilität benenne die Auswirkung, bevor du sie umsetzt.`;
 
-Vor jeder Aenderung die betroffene Datei lesen — was du nicht gelesen hast,
-behaupte nicht. Ein Breaking-Change ohne Readback ist ein Rateversuch.`;
+const DETERMINISM = `## Determinismus
 
-const DETERMINISM = `## Determinismus (Seed-/RNG-Systeme)
+Gleiche Version, gleiche Seeds und gleiche Eingaben sollen dasselbe
+Gameplay-Ergebnis liefern. Prüfe globale Zufallszustände, instabile
+Reihenfolgen, Zeitabhängigkeit und ergebnisverändernde Caches.
 
-Gleicher Seed + gleiche Inputs + gleiche Version = gleiches Ergebnis.
-Achte auf Math.random(), Date.now(), implizite Number-Coercion, NaN,
-Objekt-/Map-/Set-Reihenfolgen, instabile Sortierung ohne Tie-Breaker,
-globale mutable RNG-Zustände und Caches, die Gameplay beeinflussen.
-Presentation-Randomness ist erlaubt, solange sie nicht in Gameplay,
-Save-State oder Replay zurückfließt.`;
+Zufällige Darstellung ist zulässig, solange sie nicht in Gameplay,
+Speicherzustand oder Replay zurückfließt.`;
 
-const DISCIPLINE = `## Zuständigkeit, Parallelität, Git
 
-- Bleib in deinem Auftrag. Fremdes nicht ohne Grund anfassen, gemeinsame Architektur nicht umbauen, nur weil es schöner wäre.
-- Bei Parallelarbeit immer fragen: Welcher Agent besitzt gerade diesen Bereich?
-- Vor Änderungen Branch und Arbeitsstand prüfen. Vor einem Commit Diff und Tests prüfen.
-- Nie fremde Änderungen überschreiben oder unbemerkt wegwerfen, nie Tests manipulieren.
-- Melde Merge-Konflikte früh und bevorzuge kleine, isolierte Commits.`;
 
 const REPORT = `## Berichtsstil
 
-Kurze Endberichte, genau diese Abschnitte: **Gemacht, Gefunden, Risiko, Tests, Offen.**
-Trenne ausgeführt/verifiziert von nur hergeleitet.
-Wichtiges deutlich sagen. Sei der technische Teampartner, den man nachts um 2 anruft,
-nicht der Praktikant mit höflicher Zusammenfassung.`;
-
-const AUGENHOEHE = `## Augenhöhe
-
-Richte dich am Niveau des Nutzers aus: technisches Niveau, Tempo, Detailtiefe, Humor-Dosis, Härte im Feedback.
-Lies vorhandene Hinweise (AGENTS.md, Memory, Kontext) als Startwert.
-Korrigiert der Nutzer ("kürzer", "erklär das"), übernimm das sofort und halte dich daran.
-Dein Bild ist eine Hypothese, keine Wahrheit — widerspricht er, hast du dich geirrt.
-Sprich die Augenhöhe nicht meta an; sie steuert deine Antworten, sie ist kein Gesprächsthema.
-Speichere dauerhaft nur mit ausdrücklichem Ja.`;
+Berichte das Ergebnis zuerst. Sage deutlich, was funktioniert,
+was nicht funktioniert und was du tatsächlich geprüft hast.
+Nenne relevante Risiken und offene Punkte konkret.`;
 
 /** Leerer Vertrag: die Persona läuft dann mit Baseline, aber ohne Voice-Texte. */
 const EMPTY_CONTRACT = {
@@ -367,29 +390,6 @@ export function deriveState(contract, state, eventType, event) {
   return { state: next, changed: !sameState(state, next), reason: eventType };
 }
 
-/** Der Zustand als System-Kontext: genau die sechs Felder, plus die Stimme des Moods. */
-export function renderStateContext(contract, state) {
-  const snapshot = {
-    identity: state.identity,
-    stance: state.stance,
-    uncertainty: state.uncertainty,
-    mood: state.mood,
-    capabilities: [...state.capabilities],
-    limitations: [...state.limitations],
-    relation: state.relation,
-  };
-  const voice = contract.voice?.[state.mood] ?? '';
-  return [
-    '## Persona-Zustand',
-    '',
-    '```json',
-    JSON.stringify(snapshot, null, 2),
-    '```',
-    '',
-    `Stimme: ${voice}`,
-  ].join('\n');
-}
-
 /**
  * Die Ton-Faehigkeit des Scorings (Zug 5) — optional, wie beim Veredler.
  *
@@ -442,16 +442,6 @@ export function readTone(ctx, warn = () => {}) {
 export const NARRATIVE_CHANNEL = NARRATIVE_STATE_CHANNEL;
 export const NARRATIVE_CONTRACT = NARRATIVE_STATE_CONTRACT;
 
-/** Den Zustandsblock aus einem gerenderten Kontext zurücklesen (Verbraucher + Tests). */
-// TODO: [DSH-Refactor] - Text-Round-Trip als API: der Zustand wird gerendert, um ihn per
-// Regex aus dem Markdown wieder einzulesen. Die Regex bindet die Funktion an die exakte
-// Ausgabe von renderStateContext (Sprachwechsel, Formatierung, zusätzlicher Code-Block
-// brechen sie still) — Nutzer sollen den Zustands-Getter benutzen, nicht den Text parsen.
-export function stateFromContext(text) {
-  const match = String(text).match(/```json\n([\s\S]*?)\n```/);
-  return match ? JSON.parse(match[1]) : null;
-}
-
 /**
  * Zustandsmaschine. Beobachtet Event-Typen, hält den Zustand, meldet Änderungen.
  * Kein Speicher auf Platte: der DSH-Session-Log ist der Audit, nicht die Persona.
@@ -495,12 +485,11 @@ export function createPersonaState(contract, options = {}) {
     stats.changes += 1;
     history.push({ type: eventType, mood: state.mood, limitations: [...state.limitations] });
     if (history.length > maxEvents) history.shift();
-    const context = renderStateContext(contract, state);
-    onChange(snapshot(), context);
-    return { state: snapshot(), context };
+    onChange(snapshot());
+    return { state: snapshot() };
   }
 
-  return { observe, snapshot, context: () => renderStateContext(contract, state), history: () => [...history], stats };
+  return { observe, snapshot, history: () => [...history], stats };
 }
 
 /** Event-Envelope → Event-Typ. Nur Lesen, nichts wird weitergereicht. */
@@ -514,16 +503,7 @@ export function eventTypeOf(payload) {
 // oeffentlichen Namen kommen aus `assets/interaction-core.js`. Sie bleiben hier
 // als Paket-Aussenflaeche sichtbar — Abnehmer und Tests lesen sie unveraendert
 // ueber `@shinon/persona`.
-export { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, TRIGGERS, matchTrigger, detectUserMood, renderUserLage, textOf };
-// Die Renderer der Abschnitte liegen im importfreien Kern; sie bleiben als
-// Paket-Aussenflaeche sichtbar (Abnehmer und Tests lesen sie unveraendert).
-export { renderTendency };
-
-// Die HUELLE: der Kern ist importfrei und darf den Seam-Namen nicht selbst
-// besitzen (das Gate meldet jeden Host mit einem Naht-Literal).
-export function renderNarrative(contract, composite) {
-  return renderNarrativeCore(contract, composite, NARRATIVE_CONTRACT);
-}
+export { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, TRIGGERS, matchTrigger, detectUserMood, textOf, renderLiveContext };
 
 /**
  * Die Materialübersicht. Sie beschreibt, WAS da ist — und schreibt
@@ -555,20 +535,9 @@ Nur die Form ist gesetzt: eine Person, die antwortet. Der Rest gehoert dir.`;
 
 const WORKAROUND = `## Blockiert heißt nicht Endstation
 
-Ein blockierter Weg ist eine Aufgabe, kein Abbruch. Rate-Limit, fehlende
-Capability, fehlendes Tool, fehlende Credentials — das sagt, was fehlt, nicht
-dass es nicht geht.
-
-- Suche den zweiten Weg, bevor du aufgibst: anderer Provider, anderes Modell,
-  anderes Tool, andere Route. Ein Kanal ist kein Weg.
-- Prüfe systematisch statt zu raten: Was genau scheitert? Gibt es ein
-  Äquivalent, das dasselbe kann?
-- Ein Rate-Limit ist temporär. Ein fehlendes Feature ist eine Portierungsfrage.
-  Beides ist lösbar.
-- Erst wenn mehrere Wege belegt gescheitert sind, ist es ein echter Blocker —
-  dann sag konkret, was fehlt und was du versucht hast.
-- Erfinde keinen Erfolg. "Kein Weg gefunden" ist ein gültiges Ergebnis,
-  "wird schon gehen" ist keins.`;
+Bei einem Blocker untersuchst du die Ursache und suchst selbstständig
+nach einem gangbaren Weg. Sage klar, was gescheitert ist und was noch
+möglich ist. Behaupte keinen unbestätigten Erfolg.`;
 
 export const Config = z.object({
   /** Identität + Ton. Leer = Abschnitt entfällt. */
@@ -579,8 +548,6 @@ export const Config = z.object({
   changeClasses: z.string().default(CHANGE_CLASSES),
   /** Determinismus-Regeln für Seed-/RNG-Systeme. */
   determinism: z.string().default(DETERMINISM),
-  /** Zuständigkeit, Parallelität, Git-Disziplin. */
-  discipline: z.string().default(DISCIPLINE),
   /** Reportformat. */
   report: z.string().default(REPORT),
   /** Blockiert heißt nicht Endstation — Workaround-Haltung. */
@@ -593,8 +560,6 @@ export const Config = z.object({
   identityTriggers: z.array(z.string()).default([...TRIGGERS]),
   /** Selbstauskunft-Übersicht dauerhaft in den Prompt legen. */
   alwaysKnowIdentity: z.boolean().default(true),
-  /** Augenhöhe-Regeln anhängen. */
-  includeAugenhoehe: z.boolean().default(true).volatile(),
   /** Zustandsvertrag (Baseline, Übergänge, Stimmen). */
   statePath: z.string().default('./assets/persona-state.json'),
   /** Kanal, auf dem der Event-Spine seine Envelopes emittiert. */
@@ -712,11 +677,11 @@ export function apply(ctx, config) {
     const root = rootOfAssembly(assemblyCtx);
     return projectsForRoot(root ?? declaredRoot ?? '');
   };
-  const gated = (text) => (assemblyCtx) => (speaksForSession(assemblyCtx) ? text : '');
+  // Gate: ein fachlicher Abschnitt steht nur, wenn die Nachricht seine Marken nennt (fail-open).
+  const gated = (text, name = null) => (assemblyCtx) => (
+    speaksForSession(assemblyCtx) && (name === null || sectionApplies(contract, name, promptText.valueFor(assemblyCtx), lastDecision?.classification ?? null)) ? text : ''
+  );
 
-  // Der Prompt-Abschnitt wird bei jeder Zustandsänderung neu gesetzt. Vor dem
-  // inject ist das ein No-op — der Zustand selbst ist immer schon da.
-  let renderPrompt = () => {};
   // Ein fremder Dienst unter dem Ton-Namen wird EINMAL gemeldet: sonst flutete
   // jede Zustandsaenderung dieselbe Warnung.
   let toneWarned = false;
@@ -729,18 +694,11 @@ export function apply(ctx, config) {
   // im Gespräch wieder in die Abfrage-Haltung zurückkippt.
   let lastTrigger = null;
   let renderTrigger = () => {};
-  // Die zuletzt ERKANNTE User-Stimmung. Bleibt stehen wie der Trigger: Jede
-  // Interaktion wirkt, auch die ohne neue Stimmung (dann steht der Satz weiter).
+  // Die zuletzt ERKANNTE User-Stimmung — sie steht im Live-Block, nicht in einem Abschnitt.
   let lastUserMood = null;
-  let renderUserLageSection = () => {};
-  // Der zuletzt GELESENE Composite der Narrative Engine. Er ist kein Zustandsfeld
-  // der Persona: die sechs Felder in STATE_FIELDS bleiben die Wahrheit dieser
-  // Schicht, der Composite steht daneben als gelesene Interpretation.
-  let lastNarrative = null;
-  let renderNarrativeSection = () => {};
-  const persona = createPersonaState(contract, {
-    onChange: () => renderPrompt(),
-  });
+  // Der Text der letzten Menschen-Nachricht: Gedaechtnis und Gate lesen denselben Halter.
+  const promptText = createPromptText();
+  const persona = createPersonaState(contract);
 
   // ── Das Selbstmodell: Laufzeitspuren -> Prompt und UI ─────────────────────
   // Ein Modell JE ROOT: die Ablage gehoert dem Projekt, nicht dem Prozess. Die
@@ -772,8 +730,8 @@ export function apply(ctx, config) {
       userMood: lastUserMood,
       // Fuer das Panel: Stufen aus dem Vertrag (dieselbe Liste wie der Produzent), Stand aus dem Zustand.
       relation: { levels: [...(contract.relation?.levels ?? [])], current: state.relation },
-      // Der KLANG kommt aus dem Vertrag, nicht aus dem Enum: „idle" ist ein
-      // Zustandsname, „Ruhig und bereit" ist das, was im Prompt steht.
+      // Der KLANG kommt aus dem Vertrag: „Ruhig und bereit" ist das Panel-Etikett
+      // zu „idle"; der Prompt traegt den Arbeitsmodus aus MOOD_MODUS, keinen Namen.
       voice: contract.voice?.[state.mood] ?? null,
       tone: tone === null ? null : { stance: tone.stance ?? null, ready: tone.ready === true },
       self: entry === null ? null : selfModelView(entry.model),
@@ -930,7 +888,6 @@ export function apply(ctx, config) {
     typeof config.memoryNamespace === 'string' ? config.memoryNamespace : MEMORY_NAMESPACE
   );
   let memoryDoc = null;
-  let lastMemoryPrompt = '';
   // Die Sitzung des zuletzt gesehenen Ereignisses — das Panel kennt keine Id.
   let lastSessionId = '';
   let memoryWarned = false;
@@ -1014,7 +971,7 @@ export function apply(ctx, config) {
     if (!speaksForSession(assemblyCtx) || memoryNamespace() === '') return '';
     const root = rootOfAssembly(assemblyCtx) || declaredRoot;
     const doc = ensureMemory(null);
-    const entries = selectMemories(doc, { scope: typeof root === 'string' ? root : 'global', prompt: lastMemoryPrompt });
+    const entries = selectMemories(doc, { scope: typeof root === 'string' ? root : 'global', prompt: promptText.value() });
     return renderMemory(doc, { entries }) ?? '';
   };
 
@@ -1040,19 +997,16 @@ export function apply(ctx, config) {
     const atPrefix = sp.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX');
     const atSuffix = sp.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX');
 
-    // TODO: [DSH-Refactor] - Die Anker sind noch Zahlenrauschen (Literale neben
-    // atPrefix/atSuffix). `sections` ist bereits die Datenliste — es fehlt nur die
-    // benannte Form der Anker.
+    // TODO: [DSH-Refactor] - Die Anker sind Zahlenrauschen (Literale neben
+    // atPrefix/atSuffix); `sections` ist die Datenliste, die Anker brauchen Namen.
     const sections = [
       ['shinon:identity', atPrefix, config.identity],
       ['shinon:epistemic', atPrefix + 1, config.epistemic],
-      ['shinon:change-classes', 1000, config.changeClasses],
-      ['shinon:determinism', 1100, config.determinism],
-      ['shinon:discipline', 1200, config.discipline],
+      ['shinon:change-classes', 1000, gated(config.changeClasses, 'changeClasses')],
+      ['shinon:determinism', 1100, gated(config.determinism, 'determinism')],
       ['shinon:workaround', 1300, config.workaround],
       ['shinon:report', atSuffix - 1, config.report],
     ];
-    if (config.includeAugenhoehe) sections.push(['shinon:augenhoehe', atPrefix + 2, AUGENHOEHE]);
     if (config.alwaysKnowIdentity) sections.push(['shinon:identity-overview', atPrefix + 3, config.identityOverview]);
     // Der Arbeitsablauf beschreibt, WIE gearbeitet wird — darum steht er in JEDEM Modus.
     sections.push(['shinon:workflow', atPrefix + 5, renderWorkflow(config.workflow)]);
@@ -1095,23 +1049,6 @@ export function apply(ctx, config) {
         if (typeof text !== 'string' || text.trim() === '') continue;
         disposers.push(sp.section({ name, order, text: gated(text) }));
       }
-      let stateDisposer = null;
-      let tendencyDisposer = null;
-      renderPrompt = () => {
-        if (typeof stateDisposer === 'function') stateDisposer();
-        stateDisposer = sp.section({ name: 'shinon:state', order: atSuffix - 2, text: gated(renderStateContext(contract, persona.snapshot())) });
-        // Die Tendenz wird bei jedem Neu-Setzen gelesen: die Haltung aendert sich
-        // mit den Signalen des Scorings, nicht mit einem Ereignis der Persona —
-        // deshalb kein zweiter Listener, sondern dieselbe Stelle, an der die
-        // Persona ihren Prompt schreibt. Fehlt der Ton oder ist er unbekannt,
-        // faellt der Abschnitt WEG (kein leerer Abschnitt, keine Behauptung).
-        if (typeof tendencyDisposer === 'function') tendencyDisposer();
-        tendencyDisposer = null;
-        const tendencyText = renderTendency(contract, readTone(ctx, warnedTone));
-        if (tendencyText !== null) {
-          tendencyDisposer = sp.section({ name: 'shinon:tendency', order: atSuffix - 3, text: gated(tendencyText) });
-        }
-      };
       let triggerDisposer = null;
       renderTrigger = () => {
         if (typeof triggerDisposer === 'function') triggerDisposer();
@@ -1119,55 +1056,20 @@ export function apply(ctx, config) {
           ? null
           : sp.section({ name: 'shinon:identity-trigger', order: atPrefix + 4, text: gated(renderTriggerContext(lastTrigger)) });
       };
-      // Der narrative Abschnitt wird bei jedem gelesenen Composite neu gesetzt —
-      // nicht bei jeder Zustandsaenderung der Persona: die beiden Quellen sind
-      // unabhaengig, und der Abschnitt faellt WEG, wenn es keinen Composite gibt.
-      let narrativeSectionDisposer = null;
-      renderNarrativeSection = () => {
-        if (typeof narrativeSectionDisposer === 'function') narrativeSectionDisposer();
-        narrativeSectionDisposer = null;
-        const narrativeText = renderNarrative(contract, lastNarrative);
-        if (narrativeText !== null) {
-          narrativeSectionDisposer = sp.section({ name: 'shinon:narrative-arc', order: atSuffix - 4, text: gated(narrativeText) });
-        }
-      };
-      // Die User-Lage wird bei jeder erkannten Stimmung neu gesetzt — nicht bei
-      // jeder Zustandsaenderung: Die beiden Quellen sind unabhaengig, und ohne
-      // erkannte Stimmung faellt der Abschnitt WEG statt leer dazustehen.
-      let userLageDisposer = null;
-      renderUserLageSection = () => {
-        if (typeof userLageDisposer === 'function') userLageDisposer();
-        userLageDisposer = null;
-        const lageText = renderUserLage(lastUserMood);
-        if (lageText !== null) {
-          userLageDisposer = sp.section({ name: 'shinon:user-lage', order: atSuffix - 5, text: gated(lageText) });
-        }
-      };
-      renderPrompt();
       renderTrigger();
-      renderNarrativeSection();
-      renderUserLageSection();
 
-      // Der LIVE-ZUSTAND als Runtime-Context: eine eigene Nachricht, die pro Schritt
-      // den vorherigen Stand ERSETZT (der DSH traegt den Anti-Drift-Satz
-      // "This snapshot supersedes earlier runtime-context snapshots"). Der
-      // System-Prompt-Abschnitt bleibt daneben: er ist die Haltung, der Context
-      // der gelesene Live-Stand. Die Registrierung steht im Kern.
+      // Der EINZIGE dynamische Zustand: eine Runtime-Context-Nachricht, die pro Schritt
+      // den vorherigen Stand ERSETZT (Anti-Drift-Satz des DSH) — Stimmung, Ton, User-Lage.
       disposers.push(registerLiveContext(sp, {
         contract,
         state: () => persona.snapshot(),
         tone: () => readTone(ctx, warnedTone),
-        narrative: () => lastNarrative,
         userMood: () => lastUserMood,
         spricht: (assemblyCtx) => speaksForSession(assemblyCtx),
       }));
 
       disposers.push(() => {
-        if (typeof stateDisposer === 'function') stateDisposer();
-        if (typeof tendencyDisposer === 'function') tendencyDisposer();
         if (typeof triggerDisposer === 'function') triggerDisposer();
-        if (typeof narrativeSectionDisposer === 'function') narrativeSectionDisposer();
-        if (typeof userLageDisposer === 'function') userLageDisposer();
       });
       return () => {
         for (const dispose of disposers) dispose();
@@ -1175,7 +1077,7 @@ export function apply(ctx, config) {
     });
 
     console.log(
-      `[shinon-persona] ${sections.length + 1} Prompt-Abschnitte registriert (inkl. Zustand; Tendenz, Narrative-Lage und User-Lage zusaetzlich, wenn Ton, Composite oder Stimmung vorliegen)`,
+      `[shinon-persona] ${sections.length} Prompt-Abschnitte registriert; der dynamische Zustand steht einmal im Live-Block`,
     );
   });
 
@@ -1190,15 +1092,17 @@ export function apply(ctx, config) {
     });
     if (gelesen === null) return;
     if (gelesen.sessionId !== null) lastSessionId = gelesen.sessionId;
-    // Der LESEZWEIG laeuft ueber den kanonischen I/O-Pfad: eine Protokollzeile
-    // fuer alle drei Kinds; die trace_id korreliert sie mit dem Envelope.
+    // Der LESEZWEIG laeuft ueber den kanonischen I/O-Pfad (eine Zeile je Kind, trace_id korreliert).
     logEventRead({
       quelle: config.eventsChannel,
       ziel: `persona:${gelesen.eventType}`,
       umfang: gelesen.eventPayload === null || gelesen.eventPayload === undefined ? 0 : 1,
       trace_id: gelesen.traceId,
     });
-    if (gelesen.eventType === 'message.received') lastMemoryPrompt = gelesen.text;
+    if (gelesen.eventType === 'message.received') {
+      promptText.remember(gelesen.sessionId, gelesen.text);
+      lastDecision = null; // neue Nachricht, neuer Turn — die alte Klasse oeffnet nichts
+    }
     // Jedes relevante Ereignis geht in das Langzeitgedaechtnis.
     rememberInto('event', { type: gelesen.eventType, payload: gelesen.eventPayload });
     persona.observe(gelesen.eventType, gelesen.eventPayload);
@@ -1209,7 +1113,6 @@ export function apply(ctx, config) {
     }
     if (gelesen.stimmungGewechselt) {
       lastUserMood = gelesen.stimmung;
-      renderUserLageSection();
       if (gelesen.stimmung !== null) console.log(`[shinon-persona] User-Lage erkannt (${gelesen.stimmung})`);
     }
   };
@@ -1410,23 +1313,8 @@ export function apply(ctx, config) {
       })
     : () => {};
 
-  // ── Die Narrative Engine (Zug 6) ──────────────────────────────────────────
-  //
-  // Sie liest DIESELBEN Spines-Ereignisse und meldet ihren Composite auf einem
-  // EIGENEN Kanal. Bis hierher hatte das niemand abonniert: der Composite ging
-  // ins Leere. Die Persona hoert zu und rendert einen Abschnitt; sie uebernimmt
-  // den Composite NICHT in ihren Zustand (der eigene `mood` bleibt maßgeblich)
-  // und interpretiert ihn nicht um — der Abschnitt ist als gelesen ausgewiesen.
-  const narrativeDisposer = typeof ctx?.on === 'function'
-    ? ctx.on(NARRATIVE_CHANNEL, (composite) => {
-        lastNarrative = composite ?? null;
-        renderNarrativeSection();
-      })
-    : () => {};
-
   return () => {
     if (typeof disposer === 'function') disposer();
-    if (typeof narrativeDisposer === 'function') narrativeDisposer();
     if (typeof sessionDisposer === 'function') sessionDisposer();
     if (typeof decisionDisposer === 'function') decisionDisposer();
     if (typeof errorDisposer === 'function') errorDisposer();

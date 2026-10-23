@@ -69,7 +69,7 @@ test('429/Provider-Fehler: genau EIN Aufruf, kein Retry, Grund ist nicht SCHEMA_
     throw Object.assign(new Error('429 Too Many Requests'), { name: 'ProviderError', status: 429 });
   })());
 
-  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined);
+  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined);
 
   assert.equal(outcome.outcome, 'rejected');
   assert.deepEqual(outcome.reasons, ['LLM_FAILED:ProviderError'], 'ein Providerfehler wird als solcher benannt');
@@ -95,7 +95,7 @@ test('Zeitlimit: der Abbruch endet als LLM_FAILED:TimeoutError, begrenzt und ohn
   // des Tests — im Host erledigt das der laufende Turn.
   const keepAlive = setTimeout(() => {}, 2000);
   const started = Date.now();
-  const outcome = await enhanceGuarded(fake, MIN, { ...baseConfig, timeoutMs: 20 }, PROMPT, null, null, null, undefined).finally(() => clearTimeout(keepAlive));
+  const outcome = await enhanceGuarded(fake, MIN, { ...baseConfig, timeoutMs: 20 }, PROMPT, null, null, undefined).finally(() => clearTimeout(keepAlive));
   const elapsed = Date.now() - started;
 
   assert.equal(outcome.outcome, 'rejected');
@@ -111,7 +111,7 @@ test('ungültiges JSON: NO_JSON, und die verworfene Antwort wird mit Chunk-Zähl
     { type: 'finish', reason: 'stop' },
   ]));
 
-  const { value: resolved, lines } = await captureWarn(() => enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined));
+  const { value: resolved, lines } = await captureWarn(() => enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined));
 
   assert.equal(resolved.outcome, 'rejected');
   assert.ok(resolved.reasons.includes('NO_JSON'), `Grund fehlt (${resolved.reasons.join(', ')})`);
@@ -127,7 +127,7 @@ test('leerer Strom: EMPTY_STREAM ist ein eigener Grund, kein Formatfehler', asyn
   // Datensatz — derselbe Grund wie falsch formatiertes JSON, obwohl gar keine
   // Antwort kam. Die Abbruchquote braucht die Trennung (`LEERER_STREAM`).
   const fake = fakeLlm(() => chunks([{ type: 'finish', reason: 'stop' }]));
-  const { value: resolved, lines } = await captureWarn(() => enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined));
+  const { value: resolved, lines } = await captureWarn(() => enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined));
 
   assert.equal(resolved.outcome, 'rejected');
   assert.deepEqual(resolved.reasons, ['EMPTY_STREAM']);
@@ -141,7 +141,7 @@ test('leerer Strom MIT Abbruch bleibt ein Abbruch — das Finish reist als Daten
   const fake = fakeLlm(() => chunks([
     { type: 'finish', reason: { kind: 'aborted', failure: { message: 'Request was aborted' } } },
   ]));
-  const { value: resolved } = await captureWarn(() => enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined));
+  const { value: resolved } = await captureWarn(() => enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined));
 
   assert.deepEqual(resolved.reasons, ['EMPTY_STREAM']);
   assert.deepEqual(resolved.failure, { finish: { kind: 'aborted', failure: { message: 'Request was aborted' } } });
@@ -149,7 +149,7 @@ test('leerer Strom MIT Abbruch bleibt ein Abbruch — das Finish reist als Daten
 
 test('fehlende Route: NO_ROUTE ohne jeden Modellaufruf', async () => {
   const fake = fakeLlm(() => chunks([]));
-  const outcome = await enhanceGuarded(fake, MIN, { ...baseConfig, provider: '' }, PROMPT, null, null, null, undefined);
+  const outcome = await enhanceGuarded(fake, MIN, { ...baseConfig, provider: '' }, PROMPT, null, null, undefined);
 
   assert.equal(outcome.outcome, 'unavailable');
   assert.deepEqual(outcome.reasons, ['NO_ROUTE']);
@@ -158,7 +158,7 @@ test('fehlende Route: NO_ROUTE ohne jeden Modellaufruf', async () => {
 
 test('ein kaputter Aufruf bricht den Schritt nicht: INTERNAL_ERROR statt Wurf', async () => {
   const broken = { llm: { stream() { throw new TypeError('Signal-Konstruktion kaputt'); } } };
-  const { value: resolved } = await captureWarn(() => enhanceGuarded(broken, MIN, { ...baseConfig, timeoutMs: -1 }, PROMPT, null, null, null, undefined));
+  const { value: resolved } = await captureWarn(() => enhanceGuarded(broken, MIN, { ...baseConfig, timeoutMs: -1 }, PROMPT, null, null, undefined));
 
   assert.equal(resolved.outcome, 'rejected');
   assert.match(resolved.reasons[0], /^INTERNAL_ERROR:/, resolved.reasons[0]);
@@ -170,7 +170,7 @@ test('deterministischer Fallback: gleicher Fehler, gleicher Ausgang — und der 
     const fake = fakeLlm(() => (async function* () {
       throw Object.assign(new Error('503 Service Unavailable'), { name: 'ProviderError' });
     })());
-    const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined);
+    const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined);
     return { outcome: outcome.outcome, reasons: outcome.reasons, request: fake.calls[0], calls: fake.calls.length };
   };
 
@@ -275,7 +275,7 @@ test('Salvage: der Host bekommt die verworfene Antwort als Beleg (onReject)', as
   const seen = [];
   const answer = '**Gemacht:** die Module sind gebaut, ich teste sie danach.';
   const fake = fakeLlm(() => chunks([{ type: 'text-delta', text: answer }, { type: 'finish', reason: 'stop' }]));
-  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined, (entry) => seen.push(entry));
+  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined, (entry) => seen.push(entry));
   assert.equal(outcome.outcome, 'rejected');
   assert.equal(seen.length, 1, 'genau ein Beleg je Verwerfung');
   assert.deepEqual(seen[0].reasons, ['NO_JSON']);
@@ -287,7 +287,7 @@ test('Salvage: der Host bekommt die verworfene Antwort als Beleg (onReject)', as
 test('Salvage: ein akzeptierter Lauf ruft den Journal-Haken nicht', async () => {
   const seen = [];
   const fake = fakeLlm(() => chunks([{ type: 'text-delta', text: '{"enhancedPrompt":"Fixe den Test, ohne die Assertions zu schwächen.","preservedIntent":true,"addedRequirements":[],"removedRequirements":[]}' }, { type: 'finish', reason: 'stop' }]));
-  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined, (entry) => seen.push(entry));
+  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined, (entry) => seen.push(entry));
   assert.equal(outcome.outcome, 'accepted');
   assert.deepEqual(seen, []);
 });
@@ -301,7 +301,7 @@ test('Salvage-Datensatz: Grund und Zeichenzahl reisen mit dem Ergebnis', async (
   const answer = `Klar, gerne. Hier ist der verbesserte Prompt: ${refined}`;
   const fake = fakeLlm(() => chunks([{ type: 'text-delta', text: answer }, { type: 'finish', reason: 'stop' }]));
 
-  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, null, undefined);
+  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined);
 
   assert.equal(outcome.outcome, 'accepted');
   assert.deepEqual(outcome.reasons, ['SALVAGED_PROSE']);

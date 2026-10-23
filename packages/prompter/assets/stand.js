@@ -1,13 +1,17 @@
 /**
  * @shinon/prompter — stand.js
  *
- * Der Stand (Zug 4/5): was Shinon ueber sich weiss — gewaehlte Zettel, Haltung und
- * Ton des Scorings, gerendert als Block fuer den Prompt. Liest Zettel und Skills
- * ueber die Naht in `prompt-files.js`.
+ * Der Stand (Zug 4/5): was Shinon ueber sich weiss — gewaehlte Zettel als Block
+ * fuer den Prompt, Haltung, Ton und Narrative-Lage als Datensatz fuer die Spur.
+ * Liest Zettel ueber die Naht in `prompt-files.js`.
+ *
+ * KEINE SKILLS: der Veredler redigiert Text, die ausfuehrbaren Skills erreichen
+ * das Hauptmodell ueber die native DSH-Discovery. Eine Auswahl hier waere Arbeit
+ * ohne Abnehmer — und ein Datensatz, der "geladen" behauptet, was niemand liest.
  */
 import { renderStand, selectNotes } from './note-core.js';
-import { SCORING_SERVICE, SCORING_SERVICE_CONTRACT, SKILL_RULES_CONTRACT, STAND_CONTRACT } from './mode-core.js';
-import { readNotes, readSkills, selectSkills } from './prompt-files.js';
+import { SCORING_SERVICE, SCORING_SERVICE_CONTRACT } from './mode-core.js';
+import { readNotes } from './prompt-files.js';
 
 /**
  * Den Stand dieses Schritts bauen: die passenden Zettel aus dem AUFGELOESTEN
@@ -45,45 +49,21 @@ export function standFor(config, runtime, promptText, context, toneState = null)
     : selectNotes(read.notes, haystack, runtime.noteRules.reading ?? {});
   const notes = selected.loaded.map((entry) => entry.note);
 
-  // Skill-Selektion (Zug 6): dieselbe haystack-Prüfung wie die Zettel, ein
-  // eigener Regeldatensatz. Ein fehlendes Skill-Verzeichnis ist kein Defekt
-  // (fail-open); ein unlesbarer Ordner landet in skipped. Die Skills tragen
-  // den Block, nicht den Inhalt.
-  const skillsOff = typeof config?.skillsPath !== 'string' || config.skillsPath === '';
-  let skillRead;
-  if (skillsOff || (runtime?.skillRules ?? null) === null) {
-    skillRead = { loaded: [], skipped: [], reason: skillsOff ? 'SKILLS_OFF' : 'SKILLS_NO_RULES' };
-  } else {
-    const read = readSkills(config, runtime.skillRules);
-    skillRead = read.skills.length > 0
-      ? selectSkills(read.skills, haystack, {
-          ...(runtime.skillRules.reading ?? {}),
-          explicitText: promptText,
-        })
-      : { loaded: [], skipped: [], reason: read.reason ?? 'SKILLS_EMPTY' };
-  }
-
   // Narrative-Lage (Zug 6): der letzte Composite vom Kanal, den `apply` hält.
-  // Fehlt er, bleibt `<narrative>` weg — renderStand erfindet keine Felder. Ein
-  // Fremdwert (kein Objekt, oder ein Array) ist KEINE Lage: der Kanal steht jedem
-  // offen, und ein String als Narrative waere eine Lage, die niemand geschrieben
-  // hat. Dieselbe Grenze wie `renderStand` (`isRecord`) — sonst widerspraechen
-  // sich Block ("keine Lage") und Datensatz ("Lage ohne Felder") ueber denselben
-  // Stand.
+  // Sie reist NUR als Datensatz (arc/narrator/beziehung) mit der Entscheidung —
+  // nicht in den Block: der Veredler soll Text redigieren, nicht die Deutung
+  // einer zweiten Engine uebernehmen. Ein Fremdwert (kein Objekt, oder ein
+  // Array) ist KEINE Lage: der Kanal steht jedem offen, und ein String als
+  // Narrative waere eine Lage, die niemand geschrieben hat.
   const narrative = typeof runtime?.narrative === 'object' && runtime.narrative !== null && !Array.isArray(runtime.narrative)
     ? runtime.narrative
     : null;
 
-  const block = renderStand({
-    contract: STAND_CONTRACT,
-    stance,
-    tendencies,
-    notes,
-    skills: skillRead.loaded,
-    skillsContract: SKILL_RULES_CONTRACT,
-    narrative,
-    narrativeContract: narrative === null ? null : runtime.narrativeContract,
-  });
+  // Der Block traegt NUR die Zettel: Haltung, Tendenzen und Narrative-Lage
+  // gehoeren nicht in den Veredler — sie stehen im Live-Block des Hauptmodells
+  // oder in der Entscheidungsspur. Was sie WAREN, haelt der Datensatz unten
+  // (standTrace); der Block ist Prompt.
+  const block = renderStand({ notes });
 
   return {
     block,
@@ -102,9 +82,7 @@ export function standFor(config, runtime, promptText, context, toneState = null)
         },
     tone: toneState?.source ?? 'none',
     thema: notes.map((note) => note.thema),
-    skills: skillRead.loaded.map((skill) => skill.name),
-    skillReason: skillRead.reason,
-    skipped: [...read.skipped, ...selected.skipped, ...skillRead.skipped],
+    skipped: [...read.skipped, ...selected.skipped],
     reason: read.reason,
   };
 }
@@ -128,10 +106,6 @@ export function standTrace(stand) {
     // den Host, ein Prompt-Block hat dort nichts zu suchen.
     narrative: stand.narrative ?? null,
     notes: { loaded: stand.thema, skipped: stand.skipped.length, reasons, reason: stand.reason },
-    skills: {
-      loaded: stand.skills ?? [],
-      reason: stand.skillReason ?? null,
-    },
   };
 }
 

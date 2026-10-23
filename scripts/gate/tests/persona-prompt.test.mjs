@@ -26,7 +26,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
@@ -79,7 +79,7 @@ const contextFixture = (name, value) => {
  * Root. Nur die abhängigen Dienste (Events, Scoring) fehlen — die sind
  * optional und ändern an diesem Abschnitt nichts.
  */
-async function systemPromptWith(projectContextPath, overrides = {}, { sessionCwd, prepare } = {}) {
+async function systemPromptWith(projectContextPath, overrides = {}, { sessionCwd, prepare, message, before } = {}) {
   const ctx = new Context();
   await ctx.plugin(SystemPrompt, {});
   // Eine Ablage VOR dem Bundle: der echte Context muss sie ueber `get` liefern.
@@ -90,9 +90,12 @@ async function systemPromptWith(projectContextPath, overrides = {}, { sessionCwd
     ...overrides,
     identity: IDENTITY_MARK,
     // Die uebrigen Abschnitte bleiben aus: dieser Test misst EINEN Abschnitt.
-    includeAugenhoehe: false,
     alwaysKnowIdentity: false,
   }));
+  // Die laufende Nachricht kommt als Spine-Ereignis — die Assembly sieht den
+  // Text nur so; der Pre-Step (und seine Intent-Klasse) laeuft erst danach.
+  if (typeof message === 'string') ctx.emit('shinon/event', { event_type: 'message.received', session_id: 's-gate', text: message });
+  if (typeof before === 'function') before(ctx);
   // Eine echte Sitzung kommt über `agent/pre-step`; der Hook umschließt den
   // Schritt, also auch die Assembly. Ohne Sitzung bleibt der direkte Weg (Boot).
   const assembly = sessionCwd === undefined
@@ -172,7 +175,6 @@ test('Projektscope: ein fremder Workspace bekommt weder Persona noch Projekt-Kon
 
   const { prompt, sections } = await systemPromptWith('.shinon/project-context.md', {
     workspaceRoot: fremd,
-    includeAugenhoehe: false,
     alwaysKnowIdentity: false,
   });
   // Nur UNSERE Abschnitte zaehlen: `harness:identity` und `deployment:persona-*`
@@ -314,10 +316,11 @@ test('Langzeitgedächtnis: Erinnerung und angenommene Selbstauflage stehen im EC
 
 // ── Der Arbeitsablauf (shinon:workflow) ──────────────────────────────────────
 //
-// Der Baustein beantwortet eine Frage, die die acht Haltungsabschnitte nicht
+// Der Baustein beantwortet eine Frage, die die stabilen Haltungsabschnitte nicht
 // beantworten: WIE hier gearbeitet wird — die Reihenfolge der Schritte und der
 // Umgang mit Zweifel, Blockern, Fehlern und Abbruch. Die Haltung steht weiterhin
-// in EPISTEMIC, DISCIPLINE und REPORT; der Ablauf VERWEIST auf sie.
+// in EPISTEMIC und REPORT, der Umgang mit Blockern in WORKAROUND; der Ablauf
+// VERWEIST auf sie.
 
 test('Workflow: der Ablauf steht im gerenderten System-Prompt — mit den fuenf Schritten in Reihenfolge', async () => {
   // Der Weg, den das Modell sieht: Boot -> gerenderter System-Prompt.
@@ -345,7 +348,8 @@ test('Workflow: der Ablauf steht im gerenderten System-Prompt — mit den fuenf 
   // Die Platzierung: der Ablauf steht hinter der Identitaet und vor dem Zustand
   // und dem Bericht — er ist der Weg, nicht die Lage.
   assert.ok(prompt.indexOf(IDENTITY_MARK) < prompt.indexOf('## Der Arbeitsablauf'), 'der Ablauf steht nicht nach der Identitaet');
-  assert.ok(prompt.indexOf('## Der Arbeitsablauf') < prompt.indexOf('## Persona-Zustand'), 'der Ablauf steht nicht vor dem Zustand');
+  assert.ok(prompt.indexOf('## Der Arbeitsablauf') < prompt.indexOf('## Berichtsstil'), 'der Ablauf steht nicht vor dem Bericht');
+  assert.equal(prompt.includes('## Persona-Zustand'), false, 'der Zustand ist kein Abschnitt mehr');
 });
 
 test('Workflow: der Baustein verweist auf die Haltung, statt sie zu wiederholen', async () => {
@@ -353,7 +357,7 @@ test('Workflow: der Baustein verweist auf die Haltung, statt sie zu wiederholen'
   const abschnitt = withText.find((section) => section.name === 'shinon:workflow');
   const text = String(abschnitt.text);
   // Die Verweise SIND da: der Text benennt die Abschnitte, statt sie zu kopieren.
-  for (const verweis of ['Zuständigkeit, Parallelität, Git', 'Epistemischen Haltung', 'Berichtsstil', 'Blockiert heißt nicht Endstation']) {
+  for (const verweis of ['Epistemischen Haltung', 'Berichtsstil', 'Blockiert heißt nicht Endstation']) {
     assert.ok(text.includes(verweis), `der Verweis auf "${verweis}" fehlt`);
   }
   // Und die Listen der Haltung stehen NICHT im Ablauf: sonst stuende derselbe
@@ -404,4 +408,88 @@ test('Workflow: der Renderer gibt einen leeren Text fuer einen leeren Auftrag', 
   assert.match(ohne, /Mein eigener Ablauf\./);
   const mit = '## Mein Ablauf\n\nText.';
   assert.equal(kern.renderWorkflow(mit), mit);
+});
+
+/** Namen der Abschnitte, die in diesem Assembly wirklich Text beitragen. */
+const traegt = (gebaut, name) => gebaut.withText.some((section) => section.name === name);
+
+//
+// ── Das Gate der fachlichen Abschnitte (Punkt 3) ────────────────────────────
+//
+// `changeClasses` und `determinism` sind keine Identitaet: sie gelten, wenn die
+// Aufgabe sie braucht. Der Ausloeser ist die laufende Nachricht — sie liegt als
+// Spine-Ereignis vor, die Assembly (agent-loop:907) laeuft vor dem Pre-Step
+// (:909), eine Intent-Klasse des Pre-Steps kaeme fuer einen Abschnitt zu spaet.
+// Gemessen wird am FERTIGEN Prompt, nicht an der Abschnittsliste.
+
+const FRAGE = 'Wie viele Zeilen hat die Datei und wer ruft sie auf?';
+const UMBAU = 'Fixe den Bug im Prompter und pruefe das Ergebnis mit Tests.';
+const SEED = 'Gleicher Seed, gleiches Replay — pruefe den Zufall.';
+
+test('fachliche Abschnitte: eine Frage traegt weder Code- noch Seed-Regeln', async () => {
+  const gebaut = await systemPromptWith('', {}, { message: FRAGE });
+  assert.equal(traegt(gebaut, 'shinon:change-classes'), false, 'Code-Regeln in einem Frage-Turn');
+  assert.equal(traegt(gebaut, 'shinon:determinism'), false, 'Seed-Regeln in einem Frage-Turn');
+  // Die Identitaet bleibt — das Gate trifft nur fachliche Abschnitte.
+  assert.equal(traegt(gebaut, 'shinon:identity'), true, 'die Identitaet darf nicht mitfallen');
+});
+
+test('fachliche Abschnitte: ein Umbau traegt die Code-Regeln, aber nicht die Seed-Regeln', async () => {
+  const gebaut = await systemPromptWith('', {}, { message: UMBAU });
+  assert.equal(traegt(gebaut, 'shinon:change-classes'), true, 'Code-Regeln fehlen im Umbau-Turn');
+  assert.equal(traegt(gebaut, 'shinon:determinism'), false, 'Seed-Regeln ohne Seed im Text');
+});
+
+test('fachliche Abschnitte: eine Seed-Frage traegt die Determinismus-Regeln', async () => {
+  const gebaut = await systemPromptWith('', {}, { message: SEED });
+  assert.equal(traegt(gebaut, 'shinon:determinism'), true, 'Seed-Regeln fehlen bei einer Seed-Frage');
+  assert.equal(traegt(gebaut, 'shinon:change-classes'), false);
+});
+
+test('fachliche Abschnitte: der Turn wird am gerenderten Prompt kuerzer', async () => {
+  const frage = await systemPromptWith('', {}, { message: FRAGE });
+  const umbau = await systemPromptWith('', {}, { message: UMBAU });
+  const ersparnis = umbau.prompt.length - frage.prompt.length;
+  // Genau der Abschnitt, den das Gate entfernt — plus der eine Trenner, mit dem
+  // der gerenderte Prompt Abschnitte verbindet. Mehr spart das Gate nicht.
+  const code = String(umbau.withText.find((section) => section.name === 'shinon:change-classes')?.text ?? '');
+  assert.ok(ersparnis >= code.length && ersparnis <= code.length + 4, `Ersparnis ${ersparnis} vs Abschnitt ${code.length}`);
+  assert.ok(ersparnis > 0, 'der Frage-Turn ist nicht kuerzer');
+  // Und ohne Nachricht (Boot, Assembly ohne Turn) gilt fail-open: beide stehen.
+  const boot = await systemPromptWith('', {});
+  assert.equal(traegt(boot, 'shinon:change-classes'), true, 'ohne Text muss die Regel stehen');
+  assert.equal(traegt(boot, 'shinon:determinism'), true, 'ohne Text muss die Regel stehen');
+});
+
+test('Gate und Registry nennen dieselben Marken', () => {
+  const contract = JSON.parse(readFileSync(join(PACKAGE_DIR, 'assets/persona-state.json'), 'utf8'));
+  const registry = JSON.parse(readFileSync(join(PACKAGE_DIR, '../prompter/assets/blocks.json'), 'utf8'));
+  const byId = Object.fromEntries(registry.blocks.map((block) => [block.id, block]));
+  // Zwei Systeme, eine Liste: die Persona entscheidet, die Registry beschreibt.
+  assert.deepEqual(contract.sectionGates.changeClasses.markers, byId['persona-change-classes'].ausloeser.haystack);
+  assert.deepEqual(contract.sectionGates.determinism.markers, byId['persona-determinism'].ausloeser.haystack);
+  assert.deepEqual(contract.sectionGates.changeClasses.intentClasses, byId['persona-change-classes'].ausloeser.intentKlassen);
+  assert.deepEqual(contract.sectionGates.determinism.intentClasses, byId['persona-determinism'].ausloeser.intentKlassen);
+});
+
+test('fachliche Abschnitte: die Intent-Klasse des vorigen Schritts oeffnet sie ab Schritt 2', async () => {
+  // Der Text nennt keine Marke („Setze … um“ ist ein trennbares Verb, kein
+  // Stichwort) — die Klasse des Vorschritts traegt den Abschnitt.
+  const gebaut = await systemPromptWith('', {}, {
+    message: 'Setze Punkt 3 um.',
+    before: (ctx) => ctx.emit(bundle.PROMPTER_DECISION_CHANNEL, { intentClassification: 'MULTI_STEP_TASK' }),
+  });
+  assert.equal(traegt(gebaut, 'shinon:change-classes'), true, 'die gelesene Klasse oeffnet den Abschnitt nicht');
+});
+
+test('fachliche Abschnitte: eine neue Nachricht loescht die Klasse des vorigen Turns', async () => {
+  const gebaut = await systemPromptWith('', {}, {
+    before: (ctx) => {
+      ctx.emit('shinon/event', { event_type: 'message.received', session_id: 's-gate', text: 'Setze Punkt 3 um.' });
+      ctx.emit(bundle.PROMPTER_DECISION_CHANNEL, { intentClassification: 'MULTI_STEP_TASK' });
+      ctx.emit('shinon/event', { event_type: 'message.received', session_id: 's-gate', text: FRAGE });
+    },
+  });
+  assert.equal(traegt(gebaut, 'shinon:change-classes'), false, 'die Klasse des vorigen Turns oeffnet den neuen');
+  assert.equal(traegt(gebaut, 'shinon:determinism'), false);
 });

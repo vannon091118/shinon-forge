@@ -8,17 +8,16 @@
  * konnte das sehen — die Paket-Tests prüfen die Mathematik, nicht die
  * Verdrahtung. Diese Datei prüft die Verdrahtung.
  *
- * Vier Ebenen:
+ * Drei Ebenen:
  *   1. Der Vertrag: die Ableitung ist vollständig und jeder Mood-Ereignistyp
  *      existiert im Spine (ein Takt auf ein Ereignis, das es nicht gibt, klingt nie).
- *   2. Die Naht als DATEN: Kanalname und Vertragsname sind auf beiden Seiten
- *      LITERALE (kein Paket importiert das andere) — gepinnt über `twinIssues`
- *      und gegen das echte Bundle. Drift wäre hier STILL.
- *   3. `renderNarrative` ist rein: voller Composite → Abschnitt, fehlender → `null`.
- *      Kein leerer Abschnitt, keine Behauptung.
- *   4. Der echte Bundle-Pfad: das Persona-Bundle an einen Fake-Host gehängt, der
- *      nur `on`/`inject`/`get` kennt, ein Composite auf den Kanal geschickt — der
- *      Abschnitt erscheint, der Persona-Zustand bleibt unberührt (Vorrang!).
+ *   2. Die Naht als DATEN: Kanalname und Vertragsname kommen aus dem Naht-Kern
+ *      (`@shinon/seams/core`), kein Paket trägt sie als Literal — gepinnt über
+ *      `twinIssues` und gegen das echte Bundle. Drift wäre hier STILL.
+ *   3. Der echte Bundle-Pfad: das Persona-Bundle kennt den Kanal nicht mehr —
+ *      der Composite ändert den Live-Block nicht, der Persona-Zustand bleibt
+ *      unberührt (Vorrang!). Der Veredler trägt die Lage als Datensatz in
+ *      seiner Spur, nicht als Prompt-Element.
  *
  * Läuft mit `node --test` — kein DSH, kein node_modules (Schemastery-Stub).
  */
@@ -94,6 +93,7 @@ function consumerInput(consumer) {
 function createHost() {
   const handlers = new Map();
   const sections = [];
+  const contexts = [];
   const child = {
     effect(run) {
       const dispose = run();
@@ -111,6 +111,14 @@ function createHost() {
         return () => {
           const at = sections.indexOf(entry);
           if (at >= 0) sections.splice(at, 1);
+        };
+      },
+      context({ name, order, text }) {
+        const entry = { name, order, get text() { return typeof text === 'function' ? text({}) : text; } };
+        contexts.push(entry);
+        return () => {
+          const at = contexts.indexOf(entry);
+          if (at >= 0) contexts.splice(at, 1);
         };
       },
     },
@@ -132,9 +140,13 @@ function createHost() {
     if (handler) handler(payload);
     return handler !== undefined;
   };
-  const narrativeSection = () => sections.find((entry) => entry.name === 'shinon:narrative-arc');
-  const stateSection = () => sections.find((entry) => entry.name === 'shinon:state');
-  return { ctx, handlers, sections, dispatch, narrativeSection, stateSection };
+  const liveOf = () => {
+    const entry = contexts.find((candidate) => candidate.name === 'shinon:persona-live');
+    if (!entry) return '';
+    const text = entry.text;
+    return typeof text === 'string' ? text : '';
+  };
+  return { ctx, handlers, sections, contexts, dispatch, liveOf };
 }
 const connect = () =>
   quiet(() => {
@@ -145,12 +157,10 @@ const connect = () =>
       projectContextPath: '',
       // Die Persona spricht nur für einen AUSDRÜCKLICH benannten Workspace.
       workspaceRoot: ROOT,
-      includeAugenhoehe: true,
       identity: 'IDENT',
       epistemic: 'EPI',
       changeClasses: 'CC',
       determinism: 'DET',
-      discipline: 'DISC',
       report: 'REP',
     });
     return { ...host, dispose };
@@ -268,8 +278,8 @@ test('narrative: die Naht ist keine Zwillings-Regel mehr, sondern ein Kern', () 
   assert.deepEqual(repo.hostMirrorIssues(), []);
 });
 
-test('narrative: BEIDE Abnehmer sind vollständig verdrahtet', () => {
-  assert.deepEqual(CONSUMERS.map((consumer) => consumer.dir), ['persona', 'prompter'], 'es sind zwei Abnehmer — Persona und Veredler');
+test('narrative: DER Abnehmer ist vollständig verdrahtet', () => {
+  assert.deepEqual(CONSUMERS.map((consumer) => consumer.dir), ['prompter'], 'es ist ein Abnehmer — der Veredler');
   for (const consumer of CONSUMERS) {
     const input = consumerInput(consumer);
     assert.deepEqual(consumerIssues(input.consumer, input.sources, input.stateContract), [], `${consumer.dir} ist nicht verdrahtet`);
@@ -289,16 +299,7 @@ test('narrative: ein fehlender Nachweis in der Nachweisdatei wird gemeldet (Muta
   const prompterConsumer = CONSUMERS.find((consumer) => consumer.dir === 'prompter');
   const input = consumerInput(prompterConsumer);
   const issues = consumerIssues(input.consumer, { ...input.sources, evidence: '<nichts_davon>' }, null);
-  assert.ok(issues.some((issue) => issue.includes('<narrative')), issues.join('\n'));
-});
-
-test('narrative: ein Abnehmer ohne narrative-Block im Vertrag wird gemeldet', () => {
-  const personaConsumer = CONSUMERS.find((consumer) => consumer.dir === 'persona');
-  const input = consumerInput(personaConsumer);
-  const broken = JSON.parse(JSON.stringify(personaContract));
-  delete broken.narrative;
-  const issues = consumerIssues(input.consumer, input.sources, broken);
-  assert.ok(issues.some((issue) => issue.includes('narrative-Block fehlt')), issues.join('\n'));
+  assert.ok(issues.some((issue) => issue.includes('Entscheidungsspur')), issues.join('\n'));
 });
 
 // ── 2b. Der zweite Abnehmer: der Veredler (MAX) ─────────────────────────────
@@ -313,7 +314,7 @@ test('narrative: der Veredler importiert Kanal und Vertragsname aus dem Naht-Ker
 
 test('narrative: ein Literal im Abnehmer wird wieder zum Befund (Mutationsprobe)', () => {
   // Die Prüfung ist umgedreht: Import ist die Zusage, Literal ist der Befund.
-  const consumer = CONSUMERS.find((entry) => entry.dir === 'persona');
+  const consumer = CONSUMERS.find((entry) => entry.dir === 'prompter');
   const input = consumerInput(consumer);
   const broken = {
     main: `${input.sources.main}\nexport const NARRATIVE_CHANNEL = '${STATE_CHANNEL}';\n`,
@@ -328,35 +329,32 @@ test('narrative: ein Literal im Abnehmer wird wieder zum Befund (Mutationsprobe)
   assert.ok(missing.some((issue) => issue.includes('importiert NARRATIVE_STATE_CHANNEL nicht')), missing.join('\n'));
 });
 
-test('narrative: renderStand macht aus dem Composite ein <narrative>-Element — aus nichts nichts', () => {
-  assert.equal(prompter.renderStand({ stance: null, tendencies: [], notes: [] }), null, 'ohne Inhalt kein Stand');
+test('narrative: renderStand trägt keine Narrative — die Lage steht in der Spur', () => {
+  assert.equal(prompter.renderStand({ stance: null, tendencies: [], notes: [] }), null, 'ohne Zettel kein Stand');
   assert.equal(
-    prompter.renderStand({ stance: null, tendencies: [], notes: [], narrative: {} }),
+    prompter.renderStand({ stance: null, tendencies: [], notes: [], narrative: COMPOSITE }),
     null,
-    'ein Composite ohne Feld ergibt kein Element',
+    'ein Composite ohne Zettel ergibt keinen Block',
   );
   const block = prompter.renderStand({
     stance: null,
     tendencies: [],
-    notes: [],
+    notes: [{ thema: 'gate', bei: 'Bei X', immer: 'Immer Y', weil: 'Weil Z' }],
     narrative: COMPOSITE,
     narrativeContract: NARRATIVE_CONTRACT_ID,
   });
   assert.ok(block.startsWith('<shinon_stand>'), 'der Stand bleibt EIN Block');
-  assert.ok(block.includes(`<narrative contract="${NARRATIVE_CONTRACT_ID}">`), 'die Herkunft fehlt am Element');
-  for (const value of ['arc-7', 'system', 'established_duo', 'concerned']) {
-    assert.ok(block.includes(value), `${value} fehlt im Stand`);
-  }
+  assert.ok(block.includes('<zettel thema="gate">'), 'die Zettel stehen drin');
+  assert.equal(block.includes('<narrative'), false, 'kein Narrative-Element im Veredler-Block');
   assert.ok(block.endsWith('</shinon_stand>'));
-  assert.equal(block.split('</narrative>').length - 1, 1, 'genau ein Element, nicht mehrere');
 });
 
-test('narrative: standFor nimmt den Composite aus dem Laufzeit-Zustand in den Stand auf', () => {
+test('narrative: standFor nimmt den Composite in die Spur auf, nicht in den Block', () => {
   const config = { notesPath: '', skillsPath: '' };
   assert.equal(prompter.standFor(config, {}, 'text', null, null).block, null, 'ohne alles kein Stand');
 
   const withNarrative = prompter.standFor(config, { narrative: COMPOSITE }, 'text', null, null);
-  assert.ok(withNarrative.block.includes('<narrative'), 'der Arc fehlt im Stand');
+  assert.equal(withNarrative.block, null, 'die Lage steht nicht im Veredler-Block');
   assert.equal(withNarrative.narrative.arc_id, 'arc-7');
   assert.equal(withNarrative.narrative.narrator, 'system');
   // Die Spur ist ein Datensatz, kein Prompt-Block: kein Fliesstext darin.
@@ -381,72 +379,35 @@ test('narrative: der umgekehrte Weg — ein fremder Composite wird nicht erfunde
   }
 });
 
-// ── 3. Die reine Funktion ────────────────────────────────────────────────────
+// ── 3. Der echte Bundle-Pfad ────────────────────────────────────────────────
 
-test('narrative: renderNarrative macht aus einem Composite einen Abschnitt — aus nichts nichts', () => {
-  assert.equal(persona.renderNarrative(personaContract, null), null);
-  assert.equal(persona.renderNarrative(personaContract, undefined), null);
-  assert.equal(persona.renderNarrative(personaContract, 'kein objekt'), null);
-  assert.equal(persona.renderNarrative(personaContract, {}), null, 'ein Composite ohne Feld ergibt keinen Abschnitt');
-  assert.equal(persona.renderNarrative({}, COMPOSITE), null, 'ohne Beschriftung im Vertrag keine Sektion');
-
-  const text = persona.renderNarrative(personaContract, COMPOSITE);
-  assert.ok(text.startsWith(personaContract.narrative.heading));
-  for (const value of ['arc-7', 'system', 'concerned', 'established_duo']) {
-    assert.ok(text.includes(value), `${value} fehlt im Abschnitt`);
-  }
-  // Die Herkunft steht dabei: die Sektion behauptet nicht, sie sei die Persona.
-  assert.match(text, /authority NONE/);
-  assert.ok(text.includes(narrative.STATE_CONTRACT));
-});
-
-test('narrative: ein teilweise gefüllter Composite lässt nur Vorhandenes durch', () => {
-  const text = persona.renderNarrative(personaContract, { arc_id: 'arc-9', narrator: null, seq: 0 });
-  assert.ok(text.includes('arc-9'));
-  assert.equal(text.includes('Erzähler'), false, 'ein fehlendes Feld wird nicht behauptet');
-  // `seq: 0` ist ein WERT, kein Fehlen: 0 muss durchkommen.
-  assert.ok(text.includes('Takt: 0'));
-});
-
-// ── 4. Der echte Bundle-Pfad ─────────────────────────────────────────────────
-
-test('narrative: ohne Composite gibt es keinen narrativen Abschnitt', () => {
+test('narrative: die Persona abonniert den Kanal nicht — kein Abschnitt, kein Handler', () => {
   const host = connect();
-  assert.equal(host.narrativeSection(), undefined);
-  assert.equal(host.handlers.has(STATE_CHANNEL), true, 'der Kanal muss abonniert sein, auch ohne Ereignis');
+  assert.equal(host.handlers.has(STATE_CHANNEL), false, 'die Persona hört nicht mehr zu');
+  assert.equal(host.dispatch(STATE_CHANNEL, COMPOSITE), false);
+  assert.ok(!host.sections.some((entry) => entry.name === 'shinon:narrative-arc'), 'kein Narrativ-Abschnitt');
   host.dispose();
 });
 
-test('narrative: ein Composite auf dem Kanal erscheint als Abschnitt im Prompt', () => {
+test('narrative: der Composite ändert den Live-Block nicht — der Persona-Zustand bleibt maßgeblich', () => {
   const host = connect();
-  assert.equal(host.dispatch(STATE_CHANNEL, COMPOSITE), true);
-  const section = host.narrativeSection();
-  assert.ok(section, 'der Abschnitt shinon:narrative-arc fehlt');
-  assert.equal(section.text.includes('arc-7'), true);
-  // Ersetzen, nicht anhängen: genau EIN narrativer Abschnitt bleibt.
-  host.dispatch(STATE_CHANNEL, { ...COMPOSITE, arc_id: 'arc-8' });
-  assert.equal(host.sections.filter((entry) => entry.name === 'shinon:narrative-arc').length, 1);
-  assert.ok(host.narrativeSection().text.includes('arc-8'));
-  host.dispose();
-});
-
-test('narrative: der Composite ändert den Persona-ZUSTAND nicht (der eigene Mood bleibt maßgeblich)', () => {
-  const host = connect();
-  const before = host.stateSection().text;
+  const before = host.liveOf();
+  assert.ok(before.includes('du bist gerade bereit'), `unerwarteter Live-Stand: ${before}`);
   host.dispatch(STATE_CHANNEL, COMPOSITE);
-  assert.equal(host.stateSection().text, before, 'der narrativen Stimmung darf der Zustand nicht folgen');
+  assert.equal(host.liveOf(), before, 'der narrativen Stimmung darf der Zustand nicht folgen');
   // Und der Persona-Mood kommt weiterhin aus dem Spine, nicht aus der Narrative.
   host.dispatch('shinon/event', { event_type: 'gate.failed', session_id: 's1' });
-  assert.match(host.stateSection().text, /"mood": "concerned"/);
-  assert.match(host.narrativeSection().text, /Narrative Stimmung/);
+  assert.match(host.liveOf(), /bei einem Risiko/);
+  assert.equal(host.liveOf().includes('arc-7'), false, 'keine Arc-Id im Live-Block');
   host.dispose();
 });
+
 
 test('narrative: nach dispose kommt kein Composite mehr an', () => {
   const host = connect();
   host.dispose();
   assert.equal(host.dispatch(STATE_CHANNEL, COMPOSITE), false);
-  assert.equal(host.narrativeSection(), undefined);
+  assert.ok(!host.sections.some((entry) => entry.name === 'shinon:narrative-arc'), 'kein Narrativ-Abschnitt');
 });
 
 // ── 5. Das Gate selbst, gegen dieses Repo ────────────────────────────────────
@@ -459,7 +420,7 @@ test('narrative: das Gate läuft gegen dieses Repo grün', () => {
 
 test('narrative: das Gate meldet einen fehlenden Abnehmer (Mutationsprobe über den Slice)', () => {
   const root = repo.readRoot();
-  const packages = repo.discover(root).filter((pkg) => pkg.dir !== 'persona');
+  const packages = repo.discover(root).filter((pkg) => pkg.dir !== 'prompter');
   const issues = check({ root, packages, repo });
   assert.ok(issues.some((issue) => issue.includes('keinen Abnehmer')), issues.join('\n'));
 });

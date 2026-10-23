@@ -109,6 +109,7 @@ function createHost(services = {}) {
 /** Der echte `getSectionOrder`/`section`-Vertrag des System-Prompts, minimal. */
 function systemPromptHub() {
   const entries = new Map();
+  const contexts = new Map();
   return {
     getSectionOrder(name) {
       return name === 'DEPLOYMENT_PERSONA_PREFIX' ? 0 : 9000;
@@ -118,6 +119,18 @@ function systemPromptHub() {
       return () => {
         if (entries.get(entry.name) === entry) entries.delete(entry.name);
       };
+    },
+    // Der Live-Zustand ist RUNTIME-CONTEXT, kein Abschnitt: eigener Kanal.
+    context(entry) {
+      contexts.set(entry.name, entry);
+      return () => {
+        if (contexts.get(entry.name) === entry) contexts.delete(entry.name);
+      };
+    },
+    rawContext(name) {
+      const entry = contexts.get(name);
+      if (!entry) return null;
+      return { ...entry, text: typeof entry.text === 'function' ? entry.text(ASSEMBLY) : entry.text };
     },
     raw(name) {
       const entry = entries.get(name);
@@ -157,7 +170,6 @@ const PERSONA_CONFIG = {
   // koennte gar nicht greifen — der Pfad ist relativ zum Paket.
   statePath: './assets/persona-state.json',
   identity: 'PERSONA-MARKE',
-  includeAugenhoehe: false,
   alwaysKnowIdentity: false,
   projectContextPath: '',
   selfModelNamespace: '',
@@ -219,15 +231,15 @@ test('persona: der Text einer echten user/message-Blockliste erreicht User-Lage,
   quiet(() => loaded.persona.apply(host.ctx, { ...PERSONA_CONFIG, memoryNamespace: loaded.persona.MEMORY_NAMESPACE }));
   const disposePersona = host.dispose;
 
-  // Vor dem Ereignis: kein Prompt-Text -> kein Beleg im Gedaechtnisblock.
-  assert.equal(hub.raw('shinon:user-lage'), null, 'User-Lage ohne Ereignis');
+  // Vor dem Ereignis: keine Reaktion -> kein Beleg im Gedaechtnisblock.
+  assert.equal((hub.rawContext('shinon:persona-live')?.text ?? '').includes('Besondere Reaktion'), false, 'Reaktion ohne Ereignis');
   assert.equal(hub.render(ASSEMBLY).some((section) => section.name === 'shinon:memory'), false, 'Beleg ohne Prompt-Text');
 
   host.ctx.emit('session/event', SESSION, humanMessage('Boah, heute laeuft alles schief, ich bin genervt. Wer bist du?'));
 
-  const lage = hub.raw('shinon:user-lage');
-  assert.ok(lage, 'User-Lage fehlt — der Blocklisten-Text kam nicht an');
-  assert.match(lage.text, /frustriert/);
+  const live = hub.rawContext('shinon:persona-live');
+  assert.ok(live, 'Live-Kanal fehlt — der Blocklisten-Text kam nicht an');
+  assert.match(live.text, /Besondere Reaktion: der Mensch ist genervt/);
   const trigger = hub.raw('shinon:identity-trigger');
   assert.ok(trigger, 'Anrede fehlt — der Blocklisten-Text kam nicht an');
   assert.match(trigger.text, /wer bist du/i);
@@ -301,7 +313,7 @@ test('skills: der Lebenszyklus feuert auf turn.end durch den echten Spine und sc
 
 // ── 3. Ein Produzent für die Beziehungsstufe ────────────────────────────────
 
-test('relation: der ausdrueckliche Akt erreicht Persona und Narrative durch den echten Spine', async () => {
+test('relation: der ausdrueckliche Akt erreicht den Zustand — nicht den Prompt', async () => {
   const hub = systemPromptHub();
   const routes = [];
   const webServer = {
@@ -353,12 +365,12 @@ test('relation: der ausdrueckliche Akt erreicht Persona und Narrative durch den 
   const injected = table.find((entry) => entry.kind === 'global' && entry.name === loaded.persona.UI_STATE_GLOBAL);
   assert.ok(injected, 'der Zustands-Global fehlt');
   assert.deepEqual(injected.value.relation, { levels: ['stranger', 'known', 'trusted', 'anchor'], current: 'trusted' });
-  const state = hub.render(ASSEMBLY).find((section) => section.name === 'shinon:state');
-  assert.ok(state, 'Zustands-Abschnitt fehlt');
-  assert.match(state.text, /"relation": "trusted"/);
-  const arc = hub.render(ASSEMBLY).find((section) => section.name === 'shinon:narrative-arc');
-  assert.ok(arc, 'Narrative-Lage fehlt');
-  assert.match(arc.text, /Beziehung: established_duo/);
+  // Der Prompt behauptet den Akt NICHT: Beziehungsstufe und Narrative sind
+  // Metadaten. Was bleibt, ist der Zustand (UI-Global) — und kein Abschnitt.
+  const rendered = hub.render(ASSEMBLY).map((section) => section.name);
+  assert.equal(rendered.includes('shinon:state'), false, 'kein Zustands-Abschnitt mehr');
+  assert.equal(rendered.includes('shinon:narrative-arc'), false, 'kein Narrativ-Abschnitt mehr');
+  assert.equal((hub.rawContext('shinon:persona-live')?.text ?? '').includes('trusted'), false, 'keine Stufe im Live-Block');
 
   // Fail-closed: eine erfundene Stufe und eine fehlende Sitzung aendern nichts.
   assert.deepEqual(service.set({ level: 'erfunden', sessionId: 'sess-1' }), { ok: false, error: 'UNKNOWN_RELATION' });
@@ -366,10 +378,10 @@ test('relation: der ausdrueckliche Akt erreicht Persona und Narrative durch den 
 
   // Und der naechste ausdrueckliche Akt hebt die Stufe weiter — ohne einen zweiten Weg.
   service.set({ level: 'anchor', sessionId: 'sess-1' });
-  const after = hub.render(ASSEMBLY).find((section) => section.name === 'shinon:state');
-  assert.match(after.text, /"relation": "anchor"/);
-  const arcAfter = hub.render(ASSEMBLY).find((section) => section.name === 'shinon:narrative-arc');
-  assert.match(arcAfter.text, /Beziehung: trusted_team/);
+  const later = [];
+  host.ctx.emit(loaded.persona.INDEX_INJECT, later);
+  const after = later.find((entry) => entry.kind === 'global' && entry.name === loaded.persona.UI_STATE_GLOBAL);
+  assert.equal(after.value.relation.current, 'anchor', 'der naechste Akt hebt die Stufe');
 
   host.dispose();
 });

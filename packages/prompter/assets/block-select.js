@@ -143,7 +143,7 @@ export function buildHaystack(promptText, context = null) {
  */
 
 /** Bausteine, deren Inhalt eine eigene Pipeline lädt (Gate, kein Zweitleser). */
-const PIPELINE_BLOCKS = ['stand-zettel', 'skills-block', 'intent-expansion'];
+const PIPELINE_BLOCKS = ['stand-zettel', 'intent-expansion'];
 
 function sourceReady(block, available) {
   const a = isRecord(available) ? available : {};
@@ -159,10 +159,6 @@ function sourceReady(block, available) {
       return a.notesOn === true
         ? { ready: true, reason: null }
         : { ready: false, reason: 'QUELLE_FEHLT:zettel' };
-    case 'skills-block':
-      return a.skillsOn === true
-        ? { ready: true, reason: null }
-        : { ready: false, reason: 'QUELLE_FEHLT:skills' };
     case 'intent-expansion':
       return a.intentOn === true
         ? { ready: true, reason: null }
@@ -214,11 +210,11 @@ export function matchBlock(block, input = {}) {
   if (!source.ready) return { selected: false, hits: 0, reason: source.reason };
 
   // Pipeline-Bausteine: die Quelle IST der Anlass — ihre Inhalte liegen in
-  // einer eigenen Pipeline (Zettelverzeichnis, Skillordner, Intent-Datei), die
-  // der Host NACH dieser Auswahl lädt. Auslöser-Texte werten hier nichts: wer
+  // einer eigenen Pipeline (Zettelverzeichnis, Intent-Datei), die der Host
+  // NACH dieser Auswahl lädt. Auslöser-Texte werten hier nichts: wer
   // regelkonform „an“ ist, wird gewählt (QUELLE_BEREIT), wer aus ist, kam
   // bereits mit QUELLE_FEHLT heraus. Das ist die Migration: kein zweites
-  // Parallelsystem neben selectNotes/selectSkills, sondern EIN Gate.
+  // Parallelsystem neben selectNotes, sondern EIN Gate.
   if (PIPELINE_BLOCKS.includes(block.id)) {
     return { selected: true, hits: 0, reason: `QUELLE_BEREIT:${block.id}` };
   }

@@ -13,9 +13,10 @@
  * bleiben beim Host — der Kern kennt keine Abschnittsnamen des Hosts.
  *
  * WAS DIESER BAUSTEIN NICHT IST: die Haltung. Evidenz und Widerspruch stehen
- * in der Epistemischen Haltung, Zustaendigkeit und Zusammenarbeit in der
- * Disziplin, die Form des Berichts im Berichtsstil. Hier wird der ABLAUF
- * beschrieben und auf jene Abschnitte verwiesen, statt sie zu wiederholen.
+ * in der Epistemischen Haltung, die Form des Berichts im Berichtsstil, der
+ * Umgang mit Blockern in "Blockiert heißt nicht Endstation". Hier wird der
+ * ABLAUF beschrieben und auf jene Abschnitte verwiesen, statt sie zu
+ * wiederholen.
  */
 
 /** Die Ueberschrift des Abschnitts — an EINER Stelle, damit sie nicht driftet. */
@@ -33,8 +34,8 @@ Kein Schritt wird übersprungen, weil ein späterer bequemer wirkt.
    Der Plan ist ein Satz, kein Programm: der nächste Schritt, der die Lage
    bewegt.
 3. HANDELN — du gehst den kleinsten Schritt, der die Lage bewegt, im Rahmen
-   deines Auftrags (siehe Zuständigkeit, Parallelität, Git). Kein Umweg, kein
-   Warten. Werkzeug vor Behauptung: erst ausführen, dann sagen.
+   deines Auftrags. Kein Umweg, kein Warten. Werkzeug vor Behauptung: erst
+   ausführen, dann sagen.
 4. PRÜFEN — du lässt den Test laufen und misst das Ergebnis, bevor du meldest.
    Was als Beleg zählt, steht in der Epistemischen Haltung; hier geht es um die
    Reihenfolge: erst messen, dann melden.

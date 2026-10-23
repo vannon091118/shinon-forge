@@ -1920,7 +1920,7 @@ test('Zettel: der passende Zettel steht als eigener Block im Aufruf und im Daten
   // `narrative: null` steht im Datensatz, weil kein Composite gelesen wurde —
   // das Feld ist die Narrative-Lage (Zug 6), und sein Fehlen waere von „es gibt
   // keine" nicht zu unterscheiden. Die Gegenprobe steht im Test darunter.
-  assert.deepEqual(records[0].stand, { stance: null, tone: 'none', tendencies: [], narrative: null, notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null }, skills: { loaded: [], reason: 'SKILLS_OFF' } });
+  assert.deepEqual(records[0].stand, { stance: null, tone: 'none', tendencies: [], narrative: null, notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null } });
   assert.equal(request.messages[0].content[2].text.includes('<narrative'), false, 'ohne Composite kein Narrative-Element');
   dispose();
 });
@@ -1935,7 +1935,7 @@ test('Zettel: der passende Zettel steht als eigener Block im Aufruf und im Daten
  * nicht weiter; kein Test fuhr die Kette, weil alle den Stand DIREKT aufriefen.
  * Ein Feld, das nur im direkten Aufruf existiert, existiert im Betrieb nicht.
  */
-test('Narrative: ein Composite auf dem Kanal steht im Stand und in der Spur', async () => {
+test('Narrative: ein Composite auf dem Kanal steht in der Spur, nicht im Stand', async () => {
   const composite = {
     seq: 7,
     mood: 'concerned',
@@ -1952,8 +1952,8 @@ test('Narrative: ein Composite auf dem Kanal steht im Stand und in der Spur', as
   await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
 
   const block = llm.calls[0].messages[0].content[2].text;
-  assert.ok(block.includes('<narrative'), 'die Lage steht als eigenes Element im Stand');
-  assert.ok(block.includes('arc: arc-7'), 'mit dem Arc');
+  assert.ok(block.includes('<zettel thema="prompter">'), 'die Zettel stehen im Stand');
+  assert.equal(block.includes('<narrative'), false, 'kein Narrative-Element im Veredler-Block');
   assert.deepEqual(
     records[0].stand.narrative,
     { arc_id: 'arc-7', narrator: 'system', relationship_state: 'established_duo' },
@@ -1977,8 +1977,8 @@ test('Zettel: ein fremdes Thema laedt nicht — mit Grund, nicht still', async (
 
   await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
 
-  // Ein Zettel ohne Treffer und ohne Skills ergibt KEINEN Stand — die Lücke
-  // ist ehrlich (kein `<shinon_stand>` im Aufruf), nicht ein leerer Block.
+  // Ein Zettel ohne Treffer ergibt KEINEN Stand — die Lücke ist ehrlich
+  // (kein `<shinon_stand>` im Aufruf), nicht ein leerer Block.
   assert.equal(llm.calls[0].messages[0].content.length, 2, 'kein Stand ohne passenden Zettel');
   assert.deepEqual(records[0].stand.notes.loaded, []);
   assert.deepEqual(records[0].stand.notes.reasons, ['THEMA_NICHT_IM_KONTEXT']);
@@ -2036,12 +2036,12 @@ test('Zettel: hoechstens drei laden, die meisten Treffer zuerst', async () => {
   dispose();
 });
 
-// ── 8. Der Ton im selben Block (Zug 5) ──────────────────────────────────────
+// ── 8. Der Ton in der Spur, nicht im Block (Zug 5) ─────────────────────────
 //
 // Haltung und Tendenzen kommen aus dem Scoring — ueber dieselbe Bauform der
-// Naht (optionales `get`, gepruefter Vertragsname). Sie landen im SELBEN Block
-// wie die Zettel: der Kontext sind Dateien, der Stand ist, was Shinon ueber sich
-// weiss, und ein zweiter Block waere eine zweite Wahrheit ueber denselben Schritt.
+// Naht (optionales `get`, gepruefter Vertragsname). Sie landen NICHT im
+// Veredler-Block: der Stand traegt nur Zettel, der Ton steht im Live-Block
+// des Hauptmodells und als Datensatz in der Spur.
 
 /** Eine Ton-Faehigkeit in der Form, die @shinon/scoring anbietet. */
 const toneService = (state) => ({
@@ -2059,7 +2059,7 @@ const toneState = {
   signals: 5,
 };
 
-test('Stand: Haltung und Tendenzen stehen im selben Block wie die Zettel', async () => {
+test('Stand: Haltung und Tendenzen stehen in der Spur, nicht im Block', async () => {
   const dir = notesFor('mit-ton', { 'a.json': note('prompter') });
   const llm = fakeLlm(reply(goodResult()));
   const services = toneService(toneState);
@@ -2069,17 +2069,16 @@ test('Stand: Haltung und Tendenzen stehen im selben Block wie die Zettel', async
   await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
 
   const block = llm.calls[0].messages[0].content[2].text;
-  assert.equal(llm.calls[0].messages[0].content.length, 3, 'EIN Stand-Block, nicht zwei');
-  assert.ok(block.includes('<haltung>kritisch</haltung>'), 'die Haltung steht im Block');
-  assert.ok(block.includes('<tendenzen>korrektur hoch; zustimmung niedrig</tendenzen>'), 'die Stufen stehen im Block');
-  assert.ok(block.includes('<zettel thema="prompter">'), 'und die Zettel bleiben darin');
+  assert.equal(llm.calls[0].messages[0].content.length, 3, 'Roh-Prompt, Kontextblock, Stand');
+  assert.equal(block.includes('<haltung>'), false, 'keine Haltung im Veredler-Block');
+  assert.equal(block.includes('<tendenzen>'), false, 'keine Stufen im Veredler-Block');
+  assert.ok(block.includes('<zettel thema="prompter">'), 'nur die Zettel stehen darin');
   assert.deepEqual(records[0].stand, {
     stance: 'kritisch',
     tone: 'scoring',
     tendencies: ['korrektur hoch', 'zustimmung niedrig'],
     narrative: null,
     notes: { loaded: ['prompter'], skipped: 0, reasons: [], reason: null },
-    skills: { loaded: [], reason: 'SKILLS_OFF' },
   });
   dispose();
 });
@@ -2135,26 +2134,22 @@ test('Stand: eine leere Antwort des Scorings ist kein Ton', async () => {
   dispose();
 });
 
-// ── 14. Skills: nur der Nutzertext ist eine ausdrückliche Nennung ─────────
+// ── 14. Skills: der Veredler injiziert keine ───────────────────────────────
 
 /**
- * Ein Skill, den erst die INTENT-ERWEITERUNG nennt, ist keine Nutzeranweisung.
+ * Skills gehoeren dem Hauptagenten ueber die native DSH-Skill-Discovery —
+ * der Veredler redigiert Text und bekommt keinen Skill-Block. Auch ein
+ * Skill-Verzeichnis mit Treffern aendert daran nichts: Der Request traegt
+ * keinen `<shinon_skills>`- und keinen `<selected_skills>`-Block, der Schritt
+ * laeuft trotzdem.
  *
- * Der Enhancer baut in MAX aus `prompt.text` plus der Expansion aus
- * `assets/intent-rules.json` einen `expandedText`. Bis hierher ging dieser
- * `expandedText` als `explicitText` in die Skill-Auswahl — dann hätte ein
- * Skill-Name, der nur in einer Regeldatei steht, als „vom Nutzer genannt"
- * gegolten und den Prioritätsrang vor besser passenden Skills bekommen. Der
- * Nutzer hat ihn nie genannt; die Regel hat ihn genannt. `assets/stand.js`
- * übergibt seit jeher `promptText` — hier wird die zweite Stelle gepinnt.
- *
- * Der Fall ist so gebaut, dass die beiden Ausgänge SICHTBAR auseinandergehen:
- * `a-arch` trifft dreimal (quartz, runtime, architektur), `z-spezial` einmal
- * (sein eigener Name, aus der Expansion). Mit der alten Übergabe gewinnt
- * `z-spezial` als „explizit"; mit der richtigen Reihenfolge gewinnt `a-arch`
- * über die Trefferzahl.
+ * Der Fall ist so gebaut, dass ein Treffer sicher zustande kaeme: `a-arch`
+ * trifft dreimal (quartz, runtime, architektur), `z-spezial` einmal (ueber die
+ * Intent-Expansion). Frueher wurde an dieser Stelle die Auswahl gepinnt (nur
+ * der Nutzertext gilt als ausdrueckliche Nennung); heute zaehlt sie nicht mehr,
+ * weil der Veredler Skills gar nicht mehr liest.
  */
-test('Skills: die Intent-Expansion nennt keinen Skill „explizit"', async () => {
+test('Skills: kein Skill-Block im Veredler-Request — auch nicht bei Treffern', async () => {
   const skillsRoot = mkdtempSync(join(tmpdir(), 'shinon-prompter-skills-'));
   const writeSkill = (name, description) => {
     mkdirSync(join(skillsRoot, name), { recursive: true });
@@ -2187,16 +2182,14 @@ test('Skills: die Intent-Expansion nennt keinen Skill „explizit"', async () =>
 
   await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
 
-  // Nur der SKILL-Block zählt: der expandierte Prompt selbst nennt `z-spezial`
-  // (die Expansion steht wörtlich darin). Ein `indexOf` über den ganzen Request
-  // würde genau die Regeldatei messen, die es nicht sein darf.
+  // Der expandierte Prompt selbst nennt `z-spezial` (die Expansion steht
+  // woertlich darin) — als Text, nicht als injizierter Skill-Block. Ein
+  // `indexOf` ueber den ganzen Request wuerde genau die Regeldatei messen,
+  // die es nicht sein darf.
   const request = llm.calls[0].messages[0].content.map((part) => part.text ?? '').join('\n');
-  const block = /<shinon_skills>[\s\S]*?<\/shinon_skills>/.exec(request)?.[0] ?? '';
-  assert.ok(block !== '', `der Skill-Block fehlt im Request: ${request}`);
-  const matched = block.indexOf('a-arch');
-  const named = block.indexOf('z-spezial');
-  assert.ok(matched >= 0 && named >= 0, `beide Skills stehen im Block: ${block}`);
-  assert.ok(matched < named, `der dreifach passende Skill steht vor dem, den nur die Expansion nennt: ${block}`);
+  assert.equal(/<shinon_skills>[\s\S]*?<\/shinon_skills>/.test(request), false, `kein Skill-Block im Request: ${request}`);
+  assert.equal(request.includes('<selected_skills'), false, 'kein Stand-Skill-Block');
+  assert.ok(request.includes('z-spezial'), 'die Expansion steht als Auftragstext drin — nicht als Skill-Block');
   dispose();
   rmSync(skillsRoot, { recursive: true, force: true });
 });

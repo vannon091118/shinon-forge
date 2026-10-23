@@ -18,13 +18,12 @@
 import { join } from 'node:path';
 import { abortRecord } from './abort-core.js';
 import { WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks } from './block-select.js';
-import { CAPABILITIES_CONTRACT, appendTaskBrief, briefRecord, matchCapability, renderTaskBrief, taskBrief } from './capability-map.js';
+import { CAPABILITIES_CONTRACT, briefRecord, matchCapability, renderTaskBrief, taskBrief } from './capability-map.js';
 import { knowledgeTrace, renderKnowledgeBlock } from './knowledge-block.js';
 import { enhanceGuarded, replacePrompt } from './enhancer.js';
 import { addTurnDuration, memorySummary, semanticProfile, weightsFrom } from './intent-memory.js';
 import { UNDEFINED, expandPrompt, isQuestion, normalizeIntentText, resolveIntent } from './intent-resolver.js';
 import { CONTRACT, DECISION_CHANNEL, FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, NOT_SUPPLIED, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, contextLabel, noContext, resolveMode, withContext } from './mode-core.js';
-import { readSkills, selectSkills } from './prompt-files.js';
 import { PROVENANCE_CONTRACT, provenanceRecord } from './provenance.js';
 import { OUTCOME_EFFECTS } from './result-contract.js';
 import { ContextSchema } from './schema.js';
@@ -377,7 +376,6 @@ function blockSelection(ctx, config, runtime, contract, promptText, context, sta
       available: {
         contextPresent: context !== null,
         notesOn: runtime.noteRules !== null && config.notesPath !== '',
-        skillsOn: runtime.skillRules !== null && config.skillsPath !== '',
         intentOn: runtime.intentRules !== null,
         narrative: runtime.narrative !== null,
         recentEvents: [],
@@ -469,33 +467,10 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   const selection = blockSelection(ctx, config, runtime, contract, expandedText, supply.context, stance);
   const stand = contextUsed ? standFor(config, runtime, expandedText, supply.context, toneState) : null;
 
-  // Skills werden IMMER gelesen (Zug 6): unabhaengig vom Modus, unabhaengig vom
-  // Kontext. Sie geben dem Modell Zugriff auf projekspezifisches Wissen.
-  let skills = [];
-  if (runtime.skillRules !== null) {
-    try {
-      const skillRead = readSkills(config, runtime.skillRules);
-      if (skillRead.skills.length > 0) {
-        // `explicitText` ist der NUTZERTEXT, nicht `expandedText`: die
-        // Intent-Erweiterung stammt aus `assets/intent-rules.json`, also aus
-        // einer Regeldatei. Ein Skill-Name, der nur dort steht, ist keine
-        // ausdrückliche Nennung durch den Menschen — er darf nicht den
-        // Prioritätsrang vor besser passenden Skills bekommen. `stand.js`
-        // übergibt aus demselben Grund `promptText`; beide Stellen antworten
-        // auf dieselbe Frage und müssen dieselbe Antwort geben.
-        const selected = selectSkills(skillRead.skills, [expandedText], {
-          ...(runtime.skillRules.reading ?? {}),
-          explicitText: prompt.text,
-        });
-        skills = selected.loaded;
-        if (skills.length > 0) {
-          console.log(`[shinon-prompter] Skills injiziert: ${skills.map((s) => s.name).join(', ')}`);
-        }
-      }
-    } catch (error) {
-      console.warn(`[shinon-prompter] Skills konnten nicht gelesen werden (${error?.message})`);
-    }
-  }
+  // Skills liest der Veredler NICHT: er redigiert Text, und die ausfuehrbaren
+  // Skill-Inhalte bleiben der nativen DSH-Skill-Discovery des Hauptagenten.
+  // Auch die Baustein-Auswahl kennt keine Skill-Quelle mehr — der Baustein
+  // `skills-block` ist mit dem Injektionsweg aus der Registry verschwunden.
 
   // Aktions-Check (P3) — seit 2026-10-19 ein OPTIONALER Kurzweg, nicht die
   // Vorgabe: der Veredler laeuft fuer JEDEN Schritt, auch fuer "hallo" und fuer
@@ -517,7 +492,7 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
       reasons: ['NO_ENHANCEMENT_NEEDED'],
       result: { enhancedPrompt: prompt.text, preservedIntent: true, addedRequirements: [], removedRequirements: [], uncertainties: [], references: [] },
     }
-    : await enhanceGuarded(ctx, contract, { ...config, ...runtime.route, strictFacts: knowledgeSnapshot !== null }, expandedText, supply.context, stand, skills, payload.signal, journalRejected);
+    : await enhanceGuarded(ctx, contract, { ...config, ...runtime.route, strictFacts: knowledgeSnapshot !== null }, expandedText, supply.context, stand, payload.signal, journalRejected);
   if (direct) console.log(`[shinon-prompter] Direkt durchgereicht (${runtime.turn.resolution.classification}) — kein One-Shot`);
 
   // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
@@ -528,14 +503,14 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   // der Rueckfall ist die Durchreiche, damit ein solcher Fall nie den Schritt
   // bricht — dieselbe Fail-Richtung wie im ganzen Paket.
   const effect = OUTCOME_EFFECTS[outcome.outcome] ?? OUTCOME_EFFECTS.rejected;
-  // Der Aufgabenbrief haengt am ERSETZTEN Prompt, nicht am Roh-Prompt: er sagt dem
-  // Main-Agenten, WER die Frage beantwortet und WO der Beleg liegt. Der direkte
-  // Kurzweg bleibt unberuehrt (sein Versprechen ist: keine Aenderung), und ohne
-  // gefundene Nachricht gibt es nichts anzuhaengen. Der Grund steht im Datensatz,
-  // nicht nur im Log — `brief_reason` nennt ihn.
-  const briefState = effect.replacePrompt && outcome.outcome === 'accepted' && !direct
-    ? briefFor(runtime, expandedText)
-    : { reason: direct ? 'DIREKT' : 'KEIN_ERSETZEN' };
+  // Der Aufgabenbrief haengt NICHT an der ersetzten Nutzernachricht:
+  // Routing-Metadaten gehoeren in den Runtime-Context (`registerContext`
+  // liest `runtime.lastBriefText`) — und nur bei EINDEUTIGEM Treffer. Bei
+  // uneindeutigem Treffer entfaellt der Brief; der Grund steht im Datensatz
+  // (`brief_reason`), nicht im Prompt. Der direkte Kurzweg bleibt unberuehrt
+  // (sein Versprechen ist: keine Aenderung).
+  const briefState = !direct ? briefFor(runtime, expandedText) : { reason: 'DIREKT' };
+  runtime.lastBriefText = briefState.rendered?.text ?? null;
   // `outcome.result` ist bei jedem nicht angenommenen Ausgang `null` — und dann
   // wird nichts ersetzt. Der Zugriff steht deshalb hinter derselben Bedingung
   // wie der Ersatz selbst, nicht davor.
@@ -584,9 +559,7 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   // `content[1]` ist der Kontext: das Modell sieht beides, der Auftrag bleibt
   // unangetastet, und der Vertrag haelt.
   const replacement = effect.replacePrompt && typeof outcome.result?.enhancedPrompt === 'string'
-    ? withKnowledge(briefState.rendered === undefined
-      ? outcome.result.enhancedPrompt
-      : appendTaskBrief(outcome.result.enhancedPrompt, briefState.rendered))
+    ? withKnowledge(outcome.result.enhancedPrompt)
     : null;
   // Kein Ersatz heisst NICHT "kein Wissen": auf dem Direktpfad und nach einem
   // abgelehnten One-Shot wird der Roh-Prompt um den Block ergaenzt, ueber
@@ -629,7 +602,7 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
     ? { ...outcome, outcome: 'rejected', reasons: effect.missingMessage }
     : outcome;
   const brief = briefState.record !== undefined
-    ? (messages !== null ? { record: briefState.record, reason: null } : { record: null, reason: 'NACHRICHT_FEHLT' })
+    ? { record: briefState.record, reason: null }
     : { record: null, reason: briefState.reason ?? 'KEIN_BRIEF' };
   // Die zweite Hälfte der Gesamtlaufzeit: die Dauer fällt erst nach dem Turn an
   // und hängt an demselben Pattern, das die Beobachtung verbucht hat.

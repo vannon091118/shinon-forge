@@ -231,68 +231,28 @@ function escapeText(text) {
 }
 
 /**
- * Den Stand als EINEN Block rendern — Haltung, Tendenzen, passende Zettel.
+ * Den Stand als EINEN Block rendern — nur die passenden Zettel.
  *
- * Der Stand ist eine Auskunft, keine Anweisung: er steht in eigenen Marken und
- * nennt seine Herkunft. Leere Teile FALLEN WEG statt leer dazustehen: ein
- * `<haltung>` ohne Haltung wäre eine Behauptung. Ist nichts davon da, kommt
- * `null` zurück — der Aufrufer hängt dann keinen Block an (kein leerer Block im
- * Prompt).
+ * Der Stand ist eine Auskunft, keine Anweisung: er steht in eigenen Marken.
+ * Haltung, Tendenzen, Narrative-Lage und Skills gehoeren NICHT hierher — sie
+ * stehen im Live-Block des Hauptmodells, in der Entscheidungsspur oder in
+ * der nativen Skill-Discovery. Was doppelt stuende, wuerde doppelt wirken.
  *
- * ZUG 6 — die Narrative-Lage: der Composite der Narrative Engine kommt als
- * EIGENES Element `<narrative contract="…">` in den Stand. Er trägt seinen
- * Vertragsnamen als Herkunft und ist damit als gelesen ausgewiesen; die Engine
- * sagt selbst `authority: NONE` (abgeleitet ist nicht autoritativ), und dieses
- * Element behauptet deshalb nichts über die Welt — es sagt, wie der Takt
- * gelesen wurde. Nur die FELDER, die der Composite wirklich trägt: ein Arc, den
- * es nicht gibt, wird nicht erfunden.
+ * Gibt es keine passende Notiz, entfaellt der Block vollstaendig: `null`
+ * heisst kein Block im Prompt (kein leerer Block, keine Behauptung).
  */
 export function renderStand(stand) {
   if (!isRecord(stand)) return null;
-  const tens = Array.isArray(stand.tendencies) ? stand.tendencies : [];
   const notes = Array.isArray(stand.notes) ? stand.notes : [];
-  const skills = Array.isArray(stand.skills) ? stand.skills : [];
-  const hasStance = stand.stance !== null && stand.stance !== undefined;
-  const narrative = isRecord(stand.narrative) ? stand.narrative : null;
-  const lage = narrative === null
-    ? []
-    : [
-        ['arc', narrative.arc_id],
-        ['erzaehler', narrative.narrator],
-        ['beziehung', narrative.relationship_state],
-        ['stimmung', narrative.mood],
-      ].filter(([, value]) => value !== null && value !== undefined && value !== '');
-  if (!hasStance && tens.length === 0 && notes.length === 0 && skills.length === 0 && lage.length === 0) return null;
+  if (notes.length === 0) return null;
 
   const lines = ['<shinon_stand>'];
-  if (typeof stand.contract === 'string' && stand.contract !== '') {
-    lines.push(`<stand_contract>${escapeText(stand.contract)}</stand_contract>`);
-  }
-  if (hasStance) lines.push(`<haltung>${escapeText(stand.stance)}</haltung>`);
-  if (tens.length > 0) {
-    lines.push(`<tendenzen>${tens.map((entry) => `${escapeText(entry.klasse)} ${escapeText(entry.stufe)}`).join('; ')}</tendenzen>`);
-  }
-  if (lage.length > 0) {
-    const origin = typeof stand.narrativeContract === 'string' && stand.narrativeContract !== ''
-      ? ` contract="${escapeText(stand.narrativeContract)}"`
-      : '';
-    lines.push(`<narrative${origin}>`);
-    lines.push(lage.map(([key, value]) => `${key}: ${escapeText(value)}`).join('; '));
-    lines.push('</narrative>');
-  }
   for (const note of notes) {
     lines.push(`<zettel thema="${escapeText(note.thema)}">`);
     lines.push(`bei: ${escapeText(note.bei)}`);
     lines.push(`immer: ${escapeText(note.immer)}`);
     lines.push(`weil: ${escapeText(note.weil)}`);
     lines.push('</zettel>');
-  }
-  if (skills.length > 0) {
-    lines.push(`<selected_skills contract="${escapeText(typeof stand.skillsContract === 'string' ? stand.skillsContract : 'shinon.skill-rules/v1')}">`);
-    for (const skill of skills) {
-      lines.push(`  <skill name="${escapeText(skill.name)}">${escapeText(skill.description)}</skill>`);
-    }
-    lines.push('</selected_skills>');
   }
   lines.push('</shinon_stand>');
   return lines.join('\n');

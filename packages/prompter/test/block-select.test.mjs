@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { BLOCK_LAGEN } from '../assets/block-review.js';
 import {
   BLOCKS_CONTRACT,
   candidateBlocks,
@@ -58,6 +59,15 @@ test('registry: die echte blocks.json lädt und prüft', () => {
     blocks: [...REGISTRY.blocks, REGISTRY.blocks[0]],
   };
   assert.match(validateRegistry(doubled).reason, /^ID_DOPPELT:/);
+});
+
+test('registry: jede Lage der Daten ist eine Lage der Pruefung', () => {
+  // Zwei Wahrheiten ueber denselben Namen waeren ein Datenfehler, der nirgends
+  // auffaellt: die Registry traegt `lage`, `BLOCK_LAGEN` entscheidet, was ein
+  // Vorschlag sein darf. Der Live-Block steht in der Nachricht, die den Stand
+  // ersetzt — ohne diesen Eintrag waere er fuer den Waechter ein Fremdwert.
+  const unknown = REGISTRY.blocks.filter((block) => !BLOCK_LAGEN.includes(block.lage));
+  assert.deepEqual(unknown.map((block) => `${block.id}:${block.lage}`), []);
 });
 
 test('selektor: Pflicht steht immer — auch in MIN mit leerem Prompt', () => {
@@ -160,17 +170,16 @@ test('selektor: Budget deckelt Situatives, nie Pflicht — deterministisch', () 
   assert.ok(first.totalTokens >= 900 && first.totalTokens <= 1000 + 600, `Deckel verletzt (${first.totalTokens})`);
 });
 
-test('selektor: Quellen-Gate — ohne Kontext kein Index-Block, ohne Skills kein Skill-Block', () => {
+test('selektor: Quellen-Gate — ohne Kontext kein Index-Block, ohne Zettel kein Zettel-Block', () => {
   const selection = selectBlocks(REGISTRY, {
     mode: 'MAX',
     promptText: 'refaktoriere den code',
     context: null,
-    available: { contextPresent: false, notesOn: false, skillsOn: false, intentOn: false, narrative: false },
+    available: { contextPresent: false, notesOn: false, intentOn: false, narrative: false },
   });
   const skipped = Object.fromEntries(selection.skipped.map((entry) => [entry.id, entry.reason]));
   assert.equal(skipped['index-project-context'], 'QUELLE_FEHLT:kontext');
   assert.equal(skipped['stand-zettel'], 'QUELLE_FEHLT:zettel');
-  assert.equal(skipped['skills-block'], 'QUELLE_FEHLT:skills');
   assert.equal(skipped['intent-expansion'], 'QUELLE_FEHLT:intent');
 });
 
@@ -183,17 +192,17 @@ test('selektor: matchBlock kennt jede Richtung einzeln', () => {
 });
 
 test('selektor: Gewicht bricht Gleichstand, schlägt nie Treffer', () => {
-  // 'commit' trifft change-classes UND discipline je einmal — Gleichstand.
+  // 'commit' trifft change-classes, 'replay' trifft determinism — je einmal, Gleichstand.
   const tie = { mode: 'MAX', promptText: 'commit replay', context: null, available: {} };
   const plain = selectBlocks(REGISTRY, tie).selected.map((entry) => entry.id);
-  assert.ok(plain.includes('persona-change-classes') && plain.includes('persona-discipline'), 'Gleichstand als Basis');
+  assert.ok(plain.includes('persona-change-classes') && plain.includes('persona-determinism'), 'Gleichstand als Basis');
   const weights = {
     'persona-change-classes': { up: 0, down: 5 },
-    'persona-discipline': { up: 5, down: 0 },
+    'persona-determinism': { up: 5, down: 0 },
   };
   const learned = selectBlocks(REGISTRY, { ...tie, weights }).selected.map((entry) => entry.id);
   assert.ok(
-    learned.indexOf('persona-discipline') < learned.indexOf('persona-change-classes'),
+    learned.indexOf('persona-determinism') < learned.indexOf('persona-change-classes'),
     `Gleichstand bricht das Gewicht (${learned.join(',')})`,
   );
   // 'seed' gibt determinism ZWEI Treffer — kein Gewicht der Welt überholt das.
@@ -219,7 +228,7 @@ test('selektor: Kandidaten sind Modus + Quelle, nicht der Auslöser', () => {
   assert.ok(candidates.includes('persona-workaround'));
   // Die Quelle ist aus: kein Kandidat, egal welcher Modus.
   assert.ok(!candidates.includes('stand-zettel'));
-  assert.ok(!candidates.includes('skills-block'));
+  assert.ok(candidates.includes('persona-live'), 'der Live-Block steht zur Wahl, sobald der Modus passt');
   // Der Modus ist der zweite Deckel: MAX-Bausteine sind in MIN keine Kandidaten.
   const min = candidateBlocks(REGISTRY, { mode: 'MIN', available: {} }).map((block) => block.id);
   assert.ok(!min.includes('index-project-context'));

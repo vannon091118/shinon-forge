@@ -85,6 +85,8 @@ export function renderContextBlock(context) {
  * @param {object} quellen
  * @param {Function} quellen.context der Kontext (oder null)
  * @param {Function} [quellen.wissen] der Wissensblock (oder null)
+ * @param {Function} [quellen.brief] der Aufgabenbrief — Routing-Metadaten
+ *   (wer zustaendig ist, wo der Beleg liegt), nur bei eindeutigem Treffer
  * @param {Function} [quellen.spricht] liefert der Kanal in dieser Sitzung?
  * @returns {Function} der Disposer
  */
@@ -93,7 +95,7 @@ export function registerContext(sp, quellen = {}) {
     console.error('[shinon-prompter] systemPrompt-Dienst ohne context() — der Projektkontext kommt NICHT an');
     return () => {};
   }
-  const { context = () => null, wissen = () => null, spricht = () => true } = quellen;
+  const { context = () => null, wissen = () => null, brief = () => null, spricht = () => true } = quellen;
   return sp.context({
     name: CONTEXT_NAME,
     order: CONTEXT_ORDER,
@@ -108,6 +110,8 @@ export function registerContext(sp, quellen = {}) {
       if (gerendert !== '') blokte.push(gerendert);
       const wissensBlock = typeof wissen === 'function' ? wissen() : null;
       if (typeof wissensBlock === 'string' && wissensBlock !== '') blokte.push(wissensBlock);
+      const briefBlock = typeof brief === 'function' ? brief() : null;
+      if (typeof briefBlock === 'string' && briefBlock !== '') blokte.push(briefBlock);
       return blokte.join('\n\n');
     },
   });

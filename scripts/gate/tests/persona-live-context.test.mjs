@@ -82,7 +82,6 @@ async function beides(overrides = {}, { sessionCwd } = {}) {
   await quiet(() => ctx.plugin(bundle, {
     workspaceRoot: REPO_ROOT,
     identity: 'PERSONA-IDENTITY-MARKE',
-    includeAugenhoehe: false,
     alwaysKnowIdentity: false,
     ...overrides,
   }));
@@ -113,14 +112,16 @@ test('der Live-Kontext steht in den CONTEXTS, nicht nur im System-Prompt', async
   assert.match(joined, /Current runtime context\. This snapshot supersedes earlier runtime-context snapshots\./);
 });
 
-test('der Live-Kontext nennt Zustand, Stimmung und Beziehung', async () => {
+test('der Live-Kontext nennt den Arbeitsmodus — nicht die Metadaten', async () => {
   const { contexts } = await beides();
   const live = liveVon(contexts);
   assert.ok(live !== null);
-  // Die Felder stehen drin — mit ihrer Herkunft.
-  assert.match(live.text, /Zustand \(Quelle: eigener Zustand\)/);
-  assert.match(live.text, /Stimmung=/);
-  assert.match(live.text, /Beziehung \(Quelle: gelesene Stufe, nie selbst gesetzt\)/);
+  assert.match(live.text, /^## Shinon aktuell/);
+  assert.match(live.text, /Arbeitsmodus: du bist gerade/);
+  // Keine Herkunfts-Vermerke, keine Feldnamen: der Block sagt, was gilt.
+  for (const meta of ['Quelle:', 'Stimmung=', 'Beziehung (', 'Unsicherheit=']) {
+    assert.equal(live.text.includes(meta), false, `${meta} steht noch im Block`);
+  }
 });
 
 test('in einem fremden Workspace ist die Persona still — und der Block LEER', async () => {
@@ -148,8 +149,8 @@ test('ein leerer Zustand erzeugt keinen Block — der Kern gibt null zurueck', (
     state: { identity: 'Shinon', stance: 'critical', uncertainty: 'explicit', mood: 'focused', capabilities: ['analysis'], limitations: [], relation: 'known' },
   });
   assert.equal(typeof lebendig, 'string');
-  assert.match(lebendig, /Stimmung=focused/);
-  assert.match(lebendig, /Beziehung/);
+  assert.match(lebendig, /Arbeitsmodus: du bist gerade an einer Sache dran\./);
+  assert.equal(lebendig.includes('Beziehung'), false, 'keine Beziehungs-Metadaten');
 });
 
 test('die Registrierung meldet sich, wenn der Dienst kein context() kann', () => {

@@ -10,10 +10,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import * as capabilityMap from '../assets/capability-map.js';
 import {
   CAPABILITIES_CONTRACT,
   MAX_BRIEF_CHARS,
-  appendTaskBrief,
   briefRecord,
   capabilityIssues,
   containsTerm,
@@ -197,13 +197,14 @@ test('über der Grenze wird nicht gekürzt, sondern verweigert', () => {
   assert.equal(renderTaskBrief(brief, { maxChars: 60 }).chars > 60, true);
 });
 
-test('der Brief wird angehängt, nicht hineinmontiert', () => {
-  const capability = MAP.capabilities[0];
-  const rendered = renderTaskBrief(taskBrief(capability));
-  const text = 'Der Prompt des Nutzers.';
-  assert.equal(appendTaskBrief(text, rendered), `${text}\n\n${rendered.text}`);
-  assert.equal(appendTaskBrief(text, { ok: false, reason: 'BRIEF_ZU_LANG' }), text);
-  assert.equal(appendTaskBrief(text, null), text);
+test('der Brief bleibt Metadaten — es gibt keinen Prompt-Appender', () => {
+  // Die Trennung ist die Zusage: der Veredler ersetzt den Nutzertext, der Brief
+  // geht als eigener Runtime-Context-Block daneben. Ein Appender würde beides
+  // wieder mischen — deshalb existiert keiner.
+  assert.equal('appendTaskBrief' in capabilityMap, false, 'der Prompt-Appender ist zurück');
+  const rendered = renderTaskBrief(taskBrief(MAP.capabilities[0]));
+  assert.equal(rendered.ok, true);
+  assert.ok(rendered.text.startsWith('<task_brief'), 'der Block existiert als Daten');
 });
 
 test('die Spur nennt Adresse und Länge, nicht den Text', () => {

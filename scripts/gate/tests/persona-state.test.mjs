@@ -2,15 +2,10 @@
 /**
  * Tests der Persona (Identity, State, Voice).
  *
- * Wie beim Event-Spine: zwei Ebenen.
- *   1. Vertrag + reine Ableitung (deriveState, renderStateContext) — ohne alles.
- *   2. Der echte Bundle-Pfad: Event → Zustand → System-Context. Das Paket wird
- *      in ein temporäres Verzeichnis kopiert, mit einem Schemastery-Stub
- *      versehen und über seine echte apply()-Schnittstelle an einen Fake-Host
- *      gehängt, der nur `on` (Events) und `inject` (System-Prompt) kennt.
- *
- * Damit ist die Nicht-Aktions-Grenze nicht nur behauptet: der Host hat gar
- * keine andere API, und die Tests würden bei jedem Zugriff darauf werfen.
+ * Zwei Ebenen wie beim Event-Spine: (1) Vertrag + reine Ableitung, (2) der
+ * echte Bundle-Pfad (Kopie + Schemastery-Stub) an einem Fake-Host, der nur
+ * `on` und `inject` kennt. Damit ist die Nicht-Aktions-Grenze nicht behauptet,
+ * sondern erzwungen: jeder andere Zugriff wuerde werfen.
  *
  * Läuft mit `node --test` — kein node_modules, kein DSH, kein Netz.
  */
@@ -62,6 +57,7 @@ const bundle = await loadBundle();
 function createHost(services = {}) {
   const handlers = new Map();
   const sections = [];
+  const contexts = [];
   const calls = [];
   const provided = {};
   const child = {
@@ -83,9 +79,8 @@ function createHost(services = {}) {
       },
       section({ name, order, text }) {
         calls.push(`section:${name}`);
-        // Der echte Dienst loest `text` bei JEDER Assembly auf. Der Fake tut
-        // dasselbe ueber einen Getter: sonst saehe ein Test nach einer Annahme
-        // noch den alten Text und wuerde die Wirkung nicht messen koennen.
+        // Der echte Dienst loest `text` bei JEDER Assembly neu auf; der Fake
+        // tut dasselbe ueber einen Getter — sonst saehe ein Test den alten Text.
         const entry = {
           name,
           order,
@@ -95,6 +90,17 @@ function createHost(services = {}) {
         return () => {
           const at = sections.indexOf(entry);
           if (at >= 0) sections.splice(at, 1);
+        };
+      },
+      // Der dynamische Zustand ist RUNTIME-CONTEXT, kein Abschnitt: er ERSETZT
+      // pro Schritt den vorherigen Stand statt sich daneben zu stapeln.
+      context({ name, order, text }) {
+        calls.push(`context:${name}`);
+        const entry = { name, order, get text() { return typeof text === 'function' ? text({}) : text; } };
+        contexts.push(entry);
+        return () => {
+          const at = contexts.indexOf(entry);
+          if (at >= 0) contexts.splice(at, 1);
         };
       },
     },
@@ -128,20 +134,18 @@ function createHost(services = {}) {
     if (handler) handler(payload);
     return handler !== undefined;
   };
-  const stateSection = () => sections.find((entry) => entry.name === 'shinon:state');
-  const stateOf = () => bundle.stateFromContext(stateSection()?.text ?? '');
-  return { ctx, handlers, sections, calls, provided, dispatch, stateSection, stateOf };
+  const liveContext = () => contexts.find((entry) => entry.name === 'shinon:persona-live');
+  const liveOf = () => liveContext()?.text ?? '';
+  return { ctx, handlers, sections, contexts, calls, provided, dispatch, liveContext, liveOf };
 }
 /** Die Config, die jeder Aufbau teilt — ein Test kann einzelne Werte ersetzen. */
 const baseConfig = {
   statePath: './assets/persona-state.json',
   eventsChannel: 'shinon/event',
-  includeAugenhoehe: true,
   identity: 'IDENT',
   epistemic: 'EPI',
   changeClasses: 'CC',
   determinism: 'DET',
-  discipline: 'DISC',
   report: 'REP',
   // Scope ausdrücklich benannt: die Tests laufen IM Shinon-Repo, nicht „irgendwo“.
   workspaceRoot: REPO_ROOT,
@@ -334,75 +338,78 @@ test('persona: relation.updated liest die Stufe aus dem Event (nur lesend)', () 
   assert.equal(unknown.reason, 'UNKNOWN_RELATION');
   assert.deepEqual(unknown.state, start);
 
-  // Der echte Bundle-Pfad: Event auf dem Spine-Kanal aktualisiert den Kontext.
+  // Der echte Pfad: die Stufe wird gelesen, aber der Block behauptet sie NICHT.
   const host = connect();
   host.dispatch('shinon/event', { event_type: 'relation.updated', relation: 'anchor' });
-  assert.equal(host.stateOf().relation, 'anchor');
+  assert.equal(host.liveOf().includes('anchor'), false, 'keine Beziehungsstufe im Live-Block');
+  assert.match(host.liveOf(), /Arbeitsmodus:/, 'der Block steht trotzdem');
   host.dispose();
 });
 
-test('persona: der Kontext trägt genau die sieben Felder plus Stimme', () => {
-  const context = bundle.renderStateContext(contract, bundle.initialState(contract));
-  const parsed = bundle.stateFromContext(context);
-  assert.deepEqual(Object.keys(parsed), STATE_FIELDS);
-  assert.equal(parsed.identity, 'Shinon');
-  assert.match(context, /Stimme: Ruhig und bereit/);
-  for (const mood of Object.keys(contract.voice)) {
-    const text = bundle.renderStateContext(contract, { ...bundle.initialState(contract), mood });
-    assert.match(text, new RegExp(`Stimme: ${contract.voice[mood].slice(0, 12).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+test('Live-Block: genau drei Aussagen — Arbeitsmodus, Ton, besondere Reaktion', () => {
+  const state = bundle.initialState(contract);
+  const text = bundle.renderLiveContext({ contract, state, tone: null });
+  assert.match(text, /^## Shinon aktuell\n\n/);
+  assert.match(text, /Arbeitsmodus: du bist gerade bereit\./);
+  assert.equal(text.includes('Ton:'), false, 'ohne Ton keine Zeile');
+  assert.equal(text.includes('Besondere Reaktion'), false, 'ohne Stimmung keine Zeile');
+  // NAMENTLICH: eine neue Stimmung ohne Zeile faellt auf, statt still zu bleiben.
+  const lines = [['idle', 'bereit'], ['curious', 'neugierig auf den Auftrag'], ['focused', 'an einer Sache dran'], ['working', 'mitten in einer Aufgabe'], ['concerned', 'bei einem Risiko'], ['blocked', 'an einem Blocker']];
+  for (const [mood, line] of lines) {
+    assert.match(bundle.renderLiveContext({ contract, state: { ...state, mood }, tone: null }), new RegExp(`Arbeitsmodus: du bist gerade ${line}\\.`), `${mood} fehlt`);
   }
+  // Fail-closed: ein unbekannter Mood und ein fehlender Zustand behaupten nichts.
+  assert.equal(bundle.renderLiveContext({ contract, state: { ...state, mood: 'gleichgueltig' }, tone: null }), null);
+  assert.equal(bundle.renderLiveContext({ contract, state: null, tone: null }), null);
 });
 
 // ── 4. Der echte Bundle-Pfad: Event → State → System-Context ────────────────
 
-test('persona: apply registriert die Identity-Abschnitte und einen Zustandsabschnitt', () => {
+test('persona: apply registriert die stabilen Abschnitte und EINEN dynamischen Kanal', () => {
   const host = connect();
   const names = host.sections.map((entry) => entry.name);
-  for (const name of ['shinon:identity', 'shinon:epistemic', 'shinon:change-classes', 'shinon:determinism', 'shinon:discipline', 'shinon:report', 'shinon:augenhoehe', 'shinon:state']) {
+  for (const name of ['shinon:identity', 'shinon:epistemic', 'shinon:change-classes', 'shinon:determinism', 'shinon:report']) {
     assert.ok(names.includes(name), `${name} fehlt (${names.join(', ')})`);
   }
-  assert.deepEqual(host.stateOf(), {
-    identity: 'Shinon',
-    stance: 'critical',
-    uncertainty: 'explicit',
-    mood: 'idle',
-    capabilities: ['analysis', 'verification'],
-    limitations: [],
-    relation: 'known',
-  });
+  // Der Zustand ist KEIN Abschnitt mehr — fuenf trugen ihn in fuenf Gewaendern.
+  for (const gone of ['shinon:state', 'shinon:tendency', 'shinon:user-lage', 'shinon:narrative-arc', 'shinon:augenhoehe', 'shinon:discipline']) {
+    assert.equal(names.includes(gone), false, `${gone} doppelt den Live-Block`);
+  }
+  assert.equal(host.contexts.length, 1, 'genau ein dynamischer Kanal');
+  assert.equal(host.liveContext().name, 'shinon:persona-live');
+  assert.equal(host.liveContext().order, 300);
+  assert.match(host.liveOf(), /Arbeitsmodus: du bist gerade bereit/);
   host.dispose();
 });
 
-test('persona: ein Event auf dem Spine-Kanal aktualisiert den System-Context', () => {
+test('persona: ein Event aktualisiert den Live-Block, nicht die Abschnittsliste', () => {
   const host = connect();
-  // Elf Abschnitte: sechs Grundsaetze, Augenhöhe, Zustand, Selbstmodell — und
-  // Gedaechtnis + Selbstauflagen, die NAMENTLICH dazugehoeren und nicht in einer
-  // Zahl verschwinden. Die Getter tragen ohne Ablage keinen Text, sind aber da.
-  assert.equal(host.sections.length, 11);
-  for (const name of ['shinon:self-model', 'shinon:memory', 'shinon:commitments']) {
-    assert.ok(host.sections.some((entry) => entry.name === name), `${name} fehlt`);
-  }
+  // Acht stabile Abschnitte — NAMENTLICH, damit ein neuer auffaellt.
+  assert.deepEqual([...host.sections.map((entry) => entry.name)].sort(), [
+    'shinon:change-classes', 'shinon:commitments', 'shinon:determinism', 'shinon:epistemic',
+    'shinon:identity', 'shinon:memory', 'shinon:report', 'shinon:self-model',
+  ].sort());
+  const before = host.sections.length;
+
   assert.ok(host.dispatch('shinon/event', { event_type: 'gate.failed', session_id: 'sess-1' }));
-  assert.equal(host.stateOf().mood, 'concerned');
-  assert.deepEqual(host.stateOf().limitations, ['gate_failed']);
-  // Ersetzen, nicht anhängen: genau ein Zustandsabschnitt bleibt.
-  assert.equal(host.sections.filter((entry) => entry.name === 'shinon:state').length, 1);
-  assert.equal(host.sections.length, 11);
+  assert.match(host.liveOf(), /Arbeitsmodus: du bist gerade bei einem Risiko/);
+  assert.equal(host.sections.length, before, 'ein Event erzeugt keinen Abschnitt');
+  assert.equal(host.contexts.length, 1, 'genau ein Live-Kanal');
 
   host.dispatch('shinon/event', { event_type: 'gate.passed' });
-  assert.deepEqual(host.stateOf().limitations, []);
-  assert.equal(host.stateOf().mood, 'focused');
+  assert.match(host.liveOf(), /Arbeitsmodus: du bist gerade an einer Sache dran/);
+  assert.equal(host.sections.length, before);
   host.dispose();
 });
 
-test('persona: unbekanntes Event lässt den Kontext unberührt', () => {
+test('persona: unbekanntes Event lässt den Live-Block unberührt', () => {
   const host = connect();
-  const before = host.stateOf();
+  const before = host.liveOf();
   const count = host.sections.length;
   host.dispatch('shinon/event', { event_type: 'nicht.definiert' });
   host.dispatch('shinon/event', {});
   host.dispatch('shinon/event', 'kein objekt');
-  assert.deepEqual(host.stateOf(), before);
+  assert.equal(host.liveOf(), before);
   assert.equal(host.sections.length, count);
   host.dispose();
 });
@@ -415,7 +422,7 @@ test('persona: der Fake-Host kennt on, inject und nur LESENDE Abfragen — nicht
   // Pruef-Route haengt; er bekommt nur `register`, nie einen Aufruf.
   assert.deepEqual(Object.keys(host.ctx).sort(), ['get', 'inject', 'on', 'provide']);
   for (const call of host.calls) {
-    assert.ok(/^(on|inject|effect|getSectionOrder|section|get|child\.get|provide):?/.test(call), `unerwarteter Aufruf: ${call}`);
+    assert.ok(/^(on|inject|effect|getSectionOrder|section|context|get|child\.get|provide):?/.test(call), `unerwarteter Aufruf: ${call}`);
   }
   assert.ok(host.calls.includes('on:shinon/event'));
   assert.ok(host.calls.some((call) => call === 'inject:systemPrompt'));
@@ -423,6 +430,7 @@ test('persona: der Fake-Host kennt on, inject und nur LESENDE Abfragen — nicht
   // das wird hier ausgeloest — die Zusicherung gilt dem fertigen Prompt, nicht
   // der Registrierung.
   for (const section of host.sections) void section.text;
+  void host.liveOf();
   // Und die Abfragen fragen genau nach Ton, Ablage und Webserver — nach nichts
   // anderem. Die Ablage ist LESEND geholt und dient zwei eigenen Namensraeumen
   // (Selbstmodell, Gedaechtnis); die Persona schreibt keine Projektdatei.
@@ -511,18 +519,18 @@ test('Selbstmodell: ohne Ablage bleibt der Prompt ehrlich leer — keine erfunde
 test('persona: nach dispose kommen keine Events mehr an', () => {
   const host = connect();
   host.dispatch('shinon/event', { event_type: 'message.received' });
-  assert.equal(host.stateOf().mood, 'curious');
+  assert.match(host.liveOf(), /neugierig auf den Auftrag/);
   host.dispose();
   assert.equal(host.dispatch('shinon/event', { event_type: 'gate.failed' }), false);
-  assert.equal(host.stateOf().mood, 'curious');
+  assert.match(host.liveOf(), /neugierig auf den Auftrag/, 'der Block friert ein, statt weiterzulaufen');
 });
 
 test('persona: zwei Hosts führen getrennte Zustände', () => {
   const a = connect();
   const b = connect();
   a.dispatch('shinon/event', { event_type: 'action.blocked' });
-  assert.equal(a.stateOf().mood, 'blocked');
-  assert.equal(b.stateOf().mood, 'idle');
+  assert.match(a.liveOf(), /Arbeitsmodus: du bist gerade an einem Blocker/);
+  assert.match(b.liveOf(), /Arbeitsmodus: du bist gerade bereit/);
   a.dispose();
   b.dispose();
 });
@@ -545,29 +553,23 @@ test('Tendenz: dieselben Haltungen auf beiden Seiten', () => {
     'eine Haltung ohne Klang waere stumm, ein Klang ohne Haltung erfunden');
 });
 
-test('Tendenz: Ton, Tempo und Härte kommen aus dem Vertrag — oder der Abschnitt faellt weg', () => {
-  const tone = { stance: 'kritisch', tendencies: [{ klasse: 'korrektur', stufe: 'hoch' }] };
-  const text = bundle.renderTendency(contract, tone);
-  assert.match(text, /^## Tendenz \(gelesen, nicht behauptet\)/);
-  assert.match(text, /Haltung: kritisch/);
-  assert.match(text, /Lage: korrektur hoch/);
-  assert.match(text, /Ton: trocken, direkt/);
-  assert.match(text, /Tempo: langsam/);
-  assert.match(text, /Härte: hoch/);
+test('Ton: Tonalitaet und Anker kommen aus dem Vertrag — sonst keine Zeile', () => {
+  const state = bundle.initialState(contract);
+  const text = bundle.renderLiveContext({ contract, state, tone: { stance: 'kritisch', tendencies: [{ klasse: 'korrektur', stufe: 'hoch' }] } });
+  assert.match(text, /^Ton: trocken und direkt\. Anker: /m);
+  assert.match(text, /Widerspruch ohne Umweg/);
+  // Die Stufen des Scorings sind NICHT der Prompt: die Zeile traegt Tonalitaet
+  // und Anker, keine Tabellenwerte.
+  assert.equal(text.includes('korrektur hoch'), false);
 
   // Kein Ton, unbekannte Haltung, kaputte Form: es wird NICHTS behauptet.
-  assert.equal(bundle.renderTendency(contract, null), null);
-  assert.equal(bundle.renderTendency(contract, { stance: null }), null);
-  assert.equal(bundle.renderTendency(contract, { stance: '' }), null);
-  assert.equal(bundle.renderTendency(contract, { stance: 'siegesgewiss' }), null, 'unbekannte Haltung: kein erfundener Ton');
-  assert.equal(bundle.renderTendency(contract, 'kritisch'), null, 'ein String ist kein Ton');
-  // Ohne Stufen bleibt die Lage weg, der Rest steht.
-  const ohneLage = bundle.renderTendency(contract, { stance: 'neutral' });
-  assert.equal(ohneLage.includes('Lage:'), false);
-  assert.match(ohneLage, /Härte: mittel/);
+  const ohne = bundle.renderLiveContext({ contract, state, tone: null });
+  for (const tone of [null, { stance: null }, { stance: '' }, { stance: 'siegesgewiss' }, 'kritisch']) {
+    assert.equal(bundle.renderLiveContext({ contract, state, tone }), ohne, `Ton behauptet bei ${JSON.stringify(tone)}`);
+  }
 });
 
-test('Tendenz: mit Ton-Dienst steht der Abschnitt im Prompt, ohne ihn nicht', () => {
+test('Ton: mit Ton-Dienst steht die Zeile im Live-Block, ohne ihn nicht', () => {
   const stance = scoringTendency.stances[0].id;
   const service = {
     contract: bundle.SCORING_SERVICE_CONTRACT,
@@ -575,15 +577,12 @@ test('Tendenz: mit Ton-Dienst steht der Abschnitt im Prompt, ohne ihn nicht', ()
   };
 
   const withTone = connect({ [bundle.SCORING_SERVICE]: service });
-  const tendencySection = withTone.sections.find((entry) => entry.name === 'shinon:tendency');
-  assert.ok(tendencySection !== undefined, 'der Abschnitt wird registriert');
-  assert.match(tendencySection.text, new RegExp(`Haltung: ${stance}`));
-  assert.equal(tendencySection.order, 9000 - 3, 'vor dem Zustandsabschnitt');
+  assert.match(withTone.liveOf(), new RegExp(`Ton: ${contract.tendency.voices[stance].tonalitaet}`));
   withTone.dispose();
 
-  // Ohne Dienst: kein Abschnitt — und keine erfundene Haltung.
+  // Ohne Dienst: keine Ton-Zeile — und keine erfundene Haltung.
   const without = connect();
-  assert.equal(without.sections.some((entry) => entry.name === 'shinon:tendency'), false);
+  assert.equal(without.liveOf().includes('Ton:'), false);
   without.dispose();
 });
 
@@ -597,7 +596,7 @@ test('Tendenz: ein fremder Dienst unter dem Namen wird gemeldet, nicht gelesen',
     // der genau diesen Kanal stummschaltet, wuerde die Zusage verdecken.
     const host = createHost({ [bundle.SCORING_SERVICE]: { contract: 'shinon.fremd/v1', read: () => ({ stance: 'kritisch' }) } });
     quiet(() => { host.dispose = bundle.apply(host.ctx, baseConfig); }, { keep: ['error'] });
-    assert.equal(host.sections.some((entry) => entry.name === 'shinon:tendency'), false);
+    assert.equal(host.liveOf().includes('Ton:'), false, 'kein fremder Ton im Block');
     assert.ok(errors.some((line) => line.includes('verletzt den Vertrag')), errors.join(' | '));
     host.dispose();
   } finally {
@@ -750,24 +749,21 @@ test('Projektscope: das Shinon-Repo bekommt seine Persona weiterhin (Gegenprobe)
 
 // ── 8. Die User-Lage (jede Interaktion wirkt) ───────────────────────────────
 //
-// Anlass: die Antwort klang nach LLM-Standard — keine Nachfrage, keine Empathie,
-// die Persona hatte gefuehlt keine Auswirkung. Der Enhancer normalisiert den
-// Ton weg (Arbeitsauftrag bleibt optimal), also traegt die Persona die erkannte
-// Stimmung als eigenen Abschnitt: Frust und Lob kommen im Output an.
+// Der Enhancer normalisiert den Ton weg, also traegt die Persona die erkannte
+// Stimmung als EINE Zeile im Live-Block — kein eigener Abschnitt.
 
-test('persona: erkannte User-Stimmung steht als Abschnitt im Prompt', () => {
+test('persona: erkannte User-Stimmung steht als Reaktionszeile im Live-Block', () => {
   const host = connect();
-  assert.equal(host.sections.some((entry) => entry.name === 'shinon:user-lage'), false);
+  assert.equal(host.liveOf().includes('Besondere Reaktion'), false);
 
   host.dispatch('shinon/event', { event_type: 'message.received', text: 'Boah, heute läuft wirklich alles schief, ich bin genervt.' });
-  const lage = host.sections.find((entry) => entry.name === 'shinon:user-lage');
-  assert.ok(lage, 'User-Lage-Abschnitt fehlt');
-  assert.match(lage.text, /frustriert/);
+  assert.match(host.liveOf(), /Besondere Reaktion: der Mensch ist genervt/);
 
-  // Ersetzen, nicht anhängen: genau ein Lage-Abschnitt bleibt.
+  // Ersetzen, nicht anhaengen: eine Zeile, ein Kanal.
   host.dispatch('shinon/event', { event_type: 'message.received', text: 'Richtig nice, exakt richtig so!' });
-  assert.equal(host.sections.filter((entry) => entry.name === 'shinon:user-lage').length, 1);
-  assert.match(host.sections.find((entry) => entry.name === 'shinon:user-lage').text, /erfreut/);
+  assert.match(host.liveOf(), /Besondere Reaktion: der Mensch ist zufrieden/);
+  assert.equal(host.liveOf().split('Besondere Reaktion').length - 1, 1, 'genau eine Reaktionszeile');
+  assert.equal(host.contexts.length, 1, 'kein zweiter Kanal');
   host.dispose();
 });
 
@@ -777,9 +773,13 @@ test('persona: detectUserMood ist deterministisch und fail-closed', () => {
   assert.equal(bundle.detectUserMood('Alles läuft normal, ganz ruhig.'), null);
   assert.equal(bundle.detectUserMood('Ich bin genervt, nichts läuft.'), 'frustriert');
   assert.equal(bundle.detectUserMood('Richtig nice, danke!'), 'erfreut');
-  assert.equal(bundle.renderUserLage(null), null);
-  assert.match(bundle.renderUserLage('frustriert'), /frustriert/);
-  assert.match(bundle.renderUserLage('erfreut'), /Sykophantismus/);
+  // Eine unbekannte Stimmung ergibt KEINE Zeile: der Block erfindet keine Reaktion.
+  const state = bundle.initialState(contract);
+  assert.equal(
+    bundle.renderLiveContext({ contract, state, tone: null, userMood: 'gleichgueltig' }),
+    bundle.renderLiveContext({ contract, state, tone: null }),
+  );
+  assert.match(bundle.renderLiveContext({ contract, state, tone: null, userMood: 'frustriert' }), /Besondere Reaktion/);
 });
 
 // ── 9. Das Langzeitgedächtnis (Zug 10) ──────────────────────────────────────

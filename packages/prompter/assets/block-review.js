@@ -25,8 +25,17 @@ export const LEARNED_CONTRACT = 'shinon.blocks-learned/v1';
 /** Vorgabepfad der gelernten Bausteine (relativ zum ARBEITSVERZEICHNIS). */
 export const LEARNED_DEFAULT_PATH = '.shinon/blocks.learned.json';
 
-/** Erlaubte Lagen — dieselben vier wie in der Registry. */
-export const BLOCK_LAGEN = ['system', 'one-shot-system', 'user', 'one-shot-input'];
+/**
+ * Erlaubte Lagen — dieselben wie in der Registry.
+ *
+ * `runtime-context` ist die Nachricht, die pro Schritt den vorherigen Stand
+ * ERSETZT (Persona-Live-Block, Projektkontext, Aufgabenbrief) — weder
+ * System-Abschnitt noch Nutzertext. Der einzige dynamische Zustand landet dort
+ * und nicht in einem Abschnitt; die Lage muss also einen Namen haben, den die
+ * Pruefung kennt, sonst waere der Registry-Eintrag Daten, die ihr eigener
+ * Waechter ablehnen wuerde.
+ */
+export const BLOCK_LAGEN = ['system', 'one-shot-system', 'user', 'one-shot-input', 'runtime-context'];
 
 /** Erlaubte Modi — dieselben drei wie im Modus-Vertrag. */
 export const BLOCK_MODI = ['MIN', 'MID', 'MAX'];

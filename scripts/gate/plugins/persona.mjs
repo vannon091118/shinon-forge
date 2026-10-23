@@ -46,7 +46,7 @@ export const PERSONA_EVENT_TYPES = [
 ];
 
 /** Pflicht-Token im Laufzeitcode (Existenz der Fähigkeit, nicht ihre Qualität). */
-export const REQUIRED_TOKENS = ['ctx.inject', 'sp.section', 'ctx.on', 'createPersonaState', 'renderStateContext'];
+export const REQUIRED_TOKENS = ['ctx.inject', 'sp.section', 'ctx.on', 'createPersonaState', 'registerLiveContext'];
 
 /** Verbotene Module: Importnamen werden auch in Strings erkannt. */
 export const FORBIDDEN_MODULES = ['child_process'];
@@ -113,10 +113,8 @@ export function stateContractIssues(contract, file) {
     if (!PERSONA_EVENT_TYPES.includes(type)) issues.push(`${file}: unbekannter Übergang ${type}`);
   }
 
-  // Die Klangregeln der Tendenz (Zug 5): die Persona liest die HALTUNG vom
-  // Scoring und uebersetzt sie hier in Ton, Tempo und Haerte. Geprueft wird die
-  // Vollstaendigkeit der Uebersetzung — WELCHE Haltungen es gibt, steht in der
-  // Tabelle des Scorings und wird von aussen gepinnt (persona-state.test.mjs).
+  // Die Tendenz-Stimmen (Zug 5): geprueft wird die Vollstaendigkeit der
+  // Uebersetzung, nicht die Auswahl der Haltungen — die steht im Scoring.
   const tendency = contract.tendency;
   if (tendency !== undefined) {
     const voices = tendency?.voices ?? {};
@@ -125,8 +123,10 @@ export function stateContractIssues(contract, file) {
       issues.push(`${file}: tendency.voices ist leer — dann kann keine Haltung klingen`);
     }
     for (const stance of stances) {
-      for (const field of ['ton', 'tempo', 'haerte']) {
-        if (!isText(voices[stance]?.[field])) issues.push(`${file}: tendency.voices.${stance}.${field} fehlt`);
+      if (!isText(voices[stance]?.tonalitaet)) issues.push(`${file}: tendency.voices.${stance}.tonalitaet fehlt`);
+      const anker = voices[stance]?.anker;
+      if (!Array.isArray(anker) || anker.length === 0 || !anker.every(isText)) {
+        issues.push(`${file}: tendency.voices.${stance}.anker fehlt (nicht-leere Liste aus Text)`);
       }
     }
   }

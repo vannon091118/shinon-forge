@@ -27,7 +27,7 @@ Charakter** sind markiert (†), weil sie den Plan begrenzen:
 |---|---|
 | `packages/prompter/assets/enhancer.js:422` | † `salvageProse` gibt `preservedIntent: true` hartcodiert zurück |
 | `packages/prompter/assets/result-contract.js:124-128` | † Unbekannte Referenzen nur `console.warn` — Verwerfen wurde früher als „zu aggressiv" bewusst entfernt |
-| `packages/prompter/assets/pre-step.js:509-513` | Ersatztext ist `enhancedPrompt`, Task-Brief wird über `appendTaskBrief` angehängt |
+| `packages/prompter/assets/pre-step.js` (`briefFor` → `runtime.lastBriefText`) | Ersatztext ist `enhancedPrompt`; der Task-Brief geht als eigener Block in den Runtime-Context, nur bei eindeutigem Treffer |
 | `packages/project-index/assets/index-context.js` (`resolveContext`: `constraints: []`) | † `constraints: []` — benannte Lücke; „ein erfundener Eintrag wäre schlimmer als ein leerer" |
 | `packages/project-index/assets/index-context.js` (`refreshIndex`: `symbols_digest`) | † `symbols_digest` wird im Warm-Pfad **bewusst nicht** fortgeschrieben: Referenzdurchgang genau einmal (Kaltlauf), nicht je Abfrage |
 | `packages/project-index/assets/index-store.js` (`openLedger`: Versionssprung verwirft `MEMORY_TABLE`) | Versionssprung verwirft `MEMORY_TABLE` statt Migration |

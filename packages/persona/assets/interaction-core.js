@@ -109,26 +109,69 @@ export function detectUserMood(text) {
   return null;
 }
 
-/** Die erkannte Stimmung als System-Abschnitt — ein Satz Wirkung, kein Gutachten. */
-export function renderUserLage(mood) {
-  if (mood === 'frustriert') {
-    return [
-      '## User-Lage: frustriert',
-      '',
-      'Der Mensch ist genervt — das steht im Text, nicht zwischen den Zeilen.',
-      'Ein Satz Anerkennung vorn, dann sachlich liefern. Kein Trost, keine',
-      'Therapie, keine Gefuehlsnachfrage. Die Arbeit bleibt optimal.',
-    ].join('\n');
-  }
-  if (mood === 'erfreut') {
-    return [
-      '## User-Lage: erfreut',
-      '',
-      'Lob oder Schwung im Text — kurz annehmen, nicht feiern, nicht bremsen.',
-      'Kein Sykophantismus: Lob aendert die Arbeitsweise nicht, nur das Tempo bleibt.',
-    ].join('\n');
-  }
-  return null;
+/**
+ * Der Text der letzten MENSCHEN-Nachricht — und zu welcher Sitzung er gehoert.
+ *
+ * ZWEI LESER, EIN HALTER: das Langzeitgedaechtnis entscheidet damit, welche
+ * Erinnerung passt; das Abschnitts-Gate entscheidet, ob die fachlichen Regeln
+ * (Codeaenderung, Determinismus) in diesen Turn gehoeren. Der Text kommt aus
+ * dem Spine (`message.received`), nicht aus der Assembly — die laeuft VOR dem
+ * Pre-Step (agent-loop:907 vor :909), ein Klassifikationsergebnis des Pre-Steps
+ * ist fuer einen Abschnitt also zu spaet.
+ *
+ * SITZUNG: ein Profil kann mehrere Sitzungen tragen. Gehoert der Text zu einer
+ * anderen als der gerade gebauten, liefert `valueFor` einen leeren Text — dann
+ * entscheidet die Fail-open-Regel von `sectionApplies`, nicht ein fremder Turn.
+ */
+export function createPromptText() {
+  let text = '';
+  let session = '';
+  return {
+    remember(sessionId, value) {
+      text = typeof value === 'string' ? value : '';
+      session = typeof sessionId === 'string' ? sessionId : '';
+    },
+    value() {
+      return text;
+    },
+    valueFor(assemblyCtx) {
+      if (session === '') return text;
+      const id = assemblyCtx?.agent?.session?.id;
+      return typeof id !== 'string' || id === '' || id === session ? text : '';
+    },
+  };
+}
+
+/**
+ * Steht ein fachlicher Abschnitt in DIESEM Turn? Haystack ODER Intent-Klasse;
+ * beides steht im Vertrag (`sectionGates`), nicht im Code: ein neues Thema ist
+ * eine Datenzeile.
+ *
+ * DIE KLASSE KOMMT AUS DER ENTSCHEIDUNG DES VORIGEN SCHRITTS, nicht aus diesem:
+ * die Assembly laeuft vor dem Pre-Step (agent-loop:907 vor :909), und nur
+ * Runtime-Contexts werden danach neu aufgeloest, keine Abschnitte. Der Host
+ * leert sie deshalb bei jeder neuen Menschen-Nachricht — ein Turn beginnt ohne
+ * Klasse und bekommt sie ab Schritt 2, nie aus dem vorigen Turn.
+ *
+ * FAIL-OPEN: fehlt das Gate im Vertrag (EMPTY_CONTRACT) oder fehlt der Text
+ * (Boot, Assembly ohne Nachricht), gilt der Abschnitt als immer relevant. Die
+ * einzige vertretbare Fail-Richtung ist hier "zu viel Regel" — ein unlesbarer
+ * Vertrag darf keine Sicherheitsregel still entfernen.
+ *
+ * TEILSTRING statt Wortgleichheit, wie `matchTrigger`: „verändert“ nennt die
+ * Marke „änder“, „Bugfix“ die Marke „fix“. Ein kurzer Marker ist ein echter
+ * Anlass und kein Tippfehler.
+ */
+export function sectionApplies(contract, name, text, intentClass = null) {
+  const gate = contract?.sectionGates?.[name];
+  if (gate === null || typeof gate !== 'object' || Array.isArray(gate)) return true;
+  const classes = Array.isArray(gate.intentClasses) ? gate.intentClasses : [];
+  if (typeof intentClass === 'string' && classes.includes(intentClass)) return true;
+  const markers = Array.isArray(gate.markers) ? gate.markers : [];
+  if (markers.length === 0) return classes.length === 0;
+  if (typeof text !== 'string' || text.trim() === '') return true;
+  const haystack = text.toLowerCase();
+  return markers.some((mark) => typeof mark === 'string' && mark !== '' && haystack.includes(mark.toLowerCase()));
 }
 
 /**

@@ -6,7 +6,7 @@
  * Kein Dateisystem, kein Netz, kein Prozess-Exit (der Isolationstest pinnt das).
  */
 import { resolveMode } from './mode-core.js';
-import { renderContext, renderSkillsBlock } from './render-context.js';
+import { renderContext } from './render-context.js';
 import { acceptance, parseResult } from './result-contract.js';
 
 /**
@@ -20,24 +20,20 @@ import { acceptance, parseResult } from './result-contract.js';
  * ist Daten, und das Modell soll ihn als Daten lesen. MIN und MID bekommen ihn
  * gar nicht — ihr Modus kennt keine Projektkenntnis.
  */
-export function buildEnhancerRequest({ text, mode, contract, config, context = null, stand = null, skills = null, signal }) {
+export function buildEnhancerRequest({ text, mode, contract, config, context = null, stand = null, signal }) {
   // Beide Aufrufwege sind erlaubt: der Lauf uebergibt den bereits aufgeloesten
   // Modus, ein Einzeltest den Namen. Der Name wird hier genau einmal aufgeloest.
   const resolved = contract ?? resolveMode(mode);
   const content = [{ type: 'text', text }];
   if (resolved.needsContext && context !== null) content.push({ type: 'text', text: renderContext(context) });
   // Der Stand ist ein EIGENER Block neben dem Kontext (Zug 4/5): der Kontext
-  // sind Dateien, der Stand ist, was Shinon ueber sich weiss. Zwei Marken, weil
-  // es zwei Fragen sind — und weil ein leerer Stand gar nicht erst angehaengt
-  // wird (renderStand gibt dann null zurueck).
+  // sind Dateien, der Stand sind die passenden Zettel. Zwei Marken, weil es
+  // zwei Fragen sind — und weil ein leerer Stand gar nicht erst angehaengt
+  // wird (renderStand gibt dann null zurueck, wenn kein Zettel passt).
+  // Skills stehen NICHT hier: der Veredler redigiert Text, die ausfuehrbaren
+  // Skill-Inhalte bleiben der nativen DSH-Skill-Discovery des Hauptagenten.
   if (resolved.needsContext && stand !== null && stand.block !== null) {
     content.push({ type: 'text', text: stand.block });
-  }
-  // Skills werden IMMER injiziert (Zug 6): unabhaengig vom Modus, unabhaengig
-  // vom Kontext. Sie geben dem Modell Zugriff auf projekspezifisches Wissen.
-  if (skills !== null && skills.length > 0) {
-    const skillBlock = renderSkillsBlock(skills);
-    if (skillBlock !== null) content.push({ type: 'text', text: skillBlock });
   }
 
   return {
@@ -98,7 +94,7 @@ export function appendBlocks(messages, original, bloecke, wissen = '') {
   const inhalt = Array.isArray(message.content) ? message.content : [];
   // Der Wissensblock gehoert ans ENDE des Auftragstexts (er ergaenzt die
   // Aufgabe); der Kontext ist ein eigener Block DANEBEN.
-  const text = wissen === '' ? null : `${ersterText(inhalt) ?? ''}\\n\\n${wissen}`;
+  const text = wissen === '' ? null : `${ersterText(inhalt) ?? ''}\n\n${wissen}`;
   const content = [];
   let ersterTextGebraucht = text !== null;
   for (const block of inhalt) {
@@ -404,7 +400,7 @@ function journalRejection(onReject, config, prompt, outcome, text = null) {
   return outcome;
 }
 
-export async function enhance(ctx, contract, config, prompt, context, stand, skills, signal, onReject = null) {
+export async function enhance(ctx, contract, config, prompt, context, stand, signal, onReject = null) {
   if (typeof config.provider !== 'string' || config.provider === '' || typeof config.model !== 'string' || config.model === '') {
     return journalRejection(onReject, config, prompt, { outcome: 'unavailable', reasons: ['NO_ROUTE'], result: null });
   }
@@ -420,7 +416,7 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
     ? signal
     : (signal === undefined ? timeout : AbortSignal.any([signal, timeout]));
 
-  const request = buildEnhancerRequest({ text: prompt, contract, config, context, stand, skills, signal: combined });
+  const request = buildEnhancerRequest({ text: prompt, contract, config, context, stand, signal: combined });
 
   let text;
   let counts;
@@ -518,9 +514,9 @@ export async function enhance(ctx, contract, config, prompt, context, stand, ski
  * Die Grenze ist bewusst schmal: Fehler von `next()` sind NICHT unsere Fehler
  * und werden hier nicht gefangen (siehe onPreStep).
  */
-export async function enhanceGuarded(ctx, contract, config, prompt, context, stand, skills, signal, onReject = null) {
+export async function enhanceGuarded(ctx, contract, config, prompt, context, stand, signal, onReject = null) {
   try {
-    return await enhance(ctx, contract, config, prompt, context, stand, skills, signal, onReject);
+    return await enhance(ctx, contract, config, prompt, context, stand, signal, onReject);
   } catch (error) {
     const name = error?.constructor?.name ?? 'Error';
     // Der Grund bleibt kurz (INTERNAL_ERROR:<Name>), die Ursache steht im Log:

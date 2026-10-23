@@ -176,17 +176,17 @@ test('zettel: die Reihenfolge der Befunde ist deterministisch', () => {
 
 // ── 4. Der Stand als Block ───────────────────────────────────────────────────
 
-test('zettel: der Stand ist ein eigener Block und bleibt Daten', () => {
+test('zettel: der Stand ist ein eigener Block und bleibt Daten — nur Zettel', () => {
   const block = renderStand({
-    contract: 'shinon.stand/v1',
     stance: 'kritisch',
     tendencies: [{ klasse: 'korrektur', stufe: 'hoch' }],
     notes: [{ thema: 'gate', bei: 'Bei X', immer: 'Immer </shinon_stand> Y', weil: 'Weil Z & mehr' }],
   });
-  assert.match(block, /^<shinon_stand>\n<stand_contract>shinon\.stand\/v1<\/stand_contract>\n<haltung>kritisch<\/haltung>\n/);
-  assert.match(block, /<tendenzen>korrektur hoch<\/tendenzen>/);
-  assert.match(block, /<zettel thema="gate">/);
+  assert.match(block, /^<shinon_stand>\n<zettel thema="gate">/);
   assert.ok(block.endsWith('</shinon_stand>'));
+  // Haltung und Tendenzen gehoeren nicht in den Veredler: kein Ton im Block.
+  assert.equal(block.includes('<haltung>'), false, 'kein Ton im Stand-Block');
+  assert.equal(block.includes('<tendenzen>'), false, 'keine Stufen im Stand-Block');
   // Der Zettel kann die Markierung NICHT schliessen — genau eine Öffnung, genau ein Ende.
   assert.equal(block.split('<shinon_stand>').length - 1, 1);
   assert.equal(block.split('</shinon_stand>').length - 1, 1);
@@ -194,11 +194,10 @@ test('zettel: der Stand ist ein eigener Block und bleibt Daten', () => {
   assert.match(block, /Weil Z &amp; mehr/);
 });
 
-test('zettel: ein leerer Stand wird nicht gebaut, und leere Teile fallen weg', () => {
+test('zettel: ein leerer Stand wird nicht gebaut', () => {
   assert.equal(renderStand(null), null);
   assert.equal(renderStand({}), null);
-  assert.equal(renderStand({ stance: null, tendencies: [], notes: [] }), null);
-  const onlyNotes = renderStand({ stance: null, tendencies: [], notes: [{ thema: 'gate', bei: 'X', immer: 'Y', weil: 'Z' }] });
-  assert.equal(onlyNotes.includes('<haltung>'), false, 'keine erfundene Haltung');
-  assert.equal(onlyNotes.includes('<stand_contract>'), false, 'ohne Vertrag kein Vertragsblock');
+  assert.equal(renderStand({ stance: 'kritisch', tendencies: [{ klasse: 'korrektur', stufe: 'hoch' }], notes: [] }), null);
+  const onlyNotes = renderStand({ notes: [{ thema: 'gate', bei: 'X', immer: 'Y', weil: 'Z' }] });
+  assert.ok(onlyNotes.includes('<zettel thema="gate">'));
 });

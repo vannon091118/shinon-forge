@@ -20,12 +20,11 @@
  *   3. Der Ausgang ist genau EINER: der Composite geht als Ereignis
  *      (`STATE_CHANNEL`) hinaus. Es gibt keinen zweiten Weg — ein `ctx.provide`
  *      eines Zustands wäre der „tote Dienst" von vorher, und der ist entfernt.
- *   4. Der KANAL HAT ABNEHMER. Das ist die Zusage, die bis Zug 6 fehlte: die
- *      Persona abonniert den Kanal und registriert daraus einen
- *      Prompt-Abschnitt, der Veredler baut daraus das Element `<narrative>`
- *      seines Stand-Blocks (der in den MAX-Aufruf geht). Ohne diese Prüfung
- *      darf das Gate nicht grün sein — ein Sender ohne Empfänger ist kein
- *      Feature.
+ *   4. Der KANAL HAT EINEN ABNEHMER. Das ist die Zusage, die bis Zug 6
+ *      fehlte: der Veredler abonniert den Kanal und trägt die Lage als
+ *      DATENSATZ in seine Entscheidungsspur (`stand.narrative`), nicht als
+ *      Prompt-Element. Ohne diese Prüfung darf das Gate nicht grün sein —
+ *      ein Sender ohne Empfänger ist kein Feature.
  *
  *      DER NAME KOMMT SEIT 2026-10-20 AUS `@shinon/seams/core`, nicht mehr als
  *      Literal. Beide Abnehmer sind Host-Hälften und dürfen importieren; die
@@ -59,37 +58,26 @@ export const COMPOSITE_FIELDS = ['seq', 'mood', 'narrator', 'arc_id', 'relations
 export const EVIDENCE_LEVELS = ['EVENT_TYPE', 'EXPLICIT_PAYLOAD', 'NONE'];
 
 /**
- * Die ABNEHMER. Bis Zug 6 war diese Liste leer — und das Gate hätte die Lücke
+ * Der ABNEHMER. Bis Zug 6 war diese Liste leer — und das Gate hätte die Lücke
  * benannt, statt sie zu überspringen.
  *
- * Ein Abnehmer ist: eine Host-Hälfte, die Kanal (und ggf. Vertrag) aus
- * `@shinon/seams/core` IMPORTIERT, den Kanal wirklich abonniert (`ctx.on` auf
- * genau diesen Namen) und aus dem Composite etwas SICHTBARES macht — ein
- * Element, das eine Prüfung finden kann. Es sind zwei, und sie lesen denselben
- * Composite in zwei verschiedene Ausgänge:
+ * Ein Abnehmer ist: eine Host-Hälfte, die den Kanal aus `@shinon/seams/core`
+ * IMPORTIERT, ihn wirklich abonniert (`ctx.on` auf genau diesen Namen) und
+ * aus dem Composite etwas PRÜFBARES macht — einen Datensatz in der
+ * Entscheidungsspur, den eine Prüfung finden kann. Prompt-Elemente sind kein
+ * Nachweis: der Veredler trägt keine Narrative-Lage mehr im Stand-Block,
+ * die Persona keinen Narrativ-Abschnitt im Prompt. Was bleibt, ist die Spur.
  *
- *   persona   den System-Prompt-Abschnitt `shinon:narrative-arc`
- *   prompter  das Element `<narrative>` im Stand-Block, den MAX als eigenen
- *             Block in den Modellaufruf hängt
- *
- * Beide Namen haben EINE Definition (`@shinon/seams`); hier wird geprüft, dass
+ * Der Name hat EINE Definition (`@shinon/seams`); hier wird geprüft, dass
  * daraus auch ein Abnehmer wird.
  */
 export const CONSUMERS = [
   {
-    dir: 'persona',
-    file: 'index.js',
-    label: 'System-Prompt-Abschnitt',
-    evidence: "'shinon:narrative-arc'",
-    evidenceFile: 'index.js',
-    contractFile: 'assets/persona-state.json',
-  },
-  {
     dir: 'prompter',
     file: 'index.js',
-    label: 'Stand-Block des Veredlers (MAX)',
-    evidence: '<narrative',
-    evidenceFile: 'assets/note-core.js',
+    label: 'Entscheidungsspur des Veredlers (MAX)',
+    evidence: 'narrative: stand.narrative',
+    evidenceFile: 'assets/stand.js',
     contractFile: null,
   },
 ];
@@ -304,10 +292,10 @@ export function staticIssues(sources) {
  *
  * Geprüft wird nicht, dass irgendwo "narrative" steht, sondern die drei Dinge,
  * die einen Abnehmer ausmachen: der Kanalname als IMPORT aus dem Naht-Kern
- * (`'@shinon/seams/core'`), ein `ctx.on` auf diesen Namen, und ein Element, das
- * aus dem Composite entsteht. Ein Abnehmer, der den Kanalnamen falsch schreibt,
- * sieht aus wie "es gibt keine Narrative" — deshalb ist die Buchstabenfolge hier
- * keine Stilfrage, sondern der Befund. Und es sind ZWEI Abnehmer: die Prüfung
+ * (`'@shinon/seams/core'`), ein `ctx.on` auf diesen Namen, und ein Datensatz,
+ * der aus dem Composite entsteht. Ein Abnehmer, der den Kanalnamen falsch
+ * schreibt, sieht aus wie "es gibt keine Narrative" — deshalb ist die
+ * Buchstabenfolge hier keine Stilfrage, sondern der Befund. Die Prüfung
  * läuft über die Liste CONSUMERS, an den Abnehmer selbst werden die beiden
  * Quelltexte gereicht.
  *

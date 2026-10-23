@@ -107,6 +107,36 @@ test('der Kanal am ECHTEN systemPrompt-Dienst: der Kontext erscheint als Nachric
   }
 });
 
+test('der Aufgabenbrief reist als eigener Block — nicht im Nutzertext', async () => {
+  const root = dshRoot();
+  assert.ok(root !== null, 'dsh muss im PATH liegen');
+  const require = createRequire(join(root, 'package.json'));
+  const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
+  const { default: SystemPrompt } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-system-prompt')).href);
+
+  const ctx = new Context();
+  await ctx.plugin(SystemPrompt, {});
+  const sp = ctx.get('systemPrompt');
+  const brief = '<task_brief contract="shinon.capabilities/v1" class="DERIVED">\nFrage: Wo wird der Kontext gefunden?\n</task_brief>';
+  const dispose = channel.registerContext(sp, {
+    context: () => KONTEXT,
+    wissen: () => null,
+    brief: () => brief,
+  });
+  try {
+    const assembly = await sp.assemble({});
+    const eintrag = assembly.contexts.find((c) => c.name === channel.CONTEXT_NAME);
+    const text = typeof eintrag.text === 'function' ? eintrag.text(assembly) : eintrag.text;
+    // Der Brief steht NEBEN dem Kontext, im selben Runtime-Context — und er
+    // kommt aus dem Runtime, nicht aus dem ersetzten Nutzertext.
+    assert.match(String(text), /<task_brief contract="shinon\.capabilities\/v1"/);
+    assert.match(String(text), /Frage: Wo wird der Kontext gefunden\?/);
+    assert.equal(String(text).includes('Bitte pruefe src/a.mjs.'), false, 'kein Nutzertext im Kanal');
+  } finally {
+    dispose();
+  }
+});
+
 test('ohne Kontext ist der Kanal LEER — der Snapshot behauptet nichts', async () => {
   const root = dshRoot();
   assert.ok(root !== null, 'dsh muss im PATH liegen');

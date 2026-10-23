@@ -243,7 +243,6 @@ test('die Persona protokolliert ihren LESEZWEIG — am echten Dienst, mit der tr
       projectContextPath: '',
       workspaceRoot: REPO_ROOT,
       identity: 'SEAM-IO-MARKE',
-      includeAugenhoehe: false,
       alwaysKnowIdentity: false,
     });
   } finally {
