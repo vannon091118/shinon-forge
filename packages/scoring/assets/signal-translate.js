@@ -224,7 +224,10 @@ export function translateSignal(envelope, payload, rules, session = {}) {
     const text = humanText(payload, rules);
     if (text === null) return { ...empty, reason: 'NOT_HUMAN' };
     question = text;
-    detail = { ...detail, text };
+    // Der TEXT reist nur im Speicher (fuer den Merkzettel und den Vergleich).
+    // In den Datensatz kommt seine Laenge, nie sein Inhalt: das Protokoll ist
+    // eine Signalliste, kein zweites Sitzungsarchiv (SH-LEARN-02).
+    detail = { ...detail, chars: text.length };
     if (signalId === 'rephrase') {
       const similarity = rules?.reading?.similarity ?? {};
       const minLength = typeof similarity.minTokenLength === 'number' ? similarity.minTokenLength : 3;

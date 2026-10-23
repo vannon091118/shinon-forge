@@ -22,6 +22,15 @@ import { mayRevalidate, staleClosure } from './facts-invalidate.js';
 
 export const FACTS_FILE_NAME = 'facts.sqlite';
 
+/**
+ * Obergrenze je Bereich (SH-LEARN-02): der Faktenspeicher ist Projekt-Memory,
+ * kein Archiv. Ist die Grenze erreicht, weichen zuerst die TERMINALEN Fakten
+ * (SUPERSEDED/REJECTED) — sie sind entschieden und tragen kein Wissen mehr.
+ * Stehen danach noch zu viele lebende Fakten, wird der neue Fakt NAMENTLICH
+ * abgelehnt (`KAPAZITAET` mit Ist und Soll); geloescht wird nie still.
+ */
+export const MAX_FACTS_PER_SCOPE = 2000;
+
 // Schritt n setzt user_version auf n. Ein neuer Schritt kommt ans Ende;
 // bestehende Schritte werden nie veraendert.
 export const MIGRATIONS = Object.freeze([
@@ -109,18 +118,61 @@ export function closeFacts(db) {
   db.close();
 }
 
+/** Wie viele Fakten ein Bereich traegt. */
+function countScope(db, scope) {
+  return Number(db.prepare('select count(*) as n from facts where scope = ?').get(scope).n);
+}
+
+/**
+ * Entfernt hoechstens `room` entschiedene Fakten eines Bereichs: die aeltesten
+ * zuerst. Quellen und die EIGENEN Abhaengigkeiten gehen mit (eine Waise waere
+ * ein Fakt, den niemand mehr belegen kann); ein Fakt, auf den ein anderer
+ * zeigt, bleibt stehen — sonst risse das Loeschen ein Loch in eine Kette, die
+ * der Leser noch braucht, und die Kuerzung waere nicht mehr nachvollziehbar.
+ */
+function pruneTerminal(db, scope, room) {
+  const rows = db
+    .prepare(
+      "select f.id from facts f where f.scope = ? and f.status in ('SUPERSEDED','REJECTED')" +
+        ' and not exists (select 1 from fact_deps d where d.depends_on = f.id)' +
+        ' order by f.status_at asc, f.id asc limit ?',
+    )
+    .all(scope, Number(room));
+  const dropSources = db.prepare('delete from fact_sources where fact_id = ?');
+  const dropDeps = db.prepare('delete from fact_deps where fact_id = ?');
+  const dropFact = db.prepare('delete from facts where id = ?');
+  for (const row of rows) {
+    dropSources.run(row.id);
+    dropDeps.run(row.id);
+    dropFact.run(row.id);
+  }
+  return rows.length;
+}
+
 /**
  * Legt einen Fakt an. Gleiche Kennung ⇒ kein zweiter Eintrag (idempotent).
  * `at` ist der vom Aufrufer gelieferte Zeitpunkt; der Store liest keine Uhr.
+ * `options.maxFacts` senkt die Grenze (Tests); der Vorgabewert steht oben.
  */
-export function insertFact(db, fact, at) {
+export function insertFact(db, fact, at, options = {}) {
   const issues = checkFact(fact);
   if (issues.length > 0) return { ok: false, issues };
   const id = factId(fact);
   const existing = db.prepare('select id from facts where id = ?').get(id);
   if (existing) return { ok: true, id, existed: true };
+  const max = Number.isInteger(options.maxFacts) && options.maxFacts > 0 ? options.maxFacts : MAX_FACTS_PER_SCOPE;
+  let pruned = 0;
   db.exec('begin');
   try {
+    const count = countScope(db, fact.scope);
+    if (count >= max) {
+      pruned = pruneTerminal(db, fact.scope, count - max + 1);
+      const after = countScope(db, fact.scope);
+      if (after >= max) {
+        db.exec('rollback');
+        return { ok: false, reason: 'KAPAZITAET', scope: fact.scope, ist: after, soll: max };
+      }
+    }
     db.prepare(
       'insert into facts (id, scope, subject, predicate, value, kind, status, status_at, extract_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
@@ -141,7 +193,7 @@ export function insertFact(db, fact, at) {
     db.exec('rollback');
     throw error;
   }
-  return { ok: true, id, existed: false };
+  return { ok: true, id, existed: false, pruned };
 }
 
 export function getFact(db, id) {

@@ -139,6 +139,11 @@ const { state, evidence } = relationshipState(rules, current, event.type, event.
 | **MID** | Laufende Arcs / Relationships | Semantisch, offen |
 | **COLD** | Archivierte Arcs (Snapshots) | Komprimiert, historisch |
 
+Beide Verläufe sind Fenster, keine Archive: die Chronik hält `chronicleLimit`
+Zeilen (Vorgabe 50), die Beziehungs-Historie `relationshipWindow` (Vorgabe 20).
+Eine Zeile trägt Kennung, Typ und Zeitstempel — nicht das Ereignis. Wer den
+vollen Vorgang braucht, liest ihn im Sitzungsprotokoll des Hosts (SH-LEARN-02).
+
 ```javascript
 // HOT
 const hot = chronicle.slice(-config.chronicleLimit);

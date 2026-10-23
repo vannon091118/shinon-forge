@@ -94,6 +94,14 @@ test('scoring-signale: eine wiederholte Frage wird zur Korrektur (Wert sinkt)', 
   ]);
   assert.deepEqual(second.scorecard, expected.scorecard);
   assert.equal(second.scorecard.scores.correctness, 0.455);
+
+  // SH-LEARN-02: das Protokoll traegt die ZAHL, nicht den Text. Der volle
+  // Satz bleibt im Sitzungsarchiv des Hosts, nicht in einer zweiten Ablage.
+  assert.equal(second.outcome.detail.chars, 'Prüfe bitte die Scoring Schicht und die Signaltabelle'.length);
+  assert.equal(second.outcome.detail.text, undefined);
+  const stored = JSON.stringify(collector.records());
+  assert.equal(stored.includes('Signaltabelle'), false, 'kein Prompt-Text im Protokoll');
+  assert.ok(collector.records().every((record) => typeof record.detail === 'object'));
 });
 
 test('scoring-signale: ein themenfremder Menschen-Text erzeugt kein Signal', () => {

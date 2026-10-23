@@ -109,6 +109,7 @@
     "Unbekannte Events ändern kein semantisches Feld; sie stehen in der Chronik.",
     "Die Sequenz wächst monoton: jede(seq) > jede(seq-1).",
     "Arc-Freeze ist deterministisch: gleiche Historie = gleicher Snapshot.",
-    "Relationship-State ist abgeleitet oder NONE, nie behauptet."
+    "Relationship-State ist abgeleitet oder NONE, nie behauptet.",
+    "Chronik und Beziehungs-Historie tragen nur Kennung, Typ und Zeitstempel und sind begrenzt (chronicleLimit, relationshipWindow): die Nutzlast eines Ereignisses bleibt im Sitzungsarchiv des Hosts."
   ]
 }

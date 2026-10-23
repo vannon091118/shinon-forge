@@ -48,6 +48,7 @@
       "key-router-override.test.mjs",
       "key-router-security.test.mjs",
       "key-router-wire.test.mjs",
+      "knowledge-kinds.test.mjs",
       "local-state-hygiene.test.mjs",
       "markers.test.mjs",
       "message-ingress.test.mjs",

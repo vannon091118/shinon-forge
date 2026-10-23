@@ -28,6 +28,7 @@ import {
 import {
   FACTS_FILE_NAME,
   FACTS_VERSION,
+  MAX_FACTS_PER_SCOPE,
   MIGRATIONS,
   addDependency,
   closeFacts,
@@ -323,3 +324,61 @@ test('quelle: der Store nennt den Vertrag, und es gibt keine zweite Datei-Ablage
 function importExists() {
   return existsSync(join(HERE, '..', 'assets', 'facts-store.js'));
 }
+
+test('store: die Faktentabelle ist begrenzt — terminale weichen, lebende nie still', () => {
+  // SH-LEARN-02: Projekt-Memory ist ein Speicher, kein Archiv. Die Grenze ist
+  // je Bereich; hier auf 1 gesenkt, damit der Fall lesbar bleibt.
+  assert.ok(Number.isInteger(MAX_FACTS_PER_SCOPE) && MAX_FACTS_PER_SCOPE > 0);
+  const dir = tempDir();
+  const db = openFacts(join(dir, FACTS_FILE_NAME));
+  try {
+    const base = (subject) => ({ ...VALID_FACT, subject });
+    const first = insertFact(db, base('a.mjs'), 1, { maxFacts: 1 });
+    assert.equal(first.ok, true);
+
+    // Ein zweiter LEBENDER Fakt passt nicht: benannte Ablehnung, nichts geloescht.
+    const blocked = insertFact(db, base('b.mjs'), 2, { maxFacts: 1 });
+    assert.equal(blocked.ok, false);
+    assert.equal(blocked.reason, 'KAPAZITAET');
+    assert.deepEqual([blocked.ist, blocked.soll], [1, 1]);
+    assert.equal(listFacts(db, VALID_FACT.scope).length, 1, 'der lebende Fakt bleibt stehen');
+
+    // Derselbe Fakt erneut ist idempotent — Kapazitaet ist kein Fehler beim Wiederholen.
+    assert.equal(insertFact(db, base('a.mjs'), 3, { maxFacts: 1 }).existed, true);
+
+    // Erst ENTSCHEIDEN, dann darf der naechste kommen: der terminale weicht.
+    for (const to of ['EXTRACTED', 'VALIDATING', 'VALID', 'SUPERSEDED']) {
+      assert.deepEqual(transitionFact(db, first.id, to, 'validator', 4), { ok: true, reason: '' });
+    }
+    const second = insertFact(db, base('b.mjs'), 5, { maxFacts: 1 });
+    assert.equal(second.ok, true);
+    assert.equal(second.pruned, 1, 'genau ein entschiedener Fakt weicht');
+    assert.equal(getFact(db, first.id), null, 'der entschiedene Fakt ist weg');
+    assert.deepEqual(listFacts(db, VALID_FACT.scope).map((row) => row.id), [second.id]);
+  } finally {
+    closeFacts(db);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('store: eine entschiedene Tatsache, auf die ein anderer Fakt zeigt, bleibt stehen', () => {
+  // Kuerzen ja, Loecher nein: wer eine Kette belegt, verschwindet nicht leise.
+  const dir = tempDir();
+  const db = openFacts(join(dir, FACTS_FILE_NAME));
+  try {
+    const first = insertFact(db, { ...VALID_FACT, subject: 'a.mjs' }, 1, { maxFacts: 2 });
+    const second = insertFact(db, { ...VALID_FACT, subject: 'b.mjs' }, 2, { maxFacts: 2 });
+    assert.equal(addDependency(db, second.id, first.id).ok, true);
+    for (const to of ['EXTRACTED', 'VALIDATING', 'VALID', 'SUPERSEDED']) {
+      assert.equal(transitionFact(db, first.id, to, 'validator', 3).ok, true);
+    }
+    const blocked = insertFact(db, { ...VALID_FACT, subject: 'c.mjs' }, 4, { maxFacts: 2 });
+    assert.equal(blocked.ok, false);
+    assert.deepEqual([blocked.reason, blocked.ist, blocked.soll], ['KAPAZITAET', 2, 2]);
+    assert.notEqual(getFact(db, first.id), null, 'der belegte Vorgaenger bleibt');
+    assert.deepEqual(getFact(db, second.id).dependsOn, [first.id], 'die Kante bleibt ganz');
+  } finally {
+    closeFacts(db);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

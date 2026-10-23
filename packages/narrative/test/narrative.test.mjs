@@ -184,6 +184,26 @@ test('narrative: die Chronik ist begrenzt und liest keine Uhr', () => {
   assert.deepEqual(chronicle.map((entry) => entry.type), ['t.5', 't.6', 't.7'], 'die juengsten bleiben');
   const withoutTime = appendChronicle([], { id: 'ev-x', type: 't' }, 1);
   assert.equal(withoutTime[0].timestamp, null);
+  // SH-LEARN-02: eine Zeile ist Kennung, Typ und Zeit — keine zweite Kopie des
+  // Ereignisses. Nutzlast und Kontext bleiben im Sitzungsarchiv des Hosts.
+  const full = event('message.received', { context: { text: 'geheimer Prompt', tool: 'x' }, payload: { big: 'y' } });
+  const line = appendChronicle([], full, 1)[0];
+  assert.deepEqual(Object.keys(line).sort(), ['id', 'timestamp', 'type']);
+  assert.equal(JSON.stringify(line).includes('geheimer Prompt'), false);
+});
+
+test('narrative: die Beziehung ist ein Fenster, kein anwachsendes Protokoll', () => {
+  const state = initialState(99);
+  const narrow = { ...config, relationshipWindow: 4 };
+  for (let index = 0; index < 9; index += 1) advance(state, contract, event('message.received'), narrow);
+  const history = state.relationships['shinon+user'].history;
+  assert.equal(history.length, 4, 'relationshipWindow gilt wirklich');
+  assert.deepEqual(history.map((entry) => entry.type), ['message.received', 'message.received', 'message.received', 'message.received']);
+  assert.equal(history.at(-1).event, 'ev-message.received');
+  // Ohne Angabe gilt die Vorgabe 20 — nie unbegrenzt.
+  const unbounded = initialState(99);
+  for (let index = 0; index < 25; index += 1) advance(unbounded, contract, event('message.received'), { chronicleLimit: 5, freezeThreshold: 99 });
+  assert.equal(unbounded.relationships['shinon+user'].history.length, 20);
 });
 
 test('narrative: ein Arc traegt sein Thema aus themeByEvent', () => {

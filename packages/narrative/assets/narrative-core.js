@@ -240,8 +240,45 @@ export function advance(state, contract, event, config) {
   relationship.state = state.composite.relationship_state;
   relationship.state_reason = state.composite.relationship_reason;
   relationship.state_evidence = state.composite.relationship_evidence;
-  relationship.history.push({ event: event?.id ?? null, type: event?.type ?? null, timestamp: event?.timestamp ?? null });
+  // Die Beziehung ist ein FENSTER, kein Archiv: `relationshipWindow` stand
+  // lange im Vertrag, ohne dass es jemand las — die Historie wuchs mit jedem
+  // Takt. Sie traegt nur Kennung, Typ, Zeitstempel (SH-LEARN-02).
+  relationship.history = appendHistory(
+    relationship.history,
+    { event: event?.id ?? null, type: event?.type ?? null, timestamp: event?.timestamp ?? null },
+    windowOf(config),
+  );
   return state;
+}
+
+/** Das Beziehungsfenster aus der Konfiguration — Vorgabe 20, nie unbegrenzt. */
+export function windowOf(config) {
+  const value = config?.relationshipWindow;
+  return Number.isInteger(value) && value > 0 ? value : 20;
+}
+
+/** Die juengsten `limit` Eintraege behalten — dieselbe Regel wie die Chronik. */
+export function appendHistory(history, entry, limit) {
+  const updated = [...(Array.isArray(history) ? history : []), entry];
+  const bound = Number.isInteger(limit) && limit > 0 ? limit : 20;
+  return updated.length > bound ? updated.slice(updated.length - bound) : updated;
+}
+
+/**
+ * Eine Chronik-Zeile: Kennung, Typ, Zeitstempel. Mehr nicht.
+ *
+ * Vorher wurde das GANZE Ereignis kopiert (`{ ...event }`) — Nutzlast,
+ * Kontext und Akteure inklusive. Damit trug der Narrativ-Zustand dieselben
+ * Daten noch einmal, und "Hot Memory" war nur eine zweite Ablage derselben
+ * Nachricht. Die Chronik ist ein Verlauf, kein Archiv (SH-LEARN-02): wer den
+ * vollen Vorgang braucht, liest ihn im Sitzungsprotokoll.
+ */
+export function compactEvent(event) {
+  return {
+    id: event?.id ?? null,
+    type: event?.type ?? null,
+    timestamp: event?.timestamp ?? null,
+  };
 }
 
 /**
@@ -252,7 +289,7 @@ export function advance(state, contract, event, config) {
  * koennen, und sie tut es nicht.
  */
 export function appendChronicle(chronicle, event, limit) {
-  const entry = { ...event, timestamp: event?.timestamp ?? null };
+  const entry = compactEvent(event);
   const updated = [...(Array.isArray(chronicle) ? chronicle : []), entry];
   return updated.length > limit ? updated.slice(updated.length - limit) : updated;
 }

@@ -195,7 +195,13 @@
         "packages/project-index/assets/facts-reconcile.js"
       ]
     },
-    "docs/contracts/markers.json": {
+    "docs/contracts/knowledge-kinds.json": {
+   "art": "quelle",
+   "leser": [
+    "scripts/gate/tests/knowledge-kinds.test.mjs"
+   ]
+  },
+  "docs/contracts/markers.json": {
       "art": "zusammenfassung",
       "quelle": [
         "packages/markers/assets/marker-model.json",

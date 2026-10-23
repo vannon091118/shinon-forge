@@ -1,0 +1,65 @@
+{
+  "contract": "shinon.knowledge-kinds/v1",
+  "name": "Wissensarten — vier Speicher, vier Eigentuemer, vier Grenzen",
+  "note": "SH-LEARN-02: Nutzer-Memory, Projekt-Memory, prozedurale Skills und das episodische Archiv sind GETRENNT. Jede Art hat genau einen Eigentuemer, eine Ablage, eine harte Grenze und einen Leseweg. Keine Art kopiert vollstaendige Ereignis-Nutzlasten in einen zweiten Zustand: was ein Speicher aufnimmt, ist die verkuerzte Aussage (Statement, Praeferenz, Name, Belegzahl), nicht das Ereignis. Wer den vollen Vorgang braucht, liest ihn im Sitzungsarchiv (episodic-archive).",
+  "rules": [
+    "Ein Zustand gehoert EINER Art. Scoring liefert Feedbacksignale; Narrative bildet einen kompakten Zustand plus Begruendung ab, kein zweites Ereignisprotokoll.",
+    "Jede Grenze ist eine positive Zahl im Code oder ausdruecklich `host` (die Ablage gehoert dem Host und wird hier nicht nachgebaut).",
+    "Am Limit wird NIE still gekuerzt: der Aufrufer bekommt einen benannten Befund (`KAPAZITAET` mit Ist und Soll) oder eine Eviction-Regel, die nur entschiedene/abgelehnte Zeilen trifft.",
+    "Projekt-Memory ist pro Projekt (Bereich `scope`), Nutzer-Memory ist projektuebergreifend (`scope: global`), Skills sind Uebungsdateien, das Archiv ist unveraenderlicher Verlauf.",
+    "Ein Modell schreibt in keine dieser Ablagen direkt: der Schreibweg laeuft ueber die genannte Runtime (facts-store, persona-memory, skill-lifecycle)."
+  ],
+  "kinds": [
+    {
+      "id": "user-memory",
+      "label": "Nutzer-Memory",
+      "owner": "packages/persona/index.js",
+      "contents": "dauerhaft gueltige Praeferenzen und Erwartungen des Menschen: Korrekturen, Grenzen, belegte Lehren, angenommene Selbstauflagen",
+      "store": "shinon_index_store · Namensraum shinon.persona-memory/v1 (MEMORY_NAMESPACE)",
+      "cap": 64,
+      "capSource": { "path": "packages/persona/assets/memory-core.js", "symbol": "MEMORY_MAX_ENTRIES" },
+      "query": "memoryView() im Persona-Review-Panel (__shinonPersonaReview); acceptedCommitments() fuer den Prompt",
+      "copyRule": "compact",
+      "notHere": "Projektfakten, Skill-Ablaeufe, Sitzungsprotokolle; der Prompt-Text eines Turns",
+      "note": "Zusaetzlich gedeckelt: 24 Vorschlaege (MEMORY_MAX_PROPOSALS), 9 Belege je Eintrag (MEMORY_EVIDENCE_CAP), 96 Zeichen Detail, Alterung 0.98."
+    },
+    {
+      "id": "project-memory",
+      "label": "Projekt-Memory",
+      "owner": "packages/project-index/assets/facts-store.js",
+      "contents": "belegte Projektfakten mit Status, Quellen und Abhaengigkeiten: was im Baum gilt, woher es kommt, was daraus folgt",
+      "store": "facts.sqlite (eigene SQLite-Datei, FACTS_VERSION, additive Migrationen)",
+      "cap": 2000,
+      "capSource": { "path": "packages/project-index/assets/facts-store.js", "symbol": "MAX_FACTS_PER_SCOPE" },
+      "query": "shinon_facts_snapshot (read-only, Vertrag shinon.facts/snapshot-v1) und facts-service",
+      "copyRule": "compact",
+      "notHere": "Praeferenzen des Menschen, Skill-Ablaeufe, vollstaendige Dateiinhalte oder Ereignis-Nutzlasten",
+      "note": "Die Grenze gilt JE BEREICH. Am Limit weichen zuerst SUPERSEDED/REJECTED; lebende Fakten werden nie geloescht, sondern der neue Fakt wird mit KAPAZITAET (Ist/Soll) abgelehnt."
+    },
+    {
+      "id": "procedural-skills",
+      "label": "Prozedurale Skills",
+      "owner": "packages/prompter/assets/skill-lifecycle.js",
+      "contents": "wiederverwendbare Ablaeufe als SKILL.md: Kandidat, Belege, Entscheidung, Ziel — keine Modelltexte, gehashte Sitzungen",
+      "store": ".shinon/skill-ledger.json (shinon.skill-ledger/v1) und .agents/skills/<name>/SKILL.md",
+      "cap": 200,
+      "capSource": { "path": "packages/prompter/assets/skill-lifecycle-rules.json", "pointer": "ledger.maxEntries" },
+      "query": "skill-lifecycle: pending() fuer offene Kandidaten, veroeffentlichte Skills liest der Host aus .agents/skills",
+      "copyRule": "compact",
+      "notHere": "Projektfakten, Nutzerpraeferenzen, Gespraechsverlaeufe",
+      "note": "Pruning trifft zuerst abgelehnte, dann offene Kandidaten; veroeffentlichte Eintraege bleiben (sie belegen vorhandene Dateien)."
+    },
+    {
+      "id": "episodic-archive",
+      "label": "Episodisches Archiv",
+      "owner": "@deepseek-ai/dsh",
+      "contents": "tatsaechliche fruehere Nachrichten, Werkzeug-Ergebnisse und Ereignisse der Sitzung, unveraendert und bei Bedarf durchsuchbar",
+      "store": "$DSH_HOME/sessions (Sitzungsprotokolle des Hosts)",
+      "cap": "host",
+      "query": "@deepseek-ai/dsh-session-log-export (Export/Ansicht) — kein Paket dieses Repos haelt eine Kopie",
+      "copyRule": "none",
+      "notHere": "nichts wird hierher geschrieben; dieses Repo liest hoechstens daraus",
+      "note": "cap `host`: Aufbewahrung und Groesse gehoeren DSH. Die Grenze dieses Repos ist die Gegenrichtung — kein Zustand kopiert die Nutzlast des Archivs."
+    }
+  ]
+}
