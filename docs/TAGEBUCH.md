@@ -1945,3 +1945,37 @@ wirklich ans Hauptmodell ging, ohne den Text zu kopieren.
 `npm run test:prompter` 245/245, `npm test` Exit 0 (131 Schritte),
 `npm run gate:test` 908/908, `npm run zahlen:check` Exit 0,
 `npm run build` Exit 0 (24 Pakete, 314 Dateien).
+
+**Vier Wissensarten, vier Grenzen — und drei Stellen, die keine Grenze hatten.**
+SH-LEARN-02 verlangt nicht mehr Genauigkeit, sondern Trennung: Nutzer-Memory,
+Projekt-Memory, prozedurale Skills und das episodische Archiv sollen je einen
+Eigentuemer und eine begrenzte Menge haben, statt dass jede Schicht die
+vollstaendigen Ereignis-Nutzlasten noch einmal in ihren Zustand kopiert. Die
+Antwort ist eine Registry, keine neue Ablage: `docs/contracts/knowledge-kinds.json`
+nennt je Art den Eigentuemer, den Speicher, den Leseweg, die Grenze und was dort
+NICHT hingehoert; das Archiv selbst bleibt beim Host unter `$DSH_HOME/sessions`,
+dieses Repo haelt keine Kopie. `scripts/gate/tests/knowledge-kinds.test.mjs`
+liest die Datei und haelt jede Zahl gegen die Konstante, die sie behauptet —
+eine Grenze, die nur in der Doku steht, ist eine Behauptung, keine Grenze.
+
+Drei Stellen hatten keine. Die Narrative-Chronik kopierte mit `{ ...event }`
+das ganze Ereignis samt Kontext in den "Hot Memory"; jetzt traegt eine Zeile
+Kennung, Typ und Zeitstempel, und wer den Vorgang braucht, liest ihn im
+Sitzungsprotokoll. Die Beziehungs-Historie wuchs mit jedem Takt weiter, obwohl
+`relationshipWindow` seit jeher im Vertrag stand — sie folgt ihm jetzt (Vorgabe
+20), wie ein Notizbuch mit fester Seitenzahl statt eines Regals, das nie voll
+wird. Das Scoring-Protokoll speichert `detail.chars` statt des Prompt-Textes.
+Der Faktenspeicher ist je Bereich auf `MAX_FACTS_PER_SCOPE` (2000) begrenzt:
+erst weichen entschiedene Fakten, auf die niemand mehr zeigt, dann wird der neue
+Fakt mit `KAPAZITAET` (Ist/Soll) abgelehnt — nie eine stille Kuerzung.
+
+**Anker:** `900084d` · Pfade: `docs/contracts/knowledge-kinds.json`,
+`scripts/gate/tests/knowledge-kinds.test.mjs`,
+`packages/narrative/assets/narrative-core.js`,
+`packages/scoring/assets/signal-translate.js`,
+`packages/project-index/assets/facts-store.js`,
+`scripts/gate/test-lanes.json`, `docs/contracts/structure.json` · Belege:
+`npm test` Exit 0 (131 Schritte), `npm run gate:test` 914/914,
+`npm run test:scoring` 51/51, vier fokussierte Dateien 55/55, `--only narrative`
+und `--only scoring` je PASS, `npm run zahlen:check` Exit 0, `npm run build`
+Exit 0 (24 Pakete, 314 Dateien).
