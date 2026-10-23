@@ -1687,3 +1687,43 @@ der Glob die langsamen Dateien verlor. Die Oberflächenprüfung selbst ist nach
 `scripts/lib/commit-surfaces.mjs`, `.github/workflows/commit-guard.yml`,
 `scripts/lib/preflight/policy.mjs`, `scripts/lib/preflight/documentation.mjs`,
 `docs/ZAHLEN.md` §2.2
+
+**Der Profilpatch kommt aus zehn Fragmenten, und das Budget gilt dem gerenderten Block.**
+
+**Was der Baum jetzt anders macht.** Der 737-Zeilen-Patch
+`profiles/shinon/cordis.patch.yml` ist nicht mehr von Hand gepflegt, sondern
+bytegleich die Verkettung von zehn Fragmenten unter
+`profiles/shinon/fragments/` (Header, Routing, UI-Kern, Modellroute,
+Agentenmodell, UI/Agent, Narrative/Persona, Prompter, Popup/Key-Router,
+Traceability/Subagenten). `scripts/profile-patch.mjs` schreibt und prüft; die
+Reihenfolge ist lexikographisch, `--check` endet bei Drift mit Exit 1, und
+`npm test` ruft den Check mit auf. Ein fehlendes Fragment fällt damit auf, statt
+einen Config-Verlust still zu booten.
+
+**Die Texte und die Vorgaben sind Daten.** Persona und Prompter halten ihre
+model-gerichteten Texte in `assets/prompts.json` (Vertrag
+`shinon.prompts/v1`, Hash-Fixture je Text). Die Vorgabewerte für LLM-Deckel,
+Budget, Pfade und Dateigrenze stehen in `assets/defaults.json` beider Pakete;
+`prompt-resources.test.mjs` vergleicht die Schemastery-Defaults mit der Datei,
+statt die Gleichheit zu behaupten.
+
+**Die Verdrahtung, die vorher nur im Test grün war.** `pre-step.js` ruft
+`kuerzeAufBudget` mit dem echten Renderer auf. Der Kontext wird von hinten
+gekürzt (der Index liefert nach Relevanz), der gerenderte Block wird
+nachgeprüft, und ein metadata-only-Block, der nicht passt, endet mit dem
+benannten Grund `CONTEXT_BUDGET` statt mit einem stillen Überlauf. Der
+Produktionsaufruf ist im `context-budget`-Test textuell gepinnt.
+
+**Belege.** `npm test` Exit 0 mit **131 bestandenen Schritten**, `npm run
+gate:test` Exit 0 mit **899 von 899 Tests**, `npm run zahlen:sync` und
+`npm run zahlen:check` Exit 0, `node scripts/profile-patch.mjs --check`
+bytegleich über zehn Fragmente. Die Persona ist von 1328 auf 1197 Zeilen
+gesunken; der Bestandseintrag wurde gesenkt, nicht erhöht.
+
+**Anker:** `7d8229b` · Pfade: `scripts/profile-patch.mjs`,
+`profiles/shinon/fragments/`, `packages/persona/assets/prompts.json`,
+`packages/prompter/assets/prompts.json`,
+`packages/prompter/assets/defaults.json`,
+`packages/project-index/assets/defaults.json`,
+`packages/prompter/assets/pre-step.js` · Offen bleiben die Etappen 4–8 aus
+`docs/ROADMAP.md` §2.25.

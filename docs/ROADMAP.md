@@ -95,6 +95,39 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 - Architektur-Folge aus dem Audit: Workspace-Twin zusammenlegen (C3), Prompt-Schichten zu einem Assembler (C4), `preset shinon` statt `cordis`, Katalog-Snapshot statt Einzelprüfungen (P2).
 - Vendor-Baum zu Hash-Manifest verdichten (B5); `.session-eval/`-Zweck klären (B7-Rest; K5-Offenpunkte aus dem Report: Scope-Erkennung, Fehler-Turn-Signal, K7a-Kopplung — siehe Archiv).
 
+### 2.25 Refactor-Plan vom 2026-10-23 (offen — Etappen 0–3 sind belegt)
+
+Die Etappen 0–3 des freigegebenen Plans sind mit `7d8229b` umgesetzt und belegt:
+Baseline, Testbahnen/CI, Prompt-Ressourcen samt Vorgabedaten und der aus zehn
+Fragmenten generierte Profilpatch. Offen sind die folgenden Etappen; jede Zeile
+nennt ihre Abnahme, und keine gilt ohne Exit-Code und benannten Lauf.
+
+- **Etappe 4 — Host-Monolithen teilen:** `scripts/lib/repo.mjs` (Fassade plus
+  Eigentümer-Module, identische Exportnamen), `scripts/install-user.mjs`,
+  `packages/persona/index.js` (Zustand zuerst als `assets/persona-runtime-state.js`,
+  danach `apply`), `packages/scoring/index.js`, `packages/task-router/index.js`.
+  Abnahme: `scripts/gate/tests/source-scan.test.mjs` und die Paket-Suiten ohne
+  verlorenen Export; `npm test` Exit 0; jede Datei unter ihrer Klassengrenze.
+- **Etappe 5 — Client-Quellen:** die handgespiegelten Client-Blöcke (Codingmon,
+  Encounter, Zucht) auf Quellfragmente plus Generator umstellen; `--check` muss
+  bytegleich sein, und der jeweilige Client-Test muss die erzeugte Fassung fahren.
+  Abnahme: `node scripts/assets/build-*.mjs --check` Exit 0, `npm run test:codingmon`
+  Exit 0.
+- **Etappe 6 — Gate-Tests nach Fachbereich:** die großen Dateien
+  (`client-activation`, `context-wiring`, `scoring`, `persona`) entlang ihrer
+  Eigentümer teilen, ohne eine Zusage zu verlieren; jede neue Datei gehört genau
+  einer Bahn in `scripts/gate/test-lanes.json`.
+  Abnahme: `npm run gate:test` grün mit unveränderter Testzahl, `npm run gate:test:slow`
+  grün.
+- **Etappe 7 — Rest der Funktionslücken:** Tooltip- und Narrative-Client prüfen,
+  `selection.js` verdrahten oder entfernen (T3-5), `skill-registry-core.js`
+  entscheiden, die vier Constructor-/Vertragsstellen aus dem Audit schließen.
+  Abnahme: je Lücke ein Gate-Test mit einer Mutation, die rot wird.
+- **Etappe 8 — restliche Audit-Tiers:** die offenen Zeilen aus
+  `docs/CLEANREPO-AUDIT.md` §8.1 abarbeiten (u. a. T2-6, T2-7, T3-0, T3-5, T3-6)
+  und die Audit-Tabelle auf den gemessenen Stand ziehen.
+  Abnahme: `npm run gate:test` Exit 0, `npm test` Exit 0, Audit-Zeile mit Beleg.
+
 ### 2.3 Zurückgestellt (gated — wird erst bei erfüllter Bedingung gebaut)
 
 - Benchmarks und Metriken (4.1–4.6): Aufgaben-Set, DSH-Baseline, Shinon-Messung, Feature-Entscheidung mit Messwert.

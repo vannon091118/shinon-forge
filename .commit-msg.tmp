@@ -1,37 +1,22 @@
-Die Prompts stehen jetzt wie ein Regal im Datenblatt, nicht mehr als Textblock im Code
+Die Übergabe steht wie ein Wegweiser neben dem Weg, statt in ihm zu liegen
 
-Die model-gerichteten Texte von Persona und Prompter lagen bis heute als
-String-Konstanten in `packages/persona/index.js` und in `mode-core.js`. Damit war
-jede Formulierung eine Code-Aenderung, jeder Test ein Vergleich gegen einen
-String, und die Herkunft eines Bausteins (`blocks.json`) zeigte auf eine Datei,
-die den Text nur zufaellig enthielt. Jetzt liegen die Texte in
-`packages/persona/assets/prompts.json` und `packages/prompter/assets/prompts.json`
-(Vertrag `shinon.prompts/v1`, ein Eigentuemer je Katalog), gerendert von einem
-kleinen, importfreien `prompt-text.js`; ein fehlender Parameter oder ein
-unbekannter Platzhalter endet fail-closed mit `PROMPT_PARAM_MISSING` bzw.
-`PROMPT_UNKNOWN`, nie mit einem halben Satz. Jeder Text ist per
-`fixtures/prompts.sha256` eingefroren, und `scripts/gate/tests/prompt-resources.test.mjs`
-prueft Katalog, Verweise und Renderer in einem Lauf.
+Mit `7d8229b` sind die Etappen 2 und 3 des freigegebenen Plans committet: die
+Prompt-Texte und Vorgaben liegen als Daten, der Profilpatch entsteht aus zehn
+Fragmenten, und der MAX-Kontext wird gegen sein Budget gekuerzt. Was dieser
+Commit nachzieht, ist die Spur fuer den naechsten Agenten: `docs/ROADMAP.md`
+nennt die Etappen 4 bis 8 mit je einer Abnahme (Host-Monolithen, Client-Quellen,
+Gate-Test-Teilung, die restlichen Funktionsluecken, die offenen Audit-Zeilen),
+`docs/CHANGELOG.md` traegt die uebertragbare Kurzfassung samt Belegen, und
+`docs/TAGEBUCH.md` erzaehlt die Etappen im bestehenden Kapitel vom 2026-10-23
+weiter, mit Commit-Anker `7d8229b` und den beruehrten Pfaden.
 
-Die Vorgabewerte folgen derselben Regel: `packages/prompter/assets/defaults.json`
-und `packages/project-index/assets/defaults.json` sind die EINE Quelle fuer
-Token-Deckel, Temperature, Timeout, Budget, Dateigrenze und Pfade; die
-Schemastery-Schemas ziehen von dort. Der Test belegt die Gleichheit von
-Schema-Default und Datei, statt sie zu behaupten.
-
-Der Profilpatch ist nicht mehr ein 737-Zeilen-Block, sondern zehn geordnete
-Fragmente unter `profiles/shinon/fragments/`, die
-`scripts/profile-patch.mjs` bytegleich zusammensetzt; `--check` ist Exit 1 bei
-Drift, und `npm test` ruft den Check jetzt mit auf. Die Reihenfolge ist damit
-lesbar, ohne dass die wirksame Datei ein zweites Mal gepflegt wird.
-
-Der MAX-Kontext wird endlich gegen sein Budget gekuerzt: `pre-step.js` ruft
-`kuerzeAufBudget` mit dem echten Renderer auf, statt die Korrektur nur im Test zu
-kennen; ein metadata-only-Block, der nicht passt, endet mit dem benannten Grund
-`CONTEXT_BUDGET`. Belege: `npm test` Exit 0 mit 131 bestandenen Schritten,
-`npm run gate:test` Exit 0 mit 899 von 899 Tests, `npm run profile:patch:check`
-bytegleich ueber zehn Fragmente. Die Persona schrumpfte dabei von 1328 auf 1197
-Zeilen; der Bestandseintrag in `docs/contracts/structure.json` ist entsprechend
-gesenkt, nicht erhoeht.
+Die Zahlen sind gemessen und nicht behauptet: `npm test` Exit 0 mit 131
+bestandenen Schritten, `npm run gate:test` Exit 0 mit 899 von 899 Tests,
+`node scripts/profile-patch.mjs --check` bytegleich ueber zehn Fragmente,
+`npm run zahlen:check` Exit 0. Die Persona schrumpfte von 1328 auf 1197 Zeilen,
+der Bestandseintrag in `docs/contracts/structure.json` wurde gesenkt. Die
+Roadmap behauptet keine erledigte Etappe, die keinen Lauf hat; offen bleibt
+ausdruecklich Etappe 4 bis 8, damit niemand den Zwischenstand fuer den Schluss
+haelt.
 
 created by VANNON — Volatile Agent Needing No Other Nonsense, Never Overly Nice, Never Average Vibe
