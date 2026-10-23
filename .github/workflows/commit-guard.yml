@@ -140,8 +140,11 @@ jobs:
           npm ci --no-audit --no-fund
           echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
+      # Beide Bahnen: `fast` (lokale Kette, 20-s-Deckel) und `slow` (CI-Tier,
+      # echte SQLite-/Indexläufe, 600-s-Deckel). Der Runner wertet TAP selbst
+      # aus — ein `cancelled` ist rot, nicht Exit 0.
       - name: Gate-Tests fahren
-        run: node --test scripts/gate/tests/*.test.mjs
+        run: npm run gate:test:all
 
       # Die Client→Host-Übergabe der Codemon-Suite braucht denselben Install-Baum
       # (`dsh` im PATH, echte Typert-Brücke); in der Unit-Matrix ohne Install
@@ -150,6 +153,33 @@ jobs:
       # dem Host verheiratet.
       - name: Codemon-Übergabe fahren (volle Naht, mit Install)
         run: node --test packages/codingmon/test/uebergabe.test.mjs
+
+  # ── Gate-Engine: alle Plugins, `--full`, fail-closed ────────────────────────
+  # Die Gate-Tests prüfen die Regeln; dieser Job prüft den ECHTEN Baum mit
+  # allen 23 Plugins. Er fehlte bis 2026-10-23 in der CI: `test:core` fährt nur
+  # die lokalen Slices, `gate:test` nur die Tests. Ein Plugin ohne `check()`
+  # oder ein Befund außerhalb der lokalen Auswahl wäre damit nie gelaufen.
+  gate-full:
+    name: Gate-Engine (--full)
+    needs: preflight-docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Abhängigkeiten installieren (lockfile-treu) und dsh in den PATH legen
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Gate-Engine fahren
+        run: npm run gate:full
 
   # ── Zweig 5: die Fixtures (Validierung, ~36 s) ──────────────────────────────
   fixtures:
@@ -398,6 +428,7 @@ jobs:
       - quick
       - unit
       - gate-rules
+      - gate-full
       - fixtures
       - distribution
       - profile

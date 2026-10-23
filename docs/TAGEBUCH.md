@@ -1651,3 +1651,39 @@ Belege: `npm run gate:test` **968/968** in 9,2 s, `npm test` Exit 0,
 30. CI: Gate #536 auf `b069617` grün (2 m 55 s).
 
 **Anker:** `b069617` · Belege: `packages/project-index/assets/index-core.js`, `packages/project-index/assets/index-format.js`, `packages/project-index/assets/index-extract.js`, `packages/project-index/assets/index-store.js`, `packages/project-index/assets/index-run.js`, `packages/project-index/assets/index-context.js`, `scripts/gate/tests/index-split.test.mjs`, `docs/contracts/structure.json`
+
+## 2026-10-23 — Eine Testline, die nicht mehr lügt, und Prompts, die aus Daten kommen
+
+**Der erste Schnitt am Morgen:** Der vorhandene Arbeitsbaum trug bereits eine
+Persona-/Prompter-Extraktion — Prompt-Texte in `persona-state.json`, der
+Live-Zustand als EIN Runtime-Context, der Aufgabenbrief im Runtime-Context statt
+am ersetzten Prompt, keine zweite Skill-Auswahl im Veredler. Der Stand ist als
+`96c193f` committet, nachdem `npm test` Exit 0, `npm run zahlen:check` Exit 0 und
+`npm run preflight:docs:check` PASS zeigten.
+
+**Der Befund an der Testline:** `npm run gate:test` meldete 894 von 899 Tests
+grün — und endete mit **Exit 0**, obwohl fünf Dateien `not ok` und `cancelled`
+waren. Der 20-s-Deckel brach die Index-/Scoring-Läufe ab, und `node --test`
+wertet einen abgebrochenen Test nicht als Fehler. Ein Deckel, der nicht rot
+wird, ist kein Deckel. Neu ist deshalb `scripts/gate/test-lanes.mjs`: jede der
+104 Dateien gehört genau EINER Bahn (`scripts/gate/test-lanes.json`, Vertrag
+`shinon.gate-lanes/v1`), die lokale Bahn läuft mit 20 s und vier Bündeln, die
+CI-Bahn mit 600 s und zwei Bündeln, und der Runner liest den TAP-Bericht selbst
+— `cancelled` zählt wie `fail`. Gemessen: `gate:test` **891/891 in 19,8 s**,
+`gate:test:slow` **93/93 in 106,4 s**, zusammen **984/984**. Die vier Dateien
+über 10 s stehen mit Grund und Messung in `docs/ZAHLEN.md` §2.2; drei weitere
+liegen darunter, waren aber unter paralleler Last grenzwertig.
+
+**Die CI:** `commit-guard.yml` fährt jetzt beide Bahnen über
+`npm run gate:test:all` und hat einen eigenen Job `gate-full` für
+`npm run gate:full` (alle 23 Plugins). Der Preflight kennt damit **14**
+Pflichtjobs; `workflowIssues` verlangt den Runner statt eines Globs, weil genau
+der Glob die langsamen Dateien verlor. Die Oberflächenprüfung selbst ist nach
+`scripts/lib/commit-surfaces.mjs` gewandert — das Gate-Plugin war mit 241 Zeilen
+über seinem Bestand und gibt jetzt nur noch das Urteil weiter.
+
+**Anker:** `96c193f` · Belege: `scripts/gate/test-lanes.mjs`,
+`scripts/gate/test-lanes.json`, `scripts/gate/tests/test-lanes.test.mjs`,
+`scripts/lib/commit-surfaces.mjs`, `.github/workflows/commit-guard.yml`,
+`scripts/lib/preflight/policy.mjs`, `scripts/lib/preflight/documentation.mjs`,
+`docs/ZAHLEN.md` §2.2

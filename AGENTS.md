@@ -193,9 +193,13 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `npm run gate` / `gate:local` / `gate:full` → modular gate engine
   (`scripts/gate/engine.mjs`): slice-selected checks, one plugin per capability. Sits
   alongside `npm test`, does not replace it.
-- `npm run gate:test` → `node scripts/run-with-node.mjs node --test
-  scripts/gate/tests/*.test.mjs` (pure gate logic; no DSH needed, DSH-dependent
-  tests skip visibly).
+- `npm run gate:test` → `scripts/gate/test-lanes.mjs fast`: die lokale Bahn
+  (97 Dateien, 20-s-Grenze je Test). `npm run gate:test:slow` fährt die CI-Bahn
+  (7 Dateien mit echter SQLite/DSH, 600-s-Grenze), `npm run gate:test:all`
+  beide. Die Zuordnung steht in `scripts/gate/test-lanes.json`: jede Datei
+  gehört genau EINER Bahn, eine fehlende Zuordnung ist Exit 2. Der Runner wertet
+  TAP selbst aus — ein `cancelled` (Zeitgrenze) ist rot, auch wenn
+  `node --test` mit Exit 0 endet.
 - `npm run zahlen:sync` → `node scripts/sync-zahlen.mjs`: measures the inventory
   (packages, profile layers, versions, idioms, dist) and writes **only** the marked
   block `<!-- zahlen:bestand:start --> … <!-- zahlen:bestand:end -->` in
@@ -208,7 +212,9 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 
 **10 Sekunden sind das Ziel, 20 Sekunden die harte Grenze.** Ein Test, der länger
 braucht, ist zu langsam — nicht die Maschine. `npm run gate:test` bricht bei 20 s ab
-(`--test-timeout=20000`); die 10-s-Marke bleibt die lokale Zielgröße.
+(`--test-timeout=20000`); die 10-s-Marke bleibt die lokale Zielgröße. Was darüber
+liegt, läuft in `npm run gate:test:slow` (CI-Tier, 600 s) — die Anträge stehen in
+`docs/ZAHLEN.md` §2.2, die Zuordnung ist fail-closed.
 
 Zwei Ursachen, zwei Antworten: **Warten** (auf Index, Boot oder Worker) gehört in die
 CI-Tier und wartet auf ein **Ereignis mit 5-s-Frist**, nicht auf ein Timeout;

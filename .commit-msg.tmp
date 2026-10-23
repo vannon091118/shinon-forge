@@ -1,0 +1,23 @@
+Die Testline teilt sich in zwei Bahnen, und keine endet mehr still
+
+Der Befund war unangenehm einfach: npm run gate:test meldete 894 von 899 Tests
+grün und endete mit Exit 0, obwohl fünf Dateien als not ok und cancelled
+dastanden. Der 20-s-Deckel brach die Index- und Scoring-Läufe ab, und node
+--test wertet einen abgebrochenen Test nicht als Fehler. Ein Deckel, der nicht
+rot wird, ist kein Deckel — er sieht nur aus wie einer.
+
+Deshalb steht die Testline jetzt als Daten in scripts/gate/test-lanes.json:
+jede der 104 Dateien gehört genau EINER Bahn, fast (20 s, vier Bündel) oder
+slow (600 s, zwei Bündel). scripts/gate/test-lanes.mjs prüft die Zuordnung
+fail-closed (fehlende Datei, doppelte Bahn, fehlende Grenze = Exit 2) und liest
+den TAP-Bericht selbst; cancelled zählt wie fail. Die Bahnen sind gemessen:
+fast 891/891 in 19,8 s, slow 93/93 in 106,4 s. Die vier Dateien über 10 s
+stehen mit Grund und Messung in docs/ZAHLEN.md §2.2.
+
+Die CI fährt beide Bahnen über npm run gate:test:all und bekommt einen eigenen
+Job gate-full für npm run gate:full. Der Preflight kennt dadurch 14
+Pflichtjobs. Die Workflow-/Hook-Prüfung ist aus dem Gate-Plugin nach
+scripts/lib/commit-surfaces.mjs gewandert; das Plugin stand mit 241 Zeilen über
+seinem Bestand und gibt jetzt nur noch das Urteil weiter.
+
+created by VANNON — Volatile Agent Needing No Other Nonsense, Never Overly Nice, Never Average Vibe

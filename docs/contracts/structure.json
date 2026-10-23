@@ -111,7 +111,7 @@
     "packages/token-usage/client.js": 574,
     "packages/traceability/client.js": 539,
     "scripts/branding-check.mjs": 660,
-    "scripts/gate/plugins/commit-trailer.mjs": 238,
+    "scripts/gate/plugins/commit-trailer.mjs": 194,
     "scripts/gate/plugins/events-spine.mjs": 356,
     "scripts/gate/plugins/markers.mjs": 234,
     "scripts/gate/plugins/narrative.mjs": 429,

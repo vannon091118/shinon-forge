@@ -26,6 +26,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkMessage, swapTrailer, VANNON_TRAILER, FORBIDDEN_LINES } from '../../lib/commit-text.mjs';
 import { policyIssues, resolvePreset } from '../../lib/commit-policy.mjs';
+// Die beiden Oberflächen (CI-YAML, Hooks) haben einen eigenen Eigentümer:
+// `commit-surfaces.mjs`. Das Plugin prüft weiterhin ihre WIRKUNG, aber die
+// Regeln stehen nicht mehr in einer Datei mit der Grenze 100.
+import { hookIssues, workflowIssues } from '../../lib/commit-surfaces.mjs';
+
+export { hookIssues, workflowIssues };
 
 export const id = 'commit-trailer';
 
@@ -143,56 +149,6 @@ export function policyRuleIssues(contract) {
   return issues;
 }
 
-/** CI-Workflow: „immer" ist prüfbar, nicht behauptet. */
-export function workflowIssues(text, file = '.github/workflows/commit-guard.yml') {
-  const issues = [];
-  if (!/^on:\s*$/m.test(text) && !/^on:\s*\n/m.test(text)) issues.push(`${file}: on:-Block fehlt`);
-  for (const trigger of ['push:', 'pull_request:']) {
-    if (!text.includes(trigger)) issues.push(`${file}: Trigger ${trigger} fehlt (der Wächter muss immer laufen)`);
-  }
-  for (const filter of ['paths:', 'paths-ignore:', 'branches-ignore:']) {
-    if (text.includes(filter)) issues.push(`${file}: ${filter} filtert den Lauf — der Wächter darf nicht bedingt sein`);
-  }
-  // continue-on-error macht einen fehlgeschlagenen Wächter unsichtbar: fail-open.
-  if (/continue-on-error:\s*true/.test(text)) {
-    issues.push(`${file}: continue-on-error: true entschärft den Wächter (fail-open)`);
-  }
-  // Die Bereichslogik gehört in den Wächter, wo sie getestet wird.
-  if (/(^|\s)range=|git log|rev-parse/.test(text)) {
-    issues.push(`${file}: leitet den Prüfbereich im YAML ab — das muss der Wächter (--ci) tun`);
-  }
-  if (!text.includes('scripts/commit-guard.mjs --ci')) issues.push(`${file}: ruft den Commit-Wächter nicht auf`);
-  if (!text.includes('node --test scripts/gate/tests/*.test.mjs')) issues.push(`${file}: fährt die Gate-Tests nicht`);
-  return issues;
-}
-
-/** Hook-Dateien: fail-closed prüfen, reparieren erlauben — in dieser Richtung. */
-export function hookIssues(hooks, dir = '.githooks') {
-  const issues = [];
-  const commitMsg = hooks['commit-msg'] ?? '';
-  const prepare = hooks['prepare-commit-msg'] ?? '';
-  if (!commitMsg.includes('--file')) issues.push(`${dir}/commit-msg: prüft keine Nachricht`);
-  if (commitMsg.includes('--fix')) issues.push(`${dir}/commit-msg: enthält --fix — der Prüf-Hook darf nicht reparieren`);
-  if (!prepare.includes('--fix')) issues.push(`${dir}/prepare-commit-msg: tauscht die Signatur nicht (--fix fehlt)`);
-  const preCommit = hooks['pre-commit'] ?? '';
-  // Nur Befehlszeilen zählen: ein Kommentar darf den vollen Lauf beim Namen
-  // nennen (Erklärung), ausführen darf ihn nur CI.
-  const preCommitCommands = preCommit
-    .split('\n')
-    .filter((line) => !line.trim().startsWith('#'))
-    .join('\n');
-  if (!preCommitCommands.includes('npm test')) issues.push(`${dir}/pre-commit: fährt nicht die schnelle Linie (npm test fehlt)`);
-  // Die langsamen Pole dürfen nie still in den lokalen Hook wandern — sonst ist
-  // die Trennung schnell/lokal vs. voll/CI nur ein Name und die Hardware zahlt
-  // bei jedem Commit den vollen Lauf.
-  for (const slow of ['test:full', 'pack-test', 'gate:full', 'gate:test', 'scale:check', 'branding']) {
-    if (preCommitCommands.includes(slow)) issues.push(`${dir}/pre-commit: enthält ${slow} — der volle Lauf gehört in CI, nicht in den Commit`);
-  }
-  if (!commitMsg.includes('commit-guard.mjs') || !prepare.includes('commit-guard.mjs')) {
-    issues.push(`${dir}: Hook ruft den Wächter nicht auf`);
-  }
-  return issues;
-}
 
 export function check(ctx) {
   const issues = [];

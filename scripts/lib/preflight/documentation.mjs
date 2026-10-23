@@ -15,8 +15,11 @@ const REQUIRED_JOB_BEHAVIORS = [
     'run: node --test packages/token-usage/test/*.test.mjs', 'run: node --test packages/popup/test/*.test.mjs',
     'run: node --test packages/key-router/test/*.test.mjs', 'run: node --test packages/traceability/test/*.test.mjs',
   ] },
+  { job: 'gate-full', code: 'PREFLIGHT_GATE_ENGINE_COMMAND_MISSING', message: 'The full gate engine (all plugins, fail-closed) must execute.', contains: ['run: npm run gate:full'] },
   { job: 'gate-rules', code: 'PREFLIGHT_GATE_TEST_COMMAND_MISSING', message: 'Behavioral gate tests and installed Codemon handoff must execute.', contains: [
-    'run: node --test scripts/gate/tests/*.test.mjs',
+    // Beide Bahnen in EINEM Runner: fast (lokal) + slow (CI-Tier). Der Runner
+    // wertet TAP selbst aus; ein `cancelled` ist rot, nicht Exit 0.
+    'run: npm run gate:test:all',
     'run: node --test packages/codingmon/test/uebergabe.test.mjs',
   ] },
   { job: 'quick', code: 'PREFLIGHT_QUICK_TEST_COMMAND_MISSING', message: 'Core tests and DSH version checks must execute after preflight.', contains: ['run: npm run test:core', 'run: node scripts/check-dsh-versions.mjs'] },

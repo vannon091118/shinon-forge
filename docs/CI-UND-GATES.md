@@ -93,9 +93,11 @@ Drei Ebenen:
    `npm run test:codingmon`, `test:scoring`, `test:token`, `test:prompter`,
    `test:narrative`, `test:popup`, `test:key-router`, `test:traceability`,
    `test:hook`.
-2. **Gate-Tests** — `scripts/gate/tests/` (`npm run gate:test`): reine
-   Gate-/Lib-Logik, kein DSH nötig; braucht Node ≥ 22 und das Repo-`dsh`
-   zuerst im PATH.
+2. **Gate-Tests** — `scripts/gate/tests/`, zwei fail-closed Bahnen:
+   `npm run gate:test` (fast, 20 s je Test) und `npm run gate:test:slow`
+   (CI-Tier, echte SQLite/DSH, 600 s). `npm run gate:test:all` fährt beide;
+   die Zuordnung steht in `scripts/gate/test-lanes.json` und eine Datei ohne
+   Bahn ist Exit 2. Der Runner wertet TAP selbst aus: `cancelled` ist rot.
 3. **Distribution & E2E** — `pack-test`, Profil-Tests,
    `mobile-profile-contract-test`; dazu `scripts/e2e/`
    (`probe` liest Beweise aus Index-/Ledger-SQLite, `report` ordnet sie,
@@ -110,6 +112,7 @@ Einmal pro Klon: `npm run hooks:install` (`scripts/install-hooks.mjs`).
 | `pre-commit` | `zahlen:check` + `npm test` |
 | `commit-msg` | `commit-guard.mjs --file` (fail-closed) |
 | `prepare-commit-msg` | `commit-guard.mjs --fix` — tauscht KI-Footer gegen den Vannon-Trailer |
+| `pre-push` | Marker, `zahlen:check`, `gate:local`, Paket-Vollständigkeit — **ohne** die schweren Ketten |
 
 ## 5. GitHub-Workflows
 
@@ -122,21 +125,22 @@ brechen überholte PR-Läufe ab; der Lauf auf `main` wird nicht abgebrochen.
 Die Prüfjobs laufen parallel, soweit sie unabhängig sind. `preflight-docs` ist
 der günstige, installationsfreie Gatekeeper: fehlerhafte Doku oder Workflow-
 Verdrahtung blockiert die Installations-/Build-Jobs. Der finale Verdict-Job
-wartet auf alle 13 Pflichtjobs.
+wartet auf alle 14 Pflichtjobs.
 
 1. Commit-Wächter (`node scripts/commit-guard.mjs --ci`)
 2. Unit-Matrix (acht Paket-Suiten, ohne `npm ci`)
 3. Dokumentations-/Workflow-Preflight (aktive Befehle, echte Links, Jobgraph)
-4. Gate-Tests plus installierte Codemon-Übergabe
-5. Fixtures gegen den realen Bau
-6. Distribution: Packen, isoliert installieren und laden
-7. Profilboot
-8. Prompter-Tests
-9. TypeScript-Gate
-10. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag, `npm run build` und `npm run zahlen:check`
-11. Dependency-Audit direkt aus `package-lock.json`
-12. CodeQL für JavaScript/TypeScript
-13. Gitleaks über die vollständige Git-Historie
+4. Gate-Tests (beide Bahnen) plus installierte Codemon-Übergabe
+5. Gate-Engine `--full` (alle 23 Plugins, fail-closed)
+6. Fixtures gegen den realen Bau
+7. Distribution: Packen, isoliert installieren und laden
+8. Profilboot
+9. Prompter-Tests
+10. TypeScript-Gate
+11. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag, `npm run build` und `npm run zahlen:check`
+12. Dependency-Audit direkt aus `package-lock.json`
+13. CodeQL für JavaScript/TypeScript
+14. Gitleaks über die vollständige Git-Historie
 
 Das frühere separate `static-gate` ist entfernt: `test:core` enthält das
 statische Gate bereits. Der CI-Schnellpfad verwendet `test:core`, nicht erneut
