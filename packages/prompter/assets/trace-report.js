@@ -17,8 +17,27 @@ import { UNDEFINED } from './intent-resolver.js';
 import { DECISION_CHANNEL } from './mode-core.js';
 import { provenanceLabel, provenanceSummary } from './provenance.js';
 
+/**
+ * Die eine Zeile je Turn: Ausgang, Gruende, Abbruchgrund, Laengen.
+ *
+ * Sie traegt KEINEN Prompt-Text und keine Schluesselwerte — nur das, was den
+ * Turn im Verlauf wiederfindbar macht. `NO_JSON` und `TIMEOUT` sind verschiedene
+ * Dinge (Formatfehler gegen Abbruch) und stehen deshalb beide da: der Grund aus
+ * dem Ergebnis und die Klasse aus der Abbruch-Tabelle. Sie faellt auch bei
+ * `trace: false`, denn sie beschreibt den LAUF, nicht die Anzeige.
+ */
+function turnLine(record) {
+  const reasons = Array.isArray(record?.reasons) && record.reasons.length > 0 ? record.reasons.join(', ') : 'ohne Grund';
+  const abort = record?.abort?.label ?? record?.abort?.id ?? 'kein Abbruch';
+  const session = typeof record?.session_id === 'string' && record.session_id !== '' ? record.session_id : '(ohne Sitzung)';
+  const enhanced = Number.isInteger(record?.enhancedLength) ? record.enhancedLength : 0;
+  const raw = Number.isInteger(record?.rawLength) ? record.rawLength : 0;
+  return `[shinon-prompter] Turn ${session}: ${record?.outcome ?? 'unbekannt'} (${reasons}; ${abort}) — ${enhanced}/${raw} Zeichen`;
+}
+
 /** Entscheidung emittieren und in die Fenster-Konvention schreiben. */
 export function reportTrace(ctx, config, runtime, record) {
+  console.log(turnLine(record));
   if (!config.trace) return;
   // Der ROHE Nutzertext gehoert in den Trace: ohne ihn ist nicht nachvollziehbar,
   // WAS veredelt wurde. JSON.stringify haelt die Zeile einzeilig und vollstaendig.

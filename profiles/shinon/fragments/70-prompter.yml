@@ -48,8 +48,18 @@
     modelFallback: agnes-2.5-flash
     skillsPath: .agents/skills
     indexBudgetTokens: 6000
-    maxTokens: 0 # 0 = kein Limit (unbegrenzte Thinking-Tokens des One-Shots)
+    # Das Tokenbudget des One-Shots ist GEDECKELT, nicht offen. `0` hiesse „kein
+    # Deckel" (unbegrenzte Thinking-Tokens) — gemessen am 2026-10-23 war genau
+    # das gesetzt, und ein Modell, das statt JSON seine eigene Anweisung
+    # wiederholt, durfte dafuer beliebig viele Tokens verbrauchen. Was laenger
+    # wird als 1600 Token, ist keine Auftragsumformulierung mehr und wird
+    # verworfen (Roh-Prompt gilt). Die Zahl steht bewusst NICHT auf der
+    # Schema-Vorgabe des Pakets: nur so ist am aufgeloesten Profil beweisbar,
+    # dass diese Ebene wirkt und nicht die Vorgabe (`profile-config-override`).
+    maxTokens: 1600
     temperature: 0.3
+    # Der Deckel gilt NUR fuer den One-Shot. Der Hauptmodellstrom des Turns
+    # laeuft ueber `agent-default-model` und hat mit dieser Zahl nichts zu tun.
     timeoutMs: 15000
     trace: true
     # Gelernte Bausteine (Phase 4): Projekt-Ablage über der Paket-Registry.

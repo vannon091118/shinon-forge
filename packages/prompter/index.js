@@ -292,7 +292,17 @@ export function apply(ctx, config) {
   const blocksInfo = runtime.blocks !== null
     ? `blocks=${runtime.blocks.blocks.length}Bausteine`
     : 'blocks=off';
-  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, route=${routeLabel}, ${contextInfo}, ${notesInfo}, ${intentInfo}, ${blocksInfo})`);
+  // Ein unbegrenzter One-Shot ist eine ENTSCHEIDUNG, keine Vorgabe: `0` heisst
+  // „kein Deckel" — und das steht beim Mounten mit Grund im Log, statt sich als
+  // stilles „laeuft ja" zu verstecken. `timeoutMs` begrenzt dabei NUR diesen
+  // einen Aufruf; der Hauptmodellstrom des Turns hat sein eigenes Regiment.
+  if (!(config.maxTokens > 0)) {
+    console.warn('[shinon-prompter] maxTokens=0 — One-Shot ohne Token-Deckel; der Mainstream ist davon unberuehrt (wirksamer Wert steht im Profil)');
+  }
+  if (!(config.timeoutMs > 0)) {
+    console.warn('[shinon-prompter] timeoutMs=0 — One-Shot ohne Zeitdeckel; dieselbe Grenze gilt NICHT fuer den Hauptstrom');
+  }
+  console.log(`[shinon-prompter] Aktiviert — registriert auf ${PRE_STEP_EVENT} (mode=${config.mode}, route=${routeLabel}, maxTokens=${config.maxTokens > 0 ? config.maxTokens : 'kein Deckel'}, ${contextInfo}, ${notesInfo}, ${intentInfo}, ${blocksInfo})`);
 
   // Der fünfte Dienst (Phase 4): Vorschläge einreichen — prüfen und
   // aktivieren in einem Aufruf, fail-closed mit Befundliste. Wie der Ton und

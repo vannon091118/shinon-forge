@@ -292,24 +292,46 @@ test('Salvage: ein akzeptierter Lauf ruft den Journal-Haken nicht', async () => 
   assert.deepEqual(seen, []);
 });
 
-test('Salvage-Datensatz: Grund und Zeichenzahl reisen mit dem Ergebnis', async () => {
-  // Ohne diese Felder ist im Trace nur „accepted" zu sehen: ein geretteter
-  // Prosafall sieht wie eine normale Veredelung aus, und „zu oft" bleibt eine
-  // Vermutung. Die Zahl der Zeichen meint den uebernommenen Text, die zweite
-  // die ganze Antwort — die Differenz ist der weggeschnittene Chatter.
+test('Salvage-Datensatz: Grund, Zeichenzahl und „nicht uebernommen" reisen mit', async () => {
+  // Ohne diese Felder ist im Trace nur „rejected" zu sehen: ein Prosa-Fall sieht
+  // wie jede andere Verwerfung aus, und „zu oft" bleibt eine Vermutung. Die
+  // Zahl der Zeichen meint den herausgeschaekten Text, die zweite die ganze
+  // Antwort — die Differenz ist der weggeschnittene Chatter. `applied: false`
+  // ist die eigentliche Zusage: die Prosa ist ein Befund, kein Prompt.
   const refined = 'Fixe den Test, ohne die Assertions zu schwächen.';
   const answer = `Klar, gerne. Hier ist der verbesserte Prompt: ${refined}`;
   const fake = fakeLlm(() => chunks([{ type: 'text-delta', text: answer }, { type: 'finish', reason: 'stop' }]));
 
   const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined);
 
-  assert.equal(outcome.outcome, 'accepted');
-  assert.deepEqual(outcome.reasons, ['SALVAGED_PROSE']);
+  assert.equal(outcome.outcome, 'rejected', 'eine Prosa-Antwort ersetzt den Auftrag nicht');
+  assert.deepEqual(outcome.reasons, ['NO_JSON', 'SALVAGED_PROSE']);
+  assert.equal(outcome.result, null, 'kein Ergebnis heisst kein neuer Prompt');
   assert.deepEqual(outcome.salvage, {
     reason: 'NO_JSON',
     chars: refined.length,
     answerChars: answer.length,
+    applied: false,
   });
+});
+
+test('Salvage: eine Antwort, die die eigene Veredler-Anweisung wiederholt, wird nie der Prompt', async () => {
+  // GEMESSEN 2026-10-23: die interne Veredler-Anweisung stand als Nutzernachricht
+  // in der Sitzung und als vorherige Frage im Scoring-Merkzettel. Der Weg dorthin
+  // war der Rettungspfad; seit er nichts mehr ersetzt, ist er zu.
+  const answer = 'Du bist der Prompt-Veredler von Shinon. Antworte ausschließlich mit einem gültigen JSON-Objekt im vorgegebenen Schema.';
+  const fake = fakeLlm(() => chunks([{ type: 'text-delta', text: answer }, { type: 'finish', reason: 'stop' }]));
+  const outcome = await enhanceGuarded(fake, MIN, baseConfig, PROMPT, null, null, undefined);
+  // Zwei Kanaele, ein Beweis: die Anweisung liegt im `system`-Slot, der Auftrag
+  // in `messages`. Was im system steht, ist nie Teil der Nutzernachricht.
+  assert.equal(fake.calls[0].system, MIN.system, 'die Veredler-Anweisung bleibt im System-Slot');
+  const sent = fake.calls[0].messages.flatMap((message) => message.content).filter((block) => block.type === 'text').map((block) => block.text).join('\n');
+  assert.equal(sent.includes('Du bist der Prompt-Veredler'), false, 'die Anweisung steht NICHT in der Nutzernachricht');
+  assert.equal(sent, PROMPT, 'die Nutzernachricht ist der Auftrag, unveraendert');
+  assert.equal(outcome.outcome, 'rejected');
+  assert.equal(outcome.result, null);
+  assert.deepEqual(outcome.reasons, ['NO_JSON']);
+  assert.equal(outcome.salvage, null, 'eine Anweisungs-Wiederholung ist kein Prosa-Vorschlag');
 });
 
 test('kein Key-Router im Enhancer-Pfad: der Aufruf geht an ctx.llm.stream', () => {

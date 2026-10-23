@@ -236,6 +236,10 @@ export function countSalvage(runtime, sessionId, salvage) {
     reason,
     chars: Number.isInteger(salvage?.chars) ? salvage.chars : 0,
     answer_chars: Number.isInteger(salvage?.answerChars) ? salvage.answerChars : 0,
+    // `applied` ist die ehrliche Haelfte des Befunds: seit 2026-10-23 ersetzt
+    // eine Prosa-Antwort nichts mehr. Ein Datensatz ohne dieses Feld wuerde wie
+    // eine uebernommene Veredelung aussehen.
+    applied: salvage?.applied === true,
     count,
   };
 }

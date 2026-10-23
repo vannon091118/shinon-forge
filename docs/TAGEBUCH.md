@@ -1819,3 +1819,84 @@ liegt. Nach dem Import: `npm run build` Exit 0, 24 Pakete, 310 Dateien.
 Belege: `persona-state.test.mjs`/`persona-prompt.test.mjs`-Familie 105/105,
 `task-router.test.mjs` 26/26, `npm test` Exit 0 (131 Schritte), `gate:test`
 908/908, `zahlen:check` Exit 0.
+
+**Der Veredler bekam einen Deckel und verlor seinen Rettungspfad.**
+Gemeldet war ein Datenfluss, den man nachlesen kann: im Profil stand
+`maxTokens: 0` — in der Konfiguration „kein Limit" —, und der One-Shot durfte
+sich dafuer beliebig viele Tokens nehmen. Dazu der zweite Befund: eine Antwort
+ausserhalb des JSON-Vertrags wurde ueber `salvageProse` trotzdem der Prompt des
+Menschen und trug dabei `preservedIntent: true` — eine Zusage, die nie jemand
+geprueft hatte. Genau dieser Pfad ist der Weg, auf dem die interne
+Veredler-Anweisung als Nutzernachricht in der Sitzung landete und vom Scoring
+als vorherige FRAGE des Menschen gelesen wurde: was den Menschen ersetzt, wird
+spaeter als seine Aeusserung gelernt.
+
+Zwei Entscheidungen, beide an der Wurzel: der Deckel steht jetzt im Profil
+(`maxTokens: 1600`, bewusst nicht auf der Schema-Vorgabe, damit
+`profile-config-override` beweisen kann, dass die Profil-Ebene wirkt), und `0`
+meldet beim Mounten einen fehlenden Deckel statt still „laeuft ja" zu sagen.
+Die Prosa-Rettung ist keine Rettung mehr: `salvageProse` klassifiziert nur noch
+(`SALVAGED_PROSE`, Zeichenzahl, `applied: false`), der Ausgang heisst
+`rejected`, und der Roh-Prompt bleibt unveraendert. `preservedIntent` gibt es
+im Rettungspfad nicht mehr, weil es dort nichts zu behaupten gibt. Die
+Anweisung selbst bleibt, wo sie hingehoert: im `system`-Slot — ein Test pinnt,
+dass die Nutzernachricht genau der Auftrag ist und die Anweisung darin nicht
+vorkommt.
+
+Dazu die Nachvollziehbarkeit pro Turn: `reportTrace` schreibt EINE Zeile
+(`[shinon-prompter] Turn <sitzung>: rejected (NO_JSON, SALVAGED_PROSE; Kein
+JSON) — 0/24 Zeichen`), auch bei `trace: false`. Vorher lagen `NO_JSON` und
+`TIMEOUT` in verschiedenen Teil-Logs; ein Turn mit Formatfehler war im Verlauf
+nicht wiederzufinden.
+
+**Anker:** Pfade: `packages/prompter/assets/enhancer.js`,
+`packages/prompter/assets/pre-step.js`, `packages/prompter/assets/trace-report.js`,
+`packages/prompter/assets/runtime-state.js`, `packages/prompter/index.js`,
+`profiles/shinon/fragments/70-prompter.yml`,
+`profiles/shinon/cordis.patch.yml`, `scripts/gate/tests/prompter-contract.test.mjs`,
+`packages/prompter/test/enhancer-guards.test.mjs` · Belege:
+`npm run test:prompter` 245/245, `prompter-contract.test.mjs` 78/78,
+`npm test` Exit 0 (131 Schritte), `npm run gate:test` 908/908,
+`shinon-profile-test.mjs` 4/4 (27 Bundle-Layer, 22 Pakete), `npm run build`
+Exit 0.
+
+**Die Telemetrie ist wieder draußen — und die Sandbox hat sie verraten.**
+Die offene Persona-Arbeit hatte eine PostHog-/OpenTelemetry-Naht in den Baum
+gelegt: `packages/persona/posthog.js` und `posthog-logs.js` importierten ihre
+SDKs statisch, `packages/prompter/assets/ai-observability.js` hing an den
+One-Shot-Pfaden, und `shinon_posthog` wurde beim Mount angeboten. Aufgefallen
+ist nicht die Absicht, sondern der Ort: die Persona-Tests kopieren das Paket
+nach `/tmp` ohne `node_modules` — dort starb schon der Import
+(`ERR_MODULE_NOT_FOUND`), und zwei ganze Suiten waren rot, bevor eine einzige
+Zusicherung lief. Beim Reparieren kam der zweite Befund: die Dateien lagen in
+der Paketwurzel, nicht in `assets/`, und der Build lieferte sie deshalb nicht
+aus — `dist/packages/persona/index.js` zeigte auf eine Datei, die im Artefakt
+gar nicht existierte. Der Build war Exit 0 und wäre beim ersten Boot
+gestorben, wie eine Brücke, die auf dem Plan fertig aussieht und beim ersten
+Schritt ein Loch zeigt.
+
+Der dritte Befund war eine Entscheidung, die niemand getroffen hatte:
+`CAPTURE_PROMPT_AND_COMPLETION_CONTENT = true` hätte bei gesetztem Token
+vollständige Prompts und Antworten an einen Fremdanbieter geschickt — genau den
+Text, den dieses Repo in Entscheidungsdatensätzen bewusst nicht führt. Ein
+Dienst, den kein Verbraucher liest, ist keine Beobachtung; er ist eine
+ausgestellte Vollmacht. Er ist deshalb wieder aus dem Baum: die zwei
+Persona-Dateien, `ai-observability.js`, der `shinon_posthog`-Aufruf in
+`packages/version/index.js`, die vier Root-Abhängigkeiten mit ihren
+Lock-Einträgen und die drei Namen in `.env.example`.
+
+Was bleibt, ist die Arbeit, die sie nur begleitet hat: der Veredler verliert
+seinen Rettungspfad, bekommt einen Token-Deckel und EINE Zeile je Turn. Dazu
+die Reparaturen, ohne die der Baum nicht grün war: die Klassenregel in
+`docs/contracts/structure.json` gilt wieder für `assets/` statt für einen
+PostHog-Sonderfall, `profiles/shinon/cordis.patch.yml` ist aus den Fragmenten
+regeneriert, und `project-index.test.mjs` pinnt für `mode-core.js` die drei
+echten Importe statt der einen alten.
+
+**Anker:** Pfade: `packages/persona/index.js`,
+`packages/prompter/assets/enhancer.js`,
+`packages/prompter/assets/skill-lifecycle.js`, `package.json`,
+`docs/contracts/structure.json` · Belege: `npm test` Exit 0 (131 Schritte),
+`npm run gate:test` 908/908, `npm run test:prompter` 245/245,
+`project-index.test.mjs` 52/52, `npm run zahlen:check` Exit 0,
+`npm run build` Exit 0 (24 Pakete, 312 Dateien, 2784486 Bytes).

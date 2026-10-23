@@ -311,9 +311,8 @@ function withAbort(record, runtime) {
  */
 function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contextSource = 'none', contextUsed = false) {
   const result = outcome.result;
-  // Nur ein ANGENOMMENER Prosafall zaehlt: ein zurueckgenommener Treffer
-  // (missingMessage) ist keine Veredelung und darf „zu oft" nicht aufblaehen.
-  const salvage = outcome.outcome === 'accepted' && outcome.salvage !== null && typeof outcome.salvage === 'object'
+  // Jeder Prosafall zaehlt, auch der verworfene (`applied: false`, siehe enhancer.js).
+  const salvage = outcome.salvage !== null && typeof outcome.salvage === 'object'
     ? countSalvage(runtime, sessionId, outcome.salvage)
     : null;
   const turn = runtime?.turn ?? null;
@@ -639,7 +638,8 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
     runtime.intentMemory = addTurnDuration(runtime.intentMemory, runtime.turn.intentMatch, Date.now() - turnStarted);
     persistIntentMemory(runtime, runtime.intentMemoryPath, runtime.intentMemory);
   }
-  reportTrace(ctx, config, runtime, withAbort(withProvenance({ ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection), brief: brief.record, brief_reason: brief.reason, knowledge: knowledgeTrace(knowledge) }, supply.context), runtime));
+  const record = withAbort(withProvenance({ ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection), brief: brief.record, brief_reason: brief.reason, knowledge: knowledgeTrace(knowledge) }, supply.context), runtime);
+  reportTrace(ctx, config, runtime, record);
 
   // Nur ein gefundenes akzeptiertes Ergebnis ersetzt die Nutzernachricht. In
   // JEDEM anderen Fall geht die Entscheidung unveraendert weiter — der Roh-Prompt

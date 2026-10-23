@@ -835,22 +835,26 @@ test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async ()
 });
 
 /**
- * Prosa statt JSON ist der gemessene Regelfall (2026-10-18): das Modell antwortet
- * in Saetzen, der Enhancer verwarf, und der Prompter griff faktisch nie. Jetzt
- * wird der TEXT der Antwort uebernommen — Felder (Absicht, Anforderungen,
- * Referenzen) bleiben unangetastet, und der Rohtext der Eingabe steht im Trace.
+ * Prosa statt JSON ist der gemessene Regelfall (2026-10-18) — sie ist aber ein
+ * FEHLERFALL, kein Vorschlag. Seit 2026-10-23 wird sie benannt (`SALVAGED_PROSE`),
+ * gezaehlt und verworfen; der Auftrag des Menschen bleibt stehen. Der Grund fuer
+ * die Verschaerfung ist gemessen: eine Antwort, die die interne Veredler-Anweisung
+ * wiederholte, wurde als Nutzernachricht in die Sitzung geschrieben und vom
+ * Scoring als vorherige Frage des Menschen gelesen.
  */
-test('SALVAGED_PROSE: Prosa wird uebernommen statt verworfen — und der Rohtext steht im Trace', async () => {
+test('SALVAGED_PROSE: Prosa wird benannt und VERWORFEN — der Rohtext bleibt stehen', async () => {
   const prose = 'Bitte baue die zwoelf neuen Module und teste sie danach gruendlich.';
   const llm = fakeLlm(prose);
   const { ctx, records, dispose } = connect({ ...route }, { llm });
   const claimed = [userMessage('baue module und teste')];
   const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
 
-  assert.equal(records[0].outcome, 'accepted', 'kein JSON ist kein Grund, den Vorschlag wegzuwerfen');
-  assert.deepEqual(records[0].reasons, ['SALVAGED_PROSE']);
-  assert.equal(decision.messages[0].content[0].text, prose, 'der Prosatext ersetzt den Roh-Prompt');
+  assert.equal(records[0].outcome, 'rejected', 'eine Prosa-Antwort ist ein Befund, kein Prompt');
+  assert.deepEqual(records[0].reasons, ['NO_JSON', 'SALVAGED_PROSE']);
+  assert.equal(decision.messages[0].content[0].text, 'baue module und teste', 'der Roh-Prompt gilt unveraendert');
   assert.equal(records[0].raw_prompt, 'baue module und teste', 'die Eingabe bleibt im Trace sichtbar');
+  assert.equal(records[0].salvage.applied, false, 'die Prosa ist nicht angekommen');
+  assert.equal(records[0].salvage.chars > 0, true, 'die Zeichenzahl bleibt als Befund');
   dispose();
 });
 
@@ -860,8 +864,9 @@ test('SALVAGED_PROSE: Zaun und Vorrede fallen weg, kaputtes JSON wird kein Promp
   const { ctx, records, dispose } = connect({ ...route }, { llm });
   const claimed = [userMessage('baue module')];
   const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
-  assert.equal(records[0].outcome, 'accepted');
-  assert.equal(decision.messages[0].content[0].text, 'Baue die Module und teste sie danach.');
+  assert.equal(records[0].outcome, 'rejected', 'auch eine aufgeraeumte Prosa bleibt ein Fehlerfall');
+  assert.deepEqual(records[0].reasons, ['NO_JSON', 'SALVAGED_PROSE']);
+  assert.equal(decision.messages[0].content[0].text, 'baue module', 'der Roh-Prompt gilt');
   dispose();
 
   // Ein kaputter Objekttext ist kein Prompt: dort bleibt der Roh-Prompt.
@@ -895,10 +900,10 @@ test('SALVAGED_PROSE: ein Fuellwort vor der Vorrede laesst nicht die ganze Antwo
     const { ctx, records, dispose } = connect({ ...route }, { llm: fakeLlm(answer) });
     const claimed = [userMessage('baue module und teste sie danach')];
     const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
-    assert.equal(records[0].outcome, 'accepted');
-    assert.deepEqual(records[0].reasons, ['SALVAGED_PROSE']);
-    assert.equal(decision.messages[0].content[0].text, refined, `Fuellwort/Vorrede bleibt: ${answer.slice(0, 20)}`);
-    assert.notEqual(decision.messages[0].content[0].text, answer, 'die ganze Antwort ist kein Prompt');
+    assert.equal(records[0].outcome, 'rejected');
+    assert.deepEqual(records[0].reasons, ['NO_JSON', 'SALVAGED_PROSE']);
+    assert.equal(decision.messages[0].content[0].text, 'baue module und teste sie danach', `Roh-Prompt gilt: ${answer.slice(0, 20)}`);
+    assert.notEqual(decision.messages[0].content[0].text, refined, 'auch der herausgeschaekte Kernsatz ersetzt nichts');
     dispose();
   }
 });
@@ -987,6 +992,7 @@ test('SALVAGED_PROSE: Grund, Zeichenzahl und Fallzahl stehen im Datensatz und im
     reason: 'NO_JSON',
     chars: refined.length,
     answer_chars: answer.length,
+    applied: false,
     count: 1,
   });
   assert.equal(records[1].salvage.count, 2, 'zwei Faelle derselben Sitzung werden gezaehlt');
@@ -995,6 +1001,14 @@ test('SALVAGED_PROSE: Grund, Zeichenzahl und Fallzahl stehen im Datensatz und im
   assert.ok(
     trace.some((line) => line.includes(`salvage=NO_JSON chars=${refined.length} n=2`)),
     `Trace nennt Grund, Zeichenzahl und Fallzahl: ${trace.at(-1) ?? '(keine Trace-Zeile)'}`,
+  );
+  // EINE Zeile je Turn: ohne sie standen NO_JSON und TIMEOUT nur in getrennten
+  // Teil-Logs, und ein Turn mit Formatfehler war im Verlauf nicht zu finden.
+  const turnLines = logs.filter((line) => line.includes('[shinon-prompter] Turn '));
+  assert.ok(turnLines.length >= 2, `eine Zeile je Turn: ${turnLines.length}`);
+  assert.ok(
+    turnLines.every((line) => line.includes('rejected') && line.includes('NO_JSON') && line.includes('SALVAGED_PROSE')),
+    `Turn-Zeile nennt Ausgang und Gruende: ${turnLines.at(-1) ?? '(keine)'}`,
   );
   dispose();
 
@@ -1135,16 +1149,18 @@ test('SALVAGED_PROSE: ein JSON im Zaun (auch abgeschnitten) ersetzt den Prompt n
 
 /**
  * Gegenprobe zur Sperre: ein Prosatext im Zaun, dem die schliessende Marke fehlt,
- * ist weiterhin rettbar. Sonst wuerde die Reparatur genau die Faelle verwerfen,
- * fuer die SALVAGED_PROSE gebaut wurde.
+ * wird als Prosa ERKANNT (Grund und Zeichenzahl stimmen) — und trotzdem nicht
+ * uebernommen. Die Erkennung bleibt, die Wirkung ist weg.
  */
-test('SALVAGED_PROSE: ein offener Prosa-Zaun bleibt rettbar', async () => {
+test('SALVAGED_PROSE: ein offener Prosa-Zaun wird erkannt, aber nicht uebernommen', async () => {
   const answer = '```text\nBaue die Module und teste sie danach.';
   const { ctx, records, dispose } = connect({ ...route }, { llm: fakeLlm(answer) });
   const claimed = [userMessage('baue module')];
   const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
-  assert.equal(records[0].outcome, 'accepted');
-  assert.equal(decision.messages[0].content[0].text, 'Baue die Module und teste sie danach.');
+  assert.equal(records[0].outcome, 'rejected');
+  assert.deepEqual(records[0].reasons, ['NO_JSON', 'SALVAGED_PROSE']);
+  assert.equal(decision.messages[0].content[0].text, 'baue module');
+  assert.equal(records[0].salvage.chars, 'Baue die Module und teste sie danach.'.length);
   dispose();
 });
 

@@ -240,14 +240,20 @@ export function renderStreamEnd(finish, usage, request, elapsedMs) {
 }
 
 /**
- * Aus einer Prosa-Antwort den Vorschlag retten — statt ihn wegzuwerfen.
+ * Eine Prosa-Antwort KLASSIFIZIEREN — als Befund, nicht als Vorschlag.
  *
- * Der gemessene Fall (2026-10-18): das Modell antwortet auf Deutsch statt mit
- * JSON, der One-Shot wird verworfen und der Roh-Prompt gilt. Damit greift der
- * Prompter praktisch nie. Gerettet wird nur der TEXT, nie ein Feld: Absicht,
- * Anforderungen und Referenzen bleiben unangetastet. Was nach Satzzeichen der
- * Antwort aussieht (Zaun, Vorrede, Anfuehrungszeichen), wird entfernt; ist der
- * Rest leer oder identisch mit dem Original, bleibt es beim Verwerfen.
+ * Fruher war das ein Rettungspfad: der Text der Antwort ersetzte den Auftrag
+ * des Menschen. Seit 2026-10-23 nicht mehr. Der Grund ist gemessen und war
+ * reproduzierbar: eine Antwort ausserhalb des Vertrags ist eine ANTWORT, und
+ * wenn sie erklaert, wie der Veredler arbeitet, stand die interne Anweisung
+ * danach als Nutzernachricht in der Sitzung — und der Scoring-Merkzettel fuehrte
+ * sie als vorherige FRAGE des Menschen. Ein Text, der den Auftrag nicht belegt
+ * weiterfuehrt, darf den Auftrag nicht werden; er wird benannt (`SALVAGED_PROSE`),
+ * gezaehlt und verworfen, und der Roh-Prompt gilt.
+ *
+ * Was die Funktion noch tut: aus der Antwort den Kern schaelen, damit der Grund
+ * eine Zeichenzahl traegt und die Diagnose nicht die Vorrede mitzaehlt. Sie gibt
+ * weiterhin `null` zurueck, wenn die Antwort keine Prosa ueber den Auftrag ist.
  */
 /** Bedienprosa vor der Vorrede ("Klar, gerne.") — nie Teil des Prompts. */
 const PROSE_FILLER = '(?:sure|okay|ok|klar|gerne|gern|natürlich|natuerlich|sicher|also|nun|gut|well|alright|all right|of course|certainly)';
@@ -460,28 +466,33 @@ export async function enhance(ctx, contract, config, prompt, context, stand, sig
 
   const parsed = parseResult(text, { mode: config.mode });
   if (!parsed.ok) {
-    // Kein JSON ist kein Grund, den Vorschlag wegzuwerfen: der Text der Antwort
-    // wird uebernommen (SALVAGED_PROSE), sofern er sich vom Original unterscheidet.
+    // Ein Ergebnis ausserhalb des Vertrags ERSETZT NICHTS. Die Antwort wird
+    // klassifiziert (`SALVAGED_PROSE`), damit der Grund nachpruefbar bleibt —
+    // uebernommen wird sie nicht. Die Alternative war gemessen: nach einem
+    // One-Shot, der die eigene Veredler-Anweisung wiederholte, stand diese
+    // Anweisung als Nutzernachricht in der Sitzung und als vorherige Frage im
+    // Scoring-Merkzettel. Ein fehlerhaftes Ergebnis ist ein Befund, kein Prompt.
     const salvageable = parsed.reasons.some((reason) => reason === 'NO_JSON' || reason === 'INVALID_JSON');
     const salvaged = salvageable ? salvageProse(text, prompt) : null;
-    if (salvaged !== null && salvaged !== prompt.trim()) {
-      console.log(`[shinon-prompter] One-Shot: Ergebnis angenommen (SALVAGED_PROSE:${parsed.reasons.join(', ')}), ${salvaged.length} Zeichen — ${renderStreamEnd(finish, usage, request, elapsedMs)}`);
-      return {
-        outcome: 'accepted',
-        reasons: ['SALVAGED_PROSE'],
-        // Die Messung reist mit: warum gerettet (NO_JSON/INVALID_JSON), wie
-        // viele Zeichen uebernommen wurden und wie lang die ganze Antwort war.
-        salvage: { reason: parsed.reasons.join('+'), chars: salvaged.length, answerChars: text.length },
-        result: { enhancedPrompt: salvaged, preservedIntent: true, addedRequirements: [], removedRequirements: [], uncertainties: [], references: [] },
-      };
+    const applied = false;
+    const reasons = salvaged === null ? parsed.reasons : [...parsed.reasons, 'SALVAGED_PROSE'];
+    if (salvaged !== null) {
+      console.warn(
+        `[shinon-prompter] Prosa NICHT uebernommen (SALVAGED_PROSE: ${parsed.reasons.join(', ')}, ${salvaged.length} von ${text.length} Zeichen) — Roh-Prompt gilt; ${renderStreamEnd(finish, usage, request, elapsedMs)}`,
+      );
     }
-    logRejectedAnswer(parsed.reasons, text, counts, finish, usage, request, elapsedMs);
+    logRejectedAnswer(reasons, text, counts, finish, usage, request, elapsedMs);
     // Ein abgebrochener Stream ist KEIN Formatfehler: `finish.reason` nennt den
     // Abbruch (`{kind:'aborted', failure:{message:'Request was aborted'}}`), und
     // ohne dieses Feld wäre "Timeout" im Datensatz nicht mehr zu erkennen.
     return journalRejection(onReject, config, prompt, {
       outcome: 'rejected',
-      reasons: parsed.reasons,
+      reasons,
+      // Die Prosa reist als BEFUND mit, nicht als Prompt: `applied: false` sagt
+      // ausdruecklich, dass sie nirgends angekommen ist.
+      salvage: salvaged === null
+        ? null
+        : { reason: parsed.reasons.join('+'), chars: salvaged.length, answerChars: text.length, applied },
       failure: { finish: finish?.reason ?? null },
       result: null,
     }, text);

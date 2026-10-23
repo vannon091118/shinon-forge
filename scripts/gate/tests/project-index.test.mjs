@@ -317,11 +317,11 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
   for (const core of ['assets/note-core.js', 'assets/salvage-store.js']) {
     assert.deepEqual(bundle.extractEdges(prompterModule(core)), [], `${core} ist importfrei`);
   }
-  // `mode-core.js` hat EINEN Import — den Naht-Kern, der selbst importfrei ist.
-  // Die Eigenschaft („in CI ohne node_modules prüfbar") bleibt damit wahr; sie
-  // hinge an einem zweiten Bare-Import und wäre dann keine mehr.
+  // `mode-core.js` importiert den Naht-Kern und zwei importfreie Kerne. Die
+  // Eigenschaft („in CI ohne node_modules prüfbar") haengt an BARE-Importen:
+  // ein zweiter waere rot, eine relative Kante ist es nicht.
   assert.deepEqual(bundle.extractEdges(prompterModule('assets/mode-core.js')), [
-    { kind: 'import', target: '@shinon/seams/core' },
+    { kind: 'import', target: '@shinon/seams/core' }, { kind: 'import', target: './prompt-text.js' }, { kind: 'import', target: './defaults.js' },
   ]);
 
   // Alle Treffer einer Zeile zählen — nicht nur der erste.

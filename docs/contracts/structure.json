@@ -122,7 +122,7 @@
     "scripts/gate/tests/commit-trailer.test.mjs": 609,
     "scripts/gate/tests/persona-state.test.mjs": 995,
     "scripts/gate/tests/project-index.test.mjs": 2163,
-    "scripts/gate/tests/prompter-contract.test.mjs": 2195,
+    "scripts/gate/tests/prompter-contract.test.mjs": 2215,
     "scripts/gate/tests/task-router.test.mjs": 909
   },
   "herleitung": "Grenze = 3 × Median der Klasse, auf 50 gerundet, mindestens 100 — Median gemessen am 2026-10-20 über alle Dateien der Klasse; alles darüber steht im bestand.",
@@ -134,7 +134,7 @@
  "scripts/gate/tests/prompter-contract.test.mjs": {
   "grund": "Der Vertrags-Abnahmetest wächst mit jedem gepinnten Config-Default (zuletzt shinonMdPath); die Obergrenze hält ihn teilbar und lesbar.",
   "datum": "2026-10-23",
-  "maxZeilen": 2210
+  "maxZeilen": 2240
  }
   },
   "vertraege": {
