@@ -1,5 +1,14 @@
 {
+  "id": "diff-overview",
   "probe": "diff-overview",
+  "claim": "Das Aenderungs-Panel laesst sich ohne neue Abhaengigkeit aus `git` bauen und zeigt Datei- und Zeilenzahlen im Datei-Browser.",
+  "targets": [
+    "packages/diff-overview/index.js",
+    "packages/diff-overview/client.js",
+    "packages/diff-overview/assets/diff-core.js",
+    "packages/diff-overview/assets/git-diff.js"
+  ],
+  "expect": "GET /shinon/diff liefert summary und files; der Chip im Datei-Browser zeigt +712 -306 mit 42 Dateien, und die Grenzen (Dateien, Zeilen, Zeichen) greifen benannt.",
   "stand": "2026-10-22",
   "frage": "Kann das Änderungs-Panel (Übersicht im Datei-Browser, Klick = Zeilen) aus dem gebaut werden, was installiert ist — oder ist die ehrliche Antwort eine benannte, gemessene Abwesenheit?",
   "antwort": "Aus dem, was installiert ist: `git`. Ein Diff-Dienst existiert nicht; `node_modules/diff` liegt nur transitiv im Baum (kein Workspace-Paket deklariert es). Das Paket deklariert deshalb KEINE neue Abhängigkeit und liest Git-Ausgaben.",

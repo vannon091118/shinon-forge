@@ -1,4 +1,13 @@
 {
+  "id": "update-now",
+  "claim": "„Jetzt installieren“ fuehrt von der Frage bis zum neu gestarteten Host: Kandidat bauen, im Staging abnehmen, laufende Instanz beenden, umschalten, mit eigenem Aufruf neu starten.",
+  "targets": [
+    "scripts/install-user.mjs",
+    "scripts/lib/install-lifecycle.mjs",
+    "scripts/lib/install-verify.mjs",
+    "packages/version/index.js"
+  ],
+  "expect": "Die Route POST /shinon/version/update nimmt mode=now an; danach antwortet derselbe Port aus einem neuen Prozess mit neuem SHA, und der Rueckweg bleibt erreichbar.",
   "contract": "shinon.probes/update-now-v1",
   "name": "Slice 5 — „Jetzt installieren\" von der Frage bis zum neu gestarteten Host",
   "at": "2026-10-21T22:59:13Z",
