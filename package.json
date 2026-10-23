@@ -95,6 +95,7 @@
     "@shinon/codingmon": "workspace:*",
     "@shinon/core": "workspace:*",
     "@shinon/dashboard": "workspace:*",
+    "@shinon/diff-overview": "workspace:*",
     "@shinon/events": "workspace:*",
     "@shinon/hook": "workspace:*",
     "@shinon/key-router": "workspace:*",
@@ -113,6 +114,7 @@
     "@shinon/tooltip": "workspace:*",
     "@shinon/traceability": "workspace:*",
     "@shinon/version": "workspace:*",
+    "@shinon/widget-dock": "workspace:*",
     "typescript": "7.0.2"
   },
   "repository": {
