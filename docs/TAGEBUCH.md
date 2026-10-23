@@ -2218,3 +2218,32 @@ Nähte jetzt als Leser statt als Deklaration; deklariert bleibt allein
 `npm run build` Exit 0 (23 Pakete, 318 Dateien, 2 836 540 Bytes),
 `npm run zahlen:check` Exit 0, `tool-seams.test.mjs` 10/10,
 `provided-seams.test.mjs` 5/5.
+
+**NACHREVIEW des Commits — drei Reste, die kein Gate gesehen hatte.**
+Die Werkzeug-Verdrahtung stand, und dann kam die unangenehme Frage: was ist noch
+da, das niemand mehr benutzt? Drei Dinge. Zuerst die Namen: `REVIEW_SERVICE`
+und `RELATION_SERVICE` ueberlebten ihre Dienste um einen Tag, wie zwei
+Schluessel an einer Tuer, die zugemauert wurde — ein `ctx.get` darauf gibt
+`undefined`, und `undefined` liest sich im Cordis-Proxy wie „der Dienst ist
+noch nicht da“ statt wie „der Dienst ist fort“. Beide Namen sind gestrichen,
+Vertrag und Route bleiben.
+
+Dann der Riegel selbst: `provided-seams` las `bus.provide(…)` nur mit SYMBOL
+als erstem Argument. Die Probe hat es aufgedeckt, nicht die Vernunft — ein
+`bus.provide('shinon_persona_review', …)` mit Zeichenkette lief durch, 0 rot.
+Ein Waechter, der nur die kanonische Schreibweise sieht, bewacht die
+Schreibweise und nicht die Sache. Jetzt liest er beide Formen, und ein Symbol
+ohne aufloesbaren Literal-Wert ist ein Befund statt eines stillen Nichtfunds
+(Proben: 7 rot fuer die Zeichenkette, 3 rot fuer das unaufloesbare Symbol).
+
+Zuletzt eine doppelte Regel: `microStateToolValue` pruefte die fuenf Felder
+noch einmal von Hand, neben `MicroStateSchema`, das die Projektion selbst baut.
+Zwei Pruefer fuer eine Form sind zwei Wahrheiten — der eine zieht beim naechsten
+Feld nach, der andere nicht. Jetzt validiert das Schema der Projektion allein;
+was es ablehnt, wird `UNAVAILABLE`. Dieselbe Frage nach der Logikmischung hat
+auch eine Grenze geklaert, die vorher nur implizit war: die Werkzeug-Registry
+validiert Argumente NICHT fuer nackte Definitionen (`validateArgs` laeuft nur in
+`defineTool`), also ist der Veredler der Validator — benannt im Kopf der Datei
+statt gehofft. Alle sechs echten Quellmutationen wurden rot gesehen und
+zurueckgenommen; `gate:full` faehrt die Architektur-Riegel (Orchestrator,
+Struktur, Kanon, Vertraege) mit 27/27 PASS.

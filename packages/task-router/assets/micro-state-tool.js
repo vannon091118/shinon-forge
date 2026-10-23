@@ -20,7 +20,7 @@
  * `micro-state.js`): das Ausgabe-Schema wird daraus GEBAUT und nicht
  * abgeschrieben, damit ein sechstes Feld nicht zwei Wahrheiten erzeugt.
  */
-import { MICRO_STATE_CONTRACT, MICRO_STATE_FIELDS, MICRO_STATE_SERVICE, projectMicroState } from './micro-state.js';
+import { MICRO_STATE_CONTRACT, MICRO_STATE_FIELDS, MICRO_STATE_SERVICE, MicroStateSchema, projectMicroState } from './micro-state.js';
 
 /**
  * Der Ausgabe-Vertrag: der Vertrag der Naht (`shinon.task-router/micro-state-v1`)
@@ -59,15 +59,20 @@ const MICRO_STATE_TOOL_PARAMETERS = {
  * zwischen „kein Ziel“ und „nicht lesbar“ zieht.
  */
 export function microStateToolValue(value, fact = '') {
-  const answer = value !== null && typeof value === 'object' && !Array.isArray(value) ? value : null;
-  const usable = answer !== null
-    && answer.contract === MICRO_STATE_CONTRACT
-    && MICRO_STATE_FIELDS.every((field) => typeof answer[field] === 'string');
-  if (!usable) return projectMicroState(null, { fact, unavailable: true });
-  return {
-    contract: MICRO_STATE_CONTRACT,
-    ...Object.fromEntries(MICRO_STATE_FIELDS.map((field) => [field, answer[field]])),
-  };
+  // Geprueft wird mit DEMSELBEN Schema, das die Projektion baut — nicht mit
+  // einer zweiten Feldliste daneben. Zwei Pruefer fuer eine Form waeren zwei
+  // Wahrheiten: der eine wuerde beim naechsten Feld still nachziehen, der
+  // andere nicht. Was `MicroStateSchema` ablehnt (fremder Vertrag, fehlendes
+  // Feld, Nicht-Text), ist ein Lesefehler und damit `UNAVAILABLE`.
+  try {
+    const checked = MicroStateSchema(value);
+    return {
+      contract: MICRO_STATE_CONTRACT,
+      ...Object.fromEntries(MICRO_STATE_FIELDS.map((field) => [field, checked[field]])),
+    };
+  } catch {
+    return projectMicroState(null, { fact, unavailable: true });
+  }
 }
 
 /**

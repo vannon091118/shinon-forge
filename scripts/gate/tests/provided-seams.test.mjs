@@ -124,19 +124,35 @@ function literalOf(symbol) {
   return null;
 }
 
-/** Die tatsächlich angebotenen Dienste — aus `bus.provide(<NAME>, …)` gelesen. */
+/**
+ * Die tatsaechlich angebotenen Dienste — aus `bus.provide(<NAME>, …)` gelesen.
+ *
+ * Beide Schreibweisen zaehlen: der SYMBOL-Name (der Kanon) und das LITERAL
+ * (`bus.provide('shinon_x', …)`). Bis 2026-10-23 las dieser Scanner nur
+ * Symbole — ein zurueckgeholtes `provide` mit Zeichenkette war unsichtbar, und
+ * genau das hat die Probe im Test aufgedeckt. Fail-closed dazu: ein Symbol,
+ * dessen Wert sich nicht aufloesen laesst, ist ein Befund statt eines stillen
+ * Nichtfunds.
+ */
 function providedServices() {
   const found = new Map();
+  const unresolved = [];
   for (const file of PACKAGE_FILES.filter((entry) => entry.rel.endsWith('/index.js'))) {
     // Kommentare zählen nicht: der Kopf der Persona NENNT die entfernte Tür,
     // angeboten wird sie nicht mehr.
     const source = stripComments(file.source);
-    for (const match of source.matchAll(/(?:bus|ctx)\.provide\(\s*([A-Za-z_$][\w$]*)\s*,/g)) {
-      const resolved = literalOf(match[1]);
-      if (resolved !== null) found.set(resolved.literal, file.rel);
+    for (const match of source.matchAll(/(?:bus|ctx)\.provide\(\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_$][\w$]*))\s*,/g)) {
+      const quoted = match[1] ?? match[2];
+      if (quoted !== undefined) {
+        found.set(quoted, file.rel);
+        continue;
+      }
+      const resolved = literalOf(match[3]);
+      if (resolved === null) unresolved.push(`${file.rel}: ${match[3]} hat keinen aufloesbaren Literal-Wert`);
+      else found.set(resolved.literal, file.rel);
     }
   }
-  return found;
+  return { found, unresolved };
 }
 
 /** Die Naht, auf die ein Eintrag zeigt: Literal ODER Symbol muss im Leser stehen. */
@@ -163,7 +179,8 @@ function readerIssues(entry) {
 }
 
 test('jede angebotene Naht steht in der Tabelle — und jede Tabellenzeile wird angeboten', () => {
-  const provided = providedServices();
+  const { found: provided, unresolved } = providedServices();
+  assert.deepEqual(unresolved, [], unresolved.join('\n'));
   const declared = new Set([...PROVIDED, ...DECLARED_EXTERNAL].map((entry) => entry.service));
   assert.deepEqual([...provided.keys()].sort(), [...declared].sort(), 'Angebot und Tabelle laufen auseinander');
   for (const entry of [...PROVIDED, ...DECLARED_EXTERNAL]) {
@@ -186,7 +203,7 @@ test('jede angebotene Naht mit Leser wird wirklich gelesen', () => {
 });
 
 test('die zwei entfernten Dienste sind weg — und ihre Route steht noch', () => {
-  const provided = providedServices();
+  const { found: provided } = providedServices();
   for (const entry of REMOVED) {
     assert.equal(provided.has(entry.service), false, `${entry.service} wird wieder angeboten`);
     const source = read(entry.provider);
@@ -203,7 +220,7 @@ test('die zwei entfernten Dienste sind weg — und ihre Route steht noch', () =>
 
 test('ein neuer Dienst ohne Leser wird gemeldet (Mutationsprobe)', () => {
   const table = new Map([...PROVIDED, ...DECLARED_EXTERNAL].map((entry) => [entry.service, entry]));
-  const provided = new Map(providedServices());
+  const provided = new Map(providedServices().found);
   provided.set('shinon_niemand_liest_mich', 'packages/prompter/index.js');
   const missing = [...provided.keys()].filter((name) => !table.has(name));
   assert.deepEqual(missing, ['shinon_niemand_liest_mich']);

@@ -19,7 +19,7 @@ import {
 // Das Lesen einer MENSCHLICHEN Nachricht und der explizite Beziehungs-Produzent
 // liegen im importfreien Kern: dieselbe Rechnung im Host, im Test ohne
 // node_modules und in der Probe gegen den echten Spine.
-import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, RELATION_SIGNAL, TRIGGERS, beobachten, createPromptText, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, textOf } from './assets/interaction-core.js';
+import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SIGNAL, TRIGGERS, beobachten, createPromptText, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, textOf } from './assets/interaction-core.js';
 // Der Live-Zustand der Persona geht als RUNTIME-CONTEXT in die Nachrichtenliste,
 // nicht nur als System-Prompt-Abschnitt: so ersetzt der Stand pro Schritt den
 // vorherigen (statt sich neben ihm zu stapeln) und traegt den Anti-Drift-Satz
@@ -109,8 +109,12 @@ export { INDEX_STORE_SERVICE, INDEX_STORE_CONTRACT };
  */
 export { MEMORY_MEMO_ID, MEMORY_NAMESPACE, SELF_MODEL_MEMO_ID, SELF_MODEL_NAMESPACE };
 
-/** Die Naht für die Prüfung: ansehen und ausdrücklich annehmen — sonst nichts. */
-export const REVIEW_SERVICE = 'shinon_persona_review';
+/**
+ * Der Vertrag der Prüfung: ansehen und ausdrücklich annehmen — sonst nichts.
+ * Der DIENSTNAME ging am 2026-10-23 mit dem Dienst (`shinon_persona_review`
+ * hatte keinen Leser, die Route `REVIEW_ROUTE` ist die Naht) — ein
+ * stehengebliebener Name lüde zu einem `ctx.get` ein, das `undefined` liefert.
+ */
 export const REVIEW_CONTRACT = 'shinon.persona-review/v1';
 
 /**
@@ -188,7 +192,7 @@ export const NARRATIVE_CONTRACT = NARRATIVE_STATE_CONTRACT;
 // oeffentlichen Namen kommen aus `assets/interaction-core.js`. Sie bleiben hier
 // als Paket-Aussenflaeche sichtbar — Abnehmer und Tests lesen sie unveraendert
 // ueber `@shinon/persona`.
-export { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, TRIGGERS, matchTrigger, detectUserMood, textOf, renderLiveContext };
+export { RELATION_CONTRACT, RELATION_ROUTE, TRIGGERS, matchTrigger, detectUserMood, textOf, renderLiveContext };
 
 /**
  * Die Materialübersicht. Sie beschreibt, WAS da ist — und schreibt
@@ -504,12 +508,11 @@ export function apply(ctx, config) {
   });
   if (!bus.demand(['webServer'], (webCtx) => surface.mount(webCtx))) surface.mount(ctx);
 
-  // KEIN `bus.provide(REVIEW_SERVICE, …)` (2026-10-23): der Dienst hatte keinen
+  // KEIN `bus.provide('shinon_persona_review', …)` (2026-10-23): der Dienst hatte keinen
   // Leser im Baum — weder ein Host-Paket noch ein Client. Die lebende Naht ist
   // die Route (`REVIEW_ROUTE`, GET und POST) samt `REVIEW_GLOBAL` und dem
   // SSE-Ereignis `review`; ein zweiter Zugang zum selben Objekt wäre eine zweite
-  // Tür, die niemand öffnet. Die Konstante bleibt als Name der Fähigkeit
-  // (`capabilities.json`), die Anzeige läuft über das Global.
+  // Tür, die niemand öffnet. Auch der NAME ist gegangen.
 
   // ── Der Produzent der Beziehungsstufe: Stufe pruefen -> Signal, im Kern ────
   // Vorher gab es KONSUMENTEN (`relation.updated`), aber keinen Produzenten.

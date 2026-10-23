@@ -15,7 +15,12 @@
  * prüft `schema` gegen seine Teilmenge (type/properties/required/items/enum/
  * const/additionalProperties + Annotationen). Diese Hälfte bleibt darum beim
  * rohen JSON-Schema und zwei reinen Funktionen — ohne bare Imports, damit der
- * Abnahmetest ohne installierte `node_modules` laufen kann.
+ * Abnahmetest ohne installierte `node_modules` laufen kann. Der Preis ist
+ * benannt: die Argumente prüft NICHT die Registry (`validateArgs` läuft nur in
+ * `defineTool`), sondern der Veredler — `buildProposal` übersetzt total, und
+ * `proposeBlock` lehnt jede fehlende oder falsche Angabe mit benanntem Grund
+ * ab. Dieselbe Bauform wie `@shinon/key-router`, das seinen Werkzeugen aus
+ * demselben Grund keine bare Abhängigkeit mitgibt.
  *
  * DIE ARGUMENTE SIND ABSICHTLICH SCHMAL: `ausloeser` wird nicht als freies
  * Objekt durchgereicht, sondern aus `haystack`, `intentKlassen` und

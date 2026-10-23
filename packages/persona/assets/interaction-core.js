@@ -21,8 +21,13 @@
  */
 import { promptText } from './prompt-text.js';
 
-/** Die Naht, ueber die eine Beziehungsstufe GESETZT wird. */
-export const RELATION_SERVICE = 'shinon_persona_relation';
+/**
+ * Die Route, ueber die eine Beziehungsstufe GESETZT wird — und ihr Vertrag.
+ *
+ * Der Dienstname `shinon_persona_relation` ist am 2026-10-23 mit dem Dienst
+ * gegangen: er hatte keinen Leser, die Route ist die lebende Naht. Der Name
+ * bleibt NICHT als toter Export stehen — wer ihn braucht, liest die Route.
+ */
 export const RELATION_CONTRACT = 'shinon.persona-relation/v1';
 export const RELATION_ROUTE = '/shinon/persona/relation';
 /** Das Signal, das der Spine normalisiert (`relation.updated`). */

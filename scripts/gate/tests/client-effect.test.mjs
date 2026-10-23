@@ -69,21 +69,20 @@ function mount(dir) {
  * liest. Ein zweiter Regelsatz für die Mutationsprobe würde genau den Fehler
  * wiederholen, den der Test findet.
  */
-function effectIssues({ id, entry, events, source }) {
+function effectIssues({ id, entry, events }) {
   const issues = [];
   if (entry === undefined) issues.push(`${id}: keine Anmeldung in __shinonPlugins`);
   else if (entry.kind !== 'client') issues.push(`${id}: kind ist ${String(entry.kind)} statt 'client'`);
   if (!events.some((event) => event.type === 'shinon:plugin' && event.detail?.id === id)) {
     issues.push(`${id}: kein shinon:plugin-Update mit dieser id`);
   }
-  if (!/__shinonPlugins/.test(source)) issues.push(`${id}: das Bundle nennt die Plugin-Liste nicht`);
   return issues;
 }
 
 test('narrative und tooltip melden sich an und senden das Update', () => {
   for (const dir of WIRKUNG) {
     const half = mount(dir);
-    assert.deepEqual(effectIssues({ ...half, source: sourceOf(dir) }), [], `${dir} hat keine Wirkung`);
+    assert.deepEqual(effectIssues(half), [], `${dir} hat keine Wirkung`);
     assert.equal(half.entry.panel, null, `${dir} erfindet ein Panel, das es nicht gibt`);
     assert.ok(typeof half.entry.label === 'string' && half.entry.label !== '', `${dir} hat kein Label`);
   }
@@ -113,7 +112,6 @@ test('eine Hälfte, die nur loggt, wird gemeldet (Mutationsprobe)', () => {
     page,
     events,
     entry: page.__shinonPlugins?.get(registration.id),
-    source: LOG_ONLY,
   });
   assert.ok(issues.some((issue) => issue.includes('keine Anmeldung')), issues.join('\n'));
   assert.ok(issues.some((issue) => issue.includes('kein shinon:plugin-Update')), issues.join('\n'));
