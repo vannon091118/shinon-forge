@@ -65,6 +65,11 @@ test('wissensarten: die Registry traegt genau die vier Arten, jede einmal', () =
   assert.deepEqual(contract.kinds.map((kind) => kind.id), KIND_IDS, 'vier Arten, feste Reihenfolge');
   assert.deepEqual([...new Set(contract.kinds.map((kind) => kind.id))], KIND_IDS, 'keine Doppelung');
   assert.ok(Array.isArray(contract.rules) && contract.rules.length >= 4, 'die Regeln stehen im Vertrag');
+  for (const [index, rule] of contract.rules.entries()) {
+    const missing = ['positive', 'forbidden', 'fallback', 'error', 'trace', 'replay', 'invariant']
+      .filter((point) => typeof rule?.[point] !== 'string' || rule[point].trim() === '');
+    assert.deepEqual(missing, [], `Regel ${index + 1} ohne ${missing.join(', ')}`);
+  }
 });
 
 test('wissensarten: jede Art hat Eigentuemer, Ablage, Leseweg und eine Kopierregel', () => {
@@ -115,7 +120,10 @@ test('wissensarten: Scoring und Narrative sind keine Wissensspeicher', () => {
   const owners = contract.kinds.map((kind) => kind.owner);
   assert.equal(owners.some((owner) => owner.includes('packages/scoring')), false);
   assert.equal(owners.some((owner) => owner.includes('packages/narrative')), false);
-  const rule = contract.rules.join(' ');
+  // Die Regeln tragen seit 2026-10-23 die 7-Punkt-Form (positive, forbidden,
+  // fallback, error, trace, replay, invariant). Fuer die Textprobe zaehlt die
+  // Aussage, nicht die Huelle: die Positivsaetze werden projektiv verbunden.
+  const rule = contract.rules.map((entry) => entry.positive).join(' ');
   assert.match(rule, /Scoring liefert Feedbacksignale/);
   assert.match(rule, /Narrative/);
 });

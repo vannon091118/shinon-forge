@@ -1,13 +1,46 @@
 {
   "contract": "shinon.knowledge-kinds/v1",
   "name": "Wissensarten — vier Speicher, vier Eigentuemer, vier Grenzen",
+  "status": "IMPLEMENTED",
+  "stand": "2026-10-23",
   "note": "SH-LEARN-02: Nutzer-Memory, Projekt-Memory, prozedurale Skills und das episodische Archiv sind GETRENNT. Jede Art hat genau einen Eigentuemer, eine Ablage, eine harte Grenze und einen Leseweg. Keine Art kopiert vollstaendige Ereignis-Nutzlasten in einen zweiten Zustand: was ein Speicher aufnimmt, ist die verkuerzte Aussage (Statement, Praeferenz, Name, Belegzahl), nicht das Ereignis. Wer den vollen Vorgang braucht, liest ihn im Sitzungsarchiv (episodic-archive).",
   "rules": [
-    "Ein Zustand gehoert EINER Art. Scoring liefert Feedbacksignale; Narrative bildet einen kompakten Zustand plus Begruendung ab, kein zweites Ereignisprotokoll.",
-    "Jede Grenze ist eine positive Zahl im Code oder ausdruecklich `host` (die Ablage gehoert dem Host und wird hier nicht nachgebaut).",
-    "Am Limit wird NIE still gekuerzt: der Aufrufer bekommt einen benannten Befund (`KAPAZITAET` mit Ist und Soll) oder eine Eviction-Regel, die nur entschiedene/abgelehnte Zeilen trifft.",
-    "Projekt-Memory ist pro Projekt (Bereich `scope`), Nutzer-Memory ist projektuebergreifend (`scope: global`), Skills sind Uebungsdateien, das Archiv ist unveraenderlicher Verlauf.",
-    "Ein Modell schreibt in keine dieser Ablagen direkt: der Schreibweg laeuft ueber die genannte Runtime (facts-store, persona-memory, skill-lifecycle)."
+    {
+      "positive": "Ein Zustand gehoert EINER Art: Nutzer-Memory, Projekt-Memory, prozedurale Skills und das episodische Archiv sind vier getrennte Ablagen mit je einem Eigentuemer; Scoring liefert Feedbacksignale, Narrative bildet einen kompakten Zustand plus Begruendung ab.",
+      "forbidden": "Eine fuenfte Ablage, ein zweiter Gesamtzustand derselben Daten und eine vollstaendige Ereignis-Nutzlast ausserhalb des episodischen Archivs.",
+      "fallback": "Fehlt eine Art oder ihre Ablage, meldet der Test den fehlenden Eintrag namentlich und faellt auf keine geratene Ersatzablage zurueck.",
+      "error": "`scripts/gate/tests/knowledge-kinds.test.mjs` endet Exit 1 und nennt Art, Feld und Abweichung; das statische Gate zaehlt den Schritt als rot.",
+      "trace": "Die Registry nennt je Art `owner`, `store`, `query`, `cap` und `capSource`; eine Abweichung nennt die Datei, in der die Zahl steht.",
+      "replay": "`node --test scripts/gate/tests/knowledge-kinds.test.mjs` faehrt sechs Zusagen: Arten, Felder, eindeutige Ablagen, Zahl gegen Code, Scoring/Narrative als Nicht-Speicher, Kompaktierung am Quelltext.",
+      "invariant": "Jede Grenze ist eine positive Zahl im Code oder ausdruecklich `host`; keine Ablage ist doppelt, und jede Zahl in der Registry ist die Konstante, die sie nennt."
+    },
+    {
+      "positive": "Am Limit wird NIE still gekuerzt: der Aufrufer bekommt einen benannten Befund (`KAPAZITAET` mit Ist und Soll) oder eine Eviction-Regel, die nur entschiedene/abgelehnte Zeilen trifft.",
+      "forbidden": "Ein stilles Kuerzen, ein Loeschen lebender Zeilen und eine Eviction, die eine Abhaengigkeit anderer Zeilen zerreisst.",
+      "fallback": "Ist kein Platz und keine terminale Zeile entbehrlich, bleibt der alte Stand unveraendert und der neue Eintrag wird abgelehnt.",
+      "error": "`insertFact` liefert `{ ok: false, reason: 'KAPAZITAET', scope, ist, soll }`; der Aufrufer protokolliert Ist und Soll, statt den Fehlschlag zu verschweigen.",
+      "trace": "Der Befund traegt Bereich, Ist und Soll; die Eviction nennt die Zahl der gewichenen Zeilen (`pruned`).",
+      "replay": "`node --test packages/project-index/test/facts.test.mjs` belegt Grenze, Eviction und Ablehnung; `packages/narrative/test/narrative.test.mjs` belegt das Beziehungsfenster.",
+      "invariant": "Eine Grenze ist eine positive Zahl im Code oder `host`; jedes Limit greift nachweisbar und meldet seinen Ausgang."
+    },
+    {
+      "positive": "Projekt-Memory ist pro Projekt (Bereich `scope`), Nutzer-Memory ist projektuebergreifend (`scope: global`), Skills sind Uebungsdateien, das Archiv ist unveraenderlicher Verlauf.",
+      "forbidden": "Projektfakten in der Nutzer-Memory, Praeferenzen in der Projekt-Memory und ein Skill-Ablauf als Fakt.",
+      "fallback": "Ein unbekannter Bereich gilt nicht als global: er bleibt aussen vor, bis ihn ein Eigentuemer ausdruecklich zuordnet.",
+      "error": "Ein Eintrag ohne gueltigen Bereich wird nicht geschrieben; der Aufrufer nennt den Grund statt einer stillen Zuordnung.",
+      "trace": "Jeder Eintrag traegt seinen Bereich; die Registry nennt je Art den Bereich und den Leseweg.",
+      "replay": "`node --test packages/persona/test/persona-memory.test.mjs` belegt den Bereichsfilter und die globale Ausnahme.",
+      "invariant": "Der Bereich entscheidet, wer einen Eintrag sieht; keine Art liest den Bereich einer anderen."
+    },
+    {
+      "positive": "Ein Modell schreibt in keine dieser Ablagen direkt: der Schreibweg laeuft ueber die genannte Runtime (facts-store, persona-memory, skill-lifecycle).",
+      "forbidden": "Ein direkter Schreibzugriff aus einem Modelltext, ein Dienst, der ohne Runtime schreibt, und ein Zustand, der sich selbst aus Modellausgaben rekonstruiert.",
+      "fallback": "Ohne Runtime gibt es keinen Schreibweg: der Vorschlag bleibt im Ledger und wird nicht zur Tatsache.",
+      "error": "Ein Schreibversuch ausserhalb der Runtime wird mit dem Namen der fehlenden Runtime abgewiesen, nicht ausgefuehrt.",
+      "trace": "Jeder Schreibweg nennt Runtime, Bereich und Ausgang; die Registry nennt den Eigentuemer je Art.",
+      "replay": "`node --test scripts/gate/tests/knowledge-kinds.test.mjs` und die Paket-Suiten der vier Runtimes belegen die Schreibwege.",
+      "invariant": "Kein Modell schreibt direkt; jede Zeile in einer Ablage hat einen benannten Eigentuemer."
+    }
   ],
   "kinds": [
     {
