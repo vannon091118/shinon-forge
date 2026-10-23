@@ -273,31 +273,7 @@ jobs:
       - name: Prompter-Tests fahren
         run: node --test packages/prompter/test/*.test.mjs
 
-  # ── Zweig 8: TypeScript (gepinnter Compiler + Quellüberdeckung) ─────────────
-  # Same engine and policy as local checks; missing compiler/config/source coverage fails closed.
-  typescript:
-    name: TypeScript Gate (gepinnter Compiler + Quellüberdeckung)
-    needs: preflight-docs
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Abhängigkeiten installieren (lockfile-treu) und dsh in den PATH legen
-        run: |
-          set -euo pipefail
-          npm ci --no-audit --no-fund
-          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-
-      - name: TypeScript Gate fahren
-        run: npm run typecheck
-
-  # ── Zweig 9: Schnellpfad + DSH-Quellgleichheit (Sekunden statt Minuten) ─────
+  # ── Zweig 8: Schnellpfad + DSH-Quellgleichheit (Sekunden statt Minuten) ─────
   # `npm test` ist seit 2026-10-17 bewusst NICHT die volle Kette, sondern der
   # schnelle lokale Pfad (statisches Gate + lokale Engine-Slices). Dieser Zweig
   # pinnt ihn in CI grün; die volle Kette (`test:full`) fahren die übrigen
@@ -433,7 +409,6 @@ jobs:
       - distribution
       - profile
       - prompter
-      - typescript
       - preflight-docs
       - dependency-audit
       - codeql

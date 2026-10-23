@@ -10,7 +10,6 @@
       "client-half",
       "legacy-guard",
       "profile",
-      "typescript",
       "dsh-singleton"
     ],
     "local": [

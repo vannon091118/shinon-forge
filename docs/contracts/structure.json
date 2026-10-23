@@ -116,7 +116,6 @@
     "scripts/gate/plugins/persona.mjs": 216,
     "scripts/gate/plugins/probe-twin.mjs": 105,
     "scripts/gate/plugins/scoring.mjs": 820,
-    "scripts/gate/plugins/typescript.mjs": 204,
     "scripts/gate/tests/client-activation.test.mjs": 606,
     "scripts/gate/tests/commit-trailer.test.mjs": 609,
     "scripts/gate/tests/persona-state.test.mjs": 995,
@@ -196,12 +195,12 @@
       ]
     },
     "docs/contracts/knowledge-kinds.json": {
-   "art": "quelle",
-   "leser": [
-    "scripts/gate/tests/knowledge-kinds.test.mjs"
-   ]
-  },
-  "docs/contracts/markers.json": {
+      "art": "quelle",
+      "leser": [
+        "scripts/gate/tests/knowledge-kinds.test.mjs"
+      ]
+    },
+    "docs/contracts/markers.json": {
       "art": "zusammenfassung",
       "quelle": [
         "packages/markers/assets/marker-model.json",

@@ -12,7 +12,7 @@ export const LINKED_DOCUMENTS = [
 
 export const REQUIRED_CI_JOBS = [
   'commit-guard', 'quick', 'unit', 'gate-rules', 'gate-full', 'fixtures', 'distribution',
-  'profile', 'prompter', 'typescript', 'preflight-docs', 'dependency-audit', 'codeql', 'secret-scan',
+  'profile', 'prompter', 'preflight-docs', 'dependency-audit', 'codeql', 'secret-scan',
 ];
 
 export const JOB_DIAGNOSTIC_NAMES = {
@@ -25,7 +25,6 @@ export const JOB_DIAGNOSTIC_NAMES = {
   distribution: 'DISTRIBUTION',
   profile: 'PROFILE_BOOT',
   prompter: 'PROMPTER',
-  typescript: 'TYPESCRIPT',
   'preflight-docs': 'DOCUMENTATION',
   'dependency-audit': 'DEPENDENCY_AUDIT',
   codeql: 'CODEQL',
@@ -33,6 +32,6 @@ export const JOB_DIAGNOSTIC_NAMES = {
 };
 
 export const PREFLIGHT_BLOCKED_JOBS = [
-  'gate-rules', 'gate-full', 'fixtures', 'distribution', 'profile', 'prompter', 'typescript',
+  'gate-rules', 'gate-full', 'fixtures', 'distribution', 'profile', 'prompter',
   'quick', 'dependency-audit', 'codeql', 'secret-scan',
 ];

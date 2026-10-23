@@ -41,7 +41,7 @@ test('failed jobs get a stable job-specific code on both row and diagnostics', (
 test('cancelled, pending and skipped jobs fail closed', () => {
   for (const [job, result, suffix, prefix] of [
     ['secret-scan', 'cancelled', 'CANCELLED', 'SECRET_SCAN'],
-    ['typescript', 'pending', 'STATUS_UNRESOLVED', 'TYPESCRIPT'],
+    ['prompter', 'pending', 'STATUS_UNRESOLVED', 'PROMPTER'],
     ['preflight-docs', 'skipped', 'SKIPPED', 'DOCUMENTATION'],
   ]) {
     const report = evaluatePreflight(successfulNeeds({ [job]: result }), context);

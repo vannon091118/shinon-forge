@@ -36,7 +36,7 @@
 
 | Skript | npm-Script | Zweck |
 |---|---|---|
-| `gate/engine.mjs` | `gate`, `gate:local`, `gate:full`, `typecheck` | modulare Gate-Engine (SLICE/LOCAL/FULL, `--only`, `--branding`) |
+| `gate/engine.mjs` | `gate`, `gate:local`, `gate:full` | modulare Gate-Engine (SLICE/LOCAL/FULL, `--only`, `--branding`) |
 | `gate/policy.mjs` | — | liest `gate/policy.json` (Triggersystem: always/local/slices) |
 | `gate/tests/*.test.mjs` | `gate:test` | reine Gate-/Lib-Logik, kein DSH nötig |
 | `shinon-test.mjs` | in `test`, CI | statisches Gate: Manifest, Namensvertrag, Rollendateien, Legacy-Guard, Drift, Profil, Kanon, Struktur |

@@ -19,13 +19,12 @@ Jedes Plugin meldet `pass` / `not-applicable` / `fail`; Exit 1 bei Issues.
 | **LOCAL** | `npm run gate:local` | feste lokale Menge (Hook-Lauf) |
 | **FULL / RELEASE** | `npm run gate:full` | alle Gates |
 | einzelner Gate | `npm run gate -- --only <id>` | gezielt |
-| Typecheck | `npm run typecheck` | `--only typescript` |
 
 ### policy.json — was wann läuft
 
 - **`always`** (jeder Lauf): `bundle-resolution`, `manifest`, `contract`,
   `patch`, `host-half`, `client-half`, `legacy-guard`, `profile`,
-  `typescript`, `dsh-singleton`.
+  `dsh-singleton`.
 - **`local`** (Hook): `bundle-resolution`, `contract`, `legacy-guard`,
   `dsh-singleton`.
 - **`slices`** (Präfix-/Contains-Match auf geänderte Pfade):
@@ -131,16 +130,15 @@ wartet auf alle 14 Pflichtjobs.
 2. Unit-Matrix (acht Paket-Suiten, ohne `npm ci`)
 3. Dokumentations-/Workflow-Preflight (aktive Befehle, echte Links, Jobgraph)
 4. Gate-Tests (beide Bahnen) plus installierte Codemon-Übergabe
-5. Gate-Engine `--full` (alle 23 Plugins, fail-closed)
+5. Gate-Engine `--full` (alle 26 Plugins, fail-closed)
 6. Fixtures gegen den realen Bau
 7. Distribution: Packen, isoliert installieren und laden
 8. Profilboot
 9. Prompter-Tests
-10. TypeScript-Gate
-11. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag, `npm run build` und `npm run zahlen:check`
-12. Dependency-Audit direkt aus `package-lock.json`
-13. CodeQL für JavaScript/TypeScript
-14. Gitleaks über die vollständige Git-Historie
+10. Schnellpfad (`npm run test:core`) plus DSH-Versionsvertrag, `npm run build` und `npm run zahlen:check`
+11. Dependency-Audit direkt aus `package-lock.json`
+12. CodeQL für JavaScript/TypeScript
+13. Gitleaks über die vollständige Git-Historie
 
 Das frühere separate `static-gate` ist entfernt: `test:core` enthält das
 statische Gate bereits. Der CI-Schnellpfad verwendet `test:core`, nicht erneut

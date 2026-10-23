@@ -60,9 +60,9 @@ heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
 <!-- zahlen:struktur:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 428 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 426 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
 | Klassen | 6 | `docs/contracts/structure.json` → `klassen` | 0 |
-| Benannte Bestandsdateien (über ihrer Klassengrenze) | 26 | `docs/contracts/structure.json` → `bestand` | 0 |
+| Benannte Bestandsdateien (über ihrer Klassengrenze) | 25 | `docs/contracts/structure.json` → `bestand` | 0 |
 | Dateien ohne Klasse | 0 | `npm test` (Schritt „Struktur“) — gezählt aus `structureIssues()` | 0 |
 | Verstöße gegen den Contract der Klasse | 0 | dieselben Befunde, ohne „keine Klasse“ | 0 |
 <!-- zahlen:struktur:end -->
@@ -163,9 +163,8 @@ sie sind keine Ausnahmen von der Zielmarke, sondern eine Stabilitätsentscheidun
 ## 3. Rote Befunde
 
 In diesem Durchgang: **keine** im abschließenden Lauf. `npm test`, `npm run gate:test`,
-`npm run gate:full` und `npm run build` enden mit Exit 0; der einzige Skip mit
-System ist `typescript` (`NOT_APPLICABLE`, es existiert weiterhin keine
-First-Party-TypeScript-Datei) — kein Rot, kein stiller Skip, kein sichtbarer Skip mehr (die vier
+`npm run gate:full` und `npm run build` enden mit Exit 0; es bleibt kein Skip mit
+System — kein Rot, kein stiller Skip, kein sichtbarer Skip (die vier
 `codingmon-store`-Skips entfallen, seit `@deepseek-ai/dsh-storage-json` als
 fünftes Zielpaket an der Wurzel steht und die `uebergabe`-Naht die
 rc.2-Mechanik fährt: `RemoteAccessService`, Browser-Bündel `client.browser.js`,
@@ -211,7 +210,6 @@ Offen **außerhalb** der Gates (kein Rot, nur ungemessen):
 - `node scripts/panel-check.mjs`: braucht einen laufenden Host und dessen Token.
 - Ein echter Modell-Turn: der Arbeits-Schlüssel liegt in `.env`, der Lauf wurde in diesem
   Durchgang nicht wiederholt (§2.1).
-- `npm run typecheck`: `NOT_APPLICABLE` — es gibt keine First-Party-TypeScript-Datei.
 
 ## 5. Historie
 

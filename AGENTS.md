@@ -413,7 +413,6 @@ läuft in `test:full`/`gate:full` (CI).
 - `npm run desktop:launcher` / `desktop:launcher:uninstall` — Desktop-Installer (`scripts/desktop-launcher.mjs`).
 - `npm run uninstall:user` — Nutzer-Deinstall (`scripts/install-user.mjs uninstall`).
 - `npm run verify:panel` (`scripts/panel-check.mjs`) — Panel-Prüfung (braucht laufenden Host + Token).
-- `npm run typecheck` — Gate-Engine `--only typescript` (derzeit `NOT_APPLICABLE`, keine First-Party-TS-Datei).
 - `npm run stages` (`scripts/stages.mjs`) — Stufe-Übersicht.
 Alle Skripte laufen über `scripts/run-with-node.mjs` (verifizierter Node ≥ 22, `node_modules/.bin` vor PATH); ein nacktes `node --test …` bleibt der ungeschützte Weg. Keine erfundenen Aufrufe — alle stammen aus `package.json`.
 

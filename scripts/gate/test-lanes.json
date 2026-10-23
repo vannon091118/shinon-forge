@@ -105,7 +105,6 @@
       "test-lanes.test.mjs",
       "token-usage-seam.test.mjs",
       "token-usage-vendor.test.mjs",
-      "typescript.test.mjs",
       "version-package.test.mjs",
       "zahlen-struktur.test.mjs"
     ],

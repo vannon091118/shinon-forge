@@ -81,7 +81,7 @@ test('validateLocalSubset: local muss Teilmenge von always sein', () => {
 
 test('failureCode names a failed or throwing gate in one stable code', () => {
   assert.equal(failureCode('dead-package'), 'GATE_DEAD_PACKAGE_FAILED');
-  assert.equal(failureCode('typescript', 'THREW'), 'GATE_TYPESCRIPT_THREW');
+  assert.equal(failureCode('canon', 'THREW'), 'GATE_CANON_THREW');
   assert.equal(failureCode('  host half  '), 'GATE_HOST_HALF_FAILED');
 });
 

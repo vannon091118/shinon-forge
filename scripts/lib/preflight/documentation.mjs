@@ -27,7 +27,6 @@ const REQUIRED_JOB_BEHAVIORS = [
   { job: 'distribution', code: 'PREFLIGHT_DISTRIBUTION_COMMAND_MISSING', message: 'The isolated package-distribution test must execute.', contains: ['run: node scripts/pack-test.mjs'] },
   { job: 'profile', code: 'PREFLIGHT_PROFILE_COMMAND_MISSING', message: 'The active DSH profile boot test must execute.', contains: ['run: node scripts/shinon-profile-test.mjs'] },
   { job: 'prompter', code: 'PREFLIGHT_PROMPTER_COMMAND_MISSING', message: 'The installed Prompter test suite must execute.', contains: ['run: node --test packages/prompter/test/*.test.mjs'] },
-  { job: 'typescript', code: 'PREFLIGHT_TYPESCRIPT_COMMAND_MISSING', message: 'The TypeScript contract runner must execute.', contains: ['run: npm run typecheck'] },
   { job: 'preflight-docs', code: 'PREFLIGHT_EXECUTOR_MISSING', message: 'The dependency-free preflight must run read-only in CI.', contains: ['run: node scripts/preflight-docs.mjs --check-only --json-out preflight-docs-report.json'] },
   { job: 'dependency-audit', code: 'PREFLIGHT_DEPENDENCY_AUDIT_COMMAND_MISSING', message: 'Production dependencies must be audited at the configured severity.', contains: ['run: npm audit --omit=dev --audit-level=high'] },
   { job: 'codeql', code: 'PREFLIGHT_CODEQL_ACTION_MISSING', message: 'CodeQL must initialize and analyze JavaScript/TypeScript.', contains: ['uses: github/codeql-action/init@v4', 'uses: github/codeql-action/analyze@v4'] },

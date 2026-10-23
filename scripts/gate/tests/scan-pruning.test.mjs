@@ -124,28 +124,3 @@ test('prune: die Kosten wachsen nicht mit der Zahl der Fremddateien', () => {
   }
 });
 
-test('prune: das TypeScript-Gate nimmt dieselbe Regel', async () => {
-  const root = fixture();
-  try {
-    mkdirSync(join(root, 'src', 'ts'), { recursive: true });
-    writeFileSync(join(root, 'src', 'ts', 'echt.ts'), 'export const a: number = 1;\n');
-    writeFileSync(join(root, 'node_modules', 'fremd.ts'), 'export const f: number = 1;\n');
-    writeFileSync(join(root, 'dist', 'gebaut.ts'), 'export const g: number = 1;\n');
-    const found = discover(join(root, 'src', 'ts'), 'echt.ts');
-    assert.deepEqual(found, ['echt.ts'], 'im eigenen Ordner wird gefunden');
-    const all = await walkTypeScript(root);
-    assert.deepEqual(all, ['src/ts/echt.ts'], 'node_modules und dist werden gepruned');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-/** Kleine Helfer, damit der letzte Test nur die Zusage ausdrückt. */
-function discover(dir, name) {
-  return entriesOf(dir).filter((entry) => entry.name === name).map((entry) => entry.name);
-}
-
-async function walkTypeScript(root) {
-  const gate = await import('../plugins/typescript.mjs');
-  return gate.discoverTypeScriptFiles(root);
-}
