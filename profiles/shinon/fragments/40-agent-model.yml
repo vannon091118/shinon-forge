@@ -1,8 +1,8 @@
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
-    provider: openrouter-free
-    model: minimax/minimax-m3.1-flash:free
+    provider: openrouter
+    model: nvidia/nemotron-3.5-super-vl:free
 # Shinon-Preset: EIGENE, schmalere Werkzeug-Zusammensetzung.
 #
 # Das DSH liefert vier Presets (standard, ptc, minimal, cordis). 'standard'

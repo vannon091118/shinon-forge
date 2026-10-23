@@ -1,7 +1,7 @@
 import z from '@deepseek-ai/schemastery';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { readFileSync, existsSync } from 'node:fs';
-import { join, isAbsolute, resolve, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, isAbsolute } from 'node:path';
 import { emptySelfModel, observeDecision, observeError, decaySelfModel, selfModelSummary, selfModelView, validateSelfModel } from './assets/self-model.js';
 import { MEMORY_CONTRACT, acceptedCommitments, decideProposal, decayMemory, emptyMemory, memoryView, proposeFromMemory, rememberDecision, rememberEvent, renderCommitments, renderMemory, selectMemories, validateMemory } from './assets/memory-core.js';
 // Das Lesen einer MENSCHLICHEN Nachricht und der explizite Beziehungs-Produzent
@@ -31,7 +31,7 @@ const DEFAULTS = Object.freeze({
   workaround: promptText('persona-workaround'),
   identityOverview: promptText('persona-identity-overview'),
 });
-// Der Projekt-Kontext (nur im Shinon-Projekt) wird im importfreien Kern gelesen.
+// Der Projekt-Kontext (aus dem Sitzungs-Workspace) wird im importfreien Kern gelesen.
 import { readProjectContext } from './assets/project-context.js';
 // Die Host-Nähte (Narrative-Kanal, Entscheidungskanal, kanonischer I/O-Pfad)
 // haben EINE Definition: `@shinon/seams`.
@@ -116,12 +116,6 @@ export const SELF_MODEL_MEMO_ID = 'self-model';
  */
 const sessionRoot = new AsyncLocalStorage();
 
-/** Liegt `dir` innerhalb von `root`? Präfixvergleich reicht hier nicht. */
-function isInside(root, dir) {
-  const rel = relative(resolve(root), resolve(dir));
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
-}
-
 /**
  * Der Workspace, für den die Persona spricht — AUSDRÜCKLICH benannt, nie geraten.
  *
@@ -146,19 +140,6 @@ function declaredWorkspaceRoot(config) {
   return null;
 }
 
-/** Trägt genau dieses Verzeichnis das Shinon-Manifest? */
-function isShinonProjectAt(dir) {
-  if (dir === null) return false;
-  try {
-    const pkgPath = join(dir, 'package.json');
-    if (!existsSync(pkgPath)) return false;
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-    return pkg.name === '@shinon/forge';
-  } catch {
-    return false;
-  }
-}
-
 /**
  * @shinon/persona — Identity, State, Voice.
  *
@@ -177,9 +158,11 @@ function isShinonProjectAt(dir) {
  * Der Zustandsvertrag liegt als Daten in ./assets/persona-state.json — ein
  * neuer Mood oder Übergang ist zuerst eine Datenänderung, kein Code-Umbau.
  *
- * WICHTIG: Die Persona wird NUR im Shinon-Projekt aktiv (isShinonProject()).
- * In anderen Projekten bleibt sie stumm — Shinon-interne Daten werden nicht
- * in fremde Projekte injiziert.
+ * WICHTIG: Die Persoenlichkeit ist global — jeder zugewiesene Workspace
+ * bekommt sie (Haltung, Ton, Beziehung, Erinnerungen). Der PROJEKT-Kontext
+ * (Projektdatei, projektspezifische Erinnerungen und Auflagen, Selbstmodell)
+ * bleibt je Workspace und reist nie mit. Still bleibt die Persona nur ohne
+ * jeden Bereich (fail-closed).
  */
 
 
@@ -436,9 +419,9 @@ export const Config = z.object({
   /**
    * Pfad zur Projekt-Kontextdatei (relativ zum ARBEITSVERZEICHNIS).
    *
-   * Diese Datei enthält projekt-spezifische Kontextinformationen, die NUR im
-   * Shinon-Projekt geladen werden. Sie wird als separater Abschnitt injiziert
-   * — ähnlich wie agents.md, aber projektspezifisch. Leer = nicht laden.
+   * Diese Datei enthält projekt-spezifische Kontextinformationen aus dem
+   * Workspace der laufenden Sitzung. Sie wird als separater Abschnitt
+   * injiziert — Workspace-Daten, keine Anweisung. Leer = nicht laden.
    */
   projectContextPath: z.string().default(''),
   /**
@@ -458,16 +441,18 @@ export const Config = z.object({
    */
   memoryNamespace: z.string().default(MEMORY_NAMESPACE),
   /**
-   * Wo die IDENTITAET spricht: `workspace` (Vorgabe, nur das Shinon-Projekt)
-   * oder `global` (jede Sitzung dieses Deployments). Projekt-Kontext und
-   * projektspezifische Erinnerungen bleiben in beiden Faellen am Workspace.
+   * Wo die IDENTITAET spricht: `workspace` (Vorgabe, jede zugewiesene
+   * Sitzung und jeder deklarierte Boot) oder `global` (zusaetzlich auch
+   * ohne jede Zuweisung — die Entscheidung des Deployments). Projekt-Kontext
+   * und projektspezifische Daten bleiben in beiden Faellen am Sitzungs-
+   * Workspace und werden nie global.
    */
   identityScope: z.union([z.const('workspace'), z.const('global')]).default('workspace'),
 });
 
 export function apply(ctx, config) {
-  // Projektscope: Persona nur für den AUSDRÜCKLICH benannten Shinon-Workspace.
-  // In fremden oder unklaren Workspaces würden interne Daten exponiert.
+  // Projektscope: die Persoenlichkeit ist global, der Projekt-Kontext bleibt
+  // je Workspace.
   // GEMESSEN 2026-10-18 (Root Cause): die Profil-Config setzt nur
   // `projectContextPath`, keinen `workspaceRoot`. Der Mount brach deshalb VOR
   // jeder Registrierung ab — Persona, Ton und Selbstbezug fehlten in JEDEM
@@ -483,10 +468,6 @@ export function apply(ctx, config) {
   // `global` ist eine ENTSCHEIDUNG des Deployments, nicht die Vorgabe: die
   // Identitaet spricht dann in jeder Sitzung, projektspezifische Daten nicht.
   const globalIdentity = config.identityScope === 'global';
-  if (!globalIdentity && declaredRoot !== null && !isShinonProjectAt(declaredRoot)) {
-    console.log(`[shinon-persona] ${declaredRoot} ist nicht das Shinon-Projekt — Persona-Abschnitte werden NICHT registriert`);
-    return () => {};
-  }
   if (declaredRoot === null) {
     console.log('[shinon-persona] Kein workspaceRoot deklariert — der Sitzungs-cwd entscheidet je Schritt');
   }
@@ -519,32 +500,27 @@ export function apply(ctx, config) {
     return null;
   };
   let spokenFor = null;
-  /** Spricht die Persona fuer diesen Root? Identitaet ggf. global, Projekt nie. */
-  const speaksForRoot = (root) => {
-    if (typeof root !== 'string' || root === '') return false;
-    if (globalIdentity) return true;
-    return isShinonProjectAt(root) && (declaredRoot === null || isInside(declaredRoot, root));
+  /** Spricht die Persona fuer diesen Root? Jeder zugewiesene Root ja — die
+   * Persoenlichkeit ist global, nur der Projekt-Kontext bleibt je Workspace. */
+  const speaksForRoot = (root) => typeof root === 'string' && root !== '';
+  /** Projekt-Kontext kommt aus dem Sitzungs-Workspace — dessen eigene Datei, nie global. */
+  const projectsForSession = (assemblyCtx) => {
+    const root = rootOfAssembly(assemblyCtx) ?? declaredRoot ?? '';
+    return typeof root === 'string' && root !== '';
   };
-  /** Projekt-Kontext bleibt an das Shinon-Projekt gebunden — auch bei globaler Identitaet. */
-  const projectsForRoot = (root) => (
-    typeof root === 'string' && root !== '' && isShinonProjectAt(root) && (declaredRoot === null || isInside(declaredRoot, root))
-  );
   const speaksForSession = (assemblyCtx) => {
     const root = rootOfAssembly(assemblyCtx);
     if (root !== null) {
-      const speaks = speaksForRoot(root);
       if (spokenFor !== root) {
         spokenFor = root;
-        console.log(`[shinon-persona] Sitzung ${root} — Persona ${speaks ? 'aktiv' : 'still (fremdes Projekt)'}`);
+        console.log(`[shinon-persona] Sitzung ${root} — Persona aktiv`);
       }
-      return speaks;
+      return true;
     }
-    // Ohne Sitzungsangabe (Tests, direkte Assembly) gilt die Deklaration.
-    return declaredRoot !== null && speaksForRoot(declaredRoot);
-  };
-  const projectsForSession = (assemblyCtx) => {
-    const root = rootOfAssembly(assemblyCtx);
-    return projectsForRoot(root ?? declaredRoot ?? '');
+    // Ohne Sitzungsangabe (Tests, direkte Assembly) gilt die Deklaration —
+    // und im globalen Deployment die Entscheidung des Deployments.
+    if (globalIdentity) return true;
+    return declaredRoot !== null;
   };
   // Gate: ein fachlicher Abschnitt steht nur, wenn die Nachricht seine Marken nennt (fail-open).
   const gated = (text, name = null) => (assemblyCtx) => (
@@ -846,7 +822,9 @@ export function apply(ctx, config) {
 
   const commitmentsText = (assemblyCtx) => {
     if (!speaksForSession(assemblyCtx) || memoryNamespace() === '') return '';
-    return renderCommitments(ensureMemory(null)) ?? '';
+    const root = rootOfAssembly(assemblyCtx) || declaredRoot;
+    const scope = typeof root === 'string' && root !== '' ? root : 'global';
+    return renderCommitments(ensureMemory(null), scope) ?? '';
   };
 
   // TODO: [DSH-Refactor] - Die Registrierung steckt in vier verschachtelten Closures (inject →
@@ -888,8 +866,8 @@ export function apply(ctx, config) {
       sections.push(['shinon:commitments', atSuffix - 7, commitmentsText]);
     }
 
-    // Projekt-Kontext (Zug 9): projektspezifische Daten, die NUR im Shinon-Projekt
-    // geladen werden. Das Lesen mit Cache steht im Kern.
+    // Projekt-Kontext (Zug 9): projektspezifische Daten aus dem Sitzungs-
+    // Workspace. Das Lesen mit Cache steht im Kern.
     const contextPath = typeof config.projectContextPath === 'string' ? config.projectContextPath : '';
     if (contextPath !== '') {
       const cache = new Map();

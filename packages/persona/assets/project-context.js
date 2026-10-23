@@ -1,8 +1,8 @@
 /**
  * @shinon/persona — project-context.js
  *
- * Der Projekt-Kontext als Abschnitt: eine Datei, die NUR im Shinon-Projekt
- * gelesen wird (`.shinon/project-context.md`).
+ * Der Projekt-Kontext als Abschnitt: eine Datei aus dem Sitzungs-Workspace
+ * (`.shinon/project-context.md` — die Datei des jeweiligen Projekts).
  *
  * WARUM EIGENE DATEI: der Host-Eintrag soll keine Datei lesen und kein
  * Zustandsobjekt bauen (docs/contracts/structure.json). Der Projekt-Kontext ist

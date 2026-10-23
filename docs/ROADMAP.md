@@ -156,6 +156,26 @@ Gemessen an einer echten Sitzung im Fremdprojekt `codingmon-workspace`
   — der Index antwortet in Millisekunden; die Zeit liegt im Modell und den
   Werkzeugrunden. Abnahme: Messung mit Token-/Zeit-Budget je Turn, kein Gefühl.
 
+### 2.27 Trennung forge_DEV / Shinon-forge (2026-10-23, erledigt mit Folgepunkt)
+
+- **Erledigt (dieser Stand):** `isShinonProjectAt` und das `isInside`-Gatter sind
+  ersatzlos gestrichen — die Persoenlichkeit ist global (jede zugewiesene Sitzung
+  bekommt sie: Haltung, Ton, Beziehung, Erinnerungen, Live-Block, Ablauf), der
+  Projekt-Kontext bleibt je Workspace (Datei, projektspezifische Erinnerungen und
+  Auflagen per `scopeOfProposal`, Selbstmodell je Root). `SHINON.md` ist Vorlage
+  (`SHINON.md.example`, keine Anweisung); `.commit-msg.tmp` ent-trackt;
+  Auslastungs-Werkzeug nach `scripts/dev/` verlagert; stehende Regel in
+  `AGENTS.md` („Identität — forge_DEV und Shinon-forge“).
+  Abnahme: `persona-state.test.mjs` 46/46, `persona-prompt.test.mjs` 19/19,
+  `persona-live-context.test.mjs` 5/5, neuer Bereichs-Test in
+  `persona-memory.test.mjs`, `npm test` Exit 0 (131 Schritte), `gate:test`
+  908/908, `zahlen:check` Exit 0.
+- **Offen — Wissens-Runtime mit Forge-Pfaden:** `authorityRank`/`deriveChecks`
+  (`packages/project-index/assets/facts-reconcile.js`) kennen den Forge-Baum als
+  Literal (`docs/contracts/`, `packages/`, `scripts/`, `bin/`, `profiles/`).
+  Abnahme: Tabelle als Daten (Vertrag, additiv), Aufrufer übergibt sie; kein
+  Forge-Pfad als Literal im Produkt — mit gepinntem Verhaltenstest.
+
 ### 2.3 Zurückgestellt (gated — wird erst bei erfüllter Bedingung gebaut)
 
 - Benchmarks und Metriken (4.1–4.6): Aufgaben-Set, DSH-Baseline, Shinon-Messung, Feature-Entscheidung mit Messwert.

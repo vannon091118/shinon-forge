@@ -390,18 +390,34 @@ export function decideProposal(memory, id, decision, now = null) {
   return { memory: { ...memory, proposals: next }, ok: true, proposal: next[at] };
 }
 
+/**
+ * Der Bereich eines Vorschlags — aus `source` (`art|bereich|thema`, gesetzt von
+ * `proposeFromMemory` aus der Eintrags-Id) oder `id` (`p:…`). Fremde Formate
+ * (z. B. Claim-Quellen) ergeben null: ohne Bereich keine Bereichsanzeige.
+ */
+export function scopeOfProposal(proposal) {
+  const kandidaten = [proposal?.source, String(proposal?.id ?? '').replace(/^p:/, '')];
+  for (const kandidat of kandidaten) {
+    if (typeof kandidat !== 'string') continue;
+    const teile = kandidat.split('|');
+    if (teile.length >= 3 && teile[1] !== '') return teile[1];
+  }
+  return null;
+}
+
 /** Die angenommenen Selbstauflagen — die einzige Form, in der ein Vorschlag wirkt. */
-export function acceptedCommitments(memory, limit = MAX_COMMITMENT_LINES) {
+export function acceptedCommitments(memory, limit = MAX_COMMITMENT_LINES, scope = null) {
   const proposals = isRecord(memory) && Array.isArray(memory.proposals) ? memory.proposals : [];
   return proposals
     .filter((proposal) => proposal.status === 'accepted')
+    .filter((proposal) => scope === null || scopeOfProposal(proposal) === scope || scopeOfProposal(proposal) === 'global')
     .sort((a, b) => (b.evidence - a.evidence) || String(b.decidedAt ?? '').localeCompare(String(a.decidedAt ?? '')) || a.id.localeCompare(b.id))
     .slice(0, limit);
 }
 
 /** Die Selbstauflagen als Prompt-Abschnitt — nur angenommene, nie Vorschläge. */
-export function renderCommitments(memory) {
-  const accepted = acceptedCommitments(memory);
+export function renderCommitments(memory, scope = null) {
+  const accepted = acceptedCommitments(memory, MAX_COMMITMENT_LINES, scope);
   if (accepted.length === 0) return null;
   const lines = [promptText('persona-commitments-heading'), ''];
   for (const proposal of accepted) {

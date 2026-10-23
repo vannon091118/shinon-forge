@@ -228,7 +228,7 @@
         "datei": ".shinon/project-context.md vorhanden und nicht leer",
         "config": "projectContextPath"
       },
-      "herkunft": "packages/persona/index.js (Zug 9, nur im Shinon-Projekt)"
+      "herkunft": "packages/persona/index.js (Zug 9, aus dem Sitzungs-Workspace)"
     },
     {
       "id": "persona-live",

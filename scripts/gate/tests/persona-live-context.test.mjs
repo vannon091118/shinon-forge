@@ -15,7 +15,8 @@
  *
  * DIE ZUSAGE, die dieser Test pinnt:
  *   (a) der Live-Kontext erscheint MIT TEXT in den CONTEXTS,
- *   (b) er ist LEER, wenn die Persona still ist (fremder Workspace),
+ *   (b) er ist LEER, wenn es keinen zugewiesenen Bereich gibt (weder Sitzung
+ *       noch Deklaration) — nicht in einer fremden Sitzung,
  *   (c) Zustand, Stimmung und Beziehung stehen drin, wenn sie gesetzt sind,
  *   (d) er erzeugt KEINEN 'none'-Snapshot (das waere eine Behauptung,
  *       es gaebe keinen Stand).
@@ -63,7 +64,7 @@ const { default: SystemPrompt, renderPrompt, renderContextSections, joinContextS
 /** Der Kern des Pakets: der Live-Kontext wird dort gerechnet. */
 const liveCore = await import(new URL('../../../packages/persona/assets/live-context.js', import.meta.url).href);
 
-/** Ein fremder Workspace — fuer die stille Persona. */
+/** Ein fremder Workspace — fuer die globale Persoenlichkeit ohne dessen Projekt-Kontext. */
 const fremd = mkdtempSync(join(tmpdir(), 'shinon-fremd-'));
 
 /**
@@ -124,16 +125,17 @@ test('der Live-Kontext nennt den Arbeitsmodus — nicht die Metadaten', async ()
   }
 });
 
-test('in einem fremden Workspace ist die Persona still — und der Block LEER', async () => {
-  const { contexts } = await beides({ workspaceRoot: fremd }, { sessionCwd: fremd });
+test('in fremder Sitzung spricht die Persona — der Live-Block traegt Text', async () => {
+  // Trennung 2026-10-23: die Persoenlichkeit ist global. Still waere nur ein
+  // Bereich ohne jede Zuweisung — nicht eine fremde Sitzung.
+  const { contexts } = await beides({}, { sessionCwd: fremd });
   const live = liveVon(contexts);
-  // Der Context ist registriert, traegt aber KEINEN Text: der DSH filtert
-  // leere Strings weg, also entsteht kein Block und schon gar kein
-  // 'Current runtime context: none.' — das waere eine Behauptung, es gaebe
-  // keinen Stand.
-  if (live !== null) {
-    assert.equal(live.text, '', 'der fremde Workspace traegt keinen Text');
-  }
+  // Der Context ist registriert UND traegt Text: der Live-Zustand ist
+  // Persoenlichkeit, kein Projekt-Kontext. Leer waere er nur ohne Bereich —
+  // und selbst dann entsteht kein 'Current runtime context: none.', denn das
+  // waere eine Behauptung, es gaebe keinen Stand.
+  assert.ok(live !== null, `der Live-Kanal fehlt in ${contexts.map((c) => c.name).join(', ')}`);
+  assert.ok(live.text.length > 0, 'der Live-Block ist nicht leer');
   const joined = quiet(() => joinContextSections(contexts));
   assert.doesNotMatch(joined, /Current runtime context: none\./);
 });

@@ -24,9 +24,10 @@ dev-dsh-home/
 # Asset-Einbettung auf dem Feature-Branch, der Kit selbst ist kein Produkt.
 .shinon/tmp-blueprint/
 
-# Messausgaben des Auslastungs-Werkzeugs (.shinon/dev/auslastung.mjs): pro Lauf
-# eine JSONL-Spur und eine Zusammenfassung. Belege, die bleiben sollen, wandern
-# kuratiert nach docs/probes/ — der rohe Lauf ist Zustand, keine Quelle.
+# Messausgaben des Auslastungs-Werkzeugs (scripts/dev/auslastung.mjs): pro Lauf
+# eine JSONL-Spur und eine Zusammenfassung unter .shinon/dev/. Belege, die
+# bleiben sollen, wandern kuratiert nach docs/probes/ — der rohe Lauf ist
+# Zustand, keine Quelle.
 .shinon/dev/messung-*.jsonl
 .shinon/dev/zusammenfassung-*.json
 

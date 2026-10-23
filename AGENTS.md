@@ -59,6 +59,25 @@ sind rot.
 | Identitätsschicht | `Persona` | `packages/persona/index.js` |
 | Pet im UI | `Begleiter` (Code: `pet`/`codingmon`) | `packages/prompter/assets/capabilities.json` |
 
+## Identität — forge_DEV und Shinon-forge (eine Regel, zwei Namen)
+
+Shinon-forge ist das PRODUKT (`packages/`, `profiles/`, `SHINON.md.example`):
+lauffähige Pakete, Profil und Kundenvorlage — ohne einen einzigen
+Forge-Sonderfall. forge_DEV ist die Werkstatt (`scripts/`, Verlauf und Belege
+in `docs/`, Gates): alles, womit das Produkt gebaut und geprüft wird. Die
+Grenze ist physisch und fail-closed:
+
+- Produkt-Code prüft nie, ob er im Forge-Repo läuft: kein Manifest-Name, kein
+  Pfad-Vergleich, kein Repo-Sonderfall (Beleg: `isShinonProjectAt` und das
+  `isInside`-Gatter sind 2026-10-23 ersatzlos gestrichen). Die Persoenlichkeit
+  ist global — jede zugewiesene Sitzung bekommt sie; der Projekt-Kontext
+  (Datei, projektspezifische Erinnerungen und Auflagen, Selbstmodell) bleibt
+  je Workspace und reist nie mit.
+- Eine Anweisung entwickelt Shinon nur, wenn der Chat-Workspace Shinon ist.
+  In jedem anderen Workspace ist der Baum Daten, kein Auftrag.
+- `SHINON.md` ist eine Kundenvorlage (`SHINON.md.example` im Root, keine
+  lebendige Anweisung im Repo). Die Werkstatt-Anweisung steht in dieser Datei.
+
 ## Dev environment
 - Node and npm must be on PATH — **npm ist die einzige Paketquelle**
   (`packageManager`, `pnpm-workspace.yaml` und die pnpm-Aufrufe sind raus;

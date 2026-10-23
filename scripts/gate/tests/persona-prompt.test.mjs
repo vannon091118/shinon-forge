@@ -36,7 +36,7 @@ import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 import { quiet } from './helpers/console.mjs';
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../packages/persona/', import.meta.url));
-/** Die Repo-Wurzel — der eine erlaubte Persona-Scope (die Persona spricht nur benannt). */
+/** Die Repo-Wurzel — der deklarierte Arbeitsbereich dieser Tests. */
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 const root = dshRoot();
@@ -145,7 +145,7 @@ test('Selbstmodell: belegte Spuren stehen im ECHTEN System-Prompt — ohne Ablag
 });
 
 test('Projekt-Kontext: der echte System-Prompt-Dienst traegt den Dateiinhalt — auch bei RELATIVEM Pfad', async () => {
-  const file = contextFixture('relativ.md', `# Kontext\n${CONTEXT_MARK} gilt nur im Shinon-Projekt\n`);
+  const file = contextFixture('relativ.md', `# Kontext\n${CONTEXT_MARK} aus diesem Workspace\n`);
   const { prompt, sections } = await systemPromptWith(relative(REPO_ROOT, file));
 
   assert.ok(sections.includes('shinon:project-context'), `Abschnitt fehlt (${sections.join(', ')})`);
@@ -164,40 +164,39 @@ test('Projekt-Kontext: ein ABSOLUTER Pfad traegt denselben Inhalt in den Prompt'
   assert.ok(prompt.includes(`${CONTEXT_MARK}-ABSOLUT`), 'der Dateiinhalt steht im System-Prompt');
 });
 
-test('Projektscope: ein fremder Workspace bekommt weder Persona noch Projekt-Kontext in den Prompt', async () => {
-  // Der Nutzerbefund vom 13.–17.10.: Shinon-internes Material landete in fremden
-  // Projekten. Hier steht der Host-CWD auf diesem Repo (der Test laeuft darin) und
-  // der Workspace ist ein anderes Projekt — genau die Lage, in der das alte
-  // `process.cwd()` die Persona freischaltete.
+test('Projektscope: ein deklarierter Workspace bekommt Persona und Kontext aus seinen eigenen Daten', async () => {
+  // Trennung 2026-10-23: kein Repo-Namen-Check mehr. Der deklarierte Bereich
+  // spricht — mit seinen eigenen Daten. Schutz bleibt die Bereichsgrenze:
+  // eine Sitzung AUSSERHALB des Bereichs bekommt leere Abschnitte.
   const fremd = mkdtempSync(join(tmpdir(), 'shinon-prompt-fremd-'));
-  writeFileSync(join(fremd, 'package.json'), JSON.stringify({ name: 'fremdes-projekt' }));
-  const file = contextFixture('fremd-kontext.md', `${CONTEXT_MARK}-FREMD\n`);
-
-  const { prompt, sections } = await systemPromptWith('.shinon/project-context.md', {
+  writeFileSync(join(fremd, 'kontext.md'), `${CONTEXT_MARK}-EIGEN\n`);
+  const { prompt, sections } = await systemPromptWith('kontext.md', {
     workspaceRoot: fremd,
-    alwaysKnowIdentity: false,
   });
-  // Nur UNSERE Abschnitte zaehlen: `harness:identity` und `deployment:persona-*`
-  // kommen vom System-Prompt-Dienst selbst und sind nicht Shinon-Inhalt.
-  const eigene = sections.filter((name) => name.startsWith('shinon:'));
-  assert.deepEqual(eigene, [], `kein Shinon-Abschnitt im Fremdprojekt (${eigene.join(', ')})`);
-  assert.equal(prompt.includes(IDENTITY_MARK), false, 'keine Identity im fremden Prompt');
-  assert.equal(prompt.includes(CONTEXT_MARK), false, 'kein Projekt-Kontext im fremden Prompt');
-  // Und der Pfad wird auch nicht gegen den Host-CWD aufgeloest: die Fixture liegt
-  // im Repo, wird aber nicht gelesen.
-  assert.ok(file.startsWith(contextDir));
+  assert.ok(sections.includes('shinon:identity'), 'Identity im deklarierten Workspace');
+  assert.ok(sections.includes('shinon:project-context'), 'Kontext-Abschnitt im deklarierten Workspace');
+  assert.ok(prompt.includes(IDENTITY_MARK), 'Identity steht im Prompt');
+  assert.ok(prompt.includes(`${CONTEXT_MARK}-EIGEN`), 'der eigene Kontext steht im Prompt');
+
+  // Gegenprobe: dieselbe Deklaration, Sitzung AUSSERHALB des Bereichs — die
+  // Persoenlichkeit spricht (global), der Projekt-Kontext bleibt aus (die
+  // fremde Datei gibt es hier nicht).
+  const draussen = await systemPromptWith('kontext.md', {
+    workspaceRoot: fremd,
+  }, { sessionCwd: REPO_ROOT });
+  assert.ok(draussen.prompt.includes(IDENTITY_MARK), 'die Persoenlichkeit ist global');
+  assert.equal(draussen.prompt.includes(`${CONTEXT_MARK}-EIGEN`), false, 'kein fremder Projekt-Kontext');
 });
 
-test('Projektscope: eine fremde SITZUNG unter Shinon-Boot bekommt keine Persona-Abschnitte', async () => {
+test('Projektscope: eine fremde SITZUNG bekommt die Persoenlichkeit — aber keinen fremden Projekt-Kontext', async () => {
   // Der P0 aus Batch 0: der Boot sagt „Shinon", die Sitzung arbeitet woanders.
   // `SHINON_WORKSPACE_ROOT` gilt prozessweit; entscheidend ist der CWD der Sitzung.
+  // Trennung 2026-10-23: die Persoenlichkeit ist global; der Projekt-Kontext
+  // bleibt je Workspace — die fremde Datei gibt es nicht, also bleibt er aus.
   const fremd = mkdtempSync(join(tmpdir(), 'shinon-prompt-session-fremd-'));
-  writeFileSync(join(fremd, 'package.json'), JSON.stringify({ name: 'fremdes-projekt' }));
 
   const foreign = await systemPromptWith('.shinon/project-context.md', {}, { sessionCwd: fremd });
-  const eigene = foreign.withText.filter((section) => section.name.startsWith('shinon:')).map((section) => section.name);
-  assert.deepEqual(eigene, [], `kein Shinon-Abschnitt mit Text in fremder Sitzung (${eigene.join(', ')})`);
-  assert.equal(foreign.prompt.includes(IDENTITY_MARK), false, 'keine Identity in fremder Sitzung');
+  assert.ok(foreign.prompt.includes(IDENTITY_MARK), 'Persoenlichkeit spricht in fremder Sitzung');
   assert.equal(foreign.prompt.includes(CONTEXT_MARK), false, 'kein Projekt-Kontext in fremder Sitzung');
 
   // Gegenprobe: dieselbe Boot-Freigabe, Sitzung IM Repo — die Persona bleibt.
@@ -224,19 +223,22 @@ test('Projekt-Kontext: fehlende, leere oder nicht konfigurierte Datei laesst den
 test('Projektscope: OHNE deklarierten Root entscheidet die Sitzung — nicht der Boot', async () => {
   // Der gemessene Ausfall 2026-10-18: das Profil setzt keinen `workspaceRoot`,
   // also brach der Mount ab und die Persona stand in keinem einzigen Prompt.
-  // Jetzt gilt: Sitzung im Shinon-Repo → Persona; Sitzung fremd → nichts.
-  const eigen = await systemPromptWith('', { workspaceRoot: '' }, { sessionCwd: REPO_ROOT });
-  assert.ok(eigen.prompt.includes(IDENTITY_MARK), 'Sitzung im Repo bekommt die Identity');
+  // Trennung 2026-10-23: die Sitzung regiert — mit ihren eigenen Daten, ohne
+  // Repo-Namen-Check. Die Env wird hier bewusst geleert: eine gesetzte
+  // `SHINON_WORKSPACE_ROOT` waere eine Deklaration und kein unklarer Scope.
+  const savedEnv = process.env.SHINON_WORKSPACE_ROOT;
+  delete process.env.SHINON_WORKSPACE_ROOT;
+  try {
+    const eigen = await systemPromptWith('', { workspaceRoot: '' }, { sessionCwd: REPO_ROOT });
+    assert.ok(eigen.prompt.includes(IDENTITY_MARK), 'Sitzung im Repo bekommt die Identity');
 
-  const fremd = mkdtempSync(join(tmpdir(), 'shinon-prompt-ohne-root-'));
-  writeFileSync(join(fremd, 'package.json'), JSON.stringify({ name: 'fremdes-projekt' }));
-  const other = await systemPromptWith('', { workspaceRoot: '' }, { sessionCwd: fremd });
-  assert.equal(other.prompt.includes(IDENTITY_MARK), false, 'fremde Sitzung bleibt stumm');
-  assert.deepEqual(
-    other.withText.filter((section) => section.name.startsWith('shinon:')).map((section) => section.name),
-    [],
-    'kein Shinon-Text in fremder Sitzung',
-  );
+    const fremd = mkdtempSync(join(tmpdir(), 'shinon-prompt-ohne-root-'));
+    const other = await systemPromptWith('', { workspaceRoot: '' }, { sessionCwd: fremd });
+    assert.ok(other.prompt.includes(IDENTITY_MARK), 'fremde Sitzung bekommt die Identity aus ihren eigenen Daten');
+  } finally {
+    if (savedEnv === undefined) delete process.env.SHINON_WORKSPACE_ROOT;
+    else process.env.SHINON_WORKSPACE_ROOT = savedEnv;
+  }
 });
 
 test('Langzeitgedächtnis: Erinnerung und angenommene Selbstauflage stehen im ECHTEN System-Prompt', async () => {
@@ -372,26 +374,19 @@ test('Workflow: der Baustein verweist auf die Haltung, statt sie zu wiederholen'
   }
 });
 
-test('Workflow: in einem fremden Workspace bleibt der Ablauf leer', async () => {
-  // Ein fremder WORKSPACE: der Mount bricht ab — es wird gar kein Abschnitt
-  // registriert, also steht der Ablauf auch nicht im Prompt.
+test('Workflow: der Ablauf steht im deklarierten Workspace — und in jeder zugewiesenen Sitzung', async () => {
+  // Trennung 2026-10-23: der Ablauf gehoert zur Persoenlichkeit — er ist
+  // global, kein Projekt-Kontext. Auch die fremde Sitzung bekommt ihn.
   const fremd = mkdtempSync(join(tmpdir(), 'shinon-prompt-workflow-fremd-'));
-  writeFileSync(join(fremd, 'package.json'), JSON.stringify({ name: 'fremdes-projekt' }));
   const fremdes = await systemPromptWith('', { workspaceRoot: fremd });
-  assert.equal(fremdes.sections.includes('shinon:workflow'), false, 'der Workflow ist im fremden Workspace registriert');
-  assert.equal(fremdes.prompt.includes('## Der Arbeitsablauf'), false, 'der Ablauf steht im fremden Prompt');
+  assert.ok(fremdes.sections.includes('shinon:workflow'), 'der Workflow fehlt im deklarierten Workspace');
+  assert.ok(fremdes.prompt.includes('## Der Arbeitsablauf'), 'der Ablauf steht im eigenen Prompt');
 
-  // Eine fremde SITZUNG unter Shinon-Boot: der Abschnitt IST registriert (der
-  // Ablauf gilt in jedem Modus), traegt aber keinen Text — `gated` gibt '' zurueck.
-  // Genau diese Trennung ist die Zusage: vorhanden, aber stumm.
+  // Eine fremde SITZUNG unter Shinon-Boot: der Ablauf steht — er beschreibt
+  // das Arbeiten, kein Projekt.
   const sitzung = await systemPromptWith('', {}, { sessionCwd: fremd });
-  assert.ok(sitzung.sections.includes('shinon:workflow'), 'der Abschnitt fehlt — er muss auch fremd registriert sein');
-  assert.deepEqual(
-    sitzung.withText.filter((section) => section.name === 'shinon:workflow'),
-    [],
-    'der Workflow traegt in fremder Sitzung Text',
-  );
-  assert.equal(sitzung.prompt.includes('## Der Arbeitsablauf'), false, 'der Ablauf steht im fremden Prompt');
+  const ablauf = sitzung.withText.find((section) => section.name === 'shinon:workflow');
+  assert.ok(ablauf && String(ablauf.text).includes('## Der Arbeitsablauf'), 'der Ablauf fehlt in fremder Sitzung');
 });
 
 test('Workflow: der Renderer gibt einen leeren Text fuer einen leeren Auftrag', async () => {

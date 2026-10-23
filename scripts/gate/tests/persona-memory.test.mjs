@@ -143,6 +143,26 @@ test('memory: eine Annahme ist ein eigener Akt — unbekannt und doppelt werden 
   assert.match(commitment, /3 Belege/);
 });
 
+test('memory: eine projektbezogene Auflage reist nicht in fremde Workspaces', () => {
+  // Trennung 2026-10-23: Selbstauflagen sind Projekt-Kontext, keine globale
+  // Persoenlichkeit. Der Bereich steht in der Quelle (`art|bereich|thema`).
+  let memory = emptyMemory(NOW);
+  for (let index = 0; index < 3; index += 1) memory = remember(memory, { kind: 'limit', scope: '/projekt/a', subject: 'deploy:freigabe', detail: 'A' }, NOW).memory;
+  memory = proposeFromMemory(memory, { now: NOW }).memory;
+  const accepted = decideProposal(memory, memory.proposals[0].id, 'accepted', NOW).memory;
+
+  assert.match(renderCommitments(accepted, '/projekt/a'), /deploy:freigabe/);
+  assert.equal(renderCommitments(accepted, '/projekt/b'), null, 'fremder Projekt-Kontext bleibt aus');
+  assert.ok(renderCommitments(accepted) !== null, 'ohne Bereichsfilter bleibt die Abwaertskompatibilitaet');
+
+  // Global gilt ueberall — das ist die geteilte Persoenlichkeit, kein Projekt.
+  let global = emptyMemory(NOW);
+  for (let index = 0; index < 3; index += 1) global = remember(global, { kind: 'limit', scope: 'global', subject: 'ton:knapp', detail: 'G' }, NOW).memory;
+  global = proposeFromMemory(global, { now: NOW }).memory;
+  const globalAccepted = decideProposal(global, global.proposals[0].id, 'accepted', NOW).memory;
+  assert.match(renderCommitments(globalAccepted, '/projekt/b'), /ton:knapp/);
+});
+
 test('memory: ohne Belege gibt es weder Erinnerung noch Auflage', () => {
   assert.equal(renderMemory(emptyMemory(NOW), { scope: 'global' }), null);
   assert.equal(renderCommitments(emptyMemory(NOW)), null);

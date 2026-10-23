@@ -495,7 +495,7 @@ export async function enhance(ctx, contract, config, prompt, context, stand, sig
     return journalRejection(onReject, config, prompt, { outcome: 'rejected', reasons: decision.reasons, result: parsed.result }, text);
   }
   // Auch der ANGENOMMENE Lauf wird gemessen: Ausgang, Tokens und Dauer sind die
-  // Zahlen der Auslastungsmessung (`.shinon/dev/auslastung.mjs` liest diese Zeile).
+  // Zahlen der Auslastungsmessung (`scripts/dev/auslastung.mjs` liest diese Zeile).
   console.log(`[shinon-prompter] One-Shot: Ergebnis angenommen, ${text.length} Zeichen — ${renderStreamEnd(finish, usage, request, elapsedMs)}`);
   return { outcome: 'accepted', reasons: [], result: parsed.result };
 }

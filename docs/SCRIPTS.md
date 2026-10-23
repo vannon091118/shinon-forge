@@ -68,6 +68,7 @@
 | `store-cost.mjs` | — | Kosten des Stores |
 | `sync-zahlen.mjs` | `zahlen:sync`, `zahlen:check` | schreibt/prüft §1 der [`ZAHLEN.md`](ZAHLEN.md) aus dem Baum |
 | `s6-turn.mjs` | `s6:check`, `s6:boot`, `s6:stop` | Turn-Audit S6 (Boot/Check/Stop) → Proben |
+| `scripts/dev/auslastung.mjs` | — | Auslastungs-Messung der One-Shot-Läufe (liest die Mess-`console.log`-Zeile des Enhancers); Ausgaben unter `.shinon/dev/`, Belege kuratiert nach `docs/probes/` |
 
 | `spike-resolved-profile.mjs` | — | Spike PLAN 3.3/D3: Profil außerhalb `$DSH_HOME/profiles` laden (Vorbedingung für 3.6) |
 

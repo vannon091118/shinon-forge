@@ -680,6 +680,7 @@ test('Projekt-Kontext: ein leerer Pfad in der Config heisst nicht laden', () => 
 // `process.cwd()/package.json`. Bei `DSH_HOME=$PWD` ist der CWD der HOST (dieses
 // Repo), nicht der Workspace der Session — ein fremdes Projekt bekam damit die
 // Shinon-Persona. Der Scope kommt jetzt aus einer ausdrücklichen Angabe.
+// Trennung 2026-10-23: kein Repo-Namen-Check mehr — der BEREICH entscheidet.
 
 /** Ein frisches Fremdprojekt mit eigenem Manifest. */
 function foreignProject(name = 'fremdes-projekt') {
@@ -700,13 +701,15 @@ function withoutEnv(name, fn) {
   }
 }
 
-test('Projektscope: fremder Session-Workspace bekommt keine Persona, auch wenn der Host-CWD Shinon ist', () => {
+test('Projektscope: ein deklarierter Workspace bekommt die Persona aus seinen eigenen Daten', () => {
+  // Trennung 2026-10-23: der deklarierte Bereich spricht — kein Manifest-Check.
   const foreign = foreignProject();
   const host = withoutEnv('SHINON_WORKSPACE_ROOT', () =>
     connect({}, { workspaceRoot: foreign, projectContextPath: '.shinon/project-context.md' }));
 
-  assert.deepEqual(host.sections, [], `kein Abschnitt im Fremdprojekt (${host.sections.map((e) => e.name).join(', ')})`);
-  assert.equal(host.handlers.size, 0, 'auch kein Event-Handler wird registriert');
+  assert.ok(host.sections.some((entry) => entry.name === 'shinon:identity'), 'Identity im deklarierten Workspace');
+  assert.ok(host.handlers.size > 0, 'Events werden im deklarierten Workspace beobachtet');
+  assert.equal(projectSection(host)?.text ?? '', '', 'kein Kontext ohne Datei im eigenen Workspace');
 });
 
 test('Projektscope: unklarer Boot-Scope traegt KEINEN Text bei — die Sitzung entscheidet', () => {
@@ -722,12 +725,12 @@ test('Projektscope: unklarer Boot-Scope traegt KEINEN Text bei — die Sitzung e
   host.dispose();
 });
 
-test('Projektscope: SHINON_WORKSPACE_ROOT allein entscheidet — fremd bleibt stumm, Repo spricht', () => {
+test('Projektscope: SHINON_WORKSPACE_ROOT allein entscheidet — der Bereich spricht, nicht das Manifest', () => {
   const saved = process.env.SHINON_WORKSPACE_ROOT;
   try {
     process.env.SHINON_WORKSPACE_ROOT = foreignProject();
     const fremd = connect({}, { workspaceRoot: '' });
-    assert.deepEqual(fremd.sections, [], 'Env zeigt auf ein Fremdprojekt → keine Persona');
+    assert.ok(fremd.sections.some((entry) => entry.name === 'shinon:identity'), 'Env-Workspace bekommt die Identity');
 
     process.env.SHINON_WORKSPACE_ROOT = REPO_ROOT;
     const eigen = connect({}, { workspaceRoot: '' });
@@ -978,18 +981,15 @@ test('Zustands-Route: der Pruef-Stand reist als eigenes SSE-Ereignis und wird ge
   host.dispose();
 });
 
-test('Identitaetsscope global: Identitaet spricht ueberall, Projekt-Kontext bleibt am Shinon-Projekt', () => {
+test('Identitaetsscope global: Identitaet spricht ueberall, Projekt-Kontext kommt aus dem eigenen Workspace', () => {
+  // Trennung 2026-10-23: der Kontext kommt aus dem Workspace — kein Repo-Name.
   const foreign = foreignProject();
-  const host = connect({}, { identityScope: 'global', workspaceRoot: foreign, projectContextPath: '.shinon/project-context.md' });
+  writeFileSync(join(foreign, 'eigener-kontext.md'), 'EIGENER-KONTEXT');
+  const host = connect({}, { identityScope: 'global', workspaceRoot: foreign, projectContextPath: 'eigener-kontext.md' });
   assert.equal(host.sections.find((entry) => entry.name === 'shinon:identity')?.text, 'IDENT');
-  assert.equal(host.sections.find((entry) => entry.name === 'shinon:project-context')?.text, '');
+  assert.match(host.sections.find((entry) => entry.name === 'shinon:project-context')?.text ?? '', /EIGENER-KONTEXT/);
   assert.ok(host.handlers.has('shinon/event'), 'auch fremde Sitzungen duerfen Erinnerungen schreiben');
   host.dispose();
 });
 
-test('Identitaetsscope workspace bleibt die enge Vorgabe', () => {
-  const foreign = foreignProject();
-  const host = connect({}, { workspaceRoot: foreign, projectContextPath: '.shinon/project-context.md' });
-  assert.deepEqual(host.sections, []);
-  host.dispose();
-});
+

@@ -1745,3 +1745,36 @@ Prefix steht. Der Profil-Dump belegt beide Einträge; `shinon-md.test.mjs`
 pinnt Kern, Kanalordnung und Profil mit 9/9. Determinismus spricht kein
 Gameplay mehr, sondern Shinon-Deutsch. Offen bleiben Panel-Schranke,
 Nachrichten-Kennzeichnung und Turn-Budgets (`docs/ROADMAP.md` §2.26).
+
+**Persoenlichkeit global, Projekt-Kontext je Workspace — die Trennung steht.**
+
+Der Nutzer korrigierte die erste Fassung dieser Trennung: die zitierte Zeile
+„in einem fremden Workspace ist die Persona still" ist falsch. Shinon als
+Persoenlichkeit — Haltung, Ton, Beziehungen, Erinnerungen — ist global und
+spricht in jedem zugewiesenen Workspace; was NICHT global ist, ist der Kontext
+zu Projekten. Die erste Fassung hatte nur das Repo-Gatter entfernt und die
+Bereichsgrenze behalten; die zweite streicht auch sie für die Identität:
+`speaksForSession` ist wahr für jede zugewiesene Sitzung (und im globalen
+Deployment auch ohne), still bleibt nur ein Bereich ohne jede Zuweisung.
+`isInside` ist damit tot und geloescht, `projectsForSession` liest die Datei
+des Sitzungs-Workspace ohne Bereichsvergleich. Der undichte Rest war echt:
+angenommene Selbstauflagen wurden ohne jeden Filter in jeden Prompt gestellt —
+jetzt traegt jede Auflage ihren Bereich (`scopeOfProposal` aus Quelle oder Id,
+`global` reist mit, Unlesbares bleibt aus), und `commitmentsText` filtert nach
+der Sitzung. Erinnerungstexte waren schon bereichsgetrennt (`selectMemories`),
+Selbstmodelle je Root auch — belegt, nicht behauptet. Daneben die physische
+Hälfte: `SHINON.md` ist Vorlage (`SHINON.md.example`, die AGENTS.md-Rückbindung
+ist raus), `.commit-msg.tmp` ent-trackt, das Auslastungs-Werkzeug liegt bei den
+Werkzeugen (`scripts/dev/auslastung.mjs`, Katalogeintrag in `SCRIPTS.md`), und
+die Regel steht in `AGENTS.md` („Identität — forge_DEV und Shinon-forge").
+Was bewusst bleibt: die Forge-Daten im eigenen Workspace (`.shinon/project-context.md`
+ist Workspace-Datum mit richtiger Schranke, kein Produkt) und ein offener
+Folgepunkt (Forge-Pfade in `facts-reconcile.js`, `docs/ROADMAP.md` §2.27).
+
+**Anker:** Pfade: `packages/persona/index.js`, `packages/persona/assets/memory-core.js`,
+`packages/persona/assets/project-context.js`, `SHINON.md.example`,
+`scripts/dev/auslastung.mjs`, `AGENTS.md`, `docs/ROADMAP.md` §2.27 · Belege:
+`persona-state.test.mjs` 46/46, `persona-prompt.test.mjs` 19/19,
+`persona-live-context.test.mjs` 5/5, neuer Bereichs-Test in
+`persona-memory.test.mjs`, `npm test` Exit 0 (131 Schritte), `gate:test`
+908/908, `zahlen:check` Exit 0.
