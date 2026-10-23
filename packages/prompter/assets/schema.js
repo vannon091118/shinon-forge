@@ -183,6 +183,18 @@ export const Config = z.object({
    */
   alwaysEnhance: z.boolean().default(LLM_DEFAULTS.alwaysEnhance),
   /**
+   * Budget-Regel (2026-10-23): unterhalb dieser Zeichenzahl lohnt der One-Shot
+   * nicht — er kostete auch "hallo" (114 Zeichen) den vollen Kontext mit rund
+   * 7000 Tokens, und die Veredelung eines trivialen Satzes hat nichts zu
+   * verbessern. Der Wert ist die UNTERE Grenze des ROHEN Auftrags: darunter
+   * wird gar nicht erst ein Modell gefragt (Grund `PROMPT_ZU_KURZ`), alles
+   * darueber veredelt wie zuvor.
+   *
+   * Vorgabe ist 0 (AUS): das Paket aendert sein Verhalten nicht von selbst —
+   * die wirksame Zahl steht im Profil, wie alle Effektivwerte.
+   */
+  minEnhanceChars: z.number().min(0).default(0),
+  /**
    * Probe-Journal der VERWORFENEN One-Shot-Antworten (JSONL), relativ zum
    * WORKSPACE. Leer = kein Journal (dann bleibt nur die stderr-Zeile).
    *

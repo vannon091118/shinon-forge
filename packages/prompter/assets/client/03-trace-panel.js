@@ -52,7 +52,14 @@
     }
 
     return {
-      inject: ['slots'],
+      // DREI Einträge, wörtlich das gemessene Muster der DSH-eigenen
+      // Plan-Chip-Oberflaeche (`dsh-client-ui-plan`, `const inject = ["slots",
+      // "remote", "remote.commands"]`): `remote` trägt den Zugriff auf das
+      // Namespace-Objekt, `remote.commands` ist der getracete Kind-Dienst, den
+      // Cordis beim `.commands.execute` prüft. Einer ohne den anderen wirft
+      // `cannot get property "remote.commands" without inject` — genau der
+      // Fehler im Lauf 2026-10-23.
+      inject: ['slots', 'remote', 'remote.commands'],
       apply(ctx) {
         // Sichtbarkeit: in die gemeinsame Liste von @shinon/dashboard melden (Konvention, kein Import).
         const registry = (window.__shinonPlugins ??= new Map());
@@ -86,6 +93,25 @@
           name: 'main', key: 'shinon-prompter',
           id: 'shinon-prompter',
         }, TracePanel));
+
+        // DER VEREDLEN-KNOPF (2026-10-23): direkt vor der Senden-Aktion. Der
+        // Slot `conversation.input.right` ist der gemessene Platz dafuer
+        // (Slots-Vertrag von dsh-client-ui-conversation, „compact controls
+        // before the composer submit action"). Die Komponente bekommt ihre
+        // Sitzung ueber die registrant-eigene `inject(sessionId)`-Form —
+        // dasselbe Muster wie die DSH-eigene Plan-Chip-Oberflaeche —, und die
+        // Dienste laezt sie zum Aufrufzeitpunkt los (`ctx.get`), damit keine
+        // Verbindung beim Mounten entsteht.
+        ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
+          name: 'conversation.input.right',
+          key: 'shinon-prompter-enhance',
+          id: 'shinon-prompter-enhance',
+          inject: (sessionId) => ({
+            sessionId,
+            remote: ctx.remote ?? (typeof ctx.get === 'function' ? ctx.get('remote') : undefined),
+            conversation: typeof ctx.get === 'function' ? ctx.get('conversation') : undefined,
+          }),
+        }, EnhanceControl));
 
         // Kein `sidebar.panellist`-Eintrag mehr (2026-10-22): die Leiste war mit
         // acht Panel-Knöpfen überladen, die Workspaces fielen heraus. Die Zahl

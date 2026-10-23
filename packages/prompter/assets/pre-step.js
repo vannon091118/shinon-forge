@@ -33,6 +33,7 @@ import { readTone, standFor, standTrace } from './stand.js';
 import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT, lastHumanMessage } from '@shinon/seams/core';
 import { journalRejectedAnswer, persistIntentMemory, recordIntent } from './runtime-state.js';
 import { decisionRecord } from './decision-record.js';
+import { MODE_MANUAL } from './enhance-command.js';
 import { reportTrace } from './trace-report.js';
 
 /**
@@ -238,7 +239,11 @@ function provenanceFor(record, context) {
     entries.push({ class: 'NARRATIVE', pointer: NARRATIVE_STATE_CONTRACT, source: NARRATIVE_STATE_CHANNEL });
   }
   const reasons = Array.isArray(record?.reasons) ? record.reasons : [];
-  if (record?.outcome === 'accepted' && !reasons.includes('NO_ENHANCEMENT_NEEDED')) {
+  // Beide Direkt-Grunde (`NO_ENHANCEMENT_NEEDED` und `PROMPT_ZU_KURZ`) geben
+  // den ROHEN Prompt zurueck — auch der zu kurze Auftrag ist kein Vorschlag.
+  const direktdurchreich = reasons.some((reason) =>
+    reason === 'NO_ENHANCEMENT_NEEDED' || reason === 'ENHANCE_MANUAL' || String(reason).startsWith('PROMPT_ZU_KURZ:'));
+  if (record?.outcome === 'accepted' && !direktdurchreich) {
     entries.push({ class: 'PROPOSAL', pointer: CONTRACT, source: 'one-shot' });
   }
   // Der Aufgabenbrief ist aus der Karte ABGELEITET: er sagt, wer zustaendig ist,
@@ -438,10 +443,24 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   // klare CHAT-/LOOKUP-Turns wieder aus (dann kostet Smalltalk keinen
   // One-Shot). Der Kurzweg reicht den Text DIREKT durch und protokolliert ihn.
   const journalRejected = (entry) => journalRejectedAnswer(runtime, entry);
-  const direct = config.alwaysEnhance === false
+  // Budget-Regel (2026-10-23, gemessen am Profil-Lauf): ein trivial kurzer
+  // Auftrag bekam denselben vollen One-Shot wie eine komplexe Aufgabe — "hallo"
+  // (114 Zeichen) kostete rund 7000 Tokens fuer eine Veredelung, die nichts zu
+  // verbessern hat. Unterhalb `minEnhanceChars` wird gar kein Modell gefragt;
+  // der Vorgabewert des PAKETS ist 0 (aus), die wirksame Zahl steht im Profil.
+  const zuKurz = Number.isFinite(config.minEnhanceChars) && config.minEnhanceChars > 0
+    && prompt.text.length < config.minEnhanceChars;
+  // Der MANUELLE Modus (2026-10-23): die UI hat per `veredeln-modus` für diese
+  // Sitzung entschieden, dass nur noch der sichtbare Knopf veredelt. Der
+  // Pre-Step laeuft dann wie ein Direkt-Durchreicher — kein stiller One-Shot,
+  // keine stille Ersetzung; der Mensch sieht jede Aenderung im Eingabefeld,
+  // bevor das Hauptmodell sie bekommt. Ohne Eintrag gilt `auto` — der Default
+  // ist das heutige Verhalten, ein Sitzungs-Wechsel beginnt ohne Altlast.
+  const manualSession = runtime.sessionModes?.get(payload?.agent?.session?.id) === MODE_MANUAL;
+  const direct = zuKurz || manualSession || (config.alwaysEnhance === false
     && contract.mode !== undefined && runtime.turn?.resolution !== null
     && runtime.turn?.resolution !== undefined
-    && ['CHAT', 'LOOKUP'].includes(runtime.turn.resolution.classification);
+    && ['CHAT', 'LOOKUP'].includes(runtime.turn.resolution.classification));
   // Der Snapshot wird VOR dem One-Shot gelesen: nur so weiss der Aufruf, ob der
   // wissensgebundene Weg gilt (strenge Ergebnispruefung), und der Block haengt
   // danach unabhaengig vom Ausgang am Prompt.
@@ -449,11 +468,19 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   const outcome = direct
     ? {
       outcome: 'accepted',
-      reasons: ['NO_ENHANCEMENT_NEEDED'],
+      reasons: [zuKurz
+        ? `PROMPT_ZU_KURZ:${prompt.text.length}<${config.minEnhanceChars}`
+        : manualSession ? 'ENHANCE_MANUAL' : 'NO_ENHANCEMENT_NEEDED'],
       result: { enhancedPrompt: prompt.text, preservedIntent: true, addedRequirements: [], removedRequirements: [], uncertainties: [], references: [] },
     }
     : await enhanceGuarded(ctx, contract, { ...config, ...runtime.route, strictFacts: knowledgeSnapshot !== null }, expandedText, supply.context, stand, payload.signal, journalRejected);
-  if (direct) console.log(`[shinon-prompter] Direkt durchgereicht (${runtime.turn.resolution.classification}) — kein One-Shot`);
+  if (direct) {
+    console.log(zuKurz
+      ? `[shinon-prompter] Direkt durchgereicht (PROMPT_ZU_KURZ: ${prompt.text.length} < ${config.minEnhanceChars} Zeichen) — kein One-Shot`
+      : manualSession
+        ? '[shinon-prompter] Direkt durchgereicht (ENHANCE_MANUAL: manueller Modus dieser Sitzung) — kein One-Shot'
+        : `[shinon-prompter] Direkt durchgereicht (${runtime.turn.resolution.classification}) — kein One-Shot`);
+  }
 
   // Ab hier gehoert der Ablauf dem Loop: ein Fehler von next() bleibt SEIN Fehler
   // und darf nicht in einen zweiten next() umgedeutet werden.

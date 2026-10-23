@@ -442,6 +442,10 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     // Der Veredler ist in der Regel IMMER aktiv (Nutzerentscheidung
     // 2026-10-19); der Kurzweg bleibt ein ausdruecklicher Profil-Schalter.
     alwaysEnhance: true,
+    // Budget-Regel (2026-10-23): ab dieser Zeichenzahl lohnt der One-Shot.
+    // Vorgabe 0 = AUS — die wirksame Zahl (120) steht im Profil, weil sie eine
+    // Wirkentscheidung des Profils ist und keine Verhaltensaenderung des Pakets.
+    minEnhanceChars: 0,
     // Probe-Journal der verworfenen One-Shot-Antworten: Projektzustand unter
     // `.shinon/`, gitignoriert, nicht Teil des Tarballs.
     probeJournalPath: '.shinon/one-shot-journal.jsonl',

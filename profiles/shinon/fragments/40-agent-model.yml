@@ -2,7 +2,12 @@
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
     provider: openrouter
-    model: nvidia/nemotron-3.5-super-vl:free
+    model: thinkingmachines/inkling:free
+    # Denkaufwand der Route (2026-10-23, Wahl aus dem Profil-Lauf): `medium`
+    # laesst dem Modell Luft fuer mehrstufige Aufgaben, ohne den Turn in die
+    # Denk-Schleife zu ziehen. Die Wahl gehoert HIERHER — der Patch ist ihre
+    # Summe, nicht ihr Ort.
+    reasoningEffort: medium
 # Shinon-Preset: EIGENE, schmalere Werkzeug-Zusammensetzung.
 #
 # Das DSH liefert vier Presets (standard, ptc, minimal, cordis). 'standard'

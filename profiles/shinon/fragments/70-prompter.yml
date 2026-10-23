@@ -61,6 +61,14 @@
     # Der Deckel gilt NUR fuer den One-Shot. Der Hauptmodellstrom des Turns
     # laeuft ueber `agent-default-model` und hat mit dieser Zahl nichts zu tun.
     timeoutMs: 15000
+    # Budget-Regel (2026-10-23, gemessen am Profil-Lauf): auch "hallo" (114
+    # Zeichen) bekam den vollen MAX-Kontext mit rund 7000 Tokens — Veredelung
+    # ohne Verbesserungspotenzial zu vollen Kosten. Unterhalb 120 Zeichen wird
+    # gar kein Modell gefragt (Grund `PROMPT_ZU_KURZ` im Datensatz, sichtbare
+    # Zeile im Log); alles darueber veredelt wie zuvor. Die Zahl steht hier und
+    # nicht auf der Schema-Vorgabe (0 = aus), weil sie eine Wirkentscheidung
+    # dieses Profils ist (`profile-config-override`).
+    minEnhanceChars: 120
     trace: true
     # Gelernte Bausteine (Phase 4): Projekt-Ablage über der Paket-Registry.
     blocksLearnedPath: .shinon/blocks.learned.json

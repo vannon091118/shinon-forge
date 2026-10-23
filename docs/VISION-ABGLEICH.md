@@ -1,7 +1,7 @@
 # Vision-Abgleich — was der Code-Kern heute ist und wo er von der Vision abweicht
 
 > **Status:** current — Befund, keine Planung: der Stand der Vision gegen den
-> Stand des Baums, mit jedem Beleg an einem Pfad. **Stand:** 2026-10-20
+> Stand des Baums, mit jedem Beleg an einem Pfad. **Stand:** 2026-10-24
 > **Einstieg:** `AGENTS.md` · **Zahlen:** [`ZAHLEN.md`](ZAHLEN.md) · **offene Arbeit:** [`ROADMAP.md`](ROADMAP.md)
 > **Quellen der Vision:** [`../IDEA.md`](../IDEA.md) (Kurzfassung) ·
 > [`../shinon-forge-implementierungsplan.md`](../shinon-forge-implementierungsplan.md) (historischer Arbeitsplan, §1–§30) ·
@@ -211,6 +211,12 @@ Platz.
 **Wie tief:** die Schleife. Jedes Glied einzeln ist gebaut; die Kette ist es
 nicht.
 
+> **Geführt seit 2026-10-24:** das Betreiberziel („der lernende Shinon", Ziel B)
+> steht nicht nur in diesem Befund, sondern in `ROADMAP.md` §2.2 als
+> v0.5.0-Kandidat mit Abnahme (Beweis-Projekt + erster gelernter Baustein).
+> Dieser Befund ist der Verweis, die Roadmap die offene Liste — beides
+> zusammen, nicht der eine oder der andere.
+
 ### E. Kein Verbund-Replay
 
 **Die Vision will:** „gleiche Events → gleiche Narrative Transition →
@@ -335,7 +341,10 @@ sichtbar, aber nichts wird verweigert.
 
 ## 7. Was daraus folgt
 
-Die offenen Punkte stehen in [`ROADMAP.md`](ROADMAP.md) §2.2. In einem Satz:
+Die offenen Punkte stehen in [`ROADMAP.md`](ROADMAP.md) §2.2 — einschließlich
+des Betreiberziels „der lernende Shinon" (Ziel B, mit Beweis-Projekt und
+erstem gelerntem Baustein als Abnahme, aufgezeichnet 2026-10-24). In einem
+Satz:
 die Form ist präziser als die Vision, der Inhalt ist eine Ebene zu dünn — und
 die fehlende Ebene ist nicht ein weiterer Baustein, sondern ein Organ, das
 Aussagen prüft, Fähigkeiten als aktiv meldet und der Figur ein Handlungsrecht

@@ -257,6 +257,44 @@ test('MAX: nur `alwaysEnhance: false` nimmt CHAT/LOOKUP wieder aus dem One-Shot'
   assert.deepEqual(records[0].reasons, ['NO_ENHANCEMENT_NEEDED']);
   dispose();
 });
+test('Budget: unterhalb `minEnhanceChars` wird gar kein Modell gefragt', async () => {
+  // Gemessen 2026-10-23 am Profil-Lauf: auch "hallo" (114 Zeichen) bekam den
+  // vollen MAX-Kontext und rund 7000 Tokens One-Shot — Veredelung ohne
+  // Verbesserungspotenzial. Die Regel prueft die ZEICHENZAHL des ROHEN Auftrags,
+  // nicht die Klasse: sie gilt also auch fuer einen unklassifizierten Satz.
+  const kurz = 'hallo';
+  const llm = fakeLlm(reply(goodResult()));
+  const { ctx, records, dispose } = connect(
+    { ...route, mode: 'MAX', contextPath: dummyContextPath, minEnhanceChars: 120 },
+    { llm },
+  );
+  const claimed = [userMessage(kurz)];
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(llm.calls.length, 0, 'kein Aufruf fuer einen trivialen Auftrag');
+  assert.equal(decision.messages[0].content[0].text, kurz, 'der Roh-Prompt gilt');
+  assert.equal(records[0].outcome, 'accepted');
+  assert.deepEqual(records[0].reasons, [`PROMPT_ZU_KURZ:${kurz.length}<120`], 'der Grund nennt Mess und Grenze');
+  dispose();
+
+  // Alles darueber veredelt weiterhin — die Grenze sperrt den Weg nicht zu.
+  const lang = 'Pruefe bitte die gesamte Architektur des Projekt-Index inklusive Fakten-Snapshot und Ablage der Memories samt ihren Grenzen.';
+  assert.ok(lang.length >= 120, `die Gegenprobe muss ueber der Grenze liegen (${lang.length})`);
+  const long = fakeLlm(reply(goodResult({ enhancedPrompt: 'Pruefe die Architektur des Projekt-Index und nenne die Grenzen des Fakten-Snapshots und der Ablage.' })));
+  const second = connect(
+    { ...route, mode: 'MAX', contextPath: dummyContextPath, minEnhanceChars: 120 },
+    { llm: long },
+  );
+  const claimed2 = [userMessage(lang)];
+  const durchgereicht = await second.ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed2), loopDefault(claimed2));
+  assert.equal(long.calls.length, 1, 'darueber laeuft der One-Shot');
+  assert.equal(
+    durchgereicht.messages[0].content[0].text,
+    'Pruefe die Architektur des Projekt-Index und nenne die Grenzen des Fakten-Snapshots und der Ablage.',
+    'die Veredelung uebernimmt (die Antwort muss den Auftrag weiterfuehren — der Inhalts-Check gilt auch hier)',
+  );
+  second.dispose();
+});
 test('MAX: eine Handlungsphrase wird erweitert — als Angebot an den One-Shot', async () => {
   const llm = fakeLlm(reply(goodResult({ intentClassification: 'MULTI_STEP_TASK' })));
   const { ctx, records, dispose } = connect({ ...route, mode: 'MAX', contextPath: dummyContextPath }, { llm });

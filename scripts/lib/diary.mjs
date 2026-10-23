@@ -30,8 +30,20 @@ const diaryPath = (token) => DIARY_ROOT_FILES.has(token) || DIARY_PATH_PREFIXES.
  * Ein flacher Klon und ein Baum ohne `.git` (Fixture, Tarball, Distributionsisolat)
  * koennen die Anker nicht pruefen. Das ist ein sichtbarer Skip, kein stiller Erfolg:
  * der Aufrufer meldet ihn, und in CI traegt der Static-Gate-Zweig `fetch-depth: 0`.
+ *
+ * Die Git-Pruefung geht gegen die WURZEL selbst, nicht gegen die Git-Discovery:
+ * Git waende sonst eine `.git` aus dem Eltern-Baum ein (Klon, Sandbox, Home),
+ * und ein nacktes Verzeichnis unter einem Klon lieferte ein falsches Log
+ * statt eines Skips.
  */
 export function diaryHistory(root = ROOT) {
+  // `.git` muss in der Wurzel liegen, nicht nur im Eltern-Baum. Git-Discovery
+  // laeuft sonst hinauf: ein Sandbox- oder Fixture-Verzeichnis unter einem
+  // Klon ist kein eigener Git-Baum, sondern erbt das Log des Eltern-Clons.
+  const gitDir = join(root, '.git');
+  if (!existsSync(gitDir)) {
+    return { skip: `kein .git in ${root} — Anker nicht pruefbar` };
+  }
   try {
     const shallow = execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
       cwd: root,

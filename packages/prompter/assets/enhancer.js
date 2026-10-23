@@ -500,7 +500,13 @@ export async function enhance(ctx, contract, config, prompt, context, stand, sig
 
   // `strictFacts` kommt aus dem Aufrufer und gilt NUR fuer den wissensgebundenen
   // Weg (Zug 4). Ohne die Angabe bleibt das Verhalten des Standardwegs gleich.
-  const decision = acceptance(parsed.result, { needsContext: contract.needsContext, context, strictFacts: config.strictFacts === true });
+  //
+  // `rawPrompt` ist seit 2026-10-23 Pflicht hier: die Annahme-Prufung vergleicht
+  // den Enhanced-Prompt mit dem, was der MENSCH geschrieben hat — gemessen am
+  // Fehlerfall (das Modell lieferte seine eigene Veredler-Anweisung zurueck, und
+  // die wurde zur Nutzernachricht im Verlauf). Siehe `CONTENT_FLOOR` in
+  // `result-contract.js` fuer die Messung hinter der Schwelle.
+  const decision = acceptance(parsed.result, { needsContext: contract.needsContext, context, strictFacts: config.strictFacts === true, rawPrompt: prompt });
   if (!decision.accepted) {
     logRejectedAnswer(decision.reasons, text, counts, finish, usage, request, elapsedMs);
     return journalRejection(onReject, config, prompt, { outcome: 'rejected', reasons: decision.reasons, result: parsed.result }, text);

@@ -94,6 +94,47 @@ export function resolveReferences(references, context) {
 export const stringList = (value) => (Array.isArray(value) ? value : []);
 
 /**
+ * Die Anker-Quote: welcher Anteil der LANGEN Woerter (>=4 Buchstaben) des
+ * Roh-Prompts kommt im Kandidaten vor? `null`, wenn der Roh-Prompt keinen
+ * Anker hat (zu kurz fuer ein langes Wort) — dann ist die Quote nicht
+ * berechenbar, und "nicht berechenbar" ist kein Verwerfungsgrund.
+ *
+ * Dieselbe Woerter-Regel wie der Prose-Weg in `enhancer.js` (`salvageProse`):
+ * eine Veredelung mag den Satzbau aendern, aber ein Auftrag ueber "kognitive
+ * last und begrenzte konzentration als ressourcen" bleibt in seinen Woertern
+ * erkennbar — eine fremde Textproduktion nicht.
+ */
+export function anchorShare(candidate, rawPrompt) {
+  if (typeof rawPrompt !== 'string' || rawPrompt.trim() === '') return null;
+  // Normalisierung VOR dem Vergleich: dieselbe Wortfamilie, zwei Schreibweisen.
+  // Gemessen am Test-Fall `provenance-trace`: Roh-Text "pruefe", Modell-Antwort
+  // "Prüfe" — ohne die Ubersetzung zaehlt das als anderes Wort, obwohl es
+  // dasselbe ist. Deutsche Texte wechseln zwischen Umlaut und Transliteration,
+  // der Auftrag wechselt dadurch nicht.
+  const norm = (value) => value
+    .toLocaleLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss');
+  const words = (value) => new Set((norm(value).match(/[\p{L}\p{N}]{4,}/gu) ?? []));
+  const anchor = words(rawPrompt);
+  if (anchor.size === 0) return null;
+  const pool = words(typeof candidate === 'string' ? candidate : '');
+  const shared = [...anchor].filter((word) => pool.has(word)).length;
+  return shared / anchor.size;
+}
+
+/**
+ * Die untere Grenze der Anker-Quote fuer den JSON-Weg.
+ *
+ * GEMESSEN 2026-10-23 an den fuenf echten Ersetzungen der Sitzung
+ * `session-87c52523` (Journal + Session-Datei): vier legitime Veredelungen
+ * lagen bei 0.31, 0.40, 0.50 und 1.00 — der Fehlerfall (das Modell gab seine
+ * EIGENE Veredler-Anweisung als enhancedPrompt zurueck und der Verlauf wurde
+ * ueberschrieben) bei 0.08. 0.15 liegt dazwischen und trennt mit einem
+ * Abstand von rund 0.10 nach oben wie unten.
+ */
+export const CONTENT_FLOOR = 0.15;
+
+/**
  * Annahme-Policy (Plan §7). Das Modellergebnis wird nie direkt uebernommen:
  * jedes genannte Kriterium verwirft und laesst den Roh-Prompt gelten.
  *
@@ -132,6 +173,24 @@ export function acceptance(result, options = {}) {
         console.warn(`[shinon-prompter] Unbekannte Referenzen ignoriert: ${unresolvable.join(', ')}`);
       }
     }
+  }
+
+  // Die Inhaltsregel (gemessen 2026-10-23): der Enhanced-Prompt muss den
+  // Auftrag des Menschen weiterfuehren. Ohne sie war FORM genug — das Modell
+  // meldete `preservedIntent: true` zu seiner EIGENEN Veredler-Anweisung, und
+  // diese Anweisung wurde zur Nutzernachricht in der Sitzung (der Roh-Text war
+  // unwiederbringlich aus dem Verlauf verschwunden). Der Self-Report darf nicht
+  // die letzte Wache sein; die Anker-Quote ist gegen den Rohtext gemessen, nicht
+  // gegen die Behauptung des Modells.
+  //
+  // Ohne `rawPrompt` gibt es keinen Vergleich — ein Aufrufer, der den Rohtext
+  // nicht kennt, prueft nichts (und darf deshalb auch keiner Pruefung vertrauen).
+  if (typeof options.rawPrompt === 'string' && options.rawPrompt.trim() !== '') {
+    const floor = typeof options.contentFloor === 'number' && Number.isFinite(options.contentFloor)
+      ? options.contentFloor
+      : CONTENT_FLOOR;
+    const share = anchorShare(result.enhancedPrompt, options.rawPrompt);
+    if (share !== null && share < floor) reasons.push('CONTENT_LOST');
   }
   return { accepted: reasons.length === 0, reasons };
 }

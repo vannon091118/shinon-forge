@@ -1,6 +1,6 @@
 # Roadmap — wohin das Repo geht
 
-> **Status:** plan — die einzige Liste offener Arbeit: Release-Ziele, Abnahmen, zurückgestellte Punkte. **Stand:** 2026-10-22
+> **Status:** plan — die einzige Liste offener Arbeit: Release-Ziele, Abnahmen, zurückgestellte Punkte. **Stand:** 2026-10-24
 > **Einstieg:** `AGENTS.md` · **Zahlen:** `docs/ZAHLEN.md`
 
 Regeln dieser Datei: kein Punkt ohne Abnahme (Befehl oder beobachtbares Ergebnis),
@@ -94,6 +94,8 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
   Betreiberentscheidung (Befund `docs/VISION-ABGLEICH.md` §3 B).
 - Architektur-Folge aus dem Audit: Workspace-Twin zusammenlegen (C3), Prompt-Schichten zu einem Assembler (C4), `preset shinon` statt `cordis`, Katalog-Snapshot statt Einzelprüfungen (P2).
 - Vendor-Baum zu Hash-Manifest verdichten (B5); `.session-eval/`-Zweck klären (B7-Rest; K5-Offenpunkte aus dem Report: Scope-Erkennung, Fehler-Turn-Signal, K7a-Kopplung — siehe Archiv).
+- **Der lernende Shinon (Ziel B, Betreiberentscheidung, aufgezeichnet 2026-10-24):** jedes Mitglied bekommt einen eigenen Shinon, der sich aus der Interaktionsgeschichte weiterentwickelt — nicht über starre Prompt-Anweisungen, sondern über die Kette Beobachtung → gelernter Baustein → Verhalten. Heute existiert dieses Ziel nur als Befund in `docs/VISION-ABGLEICH.md` §3 D („Der Kreislauf ist offen"), nicht als offener Punkt. Abnahme: ein Beweis-Projekt, das *ausschließlich* mit Shinon gebaut wird (kein manuelles Zutun des Betreibers), und der *erste* aktivierte Baustein in `.shinon/blocks.learned.json` (Mechanik belegt: `shinon_block_propose`, Etappe 7 §2.25; die Ablage ist leer, weil die Naht noch nie ausgelöst wurde — ein einziger `tool-removal`-Fall pro Session ist dabei *kein* Befund gegen die Funktion). Bis dahin: nicht geplant, nicht gebaut; die Entscheidung liegt beim Betreiber, nicht beim Werkzeug. Quelle: Betreibergespräch 2026-10-23/24 (Roh-Input in `roh-texte-session-87c52523.md`).
+- **Tool-Entfernung (Polish, kein Blocker; aufgezeichnet 2026-10-24):** eine `tool-removal`-Zeile in der Session (z. B. `shinon_block_propose`, Session `87c52523`, `developer/message` seq 243) ist ein *bewusster Zustandswechsel* des Prompters, kein Fehler: die Funktion ist nachgewiesen (§2.28 `tool-turn-modell-ruft-werkzeug` BESTAETIGT). Sie ist damit **kein v0.5.0-Blocker und kein Reparaturschnitt** — als Aufzeichnung eingebracht, damit sie in keinem späteren Review erneut als „kaputt" klassifiziert wird. Einzige offene Nachbesserung (Polish): die Entfernung ist im Session-Log nicht selbst erklärt; eine Erklärungzeile ist keine Pflicht, sondern eine Option.
 
 ### 2.25 Refactor-Plan vom 2026-10-23 (offen — Etappen 0–3 sind belegt)
 

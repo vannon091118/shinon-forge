@@ -19,7 +19,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 
 import { DIFF_CONTRACT, DIFF_FILE_CONTRACT, buildOverview, parseUnified } from './diff-core.js';
 
@@ -71,7 +71,12 @@ export function gitScope(root) {
   const top = runGit(root, ['rev-parse', '--show-toplevel']);
   if (!top.ok || top.stdout.trim() === '') return null;
   const repoRoot = resolve(top.stdout.trim());
-  return { repoRoot, scope: repoRoot === resolve(root) ? 'WURZEL' : 'REPO' };
+  // Sandbox-Fix: ein TMPDIR unter dem Repo (oder Home) ist KEIN Git-Baum, nur
+  // ein nacketes Verzeichnis, das ein .git vom Eltern-Clon erbt. Die Prüfung
+  // muss gegen die Wurzel selbst laufen, nicht gegen die Git-Discovery.
+  const resolvedRoot = resolve(root);
+  if (!existsSync(join(resolvedRoot, '.git'))) return null;
+  return { repoRoot, scope: repoRoot === resolvedRoot ? 'WURZEL' : 'REPO' };
 }
 
 /**

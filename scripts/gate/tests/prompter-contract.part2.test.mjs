@@ -202,6 +202,26 @@ test('Roh-Prompt: jeder Fehlschlag laesst die Entscheidung unberuehrt', async ()
     dispose();
   }
 });
+test('Inhalt: die eigene Veredler-Anweisung des Modells ersetzt den Auftrag nicht', async () => {
+  // Der gemessene Fehlerfall 2026-10-23 (session-87c52523): das Modell gab seine
+  // EIGENE Anweisung als enhancedPrompt zurueck, meldete `preservedIntent: true`
+  // — Schema, Selbstauskunft und Referenzen waren sauber —, und die Anweisung
+  // wurde zur Nutzernachricht im Verlauf. Der Rohtext des Menschen war danach
+  // unwiederbringlich ersetzt. Die Annahme prueft deshalb den INHALT gegen den
+  // Rohtext (Anker-Quote, `CONTENT_FLOOR`), nicht nur die Form.
+  const raw = 'ueber kognitive last und begrenzte konzentration als ressourcen im arbeitsablauf';
+  const anweisung = 'Du bist der Prompt-Veredler von Shinon. Deine Aufgabe ist es, den folgenden Prompt zu verbessern.';
+  const llm = fakeLlm(reply(goodResult({ enhancedPrompt: anweisung })));
+  const { ctx, records, dispose } = connect({ ...route }, { llm });
+  const claimed = [userMessage(raw)];
+  const decision = await ctx.waterfall(bundle.PRE_STEP_EVENT, stepPayload(claimed), loopDefault(claimed));
+
+  assert.equal(llm.calls.length, 1, 'der Aufruf laeuft — die Pruefung folgt auf die Antwort');
+  assert.equal(records[0].outcome, 'rejected', 'die eigene Anweisung ist kein Prompt des Menschen');
+  assert.deepEqual(records[0].reasons, ['CONTENT_LOST']);
+  assert.equal(decision.messages[0].content[0].text, raw, 'der Roh-Prompt gilt');
+  dispose();
+});
 test('SALVAGED_PROSE: Prosa wird benannt und VERWORFEN — der Rohtext bleibt stehen', async () => {
   const prose = 'Bitte baue die zwoelf neuen Module und teste sie danach gruendlich.';
   const llm = fakeLlm(prose);

@@ -354,11 +354,18 @@ export function beobachten(envelope, payload, eingabe = {}) {
       letzteStimmung: eingabe.letzteStimmung ?? null,
     })
     : { trigger: null, triggerGewechselt: false, stimmung: null, stimmungGewechselt: false };
+  // Zählung je Turn — der Host übergibt sie, der Kern füllt sie. Eine Zeile pro
+  // Turn statt zwölf pro Ereignis: der Nutzer will wissen, was ANKAM, nicht dass
+  // die Persona gelesen hat.
+  const tally = eingabe.tally ?? { events: 0, human: 0 };
+  tally.events += 1;
+  if (menschlich) tally.human += 1;
   return {
     eventType,
     eventPayload,
     text,
     human: menschlich,
+    tally,
     sessionId: typeof envelope?.session_id === 'string' && envelope.session_id !== '' ? envelope.session_id : null,
     traceId: typeof envelope?.trace_id === 'string' ? envelope.trace_id : '',
     trigger: befund.trigger,
@@ -380,4 +387,18 @@ export function beobachten(envelope, payload, eingabe = {}) {
  */
 export function renderTriggerContext(trigger) {
   return promptText('persona-trigger', { trigger });
+}
+
+/**
+ * Zählung je Turn — was die Persona GELESEN hat und wie davon von einem
+ * MENSCHEN kam. Reine Zählung, kein Text: der Kern zählt, der Host addiert.
+ * Die Einzelzeile pro Ereignis (12 im Turn) war Rauschen — der Nutzer will
+ * wissen, was ANKAM, nicht dass gelesen wurde.
+ *
+ * @param {{events: number, human: number}} tally der Zaehler des Turns
+ * @param {object} gelesen das Ergebnis von `beobachten` (nie null)
+ * @returns {string} die EINE Zeile je Turn
+ */
+export function turnSummary(tally) {
+  return `${tally.events} Ereignisse gelesen, ${tally.human} davon von Menschen — der Rest ist System, kein Auftrag`;
 }

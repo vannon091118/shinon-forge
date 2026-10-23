@@ -26,12 +26,14 @@ import { Config as _imported_config_schema } from './assets/schema.js';
 import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, PRE_STEP_EVENT, resolveMode } from './assets/mode-core.js';
 import { PROPOSE_CONTRACT, PROPOSE_SERVICE } from './assets/block-review.js';
 import { createProposeTool } from './assets/propose-tool.js';
-import { notesDir } from './assets/prompt-files.js';
+import { loadContext, notesDir } from './assets/prompt-files.js';
 import { loadRuntime, proposeBlock } from './assets/runtime-state.js';
 import { onPreStep } from './assets/pre-step.js';
 import { renderKnowledgeBlock } from './assets/knowledge-block.js';
 import { registerContext } from './assets/context-channel.js';
 import { createSkillLifecycle, loadLifecycleRules } from './assets/skill-lifecycle.js';
+import { ENHANCE_COMMAND, MODE_AUTO, MODE_COMMAND, createSessionModes, enhanceCommandDefinition, modeCommandDefinition } from './assets/enhance-command.js';
+import { enhanceGuarded } from './assets/enhancer.js';
 /** Das Global, in das der Host die letzten Entscheidungen legt (der Client liest es). */
 export const TRACE_GLOBAL = '__shinonPrompterTrace';
 
@@ -328,6 +330,34 @@ export function apply(ctx, config) {
   });
   console.log(
     `[shinon-prompter] Werkzeug ${PROPOSE_SERVICE} ${proposeToolAsked ? 'registriert' : 'NICHT registriert (kein tools-Dienst)'} (Vertrag ${PROPOSE_CONTRACT})`,
+  );
+
+  // Die zwei Kommandos der MANUELLEN Veredelung (2026-10-23). Der Client ruft
+  // sie ueber die kompilierte Remote-Liste (`ctx.remote.commands.execute`),
+  // der Nutzer kann sie als Slash-Befehl tippen — eine Operation, zwei
+  // Aufrufer, dieselbe Host-Methode. Ohne `commands`-Dienst ist das kein
+  // Lauffehler, sondern eine benannte Zeile (dieselbe Fail-Richtung wie beim
+  // Werkzeug): der stille Weg des Pre-Step laeuft weiter, der Knopf fehlt.
+  const sessionModes = createSessionModes();
+  runtime.sessionModes = sessionModes;
+  const enhanceCommandAsked = bus.demand(['commands'], (child) => {
+    child.commands.register(enhanceCommandDefinition({
+      config,
+      loadContext: () => (config.contextPath === '' ? null : loadContext(config.contextPath)),
+      enhance: (text, options) => enhanceGuarded(
+        ctx,
+        resolveMode(config.mode),
+        { ...config, ...runtime.route, strictFacts: false },
+        text,
+        options?.context ?? null,
+        null,
+        options?.signal,
+      ),
+    }));
+    child.commands.register(modeCommandDefinition(sessionModes));
+  });
+  console.log(
+    `[shinon-prompter] Kommandos ${ENHANCE_COMMAND} + ${MODE_COMMAND} ${enhanceCommandAsked ? 'registriert' : 'NICHT registriert (kein commands-Dienst)'} — Modus ${MODE_AUTO} bis der Knopf umschaltet`,
   );
 
   // Skill-Lebenszyklus (Zug 7): Ereignisse hoeren, Kandidaten im Hintergrund

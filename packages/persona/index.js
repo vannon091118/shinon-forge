@@ -19,7 +19,7 @@ import {
 // Das Lesen einer MENSCHLICHEN Nachricht und der explizite Beziehungs-Produzent
 // liegen im importfreien Kern: dieselbe Rechnung im Host, im Test ohne
 // node_modules und in der Probe gegen den echten Spine.
-import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SIGNAL, TRIGGERS, beobachten, createPromptText, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, textOf } from './assets/interaction-core.js';
+import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SIGNAL, TRIGGERS, beobachten, createPromptText, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, textOf, turnSummary } from './assets/interaction-core.js';
 // Der Live-Zustand der Persona geht als RUNTIME-CONTEXT in die Nachrichtenliste,
 // nicht nur als System-Prompt-Abschnitt: so ersetzt der Stand pro Schritt den
 // vorherigen (statt sich neben ihm zu stapeln) und traegt den Anti-Drift-Satz
@@ -305,6 +305,7 @@ export function apply(ctx, config) {
   // Der Text der letzten Menschen-Nachricht: Gedaechtnis und Gate lesen denselben Halter.
   const promptText = createPromptText();
   const persona = createPersonaState(contract);
+  const turnTally = { events: 0, human: 0 }; // siehe `tallyTurn` im Kern
 
   // Der Sitzungs-Scope hat einen eigenen Eigentuemer (`assets/session-scope.js`):
   // er entscheidet je Assembly, fuer wen die Persona spricht. Der Eintrag haelt
@@ -446,22 +447,16 @@ export function apply(ctx, config) {
       triggers: config.identityTriggers,
       letzterTrigger: lastTrigger,
       letzteStimmung: lastUserMood,
+      tally: turnTally,
     });
     if (gelesen === null) return;
     if (gelesen.sessionId !== null) runtime.lastSessionId = gelesen.sessionId;
-    // Der LESEZWEIG laeuft ueber den kanonischen I/O-Pfad (eine Zeile je Kind, trace_id korreliert).
-    logEventRead({
-      quelle: config.eventsChannel,
-      ziel: `persona:${gelesen.eventType}`,
-      umfang: gelesen.eventPayload === null || gelesen.eventPayload === undefined ? 0 : 1,
-      trace_id: gelesen.traceId,
-    });
+    const turnLine = gelesen.eventType === 'turn.end' ? turnSummary(gelesen.tally) : null;
     if (gelesen.eventType === 'message.received' && gelesen.human) {
-      // Nur der Mensch setzt „die letzte Nachricht": sonst ueberschreibt der
-      // eingeblendete Live-Block (der NACH der Menschen-Nachricht kommt) den
-      // Text, an dem die Abschnitts-Gates und das Gedaechtnis haengen.
+      // Nur der Mensch setzt die letzte Nachricht — der eingeblendete
+      // Live-Block danach würde den Text der Abschnitts-Gates überschreiben.
       promptText.remember(gelesen.sessionId, gelesen.text);
-      lastDecision = null; // neue Nachricht, neuer Turn — die alte Klasse oeffnet nichts
+      lastDecision = null;
     }
     // Jedes relevante Ereignis geht in das Langzeitgedaechtnis.
     runtime.remember('event', { type: gelesen.eventType, payload: gelesen.eventPayload });
@@ -474,6 +469,11 @@ export function apply(ctx, config) {
     if (gelesen.stimmungGewechselt) {
       lastUserMood = gelesen.stimmung;
       if (gelesen.stimmung !== null) console.log(`[shinon-persona] User-Lage erkannt (${gelesen.stimmung})`);
+    }
+    // `umfang=0`, weil diese Zeile selbst kein gelesenes Ereignis ist.
+    if (turnLine !== null) {
+      logEventRead({ quelle: config.eventsChannel, ziel: 'persona:turn.zusammenfassung', umfang: 0, grund: turnLine, trace_id: gelesen.traceId });
+      turnTally.events = 0; // neuer Turn, neuer Zaehler — sonst zaehlt der zweite mit
     }
   };
   const disposer = bus.route(config.eventsChannel, handler);
