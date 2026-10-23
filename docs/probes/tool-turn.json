@@ -1,0 +1,32 @@
+[
+  {
+    "id": "tool-turn-katalog-und-zustellweg",
+    "claim": "Die zwei Werkzeuge kosten im Modell-Katalog zusammen 2 512 Bytes (shinon_block_propose 1 900, shinon_goal_micro_state 609) und beantworten einen Aufruf in Bruchteilen einer Millisekunde: der Mikrostand liest in 0,039 ms (p50), der Vorschlag schreibt in 0,345 ms (p50). Der einzige teure Fall ist der erste Schreibaufruf eines Prozesses mit 5,15 ms — das ist fsync, nicht die Regel.",
+    "targets": [
+      "packages/prompter/assets/propose-tool.js",
+      "packages/task-router/assets/micro-state-tool.js",
+      "packages/prompter/assets/runtime-state.js",
+      "packages/task-router/assets/micro-state.js"
+    ],
+    "expect": "Wenn die Werkzeuge den Turn spuerbar belasteten, muesste ein Aufruf in der Groessenordnung der Modellantwort liegen (Sekunden bis zehn Sekunden). Ist der Aufruf dagegen reine Rechnung plus ein Dateischreiben, muss der Median unter einer Millisekunde liegen und der Ausreisser genau beim Schreiben auftreten. Der Katalogpreis muss in Bytes messbar sein, nicht geschaetzt.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN am 2026-10-23 im Arbeitsbaum (Node v24.21.0 ueber `scripts/run-with-node.mjs`), echte Bausteine: `ToolRuntime` aus `@deepseek-ai/dsh-tools` mit Cordis-Context, beide Werkzeuge ueber `runtime.register` angemeldet (1,313 ms fuer beide zusammen, inklusive Schemapruefung), danach `runtime.schemas()` als Modell-Katalog. KATALOG (JSON-Bytes je Schema, gemessen): gesamt 2 512 · `shinon_block_propose` 1 900 · `shinon_goal_micro_state` 609. MIKROSTAND: 30 echte `execute`-Aufrufe gegen die Projektion (Phase blocked, mit Fakt) — p50 0,039 ms · p95 0,953 ms · min 0,017 · max 1,297; Ergebnis 211 Bytes, `CURRENT_STATE` blocked, `LAST_VERIFIED_FACT` gesetzt. VORSCHLAG: 10 Aufrufe ueber den ECHTEN Schreibweg (`proposeBlock` mit `loadNoteRules()`, frisches Temp-Verzeichnis je Lauf, danach entfernt) — p50 0,345 ms · p95 5,150 ms · min 0,254 · max 5,150, alle 10 `ok: true` und je eine Datei geschrieben; der Ausreisser beim ersten Aufruf ist der fsync, danach 0,254-0,361 ms. ABLEHNUNG: bekannte id in 0,096 ms mit `DOPPELT:bekannte-id:pflicht`. WAS DAS NICHT IST: keine Modellantwort, keine Netzwerklatenz — die Werkzeugseite ist gemessen, die Inferenz nicht.",
+    "evidence_note": "Millisekunden, Byte-Zahlen und Ergebniswerte; kein Schluesselwert, kein Prompt-Inhalt."
+  },
+  {
+    "id": "tool-turn-modell-ruft-werkzeug",
+    "claim": "Ein echter Modell-Turn, in dem der Agent `shinon_goal_micro_state` oder `shinon_block_propose` aufruft, ist in DIESEM Arbeitsbaum nicht gelaufen: es gibt keinen Schluessel. Der Preflight verweigert den Start benannt, die Route ist gelesen, nur `SHINON_API_KEY` fehlt.",
+    "targets": [
+      "profiles/shinon/fragments/40-agent-model.yml",
+      "profiles/shinon/cordis.patch.yml",
+      "scripts/s6-turn.mjs",
+      ".env.example"
+    ],
+    "expect": "Ein Turn ohne Modell ist keine Messung. Gefordert ist die ganze Kette: `npm run s6:check` findet den Schluessel, `npm run s6:boot` startet den Host mit dem Profil shinon, eine echte Anfrage loest im Modell einen Werkzeugaufruf aus, und im Protokoll stehen Aufruf, Ergebnis, Latenz und Token. Fehlt der Schluessel, muss der Preflight das NENNEN statt still zu starten.",
+    "result": "UNKLAR",
+    "verdict": "ASK",
+    "evidence": "GEMESSEN am 2026-10-23: `node scripts/run-with-node.mjs scripts/s6-turn.mjs check` endet mit Exit 1 und den Zeilen `key: SHINON_API_KEY FEHLEND (Umgebung und ./.env)`, `.env-Modus: kein .env vorhanden`, `route: openrouter/nvidia/nemotron-3.5-super-vl:free`, `dump-config: gelesen`. Der Baum traegt nur `.env.example` (Namen, keine Werte), die Prozessumgebung fuehrt keinen Anbieter-Schluessel, und `profiles/shinon/cordis.patch.yml:143` bindet den Anbieter `openrouter` an `apiKeyEnv: SHINON_API_KEY`. Netz ist da (OpenRouter `/api/v1/models` antwortet 200) — es fehlt ausschliesslich die Berechtigung. NACHHOLEN: `SHINON_API_KEY` in `.env` (chmod 600, ungetrackt) eintragen, `npm run s6:check` muss dann gruen sein, `npm run s6:boot` startet den Host auf Port 3099, der Turn laeuft ueber die Oberflaeche (Runbook in `scripts/s6-turn.mjs`), und das Protokoll unter dem Log-Verzeichnis ist der Beleg fuer Aufruf, Ergebnis, Latenz und Token.",
+    "evidence_note": "Preflight-Zeilen ohne Werte, Routenname, HTTP-Status des Anbieters; kein Schluessel, kein Prompt."
+  }
+]

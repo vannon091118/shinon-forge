@@ -156,6 +156,8 @@ nennt ihre Abnahme, und keine gilt ohne Exit-Code und benannten Lauf.
   Quelltext: neue Naht ohne Leser, verschwundener Leser oder wieder angebotener
   entfernter Dienst ist rot. Messung: 5/5 Fälle; Belege `npm test` Exit 0,
   `npm run gate:test` 961/961.
+- **Offen — der echte Werkzeug-Turn (2026-10-23):** die Werkzeugseite ist gemessen (`docs/probes/tool-turn.json`, `tool-turn-katalog-und-zustellweg`: Katalog 2 512 Bytes, `shinon_goal_micro_state` p50 0,039 ms, `shinon_block_propose` p50 0,345 ms auf dem echten Schreibweg), die INFERENZ nicht: der Arbeitsbaum hat keinen Anbieter-Schlüssel, und `node scripts/run-with-node.mjs scripts/s6-turn.mjs check` verweigert mit `SHINON_API_KEY FEHLEND` (Route `openrouter/nvidia/nemotron-3.5-super-vl:free`).
+  Abnahme: `npm run s6:check` grün, `npm run s6:boot`, ein Turn über die Oberfläche, in dem das Modell eines der zwei Werkzeuge aufruft; festgehalten werden Aufruf, Ergebnis, Latenz und Token im Protokoll — dann ist der zweite Probe-Eintrag (`tool-turn-modell-ruft-werkzeug`) von `UNKLAR` auf `BESTAETIGT` zu ziehen.
 - **Etappe 8 — restliche Audit-Tiers:** die offenen Zeilen aus
   `docs/CLEANREPO-AUDIT.md` §8.1 abarbeiten (u. a. T2-6, T2-7, T3-0, T3-5, T3-6)
   und die Audit-Tabelle auf den gemessenen Stand ziehen.
