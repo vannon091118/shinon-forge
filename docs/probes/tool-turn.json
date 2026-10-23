@@ -16,17 +16,32 @@
   },
   {
     "id": "tool-turn-modell-ruft-werkzeug",
-    "claim": "Ein echter Modell-Turn, in dem der Agent `shinon_goal_micro_state` oder `shinon_block_propose` aufruft, ist in DIESEM Arbeitsbaum nicht gelaufen: es gibt keinen Schluessel. Der Preflight verweigert den Start benannt, die Route ist gelesen, nur `SHINON_API_KEY` fehlt.",
+    "claim": "Ein echter Modell-Turn im Profil shinon ruft das Werkzeug `shinon_goal_micro_state` auf, wenn der Auftrag es verlangt: der Turn dauert 45,5 s, verbraucht 41 077 Token (40 983 Prompt, 94 Completion), kostet 0 und liefert `NO_GOAL` samt Vertragsmarke zurueck. Der Aufruf selbst kostet 51 ms.",
     "targets": [
+      "packages/task-router/assets/micro-state-tool.js",
+      "packages/prompter/assets/propose-tool.js",
       "profiles/shinon/fragments/40-agent-model.yml",
       "profiles/shinon/cordis.patch.yml",
-      "scripts/s6-turn.mjs",
-      ".env.example"
+      "scripts/s6-turn.mjs"
     ],
-    "expect": "Ein Turn ohne Modell ist keine Messung. Gefordert ist die ganze Kette: `npm run s6:check` findet den Schluessel, `npm run s6:boot` startet den Host mit dem Profil shinon, eine echte Anfrage loest im Modell einen Werkzeugaufruf aus, und im Protokoll stehen Aufruf, Ergebnis, Latenz und Token. Fehlt der Schluessel, muss der Preflight das NENNEN statt still zu starten.",
-    "result": "UNKLAR",
-    "verdict": "ASK",
-    "evidence": "GEMESSEN am 2026-10-23: `node scripts/run-with-node.mjs scripts/s6-turn.mjs check` endet mit Exit 1 und den Zeilen `key: SHINON_API_KEY FEHLEND (Umgebung und ./.env)`, `.env-Modus: kein .env vorhanden`, `route: openrouter/nvidia/nemotron-3.5-super-vl:free`, `dump-config: gelesen`. Der Baum traegt nur `.env.example` (Namen, keine Werte), die Prozessumgebung fuehrt keinen Anbieter-Schluessel, und `profiles/shinon/cordis.patch.yml:143` bindet den Anbieter `openrouter` an `apiKeyEnv: SHINON_API_KEY`. Netz ist da (OpenRouter `/api/v1/models` antwortet 200) — es fehlt ausschliesslich die Berechtigung. NACHHOLEN: `SHINON_API_KEY` in `.env` (chmod 600, ungetrackt) eintragen, `npm run s6:check` muss dann gruen sein, `npm run s6:boot` startet den Host auf Port 3099, der Turn laeuft ueber die Oberflaeche (Runbook in `scripts/s6-turn.mjs`), und das Protokoll unter dem Log-Verzeichnis ist der Beleg fuer Aufruf, Ergebnis, Latenz und Token.",
-    "evidence_note": "Preflight-Zeilen ohne Werte, Routenname, HTTP-Status des Anbieters; kein Schluessel, kein Prompt."
+    "expect": "Ist das Werkzeug im echten Turn erreichbar, muss die Sitzung einen `tool/call` mit dem shinon-Namen tragen, ein `tool/result` ohne Fehler und der Anbieter eine Prompt-Groesse in der Groessenordnung des montierten Kontexts nennen. Ein Turn, der nur Text liefert, bestaetigt nichts.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN am 2026-10-23 (Node v24.21.0, Route `openrouter/nvidia/nemotron-3.5-super-vl:free`). Weg: die App `dsh-headless` mit den Host-Haelften des Profils shinon (persona, events, hook, prompter, project-index, task-router, scoring, narrative) in einem eigenen Mess-Home unter dem Zustandsordner (`…/state/shinon/probe-headless-home`, NICHT im Repo), also dieselbe Verdrahtung wie `dsh --profile shinon`, nur ohne Browser; `npm run s6:check` ist gruen (Schluessel bereit, `.env`-Modus 600, Route gelesen). Turn 1 (Auftrag „Rufe jetzt das Werkzeug shinon_goal_micro_state auf\"): `turn/start` 1792778837347 bis `turn/end` 1792778882853 = 45 506 ms (Prozess-Wand 47 963 ms); `tool/call` name=shinon_goal_micro_state arguments={} bei 1792778842896, `tool/result` bei 1792778842947 (51 ms, isError=false) mit `OBJECTIVE: (leer) / CURRENT_STATE: NO_GOAL / LAST_VERIFIED_FACT: (leer) / CURRENT_BLOCKER: (leer) / NEXT_ACTION: NONE` und der Marke `(shinon.task-router/micro-state-v1)`. Zwei Modellaufrufe, beide kostenlos: `gen-1792778840-…` 20 317 Prompt / 7 Completion (native 22 553 / 21), Latenz 2 359 ms, finish_reason `tool_calls`; `gen-1792778843-…` 20 666 / 87 (native 22 960 / 104), Latenz 38 300 ms, `stop`. Summe 40 983 + 94 = 41 077 Token, total_cost 0. DIE TOKEN-QUELLE: die Sitzung traegt sie NICHT — `assistant/message` hat `usage: null`; die Zahlen kommen aus dem `responseId` im `replayState` der Antwort ueber `GET /api/v1/generation?id=…`. Ohne diese Kennung waere der Turn tokenlos protokolliert. ZWEITER LAUF aus dem Mess-Home heraus, gleicher Auftrag: `turn/start` → `turn/end` 9 296 ms, `tool/call` name=shinon_goal_micro_state arguments={} erneut, `gen-1792779198-…` 20 419 / 7 (4 733 ms, `tool_calls`) und `gen-1792779204-…` 20 689 / 79 (1 712 ms, `stop`) = 41 194 Token. Die Latenz desselben Auftrags schwankt damit zwischen 9,3 s und 45,5 s — die kostenlose Stufe des Anbieters, nicht das Werkzeug (51 ms). Und: die `generation`-Auskunft kommt VERZOEGERT, der erste Abruf direkt nach dem Turn lieferte `null`; wer die Token sofort liest, sieht nichts und haelt es faelschlich fuer „keine Angabe\".",
+    "evidence_note": "Zaehler, Werkzeugname, Zeitstempel und Statuszeilen; kein Schluessel, kein Prompttext, keine Antwortkopie. Je Turn laeuft zusaetzlich ein Titel-Aufruf desselben Modells (`session/title-llm-request`), dessen Token der Anbieter hier nicht meldet."
+  },
+  {
+    "id": "tool-turn-werkzeugwahl-ohne-ansage",
+    "claim": "Das Modell waehlt `shinon_goal_micro_state` von selbst, wenn die Frage auf genau seine Felder zielt („Wo stehe ich gerade?\", „Bin ich irgendwo blockiert, und was ist mein naechster Schritt?\").",
+    "targets": [
+      "packages/task-router/assets/micro-state-tool.js",
+      "packages/task-router/assets/micro-state.js",
+      "packages/prompter/assets/block-select.js"
+    ],
+    "expect": "Zielt eine Frage auf CURRENT_BLOCKER und NEXT_ACTION, muesste vor dem Text ein `tool/call` mit dem shinon-Namen entstehen. Entsteht stattdessen ein Aufruf des allgemeinen Werkzeugkastens (`bash`) oder gar keiner, ist die Werkzeugwahl NICHT belegt — dann traegt die Erreichbarkeit allein die Anweisung, nicht die Beschreibung des Werkzeugs.",
+    "result": "WIDERSPRUCH",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN am 2026-10-23 im selben Aufbau wie der bestaetigte Turn, zwei Laeufe ohne Anweisung. Lauf A („Wo stehe ich gerade? Antworte knapp.\"): 22 303 ms, NULL `tool/call`, Antwort „Ich bin bereit. Was ist der Auftrag?\", ein Modellaufruf `gen-1792778976-…` 20 540 Prompt / 9 Completion, Latenz 11 400 ms. Lauf B („Bin ich irgendwo blockiert, und was ist mein naechster Schritt?\"): 16 268 ms, ZWEI `tool/call`, beide `bash` („pwd && ls -la\", zweimal mit `sandbox_permissions: workspace-write`), beide `tool/result` isError=true mit „Error: sandbox mode ,workspace-write' is requested but no sandbox backend is usable on this host; refusing to run the command unconfined\"; KEIN Aufruf von `shinon_goal_micro_state`, obwohl die Frage genau dessen Felder nennt. Drei Modellaufrufe: `gen-1792779007-…` 20 385 / 25 (4 525 ms, tool_calls), `gen-1792779012-…` 20 748 / 56 (2 353 ms, tool_calls), `gen-1792779015-…` 20 803 / 305 (1 492 ms, stop); Summe 61 936 / 386 Token, Kosten 0. Damit ist die Erreichbarkeit belegt und die SELBST-WAHL nicht: das Modell greift zum allgemeinen Kasten, und die Faehigkeit des Werkzeugs traegt bisher nur die Anweisung.",
+    "evidence_note": "Werkzeugnamen, Fehlertexte, Zaehler und Zeitstempel; kein Schluessel, kein Prompttext. Die Beschreibung des Werkzeugs im Katalog ist 609 Bytes — ihre Formulierung ist die naechste Messung, nicht dieser Befund."
   }
 ]
