@@ -96,8 +96,8 @@ export const WRITABLE_ASSETS = [
 /** Die sieben Signale der Plan-Tabelle — genau diese, keine mehr. */
 export const SIGNAL_IDS = ['adopt', 'accept', 'copy', 'dismiss', 'nextq', 'rephrase', 'selffix'];
 
-/** Die drei Arten, die eine Quelle haben kann: werten, zurücknehmen, nur notieren. */
-export const SOURCE_KINDS = ['note', 'retract', 'score'];
+/** Die vier Arten einer Quelle: werten, zurücknehmen, notieren — und `observe` (SH-LEARN-01: gezaehlt, nie gewertet). */
+export const SOURCE_KINDS = ['note', 'observe', 'retract', 'score'];
 
 /** Die Stärken, die die Tabelle führt (Faktor = Vielfaches des Basis-Deltas). */
 export const STRENGTH_IDS = ['high', 'low', 'medium'];
@@ -124,14 +124,13 @@ export const FORBIDDEN_RULE_KEYS = [
 ];
 
 /**
- * Lesbar zusätzlich: die reinen Kerne und die eingefrorene Replay-Fixture.
- * `block-weights.js` ist der Lern-Kern (Phase 3) — derselbe Host liest ihn,
- * also gehört er in dieselbe Whitelist; ein fehlender Eintrag wäre kein
- * Schreibverb, sondern eine falsch benannte Grenze.
+ * Lesbar zusätzlich: die reinen Kerne, der Lern-Kern und die Replay-Fixture —
+ * derselbe Host liest sie, also gehören sie in dieselbe Whitelist.
  */
 export const READABLE_ASSETS = [
   ...WRITABLE_ASSETS,
   'assets/scoring-core.js',
+  'assets/signal-translate.js',
   'assets/block-weights.js',
   'assets/replay/scoring-demo.json',
 ];
@@ -444,17 +443,17 @@ export function signalRuleIssues(rules, scoring, spine, file) {
     if (source.kind === 'retract' && !isText(source.subjectPath)) {
       issues.push(at(`sources.${type} nimmt zurück, nennt aber keinen subjectPath`));
     }
-    if (source.kind === 'note' && claims.length > 0) {
-      issues.push(at(`sources.${type} ist nur eine Notiz und darf kein Signal beanspruchen`));
-    }
+    // `note`/`observe` nennen ihre Beobachtung, kein gewertetes Signal (SH-LEARN-01).
+    const observing = source.kind === 'note' || source.kind === 'observe';
     for (const claim of claims) {
       const signal = claim.includes(' ') ? claim.split(' ')[0] : claim;
-      referenced.add(signal);
       const definition = signals[signal];
-      if (definition === undefined) {
-        issues.push(at(`sources.${type} nennt ${JSON.stringify(claim)} — dieses Signal gibt es nicht`));
-      } else if (definition.observable !== true) {
-        issues.push(at(`sources.${type} nennt ${signal}, das die Tabelle als nicht beobachtbar führt`));
+      if (definition === undefined) issues.push(at(`sources.${type} nennt ${JSON.stringify(claim)} — dieses Signal gibt es nicht`));
+      else if (observing) {
+        if (definition.observable !== false) issues.push(at(`sources.${type} beobachtet nur, nennt aber ${signal}, das gewertet wird`));
+      } else {
+        referenced.add(signal);
+        if (definition.observable !== true) issues.push(at(`sources.${type} nennt ${signal}, das die Tabelle als nicht beobachtbar führt`));
       }
     }
   }

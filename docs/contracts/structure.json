@@ -106,7 +106,6 @@
     "packages/persona/index.js": 968,
     "packages/popup/client.js": 414,
     "packages/prompter/client.js": 282,
-    "packages/scoring/assets/scoring-core.js": 784,
     "packages/token-usage/client.js": 574,
     "packages/traceability/client.js": 539,
     "scripts/branding-check.mjs": 660,
@@ -116,26 +115,33 @@
     "scripts/gate/plugins/narrative.mjs": 429,
     "scripts/gate/plugins/persona.mjs": 216,
     "scripts/gate/plugins/probe-twin.mjs": 105,
-    "scripts/gate/plugins/scoring.mjs": 821,
+    "scripts/gate/plugins/scoring.mjs": 820,
     "scripts/gate/plugins/typescript.mjs": 204,
     "scripts/gate/tests/client-activation.test.mjs": 606,
     "scripts/gate/tests/commit-trailer.test.mjs": 609,
     "scripts/gate/tests/persona-state.test.mjs": 995,
     "scripts/gate/tests/project-index.test.mjs": 2163,
     "scripts/gate/tests/prompter-contract.test.mjs": 2215,
+    "scripts/gate/tests/scoring-memory.test.mjs": 561,
     "scripts/gate/tests/task-router.test.mjs": 909
   },
   "herleitung": "Grenze = 3 × Median der Klasse, auf 50 gerundet, mindestens 100 — Median gemessen am 2026-10-20 über alle Dateien der Klasse; alles darüber steht im bestand.",
-  "bestandAusnahmen": { "scripts/gate/tests/client-activation.test.mjs": {
-  "grund": "Der reale Client-Activation-Abnahmetest wächst mit belegten Bundle-Vertragsfällen; die Obergrenze hält ihn teilbar und lesbar.",
-  "datum": "2026-10-22",
-  "maxZeilen": 650
- },
- "scripts/gate/tests/prompter-contract.test.mjs": {
-  "grund": "Der Vertrags-Abnahmetest wächst mit jedem gepinnten Config-Default (zuletzt shinonMdPath); die Obergrenze hält ihn teilbar und lesbar.",
-  "datum": "2026-10-23",
-  "maxZeilen": 2240
- }
+  "bestandAusnahmen": {
+    "scripts/gate/tests/client-activation.test.mjs": {
+      "grund": "Der reale Client-Activation-Abnahmetest wächst mit belegten Bundle-Vertragsfällen; die Obergrenze hält ihn teilbar und lesbar.",
+      "datum": "2026-10-22",
+      "maxZeilen": 650
+    },
+    "scripts/gate/tests/prompter-contract.test.mjs": {
+      "grund": "Der Vertrags-Abnahmetest wächst mit jedem gepinnten Config-Default (zuletzt shinonMdPath); die Obergrenze hält ihn teilbar und lesbar.",
+      "datum": "2026-10-23",
+      "maxZeilen": 2240
+    },
+    "scripts/gate/tests/scoring-memory.test.mjs": {
+      "grund": "Die Abnahme verlangt jetzt, dass ein Urteil erst nach einer gesehenen Antwort wirkt (SH-LEARN-01) — jede Wertungsstelle braucht dafuer ein zusaetzliches Ereignis; die Obergrenze haelt den Test teilbar und lesbar.",
+      "datum": "2026-10-23",
+      "maxZeilen": 580
+    }
   },
   "vertraege": {
     "docs/contracts/abort.json": {

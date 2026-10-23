@@ -1,6 +1,14 @@
 {
   "contract": "shinon.signal-rules/v1",
-  "note": "Die Signal-Tabelle als Daten. Sieben Signale (die Plan-Tabelle), fuenf beobachtbare Quellen — alle intern, aus dem DSH-Ereignisstrom, kein Browser. Was hier nicht steht, wird nicht erkannt; was keinen Pol hat, wird gezaehlt und nie gewertet. Kein Deckel, kein Zaehler-Limit, keine Sekunden-Regel: nur Inhalt und Reihenfolge entscheiden.",
+  "note": "Die Signal-Tabelle als Daten. Sieben Signale (die Plan-Tabelle), fuenf beobachtbare Quellen — alle intern, aus dem DSH-Ereignisstrom, kein Browser. Was hier nicht steht, wird nicht erkannt; was keinen Pol hat, wird gezaehlt und nie gewertet. Kein Deckel, kein Zaehler-Limit, keine Sekunden-Regel: nur Inhalt und Reihenfolge entscheiden. SH-LEARN-01 (2026-10-23): jede Zeile nennt ihre STUFE — nur ein ausdrueckliches Menschenurteil zu EINER Antwort traegt eine Wertung; alles andere wird beobachtet.",
+  "attribution": {
+    "note": "SH-LEARN-01: Vor jeder Lernentscheidung muss die Herkunft benannt sein. `user` ist das ausdrueckliche Urteil des Menschen (feedback.rated) ueber eine Antwort, die diese Sitzung gesehen hat. `derived` ist aus einer menschlichen Handlung abgeleitet, ohne Urteil. `none` wird beobachtet und nie gewertet — ein Turn-Ende ist keine Aussage ueber die Antwort.",
+    "stages": {
+      "user": "ausdrueckliches Urteil des Menschen zu EINER bekannten Antwort",
+      "derived": "aus einer menschlichen Handlung abgeleitet, ohne Urteil",
+      "none": "beobachtet, nie gewertet"
+    }
+  },
   "limits": {
     "note": "Bewusst OHNE Grenzen: kein Trust-Ceiling, kein Rate-Limit pro Sitzung. Die einzige Zahl hier ist die Uebersetzung von Staerke in einen Faktor (hoch = doppeltes Basis-Delta, mittel = einfaches, niedrig = halbes).",
     "strengths": {
@@ -10,7 +18,7 @@
     }
   },
   "reading": {
-    "note": "Wie die Nutzlast gelesen wird. Gemessen an den echten DSH-Sitzungsereignissen: ein MENSCH traegt data.source.kind = 'user' (mit rpcId und clientTimeZone), Harness-Text traegt 'agent-instructions' bzw. 'runtime-context' und denselben Ereignistyp user/message — ohne diese Marke zaehlt Harness-Text als Nachricht. Der Text steht in data.content als Blockliste.",
+    "note": "Wie die Nutzlast gelesen wird. Gemessen an den echten DSH-Sitzungsereignissen: ein MENSCH traegt data.source.kind = 'user' (mit rpcId und clientTimeZone), Harness-Text traegt 'agent-instructions' bzw. 'runtime-context' und denselben Ereignistyp user/message — ohne diese Marke zaehlt Harness-Text als Nachricht. Der Text steht in data.content als Blockliste. Die ANTWORT einer Sitzung wird ueber message.id aus assistant/message erkannt; nur eine so gesehene Antwort kann bewertet werden.",
     "humanMarker": {
       "path": "data.source.kind",
       "fallbackPath": "source.kind",
@@ -21,6 +29,11 @@
       "type": "text",
       "fallbackPath": "text"
     },
+    "answerId": {
+      "path": "message.id",
+      "fallbackPath": "id",
+      "note": "DSH baut assistant/message als { turn, step, message, stream, usage?, interrupted? }; die Kennung der Antwort ist message.id. Dieselbe Kennung traegt feedback/message-put als item.messageId — nur so ist das Urteil einer Antwort zuzuordnen."
+    },
     "similarity": {
       "minShared": 3,
       "minRatio": 0.6,
@@ -28,12 +41,13 @@
       "note": "Wiederholung wird am INHALT gemessen, nicht an der Uhr: genug gemeinsame und genug ueberlappende Woerter mit der letzten Frage derselben Sitzung. Kein Zeitfenster, keine Sekundenregel. Benannte Grenze: Woerter unter minTokenLength fallen weg, Fuellwoerter zaehlen mit — die Verfeinerung (Thema ueber den Projekt-Index) ist ein eigener Zug, bis dahin wird eine themenfremde Frage nicht gewertet."
     }
   },
-  "sourcesNote": "Beobachtbare Quellen, geschluesselt nach dem Event-Typ, den der Spine emittiert; `native` ist der DSH-Typ, aus dem er entsteht. Was hier nicht steht, erzeugt kein Signal.",
+  "sourcesNote": "Beobachtbare Quellen, geschluesselt nach dem Event-Typ, den der Spine emittiert; `native` ist der DSH-Typ, aus dem er entsteht. Was hier nicht steht, erzeugt kein Signal. `note` wird gezaehlt und geschrieben (Bemerkung), `observe` nur gezaehlt: ein Turn-Ende oder eine Antwort ist Evidenz, kein Zustand.",
   "sources": {
     "feedback.rated": {
       "native": "feedback/message-put",
       "kind": "score",
       "replaces": true,
+      "requiresAnswer": true,
       "ratingPath": "item.rating",
       "subjectPath": "item.messageId",
       "byRating": {
@@ -44,7 +58,6 @@
     "feedback.retracted": {
       "native": "feedback/message-delete",
       "kind": "retract",
-      "signal": "dismiss",
       "subjectPath": "messageId"
     },
     "feedback.noted": {
@@ -61,71 +74,76 @@
       "subjectPath": "data.id",
       "subjectFallbackPath": "id"
     },
+    "message.completed": {
+      "native": "assistant/message",
+      "kind": "observe",
+      "note": "Die Antwort der Sitzung: ihre Kennung macht ein spaeteres Urteil zuordenbar (requiresAnswer). Sie ist keine Wertung — der Spine beobachtet sie, das Scoring merkt sie sich je Sitzung."
+    },
     "turn.end": {
       "native": "turn/end",
-      "kind": "score",
+      "kind": "observe",
       "reasonPath": "reason.kind",
-      "subjectPath": "turn",
-      "subjectPrefix": "turn:",
       "byReason": {
         "completed": "accept",
         "aborted": "dismiss"
-      }
+      },
+      "note": "Ein Turn-Ende ist ein BEOBACHTETES Ereignis, kein Urteil. `completed` heisst nur, dass nichts abgebrochen wurde; `aborted` kann Timeout, Werkzeugfehler oder ein Mensch sein — keiner dieser Faelle belegt eine schlechte Antwort. Beides wird gezaehlt und nie gewertet (SH-LEARN-01)."
     }
   },
   "signals": {
     "copy": {
       "observable": true,
+      "stage": "user",
       "source": "feedback.rated",
       "type": "feedback.approval",
       "strength": "medium",
       "subject": "message",
       "label": "zustimmung:bewertung",
-      "note": "Das ausdrueckliche positive Urteil des Menschen zu EINER Antwort. Die reine Kopier-Geste hat intern keine Quelle (der Browser-Beobachter ist gestrichen) — dieses Urteil steht dafuer, und es ist widerrufbar."
+      "note": "Das ausdrueckliche positive Urteil des Menschen zu EINER Antwort, die diese Sitzung gesehen hat. Die reine Kopier-Geste hat intern keine Quelle (der Browser-Beobachter ist gestrichen) — dieses Urteil steht dafuer, und es ist widerrufbar. Es belegt Zustimmung, nicht Korrektheit: die Scorecard traegt nur die Groesse des Urteils."
     },
     "adopt": {
       "observable": false,
-      "reason": "Braucht den Turn-Diff (workspaceChanges): welche Dateien hat ein Turn geaendert, ohne dass ein Werkzeug sie geschrieben hat. Eigener Zug — bis dahin wird nicht geraten."
+      "stage": "none",
+      "reason": "Braucht den Turn-Diff (workspaceChanges): welche Dateien hat ein Turn geaendert, ohne dass ein Werkzeug sie geschrieben hat. Eigener Zug — bis dahin wird nicht geraten.",
+      "reasonId": "NO_TURN_DIFF"
     },
     "selffix": {
       "observable": true,
+      "stage": "user",
       "source": "feedback.rated",
       "type": "feedback.correction",
       "strength": "high",
       "subject": "message",
       "label": "korrektur:bewertung",
-      "note": "Das ausdrueckliche negative Urteil des Menschen. Die zweite Haelfte des Plans (Aenderung am gelieferten Pfad) braucht wie 'adopt' den Turn-Diff."
+      "note": "Das ausdrueckliche negative Urteil des Menschen zu EINER Antwort, die diese Sitzung gesehen hat. Die zweite Haelfte des Plans (Aenderung am gelieferten Pfad) braucht wie 'adopt' den Turn-Diff."
     },
     "rephrase": {
       "observable": true,
+      "stage": "derived",
       "source": "message.received",
       "type": "feedback.correction",
-      "strength": "medium",
+      "strength": "low",
       "subject": "question",
       "label": "wiederholung:frage",
-      "note": "Die Frage kommt inhaltlich wieder (gemeinsame Woerter ueber der Schwelle) — die Antwort hat nicht getragen. Nur Menschen-Text zaehlt."
+      "note": "Die Frage kommt inhaltlich wieder (gemeinsame Woerter ueber der Schwelle) — die Antwort hat nicht getragen. ABGELEITET, nicht ausdruecklich: der Mensch hat nicht geurteilt, er hat neu gefragt; deshalb die schwaechste Stufe, und keine Lernentscheidung ueber Bausteine. Nur Menschen-Text zaehlt, und der Text darf nie aus einer internen Anweisung stammen."
     },
     "accept": {
-      "observable": true,
-      "source": "turn.end",
-      "type": "feedback.approval",
-      "strength": "low",
-      "subject": "turn",
-      "label": "abschluss:completed",
-      "note": "Ein Turn endet regulaer (reason.kind = completed). Schwaechste Zustimmung: sie sagt nur, dass nichts abgebrochen wurde."
+      "observable": false,
+      "stage": "none",
+      "reason": "Ein regulaerer Abschluss sagt nur, dass nichts abgebrochen wurde — er ist keine Aussage ueber die Korrektheit der Antwort. Der Wert bleibt stehen, das Ereignis wird gezaehlt (SH-LEARN-01).",
+      "reasonId": "COMPLETION_IS_NOT_CORRECTNESS"
     },
     "dismiss": {
-      "observable": true,
-      "source": "turn.end",
-      "type": "feedback.correction",
-      "strength": "medium",
-      "subject": "turn",
-      "label": "abbruch:user",
-      "note": "Abgebrochener Turn (reason.kind = aborted, Abbruch durch den Menschen) — und der Widerruf eines Urteils: feedback.retracted nimmt die Zeile zurueck, die dieselbe messageId eingebracht hat. Der Widerruf rechnet exakt: die Zeile verschwindet, die Tafel wird aus dem Rest neu nachgerechnet."
+      "observable": false,
+      "stage": "none",
+      "reason": "Ein Abbruch kann Timeout, Werkzeugfehler, Kontextgrenze oder ein Mensch sein — er ist kein Beweis fuer eine schlechte Antwort. Der Widerruf eines Urteils bleibt die exakte Ruecknahme (feedback.retracted); der Abbruch selbst wird nur gezaehlt (SH-LEARN-01).",
+      "reasonId": "ABORT_IS_NOT_A_VERDICT"
     },
     "nextq": {
       "observable": false,
-      "reason": "Thema-gleich/neu braucht die Index-Ueberschneidung (gemeinsame Dateien und Begriffe) — eigener Zug. Bis dahin wird eine neue, themenfremde Frage nicht gewertet."
+      "stage": "none",
+      "reason": "Thema-gleich/neu braucht die Index-Ueberschneidung (gemeinsame Dateien und Begriffe) — eigener Zug. Bis dahin wird eine neue, themenfremde Frage nicht gewertet.",
+      "reasonId": "NO_TOPIC_OVERLAP"
     }
   }
 }

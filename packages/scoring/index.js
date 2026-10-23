@@ -338,7 +338,13 @@ export function apply(ctx, config) {
     const sessionId = typeof envelope?.session_id === 'string' ? envelope.session_id : '';
     if (envelope?.event_type === 'session.created' && sessionId !== '') sessionBlocks.delete(sessionId);
     const outcome = result?.outcome;
-    if (outcome?.kind === 'score' && typeof outcome.signal === 'string' && typeof outcome.subject === 'string' && outcome.subject !== '' && sessionId !== '') {
+    // SH-LEARN-01: Bausteine lernen nur von einem AUSDRUECKLICHEN Menschenurteil
+    // ueber eine bekannte Antwort. Ein abgeleitetes Signal (wiederholte Frage)
+    // und der Widerruf bewegen die Tafel, aber keine Gewichte — sonst wuerde
+    // eine Formulierung, die zufaellig als Wiederholung gelesen wird, zum
+    // Lernsignal ueber Bausteine.
+    const explicit = outcome?.basis?.stage === 'user';
+    if (outcome?.kind === 'score' && explicit && typeof outcome.signal === 'string' && typeof outcome.subject === 'string' && outcome.subject !== '' && sessionId !== '') {
       const polarity = polarityOf(outcome.signal);
       const blocks = sessionBlocks.get(sessionId) ?? [];
       if (polarity !== null && blocks.length > 0) {

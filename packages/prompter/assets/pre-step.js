@@ -22,16 +22,17 @@ import { WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks } from 
 import { CAPABILITIES_CONTRACT, briefRecord, matchCapability, renderTaskBrief, taskBrief } from './capability-map.js';
 import { knowledgeTrace, renderKnowledgeBlock } from './knowledge-block.js';
 import { enhanceGuarded, replacePrompt } from './enhancer.js';
-import { addTurnDuration, memorySummary, semanticProfile, weightsFrom } from './intent-memory.js';
+import { addTurnDuration, semanticProfile, weightsFrom } from './intent-memory.js';
 import { UNDEFINED, expandPrompt, isQuestion, normalizeIntentText, resolveIntent } from './intent-resolver.js';
-import { CONTRACT, DECISION_CHANNEL, FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, NOT_SUPPLIED, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, contextLabel, noContext, resolveMode, withContext } from './mode-core.js';
+import { CONTRACT, DECISION_CHANNEL, FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, NOT_SUPPLIED, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, noContext, resolveMode, withContext } from './mode-core.js';
 import { renderContext } from './render-context.js';
 import { PROVENANCE_CONTRACT, provenanceRecord } from './provenance.js';
 import { OUTCOME_EFFECTS } from './result-contract.js';
 import { ContextSchema } from './schema.js';
 import { readTone, standFor, standTrace } from './stand.js';
 import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT, lastHumanMessage } from '@shinon/seams/core';
-import { countSalvage, journalRejectedAnswer, persistIntentMemory, recordIntent } from './runtime-state.js';
+import { journalRejectedAnswer, persistIntentMemory, recordIntent } from './runtime-state.js';
+import { decisionRecord } from './decision-record.js';
 import { reportTrace } from './trace-report.js';
 
 /**
@@ -290,75 +291,6 @@ function withProvenance(record, context) {
 function withAbort(record, runtime) {
   const info = abortRecord(record, runtime?.abortTable ?? null);
   return { ...record, abort: info.abort, abort_counts: info.abort_counts };
-}
-
-/**
- * Entscheidungsdatensatz: was entschieden wurde, ohne den Prompt-Text zu kopieren.
- * (Die Provenienz-Leiter daneben ist etwas anderes: sie sagt, WELCHE ART Aussage
- * im Prompt stand. Hier steht die Workspace-Herkunft des Schritts.)
- * Genau einer pro Schritt — auch im Randfall, damit die Spur nicht doppelt laeuft.
- *
- * `session_id` traegt die Zuordnung, nicht den Inhalt: der Task Router (§17) muss
- * die Klassifikation einem LEBENDEN Agenten zuordnen, und `ctx.goals` akzeptiert
- * nur die exakte Instanz der Registry — ueber die Sitzung ist sie eindeutig.
- * Ohne dieses Feld waere die Zuordnung ein Raten nach Reihenfolge.
- *
- * `context_source` nennt die QUELLE, die den Kontext geliefert hat (`index` |
- * `file` | `none`), waehrend `context` sagt, wie es ihr erging. Zwei Felder, weil
- * es zwei Fragen sind: „hat MAX einen Kontext benutzt" und „woher kam er".
- * Ohne das zweite waere ein Indexkontext von einer Datei nicht zu unterscheiden,
- * und die Naht nicht nachpruefbar.
- */
-function decisionRecord(contract, runtime, outcome, rawLength, sessionId, contextSource = 'none', contextUsed = false) {
-  const result = outcome.result;
-  // Jeder Prosafall zaehlt, auch der verworfene (`applied: false`, siehe enhancer.js).
-  const salvage = outcome.salvage !== null && typeof outcome.salvage === 'object'
-    ? countSalvage(runtime, sessionId, outcome.salvage)
-    : null;
-  const turn = runtime?.turn ?? null;
-  // S1-Provenienz: Workspace-Identität, Quelle, Pfade, Budget, Gründe. Der
-  // ROHE Nutzertext steht als `raw_prompt` ausdruecklich dabei — er ist die
-  // Eingabe, deren Veredelung der Trace zeigen soll; Schluesselwerte nie.
-  const ws = runtime?.workspace ?? null;
-  return {
-    contract: CONTRACT,
-    session_id: typeof sessionId === 'string' ? sessionId : '',
-    mode: contract.mode,
-    outcome: outcome.outcome,
-    reasons: outcome.reasons,
-    context: contextLabel(contract.needsContext, runtime.contextState, contextUsed),
-    context_source: contextSource,
-    workspace: ws === null ? null : { root: ws.root, rootId: ws.rootId, source: ws.source },
-    workspace_contract: ws === null ? null : ws.contract,
-    context_budget_tokens: runtime?.lastBudgetTokens ?? null,
-    context_chars: runtime?.lastContextChars ?? null,
-    context_files: runtime?.lastContextFiles ?? null,
-    // Die KLASSE ist Runtime-Eigentum: der Resolver hat sie aus dem Text
-    // abgeleitet, bevor das Modell ueberhaupt gefragt wurde. Das Modell kann sie
-    // nicht setzen — `intentClassification` ist kein Feld seines Vertrags mehr.
-    intentClassification: turn?.resolution?.classification ?? null,
-    intentReason: turn?.resolution?.reason ?? null,
-    raw_prompt: turn?.rawPrompt ?? null,
-    uncertainties: result?.uncertainties ?? [],
-    references: result?.references ?? [],
-    rawLength,
-    enhancedLength: result?.enhancedPrompt?.length ?? 0,
-    // Intent-Erweiterung (Zug 8): nur wenn aktiviert.
-    expansion: runtime?.expansion ?? null,
-    intentMatch: turn?.intentMatch ?? null,
-    // Die Erfahrung als ZAHL: der gelernte Faktor, der auf das Pattern wirkte,
-    // und die Merkmale, die den Treffer belegt haben. Kein Prompt-Text.
-    intentBias: turn?.intentBias ?? null,
-    // Der gelernte Semantik-Anteil dieses Textes: der zweite, dynamische Teil
-    // des Gewichts neben der Rückmeldung — als Zahl, nie als Prompt-Inhalt.
-    intentSemantic: turn?.intentSemantic ?? 0,
-    intentFeatures: Array.isArray(turn?.intentFeatures) ? turn.intentFeatures : [],
-    intentMemory: runtime?.intentMemory === null || runtime?.intentMemory === undefined
-      ? null
-      : memorySummary(runtime.intentMemory),
-    // Prosa-Rettung: Grund, Zeichenzahl, Fallzahl — null, wenn keine Rettung.
-    salvage,
-  };
 }
 
 /**
@@ -638,7 +570,7 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
     runtime.intentMemory = addTurnDuration(runtime.intentMemory, runtime.turn.intentMatch, Date.now() - turnStarted);
     persistIntentMemory(runtime, runtime.intentMemoryPath, runtime.intentMemory);
   }
-  const record = withAbort(withProvenance({ ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed), stand: standTrace(stand), blocks: decisionBlocks(selection), brief: brief.record, brief_reason: brief.reason, knowledge: knowledgeTrace(knowledge) }, supply.context), runtime);
+  const record = withAbort(withProvenance({ ...decisionRecord(contract, runtime, recorded, prompt.text.length, sessionId, supply.source, contextUsed, replacement === null ? 'user' : 'refined'), stand: standTrace(stand), blocks: decisionBlocks(selection), brief: brief.record, brief_reason: brief.reason, knowledge: knowledgeTrace(knowledge) }, supply.context), runtime);
   reportTrace(ctx, config, runtime, record);
 
   // Nur ein gefundenes akzeptiertes Ergebnis ersetzt die Nutzernachricht. In

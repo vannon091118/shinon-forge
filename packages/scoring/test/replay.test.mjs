@@ -154,12 +154,14 @@ test('scoring: readScore liest, Unbekanntes ergibt null', () => {
 
 // ── 7. Kern-Reinheit ─────────────────────────────────────────────────────────
 
-test('scoring: der Kern hat keine Imports und keine Zufalls-/Zeit-/Netzquellen', () => {
+test('scoring: beide Kerne tragen nur relative Importe und keine Zufalls-/Zeit-/Netzquellen', () => {
   // Kommentarblind wie die Spine-/Persona-Scanner: die Regel darf genannt werden.
-  const raw = readFileSync(join(DIR, '../assets/scoring-core.js'), 'utf8');
-  const source = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-  assert.ok(!/^\s*import[\s(]/m.test(source), 'der Kern darf keine Imports tragen (CI ohne node_modules)');
-  for (const token of ['Math.random', 'Date.now', 'fetch(', 'require(']) {
-    assert.ok(!source.includes(token), `verboten im reinen Kern: ${token}`);
+  for (const file of ['scoring-core.js', 'signal-translate.js']) {
+    const raw = readFileSync(join(DIR, `../assets/${file}`), 'utf8');
+    const source = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    assert.ok(!/from\s+['\"](node:|[^./])/m.test(source), `${file}: kein bare- oder node:-Import`);
+    for (const token of ['Math.random', 'Date.now', 'fetch(', 'require(']) {
+      assert.ok(!source.includes(token), `verboten im reinen Kern ${file}: ${token}`);
+    }
   }
 });

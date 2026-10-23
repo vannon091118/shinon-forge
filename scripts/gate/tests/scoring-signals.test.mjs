@@ -157,26 +157,33 @@ test('scoring-e2e: Menschen-Text, Wiederholung, Urteil, Widerruf — Wert für W
   assert.deepEqual(runtime.scorecard().scores, { correctness: 0.5, trust: 0.5 });
   assert.equal(runtime.collector.stats().reasons.NOT_HUMAN, 2);
 
-  // Die Frage kommt wieder — die Antwort hat nicht getragen.
+  // Die Frage kommt wieder — die Antwort hat nicht getragen. Abgeleitet, also
+  // die schwaechste Stufe: halbes Basis-Delta (SH-LEARN-01).
   dispatch('session/event', SESSION, humanMessage('Prüfe bitte die Scoring Schicht und die Signaltabelle', 'msg-2'));
-  assert.equal(runtime.scorecard().scores.correctness, 0.41);
+  assert.equal(runtime.scorecard().scores.correctness, 0.455);
 
-  // Ein positives Urteil zu EINER Antwort (nativ, widerrufbar).
+  // Ein positives Urteil zu EINER Antwort, die die Sitzung gesehen hat
+  // (`assistant/message` traegt message.id; ohne diese Antwort ist das Urteil
+  // nach SH-LEARN-01 nicht zuordenbar).
+  dispatch('session/event', SESSION, sessionEvent('assistant/message', { sessionId: 'sess-1', turn: 1, step: 1, message: { id: 'ans-1' } }));
   dispatch('session/event', SESSION, rated('ans-1', 'positive'));
   const afterRating = runtime.scorecard();
-  assert.ok(afterRating.scores.correctness > 0.41);
+  assert.ok(afterRating.scores.correctness > 0.455);
 
   // Der Widerruf derselben Antwort nimmt genau diese Zeile zurück.
   dispatch('session/event', SESSION, sessionEvent('feedback/message-delete', { sessionId: 'sess-1', messageId: 'ans-1' }));
-  assert.equal(runtime.scorecard().scores.correctness, 0.41, 'nach dem Widerruf gilt wieder der Wert von vorher');
+  assert.equal(runtime.scorecard().scores.correctness, 0.455, 'nach dem Widerruf gilt wieder der Wert von vorher');
   assert.equal(runtime.collector.stats().retracted, 1);
 
-  // Turn-Ende: regulär = schwächste Zustimmung, Abbruch = Korrektur.
+  // Turn-Ende: ein regulaerer Abschluss ist KEINE Zustimmung und ein Abbruch
+  // keine Korrektur — beides wird beobachtet, nie gewertet.
+  const beforeTurns = runtime.scorecard().scores.correctness;
   dispatch('session/event', SESSION, sessionEvent('turn/end', { turn: 7, reason: { kind: 'completed' } }));
-  const accepted = runtime.scorecard().scores.correctness;
-  assert.ok(accepted > 0.41);
+  assert.equal(runtime.scorecard().scores.correctness, beforeTurns);
+  assert.equal(runtime.collector.stats().reasons.COMPLETION_IS_NOT_CORRECTNESS, 1);
   dispatch('session/event', SESSION, sessionEvent('turn/end', { turn: 8, reason: { kind: 'aborted', reason: { kind: 'user' } } }));
-  assert.ok(runtime.scorecard().scores.correctness < accepted);
+  assert.equal(runtime.scorecard().scores.correctness, beforeTurns);
+  assert.equal(runtime.collector.stats().reasons.ABORT_IS_NOT_A_VERDICT, 1);
 
   // Ein fehlerhafter Turn ist KEIN Signal — er ändert nichts.
   const before = runtime.scorecard().scores.correctness;

@@ -49,6 +49,7 @@ const sourcesOf = () => [
   { file: 'packages/scoring/index.js', source: readFileSync(join(ROOT, 'packages/scoring/index.js'), 'utf8') },
   { file: 'packages/scoring/client.js', source: readFileSync(join(ROOT, 'packages/scoring/client.js'), 'utf8') },
   { file: 'packages/scoring/assets/scoring-core.js', source: readFileSync(join(ROOT, 'packages/scoring/assets/scoring-core.js'), 'utf8') },
+  { file: 'packages/scoring/assets/signal-translate.js', source: readFileSync(join(ROOT, 'packages/scoring/assets/signal-translate.js'), 'utf8') },
 ];
 
 // ── 1. Echte Verträge ────────────────────────────────────────────────────────
@@ -196,10 +197,10 @@ test('scoring: eine achte Zeile und ein beobachtbares Signal ohne Zulieferer wer
   extra.signals.charisma = { observable: true, source: 'feedback.rated', type: 'feedback.approval', strength: 'low', subject: 'message', label: 'x' };
   assert.ok(signalRuleIssues(extra, scoring, spine, 'x.json').some((issue) => issue.includes('steht nicht in der Plan-Tabelle')));
 
-  // Ohne turn.end hat 'accept' keinen Zulieferer mehr — eine Fähigkeit, die nie entsteht.
+  // Ohne feedback.rated hat 'copy' keinen Zulieferer mehr — eine Fähigkeit, die nie entsteht.
   const orphan = clone(rules);
-  delete orphan.sources['turn.end'];
-  assert.ok(signalRuleIssues(orphan, scoring, spine, 'x.json').some((issue) => issue.includes('Signal accept ist als beobachtbar geführt')));
+  delete orphan.sources['feedback.rated'];
+  assert.ok(signalRuleIssues(orphan, scoring, spine, 'x.json').some((issue) => issue.includes('Signal copy ist als beobachtbar geführt')));
 });
 
 test('scoring: eine beobachtbare Zeile ohne Typ, Stärke, Label oder Betreff wird gemeldet', () => {
@@ -326,14 +327,14 @@ test('scoring: eine Klasse mit falschem Pol, Doppelung, Lücke oder erfundenem S
   assert.ok(tendencyRuleIssues(flipped, rules, scoring, 'x.json').some((issue) => issue.includes('aber selffix schiebt negative')));
 
   const twice = clone(tendency);
-  twice.classes[0].signals = ['selffix', 'rephrase', 'dismiss'];
-  twice.classes[1].signals = ['copy', 'accept', 'selffix'];
+  twice.classes[0].signals = ['selffix', 'rephrase', 'copy'];
+  twice.classes[1].signals = ['copy'];
   assert.ok(tendencyRuleIssues(twice, rules, scoring, 'x.json').some((issue) => issue.includes('genau EINEN Pol')));
 
   // Ein beobachtbares Signal ohne Klasse: die Tendenz rechnet daran vorbei.
   const gap = clone(tendency);
-  gap.classes[1].signals = ['copy'];
-  assert.ok(tendencyRuleIssues(gap, rules, scoring, 'x.json').some((issue) => issue.includes('accept speist keine Klasse')));
+  gap.classes[0].signals = ['selffix'];
+  assert.ok(tendencyRuleIssues(gap, rules, scoring, 'x.json').some((issue) => issue.includes('rephrase speist keine Klasse')));
 
   const badPole = clone(tendency);
   badPole.classes[0].pole = 'neutral';

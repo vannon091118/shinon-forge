@@ -101,6 +101,11 @@ const turnEnd = (kind, turn = 1, sessionId = 's1') => [
   envelope('turn.end', sessionId),
   { session_id: sessionId, turn, reason: { kind } },
 ];
+/** Eine Antwort, die die Sitzung gesehen hat — Voraussetzung fuer ein Urteil. */
+const answer = (messageId, sessionId = 's1') => [
+  envelope('message.completed', sessionId),
+  { session_id: sessionId, message: { id: messageId } },
+];
 const noted = (sessionId = 's1') => [
   envelope('feedback.noted', sessionId),
   { session_id: sessionId, text: 'eine Bemerkung ohne Pol' },
@@ -117,32 +122,37 @@ test('lernen: Signal wertet die gemerkte Auswahl — im selben Ledger wie das Pr
   assert.equal(weights.read(), null, 'leer heißt null — wie der Ton');
 
   // Ohne gemerkte Auswahl wertet selbst ein Urteil nichts.
+  api.observe(...answer('m0'));
   api.observe(...rating('m0', 'positive'));
   assert.equal(weights.read(), null, 'keine Auswahl, keine Wertung');
 
   host.ctx.emit(BLOCKS_DECISION_CHANNEL, decision(['persona-report', 'persona-epistemic']));
+  api.observe(...answer('m1'));
   api.observe(...rating('m1', 'positive'));
   assert.deepEqual(weights.read(), {
     'persona-report': { up: 1, down: 0 },
     'persona-epistemic': { up: 1, down: 0 },
   });
 
-  // Turn-Ende trägt denselben Schritt weiter (schwache Zustimmung).
+  // Ein Turn-Ende traegt NICHTS weiter: es ist eine Beobachtung, keine
+  // Zustimmung (SH-LEARN-01) — die Gewichte bleiben, wie sie sind.
   api.observe(...turnEnd('completed'));
-  assert.deepEqual(weights.read()['persona-report'], { up: 2, down: 0 });
+  assert.deepEqual(weights.read()['persona-report'], { up: 1, down: 0 });
 
   // Die Gewichte reisen im selben Snapshot wie das Protokoll — ein Feld mehr,
   // kein neues Backend, kein neuer Namensraum.
   const snapshot = store.saved.get(LEDGER_NAMESPACE);
   assert.ok(snapshot.records.length > 0, 'das Protokoll reist mit');
-  assert.deepEqual(snapshot.blockWeights['persona-report'], { up: 2, down: 0 });
+  assert.deepEqual(snapshot.blockWeights['persona-report'], { up: 1, down: 0 });
   assert.ok(snapshot.blockAttributions.some((entry) => entry.subject === 'm1' && entry.polarity === 'up'));
+  assert.ok(!snapshot.blockAttributions.some((entry) => String(entry.subject).startsWith('turn:')));
 });
 
 test('lernen: Neustart stellt wieder her — Widerruf nimmt exakt zurück', () => {
   const store = fakeStore();
   const first = mount(store);
   first.host.ctx.emit(BLOCKS_DECISION_CHANNEL, decision(['persona-report']));
+  first.api.observe(...answer('m1'));
   first.api.observe(...rating('m1', 'positive'));
   assert.deepEqual(first.host.services.get(WEIGHTS_SERVICE).read()['persona-report'], { up: 1, down: 0 });
   first.api.dispose();

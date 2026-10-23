@@ -194,6 +194,9 @@ const humanMessage = (text, id = 'msg-1', kind = 'user') =>
   sessionEvent('user/message', { content: [{ type: 'text', text }], source: { kind }, role: 'user', id });
 const rated = (messageId, ratingValue) =>
   sessionEvent('feedback/message-put', { sessionId: 'sess-1', item: { messageId, rating: ratingValue, version: 'v1' } });
+/** Die Antwort, die das Urteil spaeter trifft: nur eine gesehene Antwort ist zuordenbar. */
+const answered = (messageId) =>
+  sessionEvent('assistant/message', { sessionId: 'sess-1', turn: 1, step: 1, message: { id: messageId } });
 const retracted = (messageId) => sessionEvent('feedback/message-delete', { sessionId: 'sess-1', messageId });
 const QUESTION = 'Prüfe bitte die Scoring Schicht und die Signaltabelle im Paket';
 
@@ -283,6 +286,7 @@ test('memory: ein Signal werten, den Host neu aufsetzen — der Stand ist noch d
 
   const first = await mount({ root: project, indexRoot, ledgerFile });
   assert.deepEqual(first.scoring.scorecard().scores, { correctness: 0.5, trust: 0.5 }, 'Ausgangslage');
+  first.host.dispatch('session/event', SESSION, answered('ans-1'));
   first.host.dispatch('session/event', SESSION, rated('ans-1', 'positive'));
   const scored = first.scoring.scorecard();
   assert.equal(scored.scores.correctness, 0.56, 'das Urteil hat gewirkt');
@@ -317,6 +321,7 @@ test('memory: spaete Kritik trifft die frueher bewertete Antwort (derselbe Betre
   const ledgerFile = join(workDir('spaet-ledger'), 'ledger.sqlite');
 
   const first = await mount({ root: project, indexRoot, ledgerFile });
+  first.host.dispatch('session/event', SESSION, answered('ans-1'));
   first.host.dispatch('session/event', SESSION, rated('ans-1', 'positive'));
   assert.equal(first.scoring.state().records.length, 1);
   shutdown(first);
@@ -325,6 +330,8 @@ test('memory: spaete Kritik trifft die frueher bewertete Antwort (derselbe Betre
   // Zuordnung in der Ablage waere das eine zweite, unabhaengige Zeile — die
   // Tafel truege dann Lob und Tadel fuer dieselbe Sache.
   const second = await mount({ root: project, indexRoot, ledgerFile });
+  // Die Antwort kam VOR dem Neustart; die Zuordnung ueberlebt ihn (der Betreff
+  // steht im Protokoll, und das wird beim Laden gelesen).
   second.host.dispatch('session/event', SESSION, rated('ans-1', 'negative'));
   const records = second.scoring.state().records;
   assert.equal(records.length, 1, 'dieselbe Antwort traegt genau eine Zeile');
@@ -333,6 +340,7 @@ test('memory: spaete Kritik trifft die frueher bewertete Antwort (derselbe Betre
   assert.ok(second.scoring.scorecard().scores.correctness < 0.5, 'und die Tafel folgt der Korrektur');
 
   // Eine ANDERE Antwort ist eine eigene Zeile — die Zuordnung trennt sie.
+  second.host.dispatch('session/event', SESSION, answered('ans-2'));
   second.host.dispatch('session/event', SESSION, rated('ans-2', 'positive'));
   assert.deepEqual(second.scoring.state().records.map((record) => record.subject).sort(), ['ans-1', 'ans-2']);
   assert.equal(storedState(second).records.length, 2);
@@ -375,6 +383,7 @@ test('memory: eine beendete Sitzung wird abgeschlossen — auf die Ereignisse, d
   // dann geschrieben, wenn gerade keine Sitzung offen ist.
   api.host.dispatch('shinon/session/created', { session_id: 'sess-1' });
   assert.equal(storedState(api).memos.length, 0, 'das zweite Schliessen raeumt den neuen Merkzettel');
+  api.host.dispatch('session/event', SESSION, answered('ans-7'));
   api.host.dispatch('session/event', SESSION, rated('ans-7', 'positive'));
   assert.equal(storedState(api).memos.length, 0, 'eine Wertung braucht keine offene Sitzung');
 
@@ -408,6 +417,7 @@ test('memory: ein kaputter Index ergibt einen leeren, aber laufenden Start', asy
 
   // LEER, aber LAUFEND: die Tafel steht am Anfang, und ein Signal wirkt trotzdem.
   assert.deepEqual(api.scoring.scorecard().scores, { correctness: 0.5, trust: 0.5 });
+  api.host.dispatch('session/event', SESSION, answered('ans-1'));
   api.host.dispatch('session/event', SESSION, rated('ans-1', 'positive'));
   assert.equal(api.scoring.scorecard().scores.correctness, 0.56, 'der Host laeuft weiter');
   assert.equal(api.scoring.state().records.length, 1, 'im Speicher ist der Stand da');
@@ -481,6 +491,7 @@ test('memory: auch wenn das Scoring ZUERST mountet, kommt der Stand an', async (
   const ledgerFile = join(workDir('reihenfolge-ledger'), 'ledger.sqlite');
 
   const first = await mount({ root: project, indexRoot, ledgerFile });
+  first.host.dispatch('session/event', SESSION, answered('ans-1'));
   first.host.dispatch('session/event', SESSION, rated('ans-1', 'positive'));
   const scored = first.scoring.scorecard();
   shutdown(first);
@@ -522,7 +533,10 @@ test('ton: der Stand ist eine Faehigkeit mit EINER Operation — und ohne Signal
   api.host.dispatch('session/event', SESSION, humanMessage(QUESTION));
   assert.equal(service.read(), null, 'eine erste Frage ist noch keine Lage');
 
-  // Ein Urteil wiegt schwerer und traegt die Korrektur-Klasse.
+  // Ein Urteil wiegt schwerer und traegt die Korrektur-Klasse. Es gilt einer
+  // Antwort, die diese Sitzung gesehen hat (SH-LEARN-01) — also erst die
+  // Antwort, dann das Urteil.
+  api.host.dispatch('session/event', SESSION, answered('msg-1'));
   api.scoring.observe(
     { event_type: 'feedback.rated', session_id: 'sess-1' },
     { session_id: 'sess-1', item: { messageId: 'msg-1', rating: 'negative' } },

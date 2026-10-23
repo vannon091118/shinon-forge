@@ -48,6 +48,12 @@ const turnEnd = (kind, turn = 1, sessionId = 'sess-1') => ({
   envelope: envelope('turn.end', sessionId),
   payload: { session_id: sessionId, turn, reason: { kind } },
 });
+/** Eine Antwort, die die Sitzung gesehen hat — Voraussetzung fuer ein Urteil. */
+const answer = (messageId, sessionId = 'sess-1') => ({
+  envelope: envelope('message.completed', sessionId),
+  payload: { session_id: sessionId, message: { id: messageId } },
+});
+const sawAnswer = (collector, messageId, sessionId = 'sess-1') => collector.observe(answer(messageId, sessionId).envelope, answer(messageId, sessionId).payload);
 
 // ── 1. Gewichtung: eine Übersetzung, aus den Daten ───────────────────────────
 
@@ -64,6 +70,7 @@ test('scoring-tendenz: der Faktor kommt aus der Tabelle, nicht aus dem Code', ()
 test('scoring-tendenz: die Stärke skaliert das Basis-Delta auf dem ganzen Weg', () => {
   const judged = (id, value) => {
     const collector = collectorOf();
+    sawAnswer(collector, id);
     const event = rating(id, value);
     return collector.observe(event.envelope, event.payload);
   };
@@ -71,41 +78,46 @@ test('scoring-tendenz: die Stärke skaliert das Basis-Delta auf dem ganzen Weg',
   assert.equal(judged('a', 'negative').scorecard.scores.correctness, 0.32);
   // medium (1×): +0.06
   assert.equal(judged('a', 'positive').scorecard.scores.correctness, 0.56);
-  // low (0.5×): +0.03 für den regulaeren Abschluss eines Turns
-  const collector = collectorOf();
-  const done = turnEnd('completed');
-  assert.equal(core.strengthFactor(rules, rules.signals.accept.strength), 0.5);
-  const low = collector.observe(done.envelope, done.payload);
-  assert.equal(low.outcome.factor, 0.5);
-  assert.equal(low.scorecard.scores.correctness, 0.53);
+  // low (0.5×) traegt die abgeleitete Wiederholung — der regulaere Abschluss
+  // ist seit SH-LEARN-01 gar keine Wertung mehr.
+  assert.equal(core.strengthFactor(rules, rules.signals.rephrase.strength), 0.5);
+  assert.equal(rules.signals.accept.observable, false);
+  assert.equal(rules.signals.dismiss.observable, false);
 });
 
 // ── 2. Widerruf: exakt, mit Betreff ──────────────────────────────────────────
 
 test('scoring-tendenz: der Widerruf rechnet exakt nach — der Wert ist der von vorher', () => {
   const collector = collectorOf();
+  sawAnswer(collector, 'ans-1');
+  sawAnswer(collector, 'ans-2');
   const before = collector.observe(rating('ans-1', 'positive').envelope, rating('ans-1', 'positive').payload);
   const middle = rating('ans-2', 'negative');
   collector.observe(middle.envelope, middle.payload);
+  // Ein Turn-Ende ist eine Beobachtung und schreibt KEINE Zeile (SH-LEARN-01).
   const third = turnEnd('completed', 7);
   collector.observe(third.envelope, third.payload);
-  assert.equal(collector.records().length, 3);
+  assert.equal(collector.records().length, 2);
 
   const undo = retract('ans-2');
   const result = collector.observe(undo.envelope, undo.payload);
   assert.equal(result.removed, 1, 'genau eine Zeile faellt weg');
-  assert.equal(collector.records().length, 2);
+  assert.equal(collector.records().length, 1);
   // Die Nachrechnung aus dem Rest ist genau das, was der Replay aus dem Rest rechnet.
   const expected = core.replay(contracts, core.initialState(scoring), collector.records().map((record) => record.event));
   assert.deepEqual(result.scorecard, expected.scorecard);
-  // Und sie ist NICHT der Wert von vor dem Widerruf — sie ist der aus den zwei Restzeilen.
-  assert.notEqual(result.scorecard.scores.correctness, before.scorecard.scores.correctness);
+  // Sie ist der Wert aus der EINEN Restzeile: das Lob von ans-1 gilt weiter,
+  // das Urteil ueber ans-2 ist aus dem Protokoll verschwunden.
+  assert.equal(result.scorecard.scores.correctness, before.scorecard.scores.correctness, 'die verbleibende Zeile traegt den Wert');
+  assert.equal(result.scorecard.scores.correctness, 0.56);
   const again = retract('ans-2');
   assert.equal(collector.observe(again.envelope, again.payload).removed, 0, 'ein zweiter Widerruf trifft nichts mehr');
 });
 
 test('scoring-tendenz: späte Kritik trifft DIESELBE Aufgabe und ersetzt sie', () => {
   const collector = collectorOf();
+  sawAnswer(collector, 'ans-1');
+  sawAnswer(collector, 'ans-2');
   const early = rating('ans-1', 'positive');
   collector.observe(early.envelope, early.payload);
   collector.observe(rating('ans-2', 'positive').envelope, rating('ans-2', 'positive').payload);
@@ -123,6 +135,8 @@ test('scoring-tendenz: späte Kritik trifft DIESELBE Aufgabe und ersetzt sie', (
 
 test('scoring-tendenz: der Betreff trägt die Sitzung mit — fremde Sitzung, fremde Zuordnung', () => {
   const collector = collectorOf();
+  sawAnswer(collector, 'ans-1', 'sess-1');
+  sawAnswer(collector, 'ans-1', 'sess-2');
   collector.observe(rating('ans-1', 'positive', 'sess-1').envelope, rating('ans-1', 'positive', 'sess-1').payload);
   collector.observe(rating('ans-1', 'negative', 'sess-2').envelope, rating('ans-1', 'negative', 'sess-2').payload);
   assert.equal(collector.records().length, 2, 'zwei Sitzungen sind zwei Urteile');
@@ -174,7 +188,9 @@ test('scoring-tendenz: was keine Klasse kennt, färbt die Tendenz nicht', () => 
 });
 
 test('scoring-tendenz: dieselben Zeilen ergeben dieselbe Tendenz — und die Zeilen bleiben unberührt', () => {
-  const ledger = [record('accept'), record('copy'), record('accept'), record('rephrase')];
+  // Drei ausdrueckliche Urteile und eine Wiederholung: der Abschluss eines
+  // Turns steht seit SH-LEARN-01 in keiner Klasse mehr.
+  const ledger = [record('copy'), record('copy'), record('copy'), record('rephrase')];
   const before = JSON.stringify(ledger);
   const first = core.deriveTendency(tendency, ledger);
   const second = core.deriveTendency(tendency, ledger);
@@ -186,9 +202,12 @@ test('scoring-tendenz: dieselben Zeilen ergeben dieselbe Tendenz — und die Zei
 
 test('scoring-tendenz: die Tendenz entsteht aus dem echten Protokoll des Sammlers', () => {
   const collector = collectorOf();
+  for (const id of ['ans-1', 'ans-2', 'ans-3']) sawAnswer(collector, id);
   collector.observe(rating('ans-1', 'negative').envelope, rating('ans-1', 'negative').payload);
+  // Ein Abbruch zaehlt NICHT als Korrektur — die Tendenz steht auf Urteilen.
   collector.observe(turnEnd('aborted', 4).envelope, turnEnd('aborted', 4).payload);
   collector.observe(rating('ans-2', 'negative').envelope, rating('ans-2', 'negative').payload);
+  collector.observe(rating('ans-3', 'negative').envelope, rating('ans-3', 'negative').payload);
   const derived = core.deriveTendency(tendency, collector.records());
   assert.equal(derived.ready, true);
   assert.deepEqual(derived.counts, { korrektur: 3, zustimmung: 0 });

@@ -48,6 +48,15 @@ const rating = (messageId, value, sessionId = 'sess-1') => ({
   payload: { session_id: sessionId, item: { messageId, rating: value } },
 });
 
+/** Eine Antwort, die die Sitzung gesehen hat (`assistant/message` → message.completed). */
+const answer = (messageId, sessionId = 'sess-1') => ({
+  envelope: envelope('message.completed', sessionId),
+  payload: { session_id: sessionId, message: { id: messageId } },
+});
+
+/** Die Antwort sichtbar machen — ohne sie ist ein Urteil nicht zuordenbar (SH-LEARN-01). */
+const sawAnswer = (collector, messageId, sessionId = 'sess-1') => collector.observe(answer(messageId, sessionId).envelope, answer(messageId, sessionId).payload);
+
 const retract = (messageId, sessionId = 'sess-1') => ({
   envelope: envelope('feedback.retracted', sessionId),
   payload: { session_id: sessionId, messageId },
@@ -76,13 +85,15 @@ test('scoring-signale: eine wiederholte Frage wird zur Korrektur (Wert sinkt)', 
   const again = human('Prüfe bitte die Scoring Schicht und die Signaltabelle', { id: 'msg-2' });
   const second = collector.observe(again.envelope, again.payload);
   assert.equal(second.outcome.signal, 'rephrase');
+  assert.equal(second.outcome.basis.stage, 'derived', 'eine Wiederholung ist abgeleitet, kein Urteil');
   assert.equal(second.outcome.event.type, 'feedback.correction');
+  assert.equal(second.outcome.factor, 0.5, 'abgeleitet zaehlt nur halb');
   // Genau das, was der Replay aus demselben Ereignis rechnet — nicht mehr und nicht weniger.
   const expected = core.replay(contracts, core.initialState(scoring), [
-    { type: 'feedback.correction', payload: { session_id: 'sess-1', correction: 'wiederholung:frage' } },
+    { type: 'feedback.correction', weight: 0.5, payload: { session_id: 'sess-1', correction: 'wiederholung:frage' } },
   ]);
   assert.deepEqual(second.scorecard, expected.scorecard);
-  assert.equal(second.scorecard.scores.correctness, 0.41);
+  assert.equal(second.scorecard.scores.correctness, 0.455);
 });
 
 test('scoring-signale: ein themenfremder Menschen-Text erzeugt kein Signal', () => {
@@ -110,12 +121,16 @@ test('scoring-signale: Harness-Text zählt nicht, auch wenn er wie eine Frage au
   assert.equal(collector.session('sess-1').previousQuestion, QUESTION);
 });
 
-test('scoring-signale: Urteil, Akzeptanz und Abbruch wirken nach ihrer Stärke', () => {
+test('scoring-signale: ein Urteil wirkt — Abschluss und Abbruch werten nicht (SH-LEARN-01)', () => {
   const collector = collectorOf();
+  sawAnswer(collector, 'ans-1');
+  sawAnswer(collector, 'ans-2');
+
   const positive = rating('ans-1', 'positive');
   const approved = collector.observe(positive.envelope, positive.payload);
   assert.equal(approved.outcome.signal, 'copy');
   assert.equal(approved.outcome.factor, 1);
+  assert.equal(approved.outcome.basis.stage, 'user', 'nur ein ausdrueckliches Urteil traegt eine Wertung');
   assert.equal(approved.scorecard.scores.correctness, 0.56);
 
   const negative = rating('ans-2', 'negative');
@@ -123,12 +138,37 @@ test('scoring-signale: Urteil, Akzeptanz und Abbruch wirken nach ihrer Stärke',
   assert.equal(corrected.outcome.signal, 'selffix');
   assert.equal(corrected.outcome.factor, 2, 'ein negatives Urteil wiegt doppelt');
 
+  // Ein regulaerer Abschluss sagt nur, dass nichts abgebrochen wurde. Er ist
+  // KEINE Zustimmung zur Antwort und darf die Tafel nicht bewegen.
+  const afterJudgement = collector.scorecard().scores;
   const accepted = collector.observe(turnEnd('completed', 7).envelope, turnEnd('completed', 7).payload);
-  assert.equal(accepted.outcome.signal, 'accept');
-  assert.equal(accepted.outcome.factor, 0.5, 'der reguläre Abschluss ist die schwächste Zustimmung');
+  assert.equal(accepted.outcome.reason, 'COMPLETION_IS_NOT_CORRECTNESS');
+  assert.equal(accepted.outcome.event, null);
+  assert.deepEqual(accepted.scorecard.scores, afterJudgement);
 
+  // Ein Abbruch kann Timeout, Werkzeugfehler oder ein Mensch sein — kein Beweis
+  // fuer eine schlechte Antwort, also keine Korrektur.
   const aborted = collector.observe(turnEnd('aborted', 8).envelope, turnEnd('aborted', 8).payload);
-  assert.equal(aborted.outcome.signal, 'dismiss');
+  assert.equal(aborted.outcome.reason, 'ABORT_IS_NOT_A_VERDICT');
+  assert.equal(aborted.outcome.event, null);
+  assert.deepEqual(aborted.scorecard.scores, afterJudgement);
+});
+
+test('scoring-signale: ein Urteil ohne bekannte Antwort ist keine Evidenz (SH-LEARN-01)', () => {
+  const collector = collectorOf();
+  const before = collector.scorecard();
+  // Irgendeine messageId ist keine Zuordnung: die Antwort muss in DIESER
+  // Sitzung gesehen worden sein (assistant/message).
+  const fremd = collector.observe(rating('fremd-1', 'positive').envelope, rating('fremd-1', 'positive').payload);
+  assert.equal(fremd.outcome.reason, 'UNATTRIBUTED_FEEDBACK');
+  assert.equal(fremd.outcome.event, null);
+  assert.deepEqual(fremd.scorecard, before);
+
+  // Und auch eine in einer ANDEREN Sitzung gesehene Antwort zuordenbar nur dort.
+  sawAnswer(collector, 'ans-9', 'sess-2');
+  const cross = collector.observe(rating('ans-9', 'positive', 'sess-1').envelope, rating('ans-9', 'positive', 'sess-1').payload);
+  assert.equal(cross.outcome.reason, 'UNATTRIBUTED_FEEDBACK', 'die Sitzung gehoert zur Zuordnung');
+  assert.equal(collector.records().length, 0);
 });
 
 // ── 2. Widerruf rechnet exakt ────────────────────────────────────────────────
@@ -136,6 +176,7 @@ test('scoring-signale: Urteil, Akzeptanz und Abbruch wirken nach ihrer Stärke',
 test('scoring-signale: der Widerruf nimmt genau die Wertung zurück', () => {
   const collector = collectorOf();
   const before = collector.scorecard();
+  sawAnswer(collector, 'ans-1');
 
   const positive = rating('ans-1', 'positive');
   collector.observe(positive.envelope, positive.payload);
@@ -150,6 +191,7 @@ test('scoring-signale: der Widerruf nimmt genau die Wertung zurück', () => {
 
 test('scoring-signale: ein zweites Urteil ersetzt das erste (DSH: create or replace)', () => {
   const collector = collectorOf();
+  sawAnswer(collector, 'ans-1');
   collector.observe(...Object.values(rating('ans-1', 'negative')));
   assert.equal(collector.stats().records, 1);
   collector.observe(...Object.values(rating('ans-1', 'positive')));
@@ -179,8 +221,11 @@ test('scoring-signale: unbekannte Ereignisse und unvollständige Urteile ändern
   assert.ok(weirdRating.outcome.reason.startsWith('UNKNOWN_RATING'));
   assert.deepEqual(weirdRating.scorecard, before);
 
+  // Ein Turn-Ende mit unbekanntem Grund ist eine BEOBACHTUNG ohne Zuordnung:
+  // gezaehlt, nie gewertet (SH-LEARN-01) — kein Signal, keine Aenderung.
   const weirdTurn = collector.observe(...Object.values(turnEnd('error', 3)));
-  assert.ok(weirdTurn.outcome.reason.startsWith('UNHANDLED_REASON'));
+  assert.equal(weirdTurn.outcome.reason, 'OBSERVED_ONLY');
+  assert.equal(weirdTurn.outcome.detail.observation, null);
   assert.deepEqual(weirdTurn.scorecard, before);
 
   const emptyRetract = collector.observe(envelope('feedback.retracted'), { session_id: 'sess-1' });
@@ -257,6 +302,8 @@ test('scoring-ablage: der Kern meldet seinen Stand, statt ihn zu schreiben', () 
   const { collector, seen } = collectorWithSink();
   assert.equal(seen.length, 0, 'ohne Ereignis kein Schreibvorgang');
 
+  sawAnswer(collector, 'ans-1');
+  assert.equal(seen.length, 0, 'eine beobachtete Antwort ist kein Schreibvorgang');
   collector.observe(...Object.values(rating('ans-1', 'positive')));
   assert.equal(seen.length, 1);
   assert.equal(seen[0].why, 'score', 'der Grund steht mit dabei');
@@ -282,6 +329,7 @@ test('scoring-ablage: der Kern meldet seinen Stand, statt ihn zu schreiben', () 
 
 test('scoring-ablage: der geladene Stand trägt den ganzen Weg (Neustart im Kern)', () => {
   const source = collectorOf();
+  sawAnswer(source, 'ans-1');
   source.observe(...Object.values(rating('ans-1', 'positive')));
   source.observe(...Object.values(human(QUESTION)));
   const snapshot = source.state();
@@ -301,6 +349,7 @@ test('scoring-ablage: der geladene Stand trägt den ganzen Weg (Neustart im Kern
 
 test('scoring-ablage: ein fremder Stand wird gezählt und fallengelassen (fail-closed)', () => {
   const source = collectorOf();
+  sawAnswer(source, 'ans-1');
   source.observe(...Object.values(rating('ans-1', 'positive')));
   source.observe(...Object.values(human(QUESTION)));
   const good = source.state();
@@ -358,12 +407,16 @@ test('scoring-signale: die Tabelle trägt keinen Deckel, kein Limit und keine Se
   assert.deepEqual(Object.keys(rules.limits.strengths).sort(), ['high', 'low', 'medium']);
 });
 
-test('scoring-signale: der Kern bleibt importfrei und zeit-/zufallsfrei', () => {
-  const raw = readFileSync(join(DIR, '../assets/scoring-core.js'), 'utf8');
-  const source = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-  assert.ok(!/^\s*import[\s(]/m.test(source), 'der Kern darf keine Imports tragen (CI ohne node_modules)');
-  for (const token of ['Math.random', 'Date.now', 'fetch(', 'require(']) {
-    assert.ok(!source.includes(token), `verboten im reinen Kern: ${token}`);
+test('scoring-signale: beide Kerne bleiben ohne bare/node-Import, Zeit und Zufall', () => {
+  // Die Uebersetzung lebt seit SH-LEARN-01 in `signal-translate.js`; der eine
+  // relative Import zwischen den beiden Kernen ist erlaubt (beide sind rein).
+  for (const file of ['scoring-core.js', 'signal-translate.js']) {
+    const raw = readFileSync(join(DIR, `../assets/${file}`), 'utf8');
+    const source = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    assert.ok(!/from\s+['\"](node:|[^./])/m.test(source), `${file}: kein bare- oder node:-Import`);
+    for (const token of ['Math.random', 'Date.now', 'fetch(', 'require(']) {
+      assert.ok(!source.includes(token), `verboten im reinen Kern ${file}: ${token}`);
+    }
   }
 });
 

@@ -148,6 +148,11 @@ test('Trace: jede eingehängte Quelle hat einen Eintrag, der Block bleibt ohne I
   assert.equal(sent.length, 1, 'genau eine Entscheidung je Schritt');
   const record = sent[0].record;
   assert.equal(record.outcome, 'accepted');
+  // SH-LEARN-01: die Anfrage, die ans Hauptmodell ging, ist der uebernommene
+  // Vorschlag — und der Datensatz sagt das, ohne den Text zu kopieren.
+  assert.equal(record.prompt_source, 'refined');
+  assert.equal(record.prompt_applied, true);
+  assert.equal(JSON.stringify(record).includes('Bitte pruefe src/a.mjs.'), false, 'nur die Herkunft, nie der Text');
   assert.equal(record.provenance_contract, PROVENANCE_CONTRACT);
   assert.equal(record.provenance.contract, PROVENANCE_CONTRACT);
   assert.deepEqual(Object.keys(record.provenance.classes).sort(), [...PROVENANCE_CLASSES].sort());
@@ -272,6 +277,9 @@ test('ohne Kontext: die Leiter ist leer und vollständig — keine erfundene Que
   }
   const record = ctx.emitted.find((entry) => entry.channel === DECISION_CHANNEL).record;
   assert.equal(record.outcome, 'unavailable');
+  // Ohne Veredelung ist die gesendete Anfrage der Auftrag des Menschen.
+  assert.equal(record.prompt_source, 'user');
+  assert.equal(record.prompt_applied, false);
   assert.equal(record.provenance.entries.length, 0);
   assert.equal(record.provenance.violations.length, 0);
   assert.equal(record.provenance.complete, true, 'nichts eingehängt ist keine Lücke');

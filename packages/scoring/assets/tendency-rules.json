@@ -12,15 +12,15 @@
       "id": "korrektur",
       "pole": "negative",
       "label": "Korrektur",
-      "signals": ["selffix", "rephrase", "dismiss"],
-      "note": "Was gegen die letzte Antwort spricht: ausdrueckliche Ablehnung (selffix), inhaltliche Wiederholung (rephrase), Abbruch oder Widerruf (dismiss)."
+      "signals": ["selffix", "rephrase"],
+      "note": "Was gegen die letzte Antwort spricht: ausdrueckliche Ablehnung (selffix) und inhaltliche Wiederholung (rephrase). Ein Abbruch gehoert NICHT hierher — er kann Timeout, Werkzeugfehler oder ein Mensch sein und belegt keine schlechte Antwort (SH-LEARN-01)."
     },
     {
       "id": "zustimmung",
       "pole": "positive",
       "label": "Zustimmung",
-      "signals": ["copy", "accept"],
-      "note": "Was fuer sie spricht: das ausdrueckliche positive Urteil (copy) und der regulaere Abschluss (accept)."
+      "signals": ["copy"],
+      "note": "Was fuer sie spricht: allein das ausdrueckliche positive Urteil (copy). Ein regulaerer Abschluss ist keine Aussage ueber Korrektheit (SH-LEARN-01)."
     }
   ],
   "levels": [

@@ -1,15 +1,18 @@
 /**
  * @shinon/scoring — reiner Kern (assets/scoring-core.js).
  *
- * KEINE Imports (weder Bare noch node:): nur dann läuft der Replay-Test in
- * CI ohne node_modules — dieselbe Regel wie bei `@shinon/events` (Vertrag als
- * Daten) und `@shinon/codingmon` (assets/mechanik.js). `index.js` re-exportiert
- * diesen Kern, die Host-Anbindung (Dateien laden) bleibt dort.
+ * KEINE Bare- und keine node:-Imports: nur dann läuft der Replay-Test in CI ohne
+ * node_modules — dieselbe Regel wie bei `@shinon/events` (Vertrag als Daten) und
+ * `@shinon/codingmon` (assets/mechanik.js). Ein relativer Import auf den
+ * Schwesterkern `assets/signal-translate.js` ist erlaubt (er ist genauso rein).
+ * `index.js` re-exportiert beide Kerne, die Host-Anbindung bleibt dort.
  *
  * replay(Anfangszustand, Event-Strom) → { scorecard, injection, digest }.
  * Rein und deterministisch: kein Math.random, kein Date.now, kein Modell.
  * Unbekanntes ändert nichts (fail-closed); gezählt wird es trotzdem.
  */
+
+import { firstDefined, readPath, translateSignal } from './signal-translate.js';
 
 /** Vier Nachkommastellen nach jedem Event: kein Float-Rauschen im Golden-Wert. */
 export function round4(value) {
@@ -208,240 +211,10 @@ export function replay(contracts, initial, stream) {
   return { scorecard, injection, digest };
 }
 
-/**
- * ── Signale (K5): aus dem internen Ereignisstrom zur Scorecard ───────────────
- *
- * Diese Schicht LIEST den Strom, den der Spine emittiert, und uebersetzt ihn
- * nach der Signaltabelle (assets/signal-rules.json) in die Ereignisse, die der
- * Replay oben schon kennt. Nichts davon ist geraten:
- *
- *   - Nur was in der Tabelle steht, erzeugt ein Signal. Alles andere ergibt
- *     einen benannten Grund und aendert nichts (fail-closed).
- *   - Menschen-Text ist nur Text mit `data.source.kind === 'user'` — gemessen
- *     an den echten Sitzungsereignissen traegt Harness-Text ('agent-instructions',
- *     'runtime-context') denselben Typ user/message. Ohne die Marke zaehlt er nicht.
- *   - Wiederholung wird am INHALT gemessen (gemeinsame und ueberlappende Woerter),
- *     nicht an der Uhr: kein Date.now, keine Sekundenregel.
- *   - Der Widerruf rechnet exakt: die Zeile verschwindet aus dem Protokoll und die
- *     Tafel wird aus dem Rest neu nachgerechnet — kein Gegen-Delta, kein Rest.
- *
- * Die Funktionen hier sind rein und deterministisch (keine Imports, keine Zeit,
- * kein Zufall): dieselbe Folge von Ereignissen ergibt dieselbe Tafel.
- */
-
-/** Einen Punktpfad lesen: readPath({a:{b:1}}, 'a.b') → 1. Unbekanntes ergibt undefined. */
-export function readPath(source, path) {
-  if (typeof path !== 'string' || path === '') return undefined;
-  let value = source;
-  for (const key of path.split('.')) {
-    if (value === null || typeof value !== 'object') return undefined;
-    value = value[key];
-  }
-  return value;
-}
-
-/** Den ersten definierten Wert nehmen — zwei Pfade, kein Raten. */
-function firstDefined(...values) {
-  for (const value of values) if (value !== undefined && value !== null) return value;
-  return undefined;
-}
-
-/**
- * Die Woerter eines Textes: klein geschrieben, ohne Satzzeichen, kurze Woerter
- * fallen weg. Deterministisch — dieselbe Eingabe ergibt dieselbe Liste.
- */
-export function normalizeTokens(text, minLength = 3) {
-  return String(text ?? '')
-    .toLowerCase()
-    .split(/[^0-9a-zà-ÿ]+/)
-    .filter((token) => token.length >= minLength);
-}
-
-/**
- * Ueberlappung zweier Texte: gemeinsame Woerter und Jaccard-Anteil.
- * Beide Werte werden gebraucht, damit drei kurze gemeinsame Woerter nicht als
- * "dieselbe Frage" durchgehen (minShared) und ein langer Text nicht allein
- * durch seine Laenge (minRatio).
- */
-export function overlapOf(left, right, minLength = 3) {
-  const a = new Set(normalizeTokens(left, minLength));
-  const b = new Set(normalizeTokens(right, minLength));
-  let shared = 0;
-  for (const token of a) if (b.has(token)) shared += 1;
-  const union = a.size + b.size - shared;
-  return { shared, ratio: union === 0 ? 0 : shared / union };
-}
-
-/**
- * Den Text der MENSCHLICHEN Nachricht lesen — oder null.
- *
- * Die Marke ist Pflicht (siehe Kopf dieser Sektion). Der Text steht als
- * Blockliste in `data.content` (echte Form, gemessen); ein flacher `text` ist
- * der Rueckfall fuer ein direkt emittiertes Signal.
- */
-export function humanText(payload, rules) {
-  const reading = rules?.reading ?? {};
-  const marker = reading.humanMarker ?? {};
-  const kind = firstDefined(readPath(payload, marker.path), readPath(payload, marker.fallbackPath));
-  if (kind !== marker.equals) return null;
-
-  const blocks = readPath(payload, reading.textBlocks?.path);
-  if (Array.isArray(blocks)) {
-    const wanted = reading.textBlocks?.type ?? 'text';
-    const text = blocks
-      .filter((block) => block?.type === wanted && typeof block.text === 'string')
-      .map((block) => block.text)
-      .join('\n');
-    if (text.trim() !== '') return text;
-  }
-  const flat = readPath(payload, reading.textBlocks?.fallbackPath);
-  return typeof flat === 'string' && flat.trim() !== '' ? flat : null;
-}
-
-/**
- * Den Betreff eines Signals lesen: Pfad mit Rueckfall, Zahl erlaubt, Praefix
- * davor. Leer heisst leer — dann gibt es keinen Betreff (und der Widerruf kann
- * nichts treffen).
- */
-function subjectOf(payload, source) {
-  const raw = firstDefined(readPath(payload, source?.subjectPath), readPath(payload, source?.subjectFallbackPath));
-  const text = typeof raw === 'string'
-    ? raw
-    : typeof raw === 'number' && Number.isFinite(raw)
-      ? String(raw)
-      : '';
-  if (text.trim() === '') return '';
-  return `${typeof source?.subjectPrefix === 'string' ? source.subjectPrefix : ''}${text}`;
-}
-
-/**
- * Der Faktor einer Stufe — die EINE Uebersetzung von Staerke in Gewicht.
- *
- * Die Zahlen stehen in der Signaltabelle (`limits.strengths`), nicht im Code:
- * hoch = doppeltes Basis-Delta, mittel = einfaches, niedrig = halbes. Ist die
- * Stufe unbekannt, gilt 1 — der Vertragswert, nicht ein geratener Faktor.
- * Zugleich die einzige Stelle, an der `applyEvent` sein `weight` herbekommt:
- * eine zweite Delta-Tabelle gibt es nicht.
- */
-export function strengthFactor(rules, strengthId) {
-  const factor = rules?.limits?.strengths?.[strengthId];
-  return typeof factor === 'number' && Number.isFinite(factor) && factor > 0 ? factor : 1;
-}
-
-/**
- * Ein Ereignis des Spines in ein Signal uebersetzen. Rein: der Sitzungszustand
- * kommt als Argument herein, nicht als Modulzustand.
- *
- * Rueckgabe:
- *   kind      'score' (es gibt ein Ereignis fuer den Replay), 'retract' (eine
- *             Zeile wird zurueckgenommen), 'note' (beobachtet, nie gewertet)
- *   event     das Ereignis fuer den Replay — oder null
- *   reason    benannter Grund, wenn NICHTS passiert (jeder Grund ist ein Test wert)
- *   question  der gerade gesehene Menschen-Text (der Host merkt ihn sich)
- */
-export function translateSignal(envelope, payload, rules, session = {}) {
-  const empty = {
-    signal: null,
-    kind: null,
-    subject: null,
-    factor: 1,
-    event: null,
-    replaces: false,
-    question: undefined,
-    reason: null,
-    detail: {},
-  };
-  const type = typeof envelope?.event_type === 'string' ? envelope.event_type : '';
-  const sessionId = typeof envelope?.session_id === 'string' ? envelope.session_id : '';
-  if (type === '' || sessionId.trim() === '') return { ...empty, reason: 'NO_SESSION' };
-
-  const source = rules?.sources?.[type];
-  if (source === undefined || source === null || typeof source !== 'object') {
-    return { ...empty, reason: `UNKNOWN_SOURCE:${type}` };
-  }
-  const signals = rules?.signals ?? {};
-  const label = (id) => (typeof signals?.[id]?.label === 'string' ? signals[id].label : id);
-
-  // Beobachtet, ohne Pol: gezaehlt, nie gewertet.
-  if (source.kind === 'note') return { ...empty, kind: 'note', reason: 'OBSERVED_ONLY', detail: { note: source.reason ?? '' } };
-
-  // Widerruf: die Zeile mit diesem Betreff verschwindet. Der Betreff wird mit
-  // DERSELBEN Funktion gelesen wie beim Werten — sonst träfe der Widerruf eine
-  // Zeile nicht, sobald eine Regel ein Präfix führt.
-  if (source.kind === 'retract') {
-    const subject = subjectOf(payload, source);
-    if (subject === '') {
-      return { ...empty, reason: `MISSING_SUBJECT:${String(source.subjectPath)}` };
-    }
-    return { ...empty, signal: typeof source.signal === 'string' ? source.signal : null, kind: 'retract', subject };
-  }
-
-  // Bewertet: welches Signal ist es?
-  let signalId = null;
-  let detail = {};
-  if (source.byRating !== undefined && source.byRating !== null) {
-    const rating = readPath(payload, source.ratingPath);
-    signalId = typeof rating === 'string' ? source.byRating[rating] ?? null : null;
-    if (signalId === null) return { ...empty, reason: `UNKNOWN_RATING:${String(rating)}` };
-    detail = { rating };
-  } else if (source.byReason !== undefined && source.byReason !== null) {
-    const reasonKind = readPath(payload, source.reasonPath);
-    signalId = typeof reasonKind === 'string' ? source.byReason[reasonKind] ?? null : null;
-    if (signalId === null) return { ...empty, reason: `UNHANDLED_REASON:${String(reasonKind)}` };
-    detail = { reason: reasonKind };
-  } else if (typeof source.signal === 'string') {
-    signalId = source.signal;
-  }
-  if (signalId === null) return { ...empty, reason: 'NO_SIGNAL_RULE' };
-
-  const definition = signals[signalId];
-  if (definition === null || typeof definition !== 'object' || definition.observable !== true) {
-    // Die Tabelle fuehrt das Signal ausdruecklich als nicht beobachtbar.
-    return { ...empty, reason: `NOT_OBSERVABLE:${signalId}` };
-  }
-
-  // Menschen-Text: nur mit Marke. Und die Wiederholung wird am Inhalt gemessen.
-  let question;
-  if (source.humanOnly === true) {
-    const text = humanText(payload, rules);
-    if (text === null) return { ...empty, reason: 'NOT_HUMAN' };
-    question = text;
-    detail = { ...detail, text };
-    if (signalId === 'rephrase') {
-      const similarity = rules?.reading?.similarity ?? {};
-      const minLength = typeof similarity.minTokenLength === 'number' ? similarity.minTokenLength : 3;
-      const previous = typeof session.previousQuestion === 'string' ? session.previousQuestion : '';
-      const { shared, ratio } = overlapOf(previous, text, minLength);
-      const minShared = typeof similarity.minShared === 'number' ? similarity.minShared : 3;
-      const minRatio = typeof similarity.minRatio === 'number' ? similarity.minRatio : 0.6;
-      detail = { ...detail, shared, ratio };
-      if (previous.trim() === '') return { ...empty, question, detail, reason: 'FIRST_QUESTION' };
-      if (shared < minShared || ratio < minRatio) {
-        return { ...empty, question, detail, reason: 'DIFFERENT_TOPIC' };
-      }
-    }
-  }
-
-  const factor = strengthFactor(rules, definition.strength);
-  const field = definition.type === 'feedback.correction' ? 'correction' : 'approval';
-  const subject = subjectOf(payload, source) || null;
-
-  return {
-    ...empty,
-    signal: signalId,
-    kind: 'score',
-    subject,
-    factor,
-    replaces: source.replaces === true,
-    question,
-    detail,
-    event: {
-      type: definition.type,
-      weight: factor,
-      payload: { session_id: sessionId, [field]: label(signalId) },
-    },
-  };
-}
+// Die Uebersetzung selbst lebt in `signal-translate.js` — dieser Kern liest nur
+// ihre Namen (relativer Import, kein bare Import). Die oeffentliche Flaeche
+// bleibt dieselbe: wer `createSignalCollector` hier importiert, bekommt ihn.
+export { readPath, normalizeTokens, overlapOf, humanText, strengthFactor, translateSignal } from './signal-translate.js';
 
 /**
  * Die Tendenz aus dem Protokoll ableiten — rein und datengetrieben.
@@ -572,6 +345,10 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
   let notes = 0;
   let dropped = 0;
   const stats = { observed: 0, scored: 0, retracted: 0, noted: 0, silent: 0, reasons: {} };
+  // Die Zuordnung lebt im Prozess: so viele Antworten merkt sich eine Sitzung,
+  // aeltere fallen weg (dieselbe Bauform wie die Baustein-Deckel). Kein Deckel
+  // auf SIGNALE — nur auf die Kennungen, die ein Urteil braucht.
+  const MAX_ANSWERS = 200;
 
   const count = (reason) => {
     stats.reasons[reason] = (stats.reasons[reason] ?? 0) + 1;
@@ -580,7 +357,9 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
   const sessionOf = (sessionId) => {
     let state = sessions.get(sessionId);
     if (state === undefined) {
-      state = { id: sessionId, previousQuestion: '', questions: 0, signals: 0 };
+      // `answers` ist die Zuordnung, die ein Urteil pruefbar macht: die
+      // Kennungen der Antworten, die DIESE Sitzung gesehen hat (SH-LEARN-01).
+      state = { id: sessionId, previousQuestion: '', questions: 0, signals: 0, answers: new Set() };
       sessions.set(sessionId, state);
     }
     return state;
@@ -588,9 +367,16 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
 
   const scorecard = () => replay(contracts, initial, records.map((record) => record.event)).scorecard;
 
-  /** Die Merkzettel, die einen Stand SIND — Hüllen ohne Frage zaehlen nicht. */
+  /**
+   * Die Merkzettel, die einen Stand SIND — Hüllen ohne Frage zaehlen nicht.
+   * Die Antwort-Kennungen bleiben hier draussen: sie sind Prozesswissen (welche
+   * Antwort habe ich gesehen), kein dauerhafter Zustand — eine `Set` waere im
+   * JSON ohnehin leer, und ein Merkzettel ohne Frage ist nur Ballast.
+   */
   const memoList = () =>
-    [...sessions.values()].filter((state) => state.previousQuestion !== '').map((state) => ({ ...state }));
+    [...sessions.values()]
+      .filter((state) => state.previousQuestion !== '')
+      .map((state) => ({ id: state.id, previousQuestion: state.previousQuestion, questions: state.questions, signals: state.signals }));
 
   /**
    * Den Stand melden. Reine Weitergabe: der Kern kopiert, der Host schreibt.
@@ -613,6 +399,22 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
     observe(envelope, payload) {
       stats.observed += 1;
       const sessionId = typeof envelope?.session_id === 'string' ? envelope.session_id : '';
+
+      // Die ANTWORT der Sitzung merken (SH-LEARN-01): `assistant/message` traegt
+      // `message.id`, genau die Kennung, die `feedback/message-put` als
+      // `item.messageId` zurueckgibt. Nur eine so gesehene Antwort ist ein
+      // pruefbarer Gegenstand fuer ein Urteil.
+      if (envelope?.event_type === 'message.completed' && sessionId !== '') {
+        const answerId = firstDefined(readPath(payload, 'message.id'), readPath(payload, 'data.message.id'), readPath(payload, 'id'));
+        if (typeof answerId === 'string' && answerId !== '') {
+          const state = sessionOf(sessionId);
+          if (state.answers.size >= MAX_ANSWERS) {
+            const oldest = state.answers.values().next();
+            if (!oldest.done) state.answers.delete(oldest.value);
+          }
+          state.answers.add(answerId);
+        }
+      }
 
       // Ein neues Sitzungsereignis schliesst die Sitzung ab: der Merkzettel
       // geht, und es wird KEINE leere Huelle angelegt — die wieder anzulegen
@@ -687,19 +489,30 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
       let kept = 0;
       let rejected = 0;
       const next = [];
+      // Welche Antworten ein frueherer Host schon bewertet hat, bleibt
+      // zuordenbar: die Betreffe der Zeilen sind die Kennungen der Antworten.
+      const knownAnswers = new Map();
       for (const record of rawRecords) {
         if (typeof record?.event?.type !== 'string' || typeof record?.session_id !== 'string') {
           rejected += 1;
           continue;
         }
+        const subject = typeof record.subject === 'string' ? record.subject : null;
+        if (subject !== null) {
+          if (!knownAnswers.has(record.session_id)) knownAnswers.set(record.session_id, new Set());
+          knownAnswers.get(record.session_id).add(subject);
+        }
         next.push({
           session_id: record.session_id,
-          subject: typeof record.subject === 'string' ? record.subject : null,
+          subject,
           signal: typeof record.signal === 'string' ? record.signal : null,
           kind: 'score',
           factor: typeof record.factor === 'number' && Number.isFinite(record.factor) ? record.factor : 1,
           event: record.event,
           detail: record.detail !== null && typeof record.detail === 'object' ? record.detail : {},
+          // Der Altstand kennt keine Herkunft: er bleibt lesbar, traegt aber
+          // `null` und lernt damit keine Bausteine (fail-closed, kein Nachtrag).
+          basis: record.basis !== null && typeof record.basis === 'object' ? record.basis : null,
         });
         kept += 1;
       }
@@ -715,11 +528,21 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
           previousQuestion: typeof memo.previousQuestion === 'string' ? memo.previousQuestion : '',
           questions: Number.isFinite(memo.questions) ? memo.questions : 0,
           signals: Number.isFinite(memo.signals) ? memo.signals : 0,
+          answers: new Set(knownAnswers.get(memo.id) ?? []),
         });
+      }
+      // Eine Sitzung ohne Merkzettel kennt trotzdem Antworten: die Betreffe
+      // ihrer Zeilen sind die Zuordnung, die ein spaetes Urteil nach dem
+      // Neustart braucht (SH-LEARN-01). Diese Huelle traegt keine Frage und
+      // wird deshalb NIE geschrieben (memoList verlangt eine Frage) — sie ist
+      // Prozesswissen aus dem Protokoll, kein zweiter Zustand.
+      for (const [id, answers] of knownAnswers) {
+        if (sessions.has(id)) continue;
+        sessions.set(id, { id, previousQuestion: '', questions: 0, signals: 0, answers: new Set(answers) });
       }
       if (Number.isFinite(state?.notes)) notes = state.notes;
       dropped += rejected;
-      return { records: kept, memos: sessions.size, rejected };
+      return { records: kept, memos: memoList().length, rejected };
     },
     /** Die Tafel, wie sie aus dem Protokoll folgt (inkl. Injektion und Digest). */
     result() {
