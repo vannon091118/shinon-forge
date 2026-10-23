@@ -1,4 +1,5 @@
 import z from '@deepseek-ai/schemastery';
+import { createOrchestrator } from '@shinon/seams/core';
 
 /**
  * Der Slot des Overlays — EIN Besitzer fuer zwei Halves.
@@ -55,6 +56,7 @@ export function lastPayload(...args) {
 }
 
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'popup' });
   if (!config.enabled) {
     console.log('[shinon-popup] deaktiviert (enabled=false) — kein Listener registriert');
     return () => {};
@@ -83,7 +85,7 @@ export function apply(ctx, config) {
   };
 
   const handler = (...args) => trajectory({ original: lastPayload(...args), output: null, process: 'pending' });
-  const dispose = ctx.on(signal, handler);
+  const dispose = bus.route(signal, handler);
 
   return () => {
     if (typeof dispose === 'function') dispose();

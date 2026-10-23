@@ -78,11 +78,12 @@ test('key-router: jeder Anbieter nennt eine Referenz — ohne sie gibt es keinen
 
 test('key-router: die Naht-Ereignisse stehen als Literale in der Host-Hälfte', () => {
   // Absichtlich der Ro htext (nicht codeOnly): codeOnly entfernt
-  // String-Literale — genau das, was hier geprüft wird. Die gesuchte Form
-  // `ctx.on('…'` steht in keinem Kommentar (dort nur in Backticks).
+  // String-Literale — genau das, was hier geprüft wird. Seit Etappe 2 bindet
+  // `bus.route('…'` denselben Kanal; beide Formen sind gültig, die Zusage ist
+  // der Kanalname.
   const code = read(INDEX);
   assert.ok(
-    code.includes(`ctx.on('agent/request-error'`),
+    code.includes(`ctx.on('agent/request-error'`) || code.includes(`bus.route('agent/request-error'`),
     'die 429-Beobachtung hängt nicht an agent/request-error — ein Zuhörer ohne Sender',
   );
   assert.ok(

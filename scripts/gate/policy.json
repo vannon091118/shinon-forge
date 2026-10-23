@@ -10,7 +10,8 @@
       "client-half",
       "legacy-guard",
       "profile",
-      "dsh-singleton"
+      "dsh-singleton",
+      "orchestrator"
     ],
     "local": [
       "bundle-resolution",

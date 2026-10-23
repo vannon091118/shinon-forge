@@ -34,6 +34,9 @@ import { loadClientBundle, requireStub } from './helpers/client-sandbox.mjs';
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const host = read('packages/persona/index.js');
+// Die Routen haben einen eigenen Eigentuemer (`assets/ui-surface.js`); die
+// Vertragsnamen stehen weiter im Eintrag.
+const surface = read('packages/persona/assets/ui-surface.js');
 const core = read('packages/persona/assets/interaction-core.js');
 const client = read('packages/persona/client.js');
 
@@ -135,7 +138,7 @@ test('Pruef-Panel: Route, Startstand und Vertrag sind auf beiden Seiten dasselbe
   assert.equal(clientLiteral('STATE_GLOBAL'), hostLiteral('UI_STATE_GLOBAL'), 'der Zustands-Global driftet');
   // Der Host registriert GET und POST unter DIESER Route — und legt den
   // Startstand in denselben Global-Namen, den das Panel liest.
-  assert.match(host, /path: REVIEW_ROUTE,[\s\S]*?req\.method === 'GET'[\s\S]*?req\.method !== 'POST'/, 'die Route kennt nicht beide Methoden');
+  assert.match(surface, /path: names\.reviewRoute,[\s\S]*?req\.method === 'GET'[\s\S]*?req\.method !== 'POST'/, 'die Route kennt nicht beide Methoden');
   assert.match(host, /table\.push\(\{ kind: 'global', name: REVIEW_GLOBAL/, 'der Host legt den Startstand nicht in den Global-Namen');
 });
 

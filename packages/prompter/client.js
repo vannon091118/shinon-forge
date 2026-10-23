@@ -1,5 +1,6 @@
 /**
  * @shinon/prompter — Client-Hälfte: Trace-Panel.
+ * GENERIERT aus assets/client/*.js — nicht von Hand ändern; Schreiben: node scripts/build-client.mjs prompter.
  *
  * Zeigt die letzten Prompter-Entscheidungen (Outcome, Modus, Gründe, Kontextquelle).
  * Host→Client läuft über den Kanal, nicht über das Fenster: der Host emittiert
@@ -13,6 +14,7 @@
 window.__ModuleLoader__.load({
   id: '@shinon/prompter',
   factory(require) {
+// >>> @part assets/client/01-react.js
     const React = require('react');
     const h = React.createElement;
     const PLUGIN = '@shinon/prompter';
@@ -179,7 +181,9 @@ window.__ModuleLoader__.load({
       const cls = outcome === 'accepted' ? '' : outcome;
       return h('span', { className: `__pt_badge ${cls}`.trim() }, String(outcome).toUpperCase());
     }
+// <<< @part assets/client/01-react.js
 
+// >>> @part assets/client/02-trace-panel.js
     /**
      * Das Trace-Panel: die letzten Entscheidungen als aufklappbare Zeilen — die
      * Zusammenfassung nennt Ergebnis, Intent und Belege, alles Weitere steht im
@@ -278,5 +282,7 @@ window.__ModuleLoader__.load({
         });
       },
     };
+// <<< @part assets/client/02-trace-panel.js
+
   },
 });

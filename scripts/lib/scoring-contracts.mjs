@@ -1,0 +1,510 @@
+/**
+ * scoring-contracts.mjs — Eigentümer: Trigger-, Signal- und Tendenzvertrag.
+ *
+ * Die drei Prüfungen lesen die Verträge des Pakets (`scoring-state.json`,
+ * `technical-profile.json`, `skill-triggers.json`, `signal-rules.json`,
+ * `tendency-rules.json`) gegen den Spine. Gemeinsame Helfer und die
+ * Schreib-Scope-Seite liegen in `scoring-rules.mjs`; keine der beiden Dateien
+ * importiert das Plugin, die Richtung ist Fassade → Teil.
+ */
+import {
+  FORBIDDEN_RULE_KEYS,
+  PROFILE_CONTRACT_ID,
+  SCORING_CONTRACT_ID,
+  SIGNAL_IDS,
+  SIGNAL_RULES_CONTRACT_ID,
+  SOURCE_KINDS,
+  STRENGTH_IDS,
+  TENDENCY_MECHANISMS,
+  TENDENCY_POLES,
+  TENDENCY_RULES_CONTRACT_ID,
+  TRIGGERS_CONTRACT_ID,
+  isText,
+} from './scoring-rules.mjs';
+
+
+/**
+ * Trigger-Vertrag fail-closed: Dimensionen, Stufen, Skills, Event-Typen und
+ * Nutzlasten müssen auf beiden Seiten existieren — sonst feuert ein Trigger
+ * auf etwas, das es nicht gibt.
+ */
+export function contractIssues(scoring, profile, triggers, spine, file) {
+  const issues = [];
+  const at = (detail) => `${file}: ${detail}`;
+  if (typeof scoring !== 'object' || scoring === null) return [at('kein Objekt')];
+  if (scoring.contract !== SCORING_CONTRACT_ID) {
+    issues.push(at(`contract muss "${SCORING_CONTRACT_ID}" sein (ist ${JSON.stringify(scoring.contract)})`));
+  }
+  if (typeof profile !== 'object' || profile === null) return [...issues, at('Technik-Profil fehlt')];
+  if (typeof triggers !== 'object' || triggers === null) return [...issues, at('Skill-Trigger fehlen')];
+  if (profile.contract !== PROFILE_CONTRACT_ID) {
+    issues.push(at(`Profil-contract muss "${PROFILE_CONTRACT_ID}" sein (ist ${JSON.stringify(profile.contract)})`));
+  }
+  if (triggers.contract !== TRIGGERS_CONTRACT_ID) {
+    issues.push(at(`Trigger-contract muss "${TRIGGERS_CONTRACT_ID}" sein (ist ${JSON.stringify(triggers.contract)})`));
+  }
+
+  const dimensions = scoring.dimensions ?? {};
+  if (Object.keys(dimensions).length === 0) issues.push(at('dimensions fehlt oder ist leer'));
+  for (const [name, dimension] of Object.entries(dimensions)) {
+    for (const key of ['initial', 'min', 'max']) {
+      if (typeof dimension?.[key] !== 'number') issues.push(at(`dimensions.${name}.${key} muss eine Zahl sein`));
+    }
+  }
+
+  const spineEvents = spine?.events ?? {};
+  for (const [type, definition] of Object.entries(scoring.events ?? {})) {
+    // Kein erfundener Signaltyp: was der Spine nie emittiert, darf das Scoring
+    // nicht erwarten — sonst läuft das Replay auf Luft.
+    if (!spineEvents[type]) {
+      issues.push(at(`Event-Typ ${type} steht nicht im Spine — ein Trigger auf ihn feuert nie`));
+      continue;
+    }
+    // Dieselbe Nutzlast auf beiden Seiten: der Spine liefert, was das Scoring liest.
+    const want = spineEvents[type].payload ?? [];
+    const have = definition?.payload ?? [];
+    if (JSON.stringify([...have].sort()) !== JSON.stringify([...want].sort())) {
+      issues.push(at(`${type}.payload ${JSON.stringify(have)} ≠ Spine ${JSON.stringify(want)}`));
+    }
+  }
+
+  const rate = scoring.decay?.rate;
+  if (typeof rate !== 'number' || !(rate > 0 && rate <= 0.05)) {
+    issues.push(at(`decay.rate muss konservativ sein (0 < rate ≤ 0.05, ist ${JSON.stringify(rate)})`));
+  }
+  const interval = scoring.cooling?.interval;
+  if (!Number.isInteger(interval) || interval < 2) {
+    issues.push(at(`cooling.interval muss mindestens 2 Signale tragen (ist ${JSON.stringify(interval)})`));
+  }
+
+  const levels = scoring.relation?.levels ?? [];
+  if (levels.length === 0 || levels.some((level) => !isText(level))) {
+    issues.push(at('relation.levels fehlt oder ist leer'));
+  } else if (!levels.includes(scoring.relation?.initial)) {
+    issues.push(at(`relation.initial ${JSON.stringify(scoring.relation?.initial)} steht nicht in relation.levels`));
+  }
+
+  if (!Array.isArray(profile.skills) || profile.skills.length === 0 || profile.skills.some((skill) => !isText(skill))) {
+    issues.push(at('Technik-Profil skills fehlt oder ist leer'));
+  }
+  const maxTriggers = profile.limits?.maxTriggers;
+  const list = triggers.triggers ?? [];
+  if (!Array.isArray(list) || list.length === 0) {
+    issues.push(at('triggers fehlt oder ist leer'));
+  } else {
+    if (Number.isInteger(maxTriggers) && list.length > maxTriggers) {
+      issues.push(at(`${list.length} Trigger übersteigen limits.maxTriggers ${maxTriggers}`));
+    }
+    const ids = new Set();
+    for (const [index, trigger] of list.entries()) {
+      const where = `triggers[${index + 1}]`;
+      if (!isText(trigger?.id)) issues.push(at(`${where}.id fehlt`));
+      else if (ids.has(trigger.id)) issues.push(at(`${where}.id ${JSON.stringify(trigger.id)} ist doppelt`));
+      else ids.add(trigger.id);
+      const hasDimension = typeof trigger?.dimension === 'string';
+      const hasRelation = typeof trigger?.relation === 'string';
+      if (!hasDimension && !hasRelation) issues.push(at(`${where} nennt weder dimension noch relation`));
+      if (hasDimension && !dimensions[trigger.dimension]) {
+        issues.push(at(`${where}.dimension ${JSON.stringify(trigger.dimension)} steht nicht in dimensions`));
+      }
+      if (hasDimension && trigger.op !== 'below' && trigger.op !== 'above') {
+        issues.push(at(`${where}.op muss below oder above sein (ist ${JSON.stringify(trigger.op)})`));
+      }
+      if (hasDimension && typeof trigger.threshold !== 'number') {
+        issues.push(at(`${where}.threshold muss eine Zahl sein`));
+      }
+      if (hasRelation && !levels.includes(trigger.relation)) {
+        issues.push(at(`${where}.relation ${JSON.stringify(trigger.relation)} steht nicht in relation.levels`));
+      }
+      // Kein Skill außerhalb des Technik-Profils: sonst wird eine Injektion
+      // versprochen, die die Schicht nie auslösen darf.
+      if (!isText(trigger?.skill)) issues.push(at(`${where}.skill fehlt`));
+      else if (!(profile.skills ?? []).includes(trigger.skill)) {
+        issues.push(at(`${where}.skill ${JSON.stringify(trigger.skill)} steht nicht im Technik-Profil`));
+      }
+      if (!isText(trigger?.text)) issues.push(at(`${where}.text fehlt (eine Injektion ohne Text)`));
+    }
+  }
+  return issues;
+}
+
+/** Jeden Schlüsselnamen im Dokument sammeln (auch verschachtelt). */
+function keyPaths(value, prefix = '') {
+  if (value === null || typeof value !== 'object') return [];
+  const found = [];
+  for (const [key, entry] of Object.entries(value)) {
+    const path = prefix === '' ? key : `${prefix}.${key}`;
+    found.push(path);
+    found.push(...keyPaths(entry, path));
+  }
+  return found;
+}
+
+/**
+ * Die Signaltabelle prüfen (K5): genau sieben Zeilen, jede mit einem
+ * erreichbaren Zulieferer oder einem benannten Grund, und keine erfundene
+ * Quelle.
+ *
+ * Was hier fail-closed heißt: eine Zeile, die `observable: true` sagt und deren
+ * Signaltyp nicht im Scorecard-Vertrag steht, wäre ein Wert, den niemand
+ * berechnen kann. Eine Zeile, deren natives Ereignis der Spine nicht abbildet,
+ * wäre ein Signal, das nie entstehen kann. Beides ist ein Befund, kein
+ * stiller Ausfall.
+ */
+export function signalRuleIssues(rules, scoring, spine, file) {
+  const issues = [];
+  const at = (detail) => `${file}: ${detail}`;
+  if (typeof rules !== 'object' || rules === null) return [at('kein Objekt')];
+  if (rules.contract !== SIGNAL_RULES_CONTRACT_ID) {
+    issues.push(at(`contract muss "${SIGNAL_RULES_CONTRACT_ID}" sein (ist ${JSON.stringify(rules.contract)})`));
+  }
+  if (typeof scoring !== 'object' || scoring === null) return [...issues, at('Scorecard-Vertrag fehlt')];
+
+  // Kein Deckel, kein Limit, keine Sekundenregel — benannt, nicht weggelassen.
+  for (const path of keyPaths(rules)) {
+    const leaf = path.split('.').pop();
+    if (FORBIDDEN_RULE_KEYS.includes(leaf)) issues.push(at(`${path} ist verboten: Deckel, Zähler-Limit und Sekundenregeln gehören nicht in die Signaltabelle`));
+  }
+
+  const strengths = rules.limits?.strengths ?? {};
+  for (const id of STRENGTH_IDS) {
+    const factor = strengths[id];
+    if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 0) {
+      issues.push(at(`limits.strengths.${id} muss eine Zahl > 0 sein (ist ${JSON.stringify(factor)})`));
+    }
+  }
+
+  const reading = rules.reading ?? {};
+  if (!isText(reading.humanMarker?.path) || !isText(reading.humanMarker?.equals)) {
+    issues.push(at('reading.humanMarker braucht path und equals — ohne Marke wäre Harness-Text eine Nachricht'));
+  }
+  if (!isText(reading.textBlocks?.path)) issues.push(at('reading.textBlocks.path fehlt'));
+  const similarity = reading.similarity ?? {};
+  for (const key of ['minShared', 'minRatio', 'minTokenLength']) {
+    if (typeof similarity[key] !== 'number' || !Number.isFinite(similarity[key])) {
+      issues.push(at(`reading.similarity.${key} muss eine Zahl sein`));
+    }
+  }
+
+  // Die sieben Zeilen — genau diese, keine mehr und keine weniger.
+  const signals = rules.signals ?? {};
+  const ids = Object.keys(signals);
+  if (ids.length !== SIGNAL_IDS.length) {
+    issues.push(at(`signals muss genau ${SIGNAL_IDS.length} Zeilen tragen (ist ${ids.length}: ${ids.join(', ')})`));
+  }
+  for (const id of SIGNAL_IDS) {
+    if (signals[id] === undefined) issues.push(at(`Signal ${id} fehlt in signals`));
+  }
+  for (const id of ids) {
+    if (!SIGNAL_IDS.includes(id)) issues.push(at(`Signal ${id} steht nicht in der Plan-Tabelle`));
+  }
+
+  const spineEvents = spine?.events ?? {};
+  const reachable = new Set([
+    ...Object.values(spine?.signals ?? {}),
+    ...Object.values(spine?.carrier?.typeMap ?? {}),
+  ]);
+
+  const referenced = new Set();
+  for (const [id, definition] of Object.entries(signals)) {
+    if (definition === null || typeof definition !== 'object') {
+      issues.push(at(`signals.${id} ist kein Objekt`));
+      continue;
+    }
+    if (typeof definition.observable !== 'boolean') issues.push(at(`signals.${id}.observable muss ein Boolean sein`));
+    if (definition.observable === false) {
+      if (!isText(definition.reason)) issues.push(at(`signals.${id} ist nicht beobachtbar, nennt aber keinen Grund`));
+      if (definition.type !== undefined || definition.strength !== undefined) {
+        issues.push(at(`signals.${id} ist nicht beobachtbar und darf trotzdem keinen Typ/keine Stärke nennen`));
+      }
+      continue;
+    }
+    if (definition.observable !== true) continue;
+    if (!isText(definition.source)) issues.push(at(`signals.${id}.source fehlt`));
+    if (!isText(definition.label)) issues.push(at(`signals.${id}.label fehlt (ein Signal ohne Text im Scorecard-Ereignis)`));
+    if (!isText(definition.subject)) issues.push(at(`signals.${id}.subject fehlt`));
+    if (!isText(definition.type) || scoring.events?.[definition.type] === undefined) {
+      issues.push(at(`signals.${id}.type ${JSON.stringify(definition.type)} steht nicht im Scorecard-Vertrag`));
+    }
+    if (!STRENGTH_IDS.includes(definition.strength)) {
+      issues.push(at(`signals.${id}.strength muss eine der Stärken sein (${STRENGTH_IDS.join(', ')})`));
+    }
+  }
+
+  for (const [type, source] of Object.entries(rules.sources ?? {})) {
+    if (source === null || typeof source !== 'object') {
+      issues.push(at(`sources.${type} ist kein Objekt`));
+      continue;
+    }
+    // Nur ein Ereignis, das der Spine kennt UND erreicht: sonst feuert die Regel nie.
+    if (spineEvents[type] === undefined) {
+      issues.push(at(`Quelle ${type} steht nicht im Spine — eine Regel auf ein Ereignis, das es nicht gibt`));
+    } else if (!reachable.has(type)) {
+      issues.push(at(`Quelle ${type} hat keinen Signal-/Carrier-Pfad im Spine — sie kann nie entstehen`));
+    }
+    if (!isText(source.native)) {
+      issues.push(at(`sources.${type}.native fehlt (der native DSH-Typ muss benannt sein)`));
+    } else if (spine?.carrier?.typeMap?.[source.native] === undefined) {
+      issues.push(at(`sources.${type}.native ${JSON.stringify(source.native)} ist im Carrier nicht abgebildet`));
+    }
+    if (!SOURCE_KINDS.includes(source.kind)) {
+      issues.push(at(`sources.${type}.kind muss ${SOURCE_KINDS.join(' | ')} sein`));
+      continue;
+    }
+    const claims = [];
+    if (typeof source.signal === 'string') claims.push(source.signal);
+    for (const map of ['byRating', 'byReason']) {
+      if (source[map] === undefined) continue;
+      if (source[map] === null || typeof source[map] !== 'object') {
+        issues.push(at(`sources.${type}.${map} muss ein Objekt sein`));
+        continue;
+      }
+      for (const [key, signal] of Object.entries(source[map])) claims.push(`${signal} (${map}.${key})`);
+    }
+    if (source.kind === 'score' && claims.length === 0) {
+      issues.push(at(`sources.${type} wertet, sagt aber nicht welches Signal`));
+    }
+    if (source.kind === 'retract' && !isText(source.subjectPath)) {
+      issues.push(at(`sources.${type} nimmt zurück, nennt aber keinen subjectPath`));
+    }
+    // `note`/`observe` nennen ihre Beobachtung, kein gewertetes Signal (SH-LEARN-01).
+    const observing = source.kind === 'note' || source.kind === 'observe';
+    for (const claim of claims) {
+      const signal = claim.includes(' ') ? claim.split(' ')[0] : claim;
+      const definition = signals[signal];
+      if (definition === undefined) issues.push(at(`sources.${type} nennt ${JSON.stringify(claim)} — dieses Signal gibt es nicht`));
+      else if (observing) {
+        if (definition.observable !== false) issues.push(at(`sources.${type} beobachtet nur, nennt aber ${signal}, das gewertet wird`));
+      } else {
+        referenced.add(signal);
+        if (definition.observable !== true) issues.push(at(`sources.${type} nennt ${signal}, das die Tabelle als nicht beobachtbar führt`));
+      }
+    }
+  }
+
+  // Keine Zeile ohne Zulieferer: ein beobachtbares Signal, das niemand erzeugt,
+  // sieht im Vertrag wie eine Fähigkeit aus und ist in Wahrheit toter Text.
+  for (const id of SIGNAL_IDS) {
+    if (signals[id]?.observable === true && !referenced.has(id)) {
+      issues.push(at(`Signal ${id} ist als beobachtbar geführt, aber keine Quelle erzeugt es`));
+    }
+  }
+  return issues;
+}
+
+/**
+ * Den Pol eines Signals aus dem VERTRAG lesen — nicht aus seinem Namen.
+ *
+ * Der Pol ist die Richtung, in die das Signal die Dimensionen schiebt, und die
+ * steht als Vorzeichen im Delta der Scorecard. Ein Signal ohne Delta (oder mit
+ * einem Delta, das sich zu 0 aufhebt) hat keinen Pol — dann darf keine Klasse
+ * ihn für sich beanspruchen.
+ * @returns 'positive' | 'negative' | null
+ */
+export function poleOfSignal(scoring, definition) {
+  const deltas = scoring?.events?.[definition?.type]?.delta;
+  if (deltas === null || typeof deltas !== 'object') return null;
+  const sum = Object.values(deltas).reduce((total, value) => total + (typeof value === 'number' ? value : 0), 0);
+  if (!Number.isFinite(sum) || sum === 0) return null;
+  return sum > 0 ? 'positive' : 'negative';
+}
+
+/**
+ * Einen Mechanismus-Ort auflösen: `datei#pfad` muss im benannten Vertrag einen
+ * Wert tragen. Was nicht auflöst, ist eine Absichtserklärung — kein Mechanismus.
+ */
+export function resolveMechanism(where, docs) {
+  if (typeof where !== 'string' || !where.includes('#')) return undefined;
+  const [target, path] = where.split('#');
+  const source = docs?.[target];
+  if (source === undefined || source === null) return undefined;
+  return resolvePath(source, path);
+}
+
+/**
+ * Einen Punktpfad auflösen — und dabei SCHLÜSSEL MIT PUNKT treffen.
+ *
+ * Die Signaltabelle führt ihre Quellen unter `sources["feedback.rated"]`: der
+ * Punkt gehört zum Schlüssel, nicht zum Pfad. Ein naives `split('.')` findet
+ * diesen Ort nie und würde einen Mechanismus als „löst nicht auf" melden,
+ * obwohl er dasteht. Deshalb wird an jeder Stufe zuerst der GANZE Rest als
+ * Schlüssel versucht und erst dann geteilt.
+ */
+function resolvePath(value, path) {
+  if (value === null || typeof value !== 'object') return undefined;
+  const remaining = String(path);
+  if (remaining === '') return value;
+  if (Object.prototype.hasOwnProperty.call(value, remaining)) return value[remaining];
+  const index = remaining.indexOf('.');
+  if (index < 0) return undefined;
+  return resolvePath(value[remaining.slice(0, index)], remaining.slice(index + 1));
+}
+
+/**
+ * Die Tendenz-Regeln prüfen (Zug 3): Vertrag, Klassen, Herkünfte.
+ *
+ * „Klassen und Herkünfte" heißt hier konkret: jede Klasse nennt ihren POL, jedes
+ * von ihr beanspruchte Signal muss es geben, beobachtbar sein und DENSELBEN Pol
+ * im Vertrag tragen (das Vorzeichen seines Deltas, nicht sein Name), kein Signal
+ * darf zwei Klassen speisen, und kein beobachtbares Signal darf übrig bleiben —
+ * sonst rechnet die Tendenz an ihm vorbei. Dazu die Stufen (absteigend, Ende bei
+ * 0), die Haltungen (geordnet, benannte Klasse + Stufe, letzte bedingungslos),
+ * die Mindestevidenz — und die drei Mechanismen mit auflösendem Ort.
+ *
+ * @param tendency - der Vertrag `assets/tendency-rules.json`.
+ * @param rules - die Signaltabelle (Herkunft jedes Signals).
+ * @param scoring - der Scorecard-Vertrag (Pol über das Delta, Vergessen über decay).
+ * @param file - Anzeigename für Befunde.
+ */
+export function tendencyRuleIssues(tendency, rules, scoring, file) {
+  const issues = [];
+  const at = (detail) => `${file}: ${detail}`;
+  if (typeof tendency !== 'object' || tendency === null) return [at('kein Objekt')];
+  if (tendency.contract !== TENDENCY_RULES_CONTRACT_ID) {
+    issues.push(at(`contract muss "${TENDENCY_RULES_CONTRACT_ID}" sein (ist ${JSON.stringify(tendency.contract)})`));
+  }
+  if (typeof rules !== 'object' || rules === null || typeof scoring !== 'object' || scoring === null) {
+    return [...issues, at('Signaltabelle oder Scorecard-Vertrag fehlt — ohne Herkunft keine Tendenz')];
+  }
+
+  // Kein Deckel, kein Limit, keine Sekundenregel — auch hier nicht.
+  for (const path of keyPaths(tendency)) {
+    const leaf = path.split('.').pop();
+    if (FORBIDDEN_RULE_KEYS.includes(leaf)) {
+      issues.push(at(`${path} ist verboten: Deckel, Zähler-Limit und Sekundenregeln gehören nicht in die Tendenz-Regeln`));
+    }
+  }
+
+  // Die drei Mechanismen — und ihr Ort.
+  const mechanisms = tendency.mechanisms ?? {};
+  const docs = { 'signal-rules.json': rules, 'scoring-state.json': scoring };
+  for (const [id, expected] of Object.entries(TENDENCY_MECHANISMS)) {
+    const entry = mechanisms[id];
+    if (entry === null || typeof entry !== 'object') {
+      issues.push(at(`mechanisms.${id} fehlt (${id} lebt in ${expected})`));
+      continue;
+    }
+    if (!isText(entry.label)) issues.push(at(`mechanisms.${id}.label fehlt`));
+    if (!isText(entry.where)) {
+      issues.push(at(`mechanisms.${id}.where fehlt — ein Mechanismus ohne Ort ist eine Behauptung`));
+      continue;
+    }
+    const [target] = entry.where.split('#');
+    if (target !== expected) {
+      issues.push(at(`mechanisms.${id}.where nennt ${JSON.stringify(target)}, erwartet wird ${expected}`));
+      continue;
+    }
+    if (resolveMechanism(entry.where, docs) === undefined) {
+      issues.push(at(`mechanisms.${id}.where ${JSON.stringify(entry.where)} löst im Vertrag nicht auf`));
+    }
+  }
+  for (const id of Object.keys(mechanisms)) {
+    if (id === 'note') continue;
+    if (TENDENCY_MECHANISMS[id] === undefined) {
+      issues.push(at(`mechanisms.${id} ist kein benannter Mechanismus (${Object.keys(TENDENCY_MECHANISMS).join(', ')})`));
+    }
+  }
+
+  // Klassen: Pol, Wort, Herkunft — und keine Lücke, kein Doppel.
+  const signals = rules.signals ?? {};
+  const classes = tendency.classes;
+  if (!Array.isArray(classes) || classes.length === 0) issues.push(at('classes fehlt oder ist leer'));
+  const classIds = new Set();
+  const claimed = new Set();
+  for (const [index, klass] of (Array.isArray(classes) ? classes : []).entries()) {
+    const where = `classes[${index + 1}]`;
+    if (!isText(klass?.id)) {
+      issues.push(at(`${where}.id fehlt`));
+      continue;
+    }
+    if (classIds.has(klass.id)) issues.push(at(`${where}.id ${JSON.stringify(klass.id)} ist doppelt`));
+    else classIds.add(klass.id);
+    if (!TENDENCY_POLES.includes(klass.pole)) {
+      issues.push(at(`${where}.pole muss ${TENDENCY_POLES.join(' | ')} sein (ist ${JSON.stringify(klass.pole)})`));
+    }
+    if (!isText(klass.label)) issues.push(at(`${where}.label fehlt (eine Klasse ohne Wort)`));
+    if (!Array.isArray(klass.signals) || klass.signals.length === 0) {
+      issues.push(at(`${where}.signals fehlt oder ist leer`));
+      continue;
+    }
+    for (const signalId of klass.signals) {
+      const definition = signals[signalId];
+      if (definition === undefined) {
+        issues.push(at(`${where} nennt ${JSON.stringify(signalId)} — dieses Signal gibt es nicht`));
+        continue;
+      }
+      if (definition.observable !== true) {
+        issues.push(at(`${where} nennt ${signalId}, das die Tabelle als nicht beobachtbar führt`));
+        continue;
+      }
+      if (claimed.has(signalId)) {
+        issues.push(at(`${where} nennt ${signalId} ein zweites Mal — ein Signal trägt genau EINEN Pol`));
+        continue;
+      }
+      claimed.add(signalId);
+      const pole = poleOfSignal(scoring, definition);
+      if (pole === null) {
+        issues.push(at(`${signalId} hat kein Delta im Scorecard-Vertrag — ohne Vorzeichen kein Pol`));
+      } else if (pole !== klass.pole) {
+        issues.push(at(`${where} trägt den Pol ${klass.pole}, aber ${signalId} schiebt ${pole} (${definition.type})`));
+      }
+    }
+  }
+  for (const [signalId, definition] of Object.entries(signals)) {
+    if (definition?.observable === true && !claimed.has(signalId)) {
+      issues.push(at(`Signal ${signalId} speist keine Klasse — die Tendenz rechnet daran vorbei`));
+    }
+  }
+
+  // Stufen: absteigend, eindeutig, Ende bei 0.
+  const levels = tendency.levels;
+  if (!Array.isArray(levels) || levels.length === 0) issues.push(at('levels fehlt oder ist leer'));
+  const levelIds = new Set();
+  let previous = Infinity;
+  for (const [index, level] of (Array.isArray(levels) ? levels : []).entries()) {
+    const where = `levels[${index + 1}]`;
+    if (!isText(level?.id)) {
+      issues.push(at(`${where}.id fehlt`));
+      continue;
+    }
+    if (levelIds.has(level.id)) issues.push(at(`${where}.id ${JSON.stringify(level.id)} ist doppelt`));
+    else levelIds.add(level.id);
+    if (typeof level.minShare !== 'number' || !(level.minShare >= 0 && level.minShare <= 1)) {
+      issues.push(at(`${where}.minShare muss zwischen 0 und 1 liegen (ist ${JSON.stringify(level.minShare)})`));
+      continue;
+    }
+    if (level.minShare > previous) issues.push(at(`${where}.minShare steigt — die Stufen müssen absteigend stehen`));
+    previous = level.minShare;
+  }
+  if (Array.isArray(levels) && levels.length > 0 && levels[levels.length - 1]?.minShare !== 0) {
+    issues.push(at('die letzte Stufe muss bei 0 liegen — sonst bleibt ein Anteil ohne Wort'));
+  }
+
+  // Haltungen: geordnet, benannte Klasse UND Stufe, letzte bedingungslos.
+  const stances = tendency.stances;
+  if (!Array.isArray(stances) || stances.length === 0) issues.push(at('stances fehlt oder ist leer'));
+  for (const [index, stance] of (Array.isArray(stances) ? stances : []).entries()) {
+    const where = `stances[${index + 1}]`;
+    if (!isText(stance?.id)) issues.push(at(`${where}.id fehlt`));
+    const when = stance?.when;
+    if (when === undefined) continue;
+    if (when === null || typeof when !== 'object') {
+      issues.push(at(`${where}.when muss ein Objekt sein`));
+      continue;
+    }
+    for (const [classId, levelId] of Object.entries(when)) {
+      if (!classIds.has(classId)) issues.push(at(`${where}.when nennt die Klasse ${JSON.stringify(classId)}, die es nicht gibt`));
+      if (!levelIds.has(levelId)) issues.push(at(`${where}.when nennt die Stufe ${JSON.stringify(levelId)}, die es nicht gibt`));
+    }
+  }
+  const last = Array.isArray(stances) && stances.length > 0 ? stances[stances.length - 1] : undefined;
+  if (last !== undefined && last?.when !== undefined) {
+    issues.push(at('die letzte Haltung muss bedingungslos sein — sonst gibt es Lagen ohne Haltung'));
+  }
+
+  // Mindestevidenz: darunter wird nichts behauptet.
+  if (!Number.isInteger(tendency.minSignals) || tendency.minSignals < 1) {
+    issues.push(at(`minSignals muss eine ganze Zahl ≥ 1 sein (ist ${JSON.stringify(tendency.minSignals)})`));
+  }
+  return issues;
+}

@@ -2,7 +2,7 @@ import z from '@deepseek-ai/schemastery';
 import { readFileSync } from 'node:fs';
 import { advance, initialState, validateNarrativeState } from './assets/narrative-core.js';
 // Kanal und Vertrag haben EINE Definition: `@shinon/seams` (Host-Naht-Kern).
-import { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT } from '@shinon/seams/core';
+import { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT, createOrchestrator } from '@shinon/seams/core';
 
 /**
  * @shinon/narrative — Narrative Engine (Zug 5: aktiviert).
@@ -107,6 +107,7 @@ export function loadContract(path = './assets/narrative-state.json') {
 }
 
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'narrative' });
   let contract = null;
   try {
     contract = loadContract();
@@ -198,7 +199,7 @@ export function apply(ctx, config) {
     if (typeof ctx?.emit === 'function') ctx.emit(STATE_CHANNEL, state.composite);
   };
 
-  const disposer = typeof ctx?.on === 'function' ? ctx.on(config.eventsChannel, handler) : () => {};
+  const disposer = bus.route(config.eventsChannel, handler);
   if (contract !== null) {
     console.log(
       `[shinon-narrative] Aktiviert — ${config.chronicleLimit} Ereignisse Hot, Freeze bei ${config.freezeThreshold}` +

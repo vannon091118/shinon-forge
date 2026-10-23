@@ -1,4 +1,5 @@
 import z from '@deepseek-ai/schemastery';
+import { createOrchestrator } from '@shinon/seams/core';
 
 /**
  * @shinon/traceability — HOST-HÄLFTE: die WIRKSAMEN Grenzen in die Seite legen.
@@ -78,6 +79,7 @@ export function configRecord(config) {
  * keine Registrierung, laut — der Client benutzt dann den Vertrag (Rückfall).
  */
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'traceability' });
   const record = configRecord(config);
 
   if (typeof ctx?.on !== 'function') {
@@ -85,7 +87,7 @@ export function apply(ctx, config) {
     return () => {};
   }
 
-  const dispose = ctx.on(INDEX_INJECT, (table) => {
+  const dispose = bus.route(INDEX_INJECT, (table) => {
     if (Array.isArray(table)) table.push({ kind: 'global', name: TRACE_GLOBAL, value: record });
   });
 

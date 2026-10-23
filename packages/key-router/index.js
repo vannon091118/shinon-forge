@@ -46,6 +46,7 @@
  */
 
 import z from '@deepseek-ai/schemastery';
+import { createOrchestrator } from '@shinon/seams/core';
 
 import {
   authHeaders,
@@ -322,6 +323,7 @@ function serveEntry(providerId) {
 }
 
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'key-router' });
   probeTool.config = config;
   keyPools.clear();
   activeLabels.clear();
@@ -342,7 +344,7 @@ export function apply(ctx, config) {
   // Werkzeug-Registrierung über `inject`: ein direkter Dienst-Zugriff wirft am
   // Cordis-Proxy ohne Deklaration — genau der Fehler, der die Client-Hälften
   // schon einmal die Aktivierung gekostet hat.
-  ctx.inject(['tools'], (child) => {
+  bus.demand(['tools'], (child) => {
     child.tools.register(rotateTool);
     child.tools.register(statusTool);
     child.tools.register(catalogTool);
@@ -383,8 +385,8 @@ export function apply(ctx, config) {
   // stabile Klasse `RATE_LIMIT` für einen verwalteten Anbieter — und gedeckelt
   // wird der Platz, der gerade bedient wurde (die Marke aus `serveEntry`).
   let stopErrors = () => {};
-  if (overlay !== null && typeof ctx?.on === 'function') {
-    stopErrors = ctx.on('agent/request-error', (payload, next) => {
+  if (overlay !== null) {
+    stopErrors = bus.route('agent/request-error', (payload, next) => {
       const seen = observeRequestError(payload);
       if (seen !== null && keyPools.has(seen.provider)) {
         const label = activeLabels.get(seen.provider);

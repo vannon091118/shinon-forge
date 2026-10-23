@@ -14,7 +14,12 @@ export const SEAM_CORE = 'packages/seams/assets/seams.js';
 /** Das Inventar, gegen das geprueft wird (Daten, kein zweiter Regelsatz). */
 export const SEAM_INVENTORY = 'packages/seams/assets/seams.json';
 
-/** Alle Host-Runtime-Dateien: `index.js` je Paket plus jede `.js` unter `assets/`. */
+/**
+ * Alle Host-Runtime-Dateien: `index.js` je Paket plus jede `.js` unter `assets/`
+ * AUSSER `assets/client/`. Die Quellteile eines Client-Bundles sind Client-Code
+ * (sie landen nur in `client.js`) — sie als Host zu lesen, machte jede erlaubte
+ * Client-Kopie (`#region zwilling:…`, Klient-Literale) zu einem falschen Befund.
+ */
 function hostRuntimeFiles(root) {
   const files = [];
   let dirs = [];
@@ -33,7 +38,7 @@ function hostRuntimeFiles(root) {
   for (const entry of dirs) {
     const base = join(root, 'packages', entry.name);
     if (existsSync(join(base, 'index.js'))) files.push(join(base, 'index.js'));
-    if (existsSync(join(base, 'assets'))) walk(join(base, 'assets'));
+    if (existsSync(join(base, 'assets')) && !existsSync(join(base, 'assets', 'client'))) walk(join(base, 'assets'));
   }
   return files;
 }

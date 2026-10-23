@@ -1,5 +1,6 @@
 /**
  * shinon-dashboard - Dashboard UI (Client-Hälfte).
+ * GENERIERT aus assets/client/*.js — nicht von Hand ändern; Schreiben: node scripts/build-client.mjs dashboard.
  *
  * DAS FENSTER ZUR SICHTBARKEIT: was laeuft, steht hier. Jede Client-Haelfte
  * meldet sich in `window.__shinonPlugins` an (Konvention, kein Import — Pakete
@@ -32,6 +33,7 @@
 window.__ModuleLoader__.load({
   id: '@shinon/dashboard',
   factory(require) {
+// >>> @part assets/client/01-react.js
     const React = require('react');
     const h = React.createElement;
     const PLUGIN = '@shinon/dashboard';
@@ -228,7 +230,9 @@ window.__ModuleLoader__.load({
     function badge(kind, text) {
       return h('span', { className: `shinon-badge shinon-badge--${kind}` }, text);
     }
+// <<< @part assets/client/01-react.js
 
+// >>> @part assets/client/02-error-text.js
     /** Ein Projektionsfehler als Text: der Client-Dienst traegt code und message. */
     function errorText(error) {
       if (error === null || error === undefined) return '';
@@ -407,7 +411,9 @@ window.__ModuleLoader__.load({
         h(WorkspaceSection),
         h(PluginSection));
     }
+// <<< @part assets/client/02-error-text.js
 
+// >>> @part assets/client/03-dashboard-icon.js
     function DashboardIcon() {
       return h('svg', { viewBox: '0 0 16 16', width: 16, height: 16, 'aria-hidden': true },
         h('rect', { x: 1, y: 1, width: 6, height: 6, rx: 1, fill: 'currentColor' }),
@@ -474,5 +480,7 @@ window.__ModuleLoader__.load({
         }, DashboardIcon));
       }
     };
+// <<< @part assets/client/03-dashboard-icon.js
+
   }
 });

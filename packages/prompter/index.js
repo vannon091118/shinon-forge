@@ -21,7 +21,7 @@
  *                  |  (pre-step ruft runtime-state und trace-report, nie zurueck)
  */
 import z from '@deepseek-ai/schemastery';
-import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT } from '@shinon/seams/core';
+import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT, createOrchestrator } from '@shinon/seams/core';
 import { Config as _imported_config_schema } from './assets/schema.js';
 import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, PRE_STEP_EVENT, resolveMode } from './assets/mode-core.js';
 import { PROPOSE_CONTRACT, PROPOSE_SERVICE } from './assets/block-review.js';
@@ -149,6 +149,7 @@ export const inject = ['llm'];
  * nicht mehr gelesen: die Verdrahtung kennt nur die Naht, nicht die Felder.
  */
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'prompter' });
   if (typeof ctx?.on !== 'function') {
     console.error(`[shinon-prompter] ctx.on fehlt — ${PRE_STEP_EVENT} wurde NICHT registriert (BLOCKED)`);
     return () => {};
@@ -164,7 +165,7 @@ export function apply(ctx, config) {
   runtime.narrativeChannel = NARRATIVE_CHANNEL;
   runtime.narrativeContract = NARRATIVE_CONTRACT;
 
-  const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
+  const dispose = bus.route(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, runtime, payload, next));
   // DER HAKEN FUER DEN KONTEXT: `agent/inbox/claimed` feuert VOR der Assembly
   // (agent-loop:906 `claim()` vor :907 `assemble()`). Der Runtime-Context wird in
   // der Assembly projiziert — der Kontext muss also VORHER im Runtime stehen,
@@ -173,7 +174,7 @@ export function apply(ctx, config) {
   // GEMESSEN (2026-10-21, echter Turn): ohne diesen Haken kam der Projekt-
   // kontext nicht an, obwohl der Index 502 Dateien, 3926 Symbole und 2710
   // Chunks hatte — der Kanal lief, war aber leer.
-  const disposeClaimed = ctx.on('agent/inbox/claimed', (payload) => {
+  const disposeClaimed = bus.route('agent/inbox/claimed', (payload) => {
     const message = payload?.message;
     if (message?.role !== 'user') return;
     const text = (Array.isArray(message.content) ? message.content : [])
@@ -187,8 +188,8 @@ export function apply(ctx, config) {
   // zurueckgibt. Ohne diesen Kanal fiel der Kontext bei jedem verworfenen
   // One-Shot weg (gemessen 2026-10-21: 502 Dateien, 3926 Symbole, 2710 Chunks
   // im Index, nichts davon beim Modell).
-  if (typeof ctx.inject === 'function') {
-    ctx.inject(['systemPrompt'], (child) => {
+  {
+    bus.demand(['systemPrompt'], (child) => {
       const sp = child.systemPrompt;
       const disposeContext = registerContext(sp, {
         // Der Index-Dienst wird HIER gefragt, nicht im Pre-Step: die Assembly
@@ -246,7 +247,7 @@ export function apply(ctx, config) {
     });
   }
   // Das Panel liest den Puffer beim Laden: dieselbe Naht wie Marker/Traceability.
-  const disposeInject = ctx.on(INDEX_INJECT, (table) => {
+  const disposeInject = bus.route(INDEX_INJECT, (table) => {
     if (Array.isArray(table)) table.push({ kind: 'global', name: TRACE_GLOBAL, value: runtime.trace });
   });
   // Und LIVE: eine schmale SSE-Route. Der Entscheidungs-Kanal erreicht den
@@ -275,9 +276,8 @@ export function apply(ctx, config) {
   };
   // `ctx.get` allein saehe den Dienst nicht: Zugriff verlangt eine Deklaration,
   // und die Reihenfolge der Fiber ist nicht die Reihenfolge der Dienste.
-  if (typeof ctx.inject === 'function') ctx.inject(['webServer'], mountTraceRoute);
-  else mountTraceRoute(ctx);
-  const disposeNarrative = ctx.on(NARRATIVE_CHANNEL, (composite) => {
+  if (!bus.demand(['webServer'], mountTraceRoute)) mountTraceRoute(ctx);
+  const disposeNarrative = bus.route(NARRATIVE_CHANNEL, (composite) => {
     runtime.narrative = composite ?? null;
   });
 
@@ -312,8 +312,7 @@ export function apply(ctx, config) {
     contract: PROPOSE_CONTRACT,
     propose: (proposal) => proposeBlock(config, runtime, proposal),
   };
-  const canProvide = typeof ctx?.provide === 'function';
-  const releasePropose = canProvide ? ctx.provide(PROPOSE_SERVICE, proposeService) : null;
+  const releasePropose = bus.provide(PROPOSE_SERVICE, proposeService);
 
   // Skill-Lebenszyklus (Zug 7): Ereignisse hoeren, Kandidaten im Hintergrund
   // pruefen, Skills nach .agents/skills schreiben (der Root, den DSH nativ
@@ -323,7 +322,7 @@ export function apply(ctx, config) {
   if (config.skillLifecycle && config.eventsChannel !== '') {
     try {
       lifecycle = createSkillLifecycle({ ctx, rules: loadLifecycleRules(), noteRules: runtime.noteRules ?? {}, route });
-      disposeLifecycle = ctx.on(config.eventsChannel, (envelope, payload) => lifecycle.observe(envelope, payload));
+      disposeLifecycle = bus.route(config.eventsChannel, (envelope, payload) => lifecycle.observe(envelope, payload));
       console.log(`[shinon-prompter] Skill-Lebenszyklus aktiv — Ereignisse auf ${config.eventsChannel}, Ablage ${lifecycle.skillsRoot}`);
     } catch (error) {
       console.error(`[shinon-prompter] Skill-Lebenszyklus NICHT angebunden (${error?.message ?? error})`);

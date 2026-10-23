@@ -31,10 +31,13 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import zlib from 'node:zlib';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+// Der GEGENSTAND der Messung (geliefertes CSS, gehashte Klassen) und ihre
+// Bildwerkzeuge haben eigene Eigentuemer; hier steht nur die Messung selbst.
+import { readVendorStyles } from './lib/branding-css.mjs';
+import { decodePng, shoot } from './lib/branding-image.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const VENDOR = join(ROOT, 'node_modules/@deepseek-ai');
@@ -70,89 +73,11 @@ if (CHROME_CANDIDATES.length === 0) fail('kein Chrome/Chromium gefunden (--brows
 const BROWSER = CHROME_CANDIDATES[0];
 
 // ── 1. Das echte Vendor-CSS einsammeln ───────────────────────────────────────
-/**
- * Alle String-Literale einer Datei, exakt wie JS sie sieht (`vm` loest Escapes).
- * Templates mit `${…}` fallen raus — dort steht Code, kein CSS.
- */
-function stringLiterals(file) {
-  const text = readFileSync(join(VENDOR, file), 'utf8');
-  const out = [];
-  const skipped = [];
-  for (const match of text.matchAll(/"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\[\s\S])*)`/g)) {
-    const raw = match[0];
-    if (raw.includes('${')) continue;
-    try {
-      out.push(vm.runInNewContext(raw));
-    } catch (error) {
-      // Nicht verschweigen: ein Literal, das hier scheitert, fehlt der Messung.
-      skipped.push(`${raw.slice(0, 40)}… (${error.message.slice(0, 40)})`);
-    }
-  }
-  return { literals: out, skipped };
-}
-
-/**
- * ALLE CSS-Bloecke einer Datei — nicht nur die zu einem Suchtoken (siehe unten): ein Modul kann
- * mehrere Strings haben (`const css = "…"` und `const css$1 = "…"`), und eine Regel
- * fuer `runningWhaleAnimated` steht in einer ANDEREN Zelle als der Klassenname daneben.
- * Was der Browser bekommt, ist die Summe — die Summe misst dieser Nachbau.
- */
-function cssBlocks(file) {
-  const { literals, skipped } = stringLiterals(file);
-  const blocks = literals.filter((value) => typeof value === 'string'
-    && value.includes('{') && /\.[A-Za-z_-]/.test(value) && value.includes('}'));
-  if (blocks.length === 0) {
-    fail(`kein CSS-Block in ${file} — ${literals.length} Literale gelesen`
-      + (skipped.length > 0 ? `, ${skipped.length} uebersprungen: ${skipped.slice(0, 2).join(' | ')}` : ''));
-  }
-  return { blocks, skipped, literalCount: literals.length };
-}
-
-/**
- * Den gehashten Klassennamen zu einem logischen Namen finden — im CSS SEINES Pakets,
- * ueber exakten Suffix mit Trenner davor (die Praefixe selbst enthalten `_`, z. B.
- * `pI_x6G_sidebarCol`, deshalb ist ein Split am ersten `_` falsch) und dem kuerzesten
- * Kandidaten (das ist die Klasse selbst, nicht ein laengerer Name mit gleichem Suffix).
- */
-function cls(name, css, owner) {
-  const tokens = new Set([...css.matchAll(/\.([A-Za-z][A-Za-z0-9_-]*)/g)].map((match) => match[1]));
-  const candidates = [...tokens]
-    .filter((token) => token.endsWith(name) && token.length > name.length && /[_-]/.test(token[token.length - name.length - 1]))
-    .sort((left, right) => left.length - right.length);
-  if (candidates.length === 0) fail(`Klasse zu "${name}" steht nicht im CSS von ${owner}`);
-  return candidates[0];
-}
-
-const chat = cssBlocks('dsh-client-ui-chat/lib/client.js');
-const hero = cssBlocks('dsh-client-ui-conversation/lib/client.js');
-const sidebar = cssBlocks('dsh-client-ui-sidebar/lib/client.js');
-const layout = cssBlocks('dsh-client-ui-layout/lib/client.js');
-
-const vendorCss = [...sidebar.blocks, ...hero.blocks, ...chat.blocks, ...layout.blocks].join('\n');
-// Die Wal-Maske ist ein APNG, ausgeliefert unter der Mediatype `image/png`.
-if (!/mask:url\(data:image\/png;base64,/.test(vendorCss)) {
-  fail('die Wal-Maske (data:image/png, APNG) steht nicht mehr in diesem CSS — der Test misst dann die falsche Fassung');
-}
-const layoutCss = layout.blocks.join('\n');
-const sidebarCss = sidebar.blocks.join('\n');
-const heroCss = hero.blocks.join('\n');
-const chatCss = chat.blocks.join('\n');
-const C = {
-  frame: cls('frame', layoutCss, 'ui-layout'),
-  sidebarCol: cls('sidebarCol', layoutCss, 'ui-layout'),
-  overlayLayer: cls('overlayLayer', layoutCss, 'ui-layout'),
-  toggle: cls('toggle', sidebarCss, 'ui-sidebar'),
-  railMark: cls('railMark', sidebarCss, 'ui-sidebar'),
-  brandMark: cls('brandMark', sidebarCss, 'ui-sidebar'),
-  brandIdentity: cls('brandIdentity', sidebarCss, 'ui-sidebar'),
-  fishHitbox: cls('fishHitbox', heroCss, 'ui-conversation'),
-  fish: cls('fish', heroCss, 'ui-conversation'),
-  headline: cls('headline', heroCss, 'ui-conversation'),
-  running: cls('running', chatCss, 'ui-chat'),
-  runningIcon: cls('runningIcon', chatCss, 'ui-chat'),
-  runningWhaleAnimated: cls('runningWhaleAnimated', chatCss, 'ui-chat'),
-  runningWhaleStill: cls('runningWhaleStill', chatCss, 'ui-chat'),
-};
+// Die Beschaffung hat einen eigenen Eigentuemer (`scripts/lib/branding-css.mjs`):
+// sie liest die gelieferten Bundles und findet die gehashten Klassennamen. Hier
+// bleibt nur, was die Messung selbst braucht.
+const styles = readVendorStyles({ root: ROOT, fail });
+const { vendorCss, C, counts } = styles;
 
 // ── 2. Die Seite bauen ───────────────────────────────────────────────────────
 const bundleSource = readFileSync(BUNDLE, 'utf8');
@@ -322,7 +247,8 @@ const harness = `<!doctype html>
   const report = {
     errors,
     vendor: {
-      cssBlocks: { sidebar: ${sidebar.blocks.length}, hero: ${hero.blocks.length}, chat: ${chat.blocks.length}, layout: ${layout.blocks.length} },
+      cssBlocks: ${JSON.stringify({ sidebar: counts.sidebar, hero: counts.hero, chat: counts.chat, layout: counts.layout })},
+      cssSkipped: ${counts.skipped},
       skippedLiterals: ${sidebar.skipped.length + hero.skipped.length + chat.skipped.length + layout.skipped.length},
     },
     running: {
@@ -541,66 +467,9 @@ check('Marke: Fallback-Wal im Hero ist versteckt', report.marks.heroFallbackDisp
 // computed styles sagen, dass nichts ihn verbietet — nicht, dass Farbe ankommt.
 // Deshalb derselbe Aufbau zweimal fotografiert (mit und ohne Hintergrund) und die
 // Bilder im Persona-Bereich verglichen.
-function png(buffer) {
-  let pos = 8;
-  let width = 0;
-  let height = 0;
-  let colorType = 0;
-  let depth = 0;
-  const idat = [];
-  while (pos + 8 <= buffer.length) {
-    const length = buffer.readUInt32BE(pos);
-    const type = buffer.toString('latin1', pos + 4, pos + 8);
-    const data = buffer.subarray(pos + 8, pos + 8 + length);
-    if (type === 'IHDR') { width = data.readUInt32BE(0); height = data.readUInt32BE(4); depth = data[8]; colorType = data[9]; }
-    if (type === 'IDAT') idat.push(data);
-    pos += 12 + length;
-  }
-  const channels = colorType === 6 ? 4 : colorType === 2 ? 3 : 0;
-  if (channels === 0 || depth !== 8) throw new Error(`PNG-Format nicht unterstuetzt (colorType ${colorType}, depth ${depth})`);
-  const raw = zlib.inflateSync(Buffer.concat(idat));
-  const stride = width * channels;
-  const pixels = Buffer.alloc(height * stride);
-  let previous = Buffer.alloc(stride);
-  for (let y = 0; y < height; y += 1) {
-    const filter = raw[y * (stride + 1)];
-    const line = raw.subarray(y * (stride + 1) + 1, y * (stride + 1) + 1 + stride);
-    const current = Buffer.alloc(stride);
-    for (let x = 0; x < stride; x += 1) {
-      const a = x >= channels ? current[x - channels] : 0;
-      const b = previous[x];
-      const c = x >= channels ? previous[x - channels] : 0;
-      let value = line[x];
-      if (filter === 1) value += a;
-      else if (filter === 2) value += b;
-      else if (filter === 3) value += (a + b) >> 1;
-      else if (filter === 4) {
-        const p = a + b - c;
-        const pa = Math.abs(p - a);
-        const pb = Math.abs(p - b);
-        const pc = Math.abs(p - c);
-        value += pa <= pb && pa <= pc ? a : (pb <= pc ? b : c);
-      }
-      current[x] = value & 0xff;
-    }
-    current.copy(pixels, y * stride);
-    previous = current;
-  }
-  return { width, height, channels, pixels };
-}
-
-function shoot(url, out) {
-  execFileSync(BROWSER, [
-    '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-    '--hide-scrollbars', '--window-size=1280,800', '--virtual-time-budget=5000',
-    `--screenshot=${out}`, url,
-  ], { stdio: 'ignore', timeout: 120000 });
-  return readFileSync(out);
-}
-
 try {
-  const withBg = png(shoot(`file://${harnessPath}`, join(WORK, 'with-background.png')));
-  const withoutBg = png(shoot(`file://${harnessPath}?nobg=1`, join(WORK, 'without-background.png')));
+  const withBg = decodePng(shoot(BROWSER, `file://${harnessPath}`, join(WORK, 'with-background.png')));
+  const withoutBg = decodePng(shoot(BROWSER, `file://${harnessPath}?nobg=1`, join(WORK, 'without-background.png')));
   const box = report.background;
   const scale = withBg.width / (report.viewport?.width ?? withBg.width);
   const x0 = Math.max(0, Math.round(box.left * scale));
@@ -648,7 +517,7 @@ const failed = checks.filter((entry) => !entry.ok);
 console.log(`\n🌐 Branding-Messung im echten Chromium (${BROWSER})`);
 console.log(`   Seite:      ${harnessPath.replace(ROOT, '')}`);
 console.log(`   Bundle:     ${BUNDLE.replace(ROOT, '')} (ausgeliefert)`);
-console.log(`   Vendor-CSS: ${sidebar.blocks.length + hero.blocks.length + chat.blocks.length + layout.blocks.length} Bloecke (Sidebar ${sidebar.blocks.length}/Hero ${hero.blocks.length}/Chat ${chat.blocks.length}/Layout ${layout.blocks.length}), zweimal eingehaengt: VOR und NACH unseren Styles\n`);
+console.log(`   Vendor-CSS: ${counts.sidebar + counts.hero + counts.chat + counts.layout} Bloecke (Sidebar ${counts.sidebar}/Hero ${counts.hero}/Chat ${counts.chat}/Layout ${counts.layout}${counts.skipped > 0 ? `, ${counts.skipped} Literale uebersprungen` : ''}), zweimal eingehaengt: VOR und NACH unseren Styles\n`);
 for (const entry of checks) console.log(`  ${entry.ok ? '✅' : '❌'} ${entry.name}${entry.ok ? '' : ` — gemessen: ${entry.detail}`}`);
 console.log(`\n═══════════════════════════════════════`);
 console.log(`  Ergebnisse: ${checks.length - failed.length} bestanden, ${failed.length} fehlgeschlagen`);

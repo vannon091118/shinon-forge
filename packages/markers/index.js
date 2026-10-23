@@ -1,5 +1,6 @@
 import z from '@deepseek-ai/schemastery';
 import { readFileSync } from 'node:fs';
+import { createOrchestrator } from '@shinon/seams/core';
 
 /**
  * @shinon/markers — der Marker-Spiegel.
@@ -274,6 +275,7 @@ export const Config = z.object({
 });
 
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'markers' });
   let model = EMPTY_MODEL;
   try {
     model = loadModel(config.modelPath);
@@ -292,7 +294,7 @@ export function apply(ctx, config) {
   // Aussage in der Aktivierungszeile — fail-open, wie der ganze Host.
   const canInject = typeof ctx?.on === 'function';
   if (canInject) {
-    ctx.on(INDEX_INJECT, (table) => {
+    bus.route(INDEX_INJECT, (table) => {
       if (Array.isArray(table)) {
         table.push({ kind: 'global', name: LIMITS_GLOBAL, value: limitsRecord(model, mirror.limits()) });
       }

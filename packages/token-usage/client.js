@@ -1,5 +1,6 @@
 /**
  * shinon-token-usage - Token-Anzeige (Client-Hälfte)
+ * GENERIERT aus assets/client/*.js — nicht von Hand ändern; Schreiben: node scripts/build-client.mjs token-usage.
  *
  * DIE NAHT, aus der diese Anzeige ihre Zahl nimmt (gemessen, nicht erfunden):
  *  1. **Je Turn** — DSH führt das Ereignisfenster der offenen Sitzung als
@@ -29,10 +30,13 @@
 window.__ModuleLoader__.load({
   id: '@shinon/token-usage',
   factory(require) {
+// >>> @part assets/client/01-react.js
     const React = require('react');
     const h = React.createElement;
     const PLUGIN = '@shinon/token-usage';
+// <<< @part assets/client/01-react.js
 
+// >>> @part assets/client/02-insert-styles.js
     function insertStyles(tag, css) {
       if (document.querySelector(`style[data-plugin-css="${tag}"]`) !== null) return;
       const style = document.createElement('style');
@@ -435,7 +439,9 @@ function sessionReading(usage) {
     // ---------------------------------------------------------------------
     // Die Naht: welche Sitzung gezeigt wird, ihr Ereignisfenster, ihre Sitzungssumme.
     // ---------------------------------------------------------------------
+// <<< @part assets/client/02-insert-styles.js
 
+// >>> @part assets/client/03-seam-of.js
     /**
      * Die Sitzungs-Bindung der Sitzung, die die Oberfläche zeigt. Welche das ist,
      * sagt die Vorgabe-Bindung des Renderers (`SlotScopeAdapter.current`); die
@@ -570,5 +576,7 @@ function sessionReading(usage) {
         }, TokenDisplay));
       }
     };
+// <<< @part assets/client/03-seam-of.js
+
   }
 });

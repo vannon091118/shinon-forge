@@ -5,7 +5,7 @@
  * Ressourcen, Artefakt, Paketgraph und Profil-Komposition.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { cpSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { PACKAGES_DIR, ROOT, RUNTIME_FILES, SHARED_DEPS, isObject, read, readJSON, readYaml, readRoot } from './repo-basis.mjs';
 
@@ -232,6 +232,32 @@ export function resourceIssues(pkg) {
 }
 
 /** Dateien, die das Artefakt des Pakets enthalten muss: Runtime-Dateien + Ressourcen. */
+/**
+ * Was NICHT ins Artefakt (dist/) geht: die Quellteile eines generierten
+ * Bundles. `assets/` wird als Ganzes kopiert, weil es Runtime-Helfer traegt —
+ * `assets/client/` traegt aber Quelltext, den `client.js` bereits enthaelt.
+ * Er gehoert ins Repo (dort wird er geprueft) und nicht in die Auslieferung.
+ */
+export const ARTIFACT_SKIP = ['assets/client'];
+
+/**
+ * Die Artefaktdateien eines Pakets nach `dest` kopieren — dieselbe Liste wie
+ * `artifactFiles()`, ohne die Quellteile. EINE Kopierregel fuer Build und
+ * jeden, der sie sonst braucht: zwei Kopierschleifen waeren der naechste Ort,
+ * an dem ein Ordner in `dist/` landet, den niemand ausliefern will.
+ */
+export function copyArtifacts(pkg, dest) {
+  const skip = (abs) => {
+    const rel = relative(pkg.base, abs).split(sep).join('/');
+    return ARTIFACT_SKIP.some((sub) => rel === sub || rel.startsWith(sub + '/'));
+  };
+  for (const file of artifactFiles(pkg)) {
+    const src = join(pkg.base, file);
+    if (!existsSync(src)) continue;
+    cpSync(src, join(dest, file), { recursive: true, filter: (from) => !skip(from) });
+  }
+}
+
 export function artifactFiles(pkg) {
   const extra = resourceRefs(pkg)
     .map(({ value }) => value.replace(/^\.\//, ''))

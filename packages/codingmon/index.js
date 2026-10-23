@@ -1,4 +1,5 @@
 import z from '@deepseek-ai/schemastery';
+import { createOrchestrator } from '@shinon/seams/core';
 import {
   ABILITIES, ELEMENTS, ESCALATION, LEVEL_CAP, LOOT_TABLE, MILESTONES, PACING, SPECIES_IDS,
   XP_BASE, formatNumber, levelFor, lootOdds,
@@ -65,6 +66,7 @@ export const CODINGMON_STORE_SERVICE = 'shinon_codingmon_store';
 export const CODINGMON_STORE_CONTRACT = 'shinon.codingmon/store-v1';
 
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'codingmon' });
   // Der Vertrag ist reine Datenweitergabe: keine Zeit, kein Zufall, kein Modell.
   const contract = {
     version: 'shinon.codingmon/v2',
@@ -118,11 +120,11 @@ export function apply(ctx, config) {
       console.error(`[shinon-codingmon] Aktivitaet nicht lesbar — ${error?.message ?? error}`);
     }
   };
-  const offStatus = typeof ctx?.on === 'function' ? ctx.on('agent/status', (event) => {
+  const offStatus = bus.route('agent/status', (event) => {
     if (event?.status === 'running') activity.running = true;
     else if (event?.status === 'idle') activity.running = false;
-  }) : null;
-  const offSessionEvent = typeof ctx?.on === 'function' ? ctx.on('session/event', (...args) => {
+  });
+  const offSessionEvent = bus.route('session/event', (...args) => {
     const event = [...args].reverse().find((value) => value !== null && typeof value === 'object' && value.type === 'turn/end');
     if (event === undefined) return;
     const rawReason = event.reason ?? event.data?.reason;
@@ -130,7 +132,7 @@ export function apply(ctx, config) {
     if (reason !== 'completed') return;
     activity.completions += 1;
     persistCompletions();
-  }) : null;
+  });
 
   let mirror = null;
   const mirrorReady = (async () => {
@@ -144,8 +146,8 @@ export function apply(ctx, config) {
       // Der Spiegel kennt den Stand vom letzten Lauf: der Zaehler faengt dort
       // an, nicht bei null — sonst verlöre jeder Host-Neustart die Rate (J2).
       activity.completions = Math.max(0, mirror.read()?.completions ?? 0);
-      if (typeof ctx?.provide === 'function') {
-        ctx.provide(CODINGMON_STORE_SERVICE, {
+      {
+        bus.provide(CODINGMON_STORE_SERVICE, {
           contract: CODINGMON_STORE_CONTRACT,
           fields: SNAPSHOT_FIELDS.slice(),
           read: () => mirror.read(),

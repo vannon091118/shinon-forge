@@ -93,6 +93,14 @@
     },
     {
       "art": "vertrag",
+      "kanonisch": "shinon.turn/v1",
+      "definiert_in": "packages/seams/assets/turn-order.json",
+      "verboten": [
+        "shinon.turn-order/v1"
+      ]
+    },
+    {
+      "art": "vertrag",
       "kanonisch": "shinon.project-index/store-v1",
       "definiert_in": "packages/seams/assets/seams.js",
       "verboten": []
@@ -108,7 +116,7 @@
     {
       "art": "vertrag",
       "kanonisch": "shinon.persona-state/unloaded",
-      "definiert_in": "packages/persona/index.js",
+      "definiert_in": "packages/persona/assets/state-machine.js",
       "verboten": []
     },
     {

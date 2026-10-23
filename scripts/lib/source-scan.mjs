@@ -229,7 +229,9 @@ export function findForbidden(source, tokens, options = {}) {
 }
 
 /**
- * Pflicht-Token finden.
+ * Pflicht-Token finden. Ein Token darf Alternativen nennen (`a|b`): er fehlt
+ * nur, wenn KEINE der Formen im Text steht — die Umstellung auf den Orchestrator
+ * ändert die Form, nicht die Zusage.
  * @param {{ mode?: 'code' | 'module' | 'raw' }} [options]
  *   code   — ohne Kommentare und ohne Strings (Standard: der Token muss Code sein)
  *   module — ohne Kommentare, mit Strings; für Pflicht-Token, die selbst Strings
@@ -241,5 +243,5 @@ export function findForbidden(source, tokens, options = {}) {
 export function findMissing(source, tokens, options = {}) {
   const mode = options.mode ?? 'code';
   const haystack = mode === 'raw' ? String(source) : mode === 'module' ? stripComments(source) : codeOnly(source);
-  return tokens.filter((token) => !haystack.includes(token));
+  return tokens.filter((token) => String(token).split('|').every((alternative) => !haystack.includes(alternative)));
 }

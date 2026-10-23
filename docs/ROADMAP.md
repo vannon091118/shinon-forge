@@ -183,6 +183,57 @@ Gemessen an einer echten Sitzung im Fremdprojekt `codingmon-workspace`
   Abnahme: Tabelle als Daten (Vertrag, additiv), Aufrufer übergibt sie; kein
   Forge-Pfad als Literal im Produkt — mit gepinntem Verhaltenstest.
 
+### 2.28 Orchestrator-Etappen 2–5 (2026-10-23, erledigt)
+
+Der Turn-Vertrag (`shinon.turn/v1`), die Umstellung aller Host-Hälften auf
+den Orchestrator, die Datei-Teilungen (Etappe 3) und seit diesem Stand auch die
+Client-Montage samt Vertrags-Flip (Etappen 4–5) sind belegt; das Gate ist
+scharf, und jede Zeile nennt ihre Abnahme.
+
+- **Etappe 4 — Client-Montage (erledigt):** `scripts/lib/embed-blocks.mjs` ist
+der gemeinsame Block-Leser/-Schreiber (vorher trug `build-sprites.mjs` seine
+eigene Kopie), `scripts/assets/split-client.mjs` zerlegt ein Handbundle
+**einmalig** an Deklarationen der obersten Ebene, und `scripts/build-client.mjs`
+setzt die Hälften aus `packages/<dir>/assets/client/*.js` zusammen. Acht
+Bundles sind umgestellt (codingmon 3 523 Zeilen in 17 Teilen, markers 638/4,
+token-usage 583/3, traceability 548/3, dashboard 487/3, popup 423/3, core
+418/3, prompter 289/2 — zusammen 38 Teile, Median 179, Maximum 514); die
+`GENERIERT aus …`-Kopfmarke steht in genau diesen acht Dateien. Die Einbetter
+(`build-sprites --embed`, `build-codingmon --write`,
+`build-encounter-client`) schreiben in die QUELLTEILE und finden ihren Block per
+`findBlockFile`, nicht über einen verdrahteten Dateinamen.
+Abnahme: `node scripts/build-client.mjs --check --all` Exit 0 (8/8
+bytegleich), `npm run test:codingmon` 137/137 (17,0 s), `npm run build` Exit 0
+(23 Pakete, 317 Dateien).
+- **Etappe 5 — Vertrags-Flip (erledigt):** `bestand` und `bestandAusnahmen`
+sind aus `docs/contracts/structure.json` gelöscht, jede Klasse behält ihre
+gemessene Grenze, die neue Klasse `client-source` (600) trägt die Quellteile.
+Die zwei Regeltexte stehen in `AGENTS.md`: „keine handgeschriebene Datei über
+ihrer Klassengrenze“ (ein GENERIERTER Text ist frei, weil seine Grenze die
+Bytegleichheit ist) und „Bus und Datenübergabe über den Orchestrator,
+Turn-Reihenfolge aus `shinon.turn/v1`“. Ein GENERIERTER Kopf befreit nur im
+Kopfkommentar und nur die Client-Hälfte — jede andere Klasse mit der Marke ist
+ein Befund, weil dort kein Generator sie bytegleich nachrechnen könnte.
+Abnahme: `npm test` Exit 0 (127 Schritte), `npm run zahlen:sync` und
+`zahlen:check` Exit 0, `npm run build` Exit 0, `npm run test:full` Exit 0.
+- **Nachbesserung aus dem Review (erledigt):** der Review fand drei echte
+Fehler, alle mit Test gepinnt. (a) `split-client.mjs` schnitt mitten durch
+generierte Blöcke — der Encounter-Kern lag quer über zwei Teile, und der erste
+Generatorlauf verschluckte die Teile-Marken; der Splitter sperrt jetzt JEDE
+Markenfamilie (`// >>> …`/`// <<< …`, `// #region`) und bricht bei
+unbalancierten Marken ab. (b) `build-sprites.mjs` schrieb in einen verdrahteten
+Teilenamen (`10-daten.js`), den es nicht gibt — die Einbetter suchen ihren
+Block jetzt (`findBlockFile`, genau ein Treffer). (c) die GENERIERT-Marke galt
+für jede Datei in den ersten 40 Zeilen, also auch für einen Testfixtur-String,
+und befreite damit eine beliebige große Datei von der Grenze; sie gilt jetzt
+nur im Kopfkommentar und nur für die Client-Hälfte. Geschützt durch
+`scripts/gate/tests/client-montage.test.mjs` (11 Fälle: Echtbaum,
+Miniatur-Baum, verschluckende Marke, unbalancierter Split) und
+`scripts/gate/tests/structure.test.mjs` (14 Fälle).
+- **Weiterhin offen:** Etappe 6 (Gate-Tests nach Fachbereich — mit Etappe 3
+erledigt, siehe `docs/CHANGELOG.md`), Etappe 7 (Rest der Funktionslücken) und
+Etappe 8 (restliche Audit-Tiers aus `docs/CLEANREPO-AUDIT.md` §8.1).
+
 ### 2.3 Zurückgestellt (gated — wird erst bei erfüllter Bedingung gebaut)
 
 - Benchmarks und Metriken (4.1–4.6): Aufgaben-Set, DSH-Baseline, Shinon-Messung, Feature-Entscheidung mit Messwert.

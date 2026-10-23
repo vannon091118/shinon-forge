@@ -23,6 +23,8 @@
     "verify:panel": "node scripts/panel-check.mjs",
     "verify:install": "node scripts/install-user.mjs selftest",
     "build": "node scripts/build.mjs",
+    "client:build": "node scripts/build-client.mjs --all",
+    "client:check": "node scripts/build-client.mjs --check --all",
     "deb": "node scripts/deb-build.mjs",
     "win": "node scripts/win-build.mjs",
     "appimage": "node scripts/appimage-build.mjs",

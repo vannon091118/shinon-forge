@@ -1,5 +1,6 @@
 /**
  * @shinon/traceability — CLIENT-HÄLFTE: LS-Popup-Toasts im Chat.
+ * GENERIERT aus assets/client/*.js — nicht von Hand ändern; Schreiben: node scripts/build-client.mjs traceability.
  *
  * DER DATENWEG (der einzige, den ein Out-of-Tree-Bundle hat): ein Client-Bundle
  * kann KEINEN Host-Endpunkt registrieren — die Remote-Beiträge der
@@ -41,6 +42,7 @@
 window.__ModuleLoader__.load({
   id: '@shinon/traceability',
   factory(require) {
+// >>> @part assets/client/01-react.js
     const React = require('react');
     const h = React.createElement;
     const PLUGIN = '@shinon/traceability';
@@ -233,7 +235,9 @@ function foldToasts(entries, maxVisible) {
     // -----------------------------------------------------------------------
     // Naht zum Sitzungsfenster (dieselbe wie @shinon/popup).
     // -----------------------------------------------------------------------
+// <<< @part assets/client/01-react.js
 
+// >>> @part assets/client/02-seam-of.js
     /**
      * Die Sitzungs-Bindung der gezeigten Sitzung. Fehhlt ein Dienst, fehlt die
      * Bindung — dann schweigt die Anzeige, sie wirft nicht (fail-open).
@@ -405,7 +409,9 @@ function foldToasts(entries, maxVisible) {
         toasts.map((toast, i) => h(ToastItem, { key: `${toast.ts ?? toast.kind}-${i}`, toast, index: i })),
       );
     }
+// <<< @part assets/client/02-seam-of.js
 
+// >>> @part assets/client/03-inject-styles.js
     /** CSS für Toats und Animationen — EINMAL pro Seite, am Tag erkannt. */
     function injectStyles() {
       const tag = `${PLUGIN}/toasts.css`;
@@ -535,5 +541,7 @@ function foldToasts(entries, maxVisible) {
         }
       },
     };
+// <<< @part assets/client/03-inject-styles.js
+
   },
 });

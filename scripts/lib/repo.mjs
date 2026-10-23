@@ -55,8 +55,10 @@ export {
   readYaml,
 } from './repo-basis.mjs';
 export {
+  ARTIFACT_SKIP,
   artifactFiles,
   clientIssues,
+  copyArtifacts,
   composeIssues,
   contractIssues,
   dependencyIssues,

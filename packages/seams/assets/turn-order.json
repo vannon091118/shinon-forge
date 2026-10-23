@@ -1,0 +1,115 @@
+{
+  "contract": "shinon.turn/v1",
+  "status": "current",
+  "stand": "2026-10-23",
+  "turn": "agent/pre-step",
+  "gemessen_aus": [
+    "dist/profile.json (Reihenfolge der Bundles)",
+    "profiles/shinon/cordis.patch.yml (wirksame Config der Einträge)",
+    "packages/*/index.js (ctx.on-Registrierungen, 2026-10-23)"
+  ],
+  "order": [
+    {
+      "position": 1,
+      "owner": "persona",
+      "package": "@shinon/persona",
+      "source": "packages/persona/index.js",
+      "required": true,
+      "gate": {
+        "kind": "always"
+      },
+      "role": "Zustands- und Ton-Abschnitt, fail-closed gated"
+    },
+    {
+      "position": 2,
+      "owner": "hook",
+      "package": "@shinon/hook",
+      "source": "packages/hook/index.js",
+      "required": true,
+      "gate": {
+        "kind": "includes",
+        "path": "observeEvents",
+        "value": "agent/pre-step"
+      },
+      "role": "Beobachtung, kontrolliert next()"
+    },
+    {
+      "position": 3,
+      "owner": "prompter",
+      "package": "@shinon/prompter",
+      "source": "packages/prompter/index.js",
+      "required": true,
+      "gate": {
+        "kind": "includes",
+        "path": "observeEvents",
+        "value": "agent/pre-step"
+      },
+      "role": "Kontext- und Budget-Bausteine"
+    },
+    {
+      "position": 4,
+      "owner": "task-router",
+      "package": "@shinon/task-router",
+      "source": "packages/task-router/index.js",
+      "required": true,
+      "gate": {
+        "kind": "always"
+      },
+      "role": "Goal-Aktivierung, letzte Stufe vor dem Modell"
+    },
+    {
+      "position": 5,
+      "owner": "popup",
+      "package": "@shinon/popup",
+      "source": "packages/popup/index.js",
+      "required": false,
+      "gate": {
+        "kind": "equals",
+        "path": "trigger",
+        "value": "agent/pre-step"
+      },
+      "role": "optionaler Zuhörer; die wirksame Config steht heute auf user/message"
+    }
+  ],
+  "exclusive": [
+    {
+      "channel": "agent/status",
+      "owner": "codingmon",
+      "source": "packages/codingmon/index.js"
+    },
+    {
+      "channel": "agent/request-error",
+      "owner": "key-router",
+      "source": "packages/key-router/index.js"
+    },
+    {
+      "channel": "agent/inbox/claimed",
+      "owner": "prompter",
+      "source": "packages/prompter/index.js"
+    }
+  ],
+  "shared": [
+    {
+      "channel": "webserver/index-inject",
+      "owners": ["prompter", "persona", "markers", "version", "traceability"]
+    },
+    {
+      "channel": "session/event",
+      "owners": ["codingmon"],
+      "conditional": [
+        {
+          "owner": "popup",
+          "gate": {
+            "kind": "equals",
+            "path": "trigger",
+            "value": "session/event"
+          }
+        }
+      ]
+    }
+  ],
+  "spine": {
+    "channel": "shinon/event",
+    "hinweis": "Protokoll-Kanal der Spine. Leser und Schreiber stehen in den Paketen; der Vertrag beansprucht hier keinen Eigentümer, weil mehrere Pakete ihn absichtlich zugleich lesen und schreiben."
+  }
+}

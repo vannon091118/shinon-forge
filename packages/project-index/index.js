@@ -5,7 +5,7 @@ import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, createFactsService } f
 import { INDEX_DEFAULTS } from './assets/defaults.js';
 import { FACTS_FILE_NAME } from './assets/facts-store.js';
 import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
-import { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE } from '@shinon/seams/core';
+import { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, createOrchestrator } from '@shinon/seams/core';
 import { createRefreshService } from './assets/refresh-core.js';
 import {
   CONTRACT,
@@ -323,6 +323,7 @@ function reportLine(report, stats, where) {
  * Kern — ein Detektor mit benannten Mustern ist kein Beweis.
  */
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'project-index' });
   // S1: DIE EINE Workspace-Identität — explizite Config > Env > cwd. Der
   // Prompter löst dieselbe Regel (Zwilling `workspace.js`); dieser Host
   // protokolliert Quelle und Fingerabdruck, damit ein falscher Workspace im
@@ -366,7 +367,7 @@ export function apply(ctx, config) {
   // Datei-Identitaet und Kopfzeile (assets/query-connection.js).
   const queryConnection = createWarmConnection({ file, expectedRoot: options.root });
   const releaseQuery = canProvide
-    ? ctx.provide(QUERY_SERVICE, createQueryService({
+    ? bus.provide(QUERY_SERVICE, createQueryService({
       indexFile: file,
       workspaceRoot: options.root,
       chunkLines: options.chunkLines,
@@ -379,18 +380,18 @@ export function apply(ctx, config) {
     }))
     : null;
   const releaseStore = canProvide
-    ? ctx.provide(INDEX_STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile, workspaceRoot: options.root }))
+    ? bus.provide(INDEX_STORE_SERVICE, createStoreService({ indexFile: file, ledgerFile: options.ledgerFile, workspaceRoot: options.root }))
     : null;
   // Die dritte, schmale Faehigkeit (Zug 3): der Prompter liest einen Snapshot,
   // nie die Datenbank. Fehlt die Datei, ist der Dienst ehrlich leer.
   const releaseFacts = canProvide
-    ? ctx.provide(FACTS_SNAPSHOT_SERVICE, createFactsService({ file: factsFile, root: options.root, trace: config.trace }))
+    ? bus.provide(FACTS_SNAPSHOT_SERVICE, createFactsService({ file: factsFile, root: options.root, trace: config.trace }))
     : null;
   // Der TRIGGER: hat sich der Workspace geaendert, wird der Index im
   // Hintergrund aufgefrischt — ohne den Turn zu blockieren. Der Aufrufer
   // bekommt das Promise nicht; es laeuft einfach.
-  const trigger = typeof ctx?.on === 'function' && config.refreshMaxAgeMs > 0
-    ? ctx.on(config.eventsChannel, (payload) => {
+  const trigger = config.refreshMaxAgeMs > 0
+    ? bus.route(config.eventsChannel, (payload) => {
       if (payload?.event_type !== 'workspace.changed' && payload?.type !== 'workspace.changed') return;
       refreshService.refreshAsync('', { geaendert: true }).catch(() => {});
     })

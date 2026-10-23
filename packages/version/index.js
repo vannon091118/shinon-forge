@@ -1,4 +1,5 @@
 import z from '@deepseek-ai/schemastery';
+import { createOrchestrator } from '@shinon/seams/core';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -109,6 +110,7 @@ export function versionPayload(state, job = null) {
 }
 
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'version' });
   const root = rootOf();
   const endpoint = config.endpoint.replace(/\/+$/, '');
   const token = randomUUID();
@@ -274,8 +276,7 @@ export function apply(ctx, config) {
     return true;
   }
 
-  if (typeof ctx.inject === 'function') ctx.inject(['webServer'], mountRoute);
-  else mountRoute(ctx);
+  if (!bus.demand(['webServer'], mountRoute)) mountRoute(ctx);
 
   // ── Der Zustand in die Seite ─────────────────────────────────────────────
   // Der Global traegt den Zustand UND das Boot-Token: die Route vergleicht
@@ -287,7 +288,7 @@ export function apply(ctx, config) {
   // @shinon/markers.
   const canInject = typeof ctx?.on === 'function';
   if (canInject) {
-    ctx.on(INDEX_INJECT, (table) => {
+    bus.route(INDEX_INJECT, (table) => {
       if (!Array.isArray(table)) return;
       table.push({
         kind: 'global',
@@ -321,7 +322,7 @@ export function apply(ctx, config) {
   const delay = Math.max(60000, config.refreshMs);
   const hasTimer = typeof ctx?.get === 'function' && Boolean(ctx.get('timer'));
   if (hasTimer && typeof ctx.inject === 'function') {
-    ctx.inject(['timer'], (child) => { child.interval(refresh, delay); });
+    bus.demand(['timer'], (child) => { child.interval(refresh, delay); });
   } else {
     const timer = setInterval(refresh, delay);
     timer.unref?.();

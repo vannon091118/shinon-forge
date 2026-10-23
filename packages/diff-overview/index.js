@@ -1,6 +1,6 @@
 import z from '@deepseek-ai/schemastery';
 
-import { resolveWorkspaceRoot } from '@shinon/seams/core';
+import { createOrchestrator, resolveWorkspaceRoot } from '@shinon/seams/core';
 
 import {
   DIFF_CONTRACT,
@@ -127,8 +127,7 @@ function mountRoute(ctx, options) {
       try { file?.(); } catch { /* schon weg */ }
     });
   };
-  if (typeof ctx.inject === 'function') ctx.inject(['webServer'], mount);
-  else mount(ctx);
+  if (!createOrchestrator(ctx, { owner: 'diff-overview' }).demand(['webServer'], mount)) mount(ctx);
 }
 
 export function apply(ctx, config) {

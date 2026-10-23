@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 /**
  * Narrow generator for the CodingMon-50 client mirror. This is deliberately
- * not a general bundler: only the named data regions in client.js are writable.
+ * not a general bundler: only the named data regions are writable.
+ *
+ * Geschrieben wird in die QUELLTEILE (`assets/client/`), nicht in `client.js`:
+ * das Bundle ist generiert (`scripts/build-client.mjs`) und ein Lauf dieses
+ * Skripts wuerde sonst beim naechsten `build-client` ueberschrieben. Welcher
+ * Teil eine Region traegt, wird gesucht, nicht verdrahtet (`findBlockFile`).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findBlockFile, writeBlockBody } from '../lib/embed-blocks.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 const DATA_FILE = join(ROOT, 'packages', 'codingmon', 'assets', 'data', 'codingmon-50.json');
-const CLIENT_FILE = join(ROOT, 'packages', 'codingmon', 'client.js');
+const PARTS_DIR = join(ROOT, 'packages', 'codingmon', 'assets', 'client');
 const LF = String.fromCharCode(10);
 const data = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
 function validate(d) {
@@ -44,17 +50,15 @@ const regions=[
  ['generated-codingmon-buffs',`    const BUFFS = ${JSON.stringify(buffs)};`],
  ['generated-codingmon-loot',`    const LOOT_TABLE = ${JSON.stringify(loot)};\n    const LOOT_TOTAL = LOOT_TABLE.reduce((sum, entry) => sum + entry.weight, 0);`],
 ];
-function update(source,region,body){
- const open='// >>> '+region, close='// <<< '+region, a=source.indexOf(open);
- if(a<0)throw new Error('Region fehlt: '+region);
- const bodyStart=source.indexOf(LF,a)+1, b=source.indexOf(close,bodyStart);
- if(b<0)throw new Error('Endmarke fehlt: '+region);
- const closeLine=source.lastIndexOf(LF,b)+1;
- return source.slice(0,bodyStart)+body+LF+source.slice(closeLine);
-}
-let actual=readFileSync(CLIENT_FILE,'utf8'), expected=actual;
-for(const [name,body] of regions)expected=update(expected,name,body);
+function update(source,region,body){return writeBlockBody(source,region,body);}
 const check=process.argv.includes('--check'), write=process.argv.includes('--write');
 if(check===write)throw new Error('Nutzung: build-codingmon.mjs --write | --check');
-if(check){if(expected!==actual)throw new Error('Client-Spiegel ist veraltet; node scripts/assets/build-codingmon.mjs --write ausführen');console.log('OK CodingMon-Datenregionen deckungsgleich ('+counts.species+' Arten, '+counts.abilities+' Fähigkeiten)');}
-else{if(expected!==actual)writeFileSync(CLIENT_FILE,expected);console.log('OK CodingMon-Datenregionen geschrieben ('+counts.species+' Arten, '+counts.abilities+' Fähigkeiten)');}
+let changed=0;
+for(const [name,body] of regions){
+ const file=findBlockFile(PARTS_DIR,name);
+ const actual=readFileSync(file,'utf8'), expected=update(actual,name,body);
+ if(expected===actual)continue;
+ if(check)throw new Error('Client-Spiegel ist veraltet ('+name+'); node scripts/assets/build-codingmon.mjs --write ausführen');
+ writeFileSync(file,expected); changed+=1;
+}
+console.log('OK CodingMon-Datenregionen '+(check?'deckungsgleich':'geschrieben ('+changed+' Region(en) geändert)')+' ('+counts.species+' Arten, '+counts.abilities+' Fähigkeiten)');

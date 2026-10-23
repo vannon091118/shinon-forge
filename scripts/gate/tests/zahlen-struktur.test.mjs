@@ -39,7 +39,7 @@ function fixture(text) {
   mkdirSync(join(root, 'packages'), { recursive: true });
   writeFileSync(join(root, 'package.json'), JSON.stringify({ name: '@shinon/fixture', version: '0.0.0' }), 'utf8');
   writeFileSync(join(root, 'docs', 'contracts', 'structure.json'), JSON.stringify({
-    contract: 'shinon.structure/v1', rules: {}, klassen: [], bestand: {}, bestandAusnahmen: {},
+    contract: 'shinon.structure/v1', rules: {}, klassen: [],
   }), 'utf8');
   writeFileSync(join(root, 'docs', 'ZAHLEN.md'), text, 'utf8');
   execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });

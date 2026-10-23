@@ -143,4 +143,20 @@ const collectText = (node, out = []) => {
   return out;
 };
 
-export { makeClock, boot, flatten, collectText };
+/**
+ * Die Sammelpruefung eines Durchstichs: EINE Meldung je Zusage, EIN Zaehler am
+ * Ende. Sie liegt hier, weil zwei Durchstich-Dateien sie brauchen (der Lauf und
+ * seine Grenzen) — zwei Kopien wuerden zwei Auswertungen erzeugen, und ein
+ * gruener Lauf waere dann nur die Aussage der jeweils anderen Kopie.
+ */
+function createCheck() {
+  let failed = 0;
+  const failures = [];
+  const check = (name, ok, detail = '') => {
+    if (!ok) { failed += 1; failures.push(`${name}${detail === '' ? '' : ` — ${detail}`}`); }
+    console.log(`${ok ? '✅' : '✖'} ${name}${detail === '' ? '' : ` — ${detail}`}`);
+  };
+  return { check, failures, failed: () => failed };
+}
+
+export { makeClock, boot, flatten, collectText, createCheck };

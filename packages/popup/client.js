@@ -1,5 +1,6 @@
 /**
  * @shinon/popup — Client-Hälfte: DAS OVERLAY (Zug 6) und sein Panel.
+ * GENERIERT aus assets/client/*.js — nicht von Hand ändern; Schreiben: node scripts/build-client.mjs popup.
  *
  * DER DATENWEG (der einzige, der einem Out-of-Tree-Bundle offensteht): ein
  * Client-Bundle kann KEINEN Host-Endpunkt registrieren — die Remote-Beiträge der
@@ -31,6 +32,7 @@
 window.__ModuleLoader__.load({
   id: '@shinon/popup',
   factory(require) {
+// >>> @part assets/client/01-react.js
     const React = require('react');
     const h = React.createElement;
     const PLUGIN = '@shinon/popup';
@@ -55,7 +57,9 @@ window.__ModuleLoader__.load({
       registry.set(PLUGIN, { label: LABEL, kind: 'client', panel: PANEL_ID, detail });
       window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: PLUGIN } }));
     }
+// <<< @part assets/client/01-react.js
 
+// >>> @part assets/client/02-popup-icon.js
     function PopupIcon() {
       return h('svg', { viewBox: '0 0 16 16', width: 16, height: 16, 'aria-hidden': true },
         h('rect', { x: 1, y: 2, width: 14, height: 10, rx: 2, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4 }),
@@ -246,7 +250,9 @@ function progressReading(reading) {
     // ---------------------------------------------------------------------
     // Die Naht: welche Sitzung gezeigt wird und ihr Ereignisfenster.
     // ---------------------------------------------------------------------
+// <<< @part assets/client/02-popup-icon.js
 
+// >>> @part assets/client/03-seam-of.js
     /**
      * Die Bindung der gezeigten Sitzung: `SlotScopeAdapter.current` sagt welche,
      * `ClientSessions.binding` gibt sie — dieselbe Naht wie in @shinon/token-usage.
@@ -410,5 +416,7 @@ function progressReading(reading) {
         }
       },
     };
+// <<< @part assets/client/03-seam-of.js
+
   },
 });

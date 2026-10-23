@@ -108,7 +108,7 @@ test('das Paket steht im Profil (Bindeglied und Buendel)', () => {
 });
 
 test('der Host oeffnet die Route, der Client liest den Global', () => {
-  assert.match(hostSource, /ctx\.inject\(\['webServer'\]/);
+  assert.match(hostSource, /(?:ctx\.inject|bus\.demand)\(\['webServer'\]/);
   assert.match(hostSource, /webserver\/index-inject/);
   assert.match(hostSource, /kind: 'global'/);
   assert.match(clientSource, /window\[VERSION_GLOBAL\]/);

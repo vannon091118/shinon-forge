@@ -213,6 +213,10 @@ export function reconcileEntries(entries, existsFn) {
 // `@shinon/seams/core`, nicht den relativen Pfad. Beide Dateien sind importfrei
 // (nur node:-Module), also bleibt die Eigenschaft erhalten.
 export { IO_CONTRACT, IO_LOG_PREFIX, IO_KINDS, IO_FIELDS, describeIo, ioLogLine, logIo, logEventRead, ioSpinePayload, ioSpineEnvelope } from './io-path.js';
+// Der Orchestrator (route/provide/demand plus der Vertragsleser) liegt nebenan
+// und wird aus demselben Grund weitergereicht: die Host-Hälften importieren
+// `@shinon/seams/core`, nie einen relativen Pfad in ein fremdes Paket.
+export * from './orchestrator.js';
 
 export function toWorkspacePath(root, absolute) {
   const rel = relative(resolve(String(root ?? '')), resolve(String(absolute ?? '')));

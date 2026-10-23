@@ -1,6 +1,6 @@
 import z from '@deepseek-ai/schemastery';
 // Die Digest-Regel hat EINE Definition: `@shinon/seams` (Host-Naht-Kern).
-import { digest } from '@shinon/seams/core';
+import { createOrchestrator, digest } from '@shinon/seams/core';
 
 /**
  * shinon-hook — der echte DSH-Entry-Point von Shinon (Phase 1).
@@ -285,6 +285,7 @@ async function onPreStep(ctx, config, payload, next) {
  * registriert — das wird gemeldet, nicht verschwiegen (keine stillen Fallbacks).
  */
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'hook' });
   if (typeof ctx?.on !== 'function') {
     console.error(`[shinon-hook] ctx.on fehlt — ${PRE_STEP_EVENT} wurde NICHT registriert (BLOCKED)`);
     return () => {};
@@ -294,7 +295,7 @@ export function apply(ctx, config) {
     return () => {};
   }
 
-  const dispose = ctx.on(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, payload, next));
+  const dispose = bus.route(PRE_STEP_EVENT, (payload, next) => onPreStep(ctx, config, payload, next));
   console.log(`[shinon-hook] Aktiviert — registriert auf ${PRE_STEP_EVENT} (verdict=${config.verdict}, trace=${config.trace ? 'an' : 'aus'})`);
 
   return () => {

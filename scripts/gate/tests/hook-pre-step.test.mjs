@@ -335,6 +335,9 @@ test('Grenze: der Laufzeitcode enthält weder Aktion noch Fremdlogik', () => {
     assert.deepEqual(findForbidden(source, tokens), [], name);
   }
   // Der Code muss auch wirklich registrieren — sonst beweist die Grenze nichts.
-  assert.ok(codeOnly(source).includes(`ctx.on(${'PRE_STEP_EVENT'}`), 'kein echter Listener im Laufzeitcode');
+  assert.ok(
+    codeOnly(source).includes(`bus.route(${'PRE_STEP_EVENT'}`) || codeOnly(source).includes(`ctx.on(${'PRE_STEP_EVENT'}`),
+    'kein echter Listener im Laufzeitcode',
+  );
   assert.ok(codeOnly(source).includes('return next()'), 'die Entscheidung wird nicht durchgereicht');
 });

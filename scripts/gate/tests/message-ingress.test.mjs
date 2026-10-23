@@ -259,7 +259,10 @@ test('Eingang: unsere Pakete registrieren sich auf dem Seam, den der Loop dispat
     assert.deepEqual(declarations, [`export const PRE_STEP_EVENT = '${seam}';`], `@shinon/${pkg}: PRE_STEP_EVENT muss genau einmal ${seam} sein`);
     // Registriert wird in der Host-Haelfte: `index.js` haengt den Listener an.
     const host = readFileSync(join(REPO, 'packages', pkg, 'index.js'), 'utf8');
-    assert.ok(host.includes('ctx.on(PRE_STEP_EVENT'), `@shinon/${pkg}: muss auf dem Seam registrieren`);
+    assert.ok(
+      host.includes('ctx.on(PRE_STEP_EVENT') || host.includes('bus.route(PRE_STEP_EVENT'),
+      `@shinon/${pkg}: muss auf dem Seam registrieren`,
+    );
   }
 });
 

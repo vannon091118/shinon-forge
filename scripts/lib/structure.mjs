@@ -11,13 +11,18 @@
  *
  * Drei Dinge macht dieser Schritt rot, und jedes hat einen eigenen Befund:
  *
- *   1. Zeilen über der Klassengrenze — oder über dem eingefrorenen Bestand,
- *      der nur SINKEN darf. Eine Datei, die heute schon zu groß ist, wird nicht
- *      zerlegt (das wäre Arbeit, die der Auftrag verbietet); sie wird benannt.
+ *   1. Zeilen über der Klassengrenze. Es gibt KEINEN Bestand mehr: eine Datei
+ *      über ihrer Grenze ist rot, fertig. Das ist am 2026-10-23 scharf
+ *      geworden, nachdem die Client-Hälften in Quellteile zerlegt wurden
+ *      (`scripts/build-client.mjs`) und damit jede handgeschriebene Datei ihre
+ *      Grenze einhielt. Die einzige Ausnahme ist GENERIERTER Text: er hat
+ *      keine Lesegrenze, weil ihn niemand am Stück liest — dafür muss er
+ *      bytegleich aus seinen Quellen reproduzierbar sein, und das prüft
+ *      `scripts/gate/tests/client-montage.test.mjs`.
  *   2. Eine Datei ohne deklarierten Eigentümer: kein Klassenmuster trifft sie.
  *      Das ist der Fall, in dem eine neue Rolle entstanden ist, ohne dass
  *      jemand ihre Grenze entschieden hat.
- *   3. Eine Datei, die den Vertrag ihrer Klasse verletzt. Die Classen-Registry
+ *   3. Eine Datei, die den Vertrag ihrer Klasse verletzt. Die Klassen-Registry
  *      sagt, was eine Hälfte AUSMACHT (z. B. `client.js` trägt kein Schema,
  *      `index.js` trägt `apply`); ohne diese Prüfung wäre ein Klassenname nur
  *      ein Ordner-Etikett.
@@ -89,30 +94,53 @@ function zuRelative(root, abs) {
  * Der Befund zu EINER Datei — oder null. Getrennt von der Schleife, damit der
  * Test genau eine Regel einzeln anfahren kann, ohne einen ganzen Baum zu bauen.
  */
-export function dateiBefund({ datei, lines, struktur }) {
+export function dateiBefund({ datei, lines, struktur, generiert = false }) {
   const klasse = (struktur.klassen ?? []).find((k) => new RegExp(k.muster).test(datei));
   if (klasse === undefined) {
     return `${datei}: keine Klasse — kein Muster in ${STRUCTURE_FILE} trifft einen Eigentümer`;
   }
-  const bestand = struktur.bestand?.[datei];
-  if (bestand !== undefined) {
-    if (lines > bestand) {
-      const ausnahme = struktur.bestandAusnahmen?.[datei];
-      if (Number.isSafeInteger(ausnahme?.maxZeilen) && ausnahme.maxZeilen > bestand && lines <= ausnahme.maxZeilen) return null;
-      if (Number.isSafeInteger(ausnahme?.maxZeilen) && lines > ausnahme.maxZeilen) {
-        return `${datei}: ${lines} Zeilen über der Ausnahmegrenze ${ausnahme.maxZeilen} (${klasse.id})`;
-      }
-      return `${datei}: ${lines} Zeilen, Bestand ${bestand} (${klasse.id}) — der Bestand darf nur sinken`;
-    }
-    if (lines < bestand) {
-      return `${datei}: ${lines} Zeilen, Bestand nennt ${bestand} (${klasse.id}) — senke den Eintrag auf ${lines}`;
-    }
-    return null;
+  // Ein generierter Text ist keine Lese-Einheit: seine Grenze ist nicht die
+  // Zeilenzahl, sondern die Bytegleichheit zu seinen Quellen. Die Marke steht
+  // im Dateikopf (`GENERIERT aus …`) und wird von `generiertMarke()` gelesen.
+  // Sie gilt NUR fuer die Client-Haelfte: jeder andere generierte Text haette
+  // keinen Generator, den ein Test bytegleich nachrechnen kann — die Marke
+  // waere dort ein Etikett auf einer handgepflegten Datei und damit eine
+  // stille Abschaltung der Grenze. Deshalb ist sie ausserhalb ein Befund.
+  if (generiert) {
+    return klasse.id === 'client'
+      ? null
+      : `${datei}: Kopfmarke \`GENERIERT aus\` in der Klasse ${klasse.id} — nur eine Client-Hälfte wird generiert`;
   }
   if (lines > klasse.grenze) {
-    return `${datei}: ${lines} Zeilen über der Grenze ${klasse.grenze} (${klasse.id}) — entweder trennen oder als Bestand eintragen`;
+    return `${datei}: ${lines} Zeilen über der Grenze ${klasse.grenze} (${klasse.id}) — entweder trennen oder generieren`;
   }
   return null;
+}
+
+/**
+ * Trägt die Datei die Marke eines generierten Textes? Gemeint ist der KOPF:
+ * der Markenkommentar vor der ersten Zeile echten Codes.
+ *
+ * Warum so streng: `slice(0, 40)` war eine Zeilenzahl, geraten statt geprüft,
+ * und eine Zeichenkette in einem Testfixtur-String (`client-montage.test.mjs`
+ * baut einen generierten Kopf nach) zählte als zweiter generierter Text. Der
+ * Kopf endet, wo der Code beginnt — das ist die einzige Grenze, die ein
+ * Dateikopf von sich aus hat.
+ */
+export function generiertMarke(text) {
+  let first = true;
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (first && trimmed.startsWith('#!')) { first = false; continue; }
+    first = false;
+    if (trimmed === '' || trimmed.startsWith('//') || trimmed.startsWith('/*')
+      || trimmed.startsWith('*') || trimmed.startsWith('*/')) {
+      if (trimmed.includes('GENERIERT aus ')) return true;
+      continue;
+    }
+    return false;
+  }
+  return false;
 }
 
 /**
@@ -132,7 +160,7 @@ export function structureIssues(root = ROOT) {
   if (struktur.contract !== CONTRACT) {
     return [`${STRUCTURE_FILE}: Vertrag ${struktur.contract ?? '(fehlt)'} statt ${CONTRACT}`];
   }
-  for (const key of ['rules', 'klassen', 'bestand', 'bestandAusnahmen', 'vertraege', 'profil']) {
+  for (const key of ['rules', 'klassen', 'vertraege', 'profil']) {
     if (struktur[key] === undefined) issues.push(`${STRUCTURE_FILE}: Feld \`${key}\` fehlt`);
   }
   for (const klasse of struktur.klassen ?? []) {
@@ -145,19 +173,16 @@ export function structureIssues(root = ROOT) {
   }
   if (issues.length > 0) return issues;
 
-  const gesehen = new Set();
-
   for (const abs of codeDateien(root)) {
     const datei = zuRelative(root, abs);
-    gesehen.add(datei);
     const lines = zeilen(abs);
-    const befund = dateiBefund({ datei, lines, struktur });
+    const text = readFileSync(abs, 'utf8');
+    const befund = dateiBefund({ datei, lines, struktur, generiert: generiertMarke(text) });
     if (befund !== null) {
       issues.push(befund);
       continue;
     }
     const klasse = struktur.klassen.find((k) => new RegExp(k.muster).test(datei));
-    const text = readFileSync(abs, 'utf8');
     for (const nadel of klasse.vertrag ?? []) {
       if (!text.includes(nadel)) issues.push(`${datei}: Vertrag der Klasse ${klasse.id} verlangt \`${nadel}\``);
     }
@@ -166,20 +191,6 @@ export function structureIssues(root = ROOT) {
     }
   }
 
-  for (const [datei, ausnahme] of Object.entries(struktur.bestandAusnahmen ?? {})) {
-    const klasse = struktur.klassen.find((item) => new RegExp(item.muster).test(datei));
-    if (struktur.bestand?.[datei] === undefined) issues.push(`${datei}: Bestand-Ausnahme ohne Bestandseintrag`);
-    if (klasse?.id !== 'test') issues.push(`${datei}: Bestand-Ausnahme ist nur für Testdateien zulässig`);
-    if (typeof ausnahme?.grund !== 'string' || ausnahme.grund.trim() === ''
-      || typeof ausnahme?.datum !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(ausnahme.datum)
-      || !Number.isSafeInteger(ausnahme?.maxZeilen) || ausnahme.maxZeilen <= (struktur.bestand?.[datei] ?? 0)) {
-      issues.push(`${datei}: Bestand-Ausnahme braucht Grund, Datum und maxZeilen über dem Bestand`);
-    }
-  }
-
-  for (const datei of Object.keys(struktur.bestand ?? {})) {
-    if (!gesehen.has(datei)) issues.push(`${datei}: Bestandseintrag ohne Datei — Eintrag entfernen`);
-  }
   issues.push(...vertragsBefunde(root, struktur), ...profilBefunde(root, struktur));
   return issues;
 }
@@ -303,17 +314,18 @@ function profilBefunde(root, struktur) {
  * und `vertragsverstoesse` werden aus den Befunden gezählt, die `npm test` rot
  * machen — eine Zahl, die den Riegel wiederholt, kann nicht neben ihm driften.
  *
- * @returns {{dateien: number, klassen: number, bestand: number, ohneKlasse: number, vertragsverstoesse: number}}
+ * @returns {{dateien: number, klassen: number, generiert: number, ohneKlasse: number, vertragsverstoesse: number}}
  */
 export function strukturZahlen(root = ROOT) {
   const file = join(root, STRUCTURE_FILE);
-  const struktur = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { klassen: [], bestand: {} };
+  const struktur = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { klassen: [] };
   const issues = structureIssues(root);
   const ohneKlasse = issues.filter((issue) => issue.includes('keine Klasse')).length;
+  const generiert = codeDateien(root).filter((abs) => generiertMarke(readFileSync(abs, 'utf8'))).length;
   return {
     dateien: codeDateien(root).length,
     klassen: Array.isArray(struktur.klassen) ? struktur.klassen.length : 0,
-    bestand: Object.keys(struktur.bestand ?? {}).length,
+    generiert,
     ohneKlasse,
     vertragsverstoesse: issues.length - ohneKlasse,
   };

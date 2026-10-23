@@ -7,8 +7,9 @@
  * eine Registry mit zwei Klassen und ein paar Dateien. Jede Mutation kippt
  * genau EINE Regel, und der Befund muss sie benennen — eine Datei über der
  * Grenze, eine ohne Klasse, eine, die den Vertrag ihrer Klasse bricht, ein
- * Bestand, der nicht mehr stimmt, ein Bestand ohne Datei, eine fehlende
- * Registry.
+ * generierter Kopf, der die Grenze nicht befreit, eine fehlende Registry.
+ * Den `bestand` gibt es seit dem 2026-10-23 nicht mehr; ein alter Eintrag
+ * rettet eine Datei deshalb NICHT über ihre Grenze.
  *
  * Der Echtbaum-Fall ist der Billigste und der Wichtigste: er friert ein, dass
  * die Registry heute ehrlich ist (keine geratene Grenze, kein Eintrag, der
@@ -33,8 +34,6 @@ const REGISTRY = {
     { id: 'client', muster: '^packages/[^/]+/client\\.js$', grenze: 10, gemessen: { anzahl: 1, median: 3, max: 3 }, verboten: ['export const Config'] },
     { id: 'test', muster: '^scripts/gate/tests/.*\\.mjs$', grenze: 10, gemessen: { anzahl: 1, median: 3, max: 3 } },
   ],
-  bestand: {},
-  bestandAusnahmen: {},
   // T1-6: die zwei Riegel fuer die Orte ohne Zeilen. Der Fixture-Leser ist eine
   // Nicht-Code-Datei, damit der Kanon-Riegel nicht mit der Klassenzuordnung
   // desselben Baums kollidiert (er prueft nur, dass der Leser die Datei NENNT).
@@ -126,70 +125,55 @@ test('Host-Einstieg ohne `apply` verletzt den Vertrag seiner Klasse', () => {
   }
 });
 
-test('Bestand ist eine Obergrenze: Wachstum und Schwund sind beide rot', () => {
-  const wachsend = baum({ 'packages/a/client.js': `${GUT_CLIENT}${zeilen(20)}` });
+test('generierter Text hat keine Zeilengrenze — ein Kopf ohne Marke hat sie', () => {
+  const marke = ' * GENERIERT aus assets/client/*.js — nicht von Hand ändern\n';
+  const root = baum({ 'packages/a/client.js': `/**\n${marke} */\n${GUT_CLIENT}${zeilen(20)}` });
   try {
-    writeFileSync(join(wachsend, 'docs/contracts/structure.json'), JSON.stringify({ ...REGISTRY, bestand: { 'packages/a/client.js': 21 } }));
-    assert.deepEqual(structureIssues(wachsend), []);
-    writeFileSync(join(wachsend, 'packages/a/client.js'), `${GUT_CLIENT}${zeilen(30)}`);
-    assert.match(structureIssues(wachsend)[0], /31 Zeilen, Bestand 21 \(client\)/);
+    assert.deepEqual(structureIssues(root), [], 'die Marke im Kopf befreit von der Lesegrenze');
+    // Dieselbe Datei, Marke erst nach Zeile 40: kein Kopf, also keine Befreiung.
+    writeFileSync(join(root, 'packages/a/client.js'), `/**\n */\n${GUT_CLIENT}${zeilen(40)}${marke}`);
+    assert.match(structureIssues(root)[0], /client\.js: \d+ Zeilen über der Grenze 10 \(client\)/);
   } finally {
-    rmSync(wachsend, { recursive: true, force: true });
-  }
-
-  const sinkend = baum({ 'packages/a/client.js': `${GUT_CLIENT}${zeilen(20)}` });
-  try {
-    writeFileSync(join(sinkend, 'docs/contracts/structure.json'), JSON.stringify({ ...REGISTRY, bestand: { 'packages/a/client.js': 25 } }));
-    // Ein sinkender Bestand ist ein Befund, kein Fehler: der Eintrag lügt über
-    // den Baum, bis jemand ihn nachzieht. Genau das erzwingt der Riegel.
-    assert.match(structureIssues(sinkend)[0], /21 Zeilen, Bestand nennt 25 \(client\) — senke den Eintrag auf 21/);
-  } finally {
-    rmSync(sinkend, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('maschinelle Test-Ausnahme erlaubt begrenztes Wachstum und sperrt das Ueberziehen', () => {
-  const root = baum({ 'scripts/gate/tests/case.test.mjs': zeilen(21) });
+test('die GENERIERT-Marke gilt nur im Kopf und nur für die Client-Hälfte', () => {
+  const marke = ' * GENERIERT aus assets/client/*.js — nicht von Hand ändern\n';
+  // Eine Zeichenkette mit demselben Text ist kein Dateikopf: ein Testfixtur,
+  // der einen generierten Kopf NACHBAUT, darf sich selbst nicht befreien.
+  const root = baum({
+    'packages/a/client.js': `/**\n * Handgeschrieben.\n */\nconst MARKER = '${marke.trim()}\\n';\n${GUT_CLIENT}${zeilen(20)}`,
+  });
   try {
-    const registry = {
-      ...REGISTRY,
-      bestand: { 'scripts/gate/tests/case.test.mjs': 20 },
-      bestandAusnahmen: { 'scripts/gate/tests/case.test.mjs': { grund: 'neue Abnahmefaelle', datum: '2026-10-22', maxZeilen: 25 } },
-    };
+    assert.match(structureIssues(root)[0], /client\.js: \d+ Zeilen über der Grenze 10 \(client\)/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+
+  // Und in einer Klasse ohne Generator wäre die Marke eine Behauptung.
+  const fremd = baum({
+    'packages/a/index.js': `/**\n${marke} */\nfunction apply(ctx) {}\n${zeilen(20)}`,
+  });
+  try {
+    assert.match(structureIssues(fremd)[0], /Kopfmarke `GENERIERT aus` in der Klasse host-entry/);
+  } finally {
+    rmSync(fremd, { recursive: true, force: true });
+  }
+});
+
+test('ein alter `bestand`-Eintrag rettet eine Datei nicht mehr über die Grenze', () => {
+  const root = baum({ 'packages/a/client.js': `${GUT_CLIENT}${zeilen(20)}` });
+  try {
+    const registry = { ...REGISTRY, bestand: { 'packages/a/client.js': 21 } };
     writeFileSync(join(root, 'docs/contracts/structure.json'), JSON.stringify(registry));
-    assert.deepEqual(structureIssues(root), [], 'Wachstum innerhalb der Ausnahmegrenze ist erlaubt');
-    writeFileSync(join(root, 'scripts/gate/tests/case.test.mjs'), zeilen(26));
-    assert.match(structureIssues(root)[0], /26 Zeilen über der Ausnahmegrenze 25/);
+    assert.match(structureIssues(root)[0], /21 Zeilen über der Grenze 10 \(client\)/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('Bestand-Ausnahmen sind nur mit gueltigem Grund und fuer Testdateien erlaubt', () => {
-  const root = baum({ 'packages/a/client.js': GUT_CLIENT });
-  try {
-    writeFileSync(join(root, 'docs/contracts/structure.json'), JSON.stringify({
-      ...REGISTRY,
-      bestand: { 'packages/a/client.js': 1 },
-      bestandAusnahmen: { 'packages/a/client.js': { grund: '', datum: 'gestern', maxZeilen: 2 } },
-    }));
-    const issues = structureIssues(root);
-    assert.ok(issues.some((issue) => /nur für Testdateien zulässig/.test(issue)));
-    assert.ok(issues.some((issue) => /braucht Grund, Datum und maxZeilen/.test(issue)));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('Bestandseintrag ohne Datei und fehlende Registry sind Befunde', () => {
-  const tot = baum({ 'packages/a/client.js': GUT_CLIENT });
-  try {
-    writeFileSync(join(tot, 'docs/contracts/structure.json'), JSON.stringify({ ...REGISTRY, bestand: { 'packages/a/weg.js': 12 } }));
-    assert.match(structureIssues(tot)[0], /packages\/a\/weg\.js: Bestandseintrag ohne Datei/);
-  } finally {
-    rmSync(tot, { recursive: true, force: true });
-  }
-
+test('eine fehlende Registry ist ein Befund', () => {
   const leer = mkdtempSync(join(tmpdir(), 'shinon-structure-'));
   try {
     assert.match(structureIssues(leer)[0], /docs\/contracts\/structure\.json fehlt/);

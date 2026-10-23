@@ -1,6 +1,6 @@
 import z from '@deepseek-ai/schemastery';
 // Der Kanal kommt aus `@shinon/seams`, nicht als eigenes Literal.
-import { PROMPTER_DECISION_CHANNEL } from '@shinon/seams/core';
+import { PROMPTER_DECISION_CHANNEL, createOrchestrator } from '@shinon/seams/core';
 // Die ENTSCHEIDUNG (§16) steht in `assets/decision-core.js`, die Projektion
 // (§18) in `assets/micro-state.js`. Dieser Eintrag registriert nur noch: er
 // reicht die oeffentlichen Namen weiter, damit die Paketflaeche dieselbe bleibt.
@@ -413,6 +413,7 @@ function onDecision(ctx, config, runtime, record) {
  */
 // TODO: [DSH-Refactor] - 55 Zeilen Mount mit drei Registrierungen, Dienst-Angebot und Log in einem Rumpf; die Abmeldung spiegelt sie von Hand (dieselbe Anzahl Klammern, kein gemeinsamer Nenner). Je eine benannte Paar-Funktion fuer Registrierung und Abmeldung, damit ein neuer Listener nicht vergessen werden kann.
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'task-router' });
   if (typeof ctx?.on !== 'function') {
     console.error(`[shinon-task-router] ctx.on fehlt — ${config.sourceChannel} wurde NICHT beobachtet (BLOCKED)`);
     return () => {};
@@ -422,7 +423,7 @@ export function apply(ctx, config) {
   const disposers = [];
 
   if (config.observeEvents.includes(PRE_STEP_EVENT)) {
-    disposers.push(ctx.on(PRE_STEP_EVENT, (payload, next) => {
+    disposers.push(bus.route(PRE_STEP_EVENT, (payload, next) => {
       const step = readStep(payload);
       if (step.sessionId !== '') runtime.pending.set(step.sessionId, step);
       return next();
@@ -431,8 +432,8 @@ export function apply(ctx, config) {
     console.log(`[shinon-task-router] ${PRE_STEP_EVENT} nicht in observeEvents — ohne lebenden Agenten wird kein Goal aktiviert`);
   }
 
-  disposers.push(ctx.on(config.sourceChannel, (record) => onDecision(ctx, config, runtime, record)));
-  disposers.push(ctx.on(DISPOSED_EVENT, ({ agent } = {}) => {
+  disposers.push(bus.route(config.sourceChannel, (record) => onDecision(ctx, config, runtime, record)));
+  disposers.push(bus.route(DISPOSED_EVENT, ({ agent } = {}) => {
     const sessionId = typeof agent?.session?.id === 'string' ? agent.session.id : '';
     if (sessionId !== '') runtime.pending.delete(sessionId);
   }));
@@ -441,9 +442,8 @@ export function apply(ctx, config) {
   // ohne eigenen Zustand und ohne zusätzlichen Listener. Ein Host ohne
   // `provide` ist kein Fehler des Laufs (dieselbe Haltung wie beim Query-Dienst
   // des Project Index); er bekommt die Aussage in derselben Aktivierungszeile.
-  const canProvide = typeof ctx?.provide === 'function';
-  const releaseMicroState = canProvide ? ctx.provide(MICRO_STATE_SERVICE, createMicroStateService(ctx)) : null;
-  const microStateInfo = canProvide
+  const releaseMicroState = bus.provide(MICRO_STATE_SERVICE, createMicroStateService(ctx));
+  const microStateInfo = releaseMicroState !== null
     ? `Projektion ${MICRO_STATE_SERVICE} bereitgestellt (${MICRO_STATE_CONTRACT})`
     : `Projektion ${MICRO_STATE_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`;
 

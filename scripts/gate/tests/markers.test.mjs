@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadClientBundle, requireStub } from './helpers/client-sandbox.mjs';
+import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 import {
   MARK_FIELDS,
   MODEL_CONTRACT,
@@ -48,6 +49,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 async function loadBundle() {
   const work = mkdtempSync(join(tmpdir(), 'shinon-markers-test-'));
   cpSync(PACKAGE_DIR, join(work, 'pkg'), { recursive: true });
+  provideSeamCore(work);
   const stub = join(work, 'node_modules/@deepseek-ai/schemastery');
   mkdirSync(stub, { recursive: true });
   writeFileSync(join(stub, 'package.json'), JSON.stringify({ name: '@deepseek-ai/schemastery', version: '0.0.0-test-stub', type: 'module', exports: { '.': './index.js' } }));

@@ -1,11 +1,14 @@
 import z from '@deepseek-ai/schemastery';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { readFileSync } from 'node:fs';
-import { join, isAbsolute } from 'node:path';
 import { acceptedCommitments, decideProposal } from './assets/memory-core.js';
 // Der Zustand der Persona (Selbstmodell und Langzeitgedaechtnis) hat EINEN
 // Eigentuemer: `assets/persona-runtime-state.js`. Die Namensraeume und Dokument-Ids, die der
 // Eintrag als oeffentliche Namen weitergibt, stehen dort.
+import {
+  EMPTY_CONTRACT,
+  createPersonaState,
+  loadStateContract,
+} from './assets/state-machine.js';
 import {
   MEMORY_MEMO_ID,
   MEMORY_NAMESPACE,
@@ -16,12 +19,19 @@ import {
 // Das Lesen einer MENSCHLICHEN Nachricht und der explizite Beziehungs-Produzent
 // liegen im importfreien Kern: dieselbe Rechnung im Host, im Test ohne
 // node_modules und in der Probe gegen den echten Spine.
-import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, RELATION_SIGNAL, TRIGGERS, beobachten, createPromptText, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, sectionApplies, textOf } from './assets/interaction-core.js';
+import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SERVICE, RELATION_SIGNAL, TRIGGERS, beobachten, createPromptText, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, textOf } from './assets/interaction-core.js';
 // Der Live-Zustand der Persona geht als RUNTIME-CONTEXT in die Nachrichtenliste,
 // nicht nur als System-Prompt-Abschnitt: so ersetzt der Stand pro Schritt den
 // vorherigen (statt sich neben ihm zu stapeln) und traegt den Anti-Drift-Satz
 // "This snapshot supersedes earlier runtime-context snapshots".
-import { registerLiveContext, renderLiveContext } from './assets/live-context.js';
+import { renderLiveContext } from './assets/live-context.js';
+// Panel-Daten und Routen (Globals, SSE, Review, Beziehung) haben einen eigenen
+// Eigentuemer: der Eintrag baut die Flaeche, die Flaeche kennt die HTTP-Form.
+import { createUiSurface } from './assets/ui-surface.js';
+// Welche Abschnitte es gibt und wie sie am Prompt haengen: eigener Eigentuemer.
+import { buildSectionPlan, registerSections } from './assets/prompt-sections.js';
+// Fuer WEN die Persona in diesem Schritt spricht: eigener Eigentuemer.
+import { createSessionScope, declaredWorkspaceRoot } from './assets/session-scope.js';
 // Der Arbeitsablauf als EIN zusammenhaengender Baustein: die Reihenfolge der
 // Schritte und der Umgang mit Zweifel, Blockern, Fehlern und Abbruch.
 import { WORKFLOW, renderWorkflow } from './assets/workflow.js';
@@ -49,6 +59,7 @@ import {
   NARRATIVE_STATE_CONTRACT,
   PROMPTER_DECISION_CHANNEL as PROMPTER_DECISION_CHANNEL_CORE,
   INDEX_STORE_SERVICE, INDEX_STORE_CONTRACT,
+  createOrchestrator,
   fingerprintRoot,
   logEventRead,
 } from '@shinon/seams/core';
@@ -113,29 +124,6 @@ export const REVIEW_CONTRACT = 'shinon.persona-review/v1';
  */
 const sessionRoot = new AsyncLocalStorage();
 
-/**
- * Der Workspace, für den die Persona spricht — AUSDRÜCKLICH benannt, nie geraten.
- *
- * Gemessen 2026-10-17: `process.cwd()` ist der HOST (bei `DSH_HOME=$PWD` also das
- * Shinon-Repo), nicht der Workspace der Session. Wer daraus den Projektscope
- * ableitet, injiziert Shinon-Persona in fremde Projekte. Deshalb: explizite Config
- * (`workspaceRoot`) oder `SHINON_WORKSPACE_ROOT`; fehlt beides, ist der Scope
- * UNKLAR und die Persona bleibt aus (fail-closed, nicht fail-open).
- *
- * WARUM DER ANDERE NAME: `@shinon/seams` hat die EINE Workspace-Auflösung
- * (`resolveWorkspaceRoot`) — die faellt auf `cwd` zurück, weil Prompter und
- * Project Index den Projektbaum BRAUCHEN. Hier ist der Rückfall genau der
- * Fehler (fremde Persona in fremden Projekten), also ist das eine andere Regel
- * mit anderem Ergebnis. Zwei Regeln tragen nicht denselben Namen: ein Gate-Schritt
- * (`hostMirrorIssues`) macht eine zweite `resolveWorkspaceRoot`-Definition rot.
- */
-function declaredWorkspaceRoot(config) {
-  const declared = typeof config.workspaceRoot === 'string' ? config.workspaceRoot.trim() : '';
-  if (declared !== '') return isAbsolute(declared) ? declared : join(process.cwd(), declared);
-  const fromEnv = (process.env.SHINON_WORKSPACE_ROOT ?? '').trim();
-  if (fromEnv !== '') return isAbsolute(fromEnv) ? fromEnv : null;
-  return null;
-}
 
 /**
  * @shinon/persona — Identity, State, Voice.
@@ -164,148 +152,25 @@ function declaredWorkspaceRoot(config) {
 
 
 
-/** Leerer Vertrag: die Persona läuft dann mit Baseline, aber ohne Voice-Texte. */
-const EMPTY_CONTRACT = {
-  contract: 'shinon.persona-state/unloaded',
-  identity: 'Shinon',
-  baseline: { stance: 'critical', uncertainty: 'explicit', mood: 'idle', capabilities: [], limitations: [] },
-  transitions: {},
-  voice: {},
-  limits: { maxEvents: 25, maxLimitations: 8 },
-};
-
-/** Zustandsvertrag aus dem Paket laden. */
-export function loadStateContract(relPath) {
-  return JSON.parse(readFileSync(new URL(relPath, import.meta.url), 'utf8'));
-}
-
-/** Initialer Zustand: die Baseline aus dem Vertrag. Reine Funktion. */
-export function initialState(contract) {
-  const baseline = contract.baseline ?? {};
-  return {
-    identity: contract.identity ?? 'Shinon',
-    stance: baseline.stance ?? 'critical',
-    uncertainty: baseline.uncertainty ?? 'explicit',
-    mood: baseline.mood ?? 'idle',
-    capabilities: [...(baseline.capabilities ?? [])],
-    limitations: [...(baseline.limitations ?? [])],
-    relation: baseline.relation ?? contract.relation?.initial ?? 'known',
-  };
-}
-
-/** Die Felder, die einen Persona-Zustand ausmachen — die Grundlage des Vergleichs. */
-const STATE_FIELDS = ['identity', 'stance', 'uncertainty', 'mood', 'capabilities', 'limitations', 'relation'];
-
 /**
- * Grenze fuer das Zaehl-Woerterbuch unbekannter Event-Typen. Ein Typ mit Pfad oder Parameter
- * im Namen darf den Speicher nicht ueber die Sitzungsdauer wachsen lassen; alles darueber
- * laeuft in EINEN benannten Ueberlauf-Eimer, damit die Zahl sichtbar bleibt statt zu verschwinden.
+ * Die Zustandsmaschine hat einen eigenen Eigentuemer (`assets/state-machine.js`):
+ * Vertrag laden, Uebergang rechnen, Verlauf halten. Der Eintrag bleibt die
+ * oeffentliche Flaeche des Pakets und reicht die Namen unveraendert weiter.
  */
-const IGNORED_TYPE_LIMIT = 64;
-const IGNORED_OVERFLOW_KEY = '<overflow>';
+export {
+  EMPTY_CONTRACT,
+  loadStateContract,
+  initialState,
+  deriveState,
+  createPersonaState,
+  eventTypeOf,
+} from './assets/state-machine.js';
 
-/**
- * Zwei Zustände feldweise vergleichen. Gleich heißt: jedes der sechs Felder ist
- * gleich, Listen elementweise und in der Reihenfolge.
- */
-function sameState(left, right) {
-  for (const field of STATE_FIELDS) {
-    if (Array.isArray(left[field]) || Array.isArray(right[field])) {
-      const a = Array.isArray(left[field]) ? left[field] : [];
-      const b = Array.isArray(right[field]) ? right[field] : [];
-      if (a.length !== b.length || a.some((value, index) => value !== b[index])) return false;
-    } else if (left[field] !== right[field]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-/**
- * Ein Event, ein Übergang. Deterministisch und rein — kein Modell, keine Zeit, kein Zufall.
- * Unbekannte Events ändern nichts (fail-closed: kein Raten).
- *
- * `changed` ist ein Messergebnis, keine Behauptung: der berechnete Zustand wird
- * feldweise gegen den vorigen geprüft. Ein Übergang, der nichts verschiebt (etwa
- * eine Limitation, die schon gesetzt war), meldet damit `false` — kein
- * History-Eintrag, kein neuer Prompt-Abschnitt für eine Nicht-Änderung.
- */
-export function deriveState(contract, state, eventType, event) {
-  const transition = contract.transitions?.[eventType];
-  if (!transition) return { state, changed: false, reason: 'UNKNOWN_EVENT' };
-
-  // relation.updated trägt die Stufe im Event (Nutzlastfeld relation) — kein
-  // statischer Übergang. Unbenannt heißt: nichts ändern (fail-closed, kein Raten).
-  // Nur lesend: die Persona setzt die Stufe aus dem Event, schreibt aber nie eine.
-  let relation = state.relation ?? contract.baseline?.relation ?? contract.relation?.initial ?? 'known';
-  if (eventType === 'relation.updated') {
-    const level = event !== null && typeof event === 'object' ? event.relation : undefined;
-    const levels = contract.relation?.levels ?? [];
-    if (typeof level !== 'string' || !levels.includes(level)) {
-      return { state, changed: false, reason: 'UNKNOWN_RELATION' };
-    }
-    relation = level;
-  }
-
-  const base = transition.reset ? initialState(contract) : state;
-  if (transition.reset) relation = base.relation;
-  const limitations = new Set(base.limitations ?? []);
-  for (const item of transition.removeLimitations ?? []) limitations.delete(item);
-  for (const item of transition.addLimitations ?? []) limitations.add(item);
-  const maxLimitations = contract.limits?.maxLimitations ?? 8;
-
-  const next = {
-    identity: contract.identity ?? state.identity,
-    stance: transition.stance ?? base.stance,
-    uncertainty: transition.uncertainty ?? base.uncertainty,
-    mood: transition.mood ?? base.mood,
-    capabilities: [...(contract.baseline?.capabilities ?? state.capabilities)],
-    limitations: [...limitations].slice(-maxLimitations),
-    relation,
-  };
-
-  return { state: next, changed: !sameState(state, next), reason: eventType };
-}
-
-/**
- * Die Ton-Faehigkeit des Scorings (Zug 5) — optional, wie beim Veredler.
- *
- * Die Persona ist LESEND: sie holt die Haltung ueber dasselbe optionale `get`
- * und rendert daraus einen Abschnitt. Fehlt der Dienst, fehlt der Abschnitt —
- * geraten wird kein Ton. Die Namen sind mit `@shinon/scoring` gepinnt
- * (`scripts/gate/tests/context-wiring.test.mjs`).
- */
-export const SCORING_SERVICE = 'shinon_scoring_state';
-export const SCORING_SERVICE_CONTRACT = 'shinon.scoring-state/read-v1';
-
-/**
- * Den Ton beim Scoring lesen — optional und mit geprueftem Vertrag.
- *
- * Dieselben vier Richtungen wie beim Veredler, aus demselben Grund: kein Dienst
- * ist der Normalfall (ein Profil ohne Scoring), ein Fremder unter diesem Namen
- * ist ein Fehler und wird einmal gemeldet, `null` heisst „es gibt nichts zu
- * sagen", und alles andere ist der Ton.
- */
-export function readTone(ctx, warn = () => {}) {
-  let service;
-  try {
-    service = typeof ctx?.get === 'function' ? ctx.get(SCORING_SERVICE) : undefined;
-  } catch {
-    service = undefined;
-  }
-  if (service === undefined || service === null) return null;
-  if (service.contract !== SCORING_SERVICE_CONTRACT || typeof service.read !== 'function') {
-    warn(`${SCORING_SERVICE} verletzt den Vertrag ${SCORING_SERVICE_CONTRACT}`);
-    return null;
-  }
-  try {
-    const read = service.read();
-    return read === undefined ? null : read;
-  } catch (error) {
-    warn(`Ton nicht lesbar (${error?.message ?? error})`);
-    return null;
-  }
-}
+// Der Ton ist eine eigene Naht (`assets/tone.js`): die Persona liest ihn, sie
+// setzt ihn nicht. Die Namen bleiben hier die oeffentliche Flaeche.
+import { readTone } from './assets/tone.js';
+export { SCORING_SERVICE, SCORING_SERVICE_CONTRACT } from './assets/tone.js';
+export { readTone };
 
 /**
  * Die Naht zur Narrative Engine (Zug 6) — beide Namen aus `@shinon/seams`.
@@ -318,63 +183,6 @@ export function readTone(ctx, warn = () => {}) {
  */
 export const NARRATIVE_CHANNEL = NARRATIVE_STATE_CHANNEL;
 export const NARRATIVE_CONTRACT = NARRATIVE_STATE_CONTRACT;
-
-/**
- * Zustandsmaschine. Beobachtet Event-Typen, hält den Zustand, meldet Änderungen.
- * Kein Speicher auf Platte: der DSH-Session-Log ist der Audit, nicht die Persona.
- */
-export function createPersonaState(contract, options = {}) {
-  const onChange = typeof options.onChange === 'function' ? options.onChange : () => {};
-  const maxEvents = contract.limits?.maxEvents ?? 25;
-  let state = initialState(contract);
-  const history = [];
-  const stats = { events: 0, changes: 0, ignored: 0, ignoredTypes: {} };
-
-  function snapshot() {
-    return {
-      identity: state.identity,
-      stance: state.stance,
-      uncertainty: state.uncertainty,
-      mood: state.mood,
-      capabilities: [...state.capabilities],
-      limitations: [...state.limitations],
-      relation: state.relation,
-    };
-  }
-
-  function observe(eventType, event) {
-    if (typeof eventType !== 'string' || eventType.trim() === '') {
-      stats.ignored += 1;
-      return null;
-    }
-    stats.events += 1;
-    const result = deriveState(contract, state, eventType, event);
-    if (!result.changed) {
-      stats.ignored += 1;
-      if (stats.ignoredTypes[eventType] !== undefined || Object.keys(stats.ignoredTypes).length < IGNORED_TYPE_LIMIT) {
-        stats.ignoredTypes[eventType] = (stats.ignoredTypes[eventType] ?? 0) + 1;
-      } else {
-        stats.ignoredTypes[IGNORED_OVERFLOW_KEY] = (stats.ignoredTypes[IGNORED_OVERFLOW_KEY] ?? 0) + 1;
-      }
-      return null;
-    }
-    state = result.state;
-    stats.changes += 1;
-    history.push({ type: eventType, mood: state.mood, limitations: [...state.limitations] });
-    if (history.length > maxEvents) history.shift();
-    onChange(snapshot());
-    return { state: snapshot() };
-  }
-
-  return { observe, snapshot, history: () => [...history], stats };
-}
-
-/** Event-Envelope → Event-Typ. Nur Lesen, nichts wird weitergereicht. */
-export function eventTypeOf(payload) {
-  if (typeof payload === 'string') return payload;
-  if (payload !== null && typeof payload === 'object' && typeof payload.event_type === 'string') return payload.event_type;
-  return null;
-}
 
 // Die Lese-Regeln (Trigger, Stimmung, Text aus Blocklisten) und ihre
 // oeffentlichen Namen kommen aus `assets/interaction-core.js`. Sie bleiben hier
@@ -448,6 +256,10 @@ export const Config = z.object({
 });
 
 export function apply(ctx, config) {
+  // Jede Registrierung dieses Pakets läuft über den einen Orchestrator: der
+  // Befund nennt das Paket, und der Gate-Vertrag (`shinon.turn/v1`) sieht die
+  // Kanäle. Die Hülle ändert kein Verhalten — sie nennt nur, was passiert.
+  const bus = createOrchestrator(ctx, { owner: 'persona' });
   // Projektscope: die Persoenlichkeit ist global, der Projekt-Kontext bleibt
   // je Workspace.
   // GEMESSEN 2026-10-18 (Root Cause): die Profil-Config setzt nur
@@ -476,53 +288,32 @@ export function apply(ctx, config) {
     console.warn(`[shinon-persona] Zustandsvertrag nicht lesbar (${config.statePath}): ${error.message}`);
   }
 
-  /**
-   * Spricht die Persona für die Sitzung dieses Schritts? Ohne Sitzungsangabe
-   * (Tests, direkte Assembly) gilt die Freigabe des Boots; mit Sitzung entscheidet
-   * deren CWD — liegt er außerhalb der Wurzel, bleibt jeder Abschnitt leer.
-   */
-  // GEMESSEN 2026-10-18 in `@deepseek-ai/dsh-agent-loop/lib/index.js:907`:
-  // `systemPrompt.assemble(...)` läuft VOR dem Wasserfall `agent/pre-step`. Der
-  // AsyncLocalStorage aus dem Pre-Step kann die Assembly deshalb NIE erreichen —
-  // der Abschnittstext wird schon vorher ausgewertet. Die Assembly übergibt ihr
-  // `context` aber an jede Textfunktion (`section.text(context)`, Quelle:
-  // dsh-system-prompt `assemble`), und darin steht der Agent samt Sitzung. Das
-  // ist der belastbare Weg: der cwd kommt aus der Assembly, nicht aus der Zeit.
-  const rootOfAssembly = (assemblyCtx) => {
-    const agent = assemblyCtx?.agent;
-    const fromAgent = agent?.session?.header?.cwd ?? agent?.session?.cwd;
-    if (typeof fromAgent === 'string' && fromAgent !== '') return fromAgent;
-    const fromStore = sessionRoot.getStore()?.root;
-    if (typeof fromStore === 'string' && fromStore !== '') return fromStore;
-    return null;
-  };
-  let spokenFor = null;
-  /** Spricht die Persona fuer diesen Root? Jeder zugewiesene Root ja — die
-   * Persoenlichkeit ist global, nur der Projekt-Kontext bleibt je Workspace. */
-  const speaksForRoot = (root) => typeof root === 'string' && root !== '';
-  /** Projekt-Kontext kommt aus dem Sitzungs-Workspace — dessen eigene Datei, nie global. */
-  const projectsForSession = (assemblyCtx) => {
-    const root = rootOfAssembly(assemblyCtx) ?? declaredRoot ?? '';
-    return typeof root === 'string' && root !== '';
-  };
-  const speaksForSession = (assemblyCtx) => {
-    const root = rootOfAssembly(assemblyCtx);
-    if (root !== null) {
-      if (spokenFor !== root) {
-        spokenFor = root;
-        console.log(`[shinon-persona] Sitzung ${root} — Persona aktiv`);
-      }
-      return true;
-    }
-    // Ohne Sitzungsangabe (Tests, direkte Assembly) gilt die Deklaration —
-    // und im globalen Deployment die Entscheidung des Deployments.
-    if (globalIdentity) return true;
-    return declaredRoot !== null;
-  };
-  // Gate: ein fachlicher Abschnitt steht nur, wenn die Nachricht seine Marken nennt (fail-open).
-  const gated = (text, name = null) => (assemblyCtx) => (
-    speaksForSession(assemblyCtx) && (name === null || sectionApplies(contract, name, promptText.valueFor(assemblyCtx), lastDecision?.classification ?? null)) ? text : ''
-  );
+  // ── Die Halter des Schritts ───────────────────────────────────────────────
+  // Zuletzt erkanntes Triggerwort. Bleibt stehen, damit die Form nicht mitten
+  // im Gespräch wieder in die Abfrage-Haltung zurückkippt.
+  let lastTrigger = null;
+  let renderTrigger = () => {};
+  // Die zuletzt ERKANNTE User-Stimmung — sie steht im Live-Block, nicht in einem Abschnitt.
+  let lastUserMood = null;
+  // Das Selbstmodell: ein Modell JE ROOT — die Ablage gehoert dem Projekt, nicht
+  // dem Prozess. `lastDecision` ist die zuletzt erkannte Auftragsklasse.
+  let lastDecision = null;
+  // Der Text der letzten Menschen-Nachricht: Gedaechtnis und Gate lesen denselben Halter.
+  const promptText = createPromptText();
+  const persona = createPersonaState(contract);
+
+  // Der Sitzungs-Scope hat einen eigenen Eigentuemer (`assets/session-scope.js`):
+  // er entscheidet je Assembly, fuer wen die Persona spricht. Der Eintrag haelt
+  // nur die Halter, die auch der Event-Zweig liest.
+  const scope = createSessionScope({
+    declaredRoot,
+    globalIdentity,
+    sessionRoot,
+    contract,
+    promptText,
+    getDecision: () => lastDecision,
+  });
+  const { rootOfAssembly, speaksForRoot, speaksForSession, projectsForSession, gated } = scope;
 
   // Ein fremder Dienst unter dem Ton-Namen wird EINMAL gemeldet: sonst flutete
   // jede Zustandsaenderung dieselbe Warnung.
@@ -532,77 +323,35 @@ export function apply(ctx, config) {
     toneWarned = true;
     console.error(`[shinon-persona] ${message} — kein Ton im Zustand`);
   };
-  // Zuletzt erkanntes Triggerwort. Bleibt stehen, damit die Form nicht mitten
-  // im Gespräch wieder in die Abfrage-Haltung zurückkippt.
-  let lastTrigger = null;
-  let renderTrigger = () => {};
-  // Die zuletzt ERKANNTE User-Stimmung — sie steht im Live-Block, nicht in einem Abschnitt.
-  let lastUserMood = null;
-  // Der Text der letzten Menschen-Nachricht: Gedaechtnis und Gate lesen denselben Halter.
-  const promptText = createPromptText();
-  const persona = createPersonaState(contract);
 
-  // ── Das Selbstmodell: Laufzeitspuren -> Prompt und UI ─────────────────────
-  // Ein Modell JE ROOT: die Ablage gehoert dem Projekt, nicht dem Prozess. Die
-  // Belege kommen aus den echten Entscheidungen des Veredlers und den Fehlern
-  // des Laufs; geschrieben wird nach jeder Aenderung, gelesen einmal je Root.
-  const uiClients = new Set();
-  let lastDecision = null;
-
-  /** Der Zustandsdatensatz der UI — Zahlen und Namen, nie ein Prompt-Text. */
-  const uiSnapshot = () => {
-    const root = sessionRoot.getStore()?.root || declaredRoot;
-    // Selbstmodell, Erinnerungen und offene Vorschlaege kommen vom Eigentuemer
-    // des Zustands — das Panel liest Zahlen, keine Prompt-Texte.
-    const panel = runtime.panel(root);
-    const state = persona.snapshot();
-    const tone = readTone(ctx, warnedTone);
-    return {
-      contract: UI_STATE_CONTRACT,
-      updatedAt: Date.now(),
-      workspace: typeof root === 'string' && root !== '' ? root : null,
-      state: {
-        identity: state.identity,
-        stance: state.stance,
-        uncertainty: state.uncertainty,
-        mood: state.mood,
-        relation: state.relation,
-        capabilities: [...state.capabilities],
-        limitations: [...state.limitations],
-      },
-      userMood: lastUserMood,
-      // Fuer das Panel: Stufen aus dem Vertrag (dieselbe Liste wie der Produzent), Stand aus dem Zustand.
-      relation: { levels: [...(contract.relation?.levels ?? [])], current: state.relation },
-      // Der KLANG kommt aus dem Vertrag: „Ruhig und bereit" ist das Panel-Etikett
-      // zu „idle"; der Prompt traegt den Arbeitsmodus aus MOOD_MODUS, keinen Namen.
-      voice: contract.voice?.[state.mood] ?? null,
-      tone: tone === null ? null : { stance: tone.stance ?? null, ready: tone.ready === true },
-      self: panel.self,
-      memory: panel.memory,
-      proposals: panel.proposals,
-      intent: lastDecision,
-    };
-  };
-
-  /*
-   * Die offenen Panels bekommen jede Aenderung sofort — sonst nur beim Laden.
-   * Der Pruef-Stand reist als EIGENES Ereignis (`review`): das Zustands-Panel
-   * liest weiter das unbenannte `data`, das Pruef-Panel haengt an `review` und
-   * braucht keinen Abruf-Timer. Beide Ereignisse tragen JSON, nie Prompt-Text.
-   */
-  const reviewEvent = () => `event: review\ndata: ${JSON.stringify(reviewService.review())}\n\n`;
-  const publishUi = () => {
-    const payload = `data: ${JSON.stringify(uiSnapshot())}\n\n`;
-    const review = reviewEvent();
-    for (const response of uiClients) {
-      try {
-        response.write(payload);
-        response.write(review);
-      } catch {
-        uiClients.delete(response);
-      }
-    }
-  };
+  // ── Die Flaeche: Panel-Daten und Routen ───────────────────────────────────
+  // Sie hat einen eigenen Eigentuemer (`assets/ui-surface.js`): hier stehen nur
+  // die Getter, weil die Runtime und der Beziehungs-Produzent erst unten gebaut
+  // werden. Die Namen bleiben in diesem Eintrag definiert.
+  const surface = createUiSurface({
+    names: {
+      uiContract: UI_STATE_CONTRACT,
+      reviewContract: REVIEW_CONTRACT,
+      uiRoute: UI_STATE_ROUTE,
+      reviewRoute: REVIEW_ROUTE,
+      relationRoute: RELATION_ROUTE,
+      relationContract: RELATION_CONTRACT,
+      bodyLimit: REVIEW_BODY_LIMIT,
+    },
+    contract,
+    persona,
+    runtime: () => runtime,
+    root: () => sessionRoot.getStore()?.root || declaredRoot,
+    tone: () => readTone(ctx, warnedTone),
+    userMood: () => lastUserMood,
+    decision: () => lastDecision,
+    relation: () => relationService,
+    review: { accepted: acceptedCommitments, decide: decideProposal },
+    log: (message) => console.log(`[shinon-persona] ${message}`),
+  });
+  const uiSnapshot = surface.snapshot;
+  const publishUi = surface.publish;
+  const reviewService = surface.reviewService;
 
   // Das Gedaechtnis hat seinen eigenen Eigentuemer (assets/persona-runtime-state.js): hier
   // steht nur, WER es baut und WELCHE Entscheidungen es mitbekommt. Der
@@ -625,7 +374,7 @@ export function apply(ctx, config) {
   // ist, welcher Disposer zu welchem Abschnitt gehoert. Ziel: eine Funktion mit EINER
   // Aufraeumliste. (Der Absturzpfad selbst ist geschlossen: der Dienst wird vor dem ersten
   // Aufruf geprueft — siehe unten.)
-  ctx.inject(['systemPrompt'], (child) => {
+  bus.demand(['systemPrompt'], (child) => {
     const sp = child.systemPrompt;
     // Fail-loud statt Throw im inject-Callback: ein fremder Dienst ohne die beiden Methoden
     // wuerde hier sonst werfen, und der Fehler faellt INNERHALB des Callbacks an, nicht beim
@@ -637,34 +386,13 @@ export function apply(ctx, config) {
     const atPrefix = sp.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX');
     const atSuffix = sp.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX');
 
-    // TODO: [DSH-Refactor] - Die Anker sind Zahlenrauschen (Literale neben
-    // atPrefix/atSuffix); `sections` ist die Datenliste, die Anker brauchen Namen.
-    const sections = [
-      ['shinon:identity', atPrefix, config.identity],
-      ['shinon:epistemic', atPrefix + 1, config.epistemic],
-      ['shinon:change-classes', 1000, gated(config.changeClasses, 'changeClasses')],
-      ['shinon:determinism', 1100, gated(config.determinism, 'determinism')],
-      ['shinon:workaround', 1300, config.workaround],
-      ['shinon:report', atSuffix - 1, config.report],
-    ];
-    if (config.alwaysKnowIdentity) sections.push(['shinon:identity-overview', atPrefix + 3, config.identityOverview]);
-    // Der Arbeitsablauf beschreibt, WIE gearbeitet wird — darum steht er in JEDEM Modus.
-    sections.push(['shinon:workflow', atPrefix + 5, renderWorkflow(config.workflow)]);
-    // Das Selbstmodell steht HINTER der Identitaet: gelernte Selbstkenntnis.
-    if (runtime.selfModelNamespace() !== '') sections.push(['shinon:self-model', atSuffix - 6, runtime.selfModelText]);
-    // Das Gedaechtnis steht VOR dem Selbstmodell: erst was ich erlebt habe, dann
-    // was ich daraus belegt weiss. Beide fallen weg, wenn es nichts zu sagen gibt.
-    if (runtime.memoryNamespace() !== '') {
-      sections.push(['shinon:memory', atSuffix - 8, runtime.memoryText]);
-      sections.push(['shinon:commitments', atSuffix - 7, runtime.commitmentsText]);
-    }
-
-    // Projekt-Kontext (Zug 9): projektspezifische Daten aus dem Sitzungs-
-    // Workspace. Das Lesen mit Cache steht im Kern.
+    // Die Liste der Abschnitte und ihre Registrierung haben einen eigenen
+    // Eigentuemer (`assets/prompt-sections.js`): hier stehen nur die Teile, die
+    // aus Config, Runtime und Workspace kommen.
     const contextPath = typeof config.projectContextPath === 'string' ? config.projectContextPath : '';
-    if (contextPath !== '') {
+    const projectContextText = contextPath === '' ? null : (() => {
       const cache = new Map();
-      sections.push(['shinon:project-context', atPrefix + 10, (assemblyCtx) => {
+      return (assemblyCtx) => {
         if (!projectsForSession(assemblyCtx)) return '';
         return readProjectContext({
           contextPath,
@@ -674,46 +402,31 @@ export function apply(ctx, config) {
           warn: (message) => console.warn(`[shinon-persona] ${message}`),
           log: (message) => console.log(`[shinon-persona] ${message}`),
         });
-      }]);
-    }
+      };
+    })();
+    const sections = buildSectionPlan({
+      atPrefix,
+      atSuffix,
+      config,
+      workflowText: renderWorkflow(config.workflow),
+      gated,
+      runtime,
+      projectContextText,
+    });
 
     child.effect(() => {
-      const disposers = [];
-      for (const [name, order, text] of sections) {
-        // Eine Funktion wird erst bei der Assembly ausgewertet und bringt ihren
-        // Scope selbst mit; ein String wird durch `gated` geschuetzt.
-        if (typeof text === 'function') {
-          disposers.push(sp.section({ name, order, text }));
-          continue;
-        }
-        if (typeof text !== 'string' || text.trim() === '') continue;
-        disposers.push(sp.section({ name, order, text: gated(text) }));
-      }
-      let triggerDisposer = null;
-      renderTrigger = () => {
-        if (typeof triggerDisposer === 'function') triggerDisposer();
-        triggerDisposer = lastTrigger === null
-          ? null
-          : sp.section({ name: 'shinon:identity-trigger', order: atPrefix + 4, text: gated(renderTriggerContext(lastTrigger)) });
-      };
-      renderTrigger();
-
-      // Der EINZIGE dynamische Zustand: eine Runtime-Context-Nachricht, die pro Schritt
-      // den vorherigen Stand ERSETZT (Anti-Drift-Satz des DSH) — Stimmung, Ton, User-Lage.
-      disposers.push(registerLiveContext(sp, {
+      const registered = registerSections(sp, sections, {
+        gated,
+        atPrefix,
         contract,
-        state: () => persona.snapshot(),
+        persona,
         tone: () => readTone(ctx, warnedTone),
         userMood: () => lastUserMood,
         spricht: (assemblyCtx) => speaksForSession(assemblyCtx),
-      }));
-
-      disposers.push(() => {
-        if (typeof triggerDisposer === 'function') triggerDisposer();
+        triggerText: () => (lastTrigger === null ? null : renderTriggerContext(lastTrigger)),
       });
-      return () => {
-        for (const dispose of disposers) dispose();
-      };
+      renderTrigger = registered.renderTrigger;
+      return registered.dispose;
     });
 
     console.log(
@@ -756,15 +469,14 @@ export function apply(ctx, config) {
       if (gelesen.stimmung !== null) console.log(`[shinon-persona] User-Lage erkannt (${gelesen.stimmung})`);
     }
   };
-  const disposer = typeof ctx?.on === 'function' ? ctx.on(config.eventsChannel, handler) : () => {};
+  const disposer = bus.route(config.eventsChannel, handler);
 
   // ── Die Belege: echte Laufzeitspuren, nicht Selbsteinschaetzung ───────────
   // Der Veredler meldet JEDE Entscheidung (Ausgang, Gruende, offene Fragen, die
   // Klasse des Auftrags); der Loop meldet jeden Fehler. Beides wird gezaehlt,
   // beides kann zu einer belegten Grenze bzw. offenen Frage werden — und beides
   // faellt wieder weg, wenn es nicht mehr auftritt.
-  const decisionDisposer = typeof ctx?.on === 'function'
-    ? ctx.on(PROMPTER_DECISION_CHANNEL, (record) => {
+  const decisionDisposer = bus.route(PROMPTER_DECISION_CHANNEL, (record) => {
         if (record === null || typeof record !== 'object') return;
         // `UNDEFINED` ist die Aussage „keine Klasse", kein Klassenname: in der
         // UI und im Selbstmodell darf sie nicht wie ein Auftrag aussehen.
@@ -779,153 +491,20 @@ export function apply(ctx, config) {
         };
         runtime.observe('decision', record);
         runtime.remember('decision', record);
-      })
-    : () => {};
-  const errorDisposer = typeof ctx?.on === 'function'
-    ? ctx.on('agent/error', (payload) => runtime.observe('error', payload?.error ?? payload))
-    : () => {};
+  });
+  const errorDisposer = bus.route('agent/error', (payload) => runtime.observe('error', payload?.error ?? payload));
   // Beim Laden der Seite steht der aktuelle Zustand im Global; ab dann schiebt
   // die SSE-Route jede Aenderung nach.
-  const uiInjectDisposer = typeof ctx?.on === 'function'
-    ? ctx.on(INDEX_INJECT, (table) => {
+  const uiInjectDisposer = bus.route(INDEX_INJECT, (table) => {
         if (!Array.isArray(table)) return;
         table.push({ kind: 'global', name: UI_STATE_GLOBAL, value: uiSnapshot() });
         // Das Panel soll beim Laden schon die offenen Vorschlaege zeigen; ohne
         // diesen Startstand waere es bis zum ersten Abruf leer.
         table.push({ kind: 'global', name: REVIEW_GLOBAL, value: reviewService.review() });
-      })
-    : () => {};
-  const routeDisposers = [];
-  /** Einen JSON-Body lesen — gedeckelt, fail-closed, ohne den Request zu haengen. */
-  const readJsonBody = (req) => new Promise((resolve) => {
-    let size = 0;
-    const chunks = [];
-    req.on('data', (chunk) => {
-      size += chunk.length;
-      if (size > REVIEW_BODY_LIMIT) { resolve({ ok: false, error: 'BODY_TOO_LARGE' }); return; }
-      chunks.push(chunk);
-    });
-    req.on('end', () => {
-      try {
-        resolve({ ok: true, value: JSON.parse(Buffer.concat(chunks).toString('utf8')) });
-      } catch {
-        resolve({ ok: false, error: 'INVALID_JSON' });
-      }
-    });
-    req.on('error', () => resolve({ ok: false, error: 'BODY_UNREADABLE' }));
   });
+  if (!bus.demand(['webServer'], (webCtx) => surface.mount(webCtx))) surface.mount(ctx);
 
-  /** Eine JSON-Antwort — ein Weg fuer alle schreibenden Routen. */
-  const sendJson = (res, status, value) => {
-    res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify(value));
-  };
-
-  const mountUiRoute = (webCtx) => {
-    const webServer = typeof webCtx?.get === 'function' ? webCtx.get('webServer') : undefined;
-    if (typeof webServer?.register !== 'function') return;
-    routeDisposers.push(webServer.register({
-      kind: 'exact',
-      path: UI_STATE_ROUTE,
-      handler: (req, res) => {
-        if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
-        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
-        res.write(`data: ${JSON.stringify(uiSnapshot())}\n\n`);
-        // Der Startstand des Pruef-Panels kommt auf derselben Verbindung — ein
-        // zweiter Kanal waere ein zweites Fenster auf denselben Zustand.
-        res.write(reviewEvent());
-        uiClients.add(res);
-        req.on('close', () => uiClients.delete(res));
-      },
-    }));
-    // Jede Entscheidung ist ein ausdruecklicher Akt: GET zeigt die Belege,
-    // POST nimmt genau eine `accepted`/`rejected`-Entscheidung entgegen.
-    routeDisposers.push(webServer.register({
-      kind: 'exact',
-      path: REVIEW_ROUTE,
-      handler: async (req, res) => {
-        if (req.method === 'GET') { sendJson(res, 200, reviewService.review()); return; }
-        if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }); return; }
-        const body = await readJsonBody(req);
-        if (!body.ok) { sendJson(res, 400, { ok: false, error: body.error }); return; }
-        const id = typeof body.value?.id === 'string' ? body.value.id : '';
-        const decision = body.value?.decision;
-        if (id === '' || (decision !== 'accepted' && decision !== 'rejected')) {
-          sendJson(res, 400, { ok: false, error: 'INVALID_REQUEST' });
-          return;
-        }
-        const result = reviewService.decide(id, decision);
-        sendJson(res, result.ok ? 200 : 409, result);
-      },
-    }));
-    // Die Beziehungsstufe ist ein AUSDRUECKLICHER Akt des Menschen, kein
-    // abgeleitetes Urteil: GET zeigt Stufen und Stand, POST setzt genau eine.
-    // Der Handler emittiert das Signal; den Rest (Validierung, `relation.updated`)
-    // machen Spine, Persona-Zustand und Narrative Engine.
-    routeDisposers.push(webServer.register({
-      kind: 'exact',
-      path: RELATION_ROUTE,
-      handler: async (req, res) => {
-        if (req.method === 'GET') {
-          sendJson(res, 200, {
-            contract: RELATION_CONTRACT,
-            levels: relationService.levels(),
-            current: persona.snapshot().relation,
-          });
-          return;
-        }
-        if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }); return; }
-        const body = await readJsonBody(req);
-        if (!body.ok) { sendJson(res, 400, { ok: false, error: body.error }); return; }
-        // Das Panel schickt nur die Stufe; die Sitzung ist die, in der die
-        // Persona zuletzt gesehen wurde. Ein Aufrufer MIT Sitzung gewinnt.
-        const result = relationService.set({
-          level: body.value?.level,
-          sessionId: body.value?.sessionId || runtime.lastSessionId,
-        });
-        if (result.ok) publishUi();
-        sendJson(res, result.ok ? 200 : 400, result);
-      },
-    }));
-    // Die Routen haengen am Fiber, nicht am Prozess.
-    webCtx.effect?.(() => () => {
-      for (const dispose of routeDisposers.splice(0)) {
-        try { dispose?.(); } catch { /* schon weg */ }
-      }
-    });
-  };
-  if (typeof ctx.inject === 'function') ctx.inject(['webServer'], mountUiRoute);
-  else mountUiRoute(ctx);
-
-  // ── Die Prüf-Naht: ansehen und ausdrücklich entscheiden ────────────────────
-  // Kein Vorschlag wird hier angenommen, weil er plausibel klingt. `review()`
-  // zeigt Belege, `decide()` ist der EINE Akt, der eine Selbstauflage erzeugt.
-  const reviewService = {
-    contract: REVIEW_CONTRACT,
-    review: () => ({
-      contract: REVIEW_CONTRACT,
-      memory: runtime.panel(null).memory,
-      proposals: (runtime.memory(null).proposals ?? []).map((proposal) => ({
-        id: proposal.id,
-        claim: proposal.claim,
-        evidence: proposal.evidence,
-        status: proposal.status,
-        decidedAt: proposal.decidedAt,
-      })),
-      commitments: acceptedCommitments(runtime.memory(null)).map((proposal) => ({ id: proposal.id, claim: proposal.claim, evidence: proposal.evidence })),
-    }),
-    decide: (id, decision) => {
-      const now = new Date().toISOString();
-      const result = decideProposal(runtime.memory(now), id, decision, now);
-      if (!result.ok) return { ok: false, error: result.error };
-      runtime.setMemory(result.memory);
-      runtime.persistMemory();
-      publishUi();
-      console.log(`[shinon-persona] Vorschlag ${id} ${decision === 'accepted' ? 'angenommen' : 'abgelehnt'}`);
-      return { ok: true, proposal: result.proposal };
-    },
-  };
-  const releaseReview = typeof ctx.provide === 'function' ? ctx.provide(REVIEW_SERVICE, reviewService) : null;
+  const releaseReview = bus.provide(REVIEW_SERVICE, reviewService);
   if (releaseReview === null) {
     console.warn(`[shinon-persona] ${REVIEW_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`);
   }
@@ -936,7 +515,7 @@ export function apply(ctx, config) {
     contract,
     typeof ctx?.emit === 'function' ? (signal, payload) => ctx.emit(signal, payload) : null,
   );
-  const releaseRelation = typeof ctx.provide === 'function' ? ctx.provide(RELATION_SERVICE, relationService) : null;
+  const releaseRelation = bus.provide(RELATION_SERVICE, relationService);
   if (releaseRelation === null) {
     console.warn(`[shinon-persona] ${RELATION_SERVICE} NICHT angeboten (der Host hat kein ctx.provide)`);
   }
@@ -944,14 +523,12 @@ export function apply(ctx, config) {
   // Der Sitzungs-Scope: `agent/pre-step` umschließt den ganzen Schritt, also auch
   // die Assembly des System-Prompts. Was hier gesetzt wird, gilt nur für diesen
   // Schritt und nur in diesem Async-Kontext.
-  const sessionDisposer = typeof ctx?.on === 'function'
-    ? ctx.on('agent/pre-step', (payload, next) => {
-        const cwd = payload?.agent?.session?.header?.cwd;
-        return sessionRoot.run({ root: typeof cwd === 'string' ? cwd : '' }, () =>
-          typeof next === 'function' ? next() : undefined,
-        );
-      })
-    : () => {};
+  const sessionDisposer = bus.route('agent/pre-step', (payload, next) => {
+    const cwd = payload?.agent?.session?.header?.cwd;
+    return sessionRoot.run({ root: typeof cwd === 'string' ? cwd : '' }, () =>
+      typeof next === 'function' ? next() : undefined,
+    );
+  });
 
   return () => {
     if (typeof disposer === 'function') disposer();
@@ -961,8 +538,7 @@ export function apply(ctx, config) {
     if (typeof uiInjectDisposer === 'function') uiInjectDisposer();
     if (typeof releaseReview === 'function') releaseReview();
     if (typeof releaseRelation === 'function') releaseRelation();
-    for (const response of uiClients) { try { response.end(); } catch { /* weg */ } }
-    uiClients.clear();
+    surface.close();
     console.log('[shinon-persona] Deaktiviert');
   };
 }

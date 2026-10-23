@@ -3,6 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const host = readFileSync(new URL('../../../packages/persona/index.js', import.meta.url), 'utf8');
+// Der Snapshot selbst hat einen eigenen Eigentuemer: der Vertragsname steht im
+// Eintrag, die Felder, die er liefert, stehen in der Flaeche.
+const surface = readFileSync(new URL('../../../packages/persona/assets/ui-surface.js', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../../../packages/core/client.js', import.meta.url), 'utf8');
 
 function bannerStatus() {
@@ -14,9 +17,10 @@ function bannerStatus() {
 
 test('Persona-Produzent und Core-Banner verwenden denselben versionierten UI-Vertrag', () => {
   assert.match(host, /UI_STATE_CONTRACT = 'shinon\.persona-ui\/v1'/);
-  assert.match(host, /contract: UI_STATE_CONTRACT/);
+  assert.match(host, /uiContract: UI_STATE_CONTRACT/);
+  assert.match(surface, /contract: names\.uiContract/);
   for (const field of ['state:', 'voice:', 'tone:', 'self:', 'intent:', 'userMood:']) {
-    assert.ok(host.includes(field), `der Host-Snapshot liefert ${field}`);
+    assert.ok(surface.includes(field), `der Host-Snapshot liefert ${field}`);
   }
   assert.match(client, /state\.contract !== 'shinon\.persona-ui\/v1'/);
 });

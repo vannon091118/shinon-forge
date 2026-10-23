@@ -16,6 +16,7 @@ import * as repo from './lib/repo.mjs';
 import { diaryHistory, diaryIssues } from './lib/diary.mjs';
 import { canonIssues } from './lib/canon.mjs';
 import { structureIssues } from './lib/structure.mjs';
+import { clientMontageIssues } from './build-client.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -146,6 +147,12 @@ checkIssues('ein Name, eine Schreibweise, eine Definition', () => canonIssues())
 // Struktur: Klassen, Grenzen, Eigentum — was waechst, waechst nicht heimlich.
 console.log('\n🧱 Struktur:');
 checkIssues('jede Datei hat eine Klasse, keine ueberschreitet ihre Grenze', () => structureIssues());
+
+// Client-Montage: ein generiertes Bundle ist die Summe seiner Quellteile.
+// Drift heißt: die Datei lügt über ihre Quelle — und die Zeilengrenze des
+// Riegels wäre für sie still abgeschaltet.
+console.log('\n🧷 Client-Montage:');
+checkIssues('generierte Bundles sind bytegleich zu ihren Quellteilen', () => clientMontageIssues());
 
 console.log('\n🧩 Generierte Idiome:');
 checkIssues('eine Quelle, generierte Blöcke — kein Drift', () => [

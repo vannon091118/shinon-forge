@@ -1,5 +1,6 @@
 /**
  * shinon-markers — der Marker-Spiegel (Client-Hälfte).
+ * GENERIERT aus assets/client/*.js — nicht von Hand ändern; Schreiben: node scripts/build-client.mjs markers.
  *
  * Spiegel des Element-Marker-Systems aus brutalord-the-feral-cycle
  * (tools/preview/marker-core.js + marker.js). Dort hängt ein CDP-Daemon den
@@ -23,6 +24,7 @@
 window.__ModuleLoader__.load({
   id: '@shinon/markers',
   factory(require) {
+// >>> @part assets/client/01-react.js
     const React = require('react');
     const h = React.createElement;
     const PLUGIN = '@shinon/markers';
@@ -210,7 +212,9 @@ window.__ModuleLoader__.load({
     // ── Nutzlast (Brutalords Format, aus dem Vertrag) ───────────────────────
     const fill = (template, values) =>
       String(template).replace(/\{(\w+)\}/g, (_match, key) => (values[key] === undefined ? '' : String(values[key])));
+// <<< @part assets/client/01-react.js
 
+// >>> @part assets/client/02-payload-of.js
     const payloadOf = (marks, comments) =>
       marks
         .map((mark) => {
@@ -396,7 +400,9 @@ window.__ModuleLoader__.load({
         h(MarkerButton, { text: 'Leeren', onClick: onClear })
       );
     }
+// <<< @part assets/client/02-payload-of.js
 
+// >>> @part assets/client/03-use-panel-actions.js
     /**
      * Die WIRKUNGEN des Panels, getrennt vom Aufbau: kopieren, senden, leeren,
      * ein Element zeigen, einen Kommentar setzen. Sie sind Kinder desselben
@@ -497,7 +503,9 @@ window.__ModuleLoader__.load({
       notify();
       return mode;
     };
+// <<< @part assets/client/03-use-panel-actions.js
 
+// >>> @part assets/client/04-add-mark.js
     const addMark = (el) => {
       const marks = readMarks();
       // Die Markenmenge kommt aus den WIRKSAMEN Grenzen, nicht aus einer zweiten
@@ -623,5 +631,7 @@ window.__ModuleLoader__.load({
         console.log('[shinon-markers] Spiegel aktiv (m = markieren, Panel: ' + PANEL_ID + ')');
       }
     };
+// <<< @part assets/client/04-add-mark.js
+
   }
 });

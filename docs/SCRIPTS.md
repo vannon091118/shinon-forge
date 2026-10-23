@@ -27,7 +27,10 @@
 | `remote-worktree.mjs` | `worktree` | erstellt, listet und entfernt Task-Worktrees außerhalb des Klons; Remove ohne `--force` |
 | `sync-idioms.mjs` | `idioms`, `idioms:check` | generiert geteilte Idiome; `--check` ohne Schreiben |
 | `branding-check.mjs` | `branding` | Brand-Marken im Baum; die Engine ruft es bei `--branding` |
-| `assets/build-sprites.mjs` | — | Grid → SVG-Sprites (Codingmon) |
+| `build-client.mjs` | `client:build` / `client:check` | setzt eine Client-Hälfte aus ihren Quellteilen `packages/<dir>/assets/client/*.js` zusammen (Bytegleichheit, kein Umformatieren); `--check` ist Exit 1 bei Drift, die Montage-Befunde liest `scripts/gate/tests/client-montage.test.mjs` |
+| `assets/build-sprites.mjs` | — | Grid → SVG-Sprites (Codingmon); `--embed` schreibt Gitter/UI/Kunst in die markierten Blöcke von `client.js` |
+| `assets/build-encounter-client.mjs` | — | bettet den importfreien Encounter-Kern wörtlich in `client.js` ein; `--check` ist Exit 1 bei Drift |
+| `assets/split-client.mjs` | — | zerlegt ein handgeschriebenes Client-Bundle EINMALIG an Deklarationen der obersten Ebene in Quellteile (ohne `--force` kein Überschreiben) |
 | `appimage-build.mjs` | `appimage` | AppImage-Hülle aus derselben Nutzlast wie das `.deb`; braucht `appimagetool`, CI-Job `appimage` |
 | `assets/build-codingmon.mjs` | — | kopiert die Katalogdaten aus `packages/codingmon/assets/data/codingmon-50.json` in die Datenregionen von `client.js` (`--write`); `--check` vergleicht und bricht bei Drift ab, geprüft von `packages/codingmon/test/katalog.test.mjs` |
 

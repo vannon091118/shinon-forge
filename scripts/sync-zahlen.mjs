@@ -152,7 +152,7 @@ export function measureStruktur(root = ROOT) {
   return [
     ['Code-Dateien unter `packages/` + `scripts/` + `bin/`', String(zahlen.dateien), 'dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`)'],
     ['Klassen', String(zahlen.klassen), '`docs/contracts/structure.json` → `klassen`'],
-    ['Benannte Bestandsdateien (über ihrer Klassengrenze)', String(zahlen.bestand), '`docs/contracts/structure.json` → `bestand`'],
+    ['Generierte Dateien (Kopfmarke `GENERIERT aus`, ohne Zeilengrenze)', String(zahlen.generiert), '`generiertMarke()` in `scripts/lib/structure.mjs` — Bytegleichheit prüft `scripts/build-client.mjs --check --all`'],
     ['Dateien ohne Klasse', String(zahlen.ohneKlasse), '`npm test` (Schritt „Struktur“) — gezählt aus `structureIssues()`'],
     ['Verstöße gegen den Contract der Klasse', String(zahlen.vertragsverstoesse), 'dieselben Befunde, ohne „keine Klasse“'],
   ];

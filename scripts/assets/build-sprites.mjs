@@ -44,6 +44,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findBlockFile, writeBlockValue } from '../lib/embed-blocks.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
@@ -51,7 +52,14 @@ const SPRITE_DIR = join(ROOT, 'packages', 'codingmon', 'assets', 'sprites');
 const UI_DIR = join(ROOT, 'packages', 'codingmon', 'assets', 'ui');
 const ART_DIR = join(ROOT, 'packages', 'codingmon', 'assets', 'art');
 const CATALOG_FILE = join(ROOT, 'packages', 'codingmon', 'assets', 'data', 'codingmon-50.json');
-const CLIENT_FILE = join(ROOT, 'packages', 'codingmon', 'client.js');
+// Die eingebetteten Spiegel stehen NICHT im ausgelieferten Bundle, sondern in
+// den Quellteilen, aus denen `scripts/build-client.mjs` das Bundle baut. Das
+// Bundle ist generiert; wer hier schriebe, schriebe in eine Datei, die der
+// naechste `build-client`-Lauf ueberschreibt. WELCHER Teil einen Block traegt,
+// wird gesucht (`findBlockFile`) und nicht verdrahtet: die Teile sind nach ihrer
+// ersten Deklaration benannt, und ein Name, der einmal nicht mehr stimmt, waere
+// ein stiller Fehlschlag.
+const PARTS_DIR = join(ROOT, 'packages', 'codingmon', 'assets', 'client');
 
 const LF = String.fromCharCode(10);
 
@@ -242,7 +250,14 @@ export function readEmbedRegion(text, region, constName) {
   return JSON.parse(body.slice(prefix.length, -1));
 }
 
-/** Beide Bloecke in `client.js` neu schreiben; @returns {changed: boolean}. */
+/**
+ * Beide Bloecke in `client.js` neu schreiben; @returns {changed: boolean}.
+ *
+ * Die Blockmechanik liegt in `scripts/lib/embed-blocks.mjs` (EIN Leser/Schreiber
+ * fuer alle Einbetter) — inklusive der Balance-Pruefung: ein Rumpf mit fremder
+ * Marke wird nicht ersetzt, sondern benannt. Genau dieser Fall (ein Schnitt
+ * mitten durch den Encounter-Kern) hat am 2026-10-23 Teile-Marken verschluckt.
+ */
 export function embedIntoClient() {
   const built = buildEmbed();
   const pairs = [
@@ -252,35 +267,15 @@ export function embedIntoClient() {
     // einer Zeile waeren im Diff und im Editor nicht mehr lesbar.
     [ART_REGION, 'SPRITE_ART', built.art, true],
   ];
-  let text = readFileSync(CLIENT_FILE, 'utf8');
   let changed = false;
   for (const [region, constName, value, oneLinePerKey] of pairs) {
-    const openAt = text.indexOf('// >>> ' + region);
-    if (openAt === -1) throw new Error('Block "' + region + '" ohne Startmarke');
-    const bodyStart = text.indexOf(LF, openAt) + 1;
-    const closeAt = text.indexOf('// <<< ' + region, bodyStart);
-    if (closeAt === -1) throw new Error('Block "' + region + '" ohne Schlussmarke');
-    const lineStart = text.lastIndexOf(LF, closeAt - 1) + 1;
-    let indent = '';
-    for (let i = lineStart; i < closeAt; i += 1) {
-      const ch = text[i];
-      if (ch !== ' ' && ch !== String.fromCharCode(9)) break;
-      indent += ch;
-    }
-    let next;
-    if (oneLinePerKey) {
-      const keys = Object.keys(value);
-      const lines = keys.map((key, index) => indent + '  ' + JSON.stringify(key) + ': ' + JSON.stringify(value[key])
-        + (index === keys.length - 1 ? '' : ','));
-      next = indent + 'const ' + constName + ' = {' + LF + lines.join(LF) + LF + indent + '};' + LF + indent;
-    } else {
-      next = indent + 'const ' + constName + ' = ' + JSON.stringify(value) + ';' + LF + indent;
-    }
-    const updated = text.slice(0, bodyStart) + next + text.slice(closeAt);
-    if (updated !== text) changed = true;
-    text = updated;
+    const file = findBlockFile(PARTS_DIR, region);
+    const text = readFileSync(file, 'utf8');
+    const updated = writeBlockValue(text, region, constName, value, { oneLinePerKey });
+    if (updated === text) continue;
+    writeFileSync(file, updated);
+    changed = true;
   }
-  if (changed) writeFileSync(CLIENT_FILE, text);
   return changed;
 }
 
@@ -305,7 +300,8 @@ function main() {
   const artBytes = Object.values(art).reduce((sum, markup) => sum + markup.length, 0);
   if (embed) {
     const changed = embedIntoClient();
-    console.log('OK ' + files.length + ' Sprites und ' + artIds + ' Kunstdateien (' + artBytes + ' Zeichen) geprueft, Einbettung ' + (changed ? 'geschrieben' : 'deckungsgleich'));
+    console.log('OK ' + files.length + ' Sprites und ' + artIds + ' Kunstdateien (' + artBytes + ' Zeichen) geprueft, Einbettung ' + (changed ? 'geschrieben' : 'deckungsgleich')
+      + (changed ? ' — jetzt `node scripts/build-client.mjs codingmon` laufen lassen' : ''));
     return;
   }
   console.log('OK ' + files.length + ' Sprites und ' + artIds + ' Kunstdateien geprueft'

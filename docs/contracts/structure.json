@@ -2,17 +2,17 @@
   "contract": "shinon.structure/v1",
   "name": "Struktur — Klassen, Grenzen, Eigentum",
   "status": "IMPLEMENTED",
-  "stand": "2026-10-22",
-  "regel": "Jede Laufzeitdatei gehört genau EINER Klasse. Die Grenze je Klasse ist aus der Messung abgeleitet (Median/max am 2026-10-20), nicht geraten: was darunter liegt, darf nicht wachsen; was darüber liegt, steht namentlich im `bestand` und darf nur sinken. Zwei Ausnahmen sind am 2026-10-21 bewusst und benannt: die Client-Hälfte eines Pakets ist ein selbsttragendes Bündel und kann nicht geteilt werden (kein relativer Import im ModuleLoader), und eine Testdatei darf nur über einen maschinenlesbaren, begrenzten Eintrag in `bestandAusnahmen` mit ihren Abnahmefällen wachsen. Beide Zahlen wurden mit der CodingMon-50-Funktion angehoben, nicht geglättet; die Herleitung steht in `docs/TAGEBUCH.md` beim 2026-10-21. Dieselbe Ausnahme gilt ein zweites Mal, ebenfalls am 2026-10-21: die CodingMon-Funktionen 0.5.0 (S2 Praesentationszustand, S3 Sprites aller 50 Arten) liegen in derselben Client-Hälfte, weil der ModuleLoader keinen relativen Import kennt — die Anhebung ist deshalb gemessen (Ist-Zeilen nach dem Bau) und nicht geraten, der Durchstich-Test ist dagegen von 784 auf 660 Zeilen GESUNKEN, weil die gemeinsame Attrappe nach `test/harness.mjs` gewandert ist. Am selben Tag wuchs dieselbe Hälfte durch S3 auf 2587 Zeilen: 50 Kunstdateien mit zusammen rund 202 000 Zeichen, eine Zeile je Art, damit der Diff lesbar bleibt — auch diese Zahl ist gemessen und im Bestand benannt, nicht geglättet. Die dritte Anhebung am selben Tag gehoert zu S5 (Encounter-Buehne): der Kern aus `assets/encounter.js` liegt als generierter Block in derselben Client-Haelfte (390 Zeilen, Kommentare gestrichen, Quelle bleibt `assets/encounter.js`), dazu die Buehne selbst; gemessen sind 3272 Zeilen und 464 367 Bytes nach dem Bau, und `npm run build` / die Gate-Pruefung lesen dieselbe Zahl. Die Alternative waere ein zweiter Reducer im Browser gewesen — genau die Doppelung, die der Slice verhindern soll. Die vierte Anhebung am selben Tag gehoert zu S6 (Pre-Flight-Deck, B04): das Deck liegt in derselben Client-Haelfte wie die Buehne, weil es ihr Zustand ist und kein zweites Panel; gemessen sind 3483 Zeilen und 475 793 Bytes nach dem Bau. Auch hier ist die Alternative kein anderer Ort, sondern eine zweite Wahrheit — das Deck liest `preflight`, `task`, `facts` und `route` aus dem Reducer-Zustand und schreibt nur ueber `encounter.block.selected` zurueck. Die fuenfte Messung, am 2026-10-22, gehoert zu @shinon/diff-overview (Aenderungs-Panel im Datei-Browser): dessen Client-Haelfte liegt mit gemessenen 245 Zeilen UNTER der 250er-Grenze der `client`-Klasse (Median 77), die Host-Haelfte mit 163 unter 550 und die zwei Kerne mit 200/179 unter 650 — keine Anhebung, kein `bestand`-Eintrag, die Grenze selbst bleibt stehen.",
+  "stand": "2026-10-23",
+  "regel": "Jede Laufzeitdatei gehört genau EINER Klasse. Die Grenze je Klasse ist aus der Messung abgeleitet (Median/max am 2026-10-20), nicht geraten. **Seit 2026-10-23 gibt es keinen `bestand` und keine `bestandAusnahmen` mehr:** jede handgeschriebene Datei hält ihre Grenze ein, und eine Datei darüber ist rot. Die vorher genannten Bestandsdateien waren die acht handgespiegelten Client-Hälften; sie liegen jetzt als kleine Quellteile unter `packages/<dir>/assets/client/` (Klasse `client-source`), und `client.js` ist ihr generiertes Bundle. Ein GENERIERTER Text (Marke `GENERIERT aus …` im Kopf) hat keine Zeilengrenze — ihn liest niemand am Stück —, dafür prüft `scripts/gate/tests/client-montage.test.mjs` die Bytegleichheit zu seinen Quellen. Die zwei Ausnahmen für Client-Hälften und Testdateien sind damit gegenstandslos.",
   "rules": [
     {
-      "positive": "`structureIssues()` ist leer: jede Datei hat eine Klasse, keine überschreitet ihre Grenze, jede Bestandsdatei steht auf ihrem eingefrorenen Wert.",
-      "forbidden": "Eine Datei ohne Klassenmuster, eine Zeile über der Klassengrenze oder der maschinenlesbaren Ausnahmegrenze und ein Eintrag im `bestand`, der nicht mehr stimmt.",
+      "positive": "`structureIssues()` ist leer: jede Datei hat eine Klasse, keine handgeschriebene Datei überschreitet ihre Grenze, und jeder generierte Text ist aus seinen Quellen reproduzierbar.",
+      "forbidden": "Eine Datei ohne Klassenmuster, eine Zeile über der Klassengrenze und ein generiert aussehender Kopf ohne prüfbaren Generator.",
       "fallback": "Fehlt die Registry, endet der Schritt mit einem Befund; es gibt keinen stillen Erfolg und keine geratene Grenze.",
       "error": "Der Befund nennt Datei, Klasse, Ist-Zeilen und Grenze; Gate und Build enden Exit 1.",
       "trace": "Jede Klassenzeile trägt `muster`, `grenze` und die Messung (`gemessen`), aus der die Grenze folgt.",
       "replay": "`node --test scripts/gate/tests/structure.test.mjs` prüft den echten Baum und sieben Mutationen auf einem Miniatur-Baum.",
-      "invariant": "Grenzen bremsen Wachstum, ohne Arbeit zu erfinden: kein Bestandseintrag verlangt heute einen Schnitt; Testwachstum braucht eine begründete, datierte Obergrenze."
+      "invariant": "Grenzen bremsen Wachstum, ohne Arbeit zu erfinden: eine Datei über der Grenze wird geteilt oder generiert, nie durch einen Bestandseintrag legalisiert."
     },
     {
       "positive": "Jede Datei unter `docs/contracts/` hat einen Eintrag in `vertraege`: `art: quelle` nennt mindestens einen Leser, der die Datei auch nennt, `art: zusammenfassung` nennt mindestens eine existierende Quelle. Jedes Profil traegt seine Pflichtdateien und keine Logik.",
@@ -51,6 +51,22 @@
       "vertrag": [],
       "verboten": [
         "export const Config"
+      ],
+      "hinweis": "Zwei Zustände: handgeschrieben (Grenze 250, gilt) oder generiert aus `assets/client/*.js` (Kopfmarke `GENERIERT aus`, dann ohne Zeilengrenze — die Grenze ist dort die Bytegleichheit, `node scripts/build-client.mjs --check --all`)."
+    },
+    {
+      "id": "client-source",
+      "muster": "^packages/[^/]+/assets/client/[^/]+\\.js$",
+      "grenze": 600,
+      "gemessen": {
+        "anzahl": 38,
+        "median": 179,
+        "max": 514,
+        "gemessen_am": "2026-10-23"
+      },
+      "vertrag": [],
+      "verboten": [
+        "export const Config"
       ]
     },
     {
@@ -60,7 +76,8 @@
       "gemessen": {
         "anzahl": 37,
         "median": 221,
-        "max": 2220
+        "max": 2220,
+        "gemessen_am": "2026-10-21"
       }
     },
     {
@@ -97,51 +114,7 @@
       }
     }
   ],
-  "bestand": {
-    "packages/codingmon/client.js": 3481,
-    "packages/codingmon/test/durchstich.test.mjs": 660,
-    "packages/core/client.js": 409,
-    "packages/dashboard/client.js": 478,
-    "packages/markers/client.js": 627,
-    "packages/persona/index.js": 968,
-    "packages/popup/client.js": 414,
-    "packages/prompter/client.js": 282,
-    "packages/token-usage/client.js": 574,
-    "packages/traceability/client.js": 539,
-    "scripts/branding-check.mjs": 660,
-    "scripts/gate/plugins/commit-trailer.mjs": 194,
-    "scripts/gate/plugins/events-spine.mjs": 356,
-    "scripts/gate/plugins/markers.mjs": 234,
-    "scripts/gate/plugins/narrative.mjs": 429,
-    "scripts/gate/plugins/persona.mjs": 216,
-    "scripts/gate/plugins/probe-twin.mjs": 105,
-    "scripts/gate/plugins/scoring.mjs": 820,
-    "scripts/gate/tests/client-activation.test.mjs": 606,
-    "scripts/gate/tests/commit-trailer.test.mjs": 609,
-    "scripts/gate/tests/persona-state.test.mjs": 995,
-    "scripts/gate/tests/project-index.test.mjs": 2163,
-    "scripts/gate/tests/prompter-contract.test.mjs": 2215,
-    "scripts/gate/tests/scoring-memory.test.mjs": 561,
-    "scripts/gate/tests/task-router.test.mjs": 909
-  },
   "herleitung": "Grenze = 3 × Median der Klasse, auf 50 gerundet, mindestens 100 — Median gemessen am 2026-10-20 über alle Dateien der Klasse; alles darüber steht im bestand.",
-  "bestandAusnahmen": {
-    "scripts/gate/tests/client-activation.test.mjs": {
-      "grund": "Der reale Client-Activation-Abnahmetest wächst mit belegten Bundle-Vertragsfällen; die Obergrenze hält ihn teilbar und lesbar.",
-      "datum": "2026-10-22",
-      "maxZeilen": 650
-    },
-    "scripts/gate/tests/prompter-contract.test.mjs": {
-      "grund": "Der Vertrags-Abnahmetest wächst mit jedem gepinnten Config-Default (zuletzt shinonMdPath); die Obergrenze hält ihn teilbar und lesbar.",
-      "datum": "2026-10-23",
-      "maxZeilen": 2240
-    },
-    "scripts/gate/tests/scoring-memory.test.mjs": {
-      "grund": "Die Abnahme verlangt jetzt, dass ein Urteil erst nach einer gesehenen Antwort wirkt (SH-LEARN-01) — jede Wertungsstelle braucht dafuer ein zusaetzliches Ereignis; die Obergrenze haelt den Test teilbar und lesbar.",
-      "datum": "2026-10-23",
-      "maxZeilen": 580
-    }
-  },
   "vertraege": {
     "docs/contracts/abort.json": {
       "art": "zusammenfassung",

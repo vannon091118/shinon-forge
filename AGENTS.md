@@ -316,12 +316,19 @@ läuft in `test:full`/`gate:full` (CI).
   `build.mjs` directly. Each owner carries its registry in `docs/contracts/`.
 - **Structure: one class per file, one owner per concern.** Every code file under
   `packages/`, `scripts/` and `bin/` belongs to exactly one class in
-  `docs/contracts/structure.json` (host entry, client half, core, test, gate plugin,
-  script). A class limit is derived from a measurement (3 × median, rounded), never
-  guessed; a file above its limit is named in `bestand` and may only shrink, and a
-  client half carries no `Config`, a host entry carries `apply`, a gate plugin carries
-  `check`. Growing past the limit without an entry, or writing a file no class owns, is
-  a gate finding (`structureIssues`, `npm run build` runs it too). Zwei Orte haben keine
+  `docs/contracts/structure.json` (host entry, client half, client source, core, test,
+  gate plugin, script). A class limit is derived from a measurement (3 × median,
+  rounded), never guessed. Die beiden Ausnahmen `bestand` und `bestandAusnahmen` sind
+  am 2026-10-23 ersatzlos gestrichen: **keine handgeschriebene Datei steht über ihrer
+  Klassengrenze**, und ein Wachstum darüber ist ein Gate-Befund statt eines neuen
+  Eintrags — geteilt wird nach Eigentum, oder die Datei wird aus kleinen Quellteilen
+  generiert (`packages/<dir>/assets/client/<nn>-<name>.js`, geschrieben von
+  `node scripts/build-client.mjs --all`, bytegleich geprüft von
+  `scripts/gate/tests/client-montage.test.mjs`). Ein GENERIERTER Text trägt die
+  `GENERIERT aus …`-Kopfmarke und hat keine Zeilengrenze — ihn liest niemand am Stück —,
+  dafür ist seine Grenze die Bytegleichheit zu seinen Quellen. A client half carries no
+  `Config`, a host entry carries `apply`, a gate plugin carries `check`. Writing a file
+  no class owns is a finding too (`structureIssues`, `npm run build` runs it). Zwei Orte haben keine
   Zeilen und stehen deshalb in derselben Registry: `docs/contracts/` je Datei als
   `art: quelle` (mit einem Leser, der sie nennt) oder `art: zusammenfassung` (mit
   existierender `quelle`), und `profiles/` als Daten-und-Links-Baum (Pflichtdateien,
@@ -341,6 +348,21 @@ läuft in `test:full`/`gate:full` (CI).
   state belong in `docs/ZAHLEN.md`, not here: a count in this file goes stale the
   moment someone adds a binding, and an agent who measures it then believes the
   rulebook is wrong.
+- **Bus und Datenübergabe laufen über den Orchestrator, die Turn-Reihenfolge steht
+  in `shinon.turn/v1`.** Eine Host-Hälfte registriert sich über
+  `createOrchestrator(ctx, { owner })` aus `@shinon/seams/core` (`route`/`provide`/
+  `demand`), nicht über ein nacktes `ctx.on`, eine Wache der Form
+  `typeof ctx?.on === 'function' ? … : () => {}` oder ein `ctx.provide` ohne
+  Eigentümer. Die drei Primitive fügen nur Sichtbarkeit hinzu — Cordis bleibt der Bus,
+  die Spine das Protokoll, die Fiber der Lebenszyklus —, und jeder Fehlerfall wird EIN
+  benannter Befund je Paket (`packages/seams/assets/orchestrator.js`). Welches Paket
+  welchen Kanal hören darf, wem ein exklusiver Kanal gehört und in welcher Reihenfolge
+  die Wasserfall-Teilnehmer von `agent/pre-step` laufen, sind DATEN:
+  `packages/seams/assets/turn-order.json` (`shinon.turn/v1`, Pflichtreihenfolge
+  persona → hook → prompter → task-router; `popup` ist der optionale fünfte Zuhörer).
+  Gate und Test lesen dieselbe Datei; ein neuer Zuhörer tritt im selben Commit in den
+  Vertrag ein, nie nur in den Code (`gate`-Plugin `orchestrator`,
+  `scripts/gate/tests/orchestrator.test.mjs`).
 - Client-internal slot ids follow `<name>-<purpose>` (e.g. `shinon-core-brand`,
   `shinon-info-banner`). Packages don't reference each other — with ONE exception:
   `@shinon/seams` (`packages/seams/assets/seams.js`) is the import-free host seam

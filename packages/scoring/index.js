@@ -1,7 +1,7 @@
 import z from '@deepseek-ai/schemastery';
 import { readFileSync } from 'node:fs';
 // Der Entscheidungskanal hat EINE Definition: `@shinon/seams` (Host-Naht-Kern).
-import { PROMPTER_DECISION_CHANNEL } from '@shinon/seams/core';
+import { PROMPTER_DECISION_CHANNEL, createOrchestrator } from '@shinon/seams/core';
 
 /**
  * @shinon/scoring — Scorecard, Decay, Relation (Kern, K3) und die Ohren (K5).
@@ -150,6 +150,7 @@ function loadOrWarn(label, relPath, fallback) {
 }
 
 export function apply(ctx, config) {
+  const bus = createOrchestrator(ctx, { owner: 'scoring' });
   const scoring = loadOrWarn('Scorecard', config.scorePath, EMPTY_SCORING);
   const profile = loadOrWarn('Technik-Profil', config.technicalPath, EMPTY_PROFILE);
   const triggers = loadOrWarn('Skill-Trigger', config.triggersPath, EMPTY_TRIGGERS);
@@ -383,7 +384,7 @@ export function apply(ctx, config) {
       return null;
     }
     try {
-      const dispose = ctx.on(config.eventsChannel, (envelope, payload) => {
+      const dispose = bus.route(config.eventsChannel, (envelope, payload) => {
         try {
           // Die Ablage erscheint spaetestens mit dem ersten Ereignis sicher da:
           // mountet das Profil den Index NACH dem Scoring, wird der Stand hier
@@ -446,7 +447,7 @@ export function apply(ctx, config) {
       };
     },
   };
-  const releaseStand = canProvide ? ctx.provide(SCORING_SERVICE, standService) : null;
+  const releaseStand = bus.provide(SCORING_SERVICE, standService);
 
   // ── Der vierte Dienst: die Gewichte als schmale Fähigkeit ───────────────────
   //
@@ -457,7 +458,7 @@ export function apply(ctx, config) {
   const stopBlocks = (() => {
     if (typeof ctx?.on !== 'function') return null;
     try {
-      const disposeBlocks = ctx.on(BLOCKS_DECISION_CHANNEL, (record) => {
+      const disposeBlocks = bus.route(BLOCKS_DECISION_CHANNEL, (record) => {
         try {
           const sessionId = typeof record?.session_id === 'string' ? record.session_id : '';
           const ids = cleanBlockIds(record?.blocks);
@@ -484,7 +485,7 @@ export function apply(ctx, config) {
       return readWeights(blockWeights);
     },
   };
-  const releaseWeights = canProvide ? ctx.provide(WEIGHTS_SERVICE, weightsService) : null;
+  const releaseWeights = bus.provide(WEIGHTS_SERVICE, weightsService);
   console.log(
     `[shinon-scoring] Ton: ${SCORING_SERVICE} (${SCORING_SERVICE_CONTRACT}) ${canProvide ? 'angeboten' : 'NICHT angeboten (der Host hat kein ctx.provide)'}`,
   );

@@ -1,5 +1,6 @@
 /**
  * @shinon/codingmon — Client-Hälfte (Codemons + Arena).
+ * GENERIERT aus assets/client/*.js — nicht von Hand ändern; Schreiben: node scripts/build-client.mjs codingmon.
  *
  * Die Marken-Slots von Sidebar und Hero haelt @shinon/core; dieser Client gibt
  * allein den ZUSTAND heraus (ueber `window.__codingmon`, dasselbe Muster wie
@@ -22,6 +23,7 @@
 window.__ModuleLoader__.load({
   id: '@shinon/codingmon',
   factory(require) {
+// >>> @part assets/client/01-react.js
     const React = require('react');
     const h = React.createElement;
     const PLUGIN = '@shinon/codingmon';
@@ -151,6 +153,9 @@ window.__ModuleLoader__.load({
     }
 
     const spriteCache = new Map();
+// <<< @part assets/client/01-react.js
+
+// >>> @part assets/client/02-sprite-svg.js
     /**
      * Matrix -> SVG. `shape-rendering: crispEdges` plus 1x1-Rects im 16er-
      * viewBox: die Pixel bleiben beim Skalieren scharf, es wird kein Bild
@@ -350,6 +355,9 @@ window.__ModuleLoader__.load({
 
     // ── Reine Funktionen (Spiegel des Host-Vertrags) ─────────────────────────
     const speciesOfFamily = (family) => SPECIES_IDS.find((id) => SPECIES[id].family === family) ?? SPECIES_IDS[0];
+// <<< @part assets/client/02-sprite-svg.js
+
+// >>> @part assets/client/03-abilities-for.js
     const abilitiesFor = (level, speciesId) => {
       const inherited = inheritedAbilities(speciesId);
       return ABILITIES.filter((ability) => ability.minLevel <= level
@@ -413,6 +421,9 @@ window.__ModuleLoader__.load({
 
     // ── 3. PACING (kuenstliche Rundendauer) ─────────────────────────────────
     const PACING = { delayMs: 3000, lockedText: 'Codermon ist im Kampf, warte auf das Ergebnis' };
+// <<< @part assets/client/03-abilities-for.js
+
+// >>> @part assets/client/04-round-delay-ms.js
     /**
      * Die Dauer, mit der dieser Client rechnet. Sie ist ein SPIEGEL des
      * Vertragswerts: der Host liest die effektive Zahl aus der Profil-Ebene,
@@ -839,6 +850,9 @@ window.__ModuleLoader__.load({
       }
       return table[table.length - 1];
     };
+// <<< @part assets/client/04-round-delay-ms.js
+
+// >>> @part assets/client/05-loot-odds.js
     const lootOdds = (entry, creature = null) => Number(((entry.weight / lootWeightsFor(creature).reduce((sum, item) => sum + item.weight, 0)) * 100).toFixed(2));
     // ── Store ───────────────────────────────────────────────────────────────
     const listeners = new Set();
@@ -1010,6 +1024,9 @@ window.__ModuleLoader__.load({
         completions: Number.isSafeInteger(source.completions) && source.completions >= 0 ? source.completions : 0,
       };
     }
+// <<< @part assets/client/05-loot-odds.js
+
+// >>> @part assets/client/06-normalize-breeding.js
     function normalizeBreeding(raw, legacyState) {
       if (raw?.schemaVersion !== BREEDING_VERSION || !Array.isArray(raw.creatures) || !Array.isArray(raw.eggs)) {
         return createBreedingState(legacyState.species, legacyState);
@@ -1199,6 +1216,9 @@ window.__ModuleLoader__.load({
       hatchReadyEggs();
       return delta;
     }
+// <<< @part assets/client/06-normalize-breeding.js
+
+// >>> @part assets/client/07-add-captured-creature.js
     function addCapturedCreature(speciesId, lvl) {
       if (!SPECIES[speciesId]) return null;
       const breeding = store.breeding;
@@ -1388,7 +1408,9 @@ window.__ModuleLoader__.load({
       if (mutationBatchDepth > 0) { pendingPersistence = true; return; }
       persistNow();
     };
+// <<< @part assets/client/07-add-captured-creature.js
 
+// >>> @part assets/client/08-host-namespace.js
     /**
      * ── Uebergabe (Client -> Host) ─────────────────────────────────────────
      * Der Stand liegt in `localStorage` und haengt damit am BROWSER-Profil; der
@@ -1579,7 +1601,9 @@ window.__ModuleLoader__.load({
         }).catch(() => {});
       } catch { /* ohne Remote-Beitrag bleibt der Spielstand unveraendert */ }
     }
+// <<< @part assets/client/08-host-namespace.js
 
+// >>> @part assets/client/09-check-spawn.js
     // ── Completion-Spawn und Herausforderung ──────────────────────────────
     /**
      * Die Spawn-Pruefung: deterministisch aus (`localSteps`, Stufe). Gibt es
@@ -1769,7 +1793,9 @@ window.__ModuleLoader__.load({
       persist();
       return { locked: true, until: lock.until, arena };
     }
+// <<< @part assets/client/09-check-spawn.js
 
+// >>> @part assets/client/10-open-battle.js
     /** Den eingefrorenen Gegner aufstellen; schlaegt er zuerst, tut er es sofort. */
     function openBattle(frozen, payload) {
       const arena = payload.arena;
@@ -1961,7 +1987,9 @@ window.__ModuleLoader__.load({
       emit();
       return { eggId, species: egg.species, gen: egg.gen, bp: egg.bp };
     }
+// <<< @part assets/client/10-open-battle.js
 
+// >>> @part assets/client/11-species-glyph.js
     /** Die Figur eines Codemons: Familie aus der Spezies, Farbe aus dem Farbton. */
     function speciesGlyph(speciesId, lvl, size) {
       const species = SPECIES[speciesId] ?? SPECIES[SPECIES_IDS[0]];
@@ -2146,7 +2174,9 @@ window.__ModuleLoader__.load({
           `${formatNumber(s.xp)} XP · HP ${formatNumber(Math.max(0, s.hp))}/${formatNumber(maximum)} · ${s.wins} Siege · Beute ${s.loot.shiny} shiny`),
       );
     }
+// <<< @part assets/client/11-species-glyph.js
 
+// >>> @part assets/client/12-pet-head.js
     // ── Panel-Bausteine (Kopf / Werte / Arena / Liste / Bilanz) ─────────────
     /** Kopf: Figur, Kreatur-Wahl (alle erreichbar), Level und Fortschritt. */
     function PetHead({ s, lvl, onPick }) {
@@ -2337,7 +2367,9 @@ window.__ModuleLoader__.load({
         h('span', { className: '__cm_sub' },
           `Zug ${s.lock.action} — ${s.rejections} abgewiesene Eingabe${s.rejections === 1 ? '' : 'n'}`));
     }
+// <<< @part assets/client/12-pet-head.js
 
+// >>> @part assets/client/13-dock-battle.js
     /**
      * Der Kampf im Dock (Gen-1): Gegner von vorn, eigenes von hinten — ECHTE
      * Sprites aus den Gittern, keine Familien-Platzhalter. Der HP-Balken
@@ -2480,7 +2512,9 @@ window.__ModuleLoader__.load({
         h('span', { className: '__cm_result-mark', dangerouslySetInnerHTML: { __html: speciesGlyph(result.speciesId, result.level, 18) } }),
         h('span', null, text));
     }
+// <<< @part assets/client/13-dock-battle.js
 
+// >>> @part assets/client/14-breeding-panel.js
     function BreedingPanel({ s }) {
       const breeding = s.breeding ?? { creatures: [], eggs: [] };
       const creatures = breeding.creatures ?? [];
@@ -2675,7 +2709,9 @@ window.__ModuleLoader__.load({
     let encounterHolding = false;
     let encounterHoldTimer = null;
     let encounterTurn = null;
+// <<< @part assets/client/14-breeding-panel.js
 
+// >>> @part assets/client/15-encounter-stop.js
     /** Jeden laufenden Timer des Uebungszugs abraeumen (Abbruch, Neustart, Abbau). */
     function encounterStop() {
       for (const id of encounterTimers) window.clearTimeout(id);
@@ -2799,7 +2835,9 @@ window.__ModuleLoader__.load({
         h('dt', null, label),
         h('dd', null, value));
     }
+// <<< @part assets/client/15-encounter-stop.js
 
+// >>> @part assets/client/16-preflight-deck.js
     /**
      * Das Pre-Flight-Deck (B04) — eine Ansicht des Encounter-Zustands, keine
      * eigene Wahrheit.
@@ -2962,7 +3000,9 @@ window.__ModuleLoader__.load({
         h(Ledger, { s }),
       );
     }
+// <<< @part assets/client/16-preflight-deck.js
 
+// >>> @part assets/client/17-insert-styles.js
     // ── Styles ──────────────────────────────────────────────────────────────
     function insertStyles(tag, css) {
       if (document.querySelector(`style[data-plugin-css="${tag}"]`) !== null) return;
@@ -3477,5 +3517,7 @@ window.__ModuleLoader__.load({
         console.log(`[shinon-codingmon] Arena aktiv — ${SPECIES_IDS.length} Codemons, Level ${level()}, ${abilitiesFor(level(), store.species).length} Faehigkeiten`);
       },
     };
+// <<< @part assets/client/17-insert-styles.js
+
   },
 });

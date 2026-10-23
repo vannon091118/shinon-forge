@@ -14,12 +14,13 @@
  * Läuft ohne node_modules - nur node:-Module und der YAML-Parser des DSH-Stacks.
  */
 import { createHash } from 'crypto';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
 import { join, relative } from 'path';
 import * as repo from './lib/repo.mjs';
 import { diaryIssues } from './lib/diary.mjs';
 import { canonIssues } from './lib/canon.mjs';
 import { structureIssues } from './lib/structure.mjs';
+import { clientMontageIssues } from './build-client.mjs';
 
 const DIST = join(repo.ROOT, 'dist');
 
@@ -72,6 +73,9 @@ for (const issue of diaryIssues()) problems.push(`Tagebuch: ${issue}`);
 // Kanon: ein Name, eine Schreibweise, eine Definition — Globals, Vertraege, Dienste.
 for (const issue of canonIssues()) problems.push(`Kanon: ${issue}`);
 for (const issue of structureIssues()) problems.push(`Struktur: ${issue}`);
+// Client-Montage: die generierten Bundles muessen bytegleich zu ihren Quellteilen
+// sein — derselbe Riegel wie `npm run client:check` und der Gate-Test.
+for (const issue of clientMontageIssues()) problems.push(`Client-Montage: ${issue}`);
 // Generierte Idiome: dieselbe Regel für die Plugin-Bausteine — die Ableitung in den
 // Paketen muss zeichengenau zu scripts/lib/plugin-idioms.mjs passen.
 for (const half of ['index.js', 'client.js']) {
@@ -94,10 +98,7 @@ const missing = [];
 for (const pkg of packages) {
   const dest = join(DIST, 'packages', pkg.dir);
   mkdirSync(dest, { recursive: true });
-  for (const file of repo.artifactFiles(pkg)) {
-    const src = join(pkg.base, file);
-    if (existsSync(src)) cpSync(src, join(dest, file), { recursive: true });
-  }
+  repo.copyArtifacts(pkg, dest);
   // Jede Referenz muss im Artefakt liegen - nicht nur kopiert werden.
   for (const { value, kind } of repo.resourceRefs(pkg)) {
     const rel = value.replace(/^\.\//, '');

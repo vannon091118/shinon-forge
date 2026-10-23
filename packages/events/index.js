@@ -1,7 +1,7 @@
 import z from '@deepseek-ai/schemastery';
 import { readFileSync } from 'node:fs';
 // Die Digest-Regel hat EINE Definition: `@shinon/seams` (Host-Naht-Kern).
-import { digest } from '@shinon/seams/core';
+import { createOrchestrator, digest } from '@shinon/seams/core';
 
 /**
  * @shinon/events — Wave 2: Shinon Hook/Event Spine.
@@ -264,7 +264,8 @@ function subscribe(ctx, signal, handler, label) {
       console.warn(`[shinon-events] Beobachtung verworfen (${label}): ${error.message}`);
     }
   };
-  const disposer = ctx.on(signal, guarded);
+  const bus = createOrchestrator(ctx, { owner: 'events' });
+  const disposer = bus.route(signal, guarded);
   return typeof disposer === 'function' ? disposer : () => {};
 }
 

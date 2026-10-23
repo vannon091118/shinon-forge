@@ -29,11 +29,15 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findBlockFile, writeBlockBody } from '../lib/embed-blocks.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 const CORE_FILE = join(ROOT, 'packages', 'codingmon', 'assets', 'encounter.js');
-const CLIENT_FILE = join(ROOT, 'packages', 'codingmon', 'client.js');
+// Geschrieben wird in den QUELLTEIL, nicht ins generierte Bundle — und welcher
+// Teil den Block traegt, wird gesucht, nicht verdrahtet (die Teile sind nach
+// ihrer ersten Deklaration benannt).
+const PARTS_DIR = join(ROOT, 'packages', 'codingmon', 'assets', 'client');
 const LF = String.fromCharCode(10);
 
 /** Der Block, den dieses Skript besitzt. Ein zweiter gibt es nicht. */
@@ -128,7 +132,8 @@ export function currentBlock(clientText) {
 
 function main() {
   const check = process.argv.includes('--check');
-  const text = readFileSync(CLIENT_FILE, 'utf8');
+  const file = findBlockFile(PARTS_DIR, REGION);
+  const text = readFileSync(file, 'utf8');
   const expected = renderEncounterBlock(readFileSync(CORE_FILE, 'utf8'));
   const actual = currentBlock(text);
   if (check) {
@@ -139,9 +144,22 @@ function main() {
     console.log('✅ build-encounter-client: Einbettung deckungsgleich');
     return;
   }
-  const start = text.indexOf(actual);
-  writeFileSync(CLIENT_FILE, text.slice(0, start) + expected + text.slice(start + actual.length));
-  console.log('✅ build-encounter-client: Block ' + REGION + ' neu geschrieben');
+  if (actual === expected) {
+    console.log('= build-encounter-client: Einbettung deckungsgleich');
+    return;
+  }
+  // Der Rumpf OHNE die beiden Markenzeilen geht durch `writeBlock`, damit der
+  // Balance-Riegel greift: enthielte der alte Rumpf eine fremde Marke, wuerde
+  // dieser Schreibvorgang sie verschlucken — und das ist ein Fehler, kein Lauf.
+  const lines = expected.split(LF);
+  const body = lines.slice(1, -1).join(LF);
+  const next = writeBlockBody(text, REGION, body);
+  if (next === text) {
+    console.log('= build-encounter-client: Einbettung deckungsgleich');
+    return;
+  }
+  writeFileSync(file, next);
+  console.log('✅ build-encounter-client: Block ' + REGION + ' neu geschrieben (' + file + ')');
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) main();
