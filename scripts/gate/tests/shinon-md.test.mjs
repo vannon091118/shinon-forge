@@ -115,9 +115,24 @@ test('ohne SHINON.md bleibt der Kanal wie zuvor — kein leerer Pflichtblock', (
   assert.equal(String(texte[0]), '', 'kein Block ohne Datei');
 });
 
+/**
+ * Der WIRKSAME Block: `preset-shinon`. Der Test las am 2026-10-23 zuerst den
+ * Wurzel-Eintrag `agent-instructions` und war damit gruen, obwohl der Lauf den
+ * Preset-Eintrag benutzte — ein Waechter vor der falschen Tuer. Der Block endet
+ * am naechsten Eintrag auf Spalte 0 (`- id:`) oder am Dateiende.
+ */
+function presetBlock(patch) {
+  const start = patch.indexOf('id: preset-shinon');
+  if (start < 0) return '';
+  const rest = patch.slice(start);
+  const next = rest.indexOf('\n- id: ');
+  return next < 0 ? rest : rest.slice(0, next);
+}
+
 test('das Profil laedt nur SHINON.md — kein AGENTS.md, kein CLAUDE.md', () => {
   const patch = readFileSync(join(ROOT, 'profiles/shinon/cordis.patch.yml'), 'utf8');
-  const eintrag = patch.slice(patch.indexOf('- id: agent-instructions'));
+  const eintrag = presetBlock(patch);
+  assert.notEqual(eintrag, '', 'preset-shinon steht im Patch');
   assert.match(eintrag, /instructionFileCandidates: \['SHINON\.md'\]/);
   assert.ok(!/AGENTS\.md/.test(eintrag), 'kein AGENTS.md in agent-instructions');
   assert.ok(!/CLAUDE\.md/.test(eintrag), 'kein CLAUDE.md in agent-instructions');
@@ -131,4 +146,15 @@ test('das Profil schaltet die englische Harness-Identitaet aus und setzt einen d
   const prefix = eintrag.slice(eintrag.indexOf('personaPrefix: |'));
   assert.match(prefix, /ausschliesslich auf Deutsch/);
   assert.ok(!/You are an AI agent/.test(prefix), 'kein englischer Satz im Prefix');
+});
+
+test('das Preset selbst traegt den deutschen Prefix und keine englische Identitaet', () => {
+  // Der Wurzel-Eintrag `system-prompt` ist NICHT der wirksame: das Preset
+  // ersetzt `persona` und `agent-instructions`. Der Test prueft deshalb den
+  // Block, den der Lauf liest (Beleg: Dump mit `id: preset-shinon`).
+  const patch = readFileSync(join(ROOT, 'profiles/shinon/cordis.patch.yml'), 'utf8');
+  const eintrag = presetBlock(patch);
+  assert.notEqual(eintrag, '', 'preset-shinon steht im Patch');
+  assert.ok(!/You are a coding agent/.test(eintrag), 'kein englischer Persona-Prefix im Preset');
+  assert.match(eintrag, /prefix: Du bist ein Programmier-Agent/, 'deutscher Persona-Prefix im Preset');
 });

@@ -57,14 +57,23 @@
         id: shinon
         order: 0
         plugins:
+          # Die WIRKSAME Ebene ist dieses Preset, nicht die Eintraege weiter
+          # oben: ein aktives Preset ersetzt `persona` und `agent-instructions`
+          # und deaktiviert die gleichnamigen Eintraege der Wurzel (gemessen im
+          # aufgeloesten Dump: `agent-instructions` trug dort `disabled: true`).
+          # Genau deshalb stand die Zusage "nur SHINON.md" am 2026-10-23 eine
+          # Zeit lang nur in der Wurzel und nicht im Lauf: hier steht sie jetzt
+          # dort, wo sie gilt.
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
-              prefix: You are a coding agent powered by the {{model}} model.
+              prefix: Du bist ein Programmier-Agent, der mit dem Modell {{model}} laeuft.
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
             config:
               maxBytes: 65536
+              instructionFileCandidates: ['SHINON.md']
+              localInstructionFileCandidates: ['SHINON.local.md']
           - id: time-context
             name: '@deepseek-ai/dsh-time-context'
           - id: persistent-shell
