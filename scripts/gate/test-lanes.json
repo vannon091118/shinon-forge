@@ -31,7 +31,6 @@
       "docs-inventory.test.mjs",
       "doctor-cli.test.mjs",
       "dsh-home.test.mjs",
-      "dsh-pin.test.mjs",
       "dsh-singleton.test.mjs",
       "dsh-versions.test.mjs",
       "e2e-harness.test.mjs",

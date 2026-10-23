@@ -91,12 +91,10 @@ Grenze ist physisch und fail-closed:
   **vor** dem PATH meldet `dsh --version` genau diesen Pin; eine **globale** Installation
   daneben darf abweichen, und eine Zusage, die an der gemessenen Fassung hängt,
   verweigert sich dann selbst (`scripts/gate/tests/message-ingress.test.mjs`). Beide
-  Zahlen: `docs/ZAHLEN.md` §1. Eine zweite Fassung liegt nicht mehr im Baum: `vendor/dsh`
-  trägt seit dem 2026-10-17 dieselbe Fassung wie Pin, Lock und Installat und wird von
-  **keinem** Laufzeitcode geladen — die drei Belege und die Kandidatenliste des Resolvers
-  stehen in `vendor/MODIFICATIONS.md`, geprüft von `scripts/gate/tests/dsh-pin.test.mjs`
-  (fail-closed). `npm run dev` startet über `bin/shinon.mjs`; ein `dsh` im PATH braucht
-  nur, wer den Profiltest direkt aufruft.
+  Zahlen: `docs/ZAHLEN.md` §1. Eine zweite Fassung liegt **nicht** im Baum: die
+  Fassung ist über Sollquelle, Lock, Installat und `dsh --version` belegt
+  (`npm run check:dsh-versions`, fail-closed). `npm run dev` startet über
+  `bin/shinon.mjs`; ein `dsh` im PATH braucht nur, wer den Profiltest direkt aufruft.
 - **Das Repo-Root ist NICHT mehr `DSH_HOME`.** Grund (gemessen 2026-10-17):
   `$DSH_HOME/AGENTS.md` ist bei DSH die benutzerglobale Anweisungsdatei und lief damit in
   JEDER Sitzung mit — auch in fremden Projekten. Das Home liegt jetzt unter dem
@@ -175,12 +173,10 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
 - `npm run check:dsh-versions` → `node scripts/check-dsh-versions.mjs`: der EINE
   Versionsprüfer. Er liest `scripts/dsh-target-versions.json` (die einzige Sollquelle)
   und prüft Root- und Workspace-Manifeste, alle Lock-Einträge (auch verschachtelte),
-  `vendor/dsh/MANIFEST.json`, Installat, `dsh --version` und ob ein Skript die Fassung
-  als zweites Literal führt. Exit 0 nur, wenn alles dieselbe Fassung nennt; jeder Befund
-  nennt Soll, Ist und Fundstelle. Dieselbe Implementierung nutzen CI und `dsh-update`.
-- `node scripts/vendor-dsh.mjs` → erneuert `vendor/dsh/` aus der Sollquelle (Registry-
-  Tarball, Integrität gegen das Lock, `MANIFEST.json` mit sha256 je Datei). Nicht von Hand
-  kopieren: der Prüfer oben vergleicht danach Fassung und Integrität.
+  ihre Tarball-URL und Integrität, Installat und `dsh --version` sowie ob ein Skript die
+  Fassung als zweites Literal führt. Exit 0 nur, wenn alles dieselbe Fassung nennt; jeder
+  Befund nennt Soll, Ist und Fundstelle. Dieselbe Implementierung nutzen CI und
+  `dsh-update`.
 - `npm run build` → `node scripts/build.mjs`: re-validates everything, then wipes and
   regenerates `dist/` (`manifest.json`, `profile.json`, `dist/packages/*`).
 

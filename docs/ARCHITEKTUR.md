@@ -38,9 +38,8 @@ Code zu patchen ist verboten (`legacy-guard`-Gate erzwingt das Fehlen von
 `conversation.hero.brand.mark`, `main`, `sidebar.panellist`,
 `agent/pre-step`, …).
 
-`vendor/dsh/` enthält eine **unveränderte** Kopie des gepinnten DSH-Tarballs
-mit sha256-`MANIFEST.json` — Beweismittel und Benchmark-Referenz, keine
-Laufzeitquelle (Details: [`SETUP.md`](SETUP.md) §6).
+Eine zweite Kopie der CLI liegt **nicht** im Baum: die Fassung ist über Sollquelle,
+Lock, Installat und `dsh --version` belegt (`npm run check:dsh-versions`).
 
 ## 2. Paket-Anatomie
 

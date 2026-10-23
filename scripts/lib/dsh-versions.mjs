@@ -2,7 +2,7 @@
  * dsh-versions.mjs — EINE Sollquelle, EIN Prüfer für alle Fassungen.
  *
  * Die Matrix ist die einzige Autorität. Geprüft werden Manifeste, Lock (auch
- * verschachtelt), Vendor, Installat, CLI und ein zweiter Versionsliteral im
+ * verschachtelt), Lock-Integritaet, Installat, CLI und ein zweiter Versionsliteral im
  * Quelltext; Befunde werden gesammelt, den Exit-Code setzt der Aufrufer.
  */
 import { execFileSync } from 'node:child_process';
@@ -262,41 +262,6 @@ export function checkVersions(root, options = {}) {
           'das Lock löst das Zielpaket gar nicht auf — eine fehlende Angabe ist ein Befund'));
       }
     }
-  }
-
-  // 3. Vendor-Metadaten: Fassung, Tarball-URL, Integrität gegen das Lock.
-  const dshTarget = targets['@deepseek-ai/dsh'];
-  const manifestPath = 'vendor/dsh/MANIFEST.json';
-  if (existsSync(join(root, manifestPath))) {
-    let vendor = null;
-    try {
-      vendor = readJson(join(root, manifestPath));
-    } catch (error) {
-      issues.push(issue('VENDOR_UNREADABLE', manifestPath, '@deepseek-ai/dsh', 'JSON', null, `nicht lesbar: ${error.message}`));
-    }
-    if (vendor !== null && vendor.version !== dshTarget) {
-      issues.push(issue('VENDOR_VERSION_MISMATCH', manifestPath, '@deepseek-ai/dsh', dshTarget, vendor.version ?? null,
-        `die vendorte Fassung ist ${vendor.version}, die Sollquelle verlangt ${dshTarget}`));
-    }
-    const vendorPackage = 'vendor/dsh/package.json';
-    if (vendor !== null && existsSync(join(root, vendorPackage))) {
-      const vendored = readJson(join(root, vendorPackage));
-      if (vendored.version !== dshTarget) {
-        issues.push(issue('VENDOR_PACKAGE_MISMATCH', vendorPackage, '@deepseek-ai/dsh', dshTarget, vendored.version ?? null,
-          `vendor/dsh/package.json nennt ${vendored.version}, die Sollquelle ${dshTarget}`));
-      }
-    }
-    if (vendor !== null && !String(vendor.source?.tarball ?? '').endsWith(`/-/dsh-${dshTarget}.tgz`)) {
-      issues.push(issue('VENDOR_TARBALL_MISMATCH', manifestPath, '@deepseek-ai/dsh', `dsh-${dshTarget}.tgz`, vendor.source?.tarball ?? null,
-        'die Tarball-URL im Manifest trägt nicht die Sollfassung'));
-    }
-    const locked = lock?.packages?.['node_modules/@deepseek-ai/dsh'];
-    if (vendor !== null && locked !== undefined && vendor.source?.integrity !== locked.integrity) {
-      issues.push(issue('VENDOR_INTEGRITY_MISMATCH', manifestPath, '@deepseek-ai/dsh', locked.integrity ?? null, vendor?.source?.integrity ?? null,
-        'Manifest und Lock beschreiben verschiedene Tarballs'));
-    }
-  } else {
-    issues.push(issue('VENDOR_MISSING', manifestPath, '@deepseek-ai/dsh', 'Datei', null, 'die vendorte CLI ist nicht belegt'));
   }
 
   // 4. Laufzeit: installierte Pakete und die CLI-Ausgabe.

@@ -7,7 +7,7 @@
  * Wenn sie von Hand nachgezogen wird, ist sie nach dem nächsten Paket alt — und
  * eine veraltete Referenz ist wie ein Kompass, der noch auf den letzten Hafen
  * zeigt. Dieses Skript liest die Fakten aus dem Baum (Manifeste, Profil, Git-
- * Index, dist, vendor) und schreibt NUR den markierten Block:
+ * Index, dist) und schreibt NUR den markierten Block:
  *
  *   <!-- zahlen:bestand:start -->
  *   … generierte Tabelle …
@@ -130,7 +130,6 @@ export function measure(root = ROOT) {
     ['Verträge unter `docs/contracts/`', String(files(root, 'docs/contracts', '.json').length), '`ls docs/contracts/*.json | wc -l`'],
     ['Proben unter `docs/probes/`', String(files(root, 'docs/probes', '.json').length), '`ls docs/probes/*.json | wc -l`'],
     ['Generierte Idiom-Blöcke', idioms === null ? 'nicht messbar (Prüfung rot)' : `${idioms.blocks} Blöcke in ${idioms.files} Dateien`, '`npm run idioms:check` (Exit 0)'],
-    ['Vendorte Dateien unter `vendor/`', String(filesUnder(root, 'vendor').length), '`find vendor -type f | wc -l`'],
     ['Build (`dist/packages/`)', distFiles.length === 0 ? 'nicht gebaut' : `${distPackages} Pakete, ${distFiles.length} Dateien, ${distBytes} Bytes`, '`npm run build` (Exit 0)'],
   ];
 }

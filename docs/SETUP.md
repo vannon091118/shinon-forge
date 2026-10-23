@@ -108,11 +108,8 @@ Welches Modell läuft, entscheidet allein das Profil
 Das statische Gate `doctor` (`scripts/gate/plugins/doctor.mjs`) prüft
 daneben die Repo-Konsistenz — nicht den laufenden Rechner.
 
-## 6. Vendor und Pins
+## 6. Pins
 
-- `vendor/dsh/` ist eine **byte-identische** Kopie des gepinnten
-  `@deepseek-ai/dsh`-Tarballs inklusive `MANIFEST.json` (sha256 je Datei).
-  **Es wird nichts zur Laufzeit geladen** — Beweis und Benchmark-Referenz.
 - Der Pin steht zweimal: `package.json` (Dependencies) und
   `scripts/dsh-target-versions.json` (kanonische Zielversion).
   `npm run check:dsh-versions` vergleicht beide; `npm run update` ist der

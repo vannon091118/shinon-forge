@@ -1,28 +1,25 @@
 # Third-Party Notices — Shinon Forge
 
 > **Status:** current — Fremdhinweise, getrennt vom eigenen Copyright. **Stand:** 2026-10-22
-> **Einstieg:** `AGENTS.md` · **Änderungslog des Vendoring-Stands:** `vendor/MODIFICATIONS.md`
+> **Einstieg:** `AGENTS.md` · **DSH-Pin:** `scripts/dsh-target-versions.json`
 
 Dieses Repo ist ein Fork und bindet fremde Software ein. Eigener und fremder Text
 bleiben getrennt (Entscheidung A12): unser Copyright steht in [`LICENSE`](LICENSE),
 hier stehen die Fremdhinweise — unverändert, nicht zusammengefasst und nicht
 umformuliert.
 
-## 1. DeepSeek Harness (`@deepseek-ai/dsh`) — vendort
+## 1. DeepSeek Harness (`@deepseek-ai/dsh`) — Abhängigkeit, nicht redistribuiert
 
 - Fassung: **0.2.1-rc.2** · Lizenz: **MIT** · Herkunft: Registry-Tarball
   (`https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.2.1-rc.2.tgz`,
   `sha512-tvY+yhfKRifthbqPe/OK0AYxM5ZkvqfYq/jMYgJcEUxiRRL1Vwra3Ti5TB6AXgSWQdiPHYh/Vp6SJa9yHwMNuw==`)
-- Diese Fassung entspricht dem Root-Pin, dem Lockfile, `vendor/dsh/MANIFEST.json`
-  und dem installierten CLI-Paket. Der aktuelle Laufzeitresolver verwendet das
-  Repo-Installat aus `node_modules`; `vendor/dsh/` ist der Herkunfts- und
-  Integritätsnachweis und wird derzeit nicht direkt vom Resolver geladen. Die
-  Quellen, Prüfbefehle und diese Laufzeitgrenze sind in
-  [`vendor/MODIFICATIONS.md`](vendor/MODIFICATIONS.md) dokumentiert.
-- Ort der Kopie: [`vendor/dsh/`](vendor/dsh/) — 20 Dateien, byte-identisch zum RC-Tarball
-  (`sha256` je Datei in [`vendor/dsh/MANIFEST.json`](vendor/dsh/MANIFEST.json))
-- Lizenztext: übernommen als [`vendor/dsh/LICENSE`](vendor/dsh/LICENSE) und hier
-  **wortgleich** wiedergegeben:
+- Diese Fassung entspricht dem Root-Pin, dem Lockfile und dem installierten
+  CLI-Paket. Der Laufzeitresolver verwendet das Repo-Installat aus
+  `node_modules`; eine vendorte Kopie gibt es seit dem 2026-10-23 **nicht**
+  (kein Laufzeitcode lud sie). `npm run check:dsh-versions` prüft Pin, Lock,
+  Integrität, Installat und `dsh --version` gegen dieselbe Sollquelle.
+- Lizenztext: hier **wortgleich** wiedergegeben (MIT verlangt die Beibehaltung
+  des Copyright- und Lizenzhinweises):
 
 ```
 MIT License
@@ -57,7 +54,7 @@ keine trug diesen Namen (`lib/*.js`, `lib/types/*.d.ts`, `LICENSE`,
 unverändert; statt einer erfundenen Datei steht hier der Befund. Ein
 Copyleft-/Attributionskonflikt, der 3.2 stoppen müsste, ist **nicht** entstanden: MIT
 verlangt die Beibehaltung des Copyright- und Lizenzhinweises, und genau der steht
-oben und in `vendor/dsh/LICENSE`.
+oben.
 
 ## 2. Der Ökosystem-Baum (`@deepseek-ai/*`) — npm-Abhängigkeit, nicht redistribuiert
 

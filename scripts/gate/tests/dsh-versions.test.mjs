@@ -3,7 +3,7 @@
  *
  * Geprüft wird jeder Weg, auf dem eine Fassung falsch sein kann: Matrix,
  * Manifest (exakt vs. Range), Peer-Bereich, Lock (auch verschachtelt),
- * Vendor-Metadaten, Installat, CLI und ein zweiter Versionsliteral im
+ * Lock-Integrität, Installat, CLI und ein zweiter Versionsliteral im
  * Quelltext. Jeder Fall baut seinen eigenen Baum unter tmpdir — der echte
  * Repo-Baum wird nicht angefasst und keine Registry befragt.
  */
@@ -71,15 +71,6 @@ function fixture(overrides = {}) {
       'node_modules/@deepseek-ai/dsh-typert-protocol': lockEntry('@deepseek-ai/dsh-typert-protocol', TYPERT),
     },
   });
-  write(root, 'vendor/dsh/MANIFEST.json', {
-    package: '@deepseek-ai/dsh',
-    version: DSH,
-    source: {
-      tarball: `https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-${DSH}.tgz`,
-      integrity: INTEGRITY,
-    },
-  });
-  write(root, 'vendor/dsh/package.json', { name: '@deepseek-ai/dsh', version: DSH });
   for (const pkg of TARGET_PACKAGES) {
     const version = pkg === '@deepseek-ai/schemastery' ? SCHM : DSH;
     write(root, `node_modules/${pkg}/package.json`, { name: pkg, version });
@@ -216,41 +207,6 @@ test('Lock: falsche Fassung, verschachtelter Eintrag, fehlender Eintrag, falsche
   tarballLock.packages['node_modules/@deepseek-ai/schemastery'].resolved = 'https://example.test/falsch.tgz';
   write(tarball.root, 'package-lock.json', tarballLock);
   assert.deepEqual(codes(run(tarball.root)), ['LOCK_TARBALL']);
-});
-
-test('Vendor: Fassung, Paketmanifest, Tarball-URL und Integrität', () => {
-  const version = fixture();
-  write(version.root, 'vendor/dsh/MANIFEST.json', {
-    package: '@deepseek-ai/dsh',
-    version: '9.9.8',
-    source: { tarball: `https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-${DSH}.tgz`, integrity: INTEGRITY },
-  });
-  assert.deepEqual(codes(run(version.root)), ['VENDOR_VERSION_MISMATCH']);
-
-  const packageFile = fixture();
-  write(packageFile.root, 'vendor/dsh/package.json', { name: '@deepseek-ai/dsh', version: '9.9.8' });
-  assert.deepEqual(codes(run(packageFile.root)), ['VENDOR_PACKAGE_MISMATCH']);
-
-  const url = fixture();
-  write(url.root, 'vendor/dsh/MANIFEST.json', {
-    package: '@deepseek-ai/dsh',
-    version: DSH,
-    source: { tarball: 'https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-9.9.8.tgz', integrity: INTEGRITY },
-  });
-  assert.deepEqual(codes(run(url.root)), ['VENDOR_TARBALL_MISMATCH']);
-
-  const integrity = fixture();
-  write(integrity.root, 'vendor/dsh/MANIFEST.json', {
-    package: '@deepseek-ai/dsh',
-    version: DSH,
-    source: { tarball: `https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-${DSH}.tgz`, integrity: 'sha512-BBBB' },
-  });
-  assert.deepEqual(codes(run(integrity.root)), ['VENDOR_INTEGRITY_MISMATCH']);
-
-  const missing = fixture();
-  write(missing.root, 'vendor/dsh/MANIFEST.json', '{ kaputt');
-  const result = checkVersions(missing.root, { runtime, skipSourceScan: true });
-  assert.deepEqual(codes(result), ['VENDOR_UNREADABLE'], 'ein unlesbares Manifest ist ein Befund, kein Absturz');
 });
 
 test('Laufzeit: falsche installierte Fassung, fehlendes Paket, CLI-Drift, CLI nicht messbar', () => {

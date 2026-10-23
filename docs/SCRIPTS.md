@@ -27,7 +27,6 @@
 | `remote-worktree.mjs` | `worktree` | erstellt, listet und entfernt Task-Worktrees außerhalb des Klons; Remove ohne `--force` |
 | `sync-idioms.mjs` | `idioms`, `idioms:check` | generiert geteilte Idiome; `--check` ohne Schreiben |
 | `branding-check.mjs` | `branding` | Brand-Marken im Baum; die Engine ruft es bei `--branding` |
-| `vendor-dsh.mjs` | — | aktualisiert `vendor/dsh/` aus dem Registry-Tarball (inkl. `MANIFEST.json`) |
 | `assets/build-sprites.mjs` | — | Grid → SVG-Sprites (Codingmon) |
 | `appimage-build.mjs` | `appimage` | AppImage-Hülle aus derselben Nutzlast wie das `.deb`; braucht `appimagetool`, CI-Job `appimage` |
 | `assets/build-codingmon.mjs` | — | kopiert die Katalogdaten aus `packages/codingmon/assets/data/codingmon-50.json` in die Datenregionen von `client.js` (`--write`); `--check` vergleicht und bricht bei Drift ab, geprüft von `packages/codingmon/test/katalog.test.mjs` |

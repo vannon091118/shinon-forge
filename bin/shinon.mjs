@@ -27,11 +27,10 @@
  * `$DSH_HOME/profiles/<name>` auskommt (`resolvedProfile`, Schritt 3.3 ist dafür
  * belegt), wird hier erst eingehängt, wenn die Profilwerte aus Code kommen
  * (Schritt 3.6) — sonst gäbe es zwei Orte, an denen das Profil definiert ist.
- * Ebenso bleibt `vendor/dsh` unverdrahtet: es läuft das Repo-Installat, also der Pin
- * aus `package.json`. Die vendorte Kopie trägt seit dem 2026-10-17 dieselbe Fassung
- * wie Pin, Lock und Installat und hat **keinen** Laufzeitleser — welcher Code sie
- * lädt (heute: keiner), welche Kandidaten `dshRoot()` kennt und was ein Umzug auf
- * eine andere Fassung kostet, steht in `vendor/MODIFICATIONS.md`.
+ * Eine zweite Kopie der CLI gibt es nicht (2026-10-23 entfernt, weil kein
+ * Laufzeitcode sie lud): es läuft das Repo-Installat, also der Pin aus
+ * `package.json`. `npm run check:dsh-versions` hält Pin, Lock, Installat und
+ * `dsh --version` auf derselben Fassung.
  *
  * Aufruf:  shinon [--check] [dsh-Argumente …]      (bzw. `npm start [-- …]`)
  *          shinon doctor [--json]                 (Laufzeit-Diagnose, S4)

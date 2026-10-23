@@ -38,8 +38,8 @@ fachlich notwendige Wirkung und einen Beleg für diese Wirkung.
 ## Vergleichsgrundlage und Grenzen
 
 - Installierte Ground Truth: Root pinnt `@deepseek-ai/dsh` auf `0.2.1-rc.2`;
-  `vendor/dsh` enthält laut `vendor/MODIFICATIONS.md` dieselbe Version, ist
-  aber nur das CLI-Paket mit ausgewählten Loader-/Dump-Dateien. Die Laufzeit-
+  installiert liegt das CLI-Paket mit Loader-/Dump-Dateien unter
+  `node_modules/@deepseek-ai/dsh`, eine zweite Kopie gibt es nicht. Die Laufzeit-
   Pakete liegen in `node_modules/@deepseek-ai/*`; Aussagen zu API-Verfügbarkeit
   wurden daran und an den geladenen Profil-Bundles gegengeprüft.
 - Profilwahrheit: `profiles/shinon/package.json` schaltet DSH Base/Web App,
@@ -219,7 +219,7 @@ ist und keine Shinon-spezifische Wirkung belegt wird, ist sie Duplikat. Wenn 4
 
 ## Geprüfte lokale Belegstellen
 
-- `package.json`, `vendor/dsh/package.json`, `vendor/MODIFICATIONS.md`
+- `package.json`, `scripts/dsh-target-versions.json`
 - `profiles/shinon/package.json`
 - `docs/ZAHLEN.md` §§1–3, `docs/ROADMAP.md` §§1.5/2, `docs/VISION-ABGLEICH.md`
 - `docs/WISSENS-RUNTIME-PLAN.md`, `docs/CLEANREPO-AUDIT.md`
