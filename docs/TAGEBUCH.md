@@ -1900,3 +1900,48 @@ echten Importe statt der einen alten.
 `npm run gate:test` 908/908, `npm run test:prompter` 245/245,
 `project-index.test.mjs` 52/52, `npm run zahlen:check` Exit 0,
 `npm run build` Exit 0 (24 Pakete, 312 Dateien, 2784486 Bytes).
+
+**Ein Lernsignal bekommt eine Herkunft, und der Abbruch verliert seine Stimme.**
+SH-LEARN-01 hat den Anlass geliefert, aber der Befund war aelter: die
+Signaltabelle las jedes Turn-Ende als Aussage ueber die Antwort. `completed`
+galt als Zustimmung, `aborted` als Ablehnung — dabei kann ein Abbruch ein
+Timeout, ein Werkzeugfehler, eine Kontextgrenze oder ein Mensch sein, und ein
+regulaerer Abschluss belegt nur, dass nichts abgebrochen wurde. Das ist, wie
+eine Waage zu benutzen, die das Gewicht der Hand mitwiegt.
+
+Die Signaltabelle fuehrt deshalb jetzt je Zeile eine STUFE. `user` ist das
+ausdrueckliche Menschenurteil zu EINER Antwort, die diese Sitzung gesehen hat;
+`derived` ist aus einer menschlichen Handlung abgeleitet (die wiederholte
+Frage); `none` wird gezaehlt und nie gewertet. `feedback.rated` traegt
+`requiresAnswer` und liest die Kennung aus `assistant/message` ueber
+`message.id`; ein Urteil, das ins Leere zeigt, endet mit
+`UNATTRIBUTED_FEEDBACK`, und die Tafel bleibt byte-identisch. Turn-Ende und
+Abbruch sind die neue Quellenart `observe`; `accept` und `dismiss` stehen in
+keiner Tendenz-Klasse mehr und schreiben keine Zeile. Bausteine lernen nur noch
+von `stage: 'user'`, die abgeleitete Wiederholung bewegt die Tafel, nie die
+Gewichte. Harness-Text bleibt draussen, weil er die Marke `source.kind: 'user'`
+nicht traegt — `NOT_HUMAN`, gezaehlt statt gedeutet.
+
+Beim Aufteilen zeigte sich die Grenze des Repos: 650 Zeilen je Kern. Die
+Uebersetzung des Ereignisstroms liegt deshalb als eigener reiner Kern unter
+`packages/scoring/assets/signal-translate.js`, der Entscheidungsdatensatz als
+`packages/prompter/assets/decision-record.js`; beide tragen nur relative
+Importe. Der Sammler merkt sich die Antwort-Kennungen je Sitzung und stellt sie
+nach einem Neustart aus den eigenen Protokollzeilen wieder her, damit spaete
+Kritik dieselbe Antwort trifft — ein Gedaechtnis, das sich aus seinen Spuren
+erneuert, statt eine zweite Wahrheit daneben zu legen. Der Veredler-Trace nennt
+zusaetzlich `prompt_source` (`user` oder `refined`), also welche Anfrage
+wirklich ans Hauptmodell ging, ohne den Text zu kopieren.
+
+**Anker:** `eb458b8` · Pfade: `packages/scoring/assets/signal-translate.js`,
+`packages/scoring/assets/signal-rules.json`,
+`packages/scoring/assets/scoring-core.js`, `packages/scoring/index.js`,
+`packages/scoring/assets/tendency-rules.json`,
+`packages/prompter/assets/decision-record.js`,
+`packages/prompter/assets/pre-step.js`,
+`scripts/gate/tests/scoring-signals.test.mjs`,
+`scripts/gate/tests/scoring-memory.test.mjs`,
+`docs/contracts/structure.json` · Belege: `npm run test:scoring` 51/51,
+`npm run test:prompter` 245/245, `npm test` Exit 0 (131 Schritte),
+`npm run gate:test` 908/908, `npm run zahlen:check` Exit 0,
+`npm run build` Exit 0 (24 Pakete, 314 Dateien).
