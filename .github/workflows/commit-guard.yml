@@ -304,7 +304,7 @@ jobs:
       - name: Schnellen Kernpfad fahren
         run: npm run test:core
 
-      - name: DSH-Versionen gegen Sollquelle, Lock, Vendor, Installat und CLI pruefen
+      - name: DSH-Versionen gegen Sollquelle, Lock, Integritaet, Installat und CLI pruefen
         run: node scripts/check-dsh-versions.mjs
 
       # Der Bestandsblock driftet sonst unbemerkt: der Hook prueft ihn lokal,

@@ -1981,7 +1981,7 @@ und `--only scoring` je PASS, `npm run zahlen:check` Exit 0, `npm run build`
 Exit 0 (24 Pakete, 314 Dateien).
 
 
-## 2026-10-23 — sieben Zusagen, die stimmen, und drei Artefakte, die gingen
+**Sieben Zusagen, die stimmen, und drei Artefakte, die gingen.**
 
 Der Tag beginnt mit einer Pruefung der letzten zehn Commits. Drei Befunde sind
 rot: das contracts-Gate verwirft `docs/contracts/knowledge-kinds.json`, weil der
@@ -2007,14 +2007,4 @@ Vendor-Baum, den kein Laufzeitcode las, waehrend `check:dsh-versions` den Pin
 weiter fail-closed prueft (`f5b75a9`); `packages/better-errors`, dessen
 gesamte Wirkung ein Logaufruf und eine Faehigkeitszeile war (`4208414`).
 
-**Anker:** `e52f6f4`, `d7bc559`, `5d97c13`, `eab9ffa`, `2ff011f`,
-`0b0fc14`, `f5b75a9`, `4208414` · Pfade:
-`docs/contracts/knowledge-kinds.json`,
-`profiles/shinon/fragments/40-agent-model.yml`,
-`packages/scoring/assets/scoring-core.js`,
-`scripts/gate/plugins/probe-twin.mjs`, `package.json`,
-`scripts/lib/preflight/policy.mjs`, `scripts/lib/dsh-versions.mjs`,
-`packages/prompter/assets/capabilities.json` · Belege: `npm test` Exit 0
-(126 Schritte), `npm run test:full` Exit 0, `gate:test` 904/904,
-`gate:test:slow` 99/99, `gate:full` PASS 26/26, `npm run build` Exit 0
-(23 Pakete, 310 Dateien), `check:dsh-versions` PASS, `zahlen:check` Exit 0.
+**Anker:** `e52f6f4`..`4208414` · Pfade: `docs/contracts/knowledge-kinds.json`, `profiles/shinon/fragments/40-agent-model.yml`, `packages/scoring/assets/scoring-core.js`, `scripts/gate/plugins/probe-twin.mjs`, `package.json`, `scripts/lib/preflight/policy.mjs`, `scripts/lib/dsh-versions.mjs`, `packages/prompter/assets/capabilities.json` · Belege: `npm test` Exit 0 (126 Schritte), `npm run test:full` Exit 0, `gate:test` 904/904, `gate:test:slow` 99/99, `gate:full` PASS 26/26, `npm run build` Exit 0 (23 Pakete, 310 Dateien), `check:dsh-versions` PASS, `zahlen:check` Exit 0.
