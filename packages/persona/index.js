@@ -456,7 +456,10 @@ export function apply(ctx, config) {
       umfang: gelesen.eventPayload === null || gelesen.eventPayload === undefined ? 0 : 1,
       trace_id: gelesen.traceId,
     });
-    if (gelesen.eventType === 'message.received') {
+    if (gelesen.eventType === 'message.received' && gelesen.human) {
+      // Nur der Mensch setzt „die letzte Nachricht": sonst ueberschreibt der
+      // eingeblendete Live-Block (der NACH der Menschen-Nachricht kommt) den
+      // Text, an dem die Abschnitts-Gates und das Gedaechtnis haengen.
       promptText.remember(gelesen.sessionId, gelesen.text);
       lastDecision = null; // neue Nachricht, neuer Turn — die alte Klasse oeffnet nichts
     }

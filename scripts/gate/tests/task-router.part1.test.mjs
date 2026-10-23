@@ -176,6 +176,29 @@ test('Kette: die Runtime-Klasse entscheidet den Router — nicht das Modell', as
   prompterDispose();
   routerDispose();
 });
+test('Kette: der Kandidat wird BENANNT, auch wenn kein Goal entsteht', async () => {
+  // GEMESSEN (2026-10-23, echter Turn): der Router entschied
+  // `GOAL_CANDIDATE:MULTI_STEP_TASK` und `ACTIVATION_DISABLED` — und schrieb
+  // KEINE Zeile. Sichtbar war nur die Gegenprobe („linearer Turn"). Der
+  // Kandidat ist die interessante Haelfte; er muss seinen Ausgang nennen.
+  const llm = fakeLlm(result());
+  const { ctx, prompterDispose, routerDispose } = chain({ llm });
+  const lines = [];
+  const realLog = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try {
+    const messages = [userMessage(RAW)];
+    await ctx.waterfall(prompter.PRE_STEP_EVENT, stepPayload(messages), loopDefault(messages));
+  } finally {
+    console.log = realLog;
+  }
+  assert.ok(
+    lines.some((line) => line.includes('Goal-Kandidat') && line.includes('ACTIVATION_DISABLED')),
+    `keine Zeile fuer den Kandidaten: ${lines.join(' | ')}`,
+  );
+  prompterDispose();
+  routerDispose();
+});
 test('Kette: linear bleibt linear, und ohne Route gibt es gar keinen Kandidaten', async () => {
   // TRANSFORM -> linearer Turn, obwohl der Enhancer gelaufen ist.
   const llm = fakeLlm(result());

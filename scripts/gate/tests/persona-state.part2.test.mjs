@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fingerprintRoot } from '../../../packages/seams/assets/seams.js';
+import { beobachten } from '../../../packages/persona/assets/interaction-core.js';
 import { provideSeamCore } from './helpers/bundle-sandbox.mjs';
 import {
   EVENT_TYPES as SPINE_EVENTS,
@@ -153,6 +154,41 @@ test('persona: erkannte User-Stimmung steht als Reaktionszeile im Live-Block', (
   assert.equal(host.liveOf().split('Besondere Reaktion').length - 1, 1, 'genau eine Reaktionszeile');
   assert.equal(host.contexts.length, 1, 'kein zweiter Kanal');
   host.dispose();
+});
+test('persona: eine System-Nachricht setzt die Stimmung nicht — nur der Mensch', () => {
+  const host = connect();
+
+  // Der Fall aus dem echten Turn (2026-10-23): die eingeblendete AGENTS.md
+  // enthaelt „hängt", eine Marke der Stimmungsliste.
+  host.dispatch('shinon/event', {
+    event_type: 'message.received',
+    source: { kind: 'agent-instructions', form: 'instructions' },
+    text: 'eine Zusage, die an der gemessenen Fassung hängt, verweigert sich',
+  });
+  assert.equal(host.liveOf().includes('Besondere Reaktion'), false, 'eine Anweisungsdatei ist kein Mensch');
+
+  host.dispatch('shinon/event', {
+    event_type: 'message.received',
+    source: { kind: 'runtime-context', form: 'snapshot' },
+    text: 'Current runtime context. This snapshot supersedes earlier snapshots.',
+  });
+  assert.equal(host.liveOf().includes('Besondere Reaktion'), false, 'der Live-Block ist kein Mensch');
+
+  // Der Riegel ist keine Stummschaltung: der Mensch danach zaehlt.
+  host.dispatch('shinon/event', { event_type: 'message.received', source: { kind: 'user' }, text: 'Das kotzt mich an.' });
+  assert.match(host.liveOf(), /der Mensch ist genervt/);
+  host.dispose();
+});
+test('persona: beobachten meldet die Fremdquelle, ohne die Stimmung zu erfinden', () => {
+  const envelope = { event_type: 'message.received', session_id: 's-gate' };
+  const fremd = beobachten(envelope, { event_type: 'message.received', source: { kind: 'skill-catalog' }, text: 'hängt, nervt, kotzt' }, {});
+  assert.equal(fremd.human, false);
+  assert.equal(fremd.stimmung, null);
+  assert.equal(fremd.trigger, null);
+
+  const mensch = beobachten(envelope, { event_type: 'message.received', text: 'Das kotzt mich an.' }, {});
+  assert.equal(mensch.human, true, 'ohne Beschriftung gilt die Nachricht als menschlich');
+  assert.equal(mensch.stimmung, 'frustriert');
 });
 test('persona: detectUserMood ist deterministisch und fail-closed', () => {
   assert.equal(bundle.detectUserMood(''), null);

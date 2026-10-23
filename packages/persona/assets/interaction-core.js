@@ -110,6 +110,31 @@ const MOOD_ERFREUT = [
   'freu mich', 'bock heute', 'perfekt', 'danke',
 ];
 
+/**
+ * Ist diese Nachricht ein MENSCH?
+ *
+ * DSH beschriftet jede Nachricht mit `source.kind`: `user` fuer den Menschen,
+ * `agent-instructions` fuer die eingeblendete AGENTS.md, `runtime-context` fuer
+ * den Live-Block, `skill-catalog` fuer die Skill-Liste. Fehlt die Beschriftung
+ * (aeltere Hosts, Testdoubles), gilt die Nachricht als menschlich — der Riegel
+ * soll eine BENANNTE Fremdquelle aussperren, nicht eine unbekannte Form stumm
+ * schalten.
+ *
+ * GEMESSEN (2026-10-23, echter Turn im Profil shinon): die `AGENTS.md` dieses
+ * Repos enthaelt das Wort „hängt" (Zeile 92, „eine Zusage, die an der
+ * gemessenen Fassung hängt"). Das ist eine Marke der Stimmungsliste. Ohne
+ * diesen Riegel meldete die Persona in JEDEM Turn „User-Lage erkannt
+ * (frustriert)": sie las den Anweisungsblock als Menschen. Die Stimmung kam aus
+ * der Datei, nicht aus dem Menschen — und ueber `promptText.remember` wurde der
+ * Anweisungsblock ausserdem zur „letzten Menschen-Nachricht", an der die
+ * Abschnitts-Gates haengen.
+ */
+export function istMenschenNachricht(payload) {
+  const source = payload?.source ?? payload?.message?.source;
+  if (source === null || typeof source !== 'object') return true;
+  return typeof source.kind !== 'string' || source.kind === 'user';
+}
+
 /** Die Stimmung des Menschen aus seinem Text — frustriert, erfreut oder null. */
 export function detectUserMood(text) {
   if (typeof text !== 'string' || text.trim() === '') return null;
@@ -308,18 +333,32 @@ export function beobachten(envelope, payload, eingabe = {}) {
   if (eventType === '') return null;
   const eventPayload = payload ?? envelope;
   const text = textOf(eventPayload);
-  const befund = auswerten({
-    text,
-    // `?? []` wuerde den Default-Parameter von `auswerten` aushebeln:
-    // `undefined` MEINT "die Standardliste", nicht "keine Trigger".
-    triggers: eingabe.triggers,
-    letzterTrigger: eingabe.letzterTrigger ?? null,
-    letzteStimmung: eingabe.letzteStimmung ?? null,
-  });
+  // Stimmung und Anrede kommen aus EINER Nachricht des MENSCHEN — nicht aus
+  // dem System-Prompt, dem Anweisungsblock, dem Live-Block oder der
+  // Skill-Liste (siehe `istMenschenNachricht`).
+  //
+  // GEMESSEN (2026-10-23, echter Turn): mit der ersten Fassung dieses Riegels
+  // (`nur message.received pruefen`) meldete derselbe Turn weiter „frustriert"
+  // — die Zeile stand hinter `persona:system.message`, weil das Wort „hängt"
+  // ueber die eingeblendete AGENTS.md in den System-Prompt wandert. Die Anrede
+  // kam aus demselben Grund: „Anrede erkannt (shinon)" traf den Produktnamen
+  // im Systemtext. Deshalb: nur die Menschen-Nachricht zaehlt.
+  const menschlich = eventType === 'message.received' && istMenschenNachricht(eventPayload);
+  const befund = menschlich
+    ? auswerten({
+      text,
+      // `?? []` wuerde den Default-Parameter von `auswerten` aushebeln:
+      // `undefined` MEINT "die Standardliste", nicht "keine Trigger".
+      triggers: eingabe.triggers,
+      letzterTrigger: eingabe.letzterTrigger ?? null,
+      letzteStimmung: eingabe.letzteStimmung ?? null,
+    })
+    : { trigger: null, triggerGewechselt: false, stimmung: null, stimmungGewechselt: false };
   return {
     eventType,
     eventPayload,
     text,
+    human: menschlich,
     sessionId: typeof envelope?.session_id === 'string' && envelope.session_id !== '' ? envelope.session_id : null,
     traceId: typeof envelope?.trace_id === 'string' ? envelope.trace_id : '',
     trigger: befund.trigger,

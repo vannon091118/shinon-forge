@@ -263,6 +263,46 @@ Miniatur-Baum, verschluckende Marke, unbalancierter Split) und
   Etappe 6 ist mit Etappe 3 erledigt, Etappe 7 mit diesem Stand (siehe
   `docs/CHANGELOG.md`).
 
+### 2.29 Release-Check vor der Freigabe (2026-10-23)
+
+Gefahren, weil ein Schlüssel vorhanden war — nicht, weil etwas offen war. Die
+Prüfkette war grün: `npm run test:full` Exit 0 (Gate 127/127, Fixtures 8,
+Distribution 92, Profilboot 4), `npm run gate:full` 27/27 PASS,
+`npm run gate:test` 964/964, `npm run gate:test:slow` 99/99, `npm run build`
+Exit 0, `npm run zahlen:check` Exit 0, `npm run check:dsh-versions` Exit 0,
+`npm run idioms:check` 15/15, `node scripts/build-client.mjs --check --all`
+bytegleich. Danach sechs echte Modell-Turns headless (Profil shinon) über
+Persona, Prompter, Task-Router, Scoring, Narrative, Events, Hook und Index.
+
+- **Behoben — die Stimmung kam aus der AGENTS.md.** `AGENTS.md:92` enthält
+  „hängt", eine Marke der Stimmungsliste; DSH blendet die Datei als Nachricht
+  mit `source.kind: agent-instructions` ein, und die Persona las jedes Ereignis
+  als Menschen-Text. Ein sachlicher Auftrag meldete viermal „frustriert", zwei
+  der Zeilen hinter `persona:system.message`. Am selben Riegel hing
+  `promptText.remember`: der Live-Block überschrieb die „letzte
+  Menschen-Nachricht", an der die Abschnitts-Gates hängen. Jetzt:
+  `istMenschenNachricht` plus `human` im Rückgabesatz, Stimmung/Anrede nur aus
+  einer Menschen-Nachricht. Beleg: `docs/probes/release-check-2026-10-23.json`,
+  neutraler Auftrag 0 Zeilen (vorher 1), „Das kotzt mich an" genau 1.
+- **Behoben — der Kandidat schwieg.** Ein Datensatz mit
+  `intent=MULTI_STEP_TASK` ergab `GOAL_CANDIDATE` + `ACTIVATION_DISABLED` und
+  **keine** Logzeile (0 Treffer im Lauf); sichtbar war nur „linearer Turn" für
+  die Gegenprobe. Der Router nennt den Kandidaten jetzt mit
+  Aktivierungsgrund (`config.trace`).
+- **Offen — 429 wird zum RangeError** (`release-check-429-wird-zum-rangeerror`,
+  UNKLAR): im `test:full`-Lauf steht `interner Fehler (RangeError … delay …
+  Received -1)` neben `429 Too Many Requests`. Der Pfad liegt im Anbieter-Paket,
+  nicht im Repo. Abnahme: einen echten 429 mit `Retry-After` provozieren und
+  die Klassifikation im Prompter-Protokoll lesen.
+- **Offen — Latenz der Gratisstufe** (`release-check-gratisstufe-latenz`):
+  derselbe Auftrag 45,5 s und 9,3 s; ein Lauf riss `timeout 120` (Exit 124) und
+  brauchte ohne Grenze 18,7 s. Runbook: harte Grenzen dieser Stufe nicht unter
+  180 s.
+- **Nicht geprüft (kein Browser im Arbeitsbaum):** die Client-Hälften (Panels,
+  Widget-Dock, Tooltip, Encounter-Bühne), der Weg durch die echte
+  Web-Oberfläche (`npm run s6:boot`) und die 429-Behandlung des Key-Routers.
+  Das ist der verbleibende Blindfleck vor einer Freigabe — nicht der Host.
+
 ### 2.3 Zurückgestellt (gated — wird erst bei erfüllter Bedingung gebaut)
 
 - Benchmarks und Metriken (4.1–4.6): Aufgaben-Set, DSH-Baseline, Shinon-Messung, Feature-Entscheidung mit Messwert.

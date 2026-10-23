@@ -1,0 +1,56 @@
+[
+  {
+    "id": "release-check-stimmung-nur-vom-menschen",
+    "claim": "Die Persona liest Stimmung und Anrede nur aus einer Nachricht des MENSCHEN. Ein eingeblendeter Anweisungsblock, der Live-Block oder die Skill-Liste setzen sie nicht — auch dann nicht, wenn darin ein Wort der Stimmungsliste steht.",
+    "targets": [
+      "packages/persona/assets/interaction-core.js",
+      "packages/persona/index.js",
+      "scripts/gate/tests/persona-state.part2.test.mjs"
+    ],
+    "expect": "Steht in der AGENTS.md eines Projekts ein Wort der Stimmungsliste, darf kein Turn „User-Lage erkannt\" melden; eine echte Menschen-Nachricht mit demselben Wort muss es weiterhin tun. Faellt der Riegel, ist der Test rot — und ohne ihn meldet jeder Turn in diesem Repo „frustriert\".",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEFUNDEN am 2026-10-23 in echten Turns (Profil shinon, App dsh-headless): ein sachlicher Auftrag („Implementiere bitte eine Retry-Logik … und schreibe einen Test dafuer\") meldete VIERMAL „[shinon-persona] User-Lage erkannt (frustriert)\". Ursache gemessen, nicht geraten: `AGENTS.md:92` enthaelt „eine Zusage, die an der gemessenen Fassung hängt\" — „hängt\" ist eine Marke von MOOD_FRUSTRIERT; DSH blendet die Datei als Nachricht mit `source.kind: agent-instructions` ein, und `beobachten` las JEDES Ereignis als Menschen-Text. Die ersten zwei Zeilen standen hinter `persona:system.message`, also kam das Wort ueber den System-Prompt. Zweiter Schaden am selben Riegel: `promptText.remember` ueberschrieb die „letzte Menschen-Nachricht\" mit dem Live-Block (`source.kind: runtime-context`) — die Abschnitts-Gates lasen danach den Snapshot. BEHOBEN: `istMenschenNachricht(payload)` (fehlende Beschriftung = menschlich, benannte Fremdquelle = nicht) plus `human` im Rueckgabesatz von `beobachten`; Stimmung und Anrede nur fuer `message.received` einer Menschen-Nachricht, `remember` nur noch fuer solche. NACHGEMESSEN im echten Turn: neutraler Auftrag → 0 Stimmungszeilen und 0 „Anrede erkannt\" (vorher 1/1), „Das kotzt mich an\" → genau 1 Stimmungszeile. Mutationsprobe: `istMenschenNachricht` auf `return true` gesetzt → 2 Faelle rot, zurueckgesetzt und 20/20 gruen.",
+    "evidence_note": "Logzeilen, Datei:Zeile, Testzahlen; kein Prompttext, kein Schluessel."
+  },
+  {
+    "id": "release-check-kandidat-wird-benannt",
+    "claim": "Der Task-Router nennt seinen Goal-Kandidaten samt Aktivierungsgrund im Protokoll — auch dann, wenn kein Goal entsteht, weil `activate` aus ist.",
+    "targets": [
+      "packages/task-router/index.js",
+      "scripts/gate/tests/task-router.part1.test.mjs"
+    ],
+    "expect": "Ein Datensatz mit `intentClassification=MULTI_STEP_TASK` und `threshold=2` ist ein Kandidat (Gewicht 2 >= Schwelle 2). Ist der Schalter aus, muss die Zeile den Kandidaten UND `ACTIVATION_DISABLED` nennen; schweigt sie, ist die interessantere Haelfte der Entscheidung nicht nachpruefbar (§16 verspricht Nachpruefbarkeit).",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEFUNDEN am 2026-10-23 im selben echten Turn: der Prompter meldete `intent=MULTI_STEP_TASK`, der Router entschied `GOAL_CANDIDATE:MULTI_STEP_TASK` und `ACTIVATION_DISABLED` — im Lauf stand davon NICHTS (`grep -c \"GOAL_CANDIDATE\\|ACTIVATION_DISABLED\"` = 0). Sichtbar war nur die Gegenprobe `[shinon-task-router] linearer Turn (INTENT_UNDEFINED)`, die der Router fuer die negative Haelfte schreibt. BEHOBEN: `onDecision` schreibt bei `config.trace` eine Zeile `Goal-Kandidat (<reason>) — Aktivierung: <reason>`; die negative Haelfte bleibt unveraendert. Gepinnt durch einen neuen Fall in `scripts/gate/tests/task-router.part1.test.mjs` (Kette mit echtem Prompter-Datensatz); Mutationsprobe: die Zeile abgeschaltet → Fall rot, zurueckgesetzt → 32/32 gruen.",
+    "evidence_note": "Logzeilen, Zaehler, Testzahlen; kein Prompttext."
+  },
+  {
+    "id": "release-check-429-wird-zum-rangeerror",
+    "claim": "Ein Anbieterfehler mit 429 wird als 429 behandelt. Tatsaechlich wird er in einem Pfad zu einem internen `RangeError: The value of \"delay\" is out of range … Received -1` und damit als „interner Fehler\" protokolliert.",
+    "targets": [
+      "packages/prompter/assets/enhancer.js",
+      "packages/prompter/index.js",
+      "node_modules/@deepseek-ai/dsh-llm-pi-ai"
+    ],
+    "expect": "Ein 429 soll als `LLM_FAILED:ProviderError` mit Statuszeile erscheinen. Erscheint stattdessen ein RangeError ueber eine negative Verzoegerung, ist die Ursache eine `Retry-After`-Angabe, die ungeprueft in einen Timer geht — dann ist die Diagnose falsch, auch wenn der Ausgang (Roh-Prompt gilt) richtig ist.",
+    "result": "UNKLAR",
+    "verdict": "ASK",
+    "evidence": "BEOBACHTET am 2026-10-23 in `npm run test:full` (Exit 0, Gate 127/127): `[shinon-prompter] interner Fehler (RangeError: The value of \"delay\" is out of range. It must be >= 0 && <= 4294967295. Received -1) — Roh-Prompt gilt` direkt neben `LLM_FAILED:ProviderError … 429 Too Many Requests`. Der Fehler kommt aus dem Anbieterpfad (pi-ai), NICHT aus dem Repo: `grep -rn delay packages/prompter` findet keine Verzoegerungsrechnung, und `packages/prompter` besitzt keine Retry-Schleife. Offen: ob der echte 429 des Anbieters (mit `Retry-After: -1` oder fehlendem Header) denselben Pfad nimmt — dafuer fehlt ein Lauf gegen einen 429, der weder Testdouble noch Gratisstufe ist. Naechster Schritt: einen Anbieter mit `Retry-After`-Kopf provozieren und die Klassifikation im Prompter-Protokoll lesen.",
+    "evidence_note": "Eine Logzeile aus einem Testlauf; keine Werte, kein Schluessel."
+  },
+  {
+    "id": "release-check-gratisstufe-latenz",
+    "claim": "Ein Turn auf der kostenlosen Stufe desselben Modells dauert zwischen 9 s und 45 s; ein harter Abbruch bei 120 s trifft ihn.",
+    "targets": [
+      "scripts/s6-turn.mjs",
+      "profiles/shinon/fragments/40-agent-model.yml"
+    ],
+    "expect": "Derselbe Auftrag, dieselbe Route, zwei Laeufe: die Latenz streut um den Faktor 5. Wenn ein Lauf die 120-s-Grenze reisst (Exit 124), muss das als Eigenschaft der Stufe im Runbook stehen und nicht als Fehler des Werkzeugs (51 ms) gelesen werden.",
+    "result": "BESTAETIGT",
+    "verdict": "WRITE",
+    "evidence": "GEMESSEN am 2026-10-23, Route `openrouter/nvidia/nemotron-3.5-super-vl:free`: identischer Auftrag 45 506 ms (`turn/start`→`turn/end`) und 9 296 ms; ein dritter Lauf mit sachlicher Frage lief in `timeout 120` und endete mit Exit 124, waehrend derselbe Lauf ohne Grenze 18,7 s brauchte. Werkzeugseite unveraendert: `shinon_goal_micro_state` 51 ms. Folge fuer das Runbook: harte Grenzen fuer diese Stufe nicht unter 180 s ansetzen und den Exit 124 als Stufenbefund fuehren.",
+    "evidence_note": "Zeitstempel und Exit-Codes; kein Prompttext."
+  }
+]

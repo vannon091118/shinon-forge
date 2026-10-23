@@ -393,6 +393,15 @@ function onDecision(ctx, config, runtime, record) {
   const decision = decide(record, config);
   const activation = decision.goal ? activateGoal(ctx, config, runtime, record) : activationVerdict({ reason: 'LINEAR_TURN' });
   if (config.trace && !decision.goal) console.log(`[shinon-task-router] linearer Turn (${decision.reason})`);
+  // Der Kandidat ist die interessantere Haelfte — und er war STUMM: mit
+  // `activate: false` entsteht kein Goal, und im Protokoll stand darueber
+  // nichts. GEMESSEN (2026-10-23, echter Turn im Profil shinon): „Implementiere
+  // … und schreibe einen Test dafuer" ergab `intent=MULTI_STEP_TASK`; der Router
+  // meldete weder Kandidat noch `ACTIVATION_DISABLED` (0 Treffer im Lauf),
+  // auffindbar war nur die Gegenprobe „linearer Turn". Eine Entscheidung, die
+  // ihren Ausgang nicht nennt, ist nicht nachpruefbar — §16 verspricht das
+  // Gegenteil.
+  else if (config.trace) console.log(`[shinon-task-router] Goal-Kandidat (${decision.reason}) — Aktivierung: ${activation.reason}`);
   try {
     const emitted = DecisionSchema(buildDecision(decision, activation));
     if (typeof ctx?.emit === 'function') ctx.emit(DECISION_CHANNEL, emitted);
