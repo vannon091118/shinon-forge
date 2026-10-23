@@ -2008,3 +2008,53 @@ weiter fail-closed prueft (`f5b75a9`); `packages/better-errors`, dessen
 gesamte Wirkung ein Logaufruf und eine Faehigkeitszeile war (`4208414`).
 
 **Anker:** `e52f6f4`..`4208414` · Pfade: `docs/contracts/knowledge-kinds.json`, `profiles/shinon/fragments/40-agent-model.yml`, `packages/scoring/assets/scoring-core.js`, `scripts/gate/plugins/probe-twin.mjs`, `package.json`, `scripts/lib/preflight/policy.mjs`, `scripts/lib/dsh-versions.mjs`, `packages/prompter/assets/capabilities.json` · Belege: `npm test` Exit 0 (126 Schritte), `npm run test:full` Exit 0, `gate:test` 904/904, `gate:test:slow` 99/99, `gate:full` PASS 26/26, `npm run build` Exit 0 (23 Pakete, 310 Dateien), `check:dsh-versions` PASS, `zahlen:check` Exit 0.
+
+**Die Client-Hälften werden montiert, und der Bestand fällt.**
+
+Am Abend geht die letzte Etappe des Plans, die noch offen war. Acht
+Client-Hälften waren über Jahre von Hand gespiegelte Monolithen: codingmon mit
+3523 Zeilen, markers 638, token-usage 583, traceability 548, dashboard 487,
+popup 423, core 418, prompter 289. Der Struktur-Riegel hatte sie nie
+freigesprochen, sondern als `bestand` benannt — ein Eintrag, der nur sinken
+durfte und deshalb ehrlich war, aber auch bequem: er sagte „zu groß" und ließ
+die Datei stehen. Jetzt steht sie nicht mehr da. Die Zeilen liegen als 38
+Quellteile unter `packages/<dir>/assets/client/` (Median 179, Maximum 514),
+`client.js` ist ihre wörtliche Verkettung, und der Bestand ist aus
+`docs/contracts/structure.json` gestrichen. Der Umbau ist strukturell und das
+ist gemessen: nach Abzug der GENERIERT-Kopfzeile und der Teile-Marken ist jede
+der acht Dateien zeichengleich zu ihrem Stand in HEAD.
+
+Der Weg dahin ist kein neuer Bundler, sondern die Umkehrung einer
+Selbstverständlichkeit: ein Client-Bundle ist EIN selbstständiges Stück, es
+kann zur Laufzeit nichts aus `assets/` nachladen — also wird es aus Teilen
+gebaut, die wörtlich seine Zeilen sind (`scripts/build-client.mjs`), und der
+Schnitt ist eine Werkzeugaufgabe (`scripts/assets/split-client.mjs`), nicht
+Handarbeit an 3400 Zeilen. Damit es nur EINE Stelle gibt, die Marken liest und
+schreibt, ist die Blocksuche aus `scripts/assets/build-sprites.mjs` nach
+`scripts/lib/embed-blocks.mjs` gezogen.
+
+Der Review am Ende findet drei echte Fehler, und alle drei sind unangenehm
+leise. Der Splitter hatte generierte Blöcke zerschnitten — der eingebettete
+Encounter-Kern lag quer über zwei Teile, und der erste Generatorlauf nahm beim
+Ersetzen „seines" Rumpfes die Teile-Marken mit, wie ein Regal, das seine eigenen
+Fächer beschriftet und dabei die Beschriftung der Nachbarfächer abreißt. Der
+Splitter sperrt jetzt jede Markenfamilie und bricht bei unbalancierten Marken
+ab; ein Einbetter ersetzt keinen Rumpf, der eine fremde Marke enthält. Der
+Sprites-Einbetter schrieb in einen verdrahteten Teilenamen (`10-daten.js`), den
+es nie gab — die Einbetter suchen ihren Block jetzt (`findBlockFile`, genau ein
+Treffer). Und die GENERIERT-Marke in `scripts/lib/structure.mjs` las die ersten
+40 Zeilen statt den Dateikopf: ein Testfixtur-String zählte damit als neunte
+generierte Datei, und eine beliebig große Datei hätte sich mit einer Zeile im
+Kommentar von ihrer Grenze befreit. Sie gilt jetzt nur im Kopfkommentar und nur
+für die Client-Hälfte, wo ein Test die Bytegleichheit nachrechnet.
+
+**Anker:** `d9aa43d` · Pfade: `scripts/build-client.mjs`,
+`scripts/assets/split-client.mjs`, `scripts/lib/embed-blocks.mjs`,
+`packages/codingmon/assets/client/README.md`,
+`scripts/gate/tests/client-montage.test.mjs`,
+`docs/contracts/structure.json`, `docs/ZAHLEN.md` §1.2 · Belege:
+`node scripts/build-client.mjs --check --all` 8/8 bytegleich, `npm test` Exit 0
+(127 Schritte), `npm run gate:test` 933/933 (11,2 s), `npm run gate:test:slow`
+99/99 (7,9 s), `npm run test:full` Exit 0 (Gate 127, Fixtures 8, Distribution
+92, Profilboot 4), `npm run test:codingmon` 137/137, `npm run gate:full` 27/27
+PASS, `npm run build` Exit 0 (23 Pakete, 317 Dateien).
