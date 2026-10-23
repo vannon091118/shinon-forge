@@ -35,6 +35,7 @@ import { CONTEXT_STATES, INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE, assertVocabu
 import { parseNote, reviewNotes } from './note-core.js';
 import { loadAbortReasons, loadCapabilityMap, loadContext, loadJsonContract, loadNoteRules, loadSkillRules } from './prompt-files.js';
 import { SALVAGE_CONTRACT, SALVAGE_MEMO_ID, SALVAGE_NAMESPACE, emptySalvage, salvageCountOf, validateSalvage, withSalvageCount } from './salvage-store.js';
+import { readShinonMd } from './shinon-md.js';
 import { fingerprintRoot, resolveWorkspaceRoot } from './workspace.js';
 
 /**
@@ -401,6 +402,28 @@ export function loadRuntime(ctx, config) {
   const workspace = { ..._fp, source: _ws.source };
   console.log(`[shinon-prompter] Workspace: ${workspace.root} (id ${workspace.rootId}, quelle ${workspace.source})`);
 
+  // SHINON.md (Pflichtblock, wenn vorhanden): die EINZIGE Anweisungsdatei aus
+  // dem Projekt — gelesen, geprueft und komprimiert, wie ein Zettel, aber ohne
+  // Relevanzranking: was da steht, gilt. Fehlt die Datei, laeuft der Schritt
+  // ohne sie weiter (fail-open); was schiefgeht, steht im Log mit Grund.
+  let shinonText = null;
+  let shinonMdReason = 'SHINON_MD_AUS';
+  if (typeof config.shinonMdPath === 'string' && config.shinonMdPath !== '') {
+    try {
+      const gelesen = readShinonMd({
+        mdPath: config.shinonMdPath,
+        root: workspace.root,
+        warn: (message) => console.warn(`[shinon-prompter] ${message}`),
+        log: (message) => console.log(`[shinon-prompter] ${message}`),
+      });
+      shinonMdReason = gelesen.reason;
+      shinonText = gelesen.text === '' ? null : gelesen.text;
+    } catch (error) {
+      console.error(`[shinon-prompter] SHINON.md nicht verwendbar (${error?.message}) — kein Anweisungsblock`);
+      shinonMdReason = 'SHINON_MD_UNLESBAR';
+    }
+  }
+
   // MAX-Quellen (S1): konfigurierte Datei > Project Index. Der Project Index
   // traegt den Baum ohnehin (eigener Host, eigener Dienst); ein zweiter Index
   // im Prompter waere dieselbe Arbeit mit anderem Speicherformat.
@@ -511,7 +534,7 @@ export function loadRuntime(ctx, config) {
   if (typeof config.probeJournalPath === 'string' && config.probeJournalPath !== '') {
     probeJournalPath = isAbsolute(config.probeJournalPath) ? config.probeJournalPath : join(workspace.root, config.probeJournalPath);
   }
-  const runtime = { context, contextState, noteRules, skillRules, capabilityMap, abortTable: abortRead.table, intentRules, intentMemory, intentMemoryPath, probeJournalPath, journalWarned: false, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, salvageCounts: new Map(), salvageNamespace: typeof config.salvageNamespace === 'string' ? config.salvageNamespace : SALVAGE_NAMESPACE, salvageState: null, salvageLoaded: false, salvagePersist: true, salvageWarned: false };
+  const runtime = { context, contextState, noteRules, skillRules, capabilityMap, abortTable: abortRead.table, intentRules, intentMemory, intentMemoryPath, probeJournalPath, journalWarned: false, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, lastShinonText: shinonText, shinonMdReason, salvageCounts: new Map(), salvageNamespace: typeof config.salvageNamespace === 'string' ? config.salvageNamespace : SALVAGE_NAMESPACE, salvageState: null, salvageLoaded: false, salvagePersist: true, salvageWarned: false };
   // Die Ablage kommt ueber dieselbe optionale Naht wie der Kontext: `ctx.get`,
   // kein `inject` — ein Profil ohne Project Index montiert den Prompter weiter.
   // Ein ERFOLGREICH gefundener Dienst wird gemerkt; ein fehlender nicht, denn

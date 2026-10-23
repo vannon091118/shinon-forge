@@ -1727,3 +1727,21 @@ gesunken; der Bestandseintrag wurde gesenkt, nicht erhöht.
 `packages/project-index/assets/defaults.json`,
 `packages/prompter/assets/pre-step.js` · Offen bleiben die Etappen 4–8 aus
 `docs/ROADMAP.md` §2.25.
+
+**Fremde Anweisung im eigenen Prompt — und was jetzt davor steht.**
+Gemessen an der Sitzung `session-04a3db92` (Fremdprojekt
+`codingmon-workspace`, Preset `shinon`): der DSH lud dort `AGENTS.md` des
+fremden Projekts und stellte es als `<system-reminder>`-Nutzernachricht in
+den Prompt; gleichzeitig begann der System-Prompt mit zwei englischen Sätzen
+(Harness-Identität, Modell-Prefix) vor der deutschen Persona. Die Antwort
+steht in drei Teilen: `SHINON.md` ist die einzige Anweisungsdatei, die das
+Profil lädt (`profiles/shinon/fragments/15-anweisungen.yml`,
+`instructionFileCandidates: ['SHINON.md']`); dieselbe Datei reist als
+geprüfter, komprimierter Pflichtblock im Runtime-Context an erster Stelle
+(`packages/prompter/assets/shinon-md.js`, gelesen/geprüft/gekuerzt beim
+Mounten, Gründe `SHINON_MD_OK`/`GEKUERZT`/`FEHLT` u. a.); die englische
+Harness-Identität ist aus (`includeHarnessIdentity: false`), der deutsche
+Prefix steht. Der Profil-Dump belegt beide Einträge; `shinon-md.test.mjs`
+pinnt Kern, Kanalordnung und Profil mit 9/9. Determinismus spricht kein
+Gameplay mehr, sondern Shinon-Deutsch. Offen bleiben Panel-Schranke,
+Nachrichten-Kennzeichnung und Turn-Budgets (`docs/ROADMAP.md` §2.26).

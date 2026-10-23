@@ -40,6 +40,12 @@ export const CONTEXT_ORDER = 300;
 /** Der Vertrag des Blocks — er steht im Block, damit der Leser ihn kennt. */
 export const CONTEXT_CONTRACT = 'shinon.prompter/context-v1';
 
+// Die Projekt-Anweisung reist als ERSTER Block: sie ist die einzige Anweisung
+// aus dem Projekt und steht damit vor Wissen, Auswahl und Brief — so wie die
+// Persona vor dem Kontext steht. Der Renderer kennt nur die Form; Lesen,
+// Pruefen und Kuerzen gehoeren `shinon-md.js` (eine Quelle, kein Echo).
+import { renderShinonBlock } from './shinon-md.js';
+
 /**
  * Den Projektkontext als EINEN Runtime-Context-Text rendern.
  *
@@ -87,6 +93,8 @@ export function renderContextBlock(context) {
  * @param {Function} [quellen.wissen] der Wissensblock (oder null)
  * @param {Function} [quellen.brief] der Aufgabenbrief — Routing-Metadaten
  *   (wer zustaendig ist, wo der Beleg liegt), nur bei eindeutigem Treffer
+ * @param {string|Function} [quellen.shinon] der gepruefte SHINON.md-Text
+ *   (Pflichtblock, wenn vorhanden) oder ein Leser dafuer
  * @param {Function} [quellen.spricht] liefert der Kanal in dieser Sitzung?
  * @returns {Function} der Disposer
  */
@@ -95,7 +103,7 @@ export function registerContext(sp, quellen = {}) {
     console.error('[shinon-prompter] systemPrompt-Dienst ohne context() — der Projektkontext kommt NICHT an');
     return () => {};
   }
-  const { context = () => null, wissen = () => null, brief = () => null, spricht = () => true } = quellen;
+  const { context = () => null, wissen = () => null, brief = () => null, shinon = null, spricht = () => true } = quellen;
   return sp.context({
     name: CONTEXT_NAME,
     order: CONTEXT_ORDER,
@@ -104,8 +112,11 @@ export function registerContext(sp, quellen = {}) {
     interpolate: false,
     text: (assemblyCtx) => {
       if (typeof spricht === 'function' && !spricht(assemblyCtx)) return '';
-      const kontext = typeof context === 'function' ? context() : null;
+      const anweisung = typeof shinon === 'function' ? shinon() : shinon;
       const blokte = [];
+      const pflicht = renderShinonBlock(anweisung);
+      if (pflicht !== '') blokte.push(pflicht);
+      const kontext = typeof context === 'function' ? context() : null;
       const gerendert = renderContextBlock(kontext);
       if (gerendert !== '') blokte.push(gerendert);
       const wissensBlock = typeof wissen === 'function' ? wissen() : null;

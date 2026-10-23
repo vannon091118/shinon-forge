@@ -91,6 +91,7 @@
       "seam-io.test.mjs",
       "seams-core.test.mjs",
       "secrets-vault.test.mjs",
+      "shinon-md.test.mjs",
       "skill-discovery.test.mjs",
       "skill-lifecycle-writer.test.mjs",
       "slot-ids.test.mjs",

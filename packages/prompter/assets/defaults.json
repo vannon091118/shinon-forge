@@ -16,6 +16,7 @@
     "learnedBlocks": ".shinon/blocks.learned.json",
     "intentMemory": ".shinon/intent-memory.json",
     "probeJournal": ".shinon/one-shot-journal.jsonl",
-    "intentPatterns": "./assets/intent-rules.json"
+    "intentPatterns": "./assets/intent-rules.json",
+    "shinonMd": "SHINON.md"
   }
 }

@@ -21,6 +21,8 @@ const FRAGMENTS = join(ROOT, 'profiles/shinon/fragments');
 const ENTRY_ORDER = [
   'shinon-task-router',
   'shinon-project-index',
+  'system-prompt',
+  'agent-instructions',
   'ui-brand-official',
   'ui-settings-general',
   'llm-pi-ai',

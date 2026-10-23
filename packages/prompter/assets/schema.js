@@ -200,6 +200,12 @@ export const Config = z.object({
    */
   intentPatternsPath: z.string().default(PATH_DEFAULTS.intentPatterns),
   /**
+   * Die Projekt-Anweisung (`SHINON.md`, relativ zum WORKSPACE). Leer = nicht
+   * laden. Vorhanden = Pflichtblock im Runtime-Context: gelesen, geprueft
+   * und komprimiert (`assets/shinon-md.js`), nie still uebergangen.
+   */
+  shinonMdPath: z.string().default(PATH_DEFAULTS.shinonMd),
+  /**
    * Ablage des Intent-Gedächtnisses (relativ zum WORKSPACE, nicht zum Host-CWD).
    * Leer = kein Gedächtnis: dann bleibt jede Gewichtung bei 1, und kein Turn
    * schreibt eine Datei. Die Zählung über alle Läufe ist Projektwissen und

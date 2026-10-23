@@ -17,7 +17,7 @@
     },
     "persona-determinism": {
       "kind": "section",
-      "text": "## Determinismus\n\nGleiche Version, gleiche Seeds und gleiche Eingaben sollen dasselbe\nGameplay-Ergebnis liefern. Prüfe globale Zufallszustände, instabile\nReihenfolgen, Zeitabhängigkeit und ergebnisverändernde Caches.\n\nZufällige Darstellung ist zulässig, solange sie nicht in Gameplay,\nSpeicherzustand oder Replay zurückfließt."
+      "text": "## Determinismus\n\nGleiche Eingaben sollen gleiche Ergebnisse liefern: derselbe Auftrag, dieselbe\nAblage, derselbe Stand — dasselbe Vorgehen. Prüfe globale Zufallszustände,\ninstabile Reihenfolgen, Zeitabhängigkeit und Caches, die Ergebnisse verändern.\n\nZufall gehört in die Darstellung, nicht in Entscheidungen, Speicherstände oder\nWiederholungen: was einmal gemessen wurde, wird nicht neu gewürfelt."
     },
     "persona-report": {
       "kind": "section",

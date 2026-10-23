@@ -13,6 +13,7 @@
 |---|---|---|
 | [`../README.md`](../README.md) | Shinons Vorstellung, Quickstart, FAQ und Wegweiser zu den technischen Docs | deutsch |
 | [`../AGENTS.md`](../AGENTS.md) | Verbindliche Regeln für Arbeit am Code: Konventionen, Pitfalls, Commit-Pflichten | deutsch |
+| [`../SHINON.md`](../SHINON.md) | Einzige Anweisungsdatei, die der DSH aus dem Projekt lädt (`SHINON.md` statt `AGENTS.md`); wird zusätzlich als geprüfter Pflichtblock in den Runtime-Context injiziert | deutsch |
 | [`ZAHLEN.md`](ZAHLEN.md) | **Einziger** Eigentümer aller harten Zahlen (Bestand §1, Prüfläufe §2, rote Befunde §3) | deutsch |
 | [`TAGEBUCH.md`](TAGEBUCH.md) | Erzählte Timeline; jedes Kapitel an Commit-SHA-Bereiche und Pfade gebunden | deutsch |
 | [`CHANGELOG.md`](CHANGELOG.md) | Kompakte, übertragbare Änderungs- und Agenten-Übergabe mit PR-/CI-Belegen | deutsch |

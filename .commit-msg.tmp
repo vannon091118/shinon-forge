@@ -1,22 +1,33 @@
-Die Übergabe steht wie ein Wegweiser neben dem Weg, statt in ihm zu liegen
+Die Anweisung steht jetzt wie ein Hausbrief im eigenen Kasten, nicht mehr als fremde Post im Flur
 
-Mit `7d8229b` sind die Etappen 2 und 3 des freigegebenen Plans committet: die
-Prompt-Texte und Vorgaben liegen als Daten, der Profilpatch entsteht aus zehn
-Fragmenten, und der MAX-Kontext wird gegen sein Budget gekuerzt. Was dieser
-Commit nachzieht, ist die Spur fuer den naechsten Agenten: `docs/ROADMAP.md`
-nennt die Etappen 4 bis 8 mit je einer Abnahme (Host-Monolithen, Client-Quellen,
-Gate-Test-Teilung, die restlichen Funktionsluecken, die offenen Audit-Zeilen),
-`docs/CHANGELOG.md` traegt die uebertragbare Kurzfassung samt Belegen, und
-`docs/TAGEBUCH.md` erzaehlt die Etappen im bestehenden Kapitel vom 2026-10-23
-weiter, mit Commit-Anker `7d8229b` und den beruehrten Pfaden.
+Gemessen an der Sitzung `session-04a3db92` im Fremdprojekt
+`codingmon-workspace` (Preset `shinon`): der DSH lud dort `AGENTS.md` des
+fremden Projekts und stellte es als `<system-reminder>`-Nutzernachricht in
+den Prompt — fremde Anweisungen im eigenen Lauf. Gleichzeitig begann der
+System-Prompt mit zwei englischen Saetzen (Harness-Identitaet,
+Modell-Prefix) vor der deutschen Persona: zweisprachig statt einheitlich.
 
-Die Zahlen sind gemessen und nicht behauptet: `npm test` Exit 0 mit 131
-bestandenen Schritten, `npm run gate:test` Exit 0 mit 899 von 899 Tests,
-`node scripts/profile-patch.mjs --check` bytegleich ueber zehn Fragmente,
-`npm run zahlen:check` Exit 0. Die Persona schrumpfte von 1328 auf 1197 Zeilen,
-der Bestandseintrag in `docs/contracts/structure.json` wurde gesenkt. Die
-Roadmap behauptet keine erledigte Etappe, die keinen Lauf hat; offen bleibt
-ausdruecklich Etappe 4 bis 8, damit niemand den Zwischenstand fuer den Schluss
-haelt.
+Die Antwort hat drei Teile. Erstens laedt der DSH in diesem Profil NUR noch
+`SHINON.md` (`instructionFileCandidates`, lokal `SHINON.local.md`) — kein
+`AGENTS.md`, kein `CLAUDE.md`; festgehalten im neuen Profilfragment
+`profiles/shinon/fragments/15-anweisungen.yml`. Zweitens reist dieselbe
+Datei als gepruefter, komprimierter Pflichtblock im Runtime-Context an
+erster Stelle: `packages/prompter/assets/shinon-md.js` liest beim Mounten,
+prueft lesbar/nicht-leer/Byte-Grenze/NUL-Freiheit mit benanntem Grund
+(`SHINON_MD_OK`, `GEKUERZT`, `FEHLT`, `ZU_GROSS`, `UNLESBAR` u. a.) und
+kuerzt deterministisch am Abschnittsende mit Schnittmarkierung; was fehlt,
+ergibt keinen Block (fail-open). Drittens faellt die englische
+Harness-Identitaet weg (`includeHarnessIdentity: false`) und ein deutscher
+Prefix eroefnet den Prompt — EINE Sprache, Werkzeug- und Vertragsnamen
+bleiben Verweise. Der Determinismus-Text spricht kein Gameplay mehr.
+
+Belege: `scripts/gate/tests/shinon-md.test.mjs` 9/9 (Kern, Kanalordnung,
+Profil als Text), `scripts/gate/tests/profile-patch.test.mjs` 2/2,
+`npm test` Exit 0 mit 131 Schritten, `npm run gate:test` Exit 0 mit 908 von
+908 Tests, echter Profil-Dump mit `includeHarnessIdentity: false` und
+`instructionFileCandidates: [SHINON.md]`, `npm run zahlen:check` Exit 0.
+Offen bleiben Panel-Schranke, Nachrichten-Kennzeichnung und Turn-Budgets in
+`docs/ROADMAP.md` §2.26 — wie ein Wegweiser am Abzweig, nicht wie ein
+Versprechen.
 
 created by VANNON — Volatile Agent Needing No Other Nonsense, Never Overly Nice, Never Average Vibe

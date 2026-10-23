@@ -1630,6 +1630,10 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     // Phase 4: die gelernte Baustein-Ablage gehoert dem PROJEKT. Der Vorgabewert
     // ist die eine Konstante des Pakets, nicht ein zweites Literal.
     blocksLearnedPath: bundle.LEARNED_DEFAULT_PATH,
+    // SHINON.md: die EINZIGE Anweisungsdatei aus dem Projekt (statt AGENTS.md).
+    // Der Vorgabewert ist hier GEPINNT — ein stiller Namenswechsel wuerde die
+    // Datei des Projekts verfehlen und den Pflichtblock kosten.
+    shinonMdPath: 'SHINON.md',
   });
 });
 

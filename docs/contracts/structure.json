@@ -129,12 +129,16 @@
     "scripts/lib/repo.mjs": 1268
   },
   "herleitung": "Grenze = 3 × Median der Klasse, auf 50 gerundet, mindestens 100 — Median gemessen am 2026-10-20 über alle Dateien der Klasse; alles darüber steht im bestand.",
-  "bestandAusnahmen": {
-    "scripts/gate/tests/client-activation.test.mjs": {
-      "grund": "Der reale Client-Activation-Abnahmetest wächst mit belegten Bundle-Vertragsfällen; die Obergrenze hält ihn teilbar und lesbar.",
-      "datum": "2026-10-22",
-      "maxZeilen": 650
-    }
+  "bestandAusnahmen": { "scripts/gate/tests/client-activation.test.mjs": {
+  "grund": "Der reale Client-Activation-Abnahmetest wächst mit belegten Bundle-Vertragsfällen; die Obergrenze hält ihn teilbar und lesbar.",
+  "datum": "2026-10-22",
+  "maxZeilen": 650
+ },
+ "scripts/gate/tests/prompter-contract.test.mjs": {
+  "grund": "Der Vertrags-Abnahmetest wächst mit jedem gepinnten Config-Default (zuletzt shinonMdPath); die Obergrenze hält ihn teilbar und lesbar.",
+  "datum": "2026-10-23",
+  "maxZeilen": 2210
+ }
   },
   "vertraege": {
     "docs/contracts/abort.json": {

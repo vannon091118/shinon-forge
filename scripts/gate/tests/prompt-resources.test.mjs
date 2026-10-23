@@ -81,6 +81,7 @@ test('die Vorgabewerte stehen als Daten und die Schemas ziehen von dort', () => 
   assert.equal(prompterDefaults.notesPath, prompter.paths.notesDir);
   assert.equal(prompterDefaults.skillsPath, prompter.paths.skillsDir);
   assert.equal(prompterDefaults.blocksLearnedPath, prompter.paths.learnedBlocks);
+  assert.equal(prompterDefaults.shinonMdPath, prompter.paths.shinonMd);
 
   const index = read('packages/project-index/assets/defaults.json');
   assert.equal(index.contract, 'shinon.project-index/defaults-v1');

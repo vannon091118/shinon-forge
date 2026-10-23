@@ -128,6 +128,34 @@ nennt ihre Abnahme, und keine gilt ohne Exit-Code und benannten Lauf.
   und die Audit-Tabelle auf den gemessenen Stand ziehen.
   Abnahme: `npm run gate:test` Exit 0, `npm test` Exit 0, Audit-Zeile mit Beleg.
 
+### 2.26 Befunde aus der Fremdprojekt-Sitzung `session-04a3db92` (2026-10-23, offen)
+
+Gemessen an einer echten Sitzung im Fremdprojekt `codingmon-workspace`
+(Preset `shinon`, Route `openrouter`/`nvidia/nemotron-3.5-super-vl:free`):
+
+- **Erledigt (dieser Stand):** fremde `AGENTS.md` als `<system-reminder>` im
+  Prompt und zwei englische System-Sätze vor der deutschen Persona. Antwort:
+  `SHINON.md` als einzige Anweisungsdatei (Profilfragment
+  `15-anweisungen.yml`, Pflichtblock im Runtime-Context), englische
+  Harness-Identität aus, deutscher `personaPrefix`.
+  Abnahme: `scripts/gate/tests/shinon-md.test.mjs` 9/9, Profil-Dump zeigt
+  `includeHarnessIdentity: false` und `instructionFileCandidates: [SHINON.md]`.
+- **Offen — Client-Panels ohne Workspace-Schranke:** Persona-Abschnitte sind
+  pro Sitzung am Workspace gated (belegt), aber die Browser-Panels
+  (CodingMon-Workbench u. a.) montieren unterschiedslos in jeder Sitzung.
+  Abnahme: ein Gate-Test, der im Fremdprojekt keine Shinon-Panels montiert
+  sieht — plus die Architektur-Entscheidung, woher der Client den
+  Sitzungs-Workspace kennt.
+- **Offen — veredelte Nachricht als Nutzertext:** der angenommene One-Shot
+  ersetzt die Nutzernachricht durch die veredelte Fassung (`replacePrompt`);
+  im Transkript steht dann der Prompter-Text als eigene Nachricht. Vertraglich
+  korrekt, aber überraschend. Abnahme: Kennzeichnung ersetzter Nachrichten
+  oder ein Schalter `alwaysEnhance` je Sitzung — mit gepinntem Vertragstest.
+- **Offen — Laufzeit kleiner Aufgaben:** Turn 3 brauchte ~10 Minuten für 12
+  Schritte bei 50 Tool-Aufrufen (Repo-Analyse durchs Modell). Kein Code-Befund
+  — der Index antwortet in Millisekunden; die Zeit liegt im Modell und den
+  Werkzeugrunden. Abnahme: Messung mit Token-/Zeit-Budget je Turn, kein Gefühl.
+
 ### 2.3 Zurückgestellt (gated — wird erst bei erfüllter Bedingung gebaut)
 
 - Benchmarks und Metriken (4.1–4.6): Aufgaben-Set, DSH-Baseline, Shinon-Messung, Feature-Entscheidung mit Messwert.

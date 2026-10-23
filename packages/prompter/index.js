@@ -216,6 +216,10 @@ export function apply(ctx, config) {
           const brief = runtime.lastBriefText ?? null;
           return typeof brief === 'string' && brief !== '' ? brief : null;
         },
+        // SHINON.md reist als Pflichtblock — gelesen, geprueft und komprimiert
+        // beim Mounten (`runtime.lastShinonText`); fehlt die Datei, faellt der
+        // Block weg, statt eine Anweisung zu behaupten.
+        shinon: () => runtime.lastShinonText ?? null,
         // Der WISSENSBLOCK wird HIER gelesen, nicht aus dem Runtime: der
         // Snapshot-Dienst ist der Besitzer, und der Pre-Step laeuft NACH der
         // Assembly (agent-loop:907 vor :909) — dort waere der Block noch leer.
