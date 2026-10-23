@@ -1,7 +1,50 @@
 import z from '@deepseek-ai/schemastery';
-// Die Regel „letzte menschliche Nachricht mit Text" hat EINE Definition:
-// `@shinon/seams` (`lastHumanMessage`) — der Kern ist importfrei.
-import { PROMPTER_DECISION_CHANNEL, lastHumanMessage } from '@shinon/seams/core';
+// Der Kanal kommt aus `@shinon/seams`, nicht als eigenes Literal.
+import { PROMPTER_DECISION_CHANNEL } from '@shinon/seams/core';
+// Die ENTSCHEIDUNG (§16) steht in `assets/decision-core.js`, die Projektion
+// (§18) in `assets/micro-state.js`. Dieser Eintrag registriert nur noch: er
+// reicht die oeffentlichen Namen weiter, damit die Paketflaeche dieselbe bleibt.
+import {
+  CONTRACT,
+  SOURCE_CONTRACT,
+  activationVerdict,
+  buildDecision,
+  decide,
+  readObjective,
+} from './assets/decision-core.js';
+import {
+  GOAL_SERVICE,
+  MICRO_NO_GOAL,
+  MICRO_STATE_CONTRACT,
+  MICRO_STATE_FIELDS,
+  MICRO_STATE_SERVICE,
+  MICRO_UNAVAILABLE,
+  MicroStateSchema,
+  NEXT_ACTIONS,
+  createMicroStateService,
+  nextActionFor,
+  projectMicroState,
+} from './assets/micro-state.js';
+
+export {
+  CONTRACT,
+  GOAL_SERVICE,
+  MICRO_NO_GOAL,
+  MICRO_STATE_CONTRACT,
+  MICRO_STATE_FIELDS,
+  MICRO_STATE_SERVICE,
+  MICRO_UNAVAILABLE,
+  MicroStateSchema,
+  NEXT_ACTIONS,
+  SOURCE_CONTRACT,
+  activationVerdict,
+  buildDecision,
+  createMicroStateService,
+  decide,
+  nextActionFor,
+  projectMicroState,
+  readObjective,
+};
 
 /**
  * shinon-task-router — Phase 5/6, Plan §16 und §17.
@@ -83,9 +126,6 @@ import { PROMPTER_DECISION_CHANNEL, lastHumanMessage } from '@shinon/seams/core'
  * Aktivierungsaufruf — nicht die Urteilskraft eines Modells.
  */
 
-/** Vertragsname der Router-Entscheidung. */
-export const CONTRACT = 'shinon.task-router/decision-v1';
-
 /**
  * Der Eingang: der Provenienz-Datensatz des Prompt-Enhancers. Die Klasse darin
  * stammt aus dem Runtime-Resolver des Prompters (Text-Patterns, kein Modell) —
@@ -97,7 +137,6 @@ export const CONTRACT = 'shinon.task-router/decision-v1';
  * gar nicht gelistet. Der Naht-Kern ist importfrei, kostet also nichts.
  */
 export const SOURCE_CHANNEL = PROMPTER_DECISION_CHANNEL;
-export const SOURCE_CONTRACT = 'shinon.prompter/result-v1';
 
 /** Der Ausgang: die Entscheidung als Datensatz. */
 export const DECISION_CHANNEL = 'shinon/task-router/decision';
@@ -107,9 +146,6 @@ export const PRE_STEP_EVENT = 'agent/pre-step';
 
 /** Lifecycle-Ereignis, nach dem eine vorgemerkte Sitzung nicht mehr lebt. */
 export const DISPOSED_EVENT = 'agent/disposed';
-
-/** Der Dienstname der Goal-Domaene in `ctx.goals`. */
-export const GOAL_SERVICE = 'goals';
 
 // Das §16-Vokabular und seine Gewichte stehen in `assets/intent-policy.js`
 // (importfrei, reine Daten). Hier bleiben nur die öffentlichen Namen.
@@ -210,87 +246,6 @@ export const DecisionSchema = z.object({
   maxGoalRounds: z.number().required(),
 });
 
-/**
- * Die Entscheidung. Reine Funktion: dieselbe Eingabe und dieselbe Konfiguration
- * ergeben dieselbe Ausgabe — es gibt keinen Zustand, keine Uhr, kein Netz.
- *
- * Die Reihenfolge der Pruefungen ist die Fail-Richtung: erst die HERKUNFT
- * (fremder Datensatz -> nichts), dann das VOKABULAR, dann die SCHWELLE, dann die
- * SUBSTANZ. Sie steht in DECISION_RULES, untereinander statt hintereinander.
- * Jede Stufe nennt ihren Grund, weil eine Entscheidung, die ihren Grund
- * verschweigt, nicht nachpruefbar ist.
- */
-/**
- * Die Regeln als TABELLE: die erste Zeile, deren `when` zutrifft, entscheidet.
- * Jede Zeile bringt ihren Grund UND die Felder mit, die in den Datensatz
- * gehoeren — ein neuer Grund ist damit eine Datenzeile, und die Fail-Reihenfolge
- * ist eine Liste statt einer sechsstufigen if-Leiter mit lokaler Closure.
- *
- * Die letzte Zeile trifft immer: sie ist der Kandidat.
- */
-const DECISION_RULES = [
-  { goal: false, when: (f) => f.record === null || typeof f.record !== 'object', reason: () => 'NO_RECORD', fields: () => ({}) },
-  { goal: false, when: (f) => f.record.contract !== SOURCE_CONTRACT, reason: () => 'FOREIGN_RECORD', fields: (f) => ({ intent: f.intent }) },
-  { goal: false, when: (f) => f.intent === '', reason: () => 'NO_CLASSIFICATION', fields: (f) => ({ intent: f.intent }) },
-  { goal: false, when: (f) => f.intent === INTENT_UNDEFINED, reason: () => 'INTENT_UNDEFINED', fields: (f) => ({ intent: f.intent }) },
-  { goal: false, when: (f) => !INTENT_CLASSES.includes(f.intent), reason: (f) => `UNKNOWN_CLASS:${f.intent}`, fields: (f) => ({ intent: f.intent }) },
-  { goal: false, when: (f) => f.weight < f.threshold, reason: (f) => `BELOW_THRESHOLD:${f.weight}<${f.threshold}`, fields: (f) => ({ intent: f.intent, weight: f.weight }) },
-  { goal: false, when: (f) => !(f.weight > 0), reason: () => 'NO_GOAL_WEIGHT', fields: (f) => ({ intent: f.intent, weight: f.weight }) },
-  { goal: false, when: (f) => f.rawLength < f.minRawLength, reason: (f) => `BELOW_MIN_RAW_LENGTH:${f.rawLength}<${f.minRawLength}`, fields: (f) => ({ intent: f.intent, weight: f.weight, rawLength: f.rawLength }) },
-  { goal: true, when: () => true, reason: (f) => `GOAL_CANDIDATE:${f.intent}`, fields: (f) => ({ intent: f.intent, weight: f.weight, rawLength: f.rawLength }) },
-];
-
-/**
- * Die Tatsachen EINMAL messen: Schwelle, Substanzgrenze und die aus dem Datensatz
- * gelesenen Werte. Eine Laenge ist keine Zahl, die negativ sein kann: was nicht
- * als positive Zahl gemessen wurde, gilt als "nicht gemessen" (0) und damit als
- * zu kurz. Die Richtung ist bewusst streng — die Alternative waere, einer
- * unbrauchbaren Angabe Zieltauglichkeit zuzusprechen.
- */
-function decisionFacts(record, config) {
-  const threshold = Number.isFinite(config.threshold) ? config.threshold : DEFAULT_THRESHOLD;
-  const minRawLength = Number.isFinite(config.minRawLength) ? config.minRawLength : DEFAULT_MIN_RAW_LENGTH;
-  // Die Klasse kommt aus dem Datensatz des Prompters — dort hat sie der
-  // Runtime-Resolver aus dem Text abgeleitet. Hier wird sie nur GELESEN.
-  const intent = typeof record?.intentClassification === 'string' ? record.intentClassification : '';
-  const measured = record?.rawLength;
-  return {
-    record,
-    threshold,
-    minRawLength,
-    intent,
-    weight: INTENT_WEIGHTS[intent] ?? 0,
-    rawLength: Number.isFinite(measured) && measured > 0 ? measured : 0,
-  };
-}
-
-export function decide(record, config = {}) {
-  const facts = decisionFacts(record, config);
-  const rule = DECISION_RULES.find((candidate) => candidate.when(facts));
-  const fields = rule.fields(facts);
-  return {
-    goal: rule.goal,
-    reason: rule.reason(facts),
-    intent: fields.intent ?? '',
-    weight: fields.weight ?? 0,
-    threshold: facts.threshold,
-    rawLength: fields.rawLength ?? 0,
-    minRawLength: facts.minRawLength,
-  };
-}
-
-/**
- * Die ABSICHT aus den Nachrichten des Schritts lesen: der getrimmte Text der
- * letzten menschlichen Nachricht. Die Regel selbst steht in `@shinon/seams`
- * (`lastHumanMessage`) — bis 2026-10-20 stand sie hier als Zwillings-Region,
- * bytegleich mit `@shinon/prompter`. Hier bleibt nur, was der Router daraus
- * macht: eine Absicht aus Harness-Text waere ein Fremdauftrag, dann liefe ein Goal
- * auf „Kontext: du hast 3 neue Werkzeugergebnisse".
- */
-export function readObjective(messages) {
-  const hit = lastHumanMessage(messages);
-  return hit === null ? null : hit.text.trim();
-}
 
 /**
  * Den lebenden Agenten und die Absicht eines Schritts vormerken. Ohne diese
@@ -339,17 +294,6 @@ function takeStep(runtime, record) {
   return { step: only ?? null, reason: only === null ? 'NO_LIVE_AGENT' : null };
 }
 
-/**
- * Das Ergebnis einer Aktivierung — benannte Felder statt vier Positionsargumente,
- * die an der Aufrufstelle wie ein Zweitupel aussahen (`activationVerdict(false,
- * 'LINEAR_TURN')`: gemeint sind `activated` und `reason`).
- */
-const activationVerdict = ({ activated = false, reason, goalId = '', maxGoalRounds = 0 }) => ({
-  activated,
-  reason,
-  goalId,
-  maxGoalRounds,
-});
 
 /**
  * Einen Fehler der Goal-Domaene einordnen.
@@ -435,252 +379,7 @@ export function activateGoal(ctx, config, runtime, record) {
   }
 }
 
-/** Aus der Entscheidung und der Aktivierung den Datensatz bauen. */
-export function buildDecision(decision, activation = activationVerdict({ reason: 'LINEAR_TURN' })) {
-  return {
-    contract: CONTRACT,
-    outcome: decision.goal ? 'goal' : 'linear',
-    intent: decision.intent,
-    weight: decision.weight,
-    threshold: decision.threshold,
-    rawLength: decision.rawLength,
-    minRawLength: decision.minRawLength,
-    reason: decision.reason,
-    activated: activation.activated,
-    activation: activation.reason,
-    goalId: activation.goalId,
-    maxGoalRounds: activation.maxGoalRounds,
-  };
-}
 
-// ── §18: Goal Micro-State — die zusätzliche Projektion ────────────────────
-
-/** Vertragsname der Micro-State-Projektion (Plan §18). */
-export const MICRO_STATE_CONTRACT = 'shinon.task-router/micro-state-v1';
-
-/**
- * Der Dienstname der Projektion — die Naht für alle, die den Zustand LESEN
- * wollen, ohne dieses Paket zu importieren (Pakete referenzieren einander
- * nicht; §19 wird dieselbe Regel brauchen wie die Naht des Enhancers).
- */
-export const MICRO_STATE_SERVICE = 'shinon_goal_micro_state';
-
-/**
- * Die fünf Felder aus §18 — wortgleich und in der Reihenfolge des Plans.
- * Genau diese fünf: der Datensatz ist EINE Momentaufnahme. Was nicht hier
- * steht (Zeitstempel, Rundenliste, Nachrichten, Verlauf), darf die
- * Projektion auch nicht mit sich führen — sonst wäre sie die zweite
- * Session-Historie, die §18 ausdruecklich verbietet.
- */
-export const MICRO_STATE_FIELDS = [
-  'OBJECTIVE',
-  'CURRENT_STATE',
-  'LAST_VERIFIED_FACT',
-  'CURRENT_BLOCKER',
-  'NEXT_ACTION',
-];
-
-/**
- * Zustaende, die NICHT aus einer DSH-Phase stammen — die zwei Aussagen, die
- * man nicht verwechseln darf: `NO_GOAL` heisst „autoritativ kein Ziel da“
- * (der Dienst antwortete mit nichts), `UNAVAILABLE` heisst „kein autoritativer
- * Zustand lesbar“ (Dienst fehlt, Lesen wirft, Zustand kaputt). Eine
- * Lesefehler zu `NO_GOAL` zu machen, waere eine Existenzaussage aus einem
- * Werkzeugfehler — genau die Verwechselung, die §18 mit seinem
- * Autoritativitaets-Satz verhindert.
- */
-export const MICRO_NO_GOAL = 'NO_GOAL';
-export const MICRO_UNAVAILABLE = 'UNAVAILABLE';
-
-/**
- * NEXT_ACTION als DATEN — Beratung, nie eine Aktion.
- *
- * Jeder Wert benennt, was als NAECHSTES zu erwarten bzw. zu tun waere; die
- * Projektion fuehrt keinen davon aus, und es gibt im Paket keinen Code, der
- * diesen Wert liest, um zu handeln. Die einzige Schreibstelle an Goal-State
- * bleibt `create` in activateGoal (§17). Die Tabelle ist eine Entscheidung,
- * keine Wahrheit — sie steht deshalb hier als Daten und nicht als Verzweigung.
- *
- *   NO_GOAL / UNAVAILABLE . NONE — nichts zu erinnern bzw. nichts zu raten
- *   active:armed ......... ROUND — die naechste Runde reserviert DSHs
- *                            Round-Driver, nicht wir (§17)
- *   active:disarmed ...... NONE — der Prozess darf nicht automatisch
- *                            weiterfahren; eine Weiterfahrt waere DSHs
- *                            Angelegenheit, keine unsere
- *   paused ............... RESUME — Fortsetzen ist ein Befehl an DSH
- *   blocked .............. HUMAN — die Blockade heben WIR NICHT selbst
- *                            (§17 Block-Policy: nicht ueberschreiben)
- *   complete ............. NONE — die Absicht ist erfuellt
- *   unbekannte Phase ..... NONE — fail-closed: wer die Phase nicht kennt,
- *                            empfiehlt nichts (die Phase selbst wird
- *                            trotzdem gespiegelt, sie ist autoritativ)
- */
-export const NEXT_ACTIONS = {
-  [MICRO_NO_GOAL]: 'NONE',
-  [MICRO_UNAVAILABLE]: 'NONE',
-  'active:armed': 'ROUND',
-  'active:disarmed': 'NONE',
-  paused: 'RESUME',
-  blocked: 'HUMAN',
-  complete: 'NONE',
-};
-
-/**
- * Der Datensatz der Projektion: Umschlag plus die fuenf Felder aus §18.
- * `required()` ueberall — ein fehlendes Feld saehe wie ein gueltiger Zustand
- * aus, und ein Micro-State ohne NEXT_ACTION ist keine Momentaufnahme.
- */
-export const MicroStateSchema = z.object({
-  contract: z.const(MICRO_STATE_CONTRACT).required(),
-  OBJECTIVE: z.string().required(),
-  CURRENT_STATE: z.string().required(),
-  LAST_VERIFIED_FACT: z.string().required(),
-  CURRENT_BLOCKER: z.string().required(),
-  NEXT_ACTION: z.string().required(),
-});
-
-/**
- * Die Empfehlung, wenn die Tabelle den Schluessel nicht kennt: NONE — wer die
- * Phase nicht kennt, empfiehlt nichts (fail-closed) —, aber BENANNT und einmal
- * je Schluessel gemeldet. Vorher degradierte `?? 'NONE'` still: eine unbekannte
- * Phase oder ein unbekannter Armierungsstand sah aus wie "nichts zu tun".
- *
- * Der Merker ist kein Zustand des Laufs, sondern eine Log-Bremse (je Schluessel
- * eine Zeile, begrenzt durch die Zahl der verschiedenen Schluessel).
- */
-const UNKNOWN_ADVICE = 'NONE';
-const reportedUnknownAdvice = new Set();
-
-/** Die Beratung aus der Tabelle — unbekannt kostet eine Empfehlung, nie die Wahrheit. */
-export function nextActionFor(state, activation = '') {
-  const key = state === 'active' ? `active:${activation}` : state;
-  const advice = NEXT_ACTIONS[key];
-  if (advice !== undefined) return advice;
-  if (!reportedUnknownAdvice.has(key)) {
-    reportedUnknownAdvice.add(key);
-    console.warn(`[shinon-task-router] Zustand "${key}" ist nicht in NEXT_ACTIONS — Empfehlung bleibt ${UNKNOWN_ADVICE}`);
-  }
-  return UNKNOWN_ADVICE;
-}
-
-/**
- * Die Projektion als REINE Funktion: Eingabe ein GoalView (oder null),
- * Ausgabe die fuenf Felder. Kein Zustand, keine Uhr, kein Dienst — und damit
- * auch nichts, was zweite Autoritaet werden koennte.
- *
- * QUELLENREGEL je Feld (§18: „Autoritative Zustände bleiben die dafür
- * vorgesehenen DSH-Services und Session-Daten“):
- *
- *   OBJECTIVE ......... view.objective — die vom Menschen gewollte Absicht,
- *                       die DSH dauerhaft fuehrt. Wortgleich, nie veraedelt.
- *   CURRENT_STATE ...... view.phase wortgleich (autoritativ); NO_GOAL und
- *                       UNAVAILABLE sind AUSSAGEN DIESES Lesers, nicht DSH-
- *                       Phasen, und deshalb benannt statt gemischt.
- *   LAST_VERIFIED_FACT AUSSCHLIESSLICH aus der benannten Quelle
- *                       (options.fact). Die Projektion leitet ihn nicht ab,
- *                       merkt ihn sich nicht und entnimmt ihn schon gar nicht
- *                       dem Modelltext — leer statt erfunden. Es gibt heute
- *                       noch keine Evidenzquelle, die ihn fuellt (§19); das
- *                       Feld und sein Schlitz sind gebaut, die Quelle fehlt.
- *   CURRENT_BLOCKER .... view.blockedReason, und nur bei Phase `blocked`
- *                       (die Types sagen: „present exactly while blocked“).
- *                       Kein Grund vorhanden → leer, nicht raten.
- *   NEXT_ACTION ........ NEXT_ACTIONS — Beratung, die nie ausgefuehrt wird.
- *
- * FAIL-CLOSED in beide Richtungen: kein View → NO_GOAL, unlesbarer View →
- * UNAVAILABLE, unbekannte Phase → gespiegelt und ohne Empfehlung.
- */
-/**
- * Wie erreichbar der autoritative Zustand war — die Achse, die NO_GOAL von
- * UNAVAILABLE trennt, und die Bruecke zu den Feldern.
- *
- * `readable` schliesst `present` ein: KEIN Feldzugriff findet ohne diesen
- * Vorbehalt statt (gemessen: `view.phase` ohne diese Bruecke warf bei `null` mit
- * TypeError).
- */
-function availability(view, options) {
-  const present = view !== null && view !== undefined;
-  const usable = present && typeof view.phase === 'string' && options.unavailable !== true;
-  return {
-    present,
-    readable: usable,
-    state: options.unavailable === true || (present && !usable) ? MICRO_UNAVAILABLE : present ? view.phase : MICRO_NO_GOAL,
-  };
-}
-
-/**
- * Den Blocker rendern — nur bei Phase `blocked` (die Types sagen: „present exactly
- * while blocked") und nur aus einem vorhandenen Grund. Kein Grund heisst leer,
- * nicht geraten.
- */
-function blockerOf(view) {
-  if (view.phase !== 'blocked') return '';
-  const reason = objectOrNull(view.blockedReason);
-  if (reason === null) return '';
-  return [reason.code, reason.message]
-    .filter((part) => typeof part === 'string' && part !== '')
-    .join(': ');
-}
-
-/** Die Felder, die WORTGLEICH aus dem autoritativen View stammen. Nie abgeleitet. */
-function authoritativeFields(view) {
-  return {
-    OBJECTIVE: typeof view.objective === 'string' ? view.objective : '',
-    CURRENT_BLOCKER: blockerOf(view),
-  };
-}
-
-export function projectMicroState(view, options = {}) {
-  const reach = availability(view, options);
-  // LAST_VERIFIED_FACT kommt AUSSCHLIESSLICH aus der benannten Quelle — leer,
-  // wenn keine da ist, und unabhaengig davon, ob ein View lesbar war.
-  const fact = typeof options.fact === 'string' ? options.fact : '';
-  const fields = reach.readable ? authoritativeFields(view) : { OBJECTIVE: '', CURRENT_BLOCKER: '' };
-  const activation = reach.readable && typeof view.activation === 'string' ? view.activation : '';
-
-  return MicroStateSchema({
-    contract: MICRO_STATE_CONTRACT,
-    OBJECTIVE: fields.OBJECTIVE,
-    CURRENT_STATE: reach.state,
-    LAST_VERIFIED_FACT: fact,
-    CURRENT_BLOCKER: fields.CURRENT_BLOCKER,
-    NEXT_ACTION: nextActionFor(reach.state, activation),
-  });
-}
-
-/**
- * Die Projektion als DIENST (§18): angeboten, nicht gespeichert.
- *
- * Jeder Aufruf liest den Zielzustand FRISCH aus `ctx.goals` — es gibt keinen
- * gehaltenen Zwischenzustand, keinen Verlauf, keine zweite Historie; was
- * zwischen zwei Aufrufen geschah, liegt bei DSH und in den Session-Daten.
- * Genau EINE Leseoperation: `get` des Ziel-Dienstes. Jede SCHREIBmethode
- * dieses Dienstes (create, edit, pause, block, ...) wird von dieser Schicht
- * nie aufgerufen — die einzige Schreibstelle bleibt activateGoal (§17), und
- * dass sie die einzige bleibt, prueft ein Abnahmetest mit einer Attrappe, auf
- * der jede Schreibmethode wirft.
- *
- * Fehler werden NICHT zu NO_GOAL: „ich kann nicht lesen“ ist eine andere
- * Aussage als „es gibt keins“. Beide fail-closed, beide benannt (UNAVAILABLE).
- */
-export function createMicroStateService(ctx) {
-  return {
-    contract: MICRO_STATE_CONTRACT,
-    state(agent, options = {}) {
-      try {
-        const goals = typeof ctx?.get === 'function' ? ctx.get(GOAL_SERVICE) : undefined;
-        if (typeof goals?.get !== 'function') return projectMicroState(null, { ...options, unavailable: true });
-        const view = goals.get(agent);
-        return projectMicroState(view ?? null, options);
-      } catch {
-        // Alles, was beim Lesen wirft (kein `ctx.get`, kein Ziel-Dienst, ein
-        // werfendes `get` wie GOAL_AGENT_NOT_LIVE) ist ein Lesefehler — und
-        // ein Lesefehler ist KEIN Zielzustand: also UNAVAILABLE, nicht NO_GOAL.
-        return projectMicroState(null, { ...options, unavailable: true });
-      }
-    },
-  };
-}
 
 /**
  * Den eingehenden Datensatz entscheiden und melden.

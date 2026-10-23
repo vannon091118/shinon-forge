@@ -2,8 +2,17 @@ import z from '@deepseek-ai/schemastery';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync } from 'node:fs';
 import { join, isAbsolute } from 'node:path';
-import { emptySelfModel, observeDecision, observeError, decaySelfModel, selfModelSummary, selfModelView, validateSelfModel } from './assets/self-model.js';
-import { MEMORY_CONTRACT, acceptedCommitments, decideProposal, decayMemory, emptyMemory, memoryView, proposeFromMemory, rememberDecision, rememberEvent, renderCommitments, renderMemory, selectMemories, validateMemory } from './assets/memory-core.js';
+import { acceptedCommitments, decideProposal } from './assets/memory-core.js';
+// Der Zustand der Persona (Selbstmodell und Langzeitgedaechtnis) hat EINEN
+// Eigentuemer: `assets/persona-runtime-state.js`. Die Namensraeume und Dokument-Ids, die der
+// Eintrag als oeffentliche Namen weitergibt, stehen dort.
+import {
+  MEMORY_MEMO_ID,
+  MEMORY_NAMESPACE,
+  SELF_MODEL_MEMO_ID,
+  SELF_MODEL_NAMESPACE,
+  createPersonaRuntime,
+} from './assets/persona-runtime-state.js';
 // Das Lesen einer MENSCHLICHEN Nachricht und der explizite Beziehungs-Produzent
 // liegen im importfreien Kern: dieselbe Rechnung im Host, im Test ohne
 // node_modules und in der Probe gegen den echten Spine.
@@ -78,32 +87,20 @@ export const INDEX_INJECT = 'webserver/index-inject';
 /** Gemeinsamer Project Index Store; Persona nutzt nur ihren eigenen Namensraum. */
 export { INDEX_STORE_SERVICE, INDEX_STORE_CONTRACT };
 
-/** Der Namensraum des Selbstmodells: ein Projekt, ein Stand. */
-export const SELF_MODEL_NAMESPACE = 'shinon.persona-self/v1';
-
 /**
- * Das Langzeitgedächtnis: eigene Ablage, eigener Namensraum.
+ * Die Namensraeume der Persona — definiert in `assets/persona-runtime-state.js`, hier nur
+ * weitergereicht: der Eintrag bleibt die oeffentliche Flaeche des Pakets.
  *
- * Nicht derselbe Raum wie das Selbstmodell: das Modell zählt Ausgänge, das
- * Gedächtnis trägt Ereignisse und Belege. Ein gemeinsames Dokument würde beim
- * Schreiben das jeweils andere überschreiben.
+ * Der Namensraum des Selbstmodells ist ein Projekt, ein Stand; das
+ * Langzeit-Gedaechtnis liegt in einem EIGENEN Raum, weil das Modell Ausgaenge
+ * zaehlt und das Gedaechtnis Ereignisse traegt — ein gemeinsames Dokument wuerde
+ * beim Schreiben das jeweils andere ueberschreiben.
  */
-export const MEMORY_NAMESPACE = 'shinon.persona-memory/v1';
-export const MEMORY_MEMO_ID = 'memory';
+export { MEMORY_MEMO_ID, MEMORY_NAMESPACE, SELF_MODEL_MEMO_ID, SELF_MODEL_NAMESPACE };
 
 /** Die Naht für die Prüfung: ansehen und ausdrücklich annehmen — sonst nichts. */
 export const REVIEW_SERVICE = 'shinon_persona_review';
 export const REVIEW_CONTRACT = 'shinon.persona-review/v1';
-
-/**
- * Die Id des Dokuments IN der Ablage.
- *
- * Die Ablage haelt Dokumente (memos), keine freien Objekte: `save` schreibt nur
- * records/memos/scorecard/notes, alles andere faellt still weg. Das Selbstmodell
- * reist deshalb als EIN Dokument unter dieser Id — geprueft wird es trotzdem
- * gegen seinen EIGENEN Vertrag.
- */
-export const SELF_MODEL_MEMO_ID = 'self-model';
 
 /**
  * Der Workspace, den die LAUFENDE Sitzung beansprucht — pro Turn, nicht pro Prozess.
@@ -549,14 +546,15 @@ export function apply(ctx, config) {
   // Ein Modell JE ROOT: die Ablage gehoert dem Projekt, nicht dem Prozess. Die
   // Belege kommen aus den echten Entscheidungen des Veredlers und den Fehlern
   // des Laufs; geschrieben wird nach jeder Aenderung, gelesen einmal je Root.
-  const selfModels = new Map();
   const uiClients = new Set();
   let lastDecision = null;
 
   /** Der Zustandsdatensatz der UI — Zahlen und Namen, nie ein Prompt-Text. */
   const uiSnapshot = () => {
     const root = sessionRoot.getStore()?.root || declaredRoot;
-    const entry = typeof root === 'string' && root !== '' ? selfModels.get(root) ?? null : null;
+    // Selbstmodell, Erinnerungen und offene Vorschlaege kommen vom Eigentuemer
+    // des Zustands — das Panel liest Zahlen, keine Prompt-Texte.
+    const panel = runtime.panel(root);
     const state = persona.snapshot();
     const tone = readTone(ctx, warnedTone);
     return {
@@ -579,9 +577,9 @@ export function apply(ctx, config) {
       // zu „idle"; der Prompt traegt den Arbeitsmodus aus MOOD_MODUS, keinen Namen.
       voice: contract.voice?.[state.mood] ?? null,
       tone: tone === null ? null : { stance: tone.stance ?? null, ready: tone.ready === true },
-      self: entry === null ? null : selfModelView(entry.model),
-      memory: memoryView(ensureMemory(null)),
-      proposals: (ensureMemory(null).proposals ?? []).filter((proposal) => proposal.status === 'proposed').length,
+      self: panel.self,
+      memory: panel.memory,
+      proposals: panel.proposals,
       intent: lastDecision,
     };
   };
@@ -606,226 +604,21 @@ export function apply(ctx, config) {
     }
   };
 
-  let storeWarned = false;
-
-  /** Die Ablage holen: EIN Dienst, EIN Vertrag — sonst kein Gedaechtnis. */
-  const warnStoreOnce = (reason) => {
-    if (storeWarned) return;
-    storeWarned = true;
-    console.warn(`[shinon-persona] Selbstmodell nur im Speicher: ${reason}`);
-  };
-
-  const resolveStore = () => {
-    let found = null;
-    try {
-      found = typeof ctx?.get === 'function' ? ctx.get(INDEX_STORE_SERVICE) ?? null : null;
-    } catch (error) {
-      warnStoreOnce(`Ablage nicht abfragbar (${error?.message ?? error})`);
-      return null;
-    }
-    if (found === null) return null;
-    if (
-      found.contract !== INDEX_STORE_CONTRACT ||
-      typeof found.load !== 'function' ||
-      typeof found.save !== 'function'
-    ) {
-      warnStoreOnce(`fremder Dienst unter ${INDEX_STORE_SERVICE} (Vertrag ${String(found?.contract)})`);
-      return null;
-    }
-    return found;
-  };
-
-  // Ein FEHLENDES Feld heisst "Vorgabe", ein LEERES heisst "aus". Der
-  // Unterschied zaehlt: sonst schaltete ein Profil ohne den Schluessel das
-  // Gedaechtnis still ab, und niemand saehe den Grund.
-  const selfModelNamespace = (root = declaredRoot) => { const base = typeof config.selfModelNamespace === 'string' ? config.selfModelNamespace : SELF_MODEL_NAMESPACE;
-    return base === '' || typeof root !== 'string' || root === '' ? base : `${base}/${fingerprintRoot(root).rootId}`; };
-
-  /** Den Stand EINMAL schreiben — dieselbe Ablage wie das Scoring, eigener Raum. */
-  const persistSelfModel = (entry) => {
-    if (entry.namespace === '') return;
-    const store = resolveStore();
-    if (store === null) {
-      warnStoreOnce('kein Index-Dienst');
-      return;
-    }
-    let answer;
-    try {
-      answer = store.save(entry.namespace, {
-        memos: [{ id: SELF_MODEL_MEMO_ID, model: entry.model }],
-      });
-    } catch (error) {
-      warnStoreOnce(`nicht beschreibbar (${error?.message ?? error})`);
-      return;
-    }
-    if (answer === null || typeof answer !== 'object' || answer.ok !== true) {
-      warnStoreOnce(`nicht beschreibbar (${answer?.error ?? 'unbekannte Antwort'})`);
-    }
-  };
-
-  /** Das Modell eines Roots laden — einmal je Root, danach aus dem Speicher. */
-  const selfModelOf = (root) => {
-    const known = selfModels.get(root);
-    if (known !== undefined) return known;
-    const namespace = selfModelNamespace(root);
-    let model = emptySelfModel(new Date().toISOString());
-    if (namespace !== '') {
-      const store = resolveStore();
-      if (store === null) warnStoreOnce('kein Index-Dienst');
-      else {
-        let answer;
-        try {
-          answer = store.load(namespace);
-        } catch (error) {
-          warnStoreOnce(`nicht lesbar (${error?.message ?? error})`);
-        }
-        const ok = answer !== null && typeof answer === 'object' && answer.ok === true;
-        const memos = ok && Array.isArray(answer.state?.memos) ? answer.state.memos : [];
-        const raw = memos.find((memo) => memo?.id === SELF_MODEL_MEMO_ID)?.model ?? null;
-        if (raw !== null) {
-          const checked = validateSelfModel(raw);
-          if (checked.foreign) console.warn(`[shinon-persona] Selbstmodell fremd (${namespace}) — neuer Stand`);
-          else {
-            model = decaySelfModel(checked.model);
-            if (checked.dropped > 0) console.warn(`[shinon-persona] ${checked.dropped} unlesbare Selbstmodell-Eintraege uebergangen`);
-          }
-        } else if (!ok && answer !== null && answer !== undefined) {
-          warnStoreOnce(`nicht lesbar (${answer?.error ?? 'unbekannte Antwort'})`);
-        }
-      }
-    }
-    const entry = { model, namespace };
-    selfModels.set(root, entry);
-    const view = selfModelView(model);
-    if (view !== null && view.runs > 0) {
-      console.log(`[shinon-persona] Selbstmodell geladen: ${view.runs} Laeufe, ${view.limits.length} Grenzen, ${view.questions.length} offene Fragen`);
-    }
-    return entry;
-  };
-
-  /** EINEN Beleg verbuchen — die einzige Stelle, die das Modell veraendert. */
-  const observeInto = (kind, payload) => {
-    const root = sessionRoot.getStore()?.root || declaredRoot;
-    if (!speaksForRoot(root)) return;
-    const entry = selfModelOf(root);
-    const now = new Date().toISOString();
-    entry.model = kind === 'decision'
-      ? observeDecision(entry.model, payload, now)
-      : observeError(entry.model, payload, now);
-    persistSelfModel(entry);
-    publishUi();
-  };
-
-  /** Der Abschnittstext: belegt, begrenzt — leer, solange nichts belegt ist. */
-  const selfModelText = (assemblyCtx) => {
-    if (!speaksForSession(assemblyCtx)) return '';
-    const root = rootOfAssembly(assemblyCtx) || declaredRoot;
-    if (typeof root !== 'string' || root === '') return '';
-    if (selfModelNamespace(root) === '') return '';
-    return selfModelSummary(selfModelOf(root).model) ?? '';
-  };
-
-  // ── Das Langzeitgedächtnis ────────────────────────────────────────────────
-  // Ereignisse und Entscheidungen werden zu belegten Erinnerungen. Die Ablage
-  // ist dieselbe wie beim Selbstmodell, der Namensraum ein eigener: ein
-  // gemeinsames Dokument wuerde beim Schreiben das jeweils andere ersetzen.
-  const memoryNamespace = () => (
-    typeof config.memoryNamespace === 'string' ? config.memoryNamespace : MEMORY_NAMESPACE
-  );
-  let memoryDoc = null;
-  // Die Sitzung des zuletzt gesehenen Ereignisses — das Panel kennt keine Id.
-  let lastSessionId = '';
-  let memoryWarned = false;
-  const warnMemoryOnce = (reason) => {
-    if (memoryWarned) return;
-    memoryWarned = true;
-    console.warn(`[shinon-persona] Gedaechtnis nur im Speicher: ${reason}`);
-  };
-
-  /** Das Gedaechtnis EINMAL laden — danach lebt es im Prozess, bis der Host endet. */
-  const ensureMemory = (now = null) => {
-    if (memoryDoc !== null) return memoryDoc;
-    memoryDoc = emptyMemory(now);
-    if (memoryNamespace() === '') return memoryDoc;
-    const store = resolveStore();
-    if (store === null) { warnMemoryOnce('kein Index-Dienst'); return memoryDoc; }
-    let answer;
-    try {
-      answer = store.load(memoryNamespace());
-    } catch (error) {
-      warnMemoryOnce(`nicht lesbar (${error?.message ?? error})`);
-      return memoryDoc;
-    }
-    const ok = answer !== null && typeof answer === 'object' && answer.ok === true;
-    const memos = ok && Array.isArray(answer.state?.memos) ? answer.state.memos : [];
-    const raw = memos.find((memo) => memo?.id === MEMORY_MEMO_ID)?.memory ?? null;
-    if (raw !== null) {
-      const checked = validateMemory(raw);
-      if (checked.foreign) console.warn(`[shinon-persona] Gedaechtnis fremd (${memoryNamespace()}) — neuer Stand`);
-      else {
-        memoryDoc = decayMemory(checked.memory).memory;
-        if (checked.dropped > 0) console.warn(`[shinon-persona] ${checked.dropped} unlesbare Gedaechtnis-Eintraege uebergangen`);
-        const view = memoryView(memoryDoc);
-        if (view !== null && view.entries > 0) {
-          console.log(`[shinon-persona] Gedaechtnis geladen: ${view.entries} Erinnerungen, ${view.limits} Grenzen, ${view.proposals} offene Vorschlaege`);
-        }
-      }
-    } else if (!ok && answer !== null && answer !== undefined) {
-      warnMemoryOnce(`nicht lesbar (${answer?.error ?? 'unbekannte Antwort'})`);
-    }
-    return memoryDoc;
-  };
-
-  const persistMemoryDoc = () => {
-    if (memoryNamespace() === '' || memoryDoc === null) return;
-    const store = resolveStore();
-    if (store === null) { warnMemoryOnce('kein Index-Dienst'); return; }
-    let answer;
-    try {
-      answer = store.save(memoryNamespace(), { memos: [{ id: MEMORY_MEMO_ID, memory: memoryDoc }] });
-    } catch (error) {
-      warnMemoryOnce(`nicht beschreibbar (${error?.message ?? error})`);
-      return;
-    }
-    if (answer === null || typeof answer !== 'object' || answer.ok !== true) {
-      warnMemoryOnce(`nicht beschreibbar (${answer?.error ?? 'unbekannte Antwort'})`);
-    }
-  };
-
-  /** EIN Ereignis oder EINE Entscheidung — die einzige Stelle, die Erinnerungen schreibt. */
-  const rememberInto = (kind, record) => {
-    const root = sessionRoot.getStore()?.root || declaredRoot;
-    if (!speaksForRoot(root) || memoryNamespace() === '') return;
-    const now = new Date().toISOString();
-    const scope = typeof root === 'string' && root !== '' ? root : 'global';
-    const doc = ensureMemory(now);
-    const result = kind === 'decision'
-      ? rememberDecision(doc, record, { scope, now })
-      : rememberEvent(doc, record, { scope, now });
-    if (!result.changed) return;
-    // Alterung und Vorschlag gehoeren in DENSELBEN Schreibvorgang: sonst laege
-    // ein Beleg ohne Alterung in der Ablage und ein Vorschlag ohne Beleg.
-    const aged = decayMemory(result.memory);
-    const proposed = proposeFromMemory(aged.memory, { now });
-    memoryDoc = { ...proposed.memory, lastSeen: now };
-    persistMemoryDoc();
-    publishUi();
-  };
-
-  const memoryText = (assemblyCtx) => {
-    if (!speaksForSession(assemblyCtx) || memoryNamespace() === '') return '';
-    const root = rootOfAssembly(assemblyCtx) || declaredRoot;
-    const doc = ensureMemory(null);
-    const entries = selectMemories(doc, { scope: typeof root === 'string' ? root : 'global', prompt: promptText.value() });
-    return renderMemory(doc, { entries }) ?? '';
-  };
-
-  const commitmentsText = (assemblyCtx) => {
-    if (!speaksForSession(assemblyCtx) || memoryNamespace() === '') return '';
-    const root = rootOfAssembly(assemblyCtx) || declaredRoot;
-    const scope = typeof root === 'string' && root !== '' ? root : 'global';
-    return renderCommitments(ensureMemory(null), scope) ?? '';
-  };
+  // Das Gedaechtnis hat seinen eigenen Eigentuemer (assets/persona-runtime-state.js): hier
+  // steht nur, WER es baut und WELCHE Entscheidungen es mitbekommt. Der
+  // Zustand selbst (einmal je Root laden, im Prozess halten, einmal schreiben)
+  // liegt dort — der Eintrag liest ihn nur noch ab.
+  const runtime = createPersonaRuntime({
+    config,
+    ctx,
+    sessionRoot,
+    declaredRoot,
+    speaksForRoot,
+    speaksForSession,
+    rootOfAssembly,
+    promptText,
+    onChange: () => publishUi(),
+  });
 
   // TODO: [DSH-Refactor] - Die Registrierung steckt in vier verschachtelten Closures (inject →
   // effect → renderPrompt → renderTrigger) mit handgefuehrtem Disposer-Stack; nicht ablesbar
@@ -858,12 +651,12 @@ export function apply(ctx, config) {
     // Der Arbeitsablauf beschreibt, WIE gearbeitet wird — darum steht er in JEDEM Modus.
     sections.push(['shinon:workflow', atPrefix + 5, renderWorkflow(config.workflow)]);
     // Das Selbstmodell steht HINTER der Identitaet: gelernte Selbstkenntnis.
-    if (selfModelNamespace() !== '') sections.push(['shinon:self-model', atSuffix - 6, selfModelText]);
+    if (runtime.selfModelNamespace() !== '') sections.push(['shinon:self-model', atSuffix - 6, runtime.selfModelText]);
     // Das Gedaechtnis steht VOR dem Selbstmodell: erst was ich erlebt habe, dann
     // was ich daraus belegt weiss. Beide fallen weg, wenn es nichts zu sagen gibt.
-    if (memoryNamespace() !== '') {
-      sections.push(['shinon:memory', atSuffix - 8, memoryText]);
-      sections.push(['shinon:commitments', atSuffix - 7, commitmentsText]);
+    if (runtime.memoryNamespace() !== '') {
+      sections.push(['shinon:memory', atSuffix - 8, runtime.memoryText]);
+      sections.push(['shinon:commitments', atSuffix - 7, runtime.commitmentsText]);
     }
 
     // Projekt-Kontext (Zug 9): projektspezifische Daten aus dem Sitzungs-
@@ -938,7 +731,7 @@ export function apply(ctx, config) {
       letzteStimmung: lastUserMood,
     });
     if (gelesen === null) return;
-    if (gelesen.sessionId !== null) lastSessionId = gelesen.sessionId;
+    if (gelesen.sessionId !== null) runtime.lastSessionId = gelesen.sessionId;
     // Der LESEZWEIG laeuft ueber den kanonischen I/O-Pfad (eine Zeile je Kind, trace_id korreliert).
     logEventRead({
       quelle: config.eventsChannel,
@@ -951,7 +744,7 @@ export function apply(ctx, config) {
       lastDecision = null; // neue Nachricht, neuer Turn — die alte Klasse oeffnet nichts
     }
     // Jedes relevante Ereignis geht in das Langzeitgedaechtnis.
-    rememberInto('event', { type: gelesen.eventType, payload: gelesen.eventPayload });
+    runtime.remember('event', { type: gelesen.eventType, payload: gelesen.eventPayload });
     persona.observe(gelesen.eventType, gelesen.eventPayload);
     if (gelesen.triggerGewechselt) {
       lastTrigger = gelesen.trigger;
@@ -984,12 +777,12 @@ export function apply(ctx, config) {
           reasons: Array.isArray(record.reasons) ? record.reasons.slice(0, 4) : [],
           memory: record.intentMemory ?? null,
         };
-        observeInto('decision', record);
-        rememberInto('decision', record);
+        runtime.observe('decision', record);
+        runtime.remember('decision', record);
       })
     : () => {};
   const errorDisposer = typeof ctx?.on === 'function'
-    ? ctx.on('agent/error', (payload) => observeInto('error', payload?.error ?? payload))
+    ? ctx.on('agent/error', (payload) => runtime.observe('error', payload?.error ?? payload))
     : () => {};
   // Beim Laden der Seite steht der aktuelle Zustand im Global; ab dann schiebt
   // die SSE-Route jede Aenderung nach.
@@ -1088,7 +881,7 @@ export function apply(ctx, config) {
         // Persona zuletzt gesehen wurde. Ein Aufrufer MIT Sitzung gewinnt.
         const result = relationService.set({
           level: body.value?.level,
-          sessionId: body.value?.sessionId || lastSessionId,
+          sessionId: body.value?.sessionId || runtime.lastSessionId,
         });
         if (result.ok) publishUi();
         sendJson(res, result.ok ? 200 : 400, result);
@@ -1111,22 +904,22 @@ export function apply(ctx, config) {
     contract: REVIEW_CONTRACT,
     review: () => ({
       contract: REVIEW_CONTRACT,
-      memory: memoryView(ensureMemory(null)),
-      proposals: (ensureMemory(null).proposals ?? []).map((proposal) => ({
+      memory: runtime.panel(null).memory,
+      proposals: (runtime.memory(null).proposals ?? []).map((proposal) => ({
         id: proposal.id,
         claim: proposal.claim,
         evidence: proposal.evidence,
         status: proposal.status,
         decidedAt: proposal.decidedAt,
       })),
-      commitments: acceptedCommitments(ensureMemory(null)).map((proposal) => ({ id: proposal.id, claim: proposal.claim, evidence: proposal.evidence })),
+      commitments: acceptedCommitments(runtime.memory(null)).map((proposal) => ({ id: proposal.id, claim: proposal.claim, evidence: proposal.evidence })),
     }),
     decide: (id, decision) => {
       const now = new Date().toISOString();
-      const result = decideProposal(ensureMemory(now), id, decision, now);
+      const result = decideProposal(runtime.memory(now), id, decision, now);
       if (!result.ok) return { ok: false, error: result.error };
-      memoryDoc = result.memory;
-      persistMemoryDoc();
+      runtime.setMemory(result.memory);
+      runtime.persistMemory();
       publishUi();
       console.log(`[shinon-persona] Vorschlag ${id} ${decision === 'accepted' ? 'angenommen' : 'abgelehnt'}`);
       return { ok: true, proposal: result.proposal };

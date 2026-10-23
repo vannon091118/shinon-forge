@@ -34,7 +34,7 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Proben unter `docs/probes/` | 53 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | nicht gebaut | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 24 Pakete, 310 Dateien, 2772307 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -60,9 +60,9 @@ heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
 <!-- zahlen:struktur:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 420 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 423 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
 | Klassen | 6 | `docs/contracts/structure.json` → `klassen` | 0 |
-| Benannte Bestandsdateien (über ihrer Klassengrenze) | 27 | `docs/contracts/structure.json` → `bestand` | 0 |
+| Benannte Bestandsdateien (über ihrer Klassengrenze) | 26 | `docs/contracts/structure.json` → `bestand` | 0 |
 | Dateien ohne Klasse | 0 | `npm test` (Schritt „Struktur“) — gezählt aus `structureIssues()` | 0 |
 | Verstöße gegen den Contract der Klasse | 0 | dieselben Befunde, ohne „keine Klasse“ | 0 |
 <!-- zahlen:struktur:end -->

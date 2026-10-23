@@ -1778,3 +1778,44 @@ Folgepunkt (Forge-Pfade in `facts-reconcile.js`, `docs/ROADMAP.md` §2.27).
 `persona-live-context.test.mjs` 5/5, neuer Bereichs-Test in
 `persona-memory.test.mjs`, `npm test` Exit 0 (131 Schritte), `gate:test`
 908/908, `zahlen:check` Exit 0.
+
+**Zwei Host-Monolithen bekommen Eigentümer (Etappe 4, zweite Hälfte).**
+`packages/persona/index.js` (1175 Zeilen) hielt zwei verschiedene Dinge in
+einer Closure: die Registrierung (Abschnitte, Routen, Prüf-Naht, Beziehungs-
+Produzent) und den Zustand (Selbstmodell, Langzeitgedächtnis, Vorschläge). Der
+Zustand hat seine eigene Regel — EINMAL je Root laden, im Prozess halten, nach
+jeder Änderung EINMAL schreiben —, und genau die steht jetzt in
+`packages/persona/assets/persona-runtime-state.js` (361). Der Eintrag baut die
+Fabrik einmal, reicht `onChange: () => publishUi()` hinein und liest danach nur
+noch ab (`runtime.panel(root)` für den UI-Datensatz, `runtime.memory(now)` für
+die Prüf-Naht). Die Namensräume und Dokument-Ids sind mit dem Zustand
+gewandert und werden vom Eintrag weitergereicht — die öffentliche Fläche bleibt
+Namen für Namen dieselbe. `packages/task-router/index.js` (770) hatte
+dieselbe Doppelung: §16 (Goal oder linear) und §18 (Goal-Micro-State). Beide
+liegen jetzt als importierbare Eigentümer in
+`packages/task-router/assets/decision-core.js` (146) und
+`packages/task-router/assets/micro-state.js` (247); der Eintrag registriert
+weiter, die Verträge, Entscheidungsregeln, Projektion und der Dienst bleiben
+über ihn erreichbar. `GOAL_SERVICE` und `SOURCE_CONTRACT` haben damit je EINE
+Definition. Der Eintrag selbst: `packages/persona/index.js` 1175 → 968,
+`packages/task-router/index.js` 770 → 469; beide unter der 550er-Grenze ihrer
+Klasse, `packages/task-router/index.js` ist damit aus dem `bestand` verschwunden
+(`packages/persona/index.js` bleibt als benannter Rest, nur gesunken).
+`packages/scoring/index.js` bleibt bei 540 ungeteilt: der Auftrag nennt die
+Datei, der Bestand verlangt keinen Schnitt, und sie trägt mit `apply` einen
+Eigentümer — ein Schnitt ohne zweiten Eigentümer wäre nur eine neue Datei.
+
+Der erste `npm run build` nach der repo-Fassade war dann rot: `artifactFiles()`
+in `scripts/lib/repo-pakete.mjs` las `RUNTIME_FILES`, ohne den Namen aus
+`scripts/lib/repo-basis.mjs` zu importieren (`ReferenceError`). Kein Test ruft
+diese Funktion, nur der Build — der Beleg dafür, dass „Fassade mit identischen
+Exports“ allein nicht reicht, solange ein Aufrufer außerhalb der Testkette
+liegt. Nach dem Import: `npm run build` Exit 0, 24 Pakete, 310 Dateien.
+
+**Anker:** Pfade: `packages/persona/index.js`,
+`packages/persona/assets/persona-runtime-state.js`,
+`packages/task-router/index.js`, `packages/task-router/assets/decision-core.js`,
+`packages/task-router/assets/micro-state.js`, `docs/contracts/structure.json` ·
+Belege: `persona-state.test.mjs`/`persona-prompt.test.mjs`-Familie 105/105,
+`task-router.test.mjs` 26/26, `npm test` Exit 0 (131 Schritte), `gate:test`
+908/908, `zahlen:check` Exit 0.

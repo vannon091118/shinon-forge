@@ -104,8 +104,15 @@ nennt ihre Abnahme, und keine gilt ohne Exit-Code und benannten Lauf.
 
 - **Etappe 4 — Host-Monolithen teilen:** `scripts/lib/repo.mjs` (Fassade plus
   Eigentümer-Module, identische Exportnamen), `scripts/install-user.mjs`,
-  `packages/persona/index.js` (Zustand zuerst als `assets/persona-runtime-state.js`,
-  danach `apply`), `packages/scoring/index.js`, `packages/task-router/index.js`.
+  `packages/persona/index.js` (Zustand als `assets/persona-runtime-state.js`,
+  danach `apply`) und `packages/task-router/index.js` (§16 als
+  `assets/decision-core.js`, §18 als `assets/micro-state.js`) sind **belegt
+  geteilt** (`521421b`, `docs/TAGEBUCH.md` 2026-10-23). **Offen bleibt allein die
+  Entscheidung zu `packages/scoring/index.js`:** 540 Zeilen liegen unter der
+  550er-Grenze der Klasse, ein Schnitt wäre nur ehrlich, wenn zwei Eigentümer
+  drinstecken — heute trägt `apply` die Ablage, das Lernen, den Ton und die
+  Gewichte als einen Zustand. Ein Schnitt dort braucht zuerst den Nachweis, dass
+  es zwei Zustände sind, nicht zwei Abschnitte.
   Abnahme: `scripts/gate/tests/source-scan.test.mjs` und die Paket-Suiten ohne
   verlorenen Export; `npm test` Exit 0; jede Datei unter ihrer Klassengrenze.
 - **Etappe 5 — Client-Quellen:** die handgespiegelten Client-Blöcke (Codingmon,
