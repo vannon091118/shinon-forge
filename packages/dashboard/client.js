@@ -67,7 +67,6 @@ window.__ModuleLoader__.load({
       { id: '@shinon/locale-de', label: 'Locale DE', active: true },
       { id: '@shinon/tooltip', label: 'Tooltip', active: true },
       { id: '@shinon/dashboard', label: 'Dashboard', active: true },
-      { id: '@shinon/better-errors', label: 'Fehler besser', active: true },
       { id: '@shinon/token-usage', label: 'Token-Nutzung', active: true },
       { id: '@shinon/hook', label: 'Hook', active: true },
       { id: '@shinon/prompter', label: 'Prompter', active: true },

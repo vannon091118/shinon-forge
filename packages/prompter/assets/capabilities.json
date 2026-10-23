@@ -416,22 +416,6 @@
       ]
     },
     {
-      "id": "fehler-lesbar",
-      "frage": "Wo werden Fehler lesbar gemacht?",
-      "owner": "better-errors",
-      "seam": null,
-      "terms": [
-        "fehler lesbar",
-        "fehlermeldung"
-      ],
-      "notAnswers": [
-        "keine Fehlerbehandlung im Host"
-      ],
-      "evidence": [
-        "packages/better-errors/index.js"
-      ]
-    },
-    {
       "id": "workspaces-und-sitzungen",
       "frage": "Wo sehe ich Workspaces und Sitzungen?",
       "owner": "dashboard",

@@ -17,14 +17,14 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 <!-- zahlen:bestand:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Pakete unter `packages/` | 24 | `ls packages \| wc -l` | 0 |
+| Pakete unter `packages/` | 23 | `ls packages \| wc -l` | 0 |
 | Profile unter `profiles/` | 3 | `git ls-files profiles \| cut -d/ -f2 \| sort -u \| wc -l` | 0 |
-| Bundle-Layer im Profil `shinon` | 27 | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.length"` | 0 |
-| davon eigene (`@shinon/*`) | 22 | dieselbe Liste, gefiltert auf `@shinon/` | 0 |
+| Bundle-Layer im Profil `shinon` | 26 | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.length"` | 0 |
+| davon eigene (`@shinon/*`) | 21 | dieselbe Liste, gefiltert auf `@shinon/` | 0 |
 | davon fremde | 5 | dieselbe Liste, Rest | 0 |
 | Pakete **nicht** im Profil (erklären sich selbst via `dsh.inactive`) | 2 (mobile, seams) | Manifeste unter `packages/*/package.json` lesen | 0 |
 | Version des Repos | `0.4.0` | `node -p "require('./package.json').version"` | 0 |
-| Paketversionen | 23× `1.0.0`, 1× `0.1.0` | `node -e "…"` über `packages/*/package.json` | 0 |
+| Paketversionen | 22× `1.0.0`, 1× `0.1.0` | `node -e "…"` über `packages/*/package.json` | 0 |
 | DSH-Pin im Root-Manifest | `0.2.1-rc.2` | `node -p "require('./package.json').dependencies['@deepseek-ai/dsh']"` | 0 |
 | Schemastery (deklariert) | `3.18.5` | `node -p "require('./package.json').dependencies['@deepseek-ai/schemastery']"` | 0 |
 | Node (`engines.node`) | `^22.19.0 \|\| >=24.0.0` | `node -p "JSON.stringify(require('./package.json').engines)"` | 0 |
@@ -32,8 +32,8 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Markdown-Dokumente (getrackt) | 35 | `git ls-files '*.md' \| wc -l` | 0 |
 | Verträge unter `docs/contracts/` | 14 | `ls docs/contracts/*.json \| wc -l` | 0 |
 | Proben unter `docs/probes/` | 53 | `ls docs/probes/*.json \| wc -l` | 0 |
-| Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
-| Build (`dist/packages/`) | 24 Pakete, 314 Dateien, 2800630 Bytes | `npm run build` (Exit 0) | 0 |
+| Generierte Idiom-Blöcke | 15 Blöcke in 11 Dateien | `npm run idioms:check` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 23 Pakete, 310 Dateien, 2796935 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -59,7 +59,7 @@ heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
 <!-- zahlen:struktur:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 424 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 422 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
 | Klassen | 6 | `docs/contracts/structure.json` → `klassen` | 0 |
 | Benannte Bestandsdateien (über ihrer Klassengrenze) | 25 | `docs/contracts/structure.json` → `bestand` | 0 |
 | Dateien ohne Klasse | 0 | `npm test` (Schritt „Struktur“) — gezählt aus `structureIssues()` | 0 |

@@ -101,7 +101,7 @@
     "packages/codingmon/client.js": 3481,
     "packages/codingmon/test/durchstich.test.mjs": 660,
     "packages/core/client.js": 409,
-    "packages/dashboard/client.js": 479,
+    "packages/dashboard/client.js": 478,
     "packages/markers/client.js": 627,
     "packages/persona/index.js": 968,
     "packages/popup/client.js": 414,

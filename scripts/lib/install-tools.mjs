@@ -78,7 +78,7 @@ export function createTools(env) {
   }
   
   /** Zeilen, die wie ein Fehler aussehen — mit benannter Ausnahme statt stillem Wegsehen. */
-  const NOISE = [/\[shinon-better-errors\]/, /ExperimentalWarning/, /trace-warnings/];
+  const NOISE = [/ExperimentalWarning/, /trace-warnings/];
   function errorLines(lines) {
     return lines.filter((line) => /\b(error|errors|exception|unhandled|failed|fehlgeschlagen|cannot)\b/i.test(line) && !NOISE.some((pattern) => pattern.test(line)));
   }

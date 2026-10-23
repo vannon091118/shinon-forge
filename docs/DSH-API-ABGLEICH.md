@@ -27,8 +27,9 @@ Codingmon-Boni sind teilweise ohne Produktionswirkung. Diese Befunde sind im
 
 Die klarste DSH-Dopplung ist enger umrissen als im ersten Bericht:
 `token-usage` portiert DSHs bereits exportierte und in der Chat-UI genutzte
-Turn-Usage-Faltung. `better-errors` ist ein lokaler Platzhalter; dass DSH eine
-gleichwertige Fehleransicht anbietet, ist hier nicht belegt. Daneben nennt der
+Turn-Usage-Faltung. `better-errors` war ein lokaler Platzhalter ohne Wirkung und ist
+am 2026-10-23 entfernt; dass DSH eine gleichwertige Fehleransicht anbietet, ist
+hier nicht belegt. Daneben nennt der
 Audit mehrere tote Shinon-Pfade und Services ohne Abnehmer. Die zwei neuen
 Pakete hatten zuvor keine Capability-Frage; diese Zuordnungen sind inzwischen
 additiv ergänzt. Die Paketanzahl ist deshalb kein Impact-Maß. Jede
@@ -139,7 +140,6 @@ für die konkrete fachliche Aufgabe gefunden; es ist keine Qualitätsabnahme.
 
 | Paket(e) | Einordnung gegen DSH |
 |---|---|
-| `better-errors` | Platzhalter: keine Fehlerdarstellung, nur Styles und Aktivierungslog. Leerlauf belegt; gleichwertiger DSH-Fehler-UI-Ersatz ist in dieser Analyse nicht belegt. |
 | `token-usage` | DSH-eigene Turn-Usage-Regel wird kopiert; DSH liefert öffentliche API und native UI samt Anbieter-/Modell-Routen. Kopie entfernen; eigener Footer nur bei belegtem anderem Nutzerwert. |
 | `core`, `locale-de`, `tooltip`, `widget-dock`, `version` | Shinon Branding, Übersetzung und Status-/Widget-Oberfläche. DSH besitzt UI-Slots und Produktoberfläche, aber kein gleiches Shinon-Branding. Behalten, sofern das Profil diese Oberfläche tatsächlich nutzt; Status-Anzeigen nicht als Aktivierungsautorität behandeln. |
 | `dashboard`, `diff-overview` | Shinon-Status-/Arbeitsübersicht und Git-Diff. Überlappen mit DSH Workspace/Session-Oberfläche; prüfen, dass keine zweite Session-Verwaltung entsteht. Der Git-Diff bleibt eine eigene Repo-Funktion. |
@@ -204,7 +204,7 @@ ist und keine Shinon-spezifische Wirkung belegt wird, ist sie Duplikat. Wenn 4
    #11–13, #23, #35, #57).
 3. DSH-Dopplungen entfernen: `token-usage` auf `dsh-token-meter/client`
    umstellen und native Chat-Usage gegen Shinon-Footer vergleichen;
-   `better-errors` bleibt nur bei implementierter Fehleransicht aktiv.
+   `better-errors` ist entfernt und kehrt nur mit einer implementierten Fehleransicht zurück.
 4. Encounter/Pre-Flight: den echten Request-Handoff implementieren und messen;
    keine weiteren Attrappen-Funktionen bis Request-Diff und Nutzerwirkung belegt
    sind.
@@ -225,7 +225,7 @@ ist und keine Shinon-spezifische Wirkung belegt wird, ist sie Duplikat. Wenn 4
 - `docs/WISSENS-RUNTIME-PLAN.md`, `docs/CLEANREPO-AUDIT.md`
 - DSH API-Pin: `node_modules/@deepseek-ai/dsh-token-meter/package.json`,
   `lib/types/client.d.ts`, `node_modules/@deepseek-ai/dsh-api-gateway/lib/types/client/index.d.ts`
-- `packages/token-usage/index.js`, `packages/better-errors/index.js`
+- `packages/token-usage/index.js`
 - `packages/task-router/index.js`, `packages/project-index/index.js`
 - `packages/codingmon/assets/encounter.js`, `packages/codingmon/client.js`
 - `docs/probes/preflight-live.json`, `docs/probes/live-model-catalog.json`

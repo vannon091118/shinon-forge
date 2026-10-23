@@ -161,7 +161,7 @@ entscheidet das Profil; welche Schlüssel existieren, die Umgebung
 **Persona/Sprache:** `persona` (System-Prompt-Schicht, Self-Model,
 Memory-Contracts, HTTP-Routen `/shinon/persona/*`), `locale-de` (deutsche
 Übersetzungen, Namespace `shinon`), `core` (Branding-Overlay in Sidebar,
-Hero, Conversation), `tooltip`/`better-errors`/`dashboard` (Config-Ebenen).
+Hero, Conversation), `tooltip`/`dashboard` (Config-Ebenen).
 
 ## 7. Governance
 

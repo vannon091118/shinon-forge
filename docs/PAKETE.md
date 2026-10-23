@@ -15,7 +15,6 @@
 
 | Paket | Rolle | Tests | Naht |
 |---|---|---|---|
-| `better-errors` | Fehleranzeige mit deutschen Meldungen (Config-Ebene, ohne Logik) | — | — |
 | `codingmon` | Pet-/Kampf-System mit dauerhaftem Zustand | ✅ (7) | Client→Host |
 | `core` | Branding-Overlay: Sidebar-, Hero-Marke, Farbverlauf, Pulse | — | Slots |
 | `dashboard` | Status-Panel; liest echte `workspaces`/`sessions`-Dienste | — | Slots |
@@ -100,9 +99,6 @@ via `skillsPath`. Zettel-Dienst: `generated-skills/` mit `npm run notes:check`.
 **`@shinon/task-router`** — liest die validierte Klassifikation des
 Prompters und entscheidet deterministisch goal/no-goal (Schwelle im
 Profil). Nutzt den DSH-Goal-State — kein zweiter Loop.
-
-**`@shinon/better-errors`** — Config-Ebene ohne Logik: `apply()` loggt nur;
-deutsche Meldungen für Fehlerbilder.
 
 ## Naht und Beobachtung
 

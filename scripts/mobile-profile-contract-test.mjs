@@ -13,7 +13,7 @@ const profile = readJson('profiles/mobile/package.json');
 const manifest = readJson('packages/mobile/package.json');
 const required = [
   '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@shinon/persona',
-  '@shinon/core', '@shinon/events', '@shinon/locale-de', '@shinon/better-errors',
+  '@shinon/core', '@shinon/events', '@shinon/locale-de',
   '@shinon/token-usage', '@shinon/prompter', '@shinon/narrative', '@shinon/mobile',
 ];
 assert.deepEqual(profile.dsh.profile.bundles, required, 'Mobile bundle allowlist drifted');

@@ -94,7 +94,6 @@ function installBundles(profile) {
     '@shinon/locale-de',
     '@shinon/tooltip',
     '@shinon/dashboard',
-    '@shinon/better-errors',
     '@shinon/token-usage',
   ];
   for (const pkg of packages) {

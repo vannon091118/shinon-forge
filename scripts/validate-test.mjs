@@ -47,7 +47,7 @@ const RULES = [
   {
     name: 'fehlender required key',
     pattern: /insert\[1\]: name fehlt oder ist kein String/,
-    break: (root) => write(root, 'packages/better-errors/cordis.patch.yml', '- insert:\n    - id: shinon-better-errors\n'),
+    break: (root) => write(root, 'packages/core/cordis.patch.yml', '- insert:\n    - id: shinon-core\n'),
   },
   {
     name: 'unbekannter Key',

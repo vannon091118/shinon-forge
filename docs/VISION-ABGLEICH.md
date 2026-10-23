@@ -258,10 +258,11 @@ Konfiguration.
 *mit* Mechanik; der Baum hat die Ethik (als Text) und eine Mechanik (als
 Formprüfung) — aber nicht die Ethik *in* der Mechanik.
 
-### H. Zwei Pakete ohne Wirkung
+### H. Ein Paket ohne Wirkung
 
-`packages/token-usage/index.js:15` und `packages/better-errors/index.js:8` —
-beide `apply()` **loggen nur** und tun sonst nichts. Der `FOUNDATION-PLAN`
+`packages/token-usage/index.js:15` — `apply()` **loggt nur** und tut sonst nichts.
+`better-errors` stand hier bis zum 2026-10-23 und ist entfernt: es hatte weder
+Leser noch Renderer. Der `FOUNDATION-PLAN`
 wollte L0 Telemetrie, die `token-usage` *echt* macht („Panel = View über
 Telemetrie"). Das ist nie geschehen; das Paket war vom ersten Commit an so
 (`ffbf721`).

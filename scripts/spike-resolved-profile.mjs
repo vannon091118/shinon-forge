@@ -60,17 +60,16 @@ const PROFILE_NAME = 'product';
  *
  * Drei Bündel, gewählt nach einer harten Eigenschaft: ihre Host-Hälften
  * brauchen keinen Dienst, rufen kein Modell, starten keinen Server und
- * schreiben nichts. `better-errors` und `token-usage` registrieren nur und
- * loggen; `events` lädt seinen Vertrag aus `assets/` und emittiert — hier
+ * schreiben nichts. `token-usage` registriert nur und loggt; `events` lädt
+ * seinen Vertrag aus `assets/` und emittiert — hier
  * niemandes Ereignis. Wer diese Liste erweitert, prüft dieselben vier
  * Eigenschaften neu: der Spike darf keinen fremden Boot und keine Sitzung
  * anfassen.
  */
-const BUNDLES = ['@shinon/better-errors', '@shinon/token-usage', '@shinon/events'];
+const BUNDLES = ['@shinon/token-usage', '@shinon/events'];
 
 /** Je Bündel die Zeile, die seinen Mount beweist (aus dem `apply()` des Pakets). */
 const MARKS = [
-  { bundle: '@shinon/better-errors', mark: '[shinon-better-errors] Aktiviert:' },
   { bundle: '@shinon/token-usage', mark: '[shinon-token-usage] Aktiviert:' },
   { bundle: '@shinon/events', mark: 'Signale + Carrier gebunden' },
 ];

@@ -2,7 +2,6 @@
   "name": "dsh-profile-shinon",
   "private": true,
   "dependencies": {
-    "@shinon/better-errors": "link:../../packages/better-errors",
     "@shinon/codingmon": "link:../../packages/codingmon",
     "@shinon/core": "link:../../packages/core",
     "@shinon/dashboard": "link:../../packages/dashboard",
@@ -38,7 +37,6 @@
         "@shinon/tooltip",
         "@shinon/widget-dock",
         "@shinon/dashboard",
-        "@shinon/better-errors",
         "@shinon/token-usage",
         "@shinon/hook",
         "@shinon/prompter",
