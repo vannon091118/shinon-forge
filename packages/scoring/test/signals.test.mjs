@@ -310,8 +310,11 @@ test('scoring-ablage: der Kern meldet seinen Stand, statt ihn zu schreiben', () 
   const { collector, seen } = collectorWithSink();
   assert.equal(seen.length, 0, 'ohne Ereignis kein Schreibvorgang');
 
+  // Ohne Frage gibt es keinen Auftrag, zu dem ein Urteil gehoeren koennte:
+  // eine gesehene Antwort allein wird nicht geschrieben. MIT Frage reist sie
+  // im Merkzettel mit (eigener Fall weiter unten).
   sawAnswer(collector, 'ans-1');
-  assert.equal(seen.length, 0, 'eine beobachtete Antwort ist kein Schreibvorgang');
+  assert.equal(seen.length, 0, 'Antwort ohne Auftrag ist kein Schreibvorgang');
   collector.observe(...Object.values(rating('ans-1', 'positive')));
   assert.equal(seen.length, 1);
   assert.equal(seen[0].why, 'score', 'der Grund steht mit dabei');
@@ -353,6 +356,31 @@ test('scoring-ablage: der geladene Stand trägt den ganzen Weg (Neustart im Kern
   assert.equal(fresh.session('sess-1').previousQuestion, QUESTION);
   fresh.observe(...Object.values(retract('ans-1')));
   assert.deepEqual(fresh.scorecard().scores, { correctness: 0.5, trust: 0.5 });
+});
+
+test('scoring-ablage: spaete Kritik trifft auch eine noch unbewertete Antwort (Neustart)', () => {
+  // Der gemeldete Fehler vom 2026-10-23: `hydrate` rekonstruierte Antworten
+  // ausschliesslich aus den Betreffen der Score-Zeilen. Eine Antwort, die eine
+  // Sitzung gesehen, aber noch nicht bewertet hatte, war nach dem Neustart
+  // unbekannt — die spaete Kritik endete mit `UNATTRIBUTED_FEEDBACK`. Jetzt
+  // reist die Kennung im Merkzettel mit; es entsteht keine zweite Ablage.
+  const source = collectorOf();
+  // Der echte Weg: erst der Auftrag (die Frage), dann die Antwort der Sitzung.
+  source.observe(...Object.values(human(QUESTION)));
+  sawAnswer(source, 'ans-spaet');
+  const before = source.state();
+  assert.equal(before.records.length, 0, 'eine gesehene Antwort ist noch kein Urteil');
+  assert.equal(before.memos.length, 1, 'der Merkzettel traegt Frage und Antwort');
+  assert.deepEqual(before.memos[0].answers, ['ans-spaet']);
+
+  const fresh = collectorOf();
+  assert.deepEqual(fresh.hydrate(before), { records: 0, memos: 1, rejected: 0 });
+  assert.equal(fresh.session('sess-1').answers.has('ans-spaet'), true, 'die Zuordnung ueberlebt den Neustart');
+
+  const late = fresh.observe(...Object.values(rating('ans-spaet', 'positive')));
+  assert.notEqual(late.outcome.reason, 'UNATTRIBUTED_FEEDBACK', 'die Antwort ist bekannt');
+  assert.equal(fresh.records().length, 1, 'das Urteil schreibt genau eine Zeile');
+  assert.equal(fresh.records()[0].subject, 'ans-spaet');
 });
 
 test('scoring-ablage: ein fremder Stand wird gezählt und fallengelassen (fail-closed)', () => {

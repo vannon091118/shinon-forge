@@ -334,9 +334,19 @@ export function deriveTendency(tendency, records = []) {
  *
  * EINE HUELLE OHNE INHALT IST KEIN ZUSTAND: im Speicher entsteht fuer jede
  * Sitzung, die ein Ereignis hatte, ein Merkzettel (auch ohne Frage — die
- * Zaehler brauchen ihn). Geschrieben wird er nur, wenn er eine Frage kennt: er
- * ist sonst nur Ballast, der sich ueber die Laufzeit zu einer Zeile je Sitzung
- * summierte, und er sagt nichts, was nicht schon "kein Merkzettel" sagt.
+ * Zaehler brauchen ihn). Geschrieben wird er nur, wenn er ETWAS ZU SAGEN HAT:
+ * eine Frage oder eine gesehene Antwort. Ohne beides ist er nur Ballast, der
+ * sich ueber die Laufzeit zu einer Zeile je Sitzung summierte.
+ *
+ * WARUM DIE ANTWORT-KENNUNGEN MITGESCHRIEBEN WERDEN (Korrektur 2026-10-23):
+ * der Kommentar an `memoList` behauptete, die Zuordnung sei Prozesswissen und
+ * müsse nicht in die Ablage. Damit ueberlebte eine Antwort den Neustart nur,
+ * wenn schon ein Urteil ueber sie im Protokoll stand — eine SPAETE Kritik an
+ * einer noch unbewerteten Antwort endete nach dem Neustart mit
+ * `UNATTRIBUTED_FEEDBACK`. Die Kennungen reisen jetzt im Merkzettel mit, ohne
+ * dass eine zweite Ablage entsteht: derselbe Datensatz, derselbe Schreibweg,
+ * nur ein Feld mehr. Der Deckel `MAX_ANSWERS` gilt beim Schreiben UND beim
+ * Laden.
  */
 export function createSignalCollector({ contracts, rules, onPersist = null } = {}) {
   const initial = initialState(contracts?.scoring ?? {});
@@ -369,14 +379,21 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
 
   /**
    * Die Merkzettel, die einen Stand SIND — Hüllen ohne Frage zaehlen nicht.
-   * Die Antwort-Kennungen bleiben hier draussen: sie sind Prozesswissen (welche
-   * Antwort habe ich gesehen), kein dauerhafter Zustand — eine `Set` waere im
-   * JSON ohnehin leer, und ein Merkzettel ohne Frage ist nur Ballast.
+   * Die Antwort-Kennungen reisen mit (siehe Kopfkommentar): sie sind die
+   * Zuordnung, die ein spaetes Urteil auch nach einem Neustart trifft. Eine
+   * Huelle ohne Frage traegt keinen Auftrag und wird deshalb nicht geschrieben;
+   * eine Wertung schreibt ihre Antwort ohnehin als Betreff der Zeile.
    */
   const memoList = () =>
     [...sessions.values()]
       .filter((state) => state.previousQuestion !== '')
-      .map((state) => ({ id: state.id, previousQuestion: state.previousQuestion, questions: state.questions, signals: state.signals }));
+      .map((state) => ({
+        id: state.id,
+        previousQuestion: state.previousQuestion,
+        questions: state.questions,
+        signals: state.signals,
+        answers: [...state.answers],
+      }));
 
   /**
    * Den Stand melden. Reine Weitergabe: der Kern kopiert, der Host schreibt.
@@ -408,11 +425,19 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
         const answerId = firstDefined(readPath(payload, 'message.id'), readPath(payload, 'data.message.id'), readPath(payload, 'id'));
         if (typeof answerId === 'string' && answerId !== '') {
           const state = sessionOf(sessionId);
+          const known = state.answers.has(answerId);
           if (state.answers.size >= MAX_ANSWERS) {
             const oldest = state.answers.values().next();
             if (!oldest.done) state.answers.delete(oldest.value);
           }
           state.answers.add(answerId);
+          // Die gesehene Antwort ist selbst ein Stand: sie wird gemeldet, damit
+          // ein Neustart sie nicht vergisst. Eine bereits bekannte Kennung
+          // loest keinen zweiten Schreibvorgang aus. Gemeldet wird nur, wenn
+          // die Sitzung eine Frage kennt: ohne Frage gibt es keinen Auftrag,
+          // zu dem das Urteil gehoeren koennte — und eine geschlossene Sitzung
+          // wird durch eine spaete Antwort nicht wieder geoeffnet.
+          if (!known && state.previousQuestion !== '') persist('answer');
         }
       }
 
@@ -523,19 +548,27 @@ export function createSignalCollector({ contracts, rules, onPersist = null } = {
           rejected += 1;
           continue;
         }
+        // Die Zuordnung kommt aus ZWEI belegten Quellen: den Betreffen der
+        // Protokollzeilen (bewertete Antworten) und den Kennungen, die der
+        // Merkzettel selbst traegt (gesehene, noch unbewertete Antworten).
+        const stored = Array.isArray(memo.answers)
+          ? memo.answers.filter((entry) => typeof entry === 'string' && entry !== '')
+          : [];
+        const merged = [...new Set([...(knownAnswers.get(memo.id) ?? []), ...stored])];
+        const answers = merged.slice(Math.max(0, merged.length - MAX_ANSWERS));
         sessions.set(memo.id, {
           id: memo.id,
           previousQuestion: typeof memo.previousQuestion === 'string' ? memo.previousQuestion : '',
           questions: Number.isFinite(memo.questions) ? memo.questions : 0,
           signals: Number.isFinite(memo.signals) ? memo.signals : 0,
-          answers: new Set(knownAnswers.get(memo.id) ?? []),
+          answers: new Set(answers),
         });
       }
       // Eine Sitzung ohne Merkzettel kennt trotzdem Antworten: die Betreffe
       // ihrer Zeilen sind die Zuordnung, die ein spaetes Urteil nach dem
       // Neustart braucht (SH-LEARN-01). Diese Huelle traegt keine Frage und
-      // wird deshalb NIE geschrieben (memoList verlangt eine Frage) — sie ist
-      // Prozesswissen aus dem Protokoll, kein zweiter Zustand.
+      // wird deshalb NIE geschrieben — sie ist Prozesswissen aus dem Protokoll,
+      // kein zweiter Zustand.
       for (const [id, answers] of knownAnswers) {
         if (sessions.has(id)) continue;
         sessions.set(id, { id, previousQuestion: '', questions: 0, signals: 0, answers: new Set(answers) });
