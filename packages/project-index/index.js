@@ -1,6 +1,6 @@
 import z from '@deepseek-ai/schemastery';
 import { existsSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, createFactsService } from './assets/facts-service.js';
 import { INDEX_DEFAULTS } from './assets/defaults.js';
 import { FACTS_FILE_NAME } from './assets/facts-store.js';
@@ -9,22 +9,21 @@ import { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE } from '@shinon/seams/core';
 import { createRefreshService } from './assets/refresh-core.js';
 import {
   CONTRACT,
-  DEFAULT_CONTEXT_BUDGET,
   DEFAULT_INDEX_ROOT,
   DEFAULT_LEDGER_FILE,
   LEDGER_CONTRACT,
-  indexMeta,
   indexPath,
   indexStats,
   migrateMemory,
   openIndex,
   openLedger,
   readMemory,
-  resolveContext,
   runIndex,
   runIndexInWorker,
   writeMemory,
 } from './assets/index-core.js';
+import { createWarmConnection } from './assets/query-connection.js';
+import { QUERY_CONTRACT, createQueryService } from './assets/query-service.js';
 
 /**
  * shinon-project-index — die Host-Haelfte: Konfiguration und Mount.
@@ -68,8 +67,12 @@ import {
 
 export * from './assets/index-core.js';
 
-/** Vertragsname der Abfrage-Faehigkeit. */
-export const QUERY_CONTRACT = 'shinon.project-index/query-v1';
+/**
+ * Vertragsname und Faehigkeit der Abfrage — beides gehoert dem Eigentuemer der
+ * Naht (`assets/query-service.js`) und wird hier nur weitergereicht. Damit
+ * bleibt die Host-Haelfte das, was sie ist: Config, Mount, Meldung.
+ */
+export { QUERY_CONTRACT, createQueryService };
 
 /**
  * Der Dienstname — der Name aus Plan §14 (`shinon_index_query`), nicht ein
@@ -196,96 +199,6 @@ export function createStoreService({ indexFile, ledgerFile, workspaceRoot = '' }
           ...(migrated.error === 'FOREIGN_ROOT' ? { migration_skipped: migrated.reason } : {}),
         };
       });
-    },
-  };
-}
-
-/**
- * Die Abfrage-Faehigkeit bauen.
- *
- * `resolveContext(prompt, { budgetTokens })` liefert die Form des Kontextvertrags
- * oder `null`. Die drei Richtungen sind Absicht:
- *
- *   null      es gibt (noch) keinen Index — eine ehrliche Leere. Ein leerer
- *             Index waere eine Behauptung: "das Projekt hat keine Dateien".
- *   Kontext   der vertragsgemaesse Kontext; die Budgetgrenze ist hart (§14).
- *   wirft     der Index ist da, aber unbrauchbar (kaputte Datei). Ein Fehler,
- *             kein stilles Nichts — der Aufrufer entscheidet, was er daraus macht.
- *
- * Die Abfrage ERZEUGT KEINEN Index: `openIndex` legt fehlende Dateien an, eine
- * Suche darf das nicht. Deshalb steht davor `existsSync`.
- *
- * WARM (Welle 2, 2026-10-20): Ist der Index da, frischt die Abfrage ihre
- * KANDIDATEN auf — je Kandidat ein `stat` gegen den Inode-Stempel, und nur eine
- * geänderte oder neue Datei wird gelesen (`refreshIndex` im Kern). Kein Watcher,
- * kein Vollscan je Turn; der Kontextvertrag bleibt bei sechs Schlüsseln, und der
- * Bericht reist über `onRefresh` (Diagnose), nicht als siebter Schlüssel.
- * Gemessen im Leitstand: 1 von 25 Dateien im Index, Kontext leer — daher dieser
- * Pfad.
- */
-export function createQueryService({
-  indexFile,
-  budgetTokens = DEFAULT_CONTEXT_BUDGET,
-  workspaceRoot = '',
-  chunkLines = INDEX_DEFAULTS.chunkLines,
-  maxFileBytes = INDEX_DEFAULTS.maxFileBytes,
-  trace = true,
-  // Der Haken, der den Index im Hintergrund auffrischt. Die Abfrage ruft ihn,
-  // wenn der Index zu alt ist — der Moment, in dem ein frischer Stand zaehlt.
-  onStale = null,
-}) {
-  return {
-    contract: QUERY_CONTRACT,
-    resolveContext(prompt, options = {}) {
-      if (!existsSync(indexFile)) return null;
-      // Der Index ist zu alt: der Hintergrund-Refresh laeuft los, und diese
-      // Abfrage beantwortet den Turn aus dem LETZTEN Stand (der Worker hat
-      // keine Zeit). Das ist der ehrliche Weg: der Aufrufer wartet nicht, und
-      // der naechste Turn hat einen frischen Index.
-      if (typeof onStale === 'function') {
-        try { onStale(prompt); } catch { /* die Wartung darf die Abfrage nicht brechen */ }
-      }
-      const budget = Number.isFinite(options?.budgetTokens) ? options.budgetTokens : budgetTokens;
-      // S1: die Abfrage ist an DENSELBEN Workspace gebunden wie der Lauf. Ein
-      // untergeschobener Index (Kopie, falscher Pfad) hat eine fremde
-      // Root-Identität und wird von `openIndex` verworfen, statt Kontext aus
-      // einem anderen Projekt zu liefern.
-      const db = openIndex(indexFile, { expectedRoot: workspaceRoot });
-      try {
-        // Der Projektname kommt aus dem INDEX selbst (der Wurzelpfad, den der
-        // Lauf eingetragen hat) — nicht aus einer Ableitung des Aufrufers. Eine
-        // zweite Wahrheit ueber denselben Index waere eine Fehlerquelle.
-        const root = indexMeta(db).root;
-        if (typeof root !== 'string' || root === '') return null;
-        return resolveContext(db, {
-          prompt,
-          project: basename(root),
-          budgetTokens: budget,
-          // Die Wurzel kommt aus dem INDEX (oben geprueft), nicht vom Aufrufer:
-          // aufgefrischt wird genau der Baum, den dieser Index beschreibt.
-          root,
-          refresh: true,
-          chunkLines,
-          maxFileBytes,
-          onRefresh: (report) => {
-            if (!trace) return;
-            if (report?.error !== undefined) {
-              console.error(`[shinon-project-index] Auffrischung fehlgeschlagen (${report.error}) — Antwort kommt aus dem letzten Stand`);
-              return;
-            }
-            // Nur EINE Zeile, wenn sich etwas geaendert hat: eine Abfrage ohne
-            // Aenderung ist der Normalfall und gehoert nicht ins Log.
-            if (report.written === 0 && report.removed === 0) return;
-            console.log(
-              `[shinon-project-index] Abfrage warm: ${report.checked} geprueft, ${report.stamped} ueber Stempel, ` +
-              `${report.read} gelesen (${report.readBytes} B), ${report.written} neu (${report.added} davon neu im Index), ` +
-              `${report.removed} entfernt, ${report.touches} Kanten, ${report.ms} ms`,
-            );
-          },
-        });
-      } finally {
-        db.close();
-      }
     },
   };
 }
@@ -448,6 +361,10 @@ export function apply(ctx, config) {
     trace: config.trace,
   });
   const canProvide = typeof ctx?.provide === 'function';
+  // Die warme Verbindung gehoert dem Mount, nicht der Faehigkeit: er gibt sie
+  // beim Abbau frei. Sie oeffnet den Index EINMAL und entwertet sich ueber
+  // Datei-Identitaet und Kopfzeile (assets/query-connection.js).
+  const queryConnection = createWarmConnection({ file, expectedRoot: options.root });
   const releaseQuery = canProvide
     ? ctx.provide(QUERY_SERVICE, createQueryService({
       indexFile: file,
@@ -455,6 +372,7 @@ export function apply(ctx, config) {
       chunkLines: options.chunkLines,
       maxFileBytes: options.maxFileBytes,
       trace: config.trace,
+      connection: queryConnection,
       onStale: config.refreshMaxAgeMs > 0
         ? (prompt) => { refreshService.refreshAsync(prompt).catch(() => {}); }
         : null,
@@ -536,6 +454,7 @@ export function apply(ctx, config) {
   return () => {
     clearImmediate(pending);
     if (typeof releaseQuery === 'function') releaseQuery();
+    queryConnection.close();
     if (typeof releaseStore === 'function') releaseStore();
     if (typeof releaseFacts === 'function') releaseFacts();
     trigger();

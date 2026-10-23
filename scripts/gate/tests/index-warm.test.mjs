@@ -25,6 +25,11 @@
  *      Kontext aus einer Datei, die es nicht gibt).
  *   5. KOSTEN — je Abfrage ein `stat` je Kandidat, gedeckelt durch
  *      WARM_CANDIDATE_LIMIT; im Normalfall 0 gelesene Bytes.
+ *   6. VERBINDUNG — die Abfrage oeffnet den Index EINMAL und haelt ihn warm.
+ *      Geprueft wird die Entwertung, nicht die Absicht: ein ausgetauschter
+ *      Index (neuer Inode), ein untergeschobener mit fremder Wurzel, eine
+ *      geloeschte Datei und eine im Betrieb geaenderte Quelldatei. Keiner
+ *      dieser Faelle darf Kontext aus einem alten Stand liefern.
  *
  * Die drei Messzahlen (kalt, warm, Trefferquote nach Änderung) stehen als
  * `# INDEX-WARM …`-Zeile in der Ausgabe und sind damit im Lauf belegt; die
@@ -46,6 +51,8 @@ import {
   resolveContext,
   updateIndex,
 } from '../../../packages/project-index/assets/index-core.js';
+import { createWarmConnection } from '../../../packages/project-index/assets/query-connection.js';
+import { createQueryService } from '../../../packages/project-index/assets/query-service.js';
 
 const work = mkdtempSync(join(tmpdir(), 'shinon-index-warm-'));
 process.on('exit', () => {
@@ -272,5 +279,176 @@ test('leere Abfrage: keine Kandidaten, kein Byte, derselbe Vertrag', () => {
     assert.deepEqual(context.files, []);
   } finally {
     db.close();
+  }
+});
+
+// ── 7. Die warme Verbindung: EIN Handle, das sich selbst entwertet ──────────
+//
+// WARUM DIESE FÄLLE: ein Handle, das den Index offen hält, ist nur dann
+// zulässig, wenn es JEDEN Wechsel bemerkt — sonst tauscht die Optimierung eine
+// Messung gegen einen alten Stand. Geprüft werden deshalb die vier Wege, auf
+// denen ein Stand sich ändern kann, ohne dass der Prozess neu startet: ein
+// neuer Inode, ein fremder Kopf, eine gelöschte Datei und eine geänderte
+// Quelldatei.
+
+/** Einen Index unter `file` für `root` bauen — der Kaltlauf als Ausgangslage. */
+function seedIndex(file, root) {
+  const db = openIndex(file, { expectedRoot: root });
+  try {
+    updateIndex(db, root, {});
+  } finally {
+    db.close();
+  }
+}
+
+/** Die Abfrage-Fähigkeit auf einem eigenen Handle (der Bau des Hosts, ohne DSH). */
+function serviceOn(root, file) {
+  const connection = createWarmConnection({ file, expectedRoot: root });
+  const service = createQueryService({ indexFile: file, workspaceRoot: root, connection, trace: false });
+  return { connection, service };
+}
+
+test('Verbindung: EIN Öffnen für viele Abfragen — und dieselbe Antwort', () => {
+  const root = fixture(8);
+  const file = join(root, 'index.sqlite');
+  seedIndex(file, root);
+  const { connection, service } = serviceOn(root, file);
+  try {
+    const first = service.resolveContext('src/mod001.mjs src/mod002.mjs', { budgetTokens: 6000 });
+    const second = service.resolveContext('src/mod001.mjs src/mod002.mjs', { budgetTokens: 6000 });
+    assert.deepEqual(second, first, 'die warme Verbindung ändert die Antwort nicht');
+    const stats = connection.stats();
+    assert.equal(stats.opened, 1, `genau EIN Öffnen für zwei Abfragen (Ist: ${stats.opened})`);
+    assert.equal(stats.reused, 1, `die zweite Abfrage benutzt das offene Handle (Ist: ${stats.reused})`);
+  } finally {
+    connection.close();
+  }
+});
+
+test('ausgetauscht: ein neu gebauter Index am selben Pfad wird gelesen, nicht der alte Inode', () => {
+  const root = fixture(4);
+  const file = join(root, 'index.sqlite');
+  seedIndex(file, root);
+  const { connection, service } = serviceOn(root, file);
+  try {
+    assert.deepEqual(service.resolveContext('src/mod000.mjs', { budgetTokens: 6000 }).symbols, ['mod000Wert']);
+    // Neuer Stand: die Datei wird GELÖSCHT und neu gebaut (neuer Inode), dabei
+    // kommt eine Datei hinzu, die im alten Stand gar nicht stehen kann.
+    rmSync(file, { force: true });
+    for (const suffix of ['-wal', '-shm']) rmSync(`${file}${suffix}`, { force: true });
+    writeFileSync(join(root, 'src', 'nachher.mjs'), 'export function nachherWert() {\n  return 0;\n}\n');
+    seedIndex(file, root);
+
+    const context = service.resolveContext('src/nachher.mjs', { budgetTokens: 6000 });
+    assert.deepEqual(context.files.map((entry) => entry.path), ['src/nachher.mjs'], 'der NEUE Stand wird gelesen');
+    assert.deepEqual(context.symbols, ['nachherWert']);
+    assert.ok(connection.stats().opened >= 2, 'der neue Inode hat ein Neuöffnen erzwungen');
+  } finally {
+    connection.close();
+  }
+});
+
+test('untergeschoben: ein Index mit fremder Wurzel liefert keinen fremden Kontext', () => {
+  const root = fixture(4);
+  const file = join(root, 'index.sqlite');
+  seedIndex(file, root);
+  const { connection, service } = serviceOn(root, file);
+  try {
+    assert.deepEqual(service.resolveContext('src/mod000.mjs', { budgetTokens: 6000 }).symbols, ['mod000Wert']);
+
+    // Ein anderer Workspace schreibt seinen Index an DENSELBEN Pfad: der Inode
+    // bleibt, nur der Kopf (und der Inhalt) wechselt. Genau dieser Fall wäre
+    // ohne Kopfprüfung unsichtbar.
+    const fremd = fixture(3);
+    // Eigener Inhalt, damit ein Leck nicht wie ein Treffer aussieht: beide
+    // Fixtures tragen dieselben Pfade, aber nur dieser Stand sagt `fremdWert`.
+    writeFileSync(join(fremd, 'src', 'mod002.mjs'), 'export function fremdWert() {\n  return 99;\n}\n');
+    const swapped = openIndex(file, { expectedRoot: fremd });
+    try {
+      updateIndex(swapped, fremd, {});
+    } finally {
+      swapped.close();
+    }
+
+    // Beweis, dass der Tausch wirklich passiert ist: ohne Bindung sieht man ihn.
+    const unbound = createWarmConnection({ file });
+    try {
+      const seen = createQueryService({ indexFile: file, connection: unbound, trace: false })
+        .resolveContext('src/mod002.mjs', { budgetTokens: 6000 });
+      assert.deepEqual(seen.symbols, ['fremdWert'], 'der untergeschobene Stand ist lesbar — der Tausch ist echt');
+    } finally {
+      unbound.close();
+    }
+
+    const context = service.resolveContext('src/mod002.mjs', { budgetTokens: 6000 });
+    assert.equal(context.symbols.includes('fremdWert'), false, 'die gebundene Abfrage liefert KEINEN fremden Kontext');
+    assert.deepEqual(context.symbols, ['mod002Wert'], 'sie liest die eigene Wurzel — notfalls frisch von der Platte');
+    assert.ok(connection.stats().replaced >= 1, 'die Kopfzeile hat das Handle entwertet');
+  } finally {
+    connection.close();
+  }
+});
+
+test('weg und wieder da: kein Index gibt null, ein neu gebauter wird ohne Neustart gelesen', () => {
+  const root = fixture(4);
+  const file = join(root, 'index.sqlite');
+  seedIndex(file, root);
+  const { connection, service } = serviceOn(root, file);
+  try {
+    assert.equal(service.resolveContext('src/mod000.mjs').files.length > 0, true);
+
+    rmSync(file, { force: true });
+    for (const suffix of ['-wal', '-shm']) rmSync(`${file}${suffix}`, { force: true });
+    assert.equal(service.resolveContext('src/mod000.mjs'), null, 'kein Index, keine erfundene Leere');
+    assert.equal(connection.stats().open, false, 'das Handle ist geschlossen, nicht verwaist');
+
+    seedIndex(file, root);
+    assert.deepEqual(service.resolveContext('src/mod000.mjs', { budgetTokens: 6000 }).symbols, ['mod000Wert']);
+  } finally {
+    connection.close();
+  }
+});
+
+test('im Betrieb geändert: die warme Verbindung liest den neuen Stand', () => {
+  const root = fixture(4);
+  const file = join(root, 'index.sqlite');
+  const changed = join(root, 'src', 'mod003.mjs');
+  seedIndex(file, root);
+  const { connection, service } = serviceOn(root, file);
+  try {
+    assert.deepEqual(service.resolveContext('src/mod003.mjs', { budgetTokens: 6000 }).symbols, ['mod003Wert']);
+    writeFileSync(changed, 'export function mod003Neu() {\n  return 3;\n}\n');
+    const after = service.resolveContext('src/mod003.mjs', { budgetTokens: 6000 });
+    assert.deepEqual(after.symbols, ['mod003Neu'], 'der Warm-Pfad liest die geänderte Datei über das offene Handle');
+  } finally {
+    connection.close();
+  }
+});
+
+test('neu gebaut bei offenem Handle: die Zeilen einer zweiten Verbindung sind sichtbar', () => {
+  const root = fixture(4);
+  const file = join(root, 'index.sqlite');
+  seedIndex(file, root);
+  const { connection, service } = serviceOn(root, file);
+  try {
+    assert.deepEqual(service.resolveContext('src/mod000.mjs', { budgetTokens: 6000 }).symbols, ['mod000Wert']);
+
+    // Ein zweiter Schreiber (hier der Host, im Betrieb der Worker) baut den
+    // Index fort, waehrend das Handle offen bleibt. SQLite in WAL liefert
+    // committete Zeilen an jede Verbindung — der Test haelt diese Annahme fest,
+    // statt sie zu glauben.
+    writeFileSync(join(root, 'src', 'spaeter.mjs'), 'export function spaeterWert() {\n  return 4;\n}\n');
+    const other = openIndex(file, { expectedRoot: root });
+    try {
+      updateIndex(other, root, {});
+    } finally {
+      other.close();
+    }
+
+    const context = service.resolveContext('src/spaeter.mjs', { budgetTokens: 6000 });
+    assert.deepEqual(context.symbols, ['spaeterWert'], 'die offene Verbindung sieht den neuen Stand');
+    assert.equal(connection.stats().open, true, 'und sie bleibt benutzbar');
+  } finally {
+    connection.close();
   }
 });

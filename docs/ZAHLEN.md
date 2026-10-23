@@ -34,7 +34,7 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Proben unter `docs/probes/` | 53 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 16 Blöcke in 12 Dateien | `npm run idioms:check` (Exit 0) | 0 |
 | Vendorte Dateien unter `vendor/` | 22 | `find vendor -type f \| wc -l` | 0 |
-| Build (`dist/packages/`) | 24 Pakete, 310 Dateien, 2772307 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 24 Pakete, 312 Dateien, 2781816 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -60,7 +60,7 @@ heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
 <!-- zahlen:struktur:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 423 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 425 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
 | Klassen | 6 | `docs/contracts/structure.json` → `klassen` | 0 |
 | Benannte Bestandsdateien (über ihrer Klassengrenze) | 26 | `docs/contracts/structure.json` → `bestand` | 0 |
 | Dateien ohne Klasse | 0 | `npm test` (Schritt „Struktur“) — gezählt aus `structureIssues()` | 0 |
@@ -107,6 +107,7 @@ Ein älterer Wert steht nur in §2.1 als Beleg mit Datum und ist keine zweite g�
 | Scoring-Tests (Kern, Signale, Ablage, Block-Gewichte) | **50** bestanden, **0** rot, **0** übersprungen — importfrei, läuft in CI ohne `npm ci`; die Host-Naht des Lernens fährt `scripts/gate/tests/scoring-block-learning.test.mjs` | 0 | `npm run test:scoring` |
 | Token-Usage-Tests | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:token` |
 | Index warm (Abfrage) | kalt **3 134 ms** (Kaltlauf **3 106 ms** für **490** Dateien, 4 746 913 B gelesen; erster Treffer +27 ms; zweiter Lauf 4 010 ms — Streuung des Kaltlaufs) gegen warm **7,0 ms** Median (5,6–18,7 ms aus 20 Abfragen, **12** Kandidaten geprüft, **0 B** gelesen); Trefferquote direkt nach einer Dateiänderung bei gleicher Größe und zurückgesetzter mtime: **1/1 frisch** (1 Datei neu gelesen, 102 473 B, 217 ms) | 0 | `npm run index:warm` |
+| Abfrage-Pfad (warme Verbindung, 2026-10-23) | `resolveContext` **46,45 ms** Median (42,56–149,26 ms aus 20) gegen **217,57 ms** (166,61–467,04 ms aus 20) im alten Pfad mit `openIndex` je Aufruf; derselbe Index (**686** Dateien), derselbe Prompt, dasselbe Budget (6 000 Token), derselbe Kontext (66 Dateien, 23 860 B); `acquire` allein **0,071 ms** Median (4 000 Läufe) gegen `index-open` **150,09 ms** (derselbe Lauf, 686 Dateien; Dateiscan 5,79 ms) | 0 | `npm run perf:baseline` (Fall `index-query`, p50 **44,73 ms** aus 5) und der gepaarte Lauf beider Pfade auf demselben Index |
 | Prompter-Tests (Zettel, Skills, Selektor, Vorschlag, Selektionsvertrag, Workspace-Identität, Provenienz, Fähigkeitskarte) | **240** bestanden, **0** rot, **0** übersprungen — der Laufzeit-Index entfiel mit der Konsolidierung (6 Größenbudget-Tests und 4 seiner Workspace-Tests ersatzlos gestrichen; `FOREIGN_ROOT`, Symlink-Grenze und `.agents`-Entkopplung prüft jetzt der Project-Index); 4 neue fuer den `SALVAGED_PROSE`-Kern (Form, Deckel, Fortschreibung, Trennung je Sitzung); 14 neue fuer die Provenienz-Leiter (10 Kern, 4 Trace); 17 neue fuer die Fähigkeitskarte (16 Kern: Zuordnung, Gleichstand, Wortgrenzen, Form, Nahtform, Brief, Grenze; 1 Trace: Brief im Prompt, Eigentümer in der Spur); 10 neue fuer die Intent-Konfliktmatrix und die Rangfolge (vier Konfliktarten, längste Phrase vor Klasse, Gleichstand, Datenreihenfolge, Frage ohne Expansion); 15 neue fuer die Abbruchquote (11 Kern: Grundtrennung, Rangfolge, Gleichstand, Quote, neuer Grund als Dateneintrag, Leitstand 5 von 9; 2 Trace: Grund und Zähler im Datensatz, dieselben Felder im Fensterspiegel; 2 Enhancer: der leere Strom ist ein eigener Grund, und sein Abbruch-Finish reist als Daten) | 0 | `npm run test:prompter` |
 | Narrative-Tests (Kern) | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:narrative` |
 | Popup-Tests (Faltung des Sitzungsfensters) | **13** bestanden, **0** rot, **0** übersprungen | 0 | `npm run test:popup` |
@@ -153,9 +154,9 @@ dabei mit Exit 0). Die folgenden Dateien laufen deshalb in der CI-Bahn `slow`
 | `scripts/gate/tests/source-write.test.mjs` | 10,1 s | Quellschreibprobe gegen den echten Baum | slow |
 | `scripts/gate/tests/context-resolver.test.mjs` | 9,6 s | unter der Zielmarke, aber lastempfindlich | slow |
 | `scripts/gate/tests/ledger-separation.test.mjs` | 8,8 s | unter der Zielmarke, aber lastempfindlich | slow |
-| `scripts/gate/tests/index-warm.test.mjs` | 6,3 s | unter der Zielmarke, aber lastempfindlich | slow |
+| `scripts/gate/tests/index-warm.test.mjs` | 23,2 s | 13 Fälle, je Fall ein echter Indexlauf (fsync); seit 2026-10-23 fünf Fälle für die warme Verbindung | slow |
 
-Die drei unter 10 s stehen in der CI-Bahn, weil sie unter paralleler Last den
+Die zwei unter 10 s stehen in der CI-Bahn, weil sie unter paralleler Last den
 20-s-Deckel rissen (gemessen: `cancelled` in `npm run gate:test` am 2026-10-23);
 sie sind keine Ausnahmen von der Zielmarke, sondern eine Stabilitätsentscheidung.
 

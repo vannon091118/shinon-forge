@@ -19,6 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { digestValue, formatTable, stabilityOf, summarize, validateReport } from './lib/perf-stats.mjs';
 import * as indexCore from '../packages/project-index/assets/index-core.js';
+import { createQueryService } from '../packages/project-index/assets/query-service.js';
 import * as scoringCore from '../packages/scoring/assets/scoring-core.js';
 import { resolveMode } from '../packages/prompter/assets/mode-core.js';
 import { buildEnhancerRequest, enhanceGuarded } from '../packages/prompter/assets/enhancer.js';
@@ -169,6 +170,36 @@ cases.push({
   blocking: true,
   reps: 1,
   prepare: () => indexCase('warm'),
+});
+
+// ── Fall: die Abfrage selbst (warme Verbindung + Warm-Pfad) ─────────────────
+// Der Preis, den ein Turn zahlt, bevor er den Kontext hat: bis 2026-10-23 waren
+// das openIndex JE AUFRUF (index-open) plus Warm-Pfad. Seit der warmen
+// Verbindung ist das Oeffnen ein `stat` und ein Kopf-Lesen; der Fall hält die
+// Zahl fest, statt sie zu behaupten.
+const QUERY_PROMPT = 'Wie wird der Workspace aufgeloest und welche Dateien regeln die Prompt-Auswahl im Prompter?';
+cases.push({
+  id: 'index-query',
+  what: 'createQueryService().resolveContext auf vorhandenem Index (warme Verbindung + Warm-Pfad)',
+  kind: 'sqlite-write',
+  blocking: true,
+  reps: 1,
+  prepare: async () => {
+    const warm = await indexCase('warm');
+    const service = createQueryService({ indexFile: warm.file, workspaceRoot: ROOT, trace: false });
+    return {
+      input: { root: ROOT, files: indexCore.listFiles(ROOT).length, promptBytes: Buffer.byteLength(QUERY_PROMPT), budgetTokens: 6000 },
+      run: () => {
+        const context = service.resolveContext(QUERY_PROMPT, { budgetTokens: 6000 });
+        return {
+          files: context?.files?.length ?? 0,
+          symbols: context?.symbols?.length ?? 0,
+          bytes: context?.files?.reduce((sum, entry) => sum + entry.content.length, 0) ?? 0,
+        };
+      },
+      cleanup: warm.cleanup,
+    };
+  },
 });
 
 // ── Fall 5: Scoring-Replay (rein; Fixture als Orakel) ───────────────────────
