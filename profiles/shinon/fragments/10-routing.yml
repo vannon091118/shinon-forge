@@ -1,0 +1,46 @@
+# Task Router (Plan §16/§17): die SCHWELLE und die STOP-POLICY sind
+# Entscheidungen, keine Konstanten im Code. Deshalb stehen die wirksamen Werte
+# hier und nicht im Paket, wo nur die Schema-Defaults liegen.
+#
+# threshold=2: MULTI_STEP_TASK (2) und LONG_RUNNING_GOAL (3) sind
+# Goal-Kandidaten, CHAT/LOOKUP/TRANSFORM (0) nie.
+# minRawLength=24: die Substanzgrenze — ein Zweiwortsatz, den das Modell fuer
+# einen Mehrschritt-Auftrag haelt, wird zurueckgestuft. Die einzige
+# deterministische Tatsache der Entscheidung, die nicht vom Modell kommt.
+#
+# activate=false ist die Entscheidung C7 ("sicherer Start bis H5"): der Router
+# BEURTEILT weiterhin jede Eingabe (threshold und minRawLength gelten unveraendert)
+# und meldet seine Entscheidung — er erzeugt aber KEIN echtes DSH-Goal
+# (ctx.goals), und damit keine vom Round-Driver fortgesetzten Runden mit
+# vollstaendigen Agentenschritten und Modellaufrufen. Wie viel das wert ist,
+# entscheidet H5 (4.6) an Messdaten, nicht an Meinung.
+# Zum Anschalten genuegt `activate: true`; die Faehigkeit ist gebaut und getestet
+# (docs/probes/task-router.json, docs/probes/goal-micro-state.json).
+# maxGoalRounds ist dann SHINONS Stop-Policy: DSH selbst erlaubt 256 Runden
+# (defaultMaxGoalRounds). Ein bereits bestehendes Goal wird NIE ueberschrieben.
+- id: shinon-task-router
+  config:
+    threshold: 2
+    minRawLength: 24
+    activate: false
+    maxGoalRounds: 6
+
+# Project Index. `verify` steht hier, weil es eine ENTSCHEIDUNG ist und keine
+# Konstante: der wirksame Wert gehoert ins Profil, das Paket haelt nur den
+# Schema-Default.
+#
+# stamp — Shinons Umgang mit der Luecke aus §11: Groesse und mtime werden nicht
+# allein geglaubt. Stimmen beide, entscheidet zusaetzlich der Inode-Stempel
+# (Geraet, Inode, Groesse, mtime, ctime). Gemessen an diesem Repo (181 Dateien,
+# 1,19 MiB): stiller Lauf 0 Bytes gelesen wie 'changed' (58,6 gegen 58,7 ms
+# Median, verschraenkt gemessen — der eine stat mehr je Datei ist hier nicht
+# messbar), waehrend 'all' JEDEN Lauf 1,2 MB liest (100 ms). Die Luecke —
+# gleiche Groesse, zurueckgesetzte mtime — wird 6 von 6 erkannt und kostet
+# 24,9 KB (2% des Baums), 'changed' erkennt 0 von 6. Ein Werkzeug, das nur die
+# METADATEN des ganzen Baums anfasst, kostet EINEN Vollauf (99%), danach ist es
+# wieder still: der Stempel wird mit aufgefrischt.
+# 'all' bleibt die Politik, die nichts annimmt — und jeden Lauf alles liest.
+- id: shinon-project-index
+  config:
+    verify: stamp
+

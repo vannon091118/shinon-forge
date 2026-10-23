@@ -33,7 +33,7 @@
     "zahlen:sync": "node scripts/run-with-node.mjs scripts/sync-zahlen.mjs",
     "zahlen:check": "node scripts/run-with-node.mjs scripts/sync-zahlen.mjs --check",
     "test": "node scripts/run-with-node.mjs scripts/preflight-docs.mjs && npm run test:core",
-    "test:core": "node scripts/run-with-node.mjs scripts/shinon-test.mjs && node scripts/run-with-node.mjs scripts/gate/engine.mjs --local",
+    "test:core": "node scripts/run-with-node.mjs scripts/shinon-test.mjs && node scripts/run-with-node.mjs scripts/profile-patch.mjs --check && node scripts/run-with-node.mjs scripts/gate/engine.mjs --local",
     "test:full": "node scripts/run-with-node.mjs node --test packages/codingmon/test/*.test.mjs && node scripts/run-with-node.mjs node --test packages/scoring/test/*.test.mjs && node scripts/run-with-node.mjs node --test packages/token-usage/test/*.test.mjs && node scripts/run-with-node.mjs node --test packages/prompter/test/*.test.mjs && node scripts/run-with-node.mjs node --test packages/narrative/test/*.test.mjs && node scripts/run-with-node.mjs node --test packages/popup/test/*.test.mjs && node scripts/run-with-node.mjs node --test packages/key-router/test/*.test.mjs && node scripts/run-with-node.mjs node --test packages/traceability/test/*.test.mjs && node scripts/run-with-node.mjs scripts/shinon-test.mjs && node scripts/run-with-node.mjs scripts/validate-test.mjs && node scripts/run-with-node.mjs scripts/pack-test.mjs && node scripts/run-with-node.mjs scripts/shinon-profile-test.mjs",
     "test:token": "node scripts/run-with-node.mjs node --test packages/token-usage/test/*.test.mjs",
     "test:hook": "node scripts/run-with-node.mjs packages/hook/test/replay.test.mjs && node scripts/run-with-node.mjs node --test scripts/gate/tests/hook-pre-step.test.mjs",
@@ -78,7 +78,9 @@
     "typecheck": "node scripts/run-with-node.mjs scripts/gate/engine.mjs --only typescript",
     "check:dsh-versions": "node scripts/run-with-node.mjs scripts/check-dsh-versions.mjs",
     "dev:mobile": "SHINON_WORKSPACE_ROOT=$PWD node scripts/open.mjs --profile mobile --print-url",
-    "test:mobile-profile": "node scripts/run-with-node.mjs scripts/mobile-profile-contract-test.mjs && node scripts/run-with-node.mjs scripts/shinon-profile-test.mjs --profile mobile"
+    "test:mobile-profile": "node scripts/run-with-node.mjs scripts/mobile-profile-contract-test.mjs && node scripts/run-with-node.mjs scripts/shinon-profile-test.mjs --profile mobile",
+    "profile:patch": "node scripts/profile-patch.mjs",
+    "profile:patch:check": "node scripts/profile-patch.mjs --check"
   },
   "dependencies": {
     "@deepseek-ai/dsh": "0.2.1-rc.2",

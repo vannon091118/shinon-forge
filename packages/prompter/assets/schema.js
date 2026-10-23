@@ -7,7 +7,7 @@
  */
 import z from '@deepseek-ai/schemastery';
 import { INDEX_BUDGET_TOKENS, MODES, NOTES_DIR_DEFAULT, SKILLS_DIR_DEFAULT } from './mode-core.js';
-import { LEARNED_DEFAULT_PATH } from './block-review.js';
+import { LLM_DEFAULTS, PATH_DEFAULTS } from './defaults.js';
 import { SALVAGE_NAMESPACE } from './salvage-store.js';
 
 /**
@@ -170,18 +170,18 @@ export const Config = z.object({
    * die DSH-GenerateOptions-Datei kennt kein `maxTokens: undefined`, aber
    * das Fehlen des Felds ist die saubere „kein Limit"-Form.
    */
-  maxTokens: z.number().default(1200),
+  maxTokens: z.number().default(LLM_DEFAULTS.maxTokens),
   /** Deterministisch: derselbe Prompt soll denselben Vorschlag ergeben. */
-  temperature: z.number().default(0),
+  temperature: z.number().default(LLM_DEFAULTS.temperature),
   /** Harte Obergrenze des One-Shots. Danach gilt der Roh-Prompt. 0 = kein Deckel. */
-  timeoutMs: z.number().default(15000),
+  timeoutMs: z.number().default(LLM_DEFAULTS.timeoutMs),
   /**
    * Der One-Shot laeuft fuer JEDEN Schritt — auch fuer eine Frage oder ein
    * "hallo". Vorgabe ist `true` (Nutzerentscheidung 2026-10-19: der Veredler
    * soll in der Regel immer aktiv sein). `false` stellt den alten Kurzweg
    * wieder her: klare CHAT-/LOOKUP-Turns gehen ohne Modellaufruf durch.
    */
-  alwaysEnhance: z.boolean().default(true),
+  alwaysEnhance: z.boolean().default(LLM_DEFAULTS.alwaysEnhance),
   /**
    * Probe-Journal der VERWORFENEN One-Shot-Antworten (JSONL), relativ zum
    * WORKSPACE. Leer = kein Journal (dann bleibt nur die stderr-Zeile).
@@ -191,21 +191,21 @@ export const Config = z.object({
    * Nutzertext und die Antwort im Klartext und gehoert deshalb dem Projekt:
    * es liegt unter `.shinon/`, wird nicht ausgeliefert und ist gitignoriert.
    */
-  probeJournalPath: z.string().default('.shinon/one-shot-journal.jsonl'),
+  probeJournalPath: z.string().default(PATH_DEFAULTS.probeJournal),
   /** Entscheidungen auf `DECISION_CHANNEL` emittieren. */
   trace: z.boolean().default(true),
   /**
    * Intent-Patterns-Datei (relativ zum Paket). Enthält Trigger → Expansion.
    * Leer = keine Intent-Erweiterung.
    */
-  intentPatternsPath: z.string().default('./assets/intent-rules.json'),
+  intentPatternsPath: z.string().default(PATH_DEFAULTS.intentPatterns),
   /**
    * Ablage des Intent-Gedächtnisses (relativ zum WORKSPACE, nicht zum Host-CWD).
    * Leer = kein Gedächtnis: dann bleibt jede Gewichtung bei 1, und kein Turn
    * schreibt eine Datei. Die Zählung über alle Läufe ist Projektwissen und
    * gehört deshalb zum Projekt, nicht in den Tarball.
    */
-  intentMemoryPath: z.string().default('.shinon/intent-memory.json'),
+  intentMemoryPath: z.string().default(PATH_DEFAULTS.intentMemory),
   /**
    * Namensraum des dauerhaften SALVAGED_PROSE-Zaehlers in der Ablage
    * (`shinon_index_store`). Leer = keine Persistenz; dann zaehlt der Prompter
@@ -223,7 +223,7 @@ export const Config = z.object({
    * dem Tarball. Leer = nicht lesen, nicht schreiben (dann bleibt die
    * Registry, wie sie ausgeliefert wurde).
    */
-  blocksLearnedPath: z.string().default(LEARNED_DEFAULT_PATH),
+  blocksLearnedPath: z.string().default(PATH_DEFAULTS.learnedBlocks),
 });
 
 

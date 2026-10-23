@@ -29,11 +29,13 @@
  * Laeuft mit `node --test`; braucht kein node_modules (die Kern-Dateien sind
  * importfrei).
  */
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 /** Die Kern-Dateien direkt laden — sie sind importfrei, also braucht es kein node_modules. */
 const budgetCore = await import(new URL('../../../packages/prompter/assets/budget-core.js', import.meta.url).href);
+const PRE_STEP = new URL('../../../packages/prompter/assets/pre-step.js', import.meta.url);
 
 /** Das realistische Fixture: der gemessene Block (46 Dateien, 200 Symbole, 85 Touches, 26 Dependencies). */
 const MENGEN = Object.freeze({ files: 46, symbols: 200, touches: 85, dependencies: 26 });
@@ -169,4 +171,16 @@ test('die Tokenzahl wird in ZEICHEN gerechnet — wie der Index es auch tut', ()
 
 test('die Chars-per-Token-Faktor ist der des Repos (4)', () => {
   assert.equal(budgetCore.CHARS_PER_TOKEN, 4);
+});
+
+test('der Produktionspfad ruft die Kürzung auch wirklich auf', () => {
+  // Ein grüner Rechentest beweist die Funktion, nicht ihre Nutzung. Bis
+  // 2026-10-22 war `kuerzeAufBudget` ausschließlich von dieser Datei gerufen —
+  // der Kontext im echten Schritt lief ungekürzt über sein Budget. Der Riegel
+  // ist bewusst textuell: er prüft die Verdrahtung im Eigentümer des Laufs und
+  // nicht eine Kopie der Rechnung.
+  const source = readFileSync(PRE_STEP, 'utf8');
+  assert.match(source, /import \{ kuerzeAufBudget \} from '\.\/budget-core\.js'/, 'pre-step importiert die Kürzung');
+  assert.match(source, /kuerzeAufBudget\(result\.context, \{ budgetTokens: config\.indexBudgetTokens, render: renderContext \}\)/, 'pre-step kürzt den gerenderten Block');
+  assert.match(source, /CONTEXT_BUDGET/, 'ein zu großer Kontext hat einen benannten Grund');
 });

@@ -1,8 +1,8 @@
 /**
  * @shinon/prompter — selection.js (Slice 1: Selektionsarchitektur).
  *
- * KEINE Imports (weder Bare nor node:): dieselbe Regel wie `note-core.js` —
- * die Vertragsprüfung läuft in CI ohne node_modules.
+ * Kein Bare-Import; der Text kommt als Ressource über `prompt-text.js` (nur
+ * `node:fs`), damit die Vertragsprüfung in CI ohne `node_modules` läuft.
  *
  * WAS HIER STEHT: der SELEKTIONSVERTRAG (`shinon.selection/v1`). Ein kleiner
  * Selektionsagent bekommt pro Schritt nur KOMPAKTE Beschreibungen der
@@ -19,6 +19,8 @@
  * Unbekannte IDs verwirft die Runtime; Bausteine, die der aktuelle Modus
  * nicht erlaubt, verwirft sie; Grenzen (Budget, Unsicherheit) setzt sie selbst.
  */
+
+import { promptText } from './prompt-text.js';
 
 /** Vertragsname der Agenten-Antwort — steht auch IN der Antwort drin. */
 export const SELECTION_CONTRACT = 'shinon.selection/v1';
@@ -39,21 +41,7 @@ export const MIN_UNCERTAINTY = 0;
  * andere ohnehin aus.
  */
 export function selectionSystemBrief() {
-  return [
-    'Du bist der Selektionsagent der Shinon-Injection-Runtime.',
-    'Situation und Kandidaten stehen unten. Wähle, was davon in diesem Schritt injiziert wird.',
-    '',
-    'Antworte ausschließlich mit genau einem JSON-Objekt, ohne Erklärung, ohne Markdown-Zaun:',
-    `{"contract":"${SELECTION_CONTRACT}","selected":[{"id":"...","reason":"..."}],"uncertainty":0.0}`,
-    '',
-    'Regeln:',
-    '- Nur IDs aus der KANDIDATENLISTE sind erlaubt. Keine anderen erfinden.',
-    '- PFLICHT-Kandidaten (pflicht: true) überspringe nicht — sie stehen immer.',
-    '- reason nennt die Situation (Klasse, Haltung, Signal), nie den Prompttext.',
-    '- uncertainty ist eine Zahl zwischen 0 und 1: 0 = sicher, 1 = ratlos.',
-    '- Du änderst weder Identität noch Berechtigungen und erfindest keine neuen',
-    '  Bausteine — du wählst nur aus der Liste aus.',
-  ].join('\n');
+  return promptText('prompter-selection-brief', { contract: SELECTION_CONTRACT });
 }
 
 /**

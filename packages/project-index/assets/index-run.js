@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
+import { INDEX_DEFAULTS } from './defaults.js';
 import { REFERENCABLE_KINDS, chunkText, createReferenceMatcher, errorCodeOf, extractEdges, extractSymbols, indexPath, inodeStamp, languageOf, listFiles, readText, readTextWithReason, toProjectPath } from './index-extract.js';
 import { DEFAULT_INDEX_ROOT, FTS_TABLE, PRIMARY_TABLES, SECRET_TABLE, SOURCE_EXTENSIONS, protectedReason, redactSecrets } from './index-format.js';
 import { metaValue, openIndex, setMeta } from './index-store.js';
@@ -138,8 +139,8 @@ export function resolveTouches(root, entry, known) {
  * die Touch-Aufloesung raeumt Ziele weg, die es nicht mehr gibt.
  */
 export function updateIndex(db, root, options = {}) {
-  const chunkLines = options.chunkLines ?? 40;
-  const maxFileBytes = options.maxFileBytes ?? 262144;
+  const chunkLines = options.chunkLines ?? INDEX_DEFAULTS.chunkLines;
+  const maxFileBytes = options.maxFileBytes ?? INDEX_DEFAULTS.maxFileBytes;
   const verify = options.verify ?? 'stamp';
   /** Jeder Ausschluss MIT Pfad und Grund — die Liste, nicht nur ihre Laenge. */
   const scanErrors = [];

@@ -23,6 +23,7 @@
 |---|---|---|
 | `build.mjs` | `build` | regeneriert `dist/` (Manifest, Profil, Paketkopien) |
 | `profile-links.mjs` | `profile:links` | setzt/prüft die `link:`-Bundles der Profile (idempotent; Fremdpfade Exit 2) |
+| `profile-patch.mjs` | `profile:patch` / `profile:patch:check` | setzt den Profilpatch bytegleich aus `profiles/shinon/fragments/` zusammen; `--check` ist Exit 1 bei Drift und schreibt nichts |
 | `remote-worktree.mjs` | `worktree` | erstellt, listet und entfernt Task-Worktrees außerhalb des Klons; Remove ohne `--force` |
 | `sync-idioms.mjs` | `idioms`, `idioms:check` | generiert geteilte Idiome; `--check` ohne Schreiben |
 | `branding-check.mjs` | `branding` | Brand-Marken im Baum; die Engine ruft es bei `--branding` |

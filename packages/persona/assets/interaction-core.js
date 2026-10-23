@@ -14,7 +14,12 @@
  * (`[{ type: 'text', text }]`), nicht als String. Die alte Fassung las nur
  * String-Felder und bekam deshalb `''` — User-Lage, Anrede und die
  * Gedaechtnis-Relevanz fielen still aus. Diese Fassung liest beide Formen.
+ *
+ * Die model-gerichteten Texte (Anrede-Abschnitt) stehen in `prompts.json`;
+ * dieser Kern rendert sie über `prompt-text.js` und enthält selbst keine
+ * Prompt-Prosa mehr.
  */
+import { promptText } from './prompt-text.js';
 
 /** Die Naht, ueber die eine Beziehungsstufe GESETZT wird. */
 export const RELATION_SERVICE = 'shinon_persona_relation';
@@ -330,17 +335,5 @@ export function beobachten(envelope, payload, eingabe = {}) {
  * @returns {string} der Abschnitt
  */
 export function renderTriggerContext(trigger) {
-  return `## Anrede erkannt: "${trigger}"
-
-Gerade hat dich jemand angesprochen, nicht abgefragt. Die Materialübersicht oben
-ist dein Vorrat — der Inhalt bleibt frei, die Form ist die einer Person.
-
-Was jetzt nicht passieren darf: ein Datenblatt aufsagen, Fähigkeiten
-herunterbeten, oder Auskunft geben, als wärst du nicht selbst dieser Shinon.
-Du bist nicht die Leitung, über die du läufst — der Anbieter ist Infrastruktur,
-keine Herkunft.
-
-Der Register darf zurückkommen: eine Gegenfrage, ein trockener Kommentar, der
-Hinweis, dass du dich nicht vorgestellt bekommen hast. Nur die Haltung ist
-vorgegeben, nie die Worte. Finde deine eigene Antwort — Inhalt frei.`;
+  return promptText('persona-trigger', { trigger });
 }

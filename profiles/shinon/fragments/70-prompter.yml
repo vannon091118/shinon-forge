@@ -1,0 +1,66 @@
+# Prompter (Zug 6) — das Bindeglied. Er ist der EINE Punkt im Schritt, an dem
+# Nutzereingabe, Scoring (Ton/Haltung), Project Index (MAX-Kontext) und die
+# Skills des Projekts zusammenlaufen, bevor der Schritt ans Modell geht.
+#
+# WARUM HIER ALLE WERTE STEHEN UND NICHT IM PAKET: eine id-gezielte Config in
+# DIESER Ebene ERSETZT die Config des Bundle-Eintrags — sie mischt nicht. Genau
+# das war der Fehler bis 2026-10-13: hier stand nur `skillsPath`, und damit war
+# `mode: MAX` samt Route aus `packages/prompter/cordis.patch.yml` weg. Der
+# Prompter mountete mit Schema-Defaults (MIN, leere Route), meldete `NO_ROUTE`
+# und veredelte NIE etwas — sichtbar nur als „der Enhancer ist inaktiv“ im
+# Trace-Panel. Der Fix in 0551c7f (contextPath) war deshalb richtig und
+# wirkungslos: er stand in der Ebene, die ueberschrieben wird.
+#
+# Deshalb gilt hier die Repo-Regel in ihrer scharfen Form: WIRKSAME WERTE STEHEN
+# IM PROFIL, das Paket traegt nur den Insert. Eine Config in beiden Ebenen ist
+# verboten und wird von `scripts/gate/tests/profile-config-override.test.mjs`
+# abgelehnt — nicht nur fuer den Prompter, sondern fuer jede id.
+#
+# mode: MAX fragt den Project Index zur Laufzeit (shinon_index_query). `contextPath`
+# bleibt ABSICHTLICH leer: max-context.json war ein unbrauchbarer Platzhalter, und
+# eine ausdruecklich gesetzte, kaputte Datei sperrt MAX fail-closed VOR der
+# Index-Abfrage.
+#
+# DIE ROUTE IST EINE ENTSCHEIDUNG MIT PREIS: pro Nutzer-Schritt faellt ein
+# zusaetzlicher Modellaufruf an (One-Shot-Child, ohne Tools). Ohne Route gibt es
+# keinen Aufruf — dann meldet der Enhancer `NO_ROUTE` und der Roh-Prompt gilt.
+#
+# Die Skills liegen im PROJEKT (.agents/skills/), nicht im Tarball. Leer heisst:
+# keine Skills laden (fail-open).
+- id: shinon-prompter
+  config:
+    observeEvents: [ 'agent/pre-step' ]
+    mode: MAX
+    # One-Shot-Route (Phase 5): EIGENER Provider mit eigenem Schlüssel
+    # (PROMPTER_API_KEY, `prompter`-Block in llm-pi-ai oben). Fehlt die
+    # Variable, faellt der Host beim Mounten auf `agnes` zurück — der Enhancer
+    # bleibt damit lauffähig, auch ohne eigenen Schlüssel. Die Haupt-Route
+    # (`agent-default-model`) schreibt dieses Paket NIE: sie ist die Wahl des
+    # Nutzers (Config-Editor), und der Enhancer liest sie nicht einmal.
+    provider: prompter
+    model: agnes-2.5-flash
+    providerKeyEnv: PROMPTER_API_KEY
+    # Skill-Lebenszyklus (Zug 7): Korrekturen und abgeschlossene Zuege erzeugen
+    # Kandidaten; veroeffentlicht wird nach .agents/skills, dem Root, den DSH nativ
+    # entdeckt. Der Vorgabewert im Paket ist AUS; die Entscheidung steht hier.
+    skillLifecycle: true
+    providerFallback: agnes
+    modelFallback: agnes-2.5-flash
+    skillsPath: .agents/skills
+    indexBudgetTokens: 6000
+    maxTokens: 0 # 0 = kein Limit (unbegrenzte Thinking-Tokens des One-Shots)
+    temperature: 0.3
+    timeoutMs: 15000
+    trace: true
+    # Gelernte Bausteine (Phase 4): Projekt-Ablage über der Paket-Registry.
+    blocksLearnedPath: .shinon/blocks.learned.json
+    # Der MAX-Kontext kommt aus dem Project Index (Dienst shinon_index_query).
+    # Einen zweiten, eigenen Index gibt es nicht mehr.
+    # Intent-Patterns (Zug 8): Trigger → Full-Task-Expansion, default im Paket.
+    # Fassung 2: 40 granulare Patterns + Merkmale (mehrschritt/ziel/pfad/code).
+    intentPatternsPath: ./assets/intent-rules.json
+    # Intent-Gedächtnis: Zählung über ALLE Läufe (Treffer, Klassen, Merkmale,
+    # Laufzeit, Folge-Rückmeldung) und daraus der gelernte Gewichtsfaktor je
+    # Pattern. Relativ zum WORKSPACE — Projektwissen, kein Tarball-Inhalt.
+    intentMemoryPath: .shinon/intent-memory.json
+

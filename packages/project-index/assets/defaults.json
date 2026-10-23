@@ -1,0 +1,7 @@
+{
+  "contract": "shinon.project-index/defaults-v1",
+  "note": "Vorgaben des Index. Das Profil gewinnt; diese Werte gelten, wenn niemand etwas anderes sagt. Die Dateigrenze ist eine harte Grenze: was darueber liegt, wird mit Grund ZU_GROSS gemeldet, nie still gekuerzt.",
+  "maxFileBytes": 262144,
+  "chunkLines": 40,
+  "contextBudgetTokens": 6000
+}

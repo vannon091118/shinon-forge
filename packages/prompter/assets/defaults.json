@@ -1,0 +1,21 @@
+{
+  "contract": "shinon.prompter/defaults-v1",
+  "note": "Die Vorgabewerte des Pakets. Das Profil gewinnt; hier steht nur, was gilt, wenn niemand etwas anderes sagt. Darum steht in dieser Datei kein Modellname und kein Schluessel — die Route waehlt der Nutzer.",
+  "llm": {
+    "maxTokens": 1200,
+    "temperature": 0,
+    "timeoutMs": 15000,
+    "alwaysEnhance": true
+  },
+  "context": {
+    "indexBudgetTokens": 6000
+  },
+  "paths": {
+    "notesDir": "generated-skills",
+    "skillsDir": ".agents/skills",
+    "learnedBlocks": ".shinon/blocks.learned.json",
+    "intentMemory": ".shinon/intent-memory.json",
+    "probeJournal": ".shinon/one-shot-journal.jsonl",
+    "intentPatterns": "./assets/intent-rules.json"
+  }
+}

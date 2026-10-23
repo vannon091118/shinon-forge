@@ -1,0 +1,10 @@
+# @shinon/core owns the sidebar brand. 'sidebar.brand.mark' and
+# 'sidebar.brand.name' are single slots (exactly one occupant), so the shipped
+# official brand has to yield.
+- id: ui-brand-official
+  disabled: true
+- id: ui-settings-general
+  name: "@deepseek-ai/dsh-client-ui-settings-general"
+  config:
+    welcomeNoticeVersion: 2026-09-28.1
+

@@ -103,7 +103,7 @@
     "packages/core/client.js": 409,
     "packages/dashboard/client.js": 479,
     "packages/markers/client.js": 627,
-    "packages/persona/index.js": 1328,
+    "packages/persona/index.js": 1197,
     "packages/popup/client.js": 414,
     "packages/prompter/client.js": 282,
     "packages/scoring/assets/scoring-core.js": 784,

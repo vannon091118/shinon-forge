@@ -1,0 +1,198 @@
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: openrouter-free
+    model: minimax/minimax-m3.1-flash:free
+# Shinon-Preset: EIGENE, schmalere Werkzeug-Zusammensetzung.
+#
+# Das DSH liefert vier Presets (standard, ptc, minimal, cordis). 'standard'
+# ist der Werkzeug-Satz der DSH-Standards; Shinon faehrt ab hier seinen
+# eigenen. Der Unterschied ist genau eine Stelle — die Terminal-Zeilen:
+#
+#   VORHER   tool-bash (2288 B) + tool-jobs (job_output 615 / job_list 168 /
+#            job_kill 370) + die Section 'tool:jobs' (384 B)
+#   NACHHER  persistent-shell-Gruppe: ein 'bash' (776 B) auf der PTY, ohne die
+#            drei Job-Werkzeuge und ohne die Job-Section.
+#
+# GEMESSEN (Profilboot, node .cache/probe/measure-preset.mjs):
+#   Tool-Anzahl    30 -> 27
+#   Schema-Bytes 26465 -> 23797   (-2668 B, -10,1 %)
+#   Section-Bytes 5168 -> 4692    (-476 B)
+#
+# Was der Tausch KOSTET (ehrlich benannt):
+#   - Die Job-Steuerung (job_output/job_list/job_kill) und der Parameter
+#     run_in_background entfallen. Ein dauerhaft laufender Befehl wird mit
+#     'sleep 10 &' im persistenten Shell gestartet.
+#   - Der Parameter sandbox_permissions (Eskalation der Dateisandbox aus dem
+#     Tool heraus) entfaellt. Die Sandbox selbst bleibt: terminal-bash
+#     injiziert sandboxPolicy und schliesst den Aufruf ueber ctx.sandbox ein
+#     (dsh-terminal-bash/lib/index.js:906-969). Das Weitern der Sandbox
+#     bleibt eine Sache des Menschen (Permission-Preset).
+#   - workdir und timeoutMs je Aufruf entfallen als Parameter; das
+#     Arbeitsverzeichnis bleibt ueber working_directory erreichbar.
+#
+# Die Gruppe ist dieselbe, die das DSH im eigenen Preset 'minimal' verwendet
+# (node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-web-app/
+# presets/minimal.patch.yml): persistent-shell mit isolate: terminals,
+# dsh-terminal + dsh-terminal-bash + dsh-tool-bash-persistent.
+#
+# PLATTFORM: Diese Datei nennt keine !!js-Ausdruecke, weil das statische Gate
+# sie mit js-yaml liest (scripts/lib/yaml.mjs) und ein unbekanntes Tag dort
+# ein ungueltiges YAML ist. Die Bash-Zeilen sind deshalb fest eingeschaltet
+# und die pwsh-Zeile fest ausgeschaltet — fuer die Plattform, auf der dieses
+# Repo laeuft (Linux: AppImage, deb, systemd-Units).
+#
+# OFFENE LUECKE, die der Nutzer kennen muss: der Windows-Weg
+# (scripts/win-build.mjs, CI-Bauhost windows-latest) bepackt DIESELBE Datei
+# (scripts/lib/payload.mjs:67). Dort bietet das Preset also bash ohne pwsh —
+# das DSH-Standard-Preset tauscht es umgekehrt. Wer Windows braucht, muss
+# die pwsh-Zeile aktivieren und die Bash-Zeilen deaktivieren; eine
+# Plattformbedingung kann diese Datei nicht tragen, weil der Gate-Parser
+# kein !!js kennt. Der Nachweis des Windows-Betriebs steht ohnehin noch aus
+# (docs/ROADMAP.md:69).
+- insert:
+    - id: preset-shinon
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: shinon
+        order: 0
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: You are a coding agent powered by the {{model}} model.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: persistent-shell
+            name: cordis:group
+            group: true
+            isolate:
+              terminals: true
+            config:
+              - id: pty
+                name: '@deepseek-ai/dsh-terminal'
+              - id: terminal-bash
+                name: '@deepseek-ai/dsh-terminal-bash'
+                config:
+                  timeoutMs: 300000
+              - id: persistent-bash
+                name: '@deepseek-ai/dsh-tool-bash-persistent'
+                config:
+                  timeoutMs: 300000
+                  description: |-
+                    Run commands in a bash shell
+                    * The contents of the "command" parameter do NOT need to be XML-escaped.
+                    * State is persistent across command calls: the working directory and the
+                      environment carry over from one call to the next.
+                    * Long output is truncated; the full output is saved to a file whose path
+                      is reported. To inspect a line range of a file, e.g. lines 10-25, try
+                      'sed -n 10,25p /path/to/the/file'.
+                    * Please avoid commands that may produce a very large amount of output.
+                    * Please run long lived commands in the background, e.g. 'sleep 10 &'.
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: true
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-schedule
+            name: '@deepseek-ai/dsh-tool-schedule'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                    You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+
+                    The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
+
+                    Resolve discoverable facts by inspection. Use ask_user_question only for user-owned choices or material ambiguity that inspection cannot answer. Do not ask the user where code lives or how current behavior works when you can find out.
+
+                    Make the plan decision-complete: state the goal and success criteria; group implementation changes by subsystem; identify public API, schema, and data-flow changes; cover edge cases, failure modes, tests, acceptance criteria, and explicit assumptions. Keep it concise enough to review but detailed enough that another engineer can implement it without making design decisions.
+
+                    When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response: it presents the plan for approval, and implementation begins only in a later step after approval. Do not paste the final plan as a plain reply or ask "should I proceed?" through prose or ask_user_question. If review rejects it, incorporate the feedback and present again. If the review channel is unavailable or aborted, stay in plan mode and ask the user to switch modes manually; do not proceed with implementation.
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                config:
+                  provider: spawn
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: tool-plugin-manager
+            name: '@deepseek-ai/dsh-plugin-manager/tools'
+            disabled: true
+          - id: tool-plugin-market
+            name: '@deepseek-ai/dsh-plugin-market/tools'
+            disabled: true

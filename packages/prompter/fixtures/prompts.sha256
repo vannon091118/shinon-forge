@@ -1,0 +1,8 @@
+# shinon.prompts/v1 — @shinon/prompter
+# Absichtlich eingefroren: eine Textänderung ist eine bewusste Entscheidung und zieht dieses Fixture mit.
+prompter-mode-allowed 530011ccc6d053b68078b7e5f89b50b1a56a90e3a2b9eb585cb664be46c36ba7
+prompter-mode-forbidden 369d7a2483fc87f585d9fa4c8c88c2b6e24811f9fbce1ffb8b272d4eb34b5723
+prompter-result-brief cc8b0593351c073847c67e2f52cbdcd6690ca5e44cf265c22fdb91efee115084
+prompter-selection-brief 5b9e29f26080391519b7ef5803dab403760bfcb8302b44f444bccb95b6dc63c6
+prompter-skill-system 1a1fb67b2f515f03680a1d34073652d91a01879bb1cd588dedd729a12601a86b
+prompter-untrusted-rule 3bfb96beb4e075c2a4cd3867f119b0881315200cbfa0edc26a6f8f3f6a90f327

@@ -1,0 +1,224 @@
+# Modell-Route über den pi-ai-Adapter. `apiKeyEnv` ist nur ein REFERENZNAME:
+# das Secret kommt aus der Umgebung (SHINON_API_KEY), nie aus dieser Datei.
+# Ohne gesetzte Variable bleibt die Route konfiguriert-aber-schlüssellos.
+#
+# WER DIE ROUTE WÄHLT: DER NUTZER. `agent-default-model` ist ein live-Feld
+# (`dsh-agent-default-model`), die Modellwahl in der UI schreibt sie über den
+# gemounteten `config-editor` (`saveSelection`) in GENAU DIESE Datei. Der Wert
+# unten ist deshalb der zuletzt gespeicherte Stand und keine Vorgabe des Repos:
+# nach einem Wechsel in der UI steht hier eine andere Route, und das ist die
+# Zusage, kein Fehler. Gemessen 2026-10-20: `provider: prompter`,
+# `model: agnes-2.5-flash` — beide Provider zeigen auf den Agnes-Host,
+# `prompter` liest `PROMPTER_API_KEY`, `agnes` liest `AGNES_API_KEY`.
+#
+# WAS GEPRÜFT WIRD, IST DIE FORM, NICHT DER NAME
+# (`scripts/lib/model-route.mjs`, `scripts/gate/tests/model-route.test.mjs`):
+# der Provider muss in diesem Patch definiert sein; eine vorhandene feste
+# Modellliste wird geprüft, eine leere Liste steht für den dynamischen DSH-
+# Katalog. `apiKeyEnv` muss einen Namen nennen (nie einen Wert).
+# Ein Modell-Literal im Test wäre beim nächsten Wechsel rot und würde die Zahl
+# ändern statt die Frage. Hart bleibt nur: eine Route OHNE Schlüssel ist
+# MISSING_CREDENTIAL — die deepseek-official-Route (dsh-llm-deepseek) ist
+# gemountet, hat aber ohne DEEPSEEK_API_KEY keinen. Wer hier eine Route ohne
+# gesetzte Variable einträgt, nimmt genau das in Kauf.
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      # Der Katalog kommt vom Anbieter, nicht aus dem Profil: `dsh-llm-pi-ai`
+      # loest die Modelle ueber `catalogModels(provider)` auf, der eingebaute
+      # pi-ai-Katalog fuehrt 42 Anbieter. Was der Profil-Eintrag beisteuert, ist
+      # der SCHLUESSEL (`apiKeyEnv`), der ANZEIGENAME und die DRAHTFORM des
+      # Endpunkts (`api`, `baseURL`) — ohne die beiden letzten kann das
+      # Modell-Panel des Hosts kein Modell eintragen, das der eingebaute
+      # Katalog nicht kennt (`needs an api`). Eine `models`-Liste wuerde den
+      # GESAMTEN Katalog ersetzen (resolveRouteModels), deshalb steht hier
+      # keine: der Katalog des Anbieters bleibt der Katalog.
+      #
+      # Ohne gesetzten Schluessel liefert `listModels` leer und der Anbieter
+      # faellt aus der Modell-Liste des Hosts (gemessen: `listModels` gibt bei
+      # fehlendem Schluessel `[]` zurueck, und `buildModelCatalog` filtert
+      # genau solche Gruppen weg). Jeder Eintrag nennt seinen eigenen
+      # Umgebungsnamen — der Name ist nicht geraten, sondern aus dem
+      # Katalog-Modul gelesen (`@earendil-works/pi-ai/dist/providers/<id>.js`);
+      # der Katalog ist die Quelle, das Profil nur die Schluesselreferenz.
+      openrouter:
+        apiKeyEnv: SHINON_API_KEY
+        displayName: OpenRouter
+        api: openai-completions
+        baseURL: https://openrouter.ai/api/v1
+      nvidia:
+        apiKeyEnv: NVIDIA_API_KEY
+        displayName: NVIDIA
+      groq:
+        apiKeyEnv: GROQ_API_KEY
+        displayName: Groq
+      cerebras:
+        apiKeyEnv: CEREBRAS_API_KEY
+        displayName: Cerebras
+      google:
+        apiKeyEnv: GOOGLE_API_KEY
+        displayName: Google
+      mistral:
+        apiKeyEnv: MISTRAL_API_KEY
+        displayName: Mistral
+      together:
+        apiKeyEnv: TOGETHER_API_KEY
+        displayName: Together AI
+      huggingface:
+        apiKeyEnv: HUGGINGFACE_API_KEY
+        displayName: Hugging Face
+      ant-ling:
+        apiKeyEnv: ANT_LING_API_KEY
+        displayName: Ant Ling
+      anthropic:
+        apiKeyEnv: ANTHROPIC_API_KEY
+        displayName: Anthropic
+      azure:
+        apiKeyEnv: AZURE_OPENAI_API_KEY
+        displayName: Azure OpenAI
+      baseten:
+        apiKeyEnv: BASETEN_API_KEY
+        displayName: Baseten
+      deepseek:
+        apiKeyEnv: DEEPSEEK_API_KEY
+        displayName: DeepSeek
+      fireworks:
+        apiKeyEnv: FIREWORKS_API_KEY
+        displayName: Fireworks
+      google-vertex:
+        apiKeyEnv: GOOGLE_CLOUD_API_KEY
+        displayName: Google Vertex
+      kimi-coding:
+        apiKeyEnv: KIMI_API_KEY
+        displayName: Kimi Coding
+      meta:
+        apiKeyEnv: META_API_KEY
+        displayName: Meta
+      minimax:
+        apiKeyEnv: MINIMAX_API_KEY
+        displayName: MiniMax
+      minimax-cn:
+        apiKeyEnv: MINIMAX_CN_API_KEY
+        displayName: MiniMax CN
+      moonshotai:
+        apiKeyEnv: MOONSHOT_API_KEY
+        displayName: Moonshot AI
+      moonshotai-cn:
+        apiKeyEnv: MOONSHOT_API_KEY
+        displayName: Moonshot AI CN
+      openai:
+        apiKeyEnv: OPENAI_API_KEY
+        displayName: OpenAI
+      opencode:
+        apiKeyEnv: OPENCODE_API_KEY
+        displayName: OpenCode
+      opencode-go:
+        apiKeyEnv: OPENCODE_API_KEY
+        displayName: OpenCode Go
+      qwen-token-plan:
+        apiKeyEnv: QWEN_TOKEN_PLAN_API_KEY
+        displayName: Qwen Token Plan
+      qwen-token-plan-cn:
+        apiKeyEnv: QWEN_TOKEN_PLAN_CN_API_KEY
+        displayName: Qwen Token Plan CN
+      qwen-token-plan-individual:
+        apiKeyEnv: QWEN_TOKEN_PLAN_API_KEY
+        displayName: Qwen Token Plan Individual
+      radius:
+        apiKeyEnv: RADIUS_API_KEY
+        displayName: Radius
+      vercel-ai-gateway:
+        apiKeyEnv: AI_GATEWAY_API_KEY
+        displayName: Vercel AI Gateway
+      xai:
+        apiKeyEnv: XAI_API_KEY
+        displayName: xAI
+      xiaomi:
+        apiKeyEnv: XIAOMI_API_KEY
+        displayName: Xiaomi
+      xiaomi-token-plan-ams:
+        apiKeyEnv: XIAOMI_TOKEN_PLAN_AMS_API_KEY
+        displayName: Xiaomi Token Plan AMS
+      xiaomi-token-plan-cn:
+        apiKeyEnv: XIAOMI_TOKEN_PLAN_CN_API_KEY
+        displayName: Xiaomi Token Plan CN
+      xiaomi-token-plan-sgp:
+        apiKeyEnv: XIAOMI_TOKEN_PLAN_SGP_API_KEY
+        displayName: Xiaomi Token Plan SGP
+      zai:
+        apiKeyEnv: ZAI_API_KEY
+        displayName: Z.ai
+      zai-coding-cn:
+        apiKeyEnv: ZAI_CODING_CN_API_KEY
+        displayName: Z.ai Coding CN
+      agnes:
+        displayName: Agnes
+        apiKeyEnv: AGNES_API_KEY
+        api: openai-completions
+        baseURL: https://apihub.agnes-ai.com/v1
+        models:
+          - id: agnes-2.5-flash
+            name: Shinon 2.5 Flash
+          - id: agnes-2.5-pro-alpha
+            name: agnes-2.5-pro-alpha
+          - id: agnes-video-2.5-flash
+            name: agnes-video-2.5-flash
+          - id: agnes-3.0-flash
+            name: agnes-3.0-flash
+          - id: agnes-image-2.1-flash
+            name: agnes-image-2.1-flash
+          - id: agnes-video-2.5
+            name: agnes-video-2.5
+          - id: agnes-image-2.0-flash
+            name: agnes-image-2.0-flash
+          - id: agnes-3.0-flash-max
+            name: agnes-3.0-flash-max
+          - id: agnes-2.5-pro
+            name: agnes-2.5-pro
+          - id: agnes-2.5-pro-beta
+            name: agnes-2.5-pro-beta
+          - id: agnes-image-2.5-flash
+            name: agnes-image-2.5-flash
+          - id: agnes-3.0-pro
+            name: agnes-3.0-pro
+      # MiniMax M3.1 Flash (free) fehlt im eingebauten pi-ai-Katalog (gemessen
+      # am 2026-10-22: der OpenRouter-Katalog fuehrt 396 Modelle, die
+      # minimax-Familie endet bei `minimax/minimax-m3`). Eine `models`-Liste am
+      # Anbieter `openrouter` wuerde dessen gesamten Katalog ersetzen
+      # (resolveRouteModels), daher ein eigener Anbieter mit nur diesem Modell.
+      # Gleicher Schluessel wie `openrouter`, Endpunkt von OpenRouter.
+      openrouter-free:
+        displayName: OpenRouter Free
+        apiKeyEnv: SHINON_API_KEY
+        api: openai-completions
+        baseURL: https://openrouter.ai/api/v1
+        models:
+          - id: minimax/minimax-m3.1-flash:free
+            name: MiniMax M3.1 Flash (free)
+      prompter:
+        displayName: Prompter
+        apiKeyEnv: PROMPTER_API_KEY
+        api: openai-completions
+        baseURL: https://apihub.agnes-ai.com/v1
+        models:
+          - id: agnes-2.5-flash
+            name: Shinon 2.5 Flash
+          - id: agnes-2.5-pro-alpha
+            name: agnes-2.5-pro-alpha
+          - id: agnes-video-2.5-flash
+            name: agnes-video-2.5-flash
+          - id: agnes-3.0-flash
+            name: agnes-3.0-flash
+          - id: agnes-image-2.1-flash
+            name: agnes-image-2.1-flash
+          - id: agnes-video-2.5
+            name: agnes-video-2.5
+          - id: agnes-image-2.0-flash
+            name: agnes-image-2.0-flash
+          - id: agnes-3.0-pro
+            name: agnes-3.0-pro
+          - id: agnes-2.5-pro-beta
+            name: agnes-2.5-pro-beta
+          - id: agnes-image-2.5-flash
+            name: agnes-image-2.5-flash

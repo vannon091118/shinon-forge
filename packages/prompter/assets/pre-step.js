@@ -17,6 +17,7 @@
  */
 import { join } from 'node:path';
 import { abortRecord } from './abort-core.js';
+import { kuerzeAufBudget } from './budget-core.js';
 import { WEIGHTS_CONTRACT, WEIGHTS_SERVICE, decisionBlocks, selectBlocks } from './block-select.js';
 import { CAPABILITIES_CONTRACT, briefRecord, matchCapability, renderTaskBrief, taskBrief } from './capability-map.js';
 import { knowledgeTrace, renderKnowledgeBlock } from './knowledge-block.js';
@@ -24,6 +25,7 @@ import { enhanceGuarded, replacePrompt } from './enhancer.js';
 import { addTurnDuration, memorySummary, semanticProfile, weightsFrom } from './intent-memory.js';
 import { UNDEFINED, expandPrompt, isQuestion, normalizeIntentText, resolveIntent } from './intent-resolver.js';
 import { CONTRACT, DECISION_CHANNEL, FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, NOT_SUPPLIED, SCORING_SERVICE, SCORING_SERVICE_CONTRACT, contextLabel, noContext, resolveMode, withContext } from './mode-core.js';
+import { renderContext } from './render-context.js';
 import { PROVENANCE_CONTRACT, provenanceRecord } from './provenance.js';
 import { OUTCOME_EFFECTS } from './result-contract.js';
 import { ContextSchema } from './schema.js';
@@ -152,13 +154,40 @@ function maxContext(ctx, config, runtime, prompt) {
     runtime.lastBudgetTokens = config.indexBudgetTokens;
     runtime.lastContextChars = (runtime.context?.files ?? []).reduce((s, f) => s + (f?.content?.length ?? 0), 0);
     runtime.lastContextFiles = (runtime.context?.files ?? []).map((f) => f?.path);
-    return withContext(runtime.context, 'file');
+    return budgetContext(withContext(runtime.context, 'file'), config, runtime);
   }
 
   const projectResult = indexContext(ctx, config, prompt.text, runtime);
-  if (projectResult.source !== 'none') return projectResult;
+  if (projectResult.source !== 'none') return budgetContext(projectResult, config, runtime);
 
   return noContext('MODE_NEEDS_CONTEXT');
+}
+
+/**
+ * Das Budget gilt dem GERENDERTEN Block, nicht dem Index-Inhalt.
+ *
+ * Der Index fuellt den Inhalt bis zum Zeichenbudget und legt Metadaten obendrauf;
+ * `kuerzeAufBudget` reserviert deren Overhead, kuerszt von hinten und prueft am
+ * gerenderten Text nach. Ohne diese Stelle war die Korrektur nur getestet, nicht
+ * wirksam (6000 Token -> 33 217 Zeichen, 38 % darueber). Passt selbst der
+ * metadata-only-Block nicht, geht der Lauf mit benanntem Grund ohne Kontext
+ * weiter statt mit einem stillen Ueberlauf.
+ */
+function budgetContext(result, config, runtime) {
+  if (result.context === null) return result;
+  const kuerzung = kuerzeAufBudget(result.context, { budgetTokens: config.indexBudgetTokens, render: renderContext });
+  if (!kuerzung.ok) {
+    runtime.contextState = 'invalid';
+    warnIndex(runtime, `${kuerzung.grund} (${kuerzung.tokens}/${config.indexBudgetTokens} Token) — Kontext verworfen`);
+    return noContext('CONTEXT_BUDGET');
+  }
+  if (kuerzung.entfernt > 0) {
+    console.log(`[shinon-prompter] MAX-Kontext gekuerzt: ${kuerzung.entfernt} Datei(en) entfernt, ${kuerzung.tokens}/${config.indexBudgetTokens} Token`);
+  }
+  runtime.lastBudgetTokens = config.indexBudgetTokens;
+  runtime.lastContextChars = kuerzung.chars;
+  runtime.lastContextFiles = (kuerzung.context.files ?? []).map((file) => file?.path);
+  return withContext(kuerzung.context, result.source);
 }
 
 /**

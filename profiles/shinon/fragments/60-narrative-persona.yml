@@ -1,0 +1,29 @@
+# Narrative Engine (Zug 5): AKTIV. Bis dahin stand `inactive: true` im Manifest —
+# gebaut, aber nicht geladen. Mit der Aktivierung ist der eigene Schema-Fallback
+# weg (das Paket bindet Schemastery wie jedes andere), die XorShift-PRNG ist weg
+# (Mood und Erzaehler kommen aus dem Vertrag), die Uhr ist weg (ein fehlendes
+# `timestamp` bleibt leer) und der tote `ctx.set`-Dienst ist weg (niemand las ihn;
+# der Composite geht als Ereignis `shinon/narrative/state` hinaus).
+#
+# Die wirksamen Grenzen stehen hier, nicht im Paket (dort nur Schema-Defaults):
+# chronicleLimit 50 = die letzten 50 Ereignisse sind der heisse Faden,
+# freezeThreshold 20 = nach 20 Takten wechselt der Arc benannt und der alte wird
+# archiviert. Der rote Faden reisst nicht, er wechselt an einer Schwelle.
+- id: shinon-narrative
+  config:
+    eventsChannel: shinon/event
+    chronicleLimit: 50
+    freezeThreshold: 20
+    relationshipWindow: 20
+
+# Persona (Zug 1-8): Die IDENTITAET spricht in jeder Sitzung dieses Deployments
+# (`identityScope: global`) und wird beim Boot nicht neu geschrieben. Projekt-
+# Kontext, projektspezifische Erinnerungen und der Selbstmodell-Stand bleiben
+# am Workspace; das Langzeitgedaechtnis liegt in der Ablage des Project Index
+# (shinon.persona-memory/v1), nie in Projektdateien. `workspace` waere die alte,
+# engere Vorgabe — hier ist die weitere bewusst gewaehlt.
+- id: shinon-persona
+  config:
+    identityScope: global
+    projectContextPath: .shinon/project-context.md
+

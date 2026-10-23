@@ -2,6 +2,7 @@ import z from '@deepseek-ai/schemastery';
 import { existsSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, createFactsService } from './assets/facts-service.js';
+import { INDEX_DEFAULTS } from './assets/defaults.js';
 import { FACTS_FILE_NAME } from './assets/facts-store.js';
 import { resolveWorkspaceRoot, fingerprintRoot } from './assets/workspace.js';
 import { INDEX_STORE_CONTRACT, INDEX_STORE_SERVICE } from '@shinon/seams/core';
@@ -226,8 +227,8 @@ export function createQueryService({
   indexFile,
   budgetTokens = DEFAULT_CONTEXT_BUDGET,
   workspaceRoot = '',
-  chunkLines = 40,
-  maxFileBytes = 262144,
+  chunkLines = INDEX_DEFAULTS.chunkLines,
+  maxFileBytes = INDEX_DEFAULTS.maxFileBytes,
   trace = true,
   // Der Haken, der den Index im Hintergrund auffrischt. Die Abfrage ruft ihn,
   // wenn der Index zu alt ist — der Moment, in dem ein frischer Stand zaehlt.
@@ -306,9 +307,9 @@ export const Config = z.object({
    */
   ledgerFile: z.string().default(''),
   /** Obergrenze je Datei. Groessere Dateien werden uebersprungen und gezaehlt. */
-  maxFileBytes: z.number().default(262144),
+  maxFileBytes: z.number().default(INDEX_DEFAULTS.maxFileBytes),
   /** Fenstergroesse der Chunks in Zeilen. */
-  chunkLines: z.number().default(40),
+  chunkLines: z.number().default(INDEX_DEFAULTS.chunkLines),
   /**
    * Das Alter, ab dem der Index im Hintergrund aufgefrischt wird (ms).
    *

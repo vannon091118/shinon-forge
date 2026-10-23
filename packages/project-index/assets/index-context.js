@@ -14,6 +14,7 @@ import { REFERENCABLE_KINDS, byPath, createReferenceMatcher, inodeStamp, languag
 import { SKIP_DIRS, SOURCE_EXTENSIONS, protectedReason, redactSecrets } from './index-format.js';
 import { forgetFile, indexFile, resolveTouches } from './index-run.js';
 import { searchChunks, setMeta } from './index-store.js';
+import { INDEX_DEFAULTS } from './defaults.js';
 
 // ══ Der Warm-Pfad: Kandidaten auffrischen, nicht den Baum ════════════════════
 //
@@ -130,8 +131,8 @@ function refreshReferences(db, entries) {
  * statt ihn in jede Abfrage zu legen.
  */
 export function refreshIndex(db, root, paths, options = {}) {
-  const chunkLines = Number.isInteger(options.chunkLines) ? options.chunkLines : 40;
-  const maxFileBytes = Number.isInteger(options.maxFileBytes) ? options.maxFileBytes : 262144;
+  const chunkLines = Number.isInteger(options.chunkLines) ? options.chunkLines : INDEX_DEFAULTS.chunkLines;
+  const maxFileBytes = Number.isInteger(options.maxFileBytes) ? options.maxFileBytes : INDEX_DEFAULTS.maxFileBytes;
   const started = Date.now();
   const absoluteRoot = resolve(root);
   const candidates = [...new Set(Array.isArray(paths) ? paths : [])].filter(indexablePath).sort(byPath);
@@ -292,7 +293,7 @@ export const CONTEXT_PRIORITIES = {
 };
 
 /** Das harte Kontextbudget (Plan §14: „max. 6000 Tokens Code-Kontext"). */
-export const DEFAULT_CONTEXT_BUDGET = 6000;
+export const DEFAULT_CONTEXT_BUDGET = INDEX_DEFAULTS.contextBudgetTokens;
 
 /** Zeichen je Token — eine Schaetzung, kein Tokenizer; gemessen ist die Groessenordnung. */
 export const CHARS_PER_TOKEN = 4;

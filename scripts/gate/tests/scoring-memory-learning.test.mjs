@@ -17,7 +17,7 @@ test('project-index memory: Gewichte und Attributionsbelege überleben Save→Lo
     mkdirSync(assets, { recursive: true });
     // Der Kern ist seit T2-5 ein Barrel plus fuenf Eigentuemer-Dateien — die
     // Kopie muss die ganze Familie mitnehmen, sonst bricht der Import im Sandkasten.
-    const coreFiles = readdirSync(source).filter((name) => name === 'workspace.js' || /^index-[a-z]+\.js$/.test(name));
+    const coreFiles = readdirSync(source).filter((name) => name === 'workspace.js' || name.startsWith('defaults.') || /^index-[a-z]+\.js$/.test(name));
     for (const name of coreFiles) cpSync(new URL(name, source), join(assets, name));
     provideSeamCore(work);
     const core = await import(pathToFileURL(join(assets, 'index-core.js')).href);

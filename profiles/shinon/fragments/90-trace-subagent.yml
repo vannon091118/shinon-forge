@@ -1,0 +1,29 @@
+# Traceability (LS-Popup-Toasts): fluechtige Meldungen unten rechts im Chat.
+#
+# DIE WIRTSCHAFT DIESES EINTRAGS: er liefert die Grenzen an die Browser-Haelfte,
+# mehr tut der Host nicht. Die Haelfte foldet das SITZUNGSSFENSTER selbst
+# (uiSession → sessions.binding → eventSource), exakt wie @shinon/popup — ein
+# Host-Listener auf `tool/call`/`tool/result`/`step/start`/`agent/error` waere
+# tot, weil das Record-Typen des Session-Logs und keine Bus-Events sind
+# (belegt an session.v4.jsonl: 199x tool/call, 0 emits in DSH-Libs).
+#
+# Der Weg zu den Grenzen ist `webserver/index-inject` als
+# `window.__SHINON_TRACEABILITY_CONFIG__` — dieselbe Naht, ueber die
+# @shinon/markers seine Grenzen ausliefert. Der fruehere Versuch schrieb in
+# `globalThis.window` zur Laufzeit und verfiel am Node-Host still.
+- id: shinon-traceability
+  config:
+    enabled: true
+    maxVisible: 3
+    duration: 4000
+- id: subagent
+  name: "@deepseek-ai/dsh-subagent"
+  config:
+    maxActiveSubagents: 2
+- id: subagent-model-selection-settings
+  name: "@deepseek-ai/dsh-tool-subagent/model-selection-settings"
+  config:
+    enabled: true
+    allowedModels:
+      - provider: prompter
+        model: agnes-2.5-flash

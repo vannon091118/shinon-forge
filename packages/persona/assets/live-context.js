@@ -11,10 +11,12 @@
  * stehen einmal hier — nicht zusaetzlich in eigenen Abschnitten. Was fehlt,
  * fehlt als Zeile; fehlt alles, gibt es gar keinen Block (fail-closed).
  *
- * Der Kern ist importfrei (kein Import, auch kein `node:`) — damit die
+ * Der Kern ist importfrei (kein Bare-Import, kein `node:`) — damit die
  * Rechnung im Host, im Test ohne node_modules und in der CI ohne DSH laufen
- * kann.
+ * kann. Die Model-Texte selbst stehen in `prompts.json` und werden über
+ * `prompt-text.js` (nur `node:fs`) gerendert.
  */
+import { promptText } from './prompt-text.js';
 
 /**
  * Der Name des Runtime-Contexts.
@@ -58,12 +60,13 @@ export const MOOD_MODUS = {
 /**
  * Besondere Reaktionen — nur wenn die erkannte User-Stimmung das Verhalten
  * wirklich veraendert. Die Stimmung selbst kommt aus `detectUserMood`
- * (interaction-core.js); hier steht nur, was daraus folgt. Keine erfundene
- * Stimmung, keine Ursache, kein Gutachten.
+ * (interaction-core.js); hier steht nur, WELCHER Text daraus folgt. Der Text
+ * selbst liegt in `prompts.json` (`persona-reaction-*`): eine neue Stimmung
+ * ist eine Datenzeile, kein neuer Satz im Code.
  */
 const USER_REAKTION = {
-  frustriert: 'der Mensch ist genervt — liefere sachlich, statt zu trösten',
-  erfreut: 'der Mensch ist zufrieden — nimm es kurz an und arbeite weiter',
+  frustriert: 'persona-reaction-frustriert',
+  erfreut: 'persona-reaction-erfreut',
 };
 
 /**
@@ -149,16 +152,18 @@ export function renderLiveContext(parts) {
   if (state === null || typeof state !== 'object') return null;
   const lines = [];
   const modus = typeof state.mood === 'string' ? MOOD_MODUS[state.mood.trim()] : undefined;
-  if (modus !== undefined) lines.push(`Arbeitsmodus: du bist gerade ${modus}.`);
+  if (modus !== undefined) lines.push(promptText('persona-live-mode', { modus }));
   const stimme = voiceOf(contract, tone);
   if (stimme !== null) {
     const anker = Array.isArray(stimme.anker) ? stimme.anker.filter((eintrag) => text(eintrag) !== null) : [];
-    lines.push(`Ton: ${stimme.tonalitaet}.${anker.length > 0 ? ` Anker: ${anker.map((eintrag) => text(eintrag)).join('; ')}.` : ''}`);
+    let ton = promptText('persona-live-tone', { tonalitaet: stimme.tonalitaet });
+    if (anker.length > 0) ton += promptText('persona-live-anchors', { anker: anker.map((eintrag) => text(eintrag)).join('; ') });
+    lines.push(ton);
   }
   const reaktion = typeof userMood === 'string' ? USER_REAKTION[userMood.trim()] : undefined;
-  if (reaktion !== undefined) lines.push(`Besondere Reaktion: ${reaktion}.`);
+  if (reaktion !== undefined) lines.push(promptText('persona-live-reaction', { reaktion: promptText(reaktion) }));
   if (lines.length === 0) return null;
-  return ['## Shinon aktuell', '', ...lines].join('\n');
+  return [promptText('persona-live-heading'), '', ...lines].join('\n');
 }
 
 /**

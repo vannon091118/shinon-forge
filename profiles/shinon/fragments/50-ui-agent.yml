@@ -1,0 +1,43 @@
+# Der Preset, den eine NEUE Sitzung startet.
+#
+# DIESE Zeile ist KEIN Verweis auf ein ungeladenes Paket: sie ist ein
+# id-zielender Override der Zeile, die das Bundle @deepseek-ai/dsh-web-app
+# selbst einfuegt (dsh-web-app/presets/cordis.patch.yml). Das 'name' ist
+# dabei die GUARD der Patch-Semantik: passt es nicht zum Ziel, verwirft der
+# Loader den Patch (gemessen: "patch: name mismatch for
+# agent-preset-registry"). Das Paket selbst liegt verschachtelt unter
+# node_modules/@deepseek-ai/dsh/node_modules/ und laedt ueber den
+# Bundle-Kontext.
+#
+# selectedDefault gehoert dem Nutzer: das UI schreibt es ueber den
+# settings-Dienst in genau diese Datei (volatile). Deshalb steht hier nur
+# das 'default' — der Wert, den die DEPLOYMENT-Vorgabe bestimmt. Ein
+# stehengebliebenes selectedDefault wuerde die Nutzerwahl ueberstimmen
+# (gemessen: defaultId = selectedDefault.get() ?? default).
+- id: agent-preset-registry
+  name: "@deepseek-ai/dsh-agent-preset-registry"
+  config:
+    default: shinon
+- id: ui-chat
+  name: "@deepseek-ai/dsh-client-ui-chat"
+  config:
+    transcriptView: verbose
+# Permission-Default (C7): `workspace-write` mit `approval: ask` — kein stiller
+# Vollzugriff im Startzustand. `danger-full-access` (approval: never) bleibt als
+# benannter Preset waehlbar, wird aber nicht mehr vorausgewaehlt: ein Nutzer, der
+# ihn will, waehlt ihn bewusst.
+- id: permission
+  name: "@deepseek-ai/dsh-permission-presets"
+  config:
+    presets:
+      read-only:
+        sandbox: read-only
+        approval: ask
+      workspace-write:
+        sandbox: workspace-write
+        approval: ask
+      danger-full-access:
+        sandbox: danger-full-access
+        approval: never
+    defaultPreset: workspace-write
+

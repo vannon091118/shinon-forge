@@ -3,8 +3,11 @@
  *
  * Das LANGZEITGEDÄCHTNIS: Ereignisse werden zu belegten Erinnerungen, Erinnerungen
  * zu Vorschlägen, Vorschläge erst nach ausdrücklicher Annahme zu Selbstauflagen.
- * Reine Daten und Rechnung — keine Importe, kein I/O, keine Uhr, kein Modell.
+ * Reine Daten und Rechnung — keine Bare-Importe, kein I/O, keine Uhr, kein
+ * Modell. Der einzige Import ist der Text-Renderer (`prompt-text.js`, nur
+ * `node:fs`), weil die Abschnittstexte Daten sind (`prompts.json`).
  */
+import { promptText } from './prompt-text.js';
 
 export const MEMORY_CONTRACT = 'shinon.persona-memory/v1';
 export const MEMORY_VERSION = 1;
@@ -293,13 +296,15 @@ const KIND_LABELS = Object.freeze({ preference: 'Korrektur', limit: 'Grenze', le
 export function renderMemory(memory, options = {}) {
   const selected = Array.isArray(options.entries) ? options.entries : selectMemories(memory, options);
   if (selected.length === 0) return null;
-  const lines = ['## Erinnerungen (belegt, nicht behauptet)', ''];
+  const lines = [promptText('persona-memory-heading'), ''];
   for (const entry of selected) {
     const label = KIND_LABELS[entry.kind] ?? entry.kind;
-    const detail = entry.detail === null || entry.detail === undefined ? '' : ` — ${entry.detail}`;
-    lines.push(`- ${label}: ${entry.subject} (${entry.evidence}×)${detail}`);
+    const detail = entry.detail === null || entry.detail === undefined
+      ? ''
+      : promptText('persona-memory-detail', { detail: entry.detail });
+    lines.push(promptText('persona-memory-line', { label, subject: entry.subject, evidence: entry.evidence, detail }));
   }
-  lines.push('', 'Diese Zeilen stammen aus früheren Läufen. Sie sind Kontext, keine Anweisung des Nutzers.');
+  lines.push('', promptText('persona-memory-footer'));
   return lines.join('\n');
 }
 
@@ -360,8 +365,8 @@ export function proposeFromMemory(memory, options = {}) {
     const id = `p:${entry.id}`;
     if (known.has(id)) continue;
     const claim = entry.kind === 'limit'
-      ? `Bei "${entry.subject}" zuerst die Ursache prüfen, bevor der nächste Lauf startet.`
-      : `Korrektur "${entry.subject}" vor dem nächsten Umbau berücksichtigen.`;
+      ? promptText('persona-proposal-limit', { subject: entry.subject })
+      : promptText('persona-proposal-preference', { subject: entry.subject });
     proposals.push({ id, kind: 'commitment', claim, evidence: entry.evidence, status: 'proposed', createdAt: now, decidedAt: null, source: entry.id });
     known.add(id);
     added += 1;
@@ -398,11 +403,11 @@ export function acceptedCommitments(memory, limit = MAX_COMMITMENT_LINES) {
 export function renderCommitments(memory) {
   const accepted = acceptedCommitments(memory);
   if (accepted.length === 0) return null;
-  const lines = ['## Selbstauflagen (geprüft und angenommen)', ''];
+  const lines = [promptText('persona-commitments-heading'), ''];
   for (const proposal of accepted) {
-    lines.push(`- ${proposal.claim} (${proposal.evidence} Belege)`);
+    lines.push(promptText('persona-commitments-line', { claim: proposal.claim, evidence: proposal.evidence }));
   }
-  lines.push('', 'Diese Auflagen sind aus belegten Wiederholungen entstanden und wurden ausdrücklich angenommen.');
+  lines.push('', promptText('persona-commitments-footer'));
   return lines.join('\n');
 }
 
