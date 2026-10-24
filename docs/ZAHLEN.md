@@ -33,7 +33,7 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Verträge unter `docs/contracts/` | 14 | `ls docs/contracts/*.json \| wc -l` | 0 |
 | Proben unter `docs/probes/` | 56 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 15 Blöcke in 11 Dateien | `npm run idioms:check` (Exit 0) | 0 |
-| Build (`dist/packages/`) | 23 Pakete, 330 Dateien, 2949898 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 23 Pakete, 330 Dateien, 2950705 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,

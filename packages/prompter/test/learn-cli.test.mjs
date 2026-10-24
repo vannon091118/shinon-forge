@@ -188,7 +188,9 @@ test('curator: ungenutzt und alt wird archiviert, nicht geloescht — und ist zu
     const dir = join(root, '.agents', 'skills', name);
     mkdirSync(dir, { recursive: true });
     const file = join(dir, SKILL_FILE);
-    writeFileSync(file, '---\nname: alter-skill\ndescription: "Nutzen wenn ein alter Ablauf geprueft wird, damit nichts verrottet."\n---\n\n# Alt\n', 'utf8');
+    // Die Marke des Skill-Writers ist der Unterschied zwischen „verwaltet" und
+    // „gehoert einem Menschen": nur mit `shinon-skill-fp:` darf der Curator.
+    writeFileSync(file, '---\nname: alter-skill\ndescription: "Nutzen wenn ein alter Ablauf geprueft wird, damit nichts verrottet."\n---\n\n# Alt\n\nshinon-skill-fp: abc123\n', 'utf8');
     const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
     utimesSync(file, old, old);
     utimesSync(dir, old, old);
@@ -215,6 +217,52 @@ test('curator: ungenutzt und alt wird archiviert, nicht geloescht — und ist zu
 
     const again = run(root, 'restore', name);
     assert.equal(again.code, 1, 'zweimal zurueckholen ist ein Konflikt, kein Erfolg');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('curator: Handgeschriebenes bleibt liegen, bis adopt es uebernimmt — pin schuetzt auch Verwaltetes', () => {
+  const root = project();
+  const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+  const plant = (name, body) => {
+    const dir = join(root, '.agents', 'skills', name);
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, SKILL_FILE);
+    writeFileSync(file, `---\nname: ${name}\ndescription: "Nutzen wenn ${name} geprueft wird, damit die Anleitung nicht verrottet."\n---\n\n# ${name}\n\n${body}\n`, 'utf8');
+    utimesSync(file, old, old);
+    utimesSync(dir, old, old);
+    return file;
+  };
+  try {
+    const hand = plant('hand-skill', 'von Hand geschrieben');
+    const agent = plant('agent-skill', 'shinon-skill-fp: def456');
+
+    const first = run(root, 'curate', '--apply');
+    assert.equal(first.code, 1, 'der verwaltete Kandidat ist ein Befund');
+    assert.match(first.stdout, /ungenutzt\s+agent-skill\s+archivieren/);
+    assert.match(first.stdout, /hand-skill: HANDGESCHRIEBEN/);
+    assert.equal(existsSync(hand), true, 'ein handgeschriebener Skill wird nie still archiviert');
+
+    assert.equal(run(root, 'pin', 'hand-skill').code, 0);
+    assert.equal(run(root, 'adopt', 'hand-skill').code, 0, 'adopt uebernimmt die Verwaltung');
+    assert.match(readFileSync(join(root, '.shinon', 'skill-usage.json'), 'utf8'), /"adopted": true/);
+    const second = run(root, 'curate', '--apply');
+    assert.equal(second.code, 1);
+    assert.equal(existsSync(hand), false, 'nach adopt darf der Curator den Skill verschieben');
+
+    const pinned = plant('gepinnt-skill', 'shinon-skill-fp: ghi789');
+    assert.equal(run(root, 'pin', 'gepinnt-skill').code, 0);
+    const third = run(root, 'curate', '--apply');
+    assert.equal(third.code, 0, 'ein gepinnter Skill ist kein Befund');
+    assert.match(third.stdout, /gepinnt-skill: GEPINNT/);
+    assert.equal(existsSync(pinned), true);
+
+    assert.equal(run(root, 'unpin', 'gepinnt-skill').code, 0);
+    const fourth = run(root, 'curate', '--apply');
+    assert.equal(fourth.code, 1);
+    assert.equal(existsSync(pinned), false, 'ohne Pin greift die Regel wieder');
+    assert.equal(run(root, 'pin', 'gibtsnicht').code, 1, 'ein unbekannter Name ist ein Befund, kein Erfolg');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

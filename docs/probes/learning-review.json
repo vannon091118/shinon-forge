@@ -7,11 +7,11 @@
     "packages/prompter/assets/skill-lifecycle.js",
     "scripts/learn.mjs"
   ],
-  "expect": "status/list/show 0; approve auf Memory 1 mit Routenhinweis; approve auf Skill 0 und 412 Bytes mit shinon-skill-fp; undo 0 (verschoben, Datei weg); curate --dry-run 0; usage 0. Automatik: KORREKTUR true, RISIKO false, BELEG_ZU_DUENN false, WIEDERHOLUNG true, FREIGABE false.",
+  "expect": "status/list/show 0; approve auf Memory 1 mit Routenhinweis; approve auf Skill 0 und 412 Bytes mit shinon-skill-fp; undo 0 (verschoben, Datei weg); curate --dry-run 0; usage 0; Handgeschriebenes bleibt bei curate --apply liegen, adopt uebernimmt es, pin schuetzt Verwaltetes. Automatik: KORREKTUR true, RISIKO false, BELEG_ZU_DUENN false, WIEDERHOLUNG true, FREIGABE false.",
   "result": "BESTAETIGT",
   "verdict": "WRITE",
-  "measuredAt": "2026-10-24T01:50:47.514Z",
   "contract": "shinon.learning-review/v1",
+  "measuredAt": "2026-10-24T02:04:18.256Z",
   "kind": "probe",
   "note": "Gemessen ohne Modell und ohne Netz: der Vorschlag entsteht ueber dieselben Funktionen wie im Host, die CLI laeuft als echter Prozess. Die Automatik-Zeile liest die Vorgaben aus packages/prompter/assets/schema.js, nicht aus dieser Datei.",
   "fixture": "/tmp/lr-probe-fixture",
@@ -97,8 +97,103 @@
       "cmd": "node scripts/learn.mjs usage --root /tmp/lr-probe-fixture",
       "exit": 0,
       "out": "Keine Zaehlung (/tmp/lr-probe-fixture/.shinon/skill-usage.json)."
+    },
+    {
+      "cmd": "node scripts/learn.mjs pin agent-skill-probe --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "agent-skill-probe: gepinnt"
+    },
+    {
+      "cmd": "node scripts/learn.mjs curate --apply --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "2 gelernte Skills in /tmp/lr-probe-fixture/.agents/skills\nKein Befund.\n  (uebersprungen) agent-skill-probe: GEPINNT\n  (uebersprungen) hand-skill-probe: HANDGESCHRIEBEN"
+    },
+    {
+      "cmd": "node scripts/learn.mjs adopt hand-skill-probe --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "hand-skill-probe: uebernommen (der Curator darf ihn verwalten)"
+    },
+    {
+      "cmd": "node scripts/learn.mjs unpin agent-skill-probe --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "agent-skill-probe: nicht mehr gepinnt"
+    },
+    {
+      "cmd": "node scripts/learn.mjs curate --apply --root /tmp/lr-probe-fixture",
+      "exit": 1,
+      "out": "2 gelernte Skills in /tmp/lr-probe-fixture/.agents/skills\n  ungenutzt     agent-skill-probe                archivieren seit 40 Tagen nie geladen\n  doppelt       hand-skill-probe                 melden      gleiche Anleitung wie agent-skill-probe\n  ungenutzt     hand-skill-probe                 archivieren seit 40 Tagen nie geladen\nArchiviert: agent-skill-probe, hand-skill-probe -> /tmp/lr-probe-fixture/.shinon/learning-archive/2026-10-24T02-04-18-065Z/JOURNAL.json"
+    },
+    {
+      "cmd": "node scripts/learn.mjs restore hand-skill-probe --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "wiederhergestellt: /tmp/lr-probe-fixture/.agents/skills/hand-skill-probe"
+    },
+    {
+      "cmd": "node scripts/learn.mjs usage --json --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "{\n  \"contract\": \"shinon.skill-usage/v1\",\n  \"skills\": [\n    {\n      \"name\": \"agent-skill-probe\",\n      \"loads\": 0,\n      \"lastLoad\": null,\n      \"pinned\": false\n    },\n    {\n      \"name\": \"hand-skill-probe\",\n      \"loads\": 0,"
     }
   ],
+  "curator": {
+    "runs": [
+      {
+        "cmd": "node scripts/learn.mjs pin agent-skill-probe",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/learn.mjs curate --apply",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/learn.mjs adopt hand-skill-probe",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/learn.mjs unpin agent-skill-probe",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/learn.mjs curate --apply",
+        "exit": 1
+      },
+      {
+        "cmd": "node scripts/learn.mjs restore hand-skill-probe",
+        "exit": 0
+      },
+      {
+        "cmd": "node scripts/learn.mjs usage --json",
+        "exit": 0
+      }
+    ],
+    "states": {
+      "pin": {
+        "output": "agent-skill-probe: gepinnt"
+      },
+      "mitPinUndHand": {
+        "exists": true,
+        "output": "2 gelernte Skills in /tmp/lr-probe-fixture/.agents/skills\nKein Befund.\n  (uebersprungen) agent-skill-probe: GEPINNT\n  (uebersprungen) hand-skill-probe: HANDGESCHRIEBEN",
+        "agentNochDa": true
+      },
+      "adopt": {
+        "output": "hand-skill-probe: uebernommen (der Curator darf ihn verwalten)"
+      },
+      "unpin": {
+        "output": "agent-skill-probe: nicht mehr gepinnt"
+      },
+      "nachAdopt": {
+        "exists": false,
+        "output": "2 gelernte Skills in /tmp/lr-probe-fixture/.agents/skills\n  ungenutzt     agent-skill-probe                archivieren seit 40 Tagen nie geladen\n  doppelt       hand-skill-probe                 melden      gleiche Anleitung wie agent-skill-probe\n  ungenutzt     hand-skill-probe                 archivieren seit 40 Tagen nie geladen\nArchiviert: agent-skill-probe, hand-skill-probe -> /tmp/lr-probe-fixture/.shinon/learning-archive/2026-10-24T02-04-18-065Z/JOURNAL.json",
+        "agentArchiviert": true
+      },
+      "restore": {
+        "exists": true,
+        "output": "wiederhergestellt: /tmp/lr-probe-fixture/.agents/skills/hand-skill-probe"
+      },
+      "usage": {
+        "output": "{\n  \"contract\": \"shinon.skill-usage/v1\",\n  \"skills\": [\n    {\n      \"name\": \"agent-skill-probe\",\n      \"loads\": 0,"
+      }
+    }
+  },
   "register": {
     "entries": 2,
     "statuses": [

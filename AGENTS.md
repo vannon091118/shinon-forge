@@ -428,10 +428,12 @@ läuft in `test:full`/`gate:full` (CI).
 - `npm run notes:check` (`scripts/notes-check.mjs`) — Notizen-Integrität prüfen.
 - `npm run learn` (`scripts/learn.mjs`) — Lernvorschläge ansehen, freigeben, ablehnen und
   zurücknehmen, Nutzung zählen, Curator fahren: `status`, `list`, `show <id>`,
-  `approve <id>`, `reject <id>`, `undo <id>`, `usage`, `curate [--apply]`,
-  `restore <name>`, `archive`. Skills schreibt der Skill-Writer; ein Memory-Vorschlag
-  wird mit dem Namen der Persona-Route (`POST /shinon/persona/review`) abgewiesen —
-  der Befehl schreibt nie am Eigentümer vorbei.
+  `approve <id>`, `reject <id>`, `undo <id>`, `usage`, `curate [--apply|--dry-run] [--force]`,
+  `restore <name>`, `archive`, `pin <name>`, `unpin <name>`, `adopt <name>`. Skills schreibt
+  der Skill-Writer; ein Memory-Vorschlag wird mit dem Namen der Persona-Route
+  (`POST /shinon/persona/review`) abgewiesen — der Befehl schreibt nie am Eigentümer vorbei.
+  Der Curator verwaltet nur, was den Marker `shinon-skill-fp:` trägt; handgeschriebene
+  Skills sind gepinnt, bis `adopt` sie übernimmt, `pin` schützt auch verwaltete.
 - `npm run dev:web` / `npm run dev:mobile` — Profil-Starts mit festen Ports/URLs.
 - `npm run test:mobile-profile` / `npm run dev:web` — Mobile-Profil-Kontrakt (`profiles/mobile`).
 - `npm run test:codingmon` (bereits genannt), zusätzlich: `test:scoring`, `test:token`, `test:prompter`, `test:narrative`, `test:popup`, `test:key-router`, `test:traceability`, `test:hook`, `test:facts` (Faktenkern, Pipeline, Snapshot, Reconciliation, Dienst), `test:claims` (Claim-Lebenszyklus der Persona) — Paket-eigene Slicen; alle über `scripts/run-with-node.mjs`.

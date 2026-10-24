@@ -61,7 +61,7 @@ function similar(a, b) {
  * automatisch: `rules.consolidate === true` waere eine Entscheidung des
  * Betreibers, nicht die Vorgabe.
  */
-export function curateSkills({ skills = [], usage = null, rules = {}, now = new Date().toISOString() } = {}) {
+export function curateSkills({ skills = [], usage = null, rules = {}, force = false, now = new Date().toISOString() } = {}) {
   const at = timeOf(now) ?? 0;
   const findings = [];
   const skipped = [];
@@ -82,6 +82,14 @@ export function curateSkills({ skills = [], usage = null, rules = {}, now = new 
     }
     if (record?.pinned === true) {
       skipped.push({ name: skill.name, reason: 'GEPINNT' });
+      continue;
+    }
+    // Handgeschriebenes gehoert niemandem, der es wegnehmen darf: nur wer den
+    // Marker des Skill-Writers traegt (oder ausdruecklich adoptiert wurde),
+    // wird verwaltet. `force` ist die EINE bewusste Ausnahme je Lauf.
+    const managed = skill.origin === 'agent' || record?.adopted === true || force === true;
+    if (!managed && rules.manageHandwritten !== true) {
+      skipped.push({ name: skill.name, reason: 'HANDGESCHRIEBEN' });
       continue;
     }
     if (unmanaged.includes(skill)) {

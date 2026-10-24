@@ -2320,4 +2320,18 @@ Schreibversuchs), ein `approve` auf den Skill (`publish`, 412 Bytes, mit
 Korrektur ⇒ `KORREKTUR`, zentrales Risiko ⇒ `RISIKO`, ein einzelner Zug ⇒
 `BELEG_ZU_DUENN`, drei Züge ⇒ `WIEDERHOLUNG`, Schalter `true` ⇒ `FREIGABE`.
 
+Der Curator bekommt am selben Abend seine Herkunftsgrenze. Bis dahin hätte er
+jeden Skill nach dreißig Tagen ohne Load verschoben — auch einen von Hand
+geschriebenen, denn das Verzeichnis sagt nichts über den Autor. Jetzt entscheidet
+die Marke in der Datei: was `shinon-skill-fp:` trägt, ist vom Skill-Writer
+erzeugt und darf verwaltet werden; alles andere ist gepinnt und steht als
+`HANDGESCHRIEBEN` im Befund. `learn adopt <name>` übernimmt ein solches Dokument
+ausdrücklich, `learn pin`/`unpin` schützt auch Verwaltetes, und `curate --force`
+bleibt die eine bewusste Ausnahme je Lauf — der Zustand (gepinnt, übernommen)
+steht in `skill-usage.json`, nicht in einem Kommentar. Die Probe
+`docs/probes/learning-review.json` fährt den Weg als Prozess: `pin` →
+`GEPINNT`, handgeschrieben → `HANDGESCHRIEBEN`, `adopt` → der Curator darf, dann
+verschiebt er, `restore` holt zurück; nebenbei meldet er die Dublette
+(`doppelt: hand-skill-probe`), ohne sie automatisch zusammenzulegen.
+
 **Anker:** `089e111`, `359abf9` · Pfade: `packages/prompter/assets/learning-review.js`, `packages/prompter/assets/learning-proposal.js`, `packages/prompter/assets/enhance-command.js`, `packages/prompter/assets/client/02-enhance-control.js`, `packages/persona/assets/event-reaction.js`, `packages/persona/assets/schema.js`, `packages/persona/assets/memory-proposal-seam.js`, `profiles/shinon/fragments/70-prompter.yml`, `profiles/shinon/fragments/40-agent-model.yml`, `scripts/learn.mjs`, `scripts/gate/tests/learning-disclosure.test.mjs` · Belege: `npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 971/971 (nach dem Automatik-Satz), `npm run test:prompter` 265/265, Persona 22/22, `npm run build` Exit 0 (23 Pakete, 330 Dateien), Profilboot 4/4, Distribution 92/92, `node scripts/profile-patch.mjs --check` bytegleich, `npm run zahlen:check` Exit 0, `npm run idioms:check` 15 Blöcke in 11 Dateien deckungsgleich.
