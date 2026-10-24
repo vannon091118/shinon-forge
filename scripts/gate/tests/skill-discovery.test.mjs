@@ -5,8 +5,9 @@
  * Belegt, was niemand von Hand bauen muss:
  *   1. Der native Provider (`@deepseek-ai/dsh-skill-filesystem`, im Dienst
  *      `skills` des installierten DSH) entdeckt `<Projekt>/.agents/skills/<n>/SKILL.md`.
- *   2. Der Skill-Lebenszyklus (`skill-lifecycle.js`) schreibt eine neue Datei in
- *      genau diesen Root, nachdem eine Korrektur ein Ereignis ausgeloest hat.
+ *   2. Die Lernpruefung (`learning-review.js`) schreibt ueber den Skill-Writer
+ *      eine neue Datei in genau diesen Root, nachdem Zuege abgeschlossen sind
+ *      und das Modell einen belastbaren Ablauf erkannt hat.
  *   3. Der Provider sieht den neuen Skill beim naechsten Abruf des Katalogs.
  *      Die Zeit bis dahin wird GEMESSEN und ausgegeben, nicht behauptet.
  *
@@ -25,8 +26,8 @@ import { pathToFileURL } from 'node:url';
 import { waitFor } from './helpers/wait.mjs';
 
 const repo = new URL('../../../', import.meta.url);
-const lifecyclePath = new URL('packages/prompter/assets/skill-lifecycle.js', repo);
-const rulesPath = new URL('packages/prompter/assets/skill-lifecycle-rules.json', repo);
+const reviewPath = new URL('packages/prompter/assets/learning-review.js', repo);
+const writerPath = new URL('packages/prompter/assets/skill-lifecycle.js', repo);
 const noteRulesPath = new URL('packages/prompter/assets/note-rules.json', repo);
 
 let dsh = null;
@@ -47,6 +48,14 @@ const GOOD = {
   bei: 'Eine Korrektur zeigt einen wiederverwendbaren Lernstoff',
   immer: 'den Lernstoff als Skill im Projekt festhalten',
   weil: 'der Katalog des Modells nur veroeffentlichte Skills kennt',
+};
+
+/** Die Antwort des Reviewers: ein Skill, mit Quelle aus dem Digest. */
+const ANSWER = {
+  decision: 'skill',
+  reason: 'Der Zug zeigt einen wiederverwendbaren Ablauf.',
+  sources: ['message:m1'],
+  candidate: GOOD,
 };
 test('DSH entdeckt einen vom Lebenszyklus geschriebenen Skill im Projekt-Root', { skip: dsh === null ? dshReason : false }, async () => {
   const previousCwd = process.cwd();
@@ -75,23 +84,41 @@ test('DSH entdeckt einen vom Lebenszyklus geschriebenen Skill im Projekt-Root', 
     const before = await ctx.skills.list({ cwd: project });
     assert.ok(before.some((skill) => skill.name === 'vorhanden' && skill.source === 'project-agents'), 'der vorhandene Skill wird nativ entdeckt');
 
-    // Der echte Lebenszyklus schreibt; der Fake-Modellaufruf liefert den Kandidaten.
-    const { createSkillLifecycle } = await import(pathToFileURL(lifecyclePath.pathname).href);
-    const rules = JSON.parse(readFileSync(rulesPath, 'utf8'));
+    // Der Reviewer schreibt ueber den Skill-Writer; der Fake liefert die Entscheidung.
+    const { createLearningReview, loadLearningRules } = await import(pathToFileURL(reviewPath.pathname).href);
+    const { createSkillWriter, loadLifecycleRules } = await import(pathToFileURL(writerPath.pathname).href);
     const noteRules = JSON.parse(readFileSync(noteRulesPath, 'utf8'));
-    const fast = { ...rules, trigger: { ...rules.trigger, correction: { ...rules.trigger.correction, settleMs: 5 } } };
+    const skillRules = loadLifecycleRules();
+    const base = loadLearningRules();
+    const rules = {
+      ...base,
+      review: { ...base.review, nudgeTurns: 1, nudgeToolCalls: 0, cooldownMs: 0, maxPerSession: 4, timeoutMs: 4000, minEvidenceForAuto: 1 },
+    };
     const llm = {
       stream() {
         return (async function* () {
-          yield { type: 'text-delta', index: 0, text: JSON.stringify(GOOD) };
+          yield { type: 'text-delta', index: 0, text: JSON.stringify(ANSWER) };
         })();
       },
     };
     const lines = [];
-    lifecycle = createSkillLifecycle({ ctx: { llm }, rules: fast, noteRules, route: { provider: 'p', model: 'm' }, log: { log: (m) => lines.push(m), warn: (m) => lines.push(m) } });
+    const quietLog = { log: (m) => lines.push(m), warn: (m) => lines.push(m) };
+    const writer = createSkillWriter({ rules: skillRules, noteRules, root: project, log: { log: () => {}, warn: () => {} } });
+    lifecycle = createLearningReview({
+      ctx: { llm },
+      config: { provider: 'p', model: 'm', skillWriteApproval: false, memoryWriteApproval: true, registryPath: '.shinon/learning-proposals.json', usagePath: '.shinon/skill-usage.json' },
+      rules,
+      skillRules,
+      noteRules,
+      writer,
+      route: { provider: 'p', model: 'm' },
+      workspaceRoot: project,
+      log: quietLog,
+    });
 
     const started = performance.now();
-    lifecycle.observe({ event_type: 'feedback.rated', session_id: 'probe' }, { data: { item: { rating: 'negative', messageId: 'probe-1' } } });
+    lifecycle.observe({ event_type: 'message.received', session_id: 'probe' }, { data: { source: { kind: 'user' }, message: { id: 'm1' }, content: [{ type: 'text', text: 'Bitte pruefe das Gate.' }] } });
+    lifecycle.observe({ event_type: 'turn.end', session_id: 'probe' }, { data: { reason: { kind: 'completed' }, turn: 1 } });
     // Gemessen wird der KATALOG-Pfad, den das Modell sieht: snapshot() mit Cache.
     // Dessen Ungueltigmachung kommt vom Datei-Watcher des Providers.
     let catalogComplete = false;
@@ -102,6 +129,7 @@ test('DSH entdeckt einen vom Lebenszyklus geschriebenen Skill im Projekt-Root', 
     }, { timeoutMs: 6000 }));
     const elapsedMs = Math.round(performance.now() - started);
     assert.equal(visible, true, `der neue Skill muss im Katalog erscheinen; Log: ${lines.join(' | ')}`);
+    assert.ok(lines.some((line) => line.includes('->')), 'der Reviewer hat den Skill ueber den Writer geschrieben');
     assert.equal(catalogComplete, true, 'die Entdeckung ist vollstaendig (kein Teilkatalog)');
     console.log(`[skill-discovery] neuer Skill im Katalog (snapshot) sichtbar nach ${elapsedMs} ms`);
 

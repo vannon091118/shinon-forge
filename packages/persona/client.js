@@ -1,5 +1,6 @@
 /**
  * @shinon/persona — Client-Hälfte: Prüf-Panel für Selbstauflagen.
+ * GENERIERT aus assets/client/*.js — nicht von Hand ändern; Schreiben: node scripts/build-client.mjs persona.
  *
  * Zeigt die OFFENEN Vorschläge mit ihren Belegen, die ENTSCHIEDENEN mit ihrem
  * Ausgang und entscheidet genau einen offenen über die bestehende Naht: GET
@@ -20,6 +21,7 @@
 window.__ModuleLoader__.load({
   id: '@shinon/persona',
   factory(require) {
+// >>> @part assets/client/01-react.js
     const React = require('react');
     const h = React.createElement;
     const PLUGIN = '@shinon/persona';
@@ -83,14 +85,16 @@ window.__ModuleLoader__.load({
       error: { marginTop: 10, fontSize: 12, color: 'var(--dsw-alias-label-danger, #ef4444)' }, note: { marginTop: 12, fontSize: 11, color: 'var(--dsw-alias-label-secondary)' },
     };
 
-    /** Ein offener Vorschlag: Behauptung, Belegzahl, zwei ausdrückliche Wege. */
+    /** Ein offener Vorschlag: Behauptung, Grund, Quellen, zwei ausdrückliche Wege. */
     function ProposalEntry({ proposal, busy, decide }) {
       const disabled = busy !== null;
+      const sources = Array.isArray(proposal.sources) && proposal.sources.length > 0 ? `Quellen: ${proposal.sources.join(', ')}` : null;
       return h('div', { className: '__pn_entry', style: style.entry },
         h('div', { className: '__pn_claim', style: style.claim }, proposal.claim),
         h('div', { className: '__pn_evidence', style: style.evidence },
           `${proposal.evidence} Beleg${proposal.evidence === 1 ? '' : 'e'} — `,
-          'entstanden aus wiederholten Entscheidungen des Veredlers'),
+          proposal.reason ?? 'entstanden aus wiederholten Entscheidungen des Veredlers'),
+        sources === null ? null : h('div', { className: '__pn_sources', style: style.evidence }, sources),
         h('div', { className: '__pn_actions', style: style.actions },
           h('button', {
             type: 'button',
@@ -105,7 +109,9 @@ window.__ModuleLoader__.load({
             onClick: () => decide(proposal.id, 'rejected'),
           }, busy === 'rejected' ? 'Wird abgelehnt …' : 'Ablehnen')));
     }
+// <<< @part assets/client/01-react.js
 
+// >>> @part assets/client/02-review-panel.js
     function ReviewPanel() {
       // Bewusst der WERT, nicht die Funktion: React wuerde eine Funktion als
       // Lazy-Initialisierer nur EINMAL aufrufen — der Startstand ist aber schon
@@ -216,7 +222,12 @@ window.__ModuleLoader__.load({
           decided.map((proposal) => h('div', { key: proposal.id, style: style.decidedRow },
             h('span', { style: proposal.status === 'accepted' ? style.accepted : style.rejected },
               proposal.status === 'accepted' ? 'angenommen' : 'abgelehnt'),
-            h('span', null, proposal.claim)))),
+            h('span', null, proposal.claim,
+              // Nur eine angenommene Auflage lässt sich zurücknehmen (der Host prüft es erneut).
+              proposal.status === 'accepted' ? h('button', {
+                type: 'button', style: { ...style.button, marginLeft: 8 }, disabled: busy !== null,
+                onClick: () => decide(proposal.id, 'revoked'),
+              }, busy === 'revoked' ? 'Wird zurückgenommen …' : 'Zurücknehmen') : null)))),
         error === null ? null : h('div', { className: '__pn_error', style: style.error }, error),
         h('div', { className: '__pn_note', style: style.note },
           `${commitments.length} Auflage${commitments.length === 1 ? '' : 'n'} · `
@@ -237,5 +248,7 @@ window.__ModuleLoader__.load({
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, ReviewPanel));
       },
     };
+// <<< @part assets/client/02-review-panel.js
+
   },
 });

@@ -250,19 +250,21 @@ test('persona: der Text einer echten user/message-Blockliste erreicht User-Lage,
   disposePersona();
 });
 
-// ── 2. Der Skill-Lebenszyklus hört auf die normalisierten Namen ─────────────
+// ── 2. Die Lernpruefung hoert auf die normalisierten Namen ──────────────────
 
-test('skills: der Lebenszyklus feuert auf turn.end durch den echten Spine und schreibt den Skill', async () => {
+test('skills: die Lernpruefung feuert auf turn.end durch den echten Spine und schreibt den Skill', async () => {
   const project = mkdtempSync(join(tmpdir(), 'shinon-spine-skills-'));
   mkdirSync(join(project, '.agents', 'skills'), { recursive: true });
   const previous = process.cwd();
   process.chdir(project);
   const calls = [];
+  // Die Antwort des Reviewers: ein Skill, mit einer Quelle, die im Digest stand.
+  const answer = { decision: 'skill', reason: 'Der Zug zeigt einen wiederverwendbaren Ablauf.', sources: ['message:msg-1'], candidate: GOOD };
   const llm = {
     stream(request) {
       calls.push(request);
       return (async function* chunks() {
-        yield { type: 'text-delta', index: 0, text: JSON.stringify(GOOD) };
+        yield { type: 'text-delta', index: 0, text: JSON.stringify(answer) };
       })();
     },
   };
@@ -276,7 +278,9 @@ test('skills: der Lebenszyklus feuert auf turn.end durch den echten Spine und sc
       provider: 'prompter',
       model: 'fake-model',
       skillsPath: '.agents/skills',
-      skillLifecycle: true,
+      // SH-LEARN-03/04: die Lernpruefung, Skill-Schreibfreigabe aus (der
+      // eindeutige Fall gilt automatisch). Die Pfade sind Projektzustand.
+      learningReview: { enabled: true, skillWriteApproval: false, registryPath: '.shinon/learning-proposals.json', usagePath: '.shinon/skill-usage.json' },
       notesPath: '',
       eventsChannel: 'shinon/event',
       workspaceRoot: project,
@@ -284,25 +288,26 @@ test('skills: der Lebenszyklus feuert auf turn.end durch den echten Spine und sc
     }));
 
     const send = (type, data) => host.ctx.emit('session/event', SESSION, sessionEvent(type, data));
-    send('user/message', { role: 'user', content: [{ type: 'text', text: 'Bitte pruefe die neue Gate-Datei.' }], source: { kind: 'user' } });
-    send('assistant/message', { message: { content: [{ type: 'text', text: 'Die Gate-Datei ist geprueft.' }] } });
-    // Der Lebenszyklus veroeffentlicht ohne Korrektur erst nach drei
-    // abgeschlossenen Zuegen (minCompleted); jeder Zug liefert denselben Kandidaten.
+    // Kennungen sind Pflicht: der Digest nennt Quellen NUR mit echter Id.
+    send('user/message', { role: 'user', message: { id: 'msg-1' }, content: [{ type: 'text', text: 'Bitte pruefe die neue Gate-Datei.' }], source: { kind: 'user' } });
+    send('assistant/message', { message: { id: 'msg-2', content: [{ type: 'text', text: 'Die Gate-Datei ist geprueft.' }] } });
+    // Der Reviewer prueft ohne Korrektur erst nach drei abgeschlossenen Zuegen
+    // (`nudgeTurns`) — und ruft das Modell dann GENAU EINMAL.
     for (const turn of [1, 2, 3]) send('turn/end', { turn, reason: { kind: 'completed' } });
 
     const file = join(project, '.agents', 'skills', GOOD.name, 'SKILL.md');
     const written = await waitFor(() => existsSync(file), { timeoutMs: 3000, stepMs: 10 });
-    assert.equal(written, true, 'kein Skill geschrieben — der Lebenszyklus hat das normalisierte turn.end nicht gehoert');
+    assert.equal(written, true, 'kein Skill geschrieben — die Lernpruefung hat das normalisierte turn.end nicht gehoert');
     assert.match(readFileSync(file, 'utf8'), /den Dateinamen in die Whitelist des Gate-Plugins eintragen/);
-    assert.equal(calls.length, 3, 'genau ein Kandidatenaufruf je abgeschlossenem Zug');
+    assert.equal(calls.length, 1, 'genau ein Modellaufruf fuer drei Zuege');
 
     // Die zweite Ausloeser-Art: die rohe negative Bewertung (`feedback/message-put`)
     // muss als `feedback.rated` ankommen, sonst entsteht nie eine Korrektur.
     send('feedback/message-put', { sessionId: SESSION.id, item: { messageId: 'msg-9', rating: 'negative' } });
     send('feedback/record', { text: 'Nein, die Whitelist war nicht der Punkt.' });
-    const corrected = await waitFor(() => calls.length === 4, { timeoutMs: 5000, stepMs: 10 });
-    assert.equal(corrected, true, 'keine Korrektur — der Lebenszyklus hat feedback.rated nicht gehoert');
-    assert.match(calls[3].messages[0].content[0].text, /<korrektur>Nein, die Whitelist war nicht der Punkt\.<\/korrektur>/);
+    const corrected = await waitFor(() => calls.length === 2, { timeoutMs: 5000, stepMs: 10 });
+    assert.equal(corrected, true, 'keine Korrektur — die Lernpruefung hat feedback.rated nicht gehoert');
+    assert.match(calls[1].messages[0].content[0].text, /Nein, die Whitelist war nicht der Punkt\./);
   } finally {
     if (typeof disposePrompter === 'function') disposePrompter();
     host.dispose();

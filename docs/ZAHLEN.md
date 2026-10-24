@@ -19,9 +19,9 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 |---|---|---|---|
 | Pakete unter `packages/` | 23 | `ls packages \| wc -l` | 0 |
 | Profile unter `profiles/` | 3 | `git ls-files profiles \| cut -d/ -f2 \| sort -u \| wc -l` | 0 |
-| Bundle-Layer im Profil `shinon` | 26 | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.length"` | 0 |
+| Bundle-Layer im Profil `shinon` | 27 | `node -p "require('./profiles/shinon/package.json').dsh.profile.bundles.length"` | 0 |
 | davon eigene (`@shinon/*`) | 21 | dieselbe Liste, gefiltert auf `@shinon/` | 0 |
-| davon fremde | 5 | dieselbe Liste, Rest | 0 |
+| davon fremde | 6 | dieselbe Liste, Rest | 0 |
 | Pakete **nicht** im Profil (erklären sich selbst via `dsh.inactive`) | 2 (mobile, seams) | Manifeste unter `packages/*/package.json` lesen | 0 |
 | Version des Repos | `0.4.0` | `node -p "require('./package.json').version"` | 0 |
 | Paketversionen | 22× `1.0.0`, 1× `0.1.0` | `node -e "…"` über `packages/*/package.json` | 0 |
@@ -33,7 +33,7 @@ außerhalb der Marker ist Prosa und bleibt unberührt. Die Historie einer Zeile 
 | Verträge unter `docs/contracts/` | 14 | `ls docs/contracts/*.json \| wc -l` | 0 |
 | Proben unter `docs/probes/` | 55 | `ls docs/probes/*.json \| wc -l` | 0 |
 | Generierte Idiom-Blöcke | 15 Blöcke in 11 Dateien | `npm run idioms:check` (Exit 0) | 0 |
-| Build (`dist/packages/`) | 23 Pakete, 318 Dateien, 2840535 Bytes | `npm run build` (Exit 0) | 0 |
+| Build (`dist/packages/`) | 23 Pakete, 329 Dateien, 2922154 Bytes | `npm run build` (Exit 0) | 0 |
 <!-- zahlen:bestand:end -->
 
 Die Zahl der Profil-Layer und der aktivierten Pakete **steht nicht in der Doku**,
@@ -59,9 +59,9 @@ heute zählt (`node scripts/shinon-test.mjs`, Schritt „Struktur“):
 <!-- zahlen:struktur:start -->
 | Zahl | Wert | Befehl (Eigentümer) | Exit |
 |---|---|---|---|
-| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 513 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
+| Code-Dateien unter `packages/` + `scripts/` + `bin/` | 533 | dieselbe Auswahl wie `codeDateien()` in `scripts/lib/structure.mjs` (`npm run zahlen:check`) | 0 |
 | Klassen | 7 | `docs/contracts/structure.json` → `klassen` | 0 |
-| Generierte Dateien (Kopfmarke `GENERIERT aus`, ohne Zeilengrenze) | 8 | `generiertMarke()` in `scripts/lib/structure.mjs` — Bytegleichheit prüft `scripts/build-client.mjs --check --all` | 0 |
+| Generierte Dateien (Kopfmarke `GENERIERT aus`, ohne Zeilengrenze) | 9 | `generiertMarke()` in `scripts/lib/structure.mjs` — Bytegleichheit prüft `scripts/build-client.mjs --check --all` | 0 |
 | Dateien ohne Klasse | 0 | `npm test` (Schritt „Struktur“) — gezählt aus `structureIssues()` | 0 |
 | Verstöße gegen den Contract der Klasse | 0 | dieselben Befunde, ohne „keine Klasse“ | 0 |
 <!-- zahlen:struktur:end -->

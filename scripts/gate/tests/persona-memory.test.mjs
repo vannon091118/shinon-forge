@@ -8,10 +8,8 @@ import assert from 'node:assert/strict';
 import {
   MEMORY_CONTRACT,
   acceptedCommitments,
-  decideProposal,
   decayMemory,
   emptyMemory,
-  proposeFromMemory,
   remember,
   rememberDecision,
   rememberEvent,
@@ -20,6 +18,7 @@ import {
   selectMemories,
   validateMemory,
 } from '../../../packages/persona/assets/memory-core.js';
+import { decideProposal, proposeFromMemory } from '../../../packages/persona/assets/memory-proposals.js';
 
 const NOW = '2026-10-19T02:00:00.000Z';
 

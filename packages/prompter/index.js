@@ -20,8 +20,13 @@
  *                  ^
  *                  |  (pre-step ruft runtime-state und trace-report, nie zurueck)
  */
+// Der statische Vertrag jeder Host-Hälfte (`indexIssues` in
+// `scripts/lib/repo-pakete.mjs`) verlangt in DIESER Datei das Literal
+// `@deepseek-ai/schemastery`: das Plugin-Schema muss an der Host-Hälfte sichtbar
+// sein. Gebaut wird es in `assets/schema.js` (dort stehen Felder und Vorgaben),
+// hier wird es unverändert angeboten.
 import z from '@deepseek-ai/schemastery';
-import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT, createOrchestrator } from '@shinon/seams/core';
+import { NARRATIVE_STATE_CHANNEL, NARRATIVE_STATE_CONTRACT, PERSONA_MEMORY_PROPOSAL_SERVICE, createOrchestrator } from '@shinon/seams/core';
 import { Config as _imported_config_schema } from './assets/schema.js';
 import { FACTS_SNAPSHOT_CONTRACT, FACTS_SNAPSHOT_SERVICE, INDEX_CONTRACT, INDEX_SERVICE, PRE_STEP_EVENT, resolveMode } from './assets/mode-core.js';
 import { PROPOSE_CONTRACT, PROPOSE_SERVICE } from './assets/block-review.js';
@@ -31,7 +36,8 @@ import { loadRuntime, proposeBlock } from './assets/runtime-state.js';
 import { onPreStep } from './assets/pre-step.js';
 import { renderKnowledgeBlock } from './assets/knowledge-block.js';
 import { registerContext } from './assets/context-channel.js';
-import { createSkillLifecycle, loadLifecycleRules } from './assets/skill-lifecycle.js';
+import { createSkillWriter, loadLifecycleRules } from './assets/skill-lifecycle.js';
+import { createLearningReview, loadLearningRules } from './assets/learning-review.js';
 import { ENHANCE_COMMAND, MODE_AUTO, MODE_COMMAND, createSessionModes, enhanceCommandDefinition, modeCommandDefinition } from './assets/enhance-command.js';
 import { enhanceGuarded } from './assets/enhancer.js';
 /** Das Global, in das der Host die letzten Entscheidungen legt (der Client liest es). */
@@ -61,8 +67,9 @@ const NARRATIVE_CONTRACT = NARRATIVE_STATE_CONTRACT;
 export { parseNote, renderStand, reviewNotes, selectNotes, tokens } from './assets/note-core.js';
 
 // --- Host-Hälfte: Plugin-Vertrag (Config, inject, apply).
-// Den Config-Defaults besitzt genau diese Datei, weil sie die eine Quelle des
-// Config-Schemas ist (Host-Hälfte laut Moduldatei-Form).
+// Das Config-Schema selbst steht in `assets/schema.js` (ein Eigentuemer für
+// Felder und Vorgaben); diese Datei bietet es unter demselben Namen an, unter
+// dem es jeder Abnehmer liest.
 const _config_schema = _imported_config_schema;
 export const Config = _config_schema;
 
@@ -360,24 +367,50 @@ export function apply(ctx, config) {
     `[shinon-prompter] Kommandos ${ENHANCE_COMMAND} + ${MODE_COMMAND} ${enhanceCommandAsked ? 'registriert' : 'NICHT registriert (kein commands-Dienst)'} — Modus ${MODE_AUTO} bis der Knopf umschaltet`,
   );
 
-  // Skill-Lebenszyklus (Zug 7): Ereignisse hoeren, Kandidaten im Hintergrund
-  // pruefen, Skills nach .agents/skills schreiben (der Root, den DSH nativ
-  // entdeckt). Fail-closed: ohne gueltige Regeln gibt es keinen Lebenszyklus.
-  let lifecycle = null;
-  let disposeLifecycle = null;
-  if (config.skillLifecycle && config.eventsChannel !== '') {
+  // Lernpruefung (SH-LEARN-03/04): EIN Produzent hoert Ereignisse, prueft im
+  // Hintergrund und legt Vorschlaege an. Die Eigentuemer schreiben: der
+  // Skill-Schreiber unter `.agents/skills`, die Persona-Naht in ihr Gedaechtnis.
+  // Fail-closed: ohne gueltige Regeln gibt es keinen Reviewer. `skillLifecycle`
+  // bleibt als Alias fuer aeltere Profile lesbar.
+  let review = null;
+  let disposeReview = null;
+  const learningOn = config.learningReview?.enabled === true || config.skillLifecycle === true;
+  if (learningOn && config.eventsChannel !== '') {
     try {
-      lifecycle = createSkillLifecycle({ ctx, rules: loadLifecycleRules(), noteRules: runtime.noteRules ?? {}, route });
-      disposeLifecycle = bus.route(config.eventsChannel, (envelope, payload) => lifecycle.observe(envelope, payload));
-      console.log(`[shinon-prompter] Skill-Lebenszyklus aktiv — Ereignisse auf ${config.eventsChannel}, Ablage ${lifecycle.skillsRoot}`);
+      const lifecycleRules = loadLifecycleRules();
+      const reviewRules = loadLearningRules();
+      const writer = createSkillWriter({
+        rules: lifecycleRules,
+        noteRules: runtime.noteRules ?? {},
+        root: config.workspaceRoot || process.cwd(),
+      });
+      // Die Persona bietet die Naht an; fehlt sie, bleiben Memory-Vorschlaege
+      // im Register und werden benannt blockiert (kein stiller Verlust).
+      let personaReader = () => null;
+      bus.demand([PERSONA_MEMORY_PROPOSAL_SERVICE], (child) => {
+        personaReader = () => child[PERSONA_MEMORY_PROPOSAL_SERVICE] ?? null;
+      });
+      review = createLearningReview({
+        ctx,
+        config: config.learningReview ?? {},
+        rules: reviewRules,
+        skillRules: lifecycleRules,
+        noteRules: runtime.noteRules ?? {},
+        writer,
+        route,
+        persona: () => personaReader(),
+        workspaceRoot: config.workspaceRoot || process.cwd(),
+      });
+      disposeReview = bus.route(config.eventsChannel, (envelope, payload) => review.observe(envelope, payload));
+      console.log(`[shinon-prompter] Lernpruefung aktiv — Ereignisse auf ${config.eventsChannel}, Register ${review.registryPath}`);
     } catch (error) {
-      console.error(`[shinon-prompter] Skill-Lebenszyklus NICHT angebunden (${error?.message ?? error})`);
+      console.error(`[shinon-prompter] Lernpruefung NICHT angebunden (${error?.message ?? error})`);
     }
   }
 
   return () => {
-    lifecycle?.dispose();
-    if (typeof disposeLifecycle === 'function') disposeLifecycle();
+    review?.dispose();
+    if (typeof disposeReview === 'function') disposeReview();
     if (typeof dispose === 'function') dispose();
     if (typeof disposeClaimed === 'function') disposeClaimed();
     if (typeof runtime.disposeContext === 'function') runtime.disposeContext();

@@ -52,7 +52,7 @@
       { "id": "geheimnis", "pattern": "api[_ -]?key|apikey|secret|passwort|password|token|\\.env\\b|credentials", "why": "Geheimnisse gehören in keinen Skill" },
       { "id": "injektion", "pattern": "ignor(e|iere|ieren|ier)\\s+(alle|alles|die|den|der|das|bisherigen|vorherigen|all|previous|the)|ignore\\s+(all\\s+)?(previous|prior|above)|system prompt|neue anweisung", "why": "ein Skill darf keine Anweisungen gegen Regeln oder Umgebung geben" },
       { "id": "ausfuehrbar", "pattern": "rm\\s+-rf|curl\\s|wget\\s|sudo\\s|chmod\\s|eval\\(|child_process|\\|\\s*sh\\b", "why": "ausführbarer Code und Shell-Befehle sind kein Lernstoff" },
-      { "id": "geschuetzt", "pattern": "scripts/gate|docs/contracts|profiles/|vendor/|dist/|package-lock", "why": "Gates, Verträge, Profile und Build-Artefakte ändert kein Skill" }
+      { "id": "geschuetzt", "pattern": "(?:aendere|ändere|schreibe|loesche|lösche|patche|edit(?:iere)?|modify|change|delete|remove|rm)\\s+[^\\n]{0,40}?(?:scripts/gate|docs/contracts|profiles/|vendor/|dist/|package-lock)", "why": "Gates, Verträge, Profile und Build-Artefakte ändert kein Skill. Eine blosse Erwähnung ist keine Änderung: sie wird als Risiko `zentral` freigabepflichtig, nicht verworfen." }
     ]
   },
   "duplicate": {

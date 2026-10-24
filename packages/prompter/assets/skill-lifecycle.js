@@ -1,49 +1,40 @@
 /**
- * @shinon/prompter — Skill-Lebenszyklus, Host (assets/skill-lifecycle.js).
+ * @shinon/prompter — Skill-Schreiber (assets/skill-lifecycle.js).
  *
- * Die Anbindung an DSH: Ereignisse lesen, den Kandidaten vom Modell holen,
- * den reinen Kern (skill-lifecycle-core.js) rechnen lassen und das Ergebnis
- * schreiben. Der Host entscheidet nichts selbst; er fuehrt nur aus.
+ * WARUM DIESE DATEI NUR NOCH SCHREIBT (2026-10-24): frueher hielt sie den
+ * ganzen Hintergrundlauf — Ereignisse, Puffer, Modellaufruf, Queue. Mit
+ * SH-LEARN-03 gibt es EINEN Produzenten (`learning-review.js`) und EINEN
+ * Schreiber je Ablage. Der Schreiber kennt keine Ereignisse und kein Modell;
+ * er bekommt einen geprueften Vorschlag und schreibt ihn — oder er verweigert
+ * mit Befund.
  *
- * Ausloeser (Ereignisse, nie je Schritt) — NORMALISIERTE Namen, weil dieser
- * Host auf `shinon/event` lauscht und nicht auf dem rohen `session/event`:
- *   - feedback.rated mit negativer Bewertung  -> Korrektur (starkes Signal)
- *   - turn.end mit reason `completed`         -> Wiederholung (schwaches Signal)
+ * DIE GRENZEN BLEIBEN:
+ *   - Schreibziel ist IMMER `rules.root.dir` (`.agents/skills`) oder der
+ *     Ledger-Ordner. Ein Pfad ausserhalb wird abgelehnt.
+ *   - Jedes Schreiben ist atomar (Temp + Rename).
+ *   - Der Basis-Hash wird beim Anwenden erneut geprueft: hat jemand die Datei
+ *     seit dem Vorschlag geaendert, gibt es `KONFLIKT` statt Ueberschreiben.
+ *   - Vor jeder Aenderung liegt eine Sicherung unter `.shinon/skill-backups/`;
+ *     `undo` stellt sie wieder her oder verschiebt eine NEU angelegte Datei
+ *     dorthin. Geloescht wird nie.
  *
- * Die Zuordnung roh -> normalisiert ist der Event-Spine (`feedback/message-put`
- * -> `feedback.rated`, `feedback/record` -> `feedback.noted`, `turn/end` ->
- * `turn.end`). Bis 2026-10-21 standen hier die ROHEN Namen; der Host hoerte damit
- * auf einen Kanal, auf dem sie nie erscheinen, und der Lebenszyklus feuerte nie.
- *
- * Hintergrund: die Arbeit laeuft in einer Warteschlange mit `maxConcurrent` = 1,
- * `maxQueue` Plaetzen und `maxPerSession` Auftraegen je Sitzung. Jeder Auftrag
- * hat ein `timeoutMs` und laesst sich mit `dispose()` abbrechen. Der Nutzerturn
- * wartet nie darauf: der Hook kehrt sofort zurueck.
- *
- * Schreibort: IMMER `rules.root.dir` relativ zum Arbeitsverzeichnis — der Root,
- * den DSH nativ entdeckt. Ein Pfad ausserhalb dieses Roots wird abgelehnt.
+ * Kein Netz, keine Shell, keine Werkzeuge. `textOf` bleibt oeffentlich, weil
+ * der Reviewer denselben Textleser fuer Ereignisse benutzt.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve, sep } from 'node:path';
-// Der Agenten-Brief ist eine Ressource (`prompts.json`), kein Literal im Host.
-import { promptText } from './prompt-text.js';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import {
   SKILL_MARK,
-  appendBeleg,
   belegLine,
   checkCandidate,
   consolidateText,
   emptyLedger,
-  fingerprintOf,
-  normalizeCandidate,
   parseLedger,
   recordEvidence,
   renderSkill,
-  sessionRef,
   setDecision,
 } from './skill-lifecycle-core.js';
-
-const SESSION_CAP = 64;
+import { hashFile } from './learning-store.js';
 
 /** Text aus einem Inhalt: String oder Blockliste (nur `text`-Bloecke). */
 export function textOf(content) {
@@ -55,49 +46,45 @@ export function textOf(content) {
     .join('\n');
 }
 
-/** Die Nutzlast eines Ereignisses: DSH legt sie mal in `data`, mal direkt ab. */
-function dataOf(payload) {
-  return payload && typeof payload === 'object' && payload.data && typeof payload.data === 'object' ? payload.data : payload ?? {};
+/** Die Belegarten eines Auftrags: Korrektur zaehlt eins, Wiederholung die Zahl. */
+export function evidenceKinds(evidence) {
+  if (evidence?.kind === 'correction') return { correction: 1, completed: 0 };
+  const completed = Number.isInteger(evidence?.completed) ? Math.max(1, evidence.completed) : 1;
+  return { correction: 0, completed };
 }
 
-function clip(text, max) {
-  const value = String(text ?? '');
-  return value.length > max ? value.slice(0, max) : value;
-}
+/**
+ * Den Schreiber bauen. `root` ist der Projektbaum (CWD des Hosts); alle Pfade
+ * werden dagegen aufgeloest und vor jedem Schreiben geprueft.
+ */
+export function createSkillWriter({ rules, noteRules, root = process.cwd(), log = console }) {
+  const skillsRoot = resolve(root, rules.root.dir);
+  const ledgerPath = resolve(root, rules.ledger.path);
+  const backupsRoot = resolve(root, '.shinon', 'skill-backups');
 
-/** Den Lebenszyklus anlegen. Liefert `observe`, `dispose` und die Zaehler fuer Tests. */
-export function createSkillLifecycle({ ctx, rules, noteRules, route, log = console }) {
-  const skillsRoot = resolve(process.cwd(), rules.root.dir);
-  const ledgerPath = resolve(process.cwd(), rules.ledger.path);
-  const { budget, trigger } = rules;
-  const controller = new AbortController();
-  const sessions = new Map();
-  const queue = [];
-  const timers = new Set();
-  const perSession = new Map();
-  let running = false;
-  let disposed = false;
-
-  const bufferOf = (sessionId) => {
-    let buffer = sessions.get(sessionId);
-    if (buffer === undefined) {
-      if (sessions.size >= SESSION_CAP) sessions.delete(sessions.keys().next().value);
-      buffer = { prompt: '', answer: '', completed: 0, pendingCorrection: null, correctionText: '', turnRef: null };
-      sessions.set(sessionId, buffer);
-    }
-    return buffer;
-  };
-
-  /** Liegt der Pfad unterhalb der erlaubten Wurzel? Jedes Schreiben prueft das. */
-  function inside(path, root = skillsRoot) {
+  function inside(path, allowedRoot = skillsRoot) {
     const target = resolve(path);
-    return target === root || target.startsWith(root + sep);
+    return target === allowedRoot || target.startsWith(allowedRoot + sep);
+  }
+
+  function rel(path) {
+    return relative(root, path).split(sep).join('/');
+  }
+
+  function writeFileAtomic(path, text, allowedRoot = skillsRoot) {
+    if (!inside(path, allowedRoot)) throw new Error(`Schreibziel ausserhalb der erlaubten Wurzel: ${path}`);
+    mkdirSync(dirname(path), { recursive: true });
+    const temp = `${path}.tmp-${process.pid}`;
+    writeFileSync(temp, text, 'utf8');
+    renameSync(temp, path);
   }
 
   function readExisting() {
     let names;
     try {
-      names = readdirSync(skillsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+      names = readdirSync(skillsRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+        .map((entry) => entry.name);
     } catch {
       return [];
     }
@@ -118,251 +105,166 @@ export function createSkillLifecycle({ ctx, rules, noteRules, route, log = conso
     if (!existsSync(ledgerPath)) return emptyLedger();
     const parsed = parseLedger(readFileSync(ledgerPath, 'utf8'));
     if (!parsed.ok) {
-      log.warn?.(`[shinon-skills] Ledger unlesbar (${parsed.reason}) — starte leer, die alte Datei bleibt unberührt`);
+      log.warn?.(`[shinon-learn] Ledger unlesbar (${parsed.reason}) — starte leer, die alte Datei bleibt unberuehrt`);
       return emptyLedger();
     }
     return parsed.ledger;
-  }
-
-  /**
-   * Atomar schreiben: erst eine temporaere Datei, dann umbenennen. Die erlaubte
-   * Wurzel ist PRO SCHREIBZIEL angegeben (Skill-Root oder Ledger-Ordner) — ein
-   * einziger Root fuer beides war ein Fehler: der Ledger liegt in .shinon/.
-   */
-  function writeFileAtomic(path, text, allowedRoot = skillsRoot) {
-    if (!inside(path, allowedRoot)) throw new Error(`Schreibziel außerhalb der erlaubten Wurzel: ${path}`);
-    mkdirSync(dirname(path), { recursive: true });
-    const temp = `${path}.tmp-${process.pid}`;
-    writeFileSync(temp, text, 'utf8');
-    renameSync(temp, path);
   }
 
   function writeLedger(ledger) {
     writeFileAtomic(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`, dirname(ledgerPath));
   }
 
-  /** Den Beleg-Schluessel aus dem Ledger in eine lesbare Zeile zurueckverwandeln. */
   const belegLines = (keys) => keys.map((key) => {
     const [kind, session, ref] = key.split('|');
     return belegLine({ kind, session, ref });
   });
 
-  /** Ein Auftrag: Modell, Pruefung, Ledger, Datei. Jede Stufe nennt ihren Befund. */
-  async function runJob(job, signal) {
-    if (signal.aborted) return;
-    const evidenceText = [
-      `<beleg art="${job.kind}">`,
-      `<nutzerauftrag>${clip(job.prompt, budget.maxPromptChars)}</nutzerauftrag>`,
-      `<antwort>${clip(job.answer, budget.maxEvidenceChars)}</antwort>`,
-      job.correction ? `<korrektur>${clip(job.correction, budget.maxEvidenceChars)}</korrektur>` : '',
-      '</beleg>',
-    ].filter(Boolean).join('\n');
-
-    const request = {
-      provider: route.provider,
-      model: route.model,
-      system: job.system,
-      messages: [{ role: 'user', content: [{ type: 'text', text: evidenceText }] }],
-      maxTokens: budget.maxTokens,
-      temperature: 0,
-      signal,
+  /**
+   * Den Zielort und die Eigentuemer-Pruefung bestimmen, OHNE zu schreiben.
+   * Der Reviewer nutzt das fuer den Vorschlag; `apply` prueft erneut.
+   */
+  function inspect(candidate, evidence) {
+    const existing = readExisting();
+    const ledger = readLedger();
+    const entry = ledger.entries[candidate?.name] ?? null;
+    const ownFile = existing.some((skill) => skill.name === candidate?.name && skill.text.includes(SKILL_MARK));
+    const owner = entry?.status === 'published' || ownFile
+      ? candidate?.name
+      : entry?.status === 'consolidated'
+        ? entry.target
+        : null;
+    const check = checkCandidate({
+      candidate,
+      existing,
+      kinds: evidenceKinds(evidence),
+      owner,
+      // Der Vorschlag IST der Freigabegegenstand. Die Belegschwelle fuer die
+      // Automatik prueft `canAuto` im Reviewer; hier wird nur der Zielort
+      // bestimmt. Ein Mensch, der freigibt, traegt den duennen Beleg.
+      approved: true,
+      rules,
+      noteRules,
+    });
+    const targetName = check.verdict === 'reject' ? null : (check.target ?? candidate?.name ?? null);
+    const file = targetName === null ? null : join(skillsRoot, targetName, rules.root.file);
+    return {
+      ...check,
+      base: file === null ? null : { path: rel(file), hash: hashFile(file) },
     };
-    let text = '';
-    for await (const chunk of ctx.llm.stream(request)) {
-      if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') text += chunk.text;
-    }
-    if (signal.aborted) return;
+  }
 
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    let raw;
-    try {
-      raw = JSON.parse(start === -1 || end < start ? '' : text.slice(start, end + 1));
-    } catch {
-      log.log(`[shinon-skills] ${job.kind}: verworfen (KEIN_JSON)`);
-      return;
+  /**
+   * Den Vorschlag anwenden. `proposal` ist der gepruefte Record; `evidence`
+   * traegt Art, Sitzung (bereits gehasht) und Kennung.
+   * @returns { ok: true, ... } | { ok: false, reason }
+   */
+  function apply(proposal, { evidence } = {}) {
+    const candidate = proposal?.payload;
+    if (candidate === null || typeof candidate !== 'object' || typeof candidate.name !== 'string') {
+      return { ok: false, reason: 'KEIN_KANDIDAT' };
     }
-    if (raw && raw.skip === true) {
-      log.log(`[shinon-skills] ${job.kind}: kein Lernstoff (Modell hat abgelehnt)`);
-      return;
+    if (!evidence || typeof evidence.kind !== 'string') return { ok: false, reason: 'OHNE_BELEG' };
+    const checked = inspect(candidate, evidence);
+    if (checked.verdict !== 'publish' && checked.verdict !== 'consolidate') {
+      return { ok: false, verdict: checked.verdict, reason: checked.reason };
     }
+    const expected = proposal?.base ?? null;
+    const actual = checked.base;
+    if (expected === null || actual === null) return { ok: false, reason: 'OHNE_BASIS' };
+    if (expected.path !== actual.path) return { ok: false, reason: 'KONFLIKT:ZIEL' };
+    if (expected.hash !== actual.hash) return { ok: false, reason: 'KONFLIKT:INHALT' };
 
-    const normalized = normalizeCandidate(raw, rules);
-    if (!normalized.ok) {
-      log.log(`[shinon-skills] ${job.kind}: verworfen (${normalized.reason})`);
-      return;
-    }
-    const candidate = normalized.candidate;
-    const fingerprint = fingerprintOf(candidate, rules);
-    const sessionId = sessionRef(job.sessionId);
-    const evidence = { kind: job.evidenceKind, session: sessionId, ref: job.ref, fingerprint };
+    const file = resolve(root, actual.path);
+    if (!inside(file)) return { ok: false, reason: 'AUSSERHALB' };
+    const previous = existsSync(file) ? readFileSync(file, 'utf8') : null;
+    const backupPath = join(backupsRoot, `${proposal.id}.md`);
+    writeFileAtomic(backupPath, previous ?? 'SHINON-NEU\n', backupsRoot);
 
     const ledger = readLedger();
-    const recorded = recordEvidence(ledger, candidate.name, evidence, { maxEntries: rules.ledger.maxEntries });
-    if (!recorded.added) {
-      log.log(`[shinon-skills] ${candidate.name}: Beleg schon bekannt — nichts zu tun (idempotent)`);
-      return;
-    }
-    const entry = recorded.entry;
-    const existing = readExisting();
-    // Der Eigentuemer: ein Ziel laut Ledger ODER eine Datei, die dieser Lebenszyklus
-    // selbst geschrieben hat (Fingerabdruck-Marker). Der zweite Fall deckt einen
-    // Absturz zwischen Datei- und Ledger-Schreiben ab; sonst waere das ein Namenskonflikt.
-    const ownFile = existing.some((skill) => skill.name === candidate.name && skill.text.includes(SKILL_MARK));
-    const owner = entry.status === 'published' || ownFile ? candidate.name : entry.status === 'consolidated' ? entry.target : null;
-    const check = checkCandidate({ candidate, existing, kinds: entry.kinds, owner, rules, noteRules });
+    const recorded = recordEvidence(ledger, candidate.name, {
+      kind: evidence.kind,
+      session: evidence.session,
+      ref: evidence.ref,
+      fingerprint: proposal.fingerprint,
+    }, { maxEntries: rules.ledger.maxEntries });
+    const entry = recorded.entry ?? ledger.entries[candidate.name];
 
-    if (check.verdict === 'publish') {
-      const skill = renderSkill(candidate, { fingerprint, belege: belegLines(entry.belege) });
-      writeFileAtomic(join(skillsRoot, candidate.name, rules.root.file), skill);
-    } else if (check.verdict === 'consolidate') {
-      const file = join(skillsRoot, check.target, rules.root.file);
-      const current = existsSync(file) ? readFileSync(file, 'utf8') : '';
-      const next = current === ''
-        ? appendBeleg(current, belegLine(evidence))
-        : consolidateText(current, candidate, { fingerprint, line: belegLine(evidence) });
+    if (checked.verdict === 'publish') {
+      const skill = renderSkill(candidate, {
+        fingerprint: proposal.fingerprint,
+        belege: belegLines(entry.belege ?? []),
+      });
+      writeFileAtomic(file, skill);
+    } else {
+      const current = previous ?? '';
+      const next = consolidateText(current, candidate, { fingerprint: proposal.fingerprint, line: belegLine(evidence) });
       if (next !== current) writeFileAtomic(file, next);
     }
 
-    writeLedger(setDecision(recorded.ledger, candidate.name, check, { maxEntries: rules.ledger.maxEntries }));
-    log.log(`[shinon-skills] ${candidate.name}: ${check.verdict} (${check.reason}${check.target ? ` → ${check.target}` : ''})`);
+    writeLedger(setDecision(recorded.ledger, candidate.name, checked, { maxEntries: rules.ledger.maxEntries }));
+    log.log?.(`[shinon-learn] ${candidate.name}: ${checked.verdict} (${checked.reason}${checked.target ? ` -> ${checked.target}` : ''})`);
+    return {
+      ok: true,
+      verdict: checked.verdict,
+      reason: checked.reason,
+      target: checked.target,
+      path: actual.path,
+      owner: candidate.name,
+      previousHash: actual.hash,
+      writtenHash: hashFile(file),
+      backup: rel(backupPath),
+    };
   }
 
-  /** Warteschlange: ein Auftrag nach dem anderen, nie mehr als maxQueue wartend. */
-  function pump() {
-    if (running || disposed) return;
-    const next = queue.shift();
-    if (next === undefined) return;
-    running = true;
-    // Ein eigener Abbruch je Auftrag: der Timeout beendet NUR diesen Auftrag,
-    // dispose() beendet ihn ebenfalls. Der gemeinsame Controller bleibt unberuehrt.
-    const jobAbort = new AbortController();
-    const onDispose = () => jobAbort.abort(new Error('skill-lifecycle disposed'));
-    controller.signal.addEventListener('abort', onDispose, { once: true });
-    const timeout = setTimeout(() => jobAbort.abort(new Error('skill-lifecycle timeout')), budget.timeoutMs);
-    timeout.unref?.();
-    timers.add(timeout);
-    runJob(next, jobAbort.signal)
-      .catch((error) => log.warn?.(`[shinon-skills] ${next.kind} abgebrochen (${error?.message ?? error})`))
-      .finally(() => {
-        clearTimeout(timeout);
-        timers.delete(timeout);
-        controller.signal.removeEventListener('abort', onDispose);
-        running = false;
-        pump();
-      });
-  }
+  /**
+   * Eine angewandte Aenderung zuruecknehmen. Nur wenn die Datei noch genau
+   * das ist, was `apply` geschrieben hat; sonst `KONFLIKT`. Eine NEU angelegte
+   * Datei wird VERSCHOBEN (in die Sicherung), nicht geloescht.
+   */
+  function undo(record) {
+    const path = typeof record?.path === 'string' ? resolve(root, record.path) : '';
+    const backup = typeof record?.backup === 'string' ? resolve(root, record.backup) : '';
+    if (path === '' || !inside(path)) return { ok: false, reason: 'AUSSERHALB' };
+    if (backup === '' || !inside(backup, backupsRoot)) return { ok: false, reason: 'OHNE_SICHERUNG' };
+    if (!existsSync(path)) return { ok: false, reason: 'FEHLT' };
+    if (hashFile(path) !== record.writtenHash) return { ok: false, reason: 'KONFLIKT:INHALT' };
+    if (!existsSync(backup)) return { ok: false, reason: 'OHNE_SICHERUNG' };
 
-  function enqueue(job) {
-    if (disposed) return false;
-    if (route.provider === '' || route.model === '') {
-      log.log(`[shinon-skills] ${job.kind}: übersprungen (keine Route)`);
-      return false;
+    const saved = readFileSync(backup, 'utf8');
+    if (saved === 'SHINON-NEU\n') {
+      renameSync(path, `${backup}.undone`);
+    } else {
+      writeFileAtomic(path, saved);
     }
-    const used = perSession.get(job.sessionId) ?? 0;
-    if (used >= budget.maxPerSession) {
-      log.log(`[shinon-skills] ${job.kind}: übersprungen (Budget der Sitzung erschöpft)`);
-      return false;
+    const ledger = readLedger();
+    if (typeof record.owner === 'string' && ledger.entries[record.owner] !== undefined) {
+      writeLedger(setDecision(ledger, record.owner, { verdict: 'undo', reason: 'WIDERRUFEN', target: null }, { maxEntries: rules.ledger.maxEntries }));
     }
-    if (queue.length >= budget.maxQueue) {
-      log.log(`[shinon-skills] ${job.kind}: übersprungen (Warteschlange voll)`);
-      return false;
-    }
-    perSession.set(job.sessionId, used + 1);
-    queue.push(job);
-    pump();
-    return true;
+    return { ok: true, path: rel(path), mode: saved === 'SHINON-NEU\n' ? 'verschoben' : 'wiederhergestellt' };
   }
 
-  /** Den Auftrag fuer die Korrektur verzoegert anlegen: ein Widerspruchs-Text kann kurz danach kommen. */
-  function scheduleCorrection(sessionId, buffer) {
-    const timer = setTimeout(() => {
-      timers.delete(timer);
-      enqueue({
-        kind: 'korrektur',
-        evidenceKind: 'correction',
-        sessionId,
-        ref: buffer.pendingCorrection,
-        prompt: buffer.prompt,
-        answer: buffer.answer,
-        correction: buffer.correctionText,
-        system: SYSTEM_PROMPT,
-      });
-    }, trigger.correction.settleMs);
-    timer.unref?.();
-    timers.add(timer);
-  }
-
-  /** Das Ereignis verarbeiten. Nie werfen: der Host darf den Lauf nicht brechen. */
-  function observe(envelope, payload) {
-    if (disposed) return;
-    try {
-      const type = typeof envelope?.event_type === 'string' ? envelope.event_type : '';
-      const sessionId = typeof envelope?.session_id === 'string' ? envelope.session_id : '';
-      if (sessionId === '') return;
-      const data = dataOf(payload);
-      const buffer = bufferOf(sessionId);
-
-      if (type === 'message.received' && data?.source?.kind === 'user') {
-        buffer.prompt = clip(textOf(data.content), budget.maxPromptChars);
-      } else if (type === 'message.completed') {
-        buffer.answer = clip(textOf(data.message?.content ?? data.content), budget.maxEvidenceChars);
-      } else if (type === trigger.correction.event) {
-        const item = data.item ?? {};
-        if (item.rating === trigger.correction.rating && typeof item.messageId === 'string') {
-          buffer.pendingCorrection = `message:${item.messageId}`;
-          buffer.correctionText = '';
-          scheduleCorrection(sessionId, buffer);
-        }
-      } else if (type === trigger.correction.recordEvent) {
-        if (buffer.pendingCorrection !== null && typeof data.text === 'string') {
-          buffer.correctionText = clip(data.text, budget.maxEvidenceChars);
-        }
-      } else if (type === 'turn.end') {
-        if (data.reason?.kind !== trigger.completed.reason) return;
-        buffer.completed += 1;
-        const turn = data.turn;
-        if (buffer.prompt === '' || buffer.answer === '') return;
-        enqueue({
-          kind: 'wiederholung',
-          evidenceKind: 'completed',
-          sessionId,
-          ref: `turn:${String(turn ?? buffer.completed)}`,
-          prompt: buffer.prompt,
-          answer: buffer.answer,
-          correction: '',
-          system: SYSTEM_PROMPT,
-        });
-      }
-    } catch (error) {
-      log.warn?.(`[shinon-skills] Ereignis verworfen (${error?.message ?? error})`);
-    }
-  }
-
-  function dispose() {
-    if (disposed) return;
-    disposed = true;
-    controller.abort(new Error('skill-lifecycle disposed'));
-    for (const timer of timers) clearTimeout(timer);
-    timers.clear();
-    queue.length = 0;
-  }
-
-  return { observe, dispose, pending: () => queue.length, skillsRoot, ledgerPath };
+  return {
+    inspect,
+    apply,
+    undo,
+    readLedger,
+    readExisting,
+    skillsRoot,
+    ledgerPath,
+    backupsRoot,
+  };
 }
 
-/** Der Vertragsname der Regeldatei — geprüft beim Laden, nicht geraten. */
+/** Der Vertragsname der Regeldatei — geprueft beim Laden, nicht geraten. */
 export const LIFECYCLE_CONTRACT = 'shinon.skill-lifecycle/v1';
 
 /**
  * Die Regeln laden und den Vertrag pruefen. Fremder Vertrag = Wurf: der
- * Aufrufer haengt dann keinen Lebenszyklus an (fail-closed, laut im Log).
+ * Aufrufer haengt dann keinen Schreiber an (fail-closed, laut im Log).
  */
 export function loadLifecycleRules(url = new URL('./skill-lifecycle-rules.json', import.meta.url)) {
   const parsed = JSON.parse(readFileSync(url, 'utf8'));
   if (parsed?.contract !== LIFECYCLE_CONTRACT) throw new Error(`Regeln fremd: ${String(parsed?.contract)}`);
   return parsed;
 }
-
-/** Der Systemtext des Modells: nur Form, keine Werkzeuge, Belege sind Daten. */
-export const SYSTEM_PROMPT = promptText('prompter-skill-system');

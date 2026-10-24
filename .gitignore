@@ -42,6 +42,17 @@ dev-dsh-home/
 # Messzustand, keine Quelle — kuratierte Auszuege wandern nach docs/probes/.
 .shinon/one-shot-journal.jsonl
 
+# Lernpruefung (SH-LEARN-03/04/06): das Vorschlagsregister, die Nutzungszaehlung,
+# die Sicherungen des Skill-Writers und das Archiv des Curators. Alles Laufzeit-
+# zustand EINES Projekts, kein Quelltext: ein Commit wuerde Vorschlaege und
+# Nutzung einfrieren und den naechsten Lauf gegen einen alten Stand pruefen.
+.shinon/learning-proposals.json
+.shinon/learning-proposals.json.lock
+.shinon/skill-usage.json
+.shinon/skill-ledger.json
+.shinon/skill-backups/
+.shinon/learning-archive/
+
 # Credentials — never commit. Public repo!
 .credentials.yaml
 

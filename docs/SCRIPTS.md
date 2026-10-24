@@ -51,6 +51,7 @@
 | `commit-guard.mjs` | `commit:guard`, `commit:check-file` | Commit-Regeln (`--ci`, `--last n`, `--range`, `--all`, `--file`, `--fix`) |
 | `install-hooks.mjs` | `hooks:install` | legt die drei Git-Hooks aus `.githooks/` |
 | `notes-check.mjs` | `notes:check` | Zettel in `generated-skills/` gegen `prompter/assets/note-rules.json` (fail-closed) |
+| `learn.mjs` | `learn` | Lernvorschläge ansehen/freigeben/ablehnen/zurücknehmen, Nutzung und Curator (`curate`, `restore`); Memory nur über die Persona-Route |
 | `preflight-docs.mjs` | `preflight:docs`, `preflight:docs:check` | prüft reale Linkziele und den vollständigen GitHub-Jobgraphen; lokal sichere Reparatur, CI read-only |
 | `preflight-verdict.mjs` | GitHub Actions | reines Abschlussurteil plus JSON-/Summary-Bericht mit Commit, Run-ID, Jobstatus und Fehlercodes |
 

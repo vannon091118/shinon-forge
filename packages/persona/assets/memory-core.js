@@ -32,11 +32,33 @@ export const MEMORY_SUBJECT_CHARS = 64;
 export const MAX_MEMORY_LINES = 6;
 export const MAX_COMMITMENT_LINES = 4;
 
+/**
+ * Die Naht des Lernpruefers in das Nutzer-Gedaechtnis (SH-LEARN-04).
+ *
+ * Die DEFINITION des Namens steht in `@shinon/seams`
+ * (`PERSONA_MEMORY_PROPOSAL_CONTRACT`); hier steht das LITERAL, weil dieser Kern
+ * ohne `node_modules` ladbar bleiben muss (er ist der Kern, den die Tests ohne
+ * Installation fahren). Die Gleichheit beider Seiten pinnt
+ * `packages/persona/test/memory-proposal.test.mjs`.
+ *
+ * Der Reviewer schlaegt VOR; angenommen wird in der Persona — entweder durch
+ * den Menschen im Pruef-Panel oder, bei eindeutigem und risikoarmem Beleg,
+ * durch den Schreibschalter des Reviewers. Ein Pfad ohne diese Pruefung
+ * existiert nicht.
+ */
+export const MEMORY_PROPOSAL_CONTRACT = 'shinon.persona/memory-proposal-v1';
+
+/** Grenzen eines fremden Vorschlags — jede Zahl ist eine Grenze, kein Ziel. */
+export const MEMORY_CLAIM_CHARS = 160;
+export const MEMORY_REASON_CHARS = 240;
+export const MEMORY_SOURCE_CHARS = 96;
+export const MEMORY_SOURCE_REFS = 6;
+
 const KINDS = Object.freeze(['preference', 'limit', 'lesson', 'evidence']);
 const SCOPES = Object.freeze(['global']);
 
 /** Ein Objekt, kein Array, kein null. */
-function isRecord(value) {
+export function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
@@ -46,7 +68,7 @@ function count(value) {
 }
 
 /** Nicht-leerer Text oder null. */
-function text(value) {
+export function text(value) {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
 }
 
@@ -120,6 +142,14 @@ export function validateMemory(raw) {
       createdAt: text(proposal.createdAt),
       decidedAt: text(proposal.decidedAt),
       source: text(proposal.source),
+      // Begruendung und Quellenbezug sind Teil der Nachvollziehbarkeit: ein
+      // Vorschlag ohne sie waere eine Behauptung. Sie werden gedeckelt, nicht
+      // verworfen — und bleiben optional, weil aeltere Ablagen sie nicht haben.
+      reason: text(proposal.reason) === null ? null : text(proposal.reason).slice(0, MEMORY_REASON_CHARS),
+      sources: Array.isArray(proposal.sources)
+        ? proposal.sources.filter((ref) => typeof ref === 'string' && ref.trim() !== '').slice(0, MEMORY_SOURCE_REFS)
+        : [],
+      scope: text(proposal.scope),
     });
   }
   memory.entries = memory.entries.slice(-MEMORY_MAX_ENTRIES);
@@ -309,93 +339,13 @@ export function renderMemory(memory, options = {}) {
 }
 
 /**
- * Einen Claim des Claim-Kerns in die vorhandenen Vorschläge übernehmen (Zug 5
- * der Wissens-Runtime). Die Brücke ändert KEINE Regel: `accepted` wird nur
- * übernommen, wenn der Claim von `human` oder `review` entschieden wurde. Ein
- * Claim, den `scoring` angenommen haben will, bleibt ein Vorschlag — die
- * Scoring liefert Signale, sie besitzt keine Persona-Wahrheit.
- */
-export function adoptClaim(memory, claim, now = null) {
-  const base = isRecord(memory) ? memory : emptyMemory(now);
-  const id = text(claim?.id);
-  const subject = text(claim?.subject);
-  if (id === null || subject === null) return { memory: base, changed: false, reason: 'KEIN_CLAIM' };
-  const decided = claim?.state === 'accepted' && (claim?.decidedBy === 'human' || claim?.decidedBy === 'review');
-  // proposed bleibt proposed; ein "angenommener" Claim ohne zuständigen Akteur
-  // bleibt ebenfalls Vorschlag; alles andere ist abgelehnt.
-  const status = decided
-    ? 'accepted'
-    : claim?.state === 'proposed' || claim?.state === 'accepted'
-      ? 'proposed'
-      : 'rejected';
-  const entry = {
-    id: `c:${id}`,
-    kind: 'commitment',
-    claim: (text(claim.detail) ?? text(claim.predicate) ?? subject).slice(0, MEMORY_DETAIL_CHARS),
-    evidence: Math.max(1, Math.min(MEMORY_EVIDENCE_CAP, Array.isArray(claim.evidence) ? claim.evidence.length : 1)),
-    status,
-    createdAt: text(now),
-    decidedAt: decided ? text(now) : null,
-    source: text(claim.source) ?? 'claim-core',
-  };
-  const proposals = [...base.proposals];
-  const at = proposals.findIndex((proposal) => proposal.id === entry.id);
-  if (at === -1) proposals.push(entry);
-  else proposals[at] = { ...proposals[at], ...entry, createdAt: proposals[at].createdAt ?? entry.createdAt };
-  return {
-    memory: { ...base, proposals: proposals.slice(-MEMORY_MAX_PROPOSALS) },
-    changed: true,
-    reason: claim?.state === 'accepted' && !decided ? 'NICHT_ENTSCHIEDEN' : '',
-  };
-}
-
-/**
- * Vorschläge aus belegten Wiederholungen. Der Vorschlag ist deterministisch
- * formuliert und wird NIE automatisch angenommen — Annahme ist ein eigener Akt.
- */
-export function proposeFromMemory(memory, options = {}) {
-  const now = text(options.now);
-  const base = isRecord(memory) ? memory : emptyMemory(now);
-  const known = new Set(base.proposals.map((proposal) => proposal.id));
-  const proposals = [...base.proposals];
-  let added = 0;
-  for (const entry of base.entries) {
-    const threshold = entry.kind === 'limit' ? LIMIT_EVIDENCE : entry.kind === 'preference' ? PREFERENCE_EVIDENCE : Infinity;
-    if (entry.evidence < threshold) continue;
-    const id = `p:${entry.id}`;
-    if (known.has(id)) continue;
-    const claim = entry.kind === 'limit'
-      ? promptText('persona-proposal-limit', { subject: entry.subject })
-      : promptText('persona-proposal-preference', { subject: entry.subject });
-    proposals.push({ id, kind: 'commitment', claim, evidence: entry.evidence, status: 'proposed', createdAt: now, decidedAt: null, source: entry.id });
-    known.add(id);
-    added += 1;
-  }
-  return {
-    memory: { ...base, proposals: proposals.slice(-MEMORY_MAX_PROPOSALS) },
-    added,
-  };
-}
-
-/** Ausdrückliche Entscheidung über einen Vorschlag. Unbekannt = abgelehnt (fail-closed). */
-export function decideProposal(memory, id, decision, now = null) {
-  const wanted = text(id);
-  if (wanted === null) return { memory, ok: false, error: 'UNKNOWN_PROPOSAL' };
-  if (decision !== 'accepted' && decision !== 'rejected') return { memory, ok: false, error: 'UNKNOWN_DECISION' };
-  const proposals = Array.isArray(memory?.proposals) ? memory.proposals : [];
-  const at = proposals.findIndex((proposal) => proposal.id === wanted);
-  if (at === -1) return { memory, ok: false, error: 'UNKNOWN_PROPOSAL' };
-  if (proposals[at].status !== 'proposed') return { memory, ok: false, error: 'ALREADY_DECIDED' };
-  const next = proposals.map((proposal, index) => (index === at ? { ...proposal, status: decision, decidedAt: text(now) } : proposal));
-  return { memory: { ...memory, proposals: next }, ok: true, proposal: next[at] };
-}
-
-/**
  * Der Bereich eines Vorschlags — aus `source` (`art|bereich|thema`, gesetzt von
  * `proposeFromMemory` aus der Eintrags-Id) oder `id` (`p:…`). Fremde Formate
  * (z. B. Claim-Quellen) ergeben null: ohne Bereich keine Bereichsanzeige.
  */
 export function scopeOfProposal(proposal) {
+  const own = text(proposal?.scope);
+  if (own !== null) return own;
   const kandidaten = [proposal?.source, String(proposal?.id ?? '').replace(/^p:/, '')];
   for (const kandidat of kandidaten) {
     if (typeof kandidat !== 'string') continue;

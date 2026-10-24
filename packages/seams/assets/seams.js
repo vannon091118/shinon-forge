@@ -88,6 +88,17 @@ export const PROMPTER_DECISION_CHANNEL = 'shinon/prompter/decision';
 export const INDEX_STORE_SERVICE = 'shinon_index_store';
 export const INDEX_STORE_CONTRACT = 'shinon.project-index/store-v1';
 
+/**
+ * Die schmale Naht des Lernens in das Nutzer-Gedaechtnis (SH-LEARN-04).
+ *
+ * Der Reviewer schlaegt vor; die Persona entscheidet ueber ihre Ablage. Der
+ * Dienst kann NUR einen Vorschlag einreichen — kein Lesen, kein Loeschen, kein
+ * direktes Schreiben in `shinon.persona-memory/v1`. Der Vertrag ist der
+ * Wire-Vertrag dieses Vorschlags, nicht das interne Register des Reviewers.
+ */
+export const PERSONA_MEMORY_PROPOSAL_SERVICE = 'shinon_persona_memory_proposal';
+export const PERSONA_MEMORY_PROPOSAL_CONTRACT = 'shinon.persona/memory-proposal-v1';
+
 /** Vertragsname der Workspace-Identität. */
 export const WORKSPACE_CONTRACT = 'shinon.workspace/v1';
 

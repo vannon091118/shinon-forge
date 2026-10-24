@@ -199,7 +199,7 @@ export function findConflict(candidate, existing, rules) {
  * @param input.kinds - Beleg-Zaehler des Kandidaten (`{ correction, completed }`), inkl. des laufenden Ereignisses.
  * @returns `{ verdict, reason, target, findings }`; verdict: publish | consolidate | candidate | reject.
  */
-export function checkCandidate({ candidate, existing = [], kinds = { correction: 0, completed: 0 }, owner = null, rules, noteRules }) {
+export function checkCandidate({ candidate, existing = [], kinds = { correction: 0, completed: 0 }, owner = null, approved = false, rules, noteRules }) {
   const forbidden = forbiddenHits(candidate, rules);
   if (forbidden.length > 0) {
     return { verdict: 'reject', reason: `VERBOTEN:${forbidden[0].id}`, target: null, findings: forbidden };
@@ -228,9 +228,14 @@ export function checkCandidate({ candidate, existing = [], kinds = { correction:
     return { verdict: 'reject', reason: 'NAME_BELEGT', target: candidate.name, findings: [] };
   }
 
+  // Die Belegschwelle entscheidet ueber AUTOMATIK, nicht ueber die Existenz
+  // eines Vorschlags: `approved` sagt, dass ein Mensch (oder die Auto-Regel mit
+  // erfuellter Schwelle) den Antrag bereits traegt. Ohne `approved` bleibt die
+  // alte, strenge Antwort `BELEG_ZU_DUENN` — der Lebenszyklus-Kern allein
+  // veroeffentlicht nie auf duennem Beleg.
   const enough = kinds.correction >= 1 || kinds.completed >= rules.evidence.minCompleted;
-  if (!enough) return { verdict: 'candidate', reason: 'BELEG_ZU_DUENN', target: null, findings: [] };
-  return { verdict: 'publish', reason: 'BELEGT', target: candidate.name, findings: [] };
+  if (!enough && !approved) return { verdict: 'candidate', reason: 'BELEG_ZU_DUENN', target: null, findings: [] };
+  return { verdict: 'publish', reason: enough ? 'BELEGT' : 'FREIGEGEBEN', target: candidate.name, findings: [] };
 }
 
 /** Die Zeile eines Belegs — deterministisch, ohne Klartext-Sitzung. */
@@ -344,7 +349,7 @@ export function recordEvidence(ledger, name, evidence, { maxEntries }) {
 export function setDecision(ledger, name, { verdict, reason, target }, { maxEntries }) {
   const current = ledger.entries[name];
   if (current === undefined) return ledger;
-  const status = verdict === 'publish' ? 'published' : verdict === 'consolidate' ? 'consolidated' : verdict === 'reject' ? 'rejected' : 'candidate';
+  const status = verdict === 'publish' ? 'published' : verdict === 'consolidate' ? 'consolidated' : verdict === 'undo' ? 'undone' : verdict === 'reject' ? 'rejected' : 'candidate';
   const entry = { ...current, status, reason, target: target ?? null };
   return pruned({ ...ledger, entries: { ...ledger.entries, [name]: entry } }, maxEntries);
 }
@@ -356,7 +361,7 @@ export function setDecision(ledger, name, { verdict, reason, target }, { maxEntr
 export function pruned(ledger, maxEntries) {
   const names = Object.keys(ledger.entries);
   if (names.length <= maxEntries) return ledger;
-  const order = ['rejected', 'candidate', 'consolidated', 'published'];
+  const order = ['rejected', 'candidate', 'undone', 'consolidated', 'published'];
   const removable = [...names].sort((a, b) => order.indexOf(ledger.entries[a].status) - order.indexOf(ledger.entries[b].status));
   const drop = new Set(removable.slice(0, names.length - maxEntries));
   return { ...ledger, entries: Object.fromEntries(Object.entries(ledger.entries).filter(([name]) => !drop.has(name))) };

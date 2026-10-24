@@ -32,7 +32,6 @@ import {
   decayMemory,
   emptyMemory,
   memoryView,
-  proposeFromMemory,
   rememberDecision,
   rememberEvent,
   renderCommitments,
@@ -40,6 +39,9 @@ import {
   selectMemories,
   validateMemory,
 } from './memory-core.js';
+// Der Vorschlags-Lebenszyklus (Entstehen, Entscheiden, Widerrufen, fremde
+// Einreichung) hat einen eigenen Eigentuemer; die Richtung ist EINE.
+import { proposeFromMemory, proposeMemory, retractProposal } from './memory-proposals.js';
 import { INDEX_STORE_SERVICE, INDEX_STORE_CONTRACT, fingerprintRoot } from '@shinon/seams/core';
 
 /** Der Namensraum des Selbstmodells: ein Projekt, ein Stand. */
@@ -322,6 +324,39 @@ export function createPersonaRuntime(deps) {
     return renderCommitments(ensureMemory(null), scope) ?? '';
   };
 
+  /**
+   * Ein FREMDER Vorschlag (Lernpruefer) — die Persona prueft und entscheidet.
+   *
+   * Der Reviewer hat kein Schreibrecht: er reicht Vorschlag, Begruendung und
+   * Quellen ein, mehr nicht. Die Pruefung (Vertrag, Groesse, Duplikat,
+   * Geheimnis, Kapazitaet) liegt im Kern; hier steht nur, in WESSEN Gedaechtnis
+   * er faellt — der Workspace der laufenden Sitzung, nie ein globaler Topf.
+   */
+  const proposeInto = (payload) => {
+    const root = sessionRoot.getStore()?.root || declaredRoot;
+    if (!speaksForRoot(root)) return { ok: false, reason: 'FREMDER_WORKSPACE' };
+    if (memoryNamespace() === '') return { ok: false, reason: 'GEDAECHTNIS_AUS' };
+    const now = new Date().toISOString();
+    const scope = typeof root === 'string' && root !== '' ? root : 'global';
+    const result = proposeMemory(ensureMemory(now), { ...(payload ?? {}), scope }, now);
+    if (!result.ok) return { ok: false, reason: result.reason, id: result.id ?? null };
+    memoryDoc = { ...result.memory, lastSeen: now };
+    persistMemoryDoc();
+    onChange();
+    return { ok: true, id: result.id, status: result.status, scope };
+  };
+
+  /** Eine angenommene Auflage zuruecknehmen — derselbe Eigentuemer, derselbe Weg. */
+  const revokeInto = (id) => {
+    const now = new Date().toISOString();
+    const result = retractProposal(ensureMemory(now), id, now);
+    if (!result.ok) return { ok: false, error: result.error };
+    memoryDoc = { ...result.memory, lastSeen: now };
+    persistMemoryDoc();
+    onChange();
+    return { ok: true, proposal: result.proposal };
+  };
+
 
   return {
     /** Der Namensraum des Selbstmodells fuer diesen Root (leer = aus). */
@@ -336,6 +371,10 @@ export function createPersonaRuntime(deps) {
     commitmentsText,
     /** EINEN Beleg verbuchen (Entscheidung oder Fehler). */
     observe: observeInto,
+    /** Einen fremden Vorschlag pruefen und annehmen (Naht des Lernpruefers). */
+    propose: proposeInto,
+    /** Eine angenommene Auflage zuruecknehmen. */
+    revoke: revokeInto,
     /** EIN Ereignis oder EINE Entscheidung erinnern. */
     remember: rememberInto,
     /** Das Gedaechtnis laden (einmal) und zurueckgeben. */

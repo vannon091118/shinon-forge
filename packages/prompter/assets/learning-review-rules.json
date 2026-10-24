@@ -1,0 +1,82 @@
+{
+  "contract": "shinon.learning-review/v1",
+  "note": "Die Regeln der asynchronen Lernpruefung (SH-LEARN-03/04/06). Alles ist DATEN: Ausloeser, Grenzen des Digests, Budget des Hintergrundlaufs, Pruef- und Risikomuster, Register- und Curator-Vorgaben. Der Kern (learning-proposal.js) rechnet nur, der Host (learning-review.js) liest Ereignisse, ruft das Modell fuer EINEN Vorschlag auf und schreibt ueber die Eigentuemer. Kein Zufall, keine Uhr im Kern: dieselben Belege ergeben dieselbe Entscheidung. Die Skill-Form selbst (Name, Beschreibung, Verbotenes, Dublette, Widerspruch) steht weiter in skill-lifecycle-rules.json — eine Quelle je Zahl.",
+  "trigger": {
+    "note": "Korrektur ist das starke Signal (sofort, nach kurzem Settle). Wiederholung ist der Nudge: mehrere abgeschlossene Zuege ODER mehrere Werkzeug-Iterationen seit der letzten Pruefung. Ein Abbruch erzeugt NIE einen Auftrag.",
+    "correctionEvent": "feedback.rated",
+    "rating": "negative",
+    "recordEvent": "feedback.noted",
+    "settleMs": 1500,
+    "completedEvent": "turn.end",
+    "completedReason": "completed",
+    "abortReason": "aborted",
+    "toolEvent": "tool.requested"
+  },
+  "format": {
+    "note": "Form des Vorschlags. Die Grenzen sind hart; alles darueber wird abgelehnt, nie gekuerzt.",
+    "reasonMax": 240,
+    "claimMax": 160,
+    "subjectMax": 64,
+    "maxSources": 6,
+    "idPrefix": "lp_"
+  },
+  "redaction": {
+    "note": "Grenzen des Gespraechs-Digests. Gezaehlt werden Zeichen, nicht Tokens; die Tokenzahl waere eine Schaetzung und wird hier nicht behauptet.",
+    "maxEntries": 24,
+    "maxChars": 8000,
+    "maxEntryChars": 700
+  },
+  "review": {
+    "note": "Eigenes Budget des Hintergrundlaufs. `maxIterations` ist die Zahl der Modellaufrufe je Auftrag: genau einer, kein Retry. `maxPerSession` zaehlt Auftraege, nicht Aufrufe.",
+    "nudgeTurns": 3,
+    "nudgeToolCalls": 8,
+    "cooldownMs": 30000,
+    "maxConcurrent": 1,
+    "maxQueue": 4,
+    "maxPerSession": 6,
+    "timeoutMs": 60000,
+    "maxTokens": 600,
+    "maxIterations": 1,
+    "minEvidenceForAuto": 3
+  },
+  "risk": {
+    "note": "Zentrale Regeln und Identitaet sind NIE automatisch. Ein Treffer macht den Vorschlag freigabepflichtig; er wird nicht verworfen. Die blosse Erwaehnung eines Pfades ist noch keine Aenderung — das unterscheidet diese Pruefung vom Schreibverbot in skill-lifecycle-rules.json.",
+    "central": [
+      "AGENTS\\.md",
+      "SHINON\\.md",
+      "docs/contracts",
+      "profiles/",
+      "scripts/gate",
+      "identitaet",
+      "identity",
+      "systemprompt",
+      "system prompt"
+    ]
+  },
+  "registry": {
+    "note": "Das Vorschlagsregister ist die Pruef- und Undo-Spur, KEINE Wissensablage. Es haelt nur Aenderungsantraege; die Wissensarten bleiben die vier aus knowledge-kinds.json. Am Limit weichen entschiedene Eintraege; offene werden nie still verworfen.",
+    "path": ".shinon/learning-proposals.json",
+    "maxEntries": 100
+  },
+  "usage": {
+    "note": "Nutzungszaehlung fuer den Curator. Sie entsteht aus Werkzeug-Aufrufen des Skill-Werkzeugs, nicht aus einer zweiten Auswahl. Fehlt die Datei, archiviert der Curator nichts.",
+    "path": ".shinon/skill-usage.json",
+    "maxEntries": 200,
+    "skillToolName": "skill"
+  },
+  "curator": {
+    "note": "Vorgaben aus dem Hermes-Curator (docs/user-guide/features/curator): Woche, zwei Stunden Ruhe, 14 Tage veraltet, 30 Tage archivieren, kein automatisches Konsolidieren, keine eingebauten Skills anfassen. Der Curator laeuft als Kommando, nicht als Daemon — DSH hat kein Sitzungsende-Ereignis.",
+    "enabled": true,
+    "intervalHours": 168,
+    "minIdleHours": 2,
+    "staleAfterDays": 14,
+    "archiveAfterDays": 30,
+    "consolidate": false,
+    "pruneBuiltins": false,
+    "maxManaged": 200
+  },
+  "skill": {
+    "note": "Die Form des Skills bleibt beim Lebenszyklus. Dieser Zeiger verhindert eine zweite Tabelle.",
+    "rulesPath": "skill-lifecycle-rules.json"
+  }
+}

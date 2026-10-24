@@ -1,6 +1,13 @@
+// Der statische Vertrag jeder Host-Hälfte (`indexIssues` in
+// `scripts/lib/repo-pakete.mjs`) verlangt in DIESER Datei das Literal
+// `@deepseek-ai/schemastery` und `export const Config`: das Plugin-Schema muss
+// an der Host-Hälfte sichtbar sein. Gebaut wird es im Eigentuemer
+// (`assets/schema.js`); der Import bleibt als benannte Grenze stehen —
+// dieselbe Form wie `@shinon/prompter`.
 import z from '@deepseek-ai/schemastery';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { acceptedCommitments, decideProposal } from './assets/memory-core.js';
+import { acceptedCommitments } from './assets/memory-core.js';
+import { decideProposal } from './assets/memory-proposals.js';
 // Der Zustand der Persona (Selbstmodell und Langzeitgedaechtnis) hat EINEN
 // Eigentuemer: `assets/persona-runtime-state.js`. Die Namensraeume und Dokument-Ids, die der
 // Eintrag als oeffentliche Namen weitergibt, stehen dort.
@@ -19,7 +26,7 @@ import {
 // Das Lesen einer MENSCHLICHEN Nachricht und der explizite Beziehungs-Produzent
 // liegen im importfreien Kern: dieselbe Rechnung im Host, im Test ohne
 // node_modules und in der Probe gegen den echten Spine.
-import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SIGNAL, TRIGGERS, beobachten, createPromptText, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, textOf, turnSummary } from './assets/interaction-core.js';
+import { RELATION_CONTRACT, RELATION_ROUTE, RELATION_SIGNAL, TRIGGERS, createPromptText, createRelationService, detectUserMood, matchTrigger, renderTriggerContext, textOf } from './assets/interaction-core.js';
 // Der Live-Zustand der Persona geht als RUNTIME-CONTEXT in die Nachrichtenliste,
 // nicht nur als System-Prompt-Abschnitt: so ersetzt der Stand pro Schritt den
 // vorherigen (statt sich neben ihm zu stapeln) und traegt den Anti-Drift-Satz
@@ -28,30 +35,22 @@ import { renderLiveContext } from './assets/live-context.js';
 // Panel-Daten und Routen (Globals, SSE, Review, Beziehung) haben einen eigenen
 // Eigentuemer: der Eintrag baut die Flaeche, die Flaeche kennt die HTTP-Form.
 import { createUiSurface } from './assets/ui-surface.js';
+import { installMemoryProposalSeam } from './assets/memory-proposal-seam.js';
+import { createEventReaction } from './assets/event-reaction.js';
+import { mountPromptSections } from './assets/prompt-mount.js';
 // Welche Abschnitte es gibt und wie sie am Prompt haengen: eigener Eigentuemer.
-import { buildSectionPlan, registerSections } from './assets/prompt-sections.js';
 // Fuer WEN die Persona in diesem Schritt spricht: eigener Eigentuemer.
 import { createSessionScope, declaredWorkspaceRoot } from './assets/session-scope.js';
 // Der Arbeitsablauf als EIN zusammenhaengender Baustein: die Reihenfolge der
 // Schritte und der Umgang mit Zweifel, Blockern, Fehlern und Abbruch.
-import { WORKFLOW, renderWorkflow } from './assets/workflow.js';
-// Die Modell-Texte der Persona liegen als Daten in ./assets/prompts.json
-// (Vertrag shinon.prompts/v1). Die Config-Vorgaben LESEN sie; ein leeres Feld
-// bleibt ein leerer Abschnitt. Metadaten (Lage, Sektion, Modus, Budget) stehen
-// in packages/prompter/assets/blocks.json.
-import { promptText } from './assets/prompt-text.js';
-
-const DEFAULTS = Object.freeze({
-  identity: promptText('persona-identity'),
-  epistemic: promptText('persona-epistemic'),
-  changeClasses: promptText('persona-change-classes'),
-  determinism: promptText('persona-determinism'),
-  report: promptText('persona-report'),
-  workaround: promptText('persona-workaround'),
-  identityOverview: promptText('persona-identity-overview'),
-});
+import { renderWorkflow } from './assets/workflow.js';
+// Der Plugin-Vertrag (Felder + Vorgaben) hat einen eigenen Eigentuemer:
+// `assets/schema.js`. Vorgaben sind DATEN (Texte aus ./assets/prompts.json,
+// Vertrag shinon.prompts/v1; Workflow aus ./assets/workflow.js; Namensraeume
+// aus dem Zustand), ein leeres Feld bleibt ein leerer Abschnitt. Metadaten
+// (Lage, Sektion, Modus, Budget) stehen in packages/prompter/assets/blocks.json.
+import { Config as _imported_config_schema } from './assets/schema.js';
 // Der Projekt-Kontext (aus dem Sitzungs-Workspace) wird im importfreien Kern gelesen.
-import { readProjectContext } from './assets/project-context.js';
 // Die Host-Nähte (Narrative-Kanal, Entscheidungskanal, kanonischer I/O-Pfad)
 // haben EINE Definition: `@shinon/seams`.
 import {
@@ -200,64 +199,11 @@ export { RELATION_CONTRACT, RELATION_ROUTE, TRIGGERS, matchTrigger, detectUserMo
  * eine Person, die angesprochen wird, kein Datenblatt, das abgefragt wird.
  */
 
-export const Config = z.object({
-  /** Identität + Ton. Leer = Abschnitt entfällt. */
-  identity: z.string().default(DEFAULTS.identity),
-  /** Epistemische Haltung (Evidenz, Widerspruch, Unsicherheit). */
-  epistemic: z.string().default(DEFAULTS.epistemic),
-  /** Änderungsklassen + Golden-Test-Disziplin. */
-  changeClasses: z.string().default(DEFAULTS.changeClasses),
-  /** Determinismus-Regeln für Seed-/RNG-Systeme. */
-  determinism: z.string().default(DEFAULTS.determinism),
-  /** Reportformat. */
-  report: z.string().default(DEFAULTS.report),
-  /** Blockiert heißt nicht Endstation — Workaround-Haltung. */
-  workaround: z.string().default(DEFAULTS.workaround),
-  /** Der Arbeitsablauf — LAGE, PLAN, HANDELN, PRUEFEN, BERICHTEN. */
-  workflow: z.string().default(WORKFLOW),
-  /** Materialübersicht fuer Selbstauskünfte. Nie die Antwort selbst. */
-  identityOverview: z.string().default(DEFAULTS.identityOverview),
-  /** Triggerwoerter, die eine Selbstauskunft auslösen. */
-  identityTriggers: z.array(z.string()).default([...TRIGGERS]),
-  /** Selbstauskunft-Übersicht dauerhaft in den Prompt legen. */
-  alwaysKnowIdentity: z.boolean().default(true),
-  /** Zustandsvertrag (Baseline, Übergänge, Stimmen). */
-  statePath: z.string().default('./assets/persona-state.json'),
-  /** Kanal, auf dem der Event-Spine seine Envelopes emittiert. */
-  eventsChannel: z.string().default('shinon/event'),
-  /**
-   * Pfad zur Projekt-Kontextdatei (relativ zum ARBEITSVERZEICHNIS).
-   *
-   * Diese Datei enthält projekt-spezifische Kontextinformationen aus dem
-   * Workspace der laufenden Sitzung. Sie wird als separater Abschnitt
-   * injiziert — Workspace-Daten, keine Anweisung. Leer = nicht laden.
-   */
-  projectContextPath: z.string().default(''),
-  /**
-   * Der Workspace, in dessen Namen die Persona spricht (absolut oder relativ zu
-   * `process.cwd()`). Leer = aus `SHINON_WORKSPACE_ROOT`, sonst unklar = keine Persona.
-   */
-  workspaceRoot: z.string().default(''),
-  /**
-   * Der Namensraum des Selbstmodells in der dauerhaften Ablage des Project
-   * Index (`shinon_index_store`). Leer = kein Gedaechtnis ueber Neustarts: das
-   * Modell lebt dann nur im Prozess, und die Ablage bekommt keine Zeile.
-   */
-  selfModelNamespace: z.string().default(SELF_MODEL_NAMESPACE),
-  /**
-   * Der Namensraum des Langzeitgedaechtnisses (Ereignisse, Belege, Vorschlaege).
-   * Leer = kein Gedaechtnis: die Persona bleibt dann bei Identitaet und Zustand.
-   */
-  memoryNamespace: z.string().default(MEMORY_NAMESPACE),
-  /**
-   * Wo die IDENTITAET spricht: `workspace` (Vorgabe, jede zugewiesene
-   * Sitzung und jeder deklarierte Boot) oder `global` (zusaetzlich auch
-   * ohne jede Zuweisung — die Entscheidung des Deployments). Projekt-Kontext
-   * und projektspezifische Daten bleiben in beiden Faellen am Sitzungs-
-   * Workspace und werden nie global.
-   */
-  identityScope: z.union([z.const('workspace'), z.const('global')]).default('workspace'),
-});
+// Die Aussenflaeche bleibt derselbe NAME: der Eintrag bietet das Schema an,
+// gebaut wird es im Eigentuemer. Abnehmer und Tests lesen unveraendert
+// `Config` aus `@shinon/persona`.
+const _config_schema = _imported_config_schema;
+export const Config = _config_schema;
 
 export function apply(ctx, config) {
   // Jede Registrierung dieses Pakets läuft über den einen Orchestrator: der
@@ -305,7 +251,9 @@ export function apply(ctx, config) {
   // Der Text der letzten Menschen-Nachricht: Gedaechtnis und Gate lesen denselben Halter.
   const promptText = createPromptText();
   const persona = createPersonaState(contract);
-  const turnTally = { events: 0, human: 0 }; // siehe `tallyTurn` im Kern
+  // Was die Persona in DIESEM Turn gelesen hat: der Kern zaehlt, der Eintrag
+  // haelt den Zaehler und setzt ihn am Turn-Ende zurueck (`turnSummary`).
+  const turnTally = { events: 0, human: 0 };
 
   // Der Sitzungs-Scope hat einen eigenen Eigentuemer (`assets/session-scope.js`):
   // er entscheidet je Assembly, fuer wen die Persona spricht. Der Eintrag haelt
@@ -354,9 +302,6 @@ export function apply(ctx, config) {
     review: { accepted: acceptedCommitments, decide: decideProposal },
     log: (message) => console.log(`[shinon-persona] ${message}`),
   });
-  const uiSnapshot = surface.snapshot;
-  const publishUi = surface.publish;
-  const reviewService = surface.reviewService;
 
   // Das Gedaechtnis hat seinen eigenen Eigentuemer (assets/persona-runtime-state.js): hier
   // steht nur, WER es baut und WELCHE Entscheidungen es mitbekommt. Der
@@ -371,111 +316,49 @@ export function apply(ctx, config) {
     speaksForSession,
     rootOfAssembly,
     promptText,
-    onChange: () => publishUi(),
+    onChange: () => surface.publish(),
   });
 
-  // TODO: [DSH-Refactor] - Die Registrierung steckt in vier verschachtelten Closures (inject →
-  // effect → renderPrompt → renderTrigger) mit handgefuehrtem Disposer-Stack; nicht ablesbar
-  // ist, welcher Disposer zu welchem Abschnitt gehoert. Ziel: eine Funktion mit EINER
-  // Aufraeumliste. (Der Absturzpfad selbst ist geschlossen: der Dienst wird vor dem ersten
-  // Aufruf geprueft — siehe unten.)
-  bus.demand(['systemPrompt'], (child) => {
-    const sp = child.systemPrompt;
-    // Fail-loud statt Throw im inject-Callback: ein fremder Dienst ohne die beiden Methoden
-    // wuerde hier sonst werfen, und der Fehler faellt INNERHALB des Callbacks an, nicht beim
-    // Abschnitt. Kein Abschnitt ist besser als ein halb registrierter Prompt.
-    if (typeof sp?.getSectionOrder !== 'function' || typeof sp?.section !== 'function') {
-      console.error('[shinon-persona] systemPrompt-Dienst ohne getSectionOrder/section — Abschnitte NICHT registriert');
-      return;
-    }
-    const atPrefix = sp.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX');
-    const atSuffix = sp.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX');
+  const disposeProposal = installMemoryProposalSeam({ bus, runtime });
 
-    // Die Liste der Abschnitte und ihre Registrierung haben einen eigenen
-    // Eigentuemer (`assets/prompt-sections.js`): hier stehen nur die Teile, die
-    // aus Config, Runtime und Workspace kommen.
-    const contextPath = typeof config.projectContextPath === 'string' ? config.projectContextPath : '';
-    const projectContextText = contextPath === '' ? null : (() => {
-      const cache = new Map();
-      return (assemblyCtx) => {
-        if (!projectsForSession(assemblyCtx)) return '';
-        return readProjectContext({
-          contextPath,
-          root: () => rootOfAssembly(assemblyCtx) || declaredRoot,
-          declaredRoot,
-          cache,
-          warn: (message) => console.warn(`[shinon-persona] ${message}`),
-          log: (message) => console.log(`[shinon-persona] ${message}`),
-        });
-      };
-    })();
-    const sections = buildSectionPlan({
-      atPrefix,
-      atSuffix,
-      config,
-      workflowText: renderWorkflow(config.workflow),
-      gated,
-      runtime,
-      projectContextText,
-    });
-
-    child.effect(() => {
-      const registered = registerSections(sp, sections, {
-        gated,
-        atPrefix,
-        contract,
-        persona,
-        tone: () => readTone(ctx, warnedTone),
-        userMood: () => lastUserMood,
-        spricht: (assemblyCtx) => speaksForSession(assemblyCtx),
-        triggerText: () => (lastTrigger === null ? null : renderTriggerContext(lastTrigger)),
-      });
-      renderTrigger = registered.renderTrigger;
-      return registered.dispose;
-    });
-
-    console.log(
-      `[shinon-persona] ${sections.length} Prompt-Abschnitte registriert; der dynamische Zustand steht einmal im Live-Block`,
-    );
-  });
+  // Die Registrierung hat einen eigenen Eigentuemer (`assets/prompt-mount.js`);
+  // der Eintrag reicht nur die Getter hinein, die aus Config und Runtime kommen.
+  // Der Callback gibt NICHTS zurueck: Cordis nimmt den Rueckgabewert von
+  // `ctx.inject` als Aufraeumfunktion und raeumt sonst sofort auf (gemessen:
+  // der Live-Kontext verschwand, waehrend die Abschnitte stehen blieben).
+  bus.demand(['systemPrompt'], (child) => { mountPromptSections(child, {
+    config,
+    contract,
+    persona,
+    runtime,
+    gated,
+    projectsForSession,
+    rootOfAssembly,
+    declaredRoot,
+    workflowText: renderWorkflow(config.workflow),
+    tone: () => readTone(ctx, warnedTone),
+    userMood: () => lastUserMood,
+    spricht: (assemblyCtx) => speaksForSession(assemblyCtx),
+    triggerText: () => (lastTrigger === null ? null : renderTriggerContext(lastTrigger)),
+    onRenderTrigger: (render) => { renderTrigger = render; },
+  }); });
 
   // Beobachtung: die Persona antwortet nie auf ein Event, sie aktualisiert
-  // ausschliesslich ihren eigenen Kontext.
-  const handler = (envelope, payload) => {
-    // Das Lesen des Ereignisses ist Rechnung und liegt im Kern.
-    const gelesen = beobachten(envelope, payload, {
-      triggers: config.identityTriggers,
-      letzterTrigger: lastTrigger,
-      letzteStimmung: lastUserMood,
-      tally: turnTally,
-    });
-    if (gelesen === null) return;
-    if (gelesen.sessionId !== null) runtime.lastSessionId = gelesen.sessionId;
-    const turnLine = gelesen.eventType === 'turn.end' ? turnSummary(gelesen.tally) : null;
-    if (gelesen.eventType === 'message.received' && gelesen.human) {
-      // Nur der Mensch setzt die letzte Nachricht — der eingeblendete
-      // Live-Block danach würde den Text der Abschnitts-Gates überschreiben.
-      promptText.remember(gelesen.sessionId, gelesen.text);
-      lastDecision = null;
-    }
-    // Jedes relevante Ereignis geht in das Langzeitgedaechtnis.
-    runtime.remember('event', { type: gelesen.eventType, payload: gelesen.eventPayload });
-    persona.observe(gelesen.eventType, gelesen.eventPayload);
-    if (gelesen.triggerGewechselt) {
-      lastTrigger = gelesen.trigger;
-      renderTrigger();
-      console.log(`[shinon-persona] Anrede erkannt (${gelesen.trigger}) — narrative Selbstauskunft aktiv`);
-    }
-    if (gelesen.stimmungGewechselt) {
-      lastUserMood = gelesen.stimmung;
-      if (gelesen.stimmung !== null) console.log(`[shinon-persona] User-Lage erkannt (${gelesen.stimmung})`);
-    }
-    // `umfang=0`, weil diese Zeile selbst kein gelesenes Ereignis ist.
-    if (turnLine !== null) {
-      logEventRead({ quelle: config.eventsChannel, ziel: 'persona:turn.zusammenfassung', umfang: 0, grund: turnLine, trace_id: gelesen.traceId });
-      turnTally.events = 0; // neuer Turn, neuer Zaehler — sonst zaehlt der zweite mit
-    }
-  };
+  // ausschliesslich ihren eigenen Kontext. Die Reaktion hat einen eigenen
+  // Eigentuemer (`assets/event-reaction.js`); hier steht nur die Registrierung.
+  const handler = createEventReaction({
+    triggers: config.identityTriggers,
+    channel: config.eventsChannel,
+    getTrigger: () => lastTrigger,
+    getMood: () => lastUserMood,
+    setTrigger: (value) => { lastTrigger = value; renderTrigger(); },
+    setMood: (value) => { lastUserMood = value; },
+    resetDecision: () => { lastDecision = null; },
+    runtime,
+    persona,
+    promptText,
+    tally: turnTally,
+  });
   const disposer = bus.route(config.eventsChannel, handler);
 
   // ── Die Belege: echte Laufzeitspuren, nicht Selbsteinschaetzung ───────────
@@ -504,10 +387,10 @@ export function apply(ctx, config) {
   // die SSE-Route jede Aenderung nach.
   const uiInjectDisposer = bus.route(INDEX_INJECT, (table) => {
         if (!Array.isArray(table)) return;
-        table.push({ kind: 'global', name: UI_STATE_GLOBAL, value: uiSnapshot() });
+        table.push({ kind: 'global', name: UI_STATE_GLOBAL, value: surface.snapshot() });
         // Das Panel soll beim Laden schon die offenen Vorschlaege zeigen; ohne
         // diesen Startstand waere es bis zum ersten Abruf leer.
-        table.push({ kind: 'global', name: REVIEW_GLOBAL, value: reviewService.review() });
+        table.push({ kind: 'global', name: REVIEW_GLOBAL, value: surface.reviewService.review() });
   });
   if (!bus.demand(['webServer'], (webCtx) => surface.mount(webCtx))) surface.mount(ctx);
 
@@ -539,11 +422,10 @@ export function apply(ctx, config) {
   });
 
   return () => {
-    if (typeof disposer === 'function') disposer();
-    if (typeof sessionDisposer === 'function') sessionDisposer();
-    if (typeof decisionDisposer === 'function') decisionDisposer();
-    if (typeof errorDisposer === 'function') errorDisposer();
-    if (typeof uiInjectDisposer === 'function') uiInjectDisposer();
+    // Eine Liste, eine Regel: jede Registrierung wird genau einmal geloest.
+    for (const dispose of [disposeProposal, disposer, sessionDisposer, decisionDisposer, errorDisposer, uiInjectDisposer]) {
+      if (typeof dispose === 'function') dispose();
+    }
     surface.close();
     console.log('[shinon-persona] Deaktiviert');
   };

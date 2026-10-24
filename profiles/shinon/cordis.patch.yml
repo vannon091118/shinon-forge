@@ -645,10 +645,23 @@
     provider: prompter
     model: agnes-2.5-flash
     providerKeyEnv: PROMPTER_API_KEY
-    # Skill-Lebenszyklus (Zug 7): Korrekturen und abgeschlossene Zuege erzeugen
-    # Kandidaten; veroeffentlicht wird nach .agents/skills, dem Root, den DSH nativ
-    # entdeckt. Der Vorgabewert im Paket ist AUS; die Entscheidung steht hier.
-    skillLifecycle: true
+    # Lernpruefung (SH-LEARN-03/04): Korrekturen und Nudges erzeugen Vorschlaege;
+    # Skills schreibt der Skill-Writer nach .agents/skills, Memory geht ueber die
+    # Persona-Naht. Der Vorgabewert im Paket ist AUS; die Entscheidung steht hier.
+    # `memoryWriteApproval`/`skillWriteApproval` stehen in der Anfangsphase auf
+    # true: jede Aenderung wird zur Freigabe bereitgestellt. `false` erlaubt
+    # eindeutige, risikoarme Aenderungen automatisch; zentrale Regeln bleiben
+    # immer freigabepflichtig. `skillLifecycle` ist der alte Alias und bleibt
+    # aus, damit es keinen zweiten Pfad gibt.
+    learningReview:
+      enabled: true
+      provider: ''
+      model: ''
+      memoryWriteApproval: true
+      skillWriteApproval: true
+      registryPath: .shinon/learning-proposals.json
+      usagePath: .shinon/skill-usage.json
+    skillLifecycle: false
     providerFallback: agnes
     modelFallback: agnes-2.5-flash
     skillsPath: .agents/skills

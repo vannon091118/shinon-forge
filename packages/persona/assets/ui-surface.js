@@ -96,16 +96,33 @@ export function createUiSurface({ names, contract, persona, runtime, root, tone,
     review: () => ({
       contract: names.reviewContract,
       memory: runtime().panel(null).memory,
+      // Begruendung und Quellenbezug gehoeren zur Anzeige: ein Vorschlag ohne
+      // sie waere eine Behauptung, und der Mensch entscheidet ueber den Grund
+      // mit. Sie fehlen bei aelteren Vorschlaegen — dann bleiben sie leer.
       proposals: (runtime().memory(null).proposals ?? []).map((proposal) => ({
         id: proposal.id,
         claim: proposal.claim,
         evidence: proposal.evidence,
         status: proposal.status,
         decidedAt: proposal.decidedAt,
+        createdAt: proposal.createdAt ?? null,
+        source: proposal.source ?? null,
+        reason: proposal.reason ?? null,
+        sources: Array.isArray(proposal.sources) ? [...proposal.sources] : [],
       })),
       commitments: review.accepted(runtime().memory(null)).map((proposal) => ({ id: proposal.id, claim: proposal.claim, evidence: proposal.evidence })),
     }),
     decide: (id, decisionValue) => {
+      // Der Widerruf ist der dritte ausdrueckliche Akt, kein Sonderfall des
+      // Ablehnens: angenommen ist angenommen, und nur der Eigentuemer nimmt
+      // eine Auflage zurueck (der Kern fuehrt die Symmetrie).
+      if (decisionValue === 'revoked') {
+        const undone = runtime().revoke(id);
+        if (undone.ok !== true) return { ok: false, error: undone.error ?? 'WIDERRUF_VERWEIGERT' };
+        publish();
+        log(`Auflage ${id} widerrufen`);
+        return { ok: true, proposal: undone.proposal };
+      }
       const now = new Date().toISOString();
       const result = review.decide(runtime().memory(now), id, decisionValue, now);
       if (!result.ok) return { ok: false, error: result.error };
@@ -167,7 +184,7 @@ export function createUiSurface({ names, contract, persona, runtime, root, tone,
         if (!body.ok) { sendJson(res, 400, { ok: false, error: body.error }); return; }
         const id = typeof body.value?.id === 'string' ? body.value.id : '';
         const chosen = body.value?.decision;
-        if (id === '' || (chosen !== 'accepted' && chosen !== 'rejected')) {
+        if (id === '' || (chosen !== 'accepted' && chosen !== 'rejected' && chosen !== 'revoked')) {
           sendJson(res, 400, { ok: false, error: 'INVALID_REQUEST' });
           return;
         }

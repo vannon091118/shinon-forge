@@ -97,6 +97,23 @@ export const ContextSchema = z.object({
  * ausdrueckliche Angabe, die nicht stimmt, darf nicht stillschweigend auf eine
  * andere Quelle ausweichen.
  */
+/**
+ * Die Lernpruefung (SH-LEARN-03/04). Die Schalter und die Route stehen hier,
+ * weil sie Entscheidungen des Betreibers sind; die Fristen, Budgets und
+ * Pruefgrenzen stehen als Daten in `learning-review-rules.json` — eine Zahl,
+ * ein Ort. `enabled: false` ist die Vorgabe: ohne Profilentscheidung laeuft
+ * kein Hintergrundmodell.
+ */
+const learningReviewSchema = z.object({
+  enabled: z.boolean().default(false),
+  provider: z.string().default(''),
+  model: z.string().default(''),
+  memoryWriteApproval: z.boolean().default(true),
+  skillWriteApproval: z.boolean().default(true),
+  registryPath: z.string().default(''),
+  usagePath: z.string().default(''),
+});
+
 export const Config = z.object({
   /** DSH-Event-Namen, auf die sich der Enhancer registriert. */
   observeEvents: z.array(z.string()).default(['agent/pre-step']),
@@ -158,6 +175,12 @@ export const Config = z.object({
    * er im Profil (`profiles/shinon/cordis.patch.yml`), wo die Entscheidungen leben.
    */
   skillLifecycle: z.boolean().default(false),
+  /**
+   * Asynchrone Lernpruefung. `skillLifecycle` bleibt als Alias lesbar (aeltere
+   * Profile): der Host prueft `learningReview.enabled || skillLifecycle`. Neue
+   * Profile setzen nur noch `learningReview`.
+   */
+  learningReview: learningReviewSchema.default({}),
   /** Kanal, auf dem der Host die Session-Ereignisse hoert (wie beim Scoring). */
   eventsChannel: z.string().default('shinon/event'),
   /**

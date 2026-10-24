@@ -209,7 +209,7 @@ welche rot sind, steht **nur** in `docs/ZAHLEN.md` §2/§3 — hier nicht wieder
   (`scripts/gate/engine.mjs`): slice-selected checks, one plugin per capability. Sits
   alongside `npm test`, does not replace it.
 - `npm run gate:test` → `scripts/gate/test-lanes.mjs fast`: die lokale Bahn
-  (97 Dateien, 20-s-Grenze je Test). `npm run gate:test:slow` fährt die CI-Bahn
+  (Dateiliste in `scripts/gate/test-lanes.json`, 20-s-Grenze je Test). `npm run gate:test:slow` fährt die CI-Bahn
   (7 Dateien mit echter SQLite/DSH, 600-s-Grenze), `npm run gate:test:all`
   beide. Die Zuordnung steht in `scripts/gate/test-lanes.json`: jede Datei
   gehört genau EINER Bahn, eine fehlende Zuordnung ist Exit 2. Der Runner wertet
@@ -426,6 +426,12 @@ läuft in `test:full`/`gate:full` (CI).
 
 ## Neue / ergänzte Befehle (seit 2026-10-17)
 - `npm run notes:check` (`scripts/notes-check.mjs`) — Notizen-Integrität prüfen.
+- `npm run learn` (`scripts/learn.mjs`) — Lernvorschläge ansehen, freigeben, ablehnen und
+  zurücknehmen, Nutzung zählen, Curator fahren: `status`, `list`, `show <id>`,
+  `approve <id>`, `reject <id>`, `undo <id>`, `usage`, `curate [--apply]`,
+  `restore <name>`, `archive`. Skills schreibt der Skill-Writer; ein Memory-Vorschlag
+  wird mit dem Namen der Persona-Route (`POST /shinon/persona/review`) abgewiesen —
+  der Befehl schreibt nie am Eigentümer vorbei.
 - `npm run dev:web` / `npm run dev:mobile` — Profil-Starts mit festen Ports/URLs.
 - `npm run test:mobile-profile` / `npm run dev:web` — Mobile-Profil-Kontrakt (`profiles/mobile`).
 - `npm run test:codingmon` (bereits genannt), zusätzlich: `test:scoring`, `test:token`, `test:prompter`, `test:narrative`, `test:popup`, `test:key-router`, `test:traceability`, `test:hook`, `test:facts` (Faktenkern, Pipeline, Snapshot, Reconciliation, Dienst), `test:claims` (Claim-Lebenszyklus der Persona) — Paket-eigene Slicen; alle über `scripts/run-with-node.mjs`.

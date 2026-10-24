@@ -6,7 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { adoptClaim, emptyMemory } from '../assets/memory-core.js';
+import { emptyMemory } from '../assets/memory-core.js';
+import { adoptClaim } from '../assets/memory-proposals.js';
 import { emptySelfModel, observeJudgement, selfModelView } from '../assets/self-model.js';
 import { judgeAction, proposeClaim, decideClaim } from '../assets/claim-core.js';
 

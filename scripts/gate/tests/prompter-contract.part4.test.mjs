@@ -1,4 +1,4 @@
-/** Teil 4/4 von prompter-contract.test.mjs — Fixtures stehen in `prompter-contract-fixtures.mjs`. */
+/** Teil 4/5 von prompter-contract.test.mjs — Fixtures stehen in `prompter-contract-fixtures.mjs`. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
