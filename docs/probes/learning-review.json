@@ -1,6 +1,17 @@
 {
-  "contract": "shinon.learning-review/v1",
+  "id": "learning-review",
+  "claim": "Die asynchrone Lernpruefung ist belegt, nicht behauptet: ein Vorschlag entsteht ueber dieselben Funktionen wie im Host, die Freigabe-Befehle laufen als echte Prozesse, Memory wird nie am Eigentuemer vorbei geschrieben, und die Automatik entscheidet nach Risiko und Beleg statt nach dem Schalter allein. Gemessen am 2026-10-24 auf DIESEM Baum, ohne Modell und ohne Netz.",
+  "targets": [
+    "packages/prompter/assets/learning-review.js",
+    "packages/prompter/assets/learning-proposal.js",
+    "packages/prompter/assets/skill-lifecycle.js",
+    "scripts/learn.mjs"
+  ],
+  "expect": "status/list/show 0; approve auf Memory 1 mit Routenhinweis; approve auf Skill 0 und 412 Bytes mit shinon-skill-fp; undo 0 (verschoben, Datei weg); curate --dry-run 0; usage 0. Automatik: KORREKTUR true, RISIKO false, BELEG_ZU_DUENN false, WIEDERHOLUNG true, FREIGABE false.",
+  "result": "BESTAETIGT",
+  "verdict": "WRITE",
   "measuredAt": "2026-10-24T01:50:47.514Z",
+  "contract": "shinon.learning-review/v1",
   "kind": "probe",
   "note": "Gemessen ohne Modell und ohne Netz: der Vorschlag entsteht ueber dieselben Funktionen wie im Host, die CLI laeuft als echter Prozess. Die Automatik-Zeile liest die Vorgaben aus packages/prompter/assets/schema.js, nicht aus dieser Datei.",
   "fixture": "/tmp/lr-probe-fixture",
