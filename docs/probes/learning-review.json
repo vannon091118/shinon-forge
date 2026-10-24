@@ -1,0 +1,110 @@
+{
+  "contract": "shinon.learning-review/v1",
+  "measuredAt": "2026-10-24T01:50:47.514Z",
+  "kind": "probe",
+  "note": "Gemessen ohne Modell und ohne Netz: der Vorschlag entsteht ueber dieselben Funktionen wie im Host, die CLI laeuft als echter Prozess. Die Automatik-Zeile liest die Vorgaben aus packages/prompter/assets/schema.js, nicht aus dieser Datei.",
+  "fixture": "/tmp/lr-probe-fixture",
+  "proposals": {
+    "skill": "lp_3e2b1a83",
+    "memory": "lp_f6055bc1",
+    "skillRisk": "niedrig"
+  },
+  "automation": {
+    "defaults": {
+      "memoryWriteApproval": false,
+      "skillWriteApproval": false,
+      "minEvidenceForAuto": 3
+    },
+    "correction": {
+      "auto": true,
+      "reason": "KORREKTUR"
+    },
+    "central": {
+      "auto": false,
+      "reason": "RISIKO"
+    },
+    "thin": {
+      "auto": false,
+      "reason": "BELEG_ZU_DUENN"
+    },
+    "turns": {
+      "auto": true,
+      "reason": "WIEDERHOLUNG"
+    },
+    "approvalOn": {
+      "auto": false,
+      "reason": "FREIGABE"
+    }
+  },
+  "applied": {
+    "path": ".agents/skills/tempo-beim-test/SKILL.md",
+    "exists": true,
+    "bytes": 412,
+    "hasFingerprint": true
+  },
+  "afterUndo": {
+    "path": ".agents/skills/tempo-beim-test/SKILL.md",
+    "exists": false
+  },
+  "commands": [
+    {
+      "cmd": "node scripts/learn.mjs status --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "Register: /tmp/lr-probe-fixture/.shinon/learning-proposals.json\n2 Eintraege — 2 offen, 0 angewendet, 0 automatisch, 0 blockiert, 0 zurueckgenommen\nNutzung: 0 Skills in /tmp/lr-probe-fixture/.shinon/skill-usage.json"
+    },
+    {
+      "cmd": "node scripts/learn.mjs list --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "lp_3e2b1a83  skill  pending      tempo-beim-test\n  Der Nutzer hat die Zeitgrenze ausdruecklich korrigiert statt sie zu heben.\n  Quellen: feedback:f-1\nlp_f6055bc1  memory pending      persona\n  Der Nutzer will kurze Antworten ohne Wiederholung.\n  Quellen: message:m-1"
+    },
+    {
+      "cmd": "node scripts/learn.mjs show lp_3e2b1a83 --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "{\n  \"contract\": \"shinon.learning-proposal/v1\",\n  \"id\": \"lp_3e2b1a83\",\n  \"target\": \"skill\",\n  \"status\": \"pending\",\n  \"reason\": \"Der Nutzer hat die Zeitgrenze ausdruecklich korrigiert statt sie zu heben.\",\n  \"sources\": [\n    {\n      \"kind\": \"feedback\",\n      \"ref\": \"feedback:f-1\",\n      \"rev\": \"feedback:f-1\"\n    }"
+    },
+    {
+      "cmd": "node scripts/learn.mjs approve lp_f6055bc1 --root /tmp/lr-probe-fixture",
+      "exit": 1,
+      "out": "learn: lp_f6055bc1 ist ein Memory-Vorschlag. Memory schreibt nur die Persona: POST /shinon/persona/review {id, decision} (oder \"revoked\" zum Zuruecknehmen)."
+    },
+    {
+      "cmd": "node scripts/learn.mjs approve lp_3e2b1a83 --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "publish -> .agents/skills/tempo-beim-test/SKILL.md (Sicherung .shinon/skill-backups/lp_3e2b1a83.md)"
+    },
+    {
+      "cmd": "node scripts/learn.mjs undo lp_3e2b1a83 --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "verschoben: .agents/skills/tempo-beim-test/SKILL.md"
+    },
+    {
+      "cmd": "node scripts/learn.mjs curate --dry-run --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "0 gelernte Skills in /tmp/lr-probe-fixture/.agents/skills\nKein Befund."
+    },
+    {
+      "cmd": "node scripts/learn.mjs usage --root /tmp/lr-probe-fixture",
+      "exit": 0,
+      "out": "Keine Zaehlung (/tmp/lr-probe-fixture/.shinon/skill-usage.json)."
+    }
+  ],
+  "register": {
+    "entries": 2,
+    "statuses": [
+      {
+        "id": "lp_3e2b1a83",
+        "target": "skill",
+        "status": "undone",
+        "by": "human",
+        "via": "cli"
+      },
+      {
+        "id": "lp_f6055bc1",
+        "target": "memory",
+        "status": "pending",
+        "by": null,
+        "via": null
+      }
+    ]
+  }
+}

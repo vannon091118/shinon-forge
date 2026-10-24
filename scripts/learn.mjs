@@ -22,7 +22,7 @@
  *   node scripts/learn.mjs reject <id>
  *   node scripts/learn.mjs undo <id>
  *   node scripts/learn.mjs usage [--json]
- *   node scripts/learn.mjs curate [--apply] [--json]
+ *   node scripts/learn.mjs curate [--apply|--dry-run] [--json]
  *   node scripts/learn.mjs restore <name>
  * Gemeinsam: `--root <dir>` (Vorgabe: Arbeitsverzeichnis).
  */
@@ -46,6 +46,10 @@ function parseArgs(argv) {
     if (value === '--json') flags.json = true;
     else if (value === '--all') flags.all = true;
     else if (value === '--apply') flags.apply = true;
+    // `--dry-run` ist die ausdrueckliche Form der Vorgabe: `curate` archiviert
+    // nur mit `--apply`. Der Schalter wird angenommen und schaltet nichts ein —
+    // ein Bedienfehler waere hier eine Ueberraschung, keine Sicherheit.
+    else if (value === '--dry-run') flags.apply = false;
     else if (value === '--root') {
       const next = argv[index + 1];
       if (next === undefined) throw new Error('--root braucht ein Verzeichnis');

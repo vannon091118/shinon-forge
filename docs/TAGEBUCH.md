@@ -2310,4 +2310,14 @@ Vorgabe selbst steht in `packages/prompter/assets/schema.js` und im Fragment
 bytegleich) — eine Zahl, ein Ort, beide Seiten gepinnt von
 `scripts/gate/tests/prompter-contract.part3.test.mjs`.
 
+Dazu gehört der Beleg, dass die Kette auch als Prozess trägt, nicht nur als
+Testfunktion: `docs/probes/learning-review.json` hält eine Fahrt durch ein
+Fixture-Projekt fest — `status`, `list`, `show`, ein `approve` auf einen
+Memory-Vorschlag (Exit 1, mit dem Namen der zuständigen Route statt eines
+Schreibversuchs), ein `approve` auf den Skill (`publish`, 412 Bytes, mit
+`shinon-skill-fp`), ein `undo` (`verschoben`), `curate --dry-run` (Exit 0) und
+`usage`. Dieselbe Datei misst die Automatik-Matrix an den echten Vorgaben:
+Korrektur ⇒ `KORREKTUR`, zentrales Risiko ⇒ `RISIKO`, ein einzelner Zug ⇒
+`BELEG_ZU_DUENN`, drei Züge ⇒ `WIEDERHOLUNG`, Schalter `true` ⇒ `FREIGABE`.
+
 **Anker:** `089e111`, `359abf9` · Pfade: `packages/prompter/assets/learning-review.js`, `packages/prompter/assets/learning-proposal.js`, `packages/prompter/assets/enhance-command.js`, `packages/prompter/assets/client/02-enhance-control.js`, `packages/persona/assets/event-reaction.js`, `packages/persona/assets/schema.js`, `packages/persona/assets/memory-proposal-seam.js`, `profiles/shinon/fragments/70-prompter.yml`, `profiles/shinon/fragments/40-agent-model.yml`, `scripts/learn.mjs`, `scripts/gate/tests/learning-disclosure.test.mjs` · Belege: `npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 971/971 (nach dem Automatik-Satz), `npm run test:prompter` 265/265, Persona 22/22, `npm run build` Exit 0 (23 Pakete, 330 Dateien), Profilboot 4/4, Distribution 92/92, `node scripts/profile-patch.mjs --check` bytegleich, `npm run zahlen:check` Exit 0, `npm run idioms:check` 15 Blöcke in 11 Dateien deckungsgleich.
