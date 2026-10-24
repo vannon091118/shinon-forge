@@ -2247,3 +2247,52 @@ validiert Argumente NICHT fuer nackte Definitionen (`validateArgs` laeuft nur in
 statt gehofft. Alle sechs echten Quellmutationen wurden rot gesehen und
 zurueckgenommen; `gate:full` faehrt die Architektur-Riegel (Orchestrator,
 Struktur, Kanon, Vertraege) mit 27/27 PASS.
+
+## 2026-10-24 — Ein Prüfer, der neben dem Turn läuft, und ein Knopf, der fragt
+
+Der Tag hat zwei Bewegungen, und beide drehen sich um dieselbe Frage: was darf
+sich ändern, ohne dass jemand daneben steht? Die erste Antwort ist die
+Lernprüfung (SH-LEARN-03 bis -06). Ein eigener Prüfer hört auf dem bestehenden
+Kanal, hält je Sitzung einen gedeckelten, redigierten Digest und entscheidet
+selbst, WANN geprüft wird: sofort nach einer ausdrücklichen Korrektur, sonst als
+Nudge nach abgeschlossenen Zügen oder nach mehreren Werkzeug-Iterationen. Der
+Aufruf `observe()` kehrt synchron zurück, der Modellaufruf läuft danach mit
+eigenem Zeit-, Token- und Iterationsbudget und genau einem `llm.stream`;
+Antwort und Abbruch eines Turns warten nie, und ein Abbruch erzeugt gar nichts.
+Geschrieben wird dabei nichts. Der Prüfer legt einen Vorschlag mit Ziel,
+Begründung und Quellenbezug ab, nachdem deterministische Prüfungen Duplikat,
+Größe, Geheimnis, verbotene Muster, Risiko und Kapazität abgearbeitet haben;
+Skills schreibt der Skill-Writer, Memory geht über die eine Naht
+`shinon_persona_memory_proposal`, und der Widerruf ist symmetrisch — im Panel
+wie in `npm run learn`. Die Wiederverwendung ist dreistufig belegt (Übersicht,
+Rumpf auf Abruf, Archivsuche), der Curator archiviert erst nach dreißig Tagen
+ohne Load und verschiebt, statt zu löschen.
+
+Die zweite Bewegung ist der Veredelungs-Knopf. Er war zuerst als Handarbeit im
+Client gedacht und ist jetzt ein eigener Host-Kern (`enhance-command.js`): ein
+Kommando, ein Panel mit Original und Vorschlag, ein Rückweg. Die Grenze ist
+gemessen — unterhalb von 120 Zeichen wird kein Modell gefragt, weil ein
+Profil-Lauf zeigte, dass auch „hallo" den vollen MAX-Kontext von rund 7000
+Tokens bekam. Und die Zahlen, die diese Grenze tragen, stehen jetzt dort, wo sie
+hingehören: `minEnhanceChars` im Fragment `70-prompter.yml`, die Modellwahl samt
+`reasoningEffort` im Fragment `40-agent-model.yml`. Der Patch
+`profiles/shinon/cordis.patch.yml` war zuvor von Hand verändert worden — er ist
+die Summe der elf Fragmente, nicht ihr Ort; `node scripts/profile-patch.mjs
+--check` ist wieder bytegleich. Ein roher Mitschnitt der eigenen Eingaben
+(`roh-texte-session-*.md`) lag dabei im Wurzelverzeichnis und ist bewusst NICHT
+in diesen Stand gewandert: das Repository ist öffentlich, und fremde Tipp-Texte
+sind keine Architektur. Er bleibt auf dem Branch `work/prompter-config`, ebenso
+die halbfertige Hook-Reparatur aus demselben Arbeitsbaum.
+
+Der dritte, kleinere Teil des Tages ist Aufräumen an der Grenze: sechs Dateien
+lagen weniger als hundert Zeilen unter ihrer Klassengrenze und sind nach
+Eigentümerschaft geteilt statt zerschnitten — die Persona-Client-Hälfte ist aus
+zwei Quellteilen generiert, das Persona-Schema steht in
+`packages/persona/assets/schema.js`, die prompter-contract-Suite hat einen
+eigenen Montage- und einen eigenen Diagnose-Teil. Beim Zusammenführen der beiden
+Stände zeigte sich, dass die Turn-Zählung aus dem älteren Commit in den neuen
+Eigentümer gehört: der Ereignis-Handler lebt jetzt in
+`packages/persona/assets/event-reaction.js` und schreibt EINE Zeile je Turn statt
+zwölf je Ereignis.
+
+**Anker:** `089e111`, `359abf9` · Pfade: `packages/prompter/assets/learning-review.js`, `packages/prompter/assets/learning-proposal.js`, `packages/prompter/assets/enhance-command.js`, `packages/prompter/assets/client/02-enhance-control.js`, `packages/persona/assets/event-reaction.js`, `packages/persona/assets/schema.js`, `packages/persona/assets/memory-proposal-seam.js`, `profiles/shinon/fragments/70-prompter.yml`, `profiles/shinon/fragments/40-agent-model.yml`, `scripts/learn.mjs`, `scripts/gate/tests/learning-disclosure.test.mjs` · Belege: `npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 969/969, `npm run test:prompter` 254/254, Persona 22/22, `npm run build` Exit 0 (23 Pakete, 330 Dateien), Profilboot 4/4, Distribution 92/92, `node scripts/profile-patch.mjs --check` bytegleich, `npm run zahlen:check` Exit 0.
