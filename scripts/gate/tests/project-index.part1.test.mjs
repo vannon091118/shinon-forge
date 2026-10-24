@@ -114,6 +114,12 @@ test('Extraktion: an echten Dateien dieses Repos — Symbole, Kanten, Referenzen
       { kind: 'import', target: './assets/salvage-store.js' },
       { kind: 'import', target: './assets/context-channel.js' },
       { kind: 'import', target: './assets/knowledge-block.js' },
+      // Die Lernpruefung (SH-LEARN-03/04, 2026-10-24): der Pruefer hoert und
+      // legt Vorschlaege ab; er schreibt nicht. Seine Regeln sind Daten.
+      { kind: 'import', target: './assets/learning-review.js' },
+      // Der Veredelungs-Knopf (2026-10-23): Kommando und Panel teilen sich EINE
+      // Host-Methode — der Client ruft sie ueber die kompilierte Remote-Liste.
+      { kind: 'import', target: './assets/enhance-command.js' },
     ].sort(byTarget),
     'Kanten sind Importe; externe Ziele bleiben drin, weil sie importiert werden',
   );
