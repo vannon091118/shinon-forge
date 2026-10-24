@@ -268,13 +268,34 @@ test('die Persona protokolliert ihren LESEZWEIG — am echten Dienst, mit der tr
 
   // Das Log wird ABGEFANGEN — der Beweis ist die Zeile, nicht das Wissen
   // darum, dass eine entstuende.
+  //
+  // GEMESSEN 2026-10-23: die Persona schreibt EINE Zeile je TURN, nicht je
+  // Ereignis. Zwoelf Zeilen „gelesen" in einem Turn sind Rauschen; die eine
+  // Zeile sagt, was ankam und wie viel davon von einem Menschen kam.
   const zeilen = [];
-  console.log = console.warn = console.error = (...args) => zeilen.push(args.map(String).join(' '));
-  try {
-    ctx.emit('shinon/event', envelope, payload);
-  } finally {
-    Object.assign(console, gesprochen);
-  }
+  const fange = (fn) => {
+    console.log = console.warn = console.error = (...args) => zeilen.push(args.map(String).join(' '));
+    try {
+      fn();
+    } finally {
+      Object.assign(console, gesprochen);
+    }
+  };
+
+  // Ein einzelnes Ereignis ist KEINE Zeile mehr: das ist die Zusage.
+  fange(() => ctx.emit('shinon/event', envelope, payload));
+  const einzel = zeilen.filter((zeile) => zeile.startsWith('[shinon-io]'));
+  assert.deepEqual(einzel, [], `ein Ereignis allein darf keine I/O-Zeile schreiben: ${JSON.stringify(einzel)}`);
+
+  // Der Turn-Abschluss traegt sie — mit der trace_id des Ereignisses.
+  const ende = events.buildEnvelope(contract, {
+    eventType: 'turn.end',
+    source: 'dsh.turn',
+    payload: { session_id: 'sess-io-1' },
+    sessionId: 'sess-io-1',
+    timestamp: '2026-10-21T07:00:05.000Z',
+  });
+  fange(() => ctx.emit('shinon/event', ende, { session_id: 'sess-io-1' }));
 
   const ioZeilen = zeilen.filter((zeile) => zeile.startsWith('[shinon-io]'));
   assert.equal(ioZeilen.length, 1, `erwartet: eine I/O-Zeile; gesehen: ${JSON.stringify(zeilen)}`);
@@ -282,12 +303,14 @@ test('die Persona protokolliert ihren LESEZWEIG — am echten Dienst, mit der tr
   // Alle drei Kinds derselben Form: kind, quelle, ziel, umfang, grund, zeitpunkt.
   assert.match(zeile, /^\[shinon-io\] kind="read"/);
   assert.match(zeile, /quelle="shinon\/event"/);
-  assert.match(zeile, /ziel="persona:message\.received"/);
-  assert.match(zeile, /umfang=\d+/);
+  assert.match(zeile, /ziel="persona:turn\.zusammenfassung"/);
+  assert.match(zeile, /umfang=0/);
   assert.match(zeile, /grund="/);
   assert.match(zeile, /zeitpunkt="/);
+  // Die Zaehlung steht im Grund: was ankam, nicht dass gelesen wurde.
+  assert.match(zeile, /\d+ Ereignisse gelesen, \d+ davon von Menschen/);
   // Die trace_id des Ereignisses steht in der Zeile: die Kette ist geschlossen.
-  assert.ok(zeile.includes(`trace_id="${envelope.trace_id}"`), `die trace_id fehlt: ${zeile}`);
+  assert.ok(zeile.includes(`trace_id="${ende.trace_id}"`), `die trace_id fehlt: ${zeile}`);
 });
 
 // ── EINE Definition: der I/O-Pfad hat einen Ort, nicht zwei ─────────────────

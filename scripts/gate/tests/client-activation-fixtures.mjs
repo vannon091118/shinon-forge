@@ -197,6 +197,15 @@ export async function clientRoot(cordis, { locale = true } = {}) {
     apply: (ctx) => {
       ctx.provide('slots', slotsService(entries));
       if (locale) ctx.provide('locale', service);
+      // `remote` (mit `remote.commands`) gehoert seit 2026-10-23 zum Vertrag der
+      // Veredelungs-Knopf-Oberflaeche: eine Client-Haelfte, die ein Kommando
+      // ausloest, deklariert es und bekommt es hier — dieselbe Form wie im
+      // echten Client-Runner, statt einer stillen Parkposition.
+      // Der Client-Runner bietet beide Namen an: `remote` als Objekt und den
+      // verschachtelten Dienst `remote.commands`, den `inject` verlangt.
+      const commands = { execute: async () => ({ kind: 'success', text: '' }) };
+      ctx.provide('remote', { commands });
+      ctx.provide('remote.commands', commands);
     },
   });
   return { root, entries, locale: service };
