@@ -331,14 +331,15 @@ test('Konfiguration: die Defaults rufen nichts auf und lassen den Ablauf unberue
     skillLifecycle: false,
     // Die Lernpruefung (SH-LEARN-03/04). `enabled: false` ist die Vorgabe: ohne
     // Profilentscheidung laeuft KEIN Hintergrundmodell. Die beiden Freigabe-
-    // schalter stehen auf `true` (jede Aenderung wird bereitgestellt), die
-    // Pfade sind leer und fallen auf die Regeldatei zurueck.
+    // schalter stehen auf `false` (Automatik fuer eindeutige, risikoarme Faelle;
+    // zentrale Regeln bleiben immer gestagt), die Pfade sind leer und fallen auf
+    // die Regeldatei zurueck.
     learningReview: {
       enabled: false,
       provider: '',
       model: '',
-      memoryWriteApproval: true,
-      skillWriteApproval: true,
+      memoryWriteApproval: false,
+      skillWriteApproval: false,
       registryPath: '',
       usagePath: '',
     },

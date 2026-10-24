@@ -2295,4 +2295,19 @@ Eigentümer gehört: der Ereignis-Handler lebt jetzt in
 `packages/persona/assets/event-reaction.js` und schreibt EINE Zeile je Turn statt
 zwölf je Ereignis.
 
-**Anker:** `089e111`, `359abf9` · Pfade: `packages/prompter/assets/learning-review.js`, `packages/prompter/assets/learning-proposal.js`, `packages/prompter/assets/enhance-command.js`, `packages/prompter/assets/client/02-enhance-control.js`, `packages/persona/assets/event-reaction.js`, `packages/persona/assets/schema.js`, `packages/persona/assets/memory-proposal-seam.js`, `profiles/shinon/fragments/70-prompter.yml`, `profiles/shinon/fragments/40-agent-model.yml`, `scripts/learn.mjs`, `scripts/gate/tests/learning-disclosure.test.mjs` · Belege: `npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 969/969, `npm run test:prompter` 254/254, Persona 22/22, `npm run build` Exit 0 (23 Pakete, 330 Dateien), Profilboot 4/4, Distribution 92/92, `node scripts/profile-patch.mjs --check` bytegleich, `npm run zahlen:check` Exit 0.
+Am Abend kippt eine einzige Vorgabe die Richtung: die beiden Schreibschalter
+(`memoryWriteApproval`, `skillWriteApproval`) stehen nicht mehr auf „jede
+Änderung bereitstellen", sondern auf `false` — Automatik ist das Ziel. Das ist
+kein Aufweichen der Grenze, sondern ihr Umzug an die Stelle, die entscheiden
+kann: der Schalter sagt nur noch, OB automatisch entschieden werden darf, und
+`canAuto` entscheidet WIE — zentrale Regelpfade (`AGENTS.md`, `docs/contracts`,
+`profiles/`, `scripts/gate`) bleiben immer gestagt, und ohne ausdrückliche
+Korrektur oder mindestens drei abgeschlossene Züge gilt nichts sofort. Der
+Rückfall im Kern bleibt bewusst gestagt: wer ihn ohne Schema ruft, bekommt die
+vorsichtige Lesart, wie ein Türsteher, der ohne Liste niemanden durchwinkt. Die
+Vorgabe selbst steht in `packages/prompter/assets/schema.js` und im Fragment
+`70-prompter.yml`, aus dem der Patch regeneriert wird (11 Fragmente,
+bytegleich) — eine Zahl, ein Ort, beide Seiten gepinnt von
+`scripts/gate/tests/prompter-contract.part3.test.mjs`.
+
+**Anker:** `089e111`, `359abf9` · Pfade: `packages/prompter/assets/learning-review.js`, `packages/prompter/assets/learning-proposal.js`, `packages/prompter/assets/enhance-command.js`, `packages/prompter/assets/client/02-enhance-control.js`, `packages/persona/assets/event-reaction.js`, `packages/persona/assets/schema.js`, `packages/persona/assets/memory-proposal-seam.js`, `profiles/shinon/fragments/70-prompter.yml`, `profiles/shinon/fragments/40-agent-model.yml`, `scripts/learn.mjs`, `scripts/gate/tests/learning-disclosure.test.mjs` · Belege: `npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 971/971 (nach dem Automatik-Satz), `npm run test:prompter` 265/265, Persona 22/22, `npm run build` Exit 0 (23 Pakete, 330 Dateien), Profilboot 4/4, Distribution 92/92, `node scripts/profile-patch.mjs --check` bytegleich, `npm run zahlen:check` Exit 0, `npm run idioms:check` 15 Blöcke in 11 Dateien deckungsgleich.

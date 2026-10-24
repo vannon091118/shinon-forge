@@ -648,17 +648,19 @@
     # Lernpruefung (SH-LEARN-03/04): Korrekturen und Nudges erzeugen Vorschlaege;
     # Skills schreibt der Skill-Writer nach .agents/skills, Memory geht ueber die
     # Persona-Naht. Der Vorgabewert im Paket ist AUS; die Entscheidung steht hier.
-    # `memoryWriteApproval`/`skillWriteApproval` stehen in der Anfangsphase auf
-    # true: jede Aenderung wird zur Freigabe bereitgestellt. `false` erlaubt
-    # eindeutige, risikoarme Aenderungen automatisch; zentrale Regeln bleiben
-    # immer freigabepflichtig. `skillLifecycle` ist der alte Alias und bleibt
-    # aus, damit es keinen zweiten Pfad gibt.
+    # `memoryWriteApproval`/`skillWriteApproval` stehen auf false: was eindeutig
+    # und risikoarm ist, gilt sofort — Automatik ist das Ziel (2026-10-24).
+    # `canAuto` entscheidet, nicht der Schalter allein: zentrale Regelpfade
+    # bleiben IMMER freigabepflichtig, und ohne ausdrueckliche Korrektur oder
+    # genug abgeschlossene Zuege wird nichts automatisch geschrieben. `true`
+    # schaltet zurueck auf „jede Aenderung bereitstellen“. `skillLifecycle` ist
+    # der alte Alias und bleibt aus, damit es keinen zweiten Pfad gibt.
     learningReview:
       enabled: true
       provider: ''
       model: ''
-      memoryWriteApproval: true
-      skillWriteApproval: true
+      memoryWriteApproval: false
+      skillWriteApproval: false
       registryPath: .shinon/learning-proposals.json
       usagePath: .shinon/skill-usage.json
     skillLifecycle: false

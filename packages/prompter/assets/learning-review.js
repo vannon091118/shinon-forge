@@ -220,6 +220,9 @@ export function createLearningReview({
       return;
     }
 
+    // Der RUECKFALL hier ist absichtlich gestagt: die Vorgabe (Automatik)
+    // kommt aus dem Schema und damit aus dem Profil, nicht aus einem fehlenden
+    // Wert. Wer den Kern ohne Schema ruft, bekommt die vorsichtige Lesart.
     const auto = canAuto(proposal, {
       memoryWriteApproval: config?.memoryWriteApproval !== false,
       skillWriteApproval: config?.skillWriteApproval !== false,

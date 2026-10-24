@@ -103,13 +103,20 @@ export const ContextSchema = z.object({
  * Pruefgrenzen stehen als Daten in `learning-review-rules.json` — eine Zahl,
  * ein Ort. `enabled: false` ist die Vorgabe: ohne Profilentscheidung laeuft
  * kein Hintergrundmodell.
+ *
+ * Die beiden Schreibschalter sind FREIGABE-Schalter, keine Sperren: `true`
+ * heisst „jede Aenderung zur Freigabe bereitstellen“, `false` heisst „was
+ * eindeutig und risikoarm ist, darf sofort gelten“. `false` ist die Vorgabe
+ * (Automatik ist das Ziel, 2026-10-24); die Entscheidung liegt dann bei
+ * `canAuto` — zentrale Regelpfade bleiben IMMER gestagt, und ohne ausdrueckliche
+ * Korrektur oder genug abgeschlossene Zuege wird nichts automatisch geschrieben.
  */
 const learningReviewSchema = z.object({
   enabled: z.boolean().default(false),
   provider: z.string().default(''),
   model: z.string().default(''),
-  memoryWriteApproval: z.boolean().default(true),
-  skillWriteApproval: z.boolean().default(true),
+  memoryWriteApproval: z.boolean().default(false),
+  skillWriteApproval: z.boolean().default(false),
   registryPath: z.string().default(''),
   usagePath: z.string().default(''),
 });
