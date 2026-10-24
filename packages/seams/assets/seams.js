@@ -113,19 +113,24 @@ export const WORKSPACE_ENV = 'SHINON_WORKSPACE_ROOT';
  * Das Ergebnis ist immer absolut und aufgelöst — zwei Schreibweisen desselben
  * Ordners ergeben dieselbe Identität.
  *
- * @returns {{ root: string, source: 'config'|'env'|'cwd' }}
+ * `fallbackToCwd: false` nimmt den cwd NICHT als Projektquelle — dann ist
+ * `root` leer (`source: 'unbekannt'`), solange niemand die Sitzung fragt.
+ *
+ * @returns {{ root: string, source: 'config'|'env'|'cwd'|'unbekannt' }}
  */
-export function resolveWorkspaceRoot({ configRoot = '', env = process.env, cwd = process.cwd() } = {}) {
-  if (typeof configRoot === 'string' && configRoot.trim() !== '') {
-    const base = typeof cwd === 'string' && cwd !== '' ? cwd : process.cwd();
-    const root = isAbsolute(configRoot.trim()) ? resolve(configRoot.trim()) : resolve(base, configRoot.trim());
+export function resolveWorkspaceRoot({ configRoot = '', env = process.env, cwd = process.cwd(), fallbackToCwd = true } = {}) {
+  const base = typeof cwd === 'string' && cwd !== '' ? cwd : (fallbackToCwd === true ? process.cwd() : '');
+  const configured = typeof configRoot === 'string' ? configRoot.trim() : '';
+  const fromEnv = typeof env?.[WORKSPACE_ENV] === 'string' ? env[WORKSPACE_ENV].trim() : '';
+  // Fail-closed: wer den cwd NICHT als Quelle will (die Sitzung entscheidet),
+  // bekommt einen LEEREN Root statt des Host-Verzeichnisses. Config und Env
+  // bleiben ausdrueckliche Angaben und gelten weiter — nur der cwd entfaellt.
+  if (base === '' && configured === '' && fromEnv === '') return { root: '', source: 'unbekannt' };
+  if (configured !== '') {
+    const root = isAbsolute(configured) ? resolve(configured) : resolve(base === '' ? process.cwd() : base, configured);
     return { root, source: 'config' };
   }
-  const fromEnv = env?.[WORKSPACE_ENV];
-  if (typeof fromEnv === 'string' && fromEnv.trim() !== '') {
-    return { root: resolve(fromEnv.trim()), source: 'env' };
-  }
-  const base = typeof cwd === 'string' && cwd !== '' ? cwd : process.cwd();
+  if (fromEnv !== '') return { root: resolve(fromEnv), source: 'env' };
   return { root: resolve(base), source: 'cwd' };
 }
 

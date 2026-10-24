@@ -34,7 +34,7 @@ export function standFor(config, runtime, promptText, context, toneState = null)
   const off = typeof config?.notesPath !== 'string' || config.notesPath === '';
   const read = off || (runtime?.noteRules ?? null) === null
     ? { notes: [], skipped: [], reason: off ? 'NOTES_OFF' : 'NOTES_NO_RULES' }
-    : readNotes(config, runtime.noteRules);
+    : readNotes(config, runtime.noteRules, runtime?.workspace?.root ?? '');
   const haystack = [
     promptText,
     context?.project ?? '',

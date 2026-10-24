@@ -27,13 +27,13 @@
  *   node scripts/learn.mjs pin <name> | unpin <name> | adopt <name>
  * Gemeinsam: `--root <dir>` (Vorgabe: Arbeitsverzeichnis).
  */
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createSkillWriter, loadLifecycleRules } from '../packages/prompter/assets/skill-lifecycle.js';
 import { loadLearningRules } from '../packages/prompter/assets/learning-review.js';
 import { pendingProposals, setProposal } from '../packages/prompter/assets/learning-proposal.js';
 import { markSkill, readRegistry, readUsage, withLock, writeRegistry, writeUsage } from '../packages/prompter/assets/learning-store.js';
-import { archiveSkills, curateSkills, readJournals, restoreArchive } from '../packages/prompter/assets/learning-curator.js';
+import { archiveSkills, curateSkills, readJournals, readSkills, restoreArchive, stampCuration } from '../packages/prompter/assets/learning-curator.js';
 
 const QUIET = { log: () => {}, warn: (message) => console.error(message) };
 const MEMORY_HINT = 'Memory schreibt nur die Persona: POST /shinon/persona/review {id, decision} (oder "revoked" zum Zuruecknehmen).';
@@ -41,7 +41,7 @@ const MEMORY_HINT = 'Memory schreibt nur die Persona: POST /shinon/persona/revie
 /** Die Argumente: Positionen und Schalter, keine zweite Grammatik. */
 function parseArgs(argv) {
   const positionals = [];
-  const flags = { json: false, all: false, apply: false, force: false, root: process.cwd() };
+  const flags = { json: false, all: false, apply: false, dryRun: false, force: false, root: process.cwd() };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === '--json') flags.json = true;
@@ -51,7 +51,7 @@ function parseArgs(argv) {
     // `--dry-run` ist die ausdrueckliche Form der Vorgabe: `curate` archiviert
     // nur mit `--apply`. Der Schalter wird angenommen und schaltet nichts ein —
     // ein Bedienfehler waere hier eine Ueberraschung, keine Sicherheit.
-    else if (value === '--dry-run') flags.apply = false;
+    else if (value === '--dry-run') flags.dryRun = true;
     else if (value === '--root') {
       const next = argv[index + 1];
       if (next === undefined) throw new Error('--root braucht ein Verzeichnis');
@@ -226,24 +226,29 @@ function main() {
     case 'curate': {
       const curator = learningRules.curator ?? {};
       const usage = readUsage(usagePath, { log: QUIET });
-      const skills = listSkills(skillsRoot, lifecycleRules.root.file);
-      const plan = curateSkills({ skills, usage: usage.usage, rules: curator, force: flags.force, now: new Date().toISOString() });
+      const skills = readSkills(skillsRoot, lifecycleRules.root.file);
+      // AUTONOM: `autoApply` in den Regeln heisst, der faellige Lauf verschiebt
+      // ohne `--apply`. `--dry-run` ist der ausdrueckliche Blick ohne Folge.
+      const apply = flags.dryRun !== true && (flags.apply || curator.autoApply !== false);
+      const stamp = new Date().toISOString();
+      const plan = curateSkills({ skills, usage: usage.usage, rules: curator, force: flags.force, now: stamp });
       const report = { ...plan, root: skillsRoot, archiveRoot, applied: null };
-      if (flags.apply && plan.archive.length > 0) {
-        report.applied = archiveSkills({ names: plan.archive, skillsRoot, archiveRoot, log: QUIET });
+      if (apply && plan.archive.length > 0) {
+        report.applied = archiveSkills({ names: plan.archive, skillsRoot, archiveRoot, now: stamp, log: QUIET });
       }
-      if (flags.json) { console.log(JSON.stringify(report, null, 2)); return plan.archive.length === 0 ? 0 : 1; }
+      if (apply) writeUsage(usagePath, stampCuration(usage.usage, stamp));
+      if (flags.json) { console.log(JSON.stringify(report, null, 2)); return plan.archive.length === 0 || apply ? 0 : 1; }
       console.log(`${skills.length} gelernte Skills in ${skillsRoot}`);
       if (plan.findings.length === 0) console.log('Kein Befund.');
       for (const finding of plan.findings) console.log(`  ${finding.kind.padEnd(13)} ${finding.name.padEnd(32)} ${finding.action.padEnd(11)} ${finding.detail}`);
       for (const skip of plan.skipped) console.log(`  (uebersprungen) ${skip.name}: ${skip.reason}`);
-      if (plan.archive.length > 0 && !flags.apply) console.log(`\n${plan.archive.length} zur Archivierung: node scripts/learn.mjs curate --apply`);
+      if (plan.archive.length > 0 && !apply) console.log(`\n${plan.archive.length} zur Archivierung: node scripts/learn.mjs curate`);
       if (report.applied !== null && report.applied !== undefined) {
         console.log(report.applied.ok
           ? `Archiviert: ${report.applied.moved.map((entry) => entry.name).join(', ')} -> ${report.applied.journal}`
           : `Archiv unvollstaendig (${report.applied.reason ?? report.applied.refused?.map((item) => `${item.name}:${item.reason}`).join(',')})`);
       }
-      return plan.archive.length === 0 ? 0 : 1;
+      return plan.archive.length === 0 || apply ? 0 : 1;
     }
     case 'pin':
     case 'unpin':
@@ -283,31 +288,6 @@ function main() {
       console.error(`learn: unbekannter Befehl "${command}"`);
       return 2;
   }
-}
-
-/** Die gelernten Skills mit Beschreibung und Anlagedatum — mehr braucht der Curator nicht. */
-function listSkills(skillsRoot, file) {
-  if (!existsSync(skillsRoot)) return [];
-  const skills = [];
-  for (const entry of readdirSync(skillsRoot, { withFileTypes: true }).filter((item) => item.isDirectory() && !item.name.startsWith('.')).sort((a, b) => a.name.localeCompare(b.name))) {
-    const path = join(skillsRoot, entry.name, file);
-    if (!existsSync(path)) continue;
-    let text;
-    let addedAt = null;
-    try {
-      text = readFileSync(path, 'utf8');
-      addedAt = statSync(path).mtime.toISOString();
-    } catch {
-      continue;
-    }
-    const match = /^description:\s*(?:"([\s\S]*?)"|(.+))$/m.exec(text.slice(0, 2000));
-    const description = (match?.[1] ?? match?.[2] ?? '').trim();
-    // Die Herkunft steht IN der Datei: der Skill-Writer setzt die Marke
-    // `shinon-skill-fp:`. Ein handgeschriebenes Dokument traegt sie nicht und
-    // wird deshalb nicht verwaltet — nur `learn adopt` uebernimmt es.
-    skills.push({ name: entry.name, description, addedAt, chars: text.length, origin: text.includes('shinon-skill-fp:') ? 'agent' : 'hand' });
-  }
-  return skills;
 }
 
 // Ein Befehl, ein Exit-Code: das Skript ist die Flaeche, kein Modul mit Nebenweg.

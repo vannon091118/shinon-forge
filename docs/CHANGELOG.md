@@ -7,7 +7,59 @@
 > Die ausführliche Erzählung mit Commit- und Pfadankern bleibt in [TAGEBUCH.md](TAGEBUCH.md);
 > offene Aufgaben bleiben ausschließlich in [ROADMAP.md](ROADMAP.md).
 
+## 0.5.0 — 2026-10-24
+
+**Der Release, in dem Shinon aufhört, sein eigenes Projekt in fremde Sitzungen zu tragen.**
+
+### Warum diese Fassung
+
+Drei Dinge waren gleichzeitig reif: der Lernzyklus lief, der Projekt-Kontext war noch an den
+Host gebunden, und der Dependency-Audit war rot. Alle drei sind entschieden, nicht vertagt.
+
+**1. Persönlichkeit global, Projekt-Kontext getrennt.** Die Persona sprach schon in jeder
+Sitzung; gelesen wurde trotzdem, was am Host hing. Mit `DSH_HOME=$PWD` war das dieses Repo.
+Jetzt gilt: der Workspace kommt aus der Sitzung (`agent.session.header.cwd`), der Host-cwd
+entscheidet nie. Ist kein Workspace bekannt, fällt der Projektinhalt weg — die Haltung bleibt,
+die fremde Datei nicht. Betroffen und geändert: `resolveWorkspaceRoot(..., fallbackToCwd)`,
+`runtime-state.js` (Workspace und `SHINON.md` werden bei einem Root-Wechsel neu gebunden),
+`prompt-files.js` (Zettel und Skills brauchen einen Root statt `process.cwd()`),
+`learning-review.js` (Register, Nutzung, Kuratierung und Skill-Schreiber folgen der Sitzung),
+`stand.js`, `learned-store`-Pfade und `createSkillWriter` (verweigert ohne Root benannt).
+Die Persona behält den deklarierten Root als Fallback **nur für ausdrückliche Config/Env** —
+er ist nie ein geratener cwd.
+
+**2. `SHINON.md` entsteht von selbst.** Beim ersten Schritt in einem Workspace legt Shinon
+die Vorlage an (`packages/prompter/assets/project-file.js`): drei Felder, ein Kommentar, und
+die Zusage, dort nie eigene Inhalte zu schreiben. Einmalig, nie überschreibend, nie ohne Root.
+Im eigenen Repo ist `/SHINON.md` gitignoriert — die Kundenvorlage bleibt `SHINON.md.example`.
+
+**3. Lernzyklus autonom, inklusive Konsolidierung.** Prüfer, Vorschlag, Freigabe,
+Wiederverwendung und Curator sind ein Kreislauf: risikoarme, belegte Vorschläge gelten sofort,
+zentrale Regelpfade und dünne Belege bleiben gestagt, der Curator läuft wöchentlich nach zwei
+Stunden Ruhe und **verschiebt** statt zu löschen. Bedienung und Rücknahme: [LERNZYKLUS.md](LERNZYKLUS.md) — die Datei liegt in `docs/`.
+
+**4. Audit grün ohne Lockerung des DSH-Pins.** `npm audit --omit=dev --audit-level=high` und
+`--audit-level=moderate` melden **0 Schwachstellen** (`found 0 vulnerabilities`, Exit 0). Die
+früheren Meldungen kamen aus exakt gepinnten DSH-Abhängigkeiten (`zod 4.4.3` in 50 Paketen,
+`undici`, `fast-uri`); die Root-`overrides` heben die Fassung, nicht die Zusage an DSH.
+
+**5. Funktionsnachweis im Dauerbetrieb.** Vom Betreiber abgenommen: **4 Stunden Dauerbetrieb
+mit echtem API-Aufruf** ohne Abbruch (gemeldet, nicht von einem Agenten nachgemessen). Was
+zusätzlich belegt ist, steht in `docs/ZAHLEN.md` §2 — und was fehlt, in `docs/ROADMAP.md`.
+
+### Grenzen dieser Fassung
+
+Kein Tag gesetzt, keine Pakete veröffentlicht. Der Release-Installationsweg bleibt der
+Quellklon; `.deb`/Windows-ZIP sind gebaut, aber nicht auf einem echten Zielsystem belegt.
+Das Modellverhalten ist nur dort behauptet, wo es gemessen wurde.
+
+---
+
 ## Unreleased
+
+### Behoben
+- Projekt-Kontext reist nicht mehr mit (2026-10-24, Arbeitsbaum): der Prompter band Workspace und Anweisungsdatei an den HOST statt an die Sitzung — mit `DSH_HOME=$PWD` war das dieses Repo, und ein fremdes Projekt erbte `SHINON.md`, Zettel, Skills, gelernte Bausteine und das Lernregister. Jetzt gilt: Sitzungs-cwd → `bindWorkspace` → Projektinhalt wird NEU gelesen; ohne bekannten Workspace bleibt der Projektinhalt leer (`OHNE_WURZEL`), die Persönlichkeit nicht. `resolveWorkspaceRoot` bekommt `fallbackToCwd: false` (leerer Root + `source: 'unbekannt'`, Config/Env gelten weiter), `readNotes`/`readSkills`/`training` brauchen einen Root, `createLearningReview` löst Register/Nutzung/Kuratierung/Schreiber je Auftrag über `rootOf()` und `writerFor(root)` auf, `createSkillWriter` verweigert ohne Root. Gepinnt: `packages/prompter/test/workspace.test.mjs` (kein cwd als Projekt, SHINON.md einmalig/nie überschreibend/nie ohne Root), 269/269 Prompter, `gate:test` 971/971, `npm test` 127/127.
+- `SHINON.md` entsteht automatisch (2026-10-24): `packages/prompter/assets/project-file.js` legt beim ersten Schritt eine Vorlage an — einmal, nie überschreibend, nie ohne Workspace; im Repo ist `/SHINON.md` gitignoriert.
 
 ### Geändert
 - Modularisierung statt Schnitt — sechs Dateien lagen weniger als 100 Zeilen unter ihrer Klassengrenze und sind jetzt nach EIGENTÜMERSCHAFT geteilt (2026-10-24, Arbeitsbaum): `packages/persona/client.js` (248/250) ist kein handgeschriebenes Bundle mehr, sondern aus `packages/persona/assets/client/01-react.js` (88) und `02-review-panel.js` (136) GENERIERT (`node scripts/assets/split-client.mjs persona`, danach `node scripts/build-client.mjs --check --all` 9/9 bytegleich); `packages/persona/index.js` gibt Schema und Vorgaben an `packages/persona/assets/schema.js` (84) ab und fällt von 484 auf 421 Zeilen — das Literal `@deepseek-ai/schemastery` bleibt im Eintrag, weil der statische Vertrag (`indexIssues`) es dort verlangt, und der Kommentar sagt das; `scripts/gate/tests/prompter-contract-fixtures.mjs` 482 → 399, die Eigenschaft des Projekt-Kontext-Blocks (`REGION_MARK`, `isOneRegion`, `MARKEN_AUSREISSER`) steht in `prompter-contract-fixtures-c.mjs` (93) und wird weitergereicht; `prompter-contract.part3.test.mjs` 479 → 373, das Diagnose-Protokoll (leerer Stream, abgeschnittene Antwort, geworfener Aufruf) ist Teil 5 (`prompter-contract.part5.test.mjs`, 119), die Teile heißen jetzt x/5; `prompter-contract.part2.test.mjs` 451 → 332, Montage und Isolation (echter Waterfall, `inject: ['llm']`, kein Werkzeugkatalog) stehen in `prompter-contract-mount.test.mjs` (137) — beide neuen Dateien sind in `scripts/gate/test-lanes.json` eingetragen. `AGENTS.md` trägt keine Zahl der Bahn-Dateien mehr, sondern den Verweis auf die Datei. Keine Zeile Inhalt ist verloren: die Client-Teile sind bytegleich die alten Bundle-Zeilen, die Testteile sind unverändert verschoben. Belege: `npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 969/969 (Exit 0), `npm run test:prompter` 254/254, Persona-Tests 22/22, `node scripts/shinon-profile-test.mjs` 4/4 (21 Bundles), `npm run build` Exit 0 (23 Pakete, 329 Dateien, 2 922 154 Bytes), `npm run zahlen:check` Exit 0.

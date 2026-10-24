@@ -1,6 +1,6 @@
 # INDEX — die Dokumentationskarte
 
-> **Status:** current · **Stand:** 2026-10-22
+> **Status:** current · **Stand:** 2026-10-24
 >
 > Diese Datei ist die Karte, nicht die Wahrheit. Sie sagt, welches Dokument
 > wofür zuständig ist — und stillschweigend, wo eine Information **nicht** steht.
@@ -35,6 +35,7 @@ wiederholen keine offenen Punkte — die stehen in `ROADMAP.md`.
 | [`ARCHITEKTUR.md`](ARCHITEKTUR.md) | Schichtmodell, Paket-Anatomie, Boot-Kette, Ereignis-Spine, typische Datenflüsse |
 | [`SETUP.md`](SETUP.md) | Installation, Profile, `DSH_HOME`, Schlüssel und Routen, Diagnose, Werkzeuge für Betreiber |
 | [`REMOTE-ARBEIT.md`](REMOTE-ARBEIT.md) | frischer Remote-Klon, lokale Freebuff-Metadaten, Task-Worktrees und Rechnerübergabe |
+| [`LERNZYKLUS.md`](LERNZYKLUS.md) | Bedienung des Lernzyklus: was du siehst, wann du freigibst, wie du eine Automatik-Übernahme zurücknimmst, was der Curator tut und wo die Grenzen liegen |
 | [`CI-UND-GATES.md`](CI-UND-GATES.md) | Gate-Engine und ihre Plugins, policy.json, Git-Hooks, Preflight-Abnahme, Security- und Release-Workflows |
 | [`PAKETE.md`](PAKETE.md) | Nachschlagewerk zu allen Paketen unter `packages/`: Zweck, Eintritt, Tests, Naht |
 | [`SCRIPTS.md`](SCRIPTS.md) | Nachschlagewerk zu `scripts/` und `bin/`: Zweck jedes Skripts und ob ein npm-Script darauf zeigt |

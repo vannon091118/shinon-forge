@@ -57,6 +57,29 @@ v0.5.0 vor, auch nicht „schnell zwischendurch“.
 | S5 Schranke | Alle Gates grün, Version/Tag/Lock konsistent, Quellarchiv + SHA-256 | `docs/TAGEBUCH.md`, 2026-10-17 (`c30112c`) | teils — **offen:** Tag `v0.4.0` + Schranken-Lauf darauf |
 | S6 Go/No-Go | Echter Modellturn mit lokalem Schlüssel, Security-/Dependency-Audit, finale Doku, CI-Run-ID des Release-Bumps | `docs/TAGEBUCH.md`, 2026-10-17 (`4db4006`) · Gate-Lauf `39711072872` | **offen** — Audit und aktueller Gate-Lauf grün; echter Modellturn, finale Release-Doku und CI-Lauf des Release-Bumps offen |
 
+## 1.6 Release v0.5.0 (2026-10-24) — was drin ist und was offen bleibt
+
+**Scope (entschieden, nicht verhandelbar):** Persönlichkeit global / Projekt-Kontext getrennt
+(Sitzungs-Workspace statt Host-cwd, `SHINON.md` automatisch angelegt), Lernzyklus SH-LEARN-01
+bis -06 autonom inklusive Konsolidierung, Production-Audit ohne Lockerung des DSH-Pins,
+Paketbau im Baum. Bedienung: [`LERNZYKLUS.md`](LERNZYKLUS.md).
+
+**Abnahme:** 4 Stunden Dauerbetrieb mit echtem API-Aufruf ohne Abbruch — **vom Betreiber
+gemeldet** (2026-10-24), nicht von einem Agenten nachgemessen. Dazu die Gate-Kette dieses
+Commits (`npm test`, `npm run gate:test`, Profilboot, `npm run build`); Belege in
+[`ZAHLEN.md`](ZAHLEN.md) §2.
+
+**Offen (bleibt offen, bis es belegt ist):**
+
+- **Tag `v0.5.0`** — braucht die ausdrückliche Freigabe des Betreibers; ein Tag ist eine
+  Veröffentlichung, kein Nebeneffekt eines Commits.
+- **Release-Installationsweg** — weiterhin der Quellklon. `.deb`/Windows-ZIP sind gebaut,
+  ein Install auf einem echten Zielsystem ist nicht belegt.
+- **S6-Rest** — echter Modell-Turn mit lokalem Schlüssel über den Release-Bump-Head und
+  ein CI-Lauf genau dieses Commits. Ein grüner Lauf eines älteren Heads zählt nicht.
+- **Modelltreue des Lernzyklus** — die Mechanik ist gepinnt, die Wirkung im Modell nicht.
+  Ein Live-Lauf, der Prompt-Abschnitt und Kataloggröße misst, steht aus.
+
 ## 2. Offene Punkte (vollständig — alles andere ist Folgearbeit oder zurückgestellt)
 
 ### 2.1 v0.4.0-Rest (Release-pflichtig)

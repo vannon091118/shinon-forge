@@ -18,7 +18,7 @@
  * `restoreArchive` holt eine Anleitung zurueck. Fehlt die Nutzungsdatei, ist die
  * Antwort „nichts zu tun\" — nicht „alles ungenutzt\".
  */
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
 export const CURATOR_CONTRACT = 'shinon.learning-curator/v1';
@@ -61,10 +61,55 @@ function similar(a, b) {
  * automatisch: `rules.consolidate === true` waere eine Entscheidung des
  * Betreibers, nicht die Vorgabe.
  */
+/**
+ * Die gelernten Skills eines Baums — mehr braucht der Curator nicht.
+ *
+ * Die HERKUNFT steht in der Datei: der Skill-Writer setzt `shinon-skill-fp:`,
+ * ein handgeschriebenes Dokument traegt sie nicht. Deshalb liest diese
+ * Funktion den Text, nicht nur den Verzeichnisnamen — sonst waere „wer hat das
+ * geschrieben“ eine Behauptung aus dem Dateinamen.
+ */
+export function readSkills(skillsRoot, file) {
+  if (!existsSync(skillsRoot)) return [];
+  const skills = [];
+  for (const entry of readdirSync(skillsRoot, { withFileTypes: true }).filter((item) => item.isDirectory() && !item.name.startsWith('.')).sort((a, b) => a.name.localeCompare(b.name))) {
+    const path = join(skillsRoot, entry.name, file);
+    if (!existsSync(path)) continue;
+    let text;
+    let addedAt = null;
+    try {
+      text = readFileSync(path, 'utf8');
+      addedAt = statSync(path).mtime.toISOString();
+    } catch {
+      continue;
+    }
+    const match = /^description:\s*(?:"([\s\S]*?)"|(.+))$/m.exec(text.slice(0, 2000));
+    const description = (match?.[1] ?? match?.[2] ?? '').trim();
+    skills.push({ name: entry.name, description, addedAt, chars: text.length, origin: text.includes('shinon-skill-fp:') ? 'agent' : 'hand' });
+  }
+  return skills;
+}
+
+/** Ist die naechste Kuratierung faellig? Reine Rechnung, keine Uhr im Kern. */
+export function curationDue(usage, rules, atMs, lastActivityAt = null) {
+  if (rules?.enabled === false || rules?.autoApply !== true) return false;
+  const idleMs = (rules?.minIdleHours ?? 0) * 60 * 60 * 1000;
+  if (lastActivityAt !== null && atMs - lastActivityAt < idleMs) return false;
+  const last = timeOf(usage?.curatedAt);
+  if (last === null) return true;
+  return atMs - last >= (rules?.intervalHours ?? 168) * 60 * 60 * 1000;
+}
+
+/** Den Lauf stempeln — die naechste Faelligkeit rechnet daraus, nicht aus mtime. */
+export function stampCuration(usage, now = new Date().toISOString()) {
+  return { ...usage, curatedAt: now };
+}
+
 export function curateSkills({ skills = [], usage = null, rules = {}, force = false, now = new Date().toISOString() } = {}) {
   const at = timeOf(now) ?? 0;
   const findings = [];
   const skipped = [];
+  const verwaltet = [];
   const list = Array.isArray(skills) ? skills.filter((skill) => typeof skill?.name === 'string' && skill.name !== '') : [];
   const known = isRecord(usage?.skills) ? usage.skills : {};
   const unmanaged = list.length > rules.maxManaged && Number.isInteger(rules.maxManaged) ? list.slice(rules.maxManaged) : [];
@@ -87,8 +132,8 @@ export function curateSkills({ skills = [], usage = null, rules = {}, force = fa
     // Handgeschriebenes gehoert niemandem, der es wegnehmen darf: nur wer den
     // Marker des Skill-Writers traegt (oder ausdruecklich adoptiert wurde),
     // wird verwaltet. `force` ist die EINE bewusste Ausnahme je Lauf.
-    const managed = skill.origin === 'agent' || record?.adopted === true || force === true;
-    if (!managed && rules.manageHandwritten !== true) {
+    const verwaltbar = skill.origin === 'agent' || record?.adopted === true || force === true;
+    if (!verwaltbar && rules.manageHandwritten !== true) {
       skipped.push({ name: skill.name, reason: 'HANDGESCHRIEBEN' });
       continue;
     }
@@ -97,6 +142,7 @@ export function curateSkills({ skills = [], usage = null, rules = {}, force = fa
       continue;
     }
 
+    verwaltet.push({ ...skill, loads: record?.loads ?? 0 });
     const last = timeOf(record?.lastLoad);
     const born = timeOf(skill.addedAt);
     const idleHours = born === null ? null : (at - born) / (60 * 60 * 1000);
@@ -132,6 +178,37 @@ export function curateSkills({ skills = [], usage = null, rules = {}, force = fa
       findings.push({ id: `veraltet:${skill.name}`, kind: 'veraltet', name: skill.name, action: 'archivieren', detail: `seit ${Math.round(idleDays)} Tagen nicht geladen` });
     } else if (idleDays >= (rules.staleAfterDays ?? 14)) {
       findings.push({ id: `veraltet:${skill.name}`, kind: 'veraltet', name: skill.name, action: 'melden', detail: `seit ${Math.round(idleDays)} Tagen nicht geladen` });
+    }
+  }
+
+  // KONSOLIDIERUNG: zwei fast gleiche Anleitungen werden nicht zusammengeschrieben
+  // (Prosa automatisch zu verschmelzen waere Raten), sondern die ueberzaehlige
+  // Kopie wandert ins Archiv — die benutzte bleibt, bei Gleichstand die juengere.
+  // Das ist umkehrbar (Journal + restore) und deterministisch.
+  if (rules.consolidate === true) {
+    const groups = [];
+    for (const skill of verwaltet) {
+      const group = groups.find((candidate) => similar(candidate[0].description, skill.description));
+      if (group === undefined) groups.push([skill]);
+      else group.push(skill);
+    }
+    for (const group of groups) {
+      if (group.length < 2) continue;
+      const keeper = [...group].sort((left, right) => (right.loads - left.loads)
+        || String(right.addedAt ?? '').localeCompare(String(left.addedAt ?? ''))
+        || left.name.localeCompare(right.name))[0];
+      for (const skill of group) {
+        if (skill.name === keeper.name) continue;
+        const index = findings.findIndex((finding) => finding.id === `doppelt:${skill.name}`);
+        if (index !== -1) findings.splice(index, 1);
+        findings.push({
+          id: `doppelt:${skill.name}`,
+          kind: 'doppelt',
+          name: skill.name,
+          action: 'archivieren',
+          detail: `Konsolidierung: ${keeper.name} bleibt (${keeper.loads} Loads)`,
+        });
+      }
     }
   }
 

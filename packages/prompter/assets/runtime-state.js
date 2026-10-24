@@ -37,6 +37,7 @@ import { loadAbortReasons, loadCapabilityMap, loadContext, loadJsonContract, loa
 import { SALVAGE_CONTRACT, SALVAGE_MEMO_ID, SALVAGE_NAMESPACE, emptySalvage, salvageCountOf, validateSalvage, withSalvageCount } from './salvage-store.js';
 import { readShinonMd } from './shinon-md.js';
 import { fingerprintRoot, resolveWorkspaceRoot } from './workspace.js';
+import { ensureProjectFile } from './project-file.js';
 
 /**
  * Eine verworfene One-Shot-Antwort ins Probe-Journal schreiben (JSONL).
@@ -302,8 +303,9 @@ export function proposeBlock(config, runtime, proposal) {
     if (typeof path !== 'string' || path === '') {
       return { ok: false, findings: ['KEINE_ABLAGE'] };
     }
-    // Dieselbe Regel wie Zettel und Skills: ein absoluter Pfad bleibt absolut.
-    const file = isAbsolute(path) ? path : join(process.cwd(), path);
+    // `learnedPath` ist bereits absolut — oder leer, wenn die Sitzung keinen
+    // Workspace genannt hat. Ein `process.cwd()` waere hier der Host.
+    const file = path;
     let current = [];
     try {
       const checked = validateLearnedFile(JSON.parse(readFileSync(file, 'utf8')));
@@ -397,36 +399,46 @@ export function loadRuntime(ctx, config) {
     }
   }
 
-  // S1: DIE EINE Workspace-Identität — explizite Config > Env > cwd.
-  // Prompter und Project Index hängen am selben aktiven Workspace; cwd allein
-  // bestimmt nie still die Projektidentität. Quelle, Pfad und Budget stehen im
-  // Mount-Log und in jedem Entscheidungsdatensatz (Provenienz ohne Inhalte).
-  const _ws = resolveWorkspaceRoot({ configRoot: config.workspaceRoot ?? '', env: process.env });
-  const _fp = fingerprintRoot(_ws.root);
-  const workspace = { ..._fp, source: _ws.source };
-  console.log(`[shinon-prompter] Workspace: ${workspace.root} (id ${workspace.rootId}, quelle ${workspace.source})`);
-
-  // SHINON.md (Pflichtblock, wenn vorhanden): die EINZIGE Anweisungsdatei aus
-  // dem Projekt — gelesen, geprueft und komprimiert, wie ein Zettel, aber ohne
-  // Relevanzranking: was da steht, gilt. Fehlt die Datei, laeuft der Schritt
-  // ohne sie weiter (fail-open); was schiefgeht, steht im Log mit Grund.
+  // S1: DIE EINE Workspace-Identität — explizite Config > Env > SITZUNG.
+  //
+  // Der Host-cwd entscheidet NIE. Bei `DSH_HOME=$PWD` ist er das Shinon-Repo;
+  // wer ihn als Projektidentitaet nimmt, injiziert Shinon-Kontext in fremde
+  // Projekte (gemessen 2026-10-24). Der Workspace kommt aus der Sitzung
+  // (`agent.session.header.cwd`), sonst ist er UNBEKANNT und Projektinhalt
+  // faellt weg — die Persoenlichkeit bleibt, der Projekt-Kontext nicht.
+  const mountRoot = resolveWorkspaceRoot({ configRoot: config.workspaceRoot ?? '', env: process.env, cwd: '', fallbackToCwd: false });
+  const workspace = mountRoot.root === ''
+    ? { root: '', rootId: '', source: mountRoot.source }
+    : { ...fingerprintRoot(mountRoot.root), source: mountRoot.source };
   let shinonText = null;
   let shinonMdReason = 'SHINON_MD_AUS';
-  if (typeof config.shinonMdPath === 'string' && config.shinonMdPath !== '') {
-    try {
-      const gelesen = readShinonMd({
-        mdPath: config.shinonMdPath,
-        root: workspace.root,
-        warn: (message) => console.warn(`[shinon-prompter] ${message}`),
-        log: (message) => console.log(`[shinon-prompter] ${message}`),
-      });
-      shinonMdReason = gelesen.reason;
-      shinonText = gelesen.text === '' ? null : gelesen.text;
-    } catch (error) {
-      console.error(`[shinon-prompter] SHINON.md nicht verwendbar (${error?.message}) — kein Anweisungsblock`);
-      shinonMdReason = 'SHINON_MD_UNLESBAR';
-    }
-  }
+
+  /** Die Anweisungsdatei des AKTUELLEN Workspace lesen (und einmalig anlegen). */
+  const loadProjectFile = () => {
+    shinonText = null;
+    shinonMdReason = 'SHINON_MD_AUS';
+    if (typeof config.shinonMdPath !== 'string' || config.shinonMdPath === '') return;
+    if (workspace.root === '') { shinonMdReason = 'OHNE_WURZEL'; return; }
+    const gelesen = ensureProjectFile({ root: workspace.root, name: config.shinonMdPath });
+    shinonMdReason = gelesen.reason;
+    shinonText = gelesen.text === '' ? null : gelesen.text;
+    if (gelesen.created) console.log(`[shinon-prompter] SHINON.md angelegt (${gelesen.path})`);
+  };
+
+  /** Die Sitzung binden. Wechselt der Root, wird der Projektinhalt neu gelesen. */
+  const bindWorkspace = (cwd) => {
+    const next = resolveWorkspaceRoot({ configRoot: config.workspaceRoot ?? '', env: process.env, cwd: typeof cwd === 'string' ? cwd : '' });
+    const nextRoot = next.root === '' ? '' : fingerprintRoot(next.root).root;
+    if (nextRoot === workspace.root) return false;
+    if (nextRoot === '') Object.assign(workspace, { root: '', rootId: '', source: next.source });
+    else Object.assign(workspace, fingerprintRoot(nextRoot), { source: next.source });
+    loadProjectFile();
+    console.log(`[shinon-prompter] Workspace gebunden: ${workspace.root || '(keiner)'} (id ${workspace.rootId || '-'}, quelle ${workspace.source})`);
+    return true;
+  };
+
+  loadProjectFile();
+  console.log(`[shinon-prompter] Workspace: ${workspace.root || '(keiner — wartet auf die Sitzung)'} (id ${workspace.rootId || '-'}, quelle ${workspace.source})`);
 
   // MAX-Quellen (S1): konfigurierte Datei > Project Index. Der Project Index
   // traegt den Baum ohnehin (eigener Host, eigener Dienst); ein zweiter Index
@@ -467,11 +479,17 @@ export function loadRuntime(ctx, config) {
   // Fehlt sie, steht die Registry wie ausgeliefert; ist sie kaputt, fällt sie
   // mit Zählung weg statt zu raten (fail-closed, wie überall in dieser Schicht).
   let learnedBlocks = [];
-  if (typeof config.blocksLearnedPath === 'string' && config.blocksLearnedPath !== '') {
+  // Gelernte Bausteine sind PROJEKT-Wissen: gelesen wird nur, wenn der
+  // Workspace beim Mounten bekannt ist (Config/Env). Nannte ihn erst die
+  // Sitzung, bleibt es bei der ausgelieferten Registry — kein cwd-Raten.
+  // Ein ABSOLUTER Pfad ist eine ausdrueckliche Angabe und gilt auch ohne
+  // Workspace; ein relativer braucht den Workspace (kein cwd-Raten).
+  if (typeof config.blocksLearnedPath === 'string' && config.blocksLearnedPath !== ''
+    && (workspace.root !== '' || isAbsolute(config.blocksLearnedPath))) {
     try {
       const learnedFile = isAbsolute(config.blocksLearnedPath)
         ? config.blocksLearnedPath
-        : join(process.cwd(), config.blocksLearnedPath);
+        : join(workspace.root, config.blocksLearnedPath);
       const raw = readFileSync(learnedFile, 'utf8');
       const checked = validateLearnedFile(JSON.parse(raw));
       if (checked.foreign) {
@@ -538,7 +556,11 @@ export function loadRuntime(ctx, config) {
   if (typeof config.probeJournalPath === 'string' && config.probeJournalPath !== '') {
     probeJournalPath = isAbsolute(config.probeJournalPath) ? config.probeJournalPath : join(workspace.root, config.probeJournalPath);
   }
-  const runtime = { context, contextState, noteRules, skillRules, capabilityMap, abortTable: abortRead.table, intentRules, intentMemory, intentMemoryPath, probeJournalPath, journalWarned: false, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, learnedPath: config.blocksLearnedPath ?? '', route, narrative: null, workspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, lastShinonText: shinonText, shinonMdReason, salvageCounts: new Map(), salvageNamespace: typeof config.salvageNamespace === 'string' ? config.salvageNamespace : SALVAGE_NAMESPACE, salvageState: null, salvageLoaded: false, salvagePersist: true, salvageWarned: false };
+  const runtime = { context, contextState, noteRules, skillRules, capabilityMap, abortTable: abortRead.table, intentRules, intentMemory, intentMemoryPath, probeJournalPath, journalWarned: false, intentLast: new Map(), intentWriteWarned: false, turn: null, trace: [], blocks, get learnedPath() {
+    const path = config.blocksLearnedPath ?? '';
+    if (path === '' || isAbsolute(path)) return path;
+    return workspace.root === '' ? '' : join(workspace.root, path);
+  }, route, narrative: null, workspace, mountRoot: mountRoot.root, bindWorkspace, lastBudgetTokens: null, lastContextChars: null, lastContextFiles: null, get lastShinonText() { return shinonText; }, get shinonMdReason() { return shinonMdReason; }, salvageCounts: new Map(), salvageNamespace: typeof config.salvageNamespace === 'string' ? config.salvageNamespace : SALVAGE_NAMESPACE, salvageState: null, salvageLoaded: false, salvagePersist: true, salvageWarned: false };
   // Die Ablage kommt ueber dieselbe optionale Naht wie der Kontext: `ctx.get`,
   // kein `inject` — ein Profil ohne Project Index montiert den Prompter weiter.
   // Ein ERFOLGREICH gefundener Dienst wird gemerkt; ein fehlender nicht, denn

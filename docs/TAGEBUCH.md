@@ -2348,3 +2348,49 @@ Ein Override ist keine Ausnahme von der Prüfung, sondern ihr Gegenstand: der
 Job bleibt fail-closed, und ein DSH-Update muss ihn mitprüfen.
 
 **Anker:** `089e111`, `359abf9` · Pfade: `packages/prompter/assets/learning-review.js`, `packages/prompter/assets/learning-proposal.js`, `packages/prompter/assets/enhance-command.js`, `packages/prompter/assets/client/02-enhance-control.js`, `packages/persona/assets/event-reaction.js`, `packages/persona/assets/schema.js`, `packages/persona/assets/memory-proposal-seam.js`, `profiles/shinon/fragments/70-prompter.yml`, `profiles/shinon/fragments/40-agent-model.yml`, `scripts/learn.mjs`, `scripts/gate/tests/learning-disclosure.test.mjs` · Belege: `npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 971/971 (nach dem Automatik-Satz), `npm run test:prompter` 265/265, Persona 22/22, `npm run build` Exit 0 (23 Pakete, 330 Dateien), Profilboot 4/4, Distribution 92/92, `node scripts/profile-patch.mjs --check` bytegleich, `npm run zahlen:check` Exit 0, `npm run idioms:check` 15 Blöcke in 11 Dateien deckungsgleich.
+
+
+Der Befund kam als Vorwurf und war berechtigt: Shinon-Kontext landete in fremden
+Projekten, zuletzt „sogar vom Prompter". Die Ursache war kein einzelner Fehler, sondern
+die letzte Stelle, an der noch der HOST als Projekt galt. Mit `DSH_HOME=$PWD` ist der
+Prozess-cwd dieses Repo; wer ihn als Workspace nimmt, trägt Shinons `SHINON.md`, Zettel,
+Skills, gelernte Bausteine und das Lernregister in jede Sitzung, die woanders läuft. Die
+Persona war schon getrennt — der Prompter nicht.
+
+Die Korrektur ist eine Reihenfolge, keine Ausnahme: `resolveWorkspaceRoot` bekommt
+`fallbackToCwd: false` und liefert dann einen LEEREN Root mit `source: 'unbekannt'` —
+Config und Env bleiben ausdrückliche Angaben und gelten weiter. `runtime-state.js` bindet
+beim ersten Schritt den Sitzungs-cwd (`bindWorkspace`) und liest den Projektinhalt bei
+einem Wechsel NEU; ohne bekannten Root bleibt er leer und meldet `OHNE_WURZEL`, statt zu
+raten. `readNotes`/`readSkills` verlangen einen Root, `createSkillWriter` verweigert ohne
+ihn benannt, `createLearningReview` löst Register, Nutzung, Kuratierung und Schreiber je
+Auftrag über `rootOf()` und `writerFor(root)` auf — die Wurzel reist MIT dem Auftrag, damit
+ein Sitzungswechsel in der Warteschlange das Ziel nicht verschiebt. Der deklarierte Root
+der Persona bleibt als Fallback erlaubt, weil er nur aus Config/Env entsteht und nie aus
+einem geratenen cwd.
+
+Zwei Nebenbefunde derselben Ursache: das Repo hatte sich beim Testen selbst eine `SHINON.md`
+angelegt (jetzt gitignoriert, Vorlage bleibt `SHINON.md.example`), und `learned-store`
+schrieb relative Pfade gegen den cwd. Die automatische Anlage bleibt — aber als eigener
+Eigentümer (`project-file.js`): einmal, nie überschreibend, nie ohne Root, und mit der
+Zusage, dort nie eigene Inhalte zu schreiben. Der Isolationstest des Prompters führt sie
+jetzt als ZWEITE benannte Schreibausnahme neben dem Proposals-Store.
+
+Der Release 0.5.0 ist damit fertig: Lernzyklus autonom inklusive Konsolidierung (der
+Curator verschiebt statt zu löschen), Audit bei null Schwachstellen ohne Lockerung des
+DSH-Pins, README in Shinons Stimme, Bedienanleitung für den Lernzyklus als eigenes
+Dokument. Der Funktionsnachweis über vier Stunden Dauerbetrieb mit echtem API-Aufruf ist
+die Meldung des Betreibers — sie steht so in `docs/ROADMAP.md` §1.6 und nicht als
+gemessene Zahl eines Agenten. Der Tag `v0.5.0` bleibt ausdrücklich offen.
+
+**Anker:** `2c80907` (Basis) · Arbeitsbaum · Pfade: `packages/seams/assets/seams.js`,
+`packages/prompter/assets/runtime-state.js`, `packages/prompter/assets/prompt-files.js`,
+`packages/prompter/assets/stand.js`, `packages/prompter/assets/project-file.js`,
+`packages/prompter/assets/learning-review.js`, `packages/prompter/assets/skill-lifecycle.js`,
+`packages/prompter/index.js`, `packages/prompter/test/workspace.test.mjs`,
+`scripts/gate/tests/prompter-contract-fixtures.mjs`, `docs/LERNZYKLUS.md`, `README.md`,
+`docs/CHANGELOG.md`, `docs/ROADMAP.md`, `docs/SETUP.md`, `docs/INDEX.md`, `.gitignore`,
+`package.json` · Belege: `npm run test:prompter` 269/269, Persona-Claims 22/22,
+`npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 971/971
+(Exit 0), `npm audit --omit=dev --audit-level=high` „found 0 vulnerabilities" (Exit 0),
+`npm run zahlen:check` Exit 0.

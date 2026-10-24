@@ -65,13 +65,14 @@
     "skillToolName": "skill"
   },
   "curator": {
-    "note": "Vorgaben aus dem Hermes-Curator (docs/user-guide/features/curator): Woche, zwei Stunden Ruhe, 14 Tage veraltet, 30 Tage archivieren, kein automatisches Konsolidieren, keine eingebauten Skills anfassen. Dazu die Herkunft: `manageHandwritten: false` heisst, nur ein Skill MIT dem Marker des Skill-Writers (`shinon-skill-fp:`) wird verwaltet — handgeschriebene sind gepinnt, bis der Betreiber sie mit `learn adopt <name>` uebernimmt; `learn curate --force` ist die eine bewusste Ausnahme je Lauf. Der Curator laeuft als Kommando, nicht als Daemon — DSH hat kein Sitzungsende-Ereignis.",
+    "note": "Vorgaben aus dem Hermes-Curator (docs/user-guide/features/curator): Woche, zwei Stunden Ruhe, 14 Tage veraltet, 30 Tage archivieren, kein automatisches Konsolidieren, keine eingebauten Skills anfassen. Dazu die Herkunft: `manageHandwritten: false` heisst, nur ein Skill MIT dem Marker des Skill-Writers (`shinon-skill-fp:`) wird verwaltet — handgeschriebene sind gepinnt, bis der Betreiber sie mit `learn adopt <name>` uebernimmt; `learn curate --force` ist die eine bewusste Ausnahme je Lauf. Er laeuft autonom: `autoApply: true` heisst, der faellige Lauf verschiebt ohne `--apply` (`--dry-run` zeigt nur), und `consolidate: true` loest Dubletten auf, indem die ueberzaehlige Kopie ins Archiv wandert statt Prosa zu verschmelzen — umkehrbar ueber Journal und `restore`. Ausgeloest wird er im Hintergrund nach einem abgeschlossenen Turn, wenn `intervalHours` seit dem letzten Lauf vergangen und der Nutzer `minIdleHours` ruhig war; ein Daemon ist er trotzdem nicht, weil DSH kein Sitzungsende-Ereignis kennt.",
     "enabled": true,
     "intervalHours": 168,
     "minIdleHours": 2,
     "staleAfterDays": 14,
     "archiveAfterDays": 30,
-    "consolidate": false,
+    "autoApply": true,
+    "consolidate": true,
     "pruneBuiltins": false,
     "manageHandwritten": false,
     "maxManaged": 200

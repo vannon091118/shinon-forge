@@ -53,6 +53,11 @@ dev-dsh-home/
 .shinon/skill-backups/
 .shinon/learning-archive/
 
+# SHINON.md ist eine KUNDENVORLAGE (SHINON.md.example im Root), keine lebendige
+# Anweisung dieses Repos. Seit 2026-10-24 legt Shinon sie beim ersten Schritt in
+# einem Workspace selbst an — im eigenen Baum ist das ein Artefakt, kein Inhalt.
+/SHINON.md
+
 # Credentials — never commit. Public repo!
 .credentials.yaml
 

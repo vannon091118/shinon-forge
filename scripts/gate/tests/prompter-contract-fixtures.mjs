@@ -238,7 +238,12 @@ export function runtimeModules() {
   // Curator schreiben Dateien, weil ein Eigentuemer sie dazu aufruft. Ihre
   // Grenzen pruefen ihre eigenen Tests (kein `tools`-Feld im Lernaufruf,
   // genau ein Modellaufruf je Auftrag, Ziel innerhalb der Wurzel).
-  const writers = new Set(['learned-store.js', 'skill-lifecycle.js', 'learning-store.js', 'learning-curator.js']);
+  // `project-file.js` legt beim ersten Schritt die PROJEKTVORLAGE an
+  // (SHINON.md) — ein Schreibvorgang im Projekt der Sitzung, ausserhalb des
+  // One-Shot-Pfads. Er ist die zweite benannte Ausnahme und wird von
+  // `workspace.test.mjs` auf „einmal, nie ueberschreiben, nie ohne Root"
+  // gepinnt.
+  const writers = new Set(['learned-store.js', 'skill-lifecycle.js', 'learning-store.js', 'learning-curator.js', 'project-file.js']);
   return [
     INDEX_FILE,
     ...readdirSync(assets).sort().filter((name) => name.endsWith('.js') && !writers.has(name)).map((name) => join(assets, name)),

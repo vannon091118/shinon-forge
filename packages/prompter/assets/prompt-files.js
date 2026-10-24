@@ -54,8 +54,11 @@ export function loadNoteRules(path = NOTE_RULES_PATH) {
  * Das Verzeichnis der Zettel aufloesen — relativ zum ARBEITSVERZEICHNIS.
  * Ein absoluter Pfad bleibt absolut (eine ausdrueckliche Angabe wird geehrt).
  */
-export function notesDir(config) {
-  return isAbsolute(config.notesPath) ? config.notesPath : join(process.cwd(), config.notesPath);
+export function notesDir(config, root = '') {
+  // Der Root ist der Workspace DER SITZUNG. Ohne ihn gibt es keinen Pfad —
+  // `process.cwd()` ist bei DSH der Host, nicht das Projekt.
+  if (isAbsolute(config.notesPath)) return config.notesPath;
+  return root === '' ? '' : join(root, config.notesPath);
 }
 
 /**
@@ -72,10 +75,11 @@ export function notesDir(config) {
  * ohne seinen Zettel arbeitet und nicht weiss, warum.
  * @returns { notes, skipped, reason } — `notes` sind gepruefte Zettel mit Datei.
  */
-export function readNotes(config, rules) {
+export function readNotes(config, rules, root = '') {
   const format = rules?.format ?? {};
   if (typeof config?.notesPath !== 'string' || config.notesPath === '') return { notes: [], skipped: [], reason: 'NOTES_OFF' };
-  const dir = notesDir(config);
+  const dir = notesDir(config, root);
+  if (dir === '') return { notes: [], skipped: [], reason: 'OHNE_WURZEL' };
   const extension = typeof format.extension === 'string' ? format.extension : '.json';
   let names;
   try {
@@ -115,8 +119,9 @@ export function loadSkillRules(path = SKILL_RULES_PATH) {
 }
 
 /** Das Skill-Verzeichnis auflösen — relativ zum ARBEITSVERZEICHNIS. */
-export function skillsDir(config) {
-  return isAbsolute(config.skillsPath) ? config.skillsPath : join(process.cwd(), config.skillsPath);
+export function skillsDir(config, root = '') {
+  if (isAbsolute(config.skillsPath)) return config.skillsPath;
+  return root === '' ? '' : join(root, config.skillsPath);
 }
 
 /**
@@ -192,10 +197,11 @@ export function readSkillUseWhen(text) {
  * nicht in der Liste. Ein leerer Ordner ergibt `reason: SKILLS_EMPTY`, nicht
  * einen still leeren Block.
  */
-export function readSkills(config, rules) {
+export function readSkills(config, rules, root = '') {
   const reading = rules?.reading ?? {};
   if (typeof config?.skillsPath !== 'string' || config.skillsPath === '') return { skills: [], skipped: [], reason: 'SKILLS_OFF' };
-  const dir = skillsDir(config);
+  const dir = skillsDir(config, root);
+  if (dir === '') return { skills: [], skipped: [], reason: 'OHNE_WURZEL' };
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });

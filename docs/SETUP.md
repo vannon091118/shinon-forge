@@ -1,8 +1,8 @@
 # SETUP — Installation, Profile, Schlüssel, Diagnose
 
-> **Status:** current · **Stand:** 2026-10-20
+> **Status:** current · **Stand:** 2026-10-24
 >
-> Der eingefrorene v0.4.0-Abnahmeweg ist der **Quellklon**. Was belegt ist,
+> Der eingefrorene v0.5.0-Abnahmeweg ist der **Quellklon**. Was belegt ist,
 > steht in [`ZAHLEN.md`](ZAHLEN.md) §2; was noch nicht belegt ist, in §4.
 > Offene Arbeit (weitere Installationswege, `.deb`, Autoupdate):
 > [`ROADMAP.md`](ROADMAP.md) §1.5.
@@ -124,7 +124,7 @@ daneben die Repo-Konsistenz — nicht den laufenden Rechner.
 | `npm run backup:retention` | Aufbewahrung des Sicherungsordners (`--keep`, `--max-age`, `--dry-run`, `--json`; jede Anwendung wird protokolliert) |
 | `npm run desktop:launcher` | Desktop-Starter (Konzept, Stand: [`ROADMAP.md`](ROADMAP.md) §2.3) |
 
-Nicht v0.4.0-Umfang (also Folgearbeit, siehe ROADMAP): `shinon update`,
+Nicht v0.5.0-Umfang (also Folgearbeit, siehe ROADMAP): `shinon update`,
 persistentes `shinon autoupdate`, `.deb` als unterstützter
 Release-Installationsweg.
 

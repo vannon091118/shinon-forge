@@ -164,3 +164,54 @@ test('workspace: unbekannte Referenzen vernichten nicht den richtigen Kontext', 
   // einzigen erfundenen Referenz weg (kein pauschales Vernichten).
   assert.ok(typeof acceptance === 'function');
 });
+
+// ── 5. Fremder Kontext bleibt draussen (gemessen 2026-10-24) ────────────────
+
+test('workspace: ohne Sitzung gibt es keinen Root — der Host-cwd ist keine Antwort', () => {
+  // Der Befund: mit DSH_HOME=$PWD wurde der Host-cwd zum "Projekt", und Shinon
+  // trug seinen eigenen Kontext in fremde Sitzungen. Wer die Sitzung fragen
+  // will, schaltet den cwd-Rueckfall ab und bekommt dann LEER, nicht geraten.
+  assert.deepEqual(resolveWorkspaceRoot({ cwd: '', fallbackToCwd: false, env: {} }), {
+    root: '',
+    source: 'unbekannt',
+  });
+  // Eine ausdrueckliche Angabe bleibt eine Angabe — Config und Env gelten weiter.
+  const explicit = tmpRoot('explicit2');
+  const fromEnv = tmpRoot('env2');
+  try {
+    assert.equal(
+      resolveWorkspaceRoot({ cwd: '', fallbackToCwd: false, configRoot: explicit, env: {} }).root,
+      explicit,
+    );
+    assert.equal(
+      resolveWorkspaceRoot({ cwd: '', fallbackToCwd: false, env: { SHINON_WORKSPACE_ROOT: fromEnv } }).root,
+      fromEnv,
+    );
+  } finally {
+    for (const d of [explicit, fromEnv]) rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test('workspace: SHINON.md entsteht einmal, ueberschreibt nie und braucht einen Root', async () => {
+  const { ensureProjectFile, SHINON_MD_TEMPLATE } = await import('../assets/project-file.js');
+  const root = tmpRoot('shinonmd');
+  try {
+    const first = ensureProjectFile({ root });
+    assert.equal(first.created, true);
+    assert.equal(first.reason, 'GELESEN');
+    assert.equal(first.text, SHINON_MD_TEMPLATE.trim());
+
+    // Ein Mensch fuellt die Datei — der zweite Schritt darf sie nicht anfassen.
+    writeFileSync(join(root, 'SHINON.md'), '# SHINON.md\n\nNur dieses Projekt.\n');
+    const second = ensureProjectFile({ root });
+    assert.equal(second.created, false);
+    assert.match(second.text, /Nur dieses Projekt/);
+
+    // Ohne Workspace kein Projektfile: fail-closed statt `process.cwd()`.
+    const none = ensureProjectFile({ root: '' });
+    assert.equal(none.path, null);
+    assert.equal(none.reason, 'OHNE_WURZEL');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

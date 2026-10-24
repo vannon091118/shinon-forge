@@ -98,6 +98,14 @@ function warnIndex(runtime, detail) {
  *                      fuer MAX genau eine gueltige Form gibt.
  */
 function indexContext(ctx, config, text, runtime) {
+  // Der Index ist an den MOUNT-Workspace gebunden. Eine Sitzung in einem anderen
+  // Projekt bekommt hier NICHTS: fremder Kontext ist schlimmer als keiner.
+  // Nur wenn BEIDE Roots bekannt sind, ist ein Vergleich ein Befund. Ist der
+  // Mount-Root unbekannt (kein config/env), ist der Dienst die einzige Quelle,
+  // die ihn kennt — dann gilt die Bindung der Sitzung.
+  if (runtime.workspace.root !== '' && runtime.mountRoot !== '' && runtime.workspace.root !== runtime.mountRoot) {
+    return noContext('FREMDER_WORKSPACE');
+  }
   let service;
   try {
     service = typeof ctx?.get === 'function' ? ctx.get(INDEX_SERVICE) : undefined;
@@ -356,6 +364,10 @@ export async function onPreStep(ctx, config, runtime, payload, next) {
   // Die Uhr laeuft ab dem Hook-Eintritt: die Dauer je Pattern ist gemessen,
   // nicht geschaetzt — sie geht als Gesamtlaufzeit ins Intent-Gedächtnis.
   const turnStarted = Date.now();
+  // VOR jedem Projektinhalt: der Workspace dieser Sitzung. Ein Wechsel bindet
+  // neu (SHINON.md, Pfade) — der Host-cwd ist nie die Projektidentitaet.
+  const bound = runtime.bindWorkspace?.(payload?.agent?.session?.header?.cwd);
+  if (bound === true) console.log(`[shinon-prompter] Projektinhalt neu gebunden (${runtime.workspace.root || 'kein Workspace'})`);
   const prompt = readPrompt(payload);
   if (prompt === null) return next();
   const sessionId = payload?.agent?.session?.id;

@@ -57,7 +57,16 @@ export function evidenceKinds(evidence) {
  * Den Schreiber bauen. `root` ist der Projektbaum (CWD des Hosts); alle Pfade
  * werden dagegen aufgeloest und vor jedem Schreiben geprueft.
  */
-export function createSkillWriter({ rules, noteRules, root = process.cwd(), log = console }) {
+export function createSkillWriter({ rules, noteRules, root = '', log = console }) {
+  // Ohne Workspace gibt es kein Ziel: `.agents/skills` eines fremden Projekts
+  // entsteht nicht aus dem Host-cwd. Der Schreiber verweigert dann benannt.
+  if (typeof root !== 'string' || root === '') {
+    return {
+      inspect: () => ({ verdict: 'reject', reason: 'OHNE_WURZEL', base: null, target: null }),
+      apply: () => ({ ok: false, reason: 'OHNE_WURZEL' }),
+      undo: () => ({ ok: false, reason: 'OHNE_WURZEL' }),
+    };
+  }
   const skillsRoot = resolve(root, rules.root.dir);
   const ledgerPath = resolve(root, rules.ledger.path);
   const backupsRoot = resolve(root, '.shinon', 'skill-backups');

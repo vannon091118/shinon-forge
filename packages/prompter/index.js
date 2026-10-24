@@ -379,10 +379,12 @@ export function apply(ctx, config) {
     try {
       const lifecycleRules = loadLifecycleRules();
       const reviewRules = loadLearningRules();
-      const writer = createSkillWriter({
+      // Der Schreiber haengt am Workspace der SITZUNG, nicht am Host-cwd:
+      // sonst landete ein Skill aus einem fremden Projekt in diesem Baum.
+      const writerFor = (root) => createSkillWriter({
         rules: lifecycleRules,
         noteRules: runtime.noteRules ?? {},
-        root: config.workspaceRoot || process.cwd(),
+        root,
       });
       // Die Persona bietet die Naht an; fehlt sie, bleiben Memory-Vorschlaege
       // im Register und werden benannt blockiert (kein stiller Verlust).
@@ -396,10 +398,12 @@ export function apply(ctx, config) {
         rules: reviewRules,
         skillRules: lifecycleRules,
         noteRules: runtime.noteRules ?? {},
-        writer,
+        writer: null,
+        writerFor,
         route,
         persona: () => personaReader(),
-        workspaceRoot: config.workspaceRoot || process.cwd(),
+        workspaceRoot: config.workspaceRoot || '',
+        rootOf: () => runtime.workspace?.root ?? '',
       });
       disposeReview = bus.route(config.eventsChannel, (envelope, payload) => review.observe(envelope, payload));
       console.log(`[shinon-prompter] Lernpruefung aktiv — Ereignisse auf ${config.eventsChannel}, Register ${review.registryPath}`);

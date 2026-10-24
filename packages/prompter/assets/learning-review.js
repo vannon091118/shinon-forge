@@ -36,6 +36,7 @@ import {
   putProposal,
 } from './learning-proposal.js';
 import { addSkillLoad, readRegistry, readUsage, withLock, writeRegistry, writeUsage } from './learning-store.js';
+import { archiveSkills, curationDue, curateSkills, readSkills, stampCuration } from './learning-curator.js';
 import { textOf } from './skill-lifecycle.js';
 
 export const LEARNING_CONTRACT = 'shinon.learning-review/v1';
@@ -73,11 +74,27 @@ export function createLearningReview({
   route,
   persona = () => null,
   log = console,
-  workspaceRoot = process.cwd(),
+  // Der Workspace kommt aus der SITZUNG, nie aus dem Host-cwd: sonst schriebe
+  // ein Lauf in einem fremden Projekt sein Register in dieses Repo.
+  workspaceRoot = '',
+  rootOf = null,
+  writerFor = null,
   now = () => new Date().toISOString(),
 }) {
-  const registryPath = resolve(workspaceRoot, config?.registryPath || rules.registry.path);
-  const usagePath = resolve(workspaceRoot, config?.usagePath || rules.usage.path);
+  /** Die Pfade EINES Roots. Ein leerer Root ergibt `null`, nie einen geratenen. */
+  const pathsFor = (root) => {
+    if (typeof root !== 'string' || root === '') return null;
+    return {
+      registry: resolve(root, config?.registryPath || rules.registry.path),
+      usage: resolve(root, config?.usagePath || rules.usage.path),
+      skills: resolve(root, skillRules.root.dir),
+      archive: resolve(root, '.shinon', 'learning-archive'),
+    };
+  };
+  const currentRoot = () => {
+    const fromSession = typeof rootOf === 'function' ? rootOf() : null;
+    return typeof fromSession === 'string' && fromSession !== '' ? fromSession : workspaceRoot;
+  };
   const reviewRoute = config?.provider && config?.model
     ? { provider: config.provider, model: config.model }
     : route;
@@ -91,6 +108,7 @@ export function createLearningReview({
   const perSession = new Map();
   let running = false;
   let disposed = false;
+  let lastActivityAt = 0;
   let personaReader = persona;
 
   const bufferOf = (sessionId) => {
@@ -119,31 +137,35 @@ export function createLearningReview({
   }
 
   /** Die Nutzung zaehlen — Quelle ist der Werkzeug-Aufruf, nicht die Auswahl. */
-  function recordUsage(sessionId, skillName) {
+  function recordUsage(sessionId, skillName, root = currentRoot()) {
+    const paths = pathsFor(root);
+    if (paths === null) return;
     try {
-      const { usage } = readUsage(usagePath, { log });
+      const { usage } = readUsage(paths.usage, { log });
       const next = addSkillLoad(usage, skillName, {
         session: sessionRef(sessionId),
         now: now(),
         maxEntries: rules.usage.maxEntries,
       });
-      writeUsage(usagePath, next);
+      writeUsage(paths.usage, next);
     } catch (error) {
       log.warn?.(`[shinon-learn] Nutzung nicht geschrieben (${error?.message ?? error})`);
     }
   }
 
   /** Einen Eintrag ins Register legen; Lock + atomar, nie zwei Wahrheiten. */
-  function persist(proposal, patch) {
-    return withLock(`${registryPath}.lock`, () => {
-      const { registry } = readRegistry(registryPath, { log });
+  function persist(proposal, patch, root) {
+    const paths = pathsFor(root);
+    if (paths === null) return { ok: false, reason: 'OHNE_WURZEL' };
+    return withLock(`${paths.registry}.lock`, () => {
+      const { registry } = readRegistry(paths.registry, { log });
       const placed = registry.entries[proposal.id] === undefined
         ? putProposal(registry, proposal, rules.registry.maxEntries)
         : { ok: true, registry };
       if (!placed.ok) return placed;
       const updated = setProposal(placed.registry, proposal.id, patch);
       if (!updated.ok) return updated;
-      writeRegistry(registryPath, updated.registry);
+      writeRegistry(paths.registry, updated.registry);
       return { ok: true, registry: updated.registry };
     });
   }
@@ -151,6 +173,16 @@ export function createLearningReview({
   /** Ein Auftrag: Digest, ein Modellaufruf, Pruefung, Vorschlag. */
   async function runJob(job, signal) {
     if (signal.aborted) return;
+    // Ohne Sitzungswurzel gibt es kein Register: der Host-cwd ist keine Antwort.
+    const skribent = pathsFor(job.root) === null ? null : (typeof writerFor === 'function' ? writerFor(job.root) : writer);
+    if (pathsFor(job.root) === null || skribent === null) {
+      log.log(`[shinon-learn] ${job.kind}: uebersprungen (OHNE_WURZEL — die Sitzung nannte keinen Workspace)`);
+      return;
+    }
+    if (job.kind === 'kuratieren') {
+      runCuration();
+      return;
+    }
     const { text, refs } = renderDigest(job.digest, rules.redaction);
     if (refs.length === 0) {
       log.log('[shinon-learn] nichts zu pruefen (leerer Beleg)');
@@ -201,13 +233,13 @@ export function createLearningReview({
     const findings = checkProposal(normalized, { rules, skillRules, noteRules }).findings;
 
     if (normalized.decision === 'skill') {
-      const checked = writer.inspect(normalized.payload, evidence);
+      const checked = skribent.inspect(normalized.payload, evidence);
       base = checked.base;
       owner = checked.target ?? normalized.payload.name;
       findings.push({ id: 'EIGENTUEMER', ok: checked.verdict === 'publish' || checked.verdict === 'consolidate', detail: `${checked.verdict}:${checked.reason}` });
       if (checked.verdict === 'reject' || checked.verdict === 'candidate') {
         const proposal = buildProposal({ ...normalized, checks: findings, evidence, base, owner }, rules);
-        persist(proposal, { status: 'blocked', decision: { by: 'review', at: now(), via: 'checks' } });
+        persist(proposal, { status: 'blocked', decision: { by: 'review', at: now(), via: 'checks' } }, job.root);
         log.log(`[shinon-learn] ${job.kind}: blockiert (${checked.reason})`);
         return;
       }
@@ -215,7 +247,7 @@ export function createLearningReview({
 
     const proposal = buildProposal({ ...normalized, checks: findings, evidence, base, owner }, rules);
     if (!findings.every((finding) => finding.ok)) {
-      persist(proposal, { status: 'blocked', decision: { by: 'review', at: now(), via: 'checks' } });
+      persist(proposal, { status: 'blocked', decision: { by: 'review', at: now(), via: 'checks' } }, job.root);
       log.log(`[shinon-learn] ${job.kind}: blockiert (${findings.filter((finding) => !finding.ok).map((finding) => finding.id).join(',')})`);
       return;
     }
@@ -231,11 +263,11 @@ export function createLearningReview({
 
     if (normalized.decision === 'skill') {
       if (!auto.auto) {
-        persist(proposal, { status: 'pending' });
+        persist(proposal, { status: 'pending' }, job.root);
         log.log(`[shinon-learn] ${job.kind}: Vorschlag ${proposal.id} wartet auf Freigabe (${auto.reason})`);
         return;
       }
-      const applied = writer.apply(proposal, { evidence });
+      const applied = skribent.apply(proposal, { evidence });
       if (!applied.ok) {
         persist(proposal, { status: 'blocked', decision: { by: 'review', at: now(), via: 'auto' } });
         log.log(`[shinon-learn] ${job.kind}: Anwenden verweigert (${applied.reason})`);
@@ -245,14 +277,14 @@ export function createLearningReview({
         status: 'auto-applied',
         decision: { by: 'review', at: now(), via: 'auto' },
         undo: { kind: 'skill', ...applied, owner: applied.owner ?? owner },
-      });
+      }, job.root);
       log.log(`[shinon-learn] ${job.kind}: ${applied.verdict} -> ${applied.path} (${auto.reason})`);
       return;
     }
 
     const service = typeof personaReader === 'function' ? personaReader() : null;
     if (service === null || service === undefined || typeof service.propose !== 'function') {
-      persist(proposal, { status: 'blocked', decision: { by: 'review', at: now(), via: 'checks' } });
+      persist(proposal, { status: 'blocked', decision: { by: 'review', at: now(), via: 'checks' } }, job.root);
       log.log(`[shinon-learn] ${job.kind}: kein Memory-Eigentuemer — Vorschlag bleibt im Register`);
       return;
     }
@@ -266,7 +298,7 @@ export function createLearningReview({
       decision: auto.auto ? 'accepted' : 'proposed',
     });
     if (answerProposal?.ok !== true) {
-      persist(proposal, { status: 'blocked', decision: { by: 'review', at: now(), via: 'checks' } });
+      persist(proposal, { status: 'blocked', decision: { by: 'review', at: now(), via: 'checks' } }, job.root);
       log.log(`[shinon-learn] ${job.kind}: Memory verweigert (${answerProposal?.reason ?? 'UNBEKANNT'})`);
       return;
     }
@@ -276,8 +308,47 @@ export function createLearningReview({
         decision: { by: 'review', at: now(), via: 'auto' },
         undo: { kind: 'memory', personaId: answerProposal.id ?? null },
       }
-      : { status: 'pending', undo: { kind: 'memory', personaId: answerProposal.id ?? null } });
+      : { status: 'pending', undo: { kind: 'memory', personaId: answerProposal.id ?? null } }, job.root);
     log.log(`[shinon-learn] ${job.kind}: Memory ${auto.auto ? 'uebernommen' : 'zur Freigabe'} (${answerProposal.id ?? 'ohne Id'})`);
+  }
+
+  /**
+   * Der Curator im Hintergrund (SH-LEARN-06, autonom): kein Modell, kein
+   * Rueckfrageweg. Er verschiebt nur, was die Regeln erlauben — Handgeschriebenes
+   * bleibt liegen, und jede Bewegung steht im Journal des Archivs.
+   */
+  function runCuration() {
+    try {
+      const paths = pathsFor(currentRoot());
+      if (paths === null) return;
+      const { usage } = readUsage(paths.usage, { log });
+      const stamp = now();
+      const plan = curateSkills({ skills: readSkills(paths.skills, skillRules.root.file), usage, rules: rules.curator ?? {}, now: stamp });
+      if (plan.archive.length > 0) {
+        const applied = archiveSkills({ names: plan.archive, skillsRoot: paths.skills, archiveRoot: paths.archive, now: stamp, log });
+        log.log(`[shinon-learn] kuratieren: ${applied.moved.length} archiviert${applied.ok ? '' : ` (unvollstaendig: ${applied.refused?.map((item) => `${item.name}:${item.reason}`).join(',') ?? applied.reason})`}`);
+      }
+      writeUsage(paths.usage, stampCuration(usage, stamp));
+    } catch (error) {
+      log.warn?.(`[shinon-learn] kuratieren abgebrochen (${error?.message ?? error})`);
+    }
+  }
+
+  /**
+   * Faelligkeit pruefen und einstellen. Die Ruhefrist gilt gegen die LETZTE
+   * Aktivitaet vor diesem Ereignis: in einem Zug, der direkt an den naechsten
+   * anschliesst, wird nicht kuratiert — nach einer Pause schon.
+   */
+  function maybeCurate(previousActivityAt) {
+    const curator = rules.curator ?? {};
+    if (curator.enabled === false || curator.autoApply !== true) return;
+    if (queue.length >= budget.maxQueue) return;
+    const paths = pathsFor(currentRoot());
+    if (paths === null) return;
+    const { usage } = readUsage(paths.usage, { log });
+    if (!curationDue(usage, curator, Date.now(), previousActivityAt)) return;
+    queue.push({ kind: 'kuratieren', root: currentRoot() });
+    pump();
   }
 
   /** Einen Auftrag einstellen. Die Zaehler werden beim Einstellen zurueckgesetzt. */
@@ -303,6 +374,9 @@ export function createLearningReview({
       session.lastReviewAt = Date.now();
     }
     perSession.set(job.sessionId, used + 1);
+    // Die Wurzel reist MIT dem Auftrag: ein Wechsel der Sitzung waehrend der
+    // Warteschlange darf das Ziel des Vorschlags nicht verschieben.
+    job.root = currentRoot();
     queue.push(job);
     pump();
     return true;
@@ -354,6 +428,9 @@ export function createLearningReview({
   /** Das Ereignis verarbeiten. Nie werfen: der Host darf den Lauf nicht brechen. */
   function observe(envelope, payload) {
     if (disposed) return;
+    const seenAt = Date.now();
+    const before = lastActivityAt;
+    lastActivityAt = seenAt;
     try {
       const type = typeof envelope?.event_type === 'string' ? envelope.event_type : '';
       const sessionId = typeof envelope?.session_id === 'string' ? envelope.session_id : '';
@@ -407,6 +484,7 @@ export function createLearningReview({
         if (reason !== rules.trigger.completedReason) return;
         session.turn += 1;
         session.turns += 1;
+        maybeCurate(before);
         const cooled = Date.now() - session.lastReviewAt < rules.review.cooldownMs;
         if (cooled) return;
         // Eine Schwelle von 0 heisst AUS, nicht „sofort": sonst feuerte jede
@@ -449,8 +527,9 @@ export function createLearningReview({
     dispose,
     attachPersona,
     pending: () => queue.length,
-    registryPath,
-    usagePath,
+    /** Nur fuer die Logzeile des Hosts — die Pfade gelten je Sitzung. */
+    get registryPath() { return pathsFor(currentRoot())?.registry ?? ''; },
+    get usagePath() { return pathsFor(currentRoot())?.usage ?? ''; },
     sessions,
   };
 }
