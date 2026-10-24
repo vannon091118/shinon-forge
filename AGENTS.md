@@ -93,7 +93,12 @@ Grenze ist physisch und fail-closed:
   verweigert sich dann selbst (`scripts/gate/tests/message-ingress.test.mjs`). Beide
   Zahlen: `docs/ZAHLEN.md` §1. Eine zweite Fassung liegt **nicht** im Baum: die
   Fassung ist über Sollquelle, Lock, Installat und `dsh --version` belegt
-  (`npm run check:dsh-versions`, fail-closed). `npm run dev` startet über
+  (`npm run check:dsh-versions`, fail-closed). DSH pinnt seine eigenen Abhängigkeiten
+  **exakt** (z. B. `zod`), deshalb liegen gepatchte Fassungen als `overrides` im
+  Root-Manifest: sie heben nur die Fassung, nicht die Zusage an DSH. Der CI-Job
+  `Production Dependency Audit` (`npm audit --omit=dev --audit-level=high`) ist
+  fail-closed und der Prüfpunkt dafür; ein DSH-Update prüft den Override mit, statt
+  ihn zu erben. `npm run dev` startet über
   `bin/shinon.mjs`; ein `dsh` im PATH braucht nur, wer den Profiltest direkt aufruft.
 - **Das Repo-Root ist NICHT mehr `DSH_HOME`.** Grund (gemessen 2026-10-17):
   `$DSH_HOME/AGENTS.md` ist bei DSH die benutzerglobale Anweisungsdatei und lief damit in

@@ -2334,4 +2334,17 @@ steht in `skill-usage.json`, nicht in einem Kommentar. Die Probe
 verschiebt er, `restore` holt zurück; nebenbei meldet er die Dublette
 (`doppelt: hand-skill-probe`), ohne sie automatisch zusammenzulegen.
 
+Der rote Audit-Job des Tages bekommt seine Erklärung, und sie ist unangenehm
+banal: 194 Meldungen waren acht Advisories auf drei Paketen, alle nur über
+`@deepseek-ai/dsh` erreichbar. Die Lawine entsteht, weil fünfzig DSH-Pakete
+`zod` **exakt** auf `4.4.3` pinnen — ein einziges ungepatchtes Paket, fünfzig
+Kopien, fünfzig Meldungen. Der naheliegende Griff, den Pin auf `0.2.1-rc.3`
+anzuheben, wurde gemessen und verworfen: 189 high bleiben, `fast-uri` ist
+gefixt, dafür zwei neue moderate. Stattdessen heben `overrides` im Root nur die
+Fassung (`zod 4.6.7`, `undici 8.12.3`, `fast-uri 3.1.9`) und lassen die Zusage an
+DSH stehen; der Audit geht von 189 high auf null, der Profilboot bleibt bei
+4/4, `dsh --version` bleibt `0.2.1-rc.2`, die Gate-Tests bleiben bei 971 + 99.
+Ein Override ist keine Ausnahme von der Prüfung, sondern ihr Gegenstand: der
+Job bleibt fail-closed, und ein DSH-Update muss ihn mitprüfen.
+
 **Anker:** `089e111`, `359abf9` · Pfade: `packages/prompter/assets/learning-review.js`, `packages/prompter/assets/learning-proposal.js`, `packages/prompter/assets/enhance-command.js`, `packages/prompter/assets/client/02-enhance-control.js`, `packages/persona/assets/event-reaction.js`, `packages/persona/assets/schema.js`, `packages/persona/assets/memory-proposal-seam.js`, `profiles/shinon/fragments/70-prompter.yml`, `profiles/shinon/fragments/40-agent-model.yml`, `scripts/learn.mjs`, `scripts/gate/tests/learning-disclosure.test.mjs` · Belege: `npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 971/971 (nach dem Automatik-Satz), `npm run test:prompter` 265/265, Persona 22/22, `npm run build` Exit 0 (23 Pakete, 330 Dateien), Profilboot 4/4, Distribution 92/92, `node scripts/profile-patch.mjs --check` bytegleich, `npm run zahlen:check` Exit 0, `npm run idioms:check` 15 Blöcke in 11 Dateien deckungsgleich.

@@ -1,4 +1,6 @@
-# Changelog für Übergaben
+# Changelog
+
+- Production-Dependency-Audit wieder fail-closed grün, ohne den DSH-Pin zu lockern (2026-10-24): Die 194 Meldungen waren **8 Advisories auf 3 Paketen**, alle ausschließlich über `@deepseek-ai/dsh` erreichbar — 50 DSH-Pakete pinnen `zod` exakt auf `4.4.3` und erbten damit dieselbe High-Meldung. Gemessen: der Pin-Anhebung auf `0.2.1-rc.3` half nicht (189 high bleiben, `fast-uri` gefixt, zwei neue moderate), `overrides` im Root (`zod 4.6.7`, `undici 8.12.3`, `fast-uri 3.1.9`, neben den bestehenden `@modelcontextprotocol/client`/`fflate`) ergaben `npm audit --omit=dev --audit-level=high` → Exit 0, „found 0 vulnerabilities". Laufzeit bleibt belegt: Profilboot 4/4 mit `dsh 0.2.1-rc.2`, `check:dsh-versions` Exit 0, `gate:test:all` 971 + 99, `npm test` Exit 0. Der Override ist bewusst: ein DSH-Update prüft ihn mit, statt ihn zu erben. für Übergaben
 
 > **Zweck:** kompakte, übertragbare Änderungsspur für Menschen und Folge-Agenten.
 > Erledigt heißt erst erledigt, wenn der konkrete Beleg und der CI-Status genannt sind.
