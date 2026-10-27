@@ -7,6 +7,10 @@
 > Die ausführliche Erzählung mit Commit- und Pfadankern bleibt in [TAGEBUCH.md](TAGEBUCH.md);
 > offene Aufgaben bleiben ausschließlich in [ROADMAP.md](ROADMAP.md).
 
+## Arbeitsstand — 2026-10-27
+
+- Die veraltete Notion-/Synchronisationspflicht ist aus `AGENTS.md` entfernt; verbindlich bleiben die Regeln und Dokumente im Repository. Belege vor dem Commit: `npm run preflight:docs:check` und `npm test` jeweils Exit 0. CI- und PR-Abnahme: noch nicht belegt.
+
 ## 0.5.0 — 2026-10-24
 
 **Der Release, in dem Shinon aufhört, sein eigenes Projekt in fremde Sitzungen zu tragen.**

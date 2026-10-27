@@ -571,15 +571,5 @@ Alle Skripte laufen über `scripts/run-with-node.mjs` (verifizierter Node ≥ 22
 
 ## Session memory (all agents)
 
-Load the canonical agent memory before starting work — prompt, hard rules, gates G0–G7,
-what may be done autonomously, the release-required list and the exception catalogue:
-
-- Page: `🧠 Agent Memory — Prompt & Anweisungen`
-  https://app.notion.com/p/3f3eb55a5817811bb969e001c9fa2d94
-- Local copy: `~/.agents/AGENTS.md` (generated, never edit by hand)
-- Marker: `MEMORY-VERSION: sha256:cbb7352b53893298bb9f0713ce3cf3cd1baa8b948ad33db6ad2ebcb8918273a1`
-- Refresh / check: `node ~/.agents/notion-agent/memory-sync.mjs sync` (or `verify`)
-
-The marker must match between the page and every local copy; a copy with a different marker is
-stale and must be re-synced before working. Rules that exist only in a chat transcript are never
-current.
+Die verbindlichen Arbeitsregeln stehen in dieser Datei und den verlinkten
+Repo-Dokumenten. Regeln, die nur in einem Chat stehen, sind nicht aktuell.
