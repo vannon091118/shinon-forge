@@ -2418,4 +2418,13 @@ unbewiesen und steht in `docs/ROADMAP.md`. Auch die Kommentare am alten,
 weiterhin öffentlich exportierten Renderer nennen ihn nicht mehr als
 produktive Injektion. Ein Modellturn wurde dafür nicht ausgeführt.
 
+Die Persona-Sichtung unterscheidet den bereits ausgelagerten Speicherzustand
+vom weiterhin im Einstieg gehaltenen Turn-Zustand: Die offene Audit-Abnahme
+bleibt deshalb offen. Bei der Gegenprüfung gegen den installierten DSH fällt
+auf, dass `workingDirectory` das aktuelle Sitzungsverzeichnis projiziert,
+während der Header das ursprüngliche Verzeichnis trägt. Persona und Prompter
+lesen den Header; ob ein Wechsel den richtigen Projektkontext erreicht, braucht
+eine eigene Sitzungsprobe mit dem echten Dienst. Die vorhandenen Persona-Tests
+laufen grün; sie belegen keinen solchen Verzeichniswechsel.
+
 **Anker:** `eebe7b8` · Pfade: `AGENTS.md`, `docs/CHANGELOG.md`, `docs/TAGEBUCH.md`, `docs/CLEANREPO-AUDIT.md`, `packages/prompter/assets/pre-step.js`, `scripts/gate/tests/skill-discovery.test.mjs`
