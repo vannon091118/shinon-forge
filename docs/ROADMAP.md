@@ -279,7 +279,7 @@ nur im Kopfkommentar und nur für die Client-Hälfte. Geschützt durch
 `scripts/gate/tests/client-montage.test.mjs` (11 Fälle: Echtbaum,
 Miniatur-Baum, verschluckende Marke, unbalancierter Split) und
 `scripts/gate/tests/structure.test.mjs` (14 Fälle).- **Weiterhin offen:** Etappe 8 (restliche Audit-Tiers aus
-  `docs/CLEANREPO-AUDIT.md` §8.1: u. a. T2-4 und T2-7).
+  `docs/CLEANREPO-AUDIT.md` §8.1: u. a. T2-4 und T2-6).
   Etappe 6 ist mit Etappe 3 erledigt, Etappe 7 mit diesem Stand (siehe
   `docs/CHANGELOG.md`).
 

@@ -9,6 +9,8 @@
 
 ## Arbeitsstand — 2026-10-27
 
+- Audit T2-7 geschlossen: Die nur von Tests aufgerufene `adoptClaim`-Brücke ist entfernt; der bestehende Vorschlags- und Review-Weg bleibt unverändert. Belege: `npm run test:claims`, `node scripts/run-with-node.mjs node --test scripts/gate/tests/persona-memory.test.mjs scripts/gate/tests/persona-state.part1.test.mjs scripts/gate/tests/persona-state.part2.test.mjs scripts/gate/tests/persona-review-panel.test.mjs` und `npm run gate` Exit 0. CI-Abnahme offen.
+
 - Audit T2-8 geschlossen: Dashboard-Inventar mit Paketbestand und Profil abgeglichen; Key-Router und Diff-Übersicht melden sich. Belege: `node scripts/run-with-node.mjs node --test scripts/gate/tests/dashboard-registry.test.mjs scripts/gate/tests/client-activation.part1.test.mjs scripts/gate/tests/client-activation.part2.test.mjs scripts/gate/tests/client-montage.test.mjs scripts/gate/tests/version-package.test.mjs`, `npm run test:key-router`, `npm run test:diff-overview`, `npm run client:check`, `npm run gate` Exit 0. CI- und Browser-Abnahme offen.
 
 - Audit T3-0 geschlossen: Drei direkte Testsuiten prüfen Pre-Step, Runtime-Zustand und Trace-Ausgabe einschließlich Fehlerfällen. Belege: `npm run test:prompter`, `npm run gate:test`, `npm test` Exit 0; CI- und PR-Abnahme noch offen.

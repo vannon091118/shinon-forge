@@ -31,12 +31,12 @@
       "invariant": "Nach dispose kommen keine Events mehr an; zwei Hosts führen getrennte Zustände."
     },
     {
-      "positive": "Claims (Zug 5 der Wissens-Runtime) laufen durch einen ausdrücklichen Lebenszyklus proposed → accepted/rejected → superseded. Ein Claim wird nur von `human` oder `review` angenommen; `scoring` liefert Signale und darf Vorschläge einbringen, aber nie eine Überzeugung setzen. Ein Urteil ist ALLOW oder DENY mit Gründen; ein ungelöster sicherheitsrelevanter Konflikt sperrt die betroffene Aktion, nicht das Projekt.",
+      "positive": "Der isolierte Claim-Kern modelliert einen ausdrücklichen Lebenszyklus proposed → accepted/rejected → superseded; eine produktive Claim-Brücke ist nicht verdrahtet. Der Kern erlaubt Annahme nur durch `human` oder `review`. Ein Urteil ist ALLOW oder DENY mit Gründen; ein ungelöster sicherheitsrelevanter Konflikt sperrt die betroffene Aktion, nicht das Projekt.",
       "forbidden": "Eine Annahme durch `scoring`, `system` oder ein Modell; ein Claim, der ohne Entscheidung als akzeptiert gespeichert wird; ein Vorschlag, der durch bloße Wiederholung zur Überzeugung wird; ein Urteil ohne Gründe; eine zweite Persona-Wahrheit neben dem Gedächtnis.",
-      "fallback": "adoptClaim übernimmt `accepted` nur bei `decidedBy` human oder review und meldet sonst NICHT_ENTSCHIEDEN bei Status proposed; observeJudgement zählt ein fehlendes Urteil als urteil:DENY, nie als ALLOW.",
-      "error": "AKTEUR_NICHT_ZUSTAENDIG, UEBERGANG_VERBOTEN, AKTEUR_VERBOTEN, ZUSTAND_UNBEKANNT (claim-core), NICHT_ENTSCHIEDEN (adoptClaim), KEIN_CLAIM",
+      "fallback": "Der bestehende Vorschlagsweg nimmt keine Auflage automatisch an; observeJudgement zählt ein fehlendes Urteil als urteil:DENY, nie als ALLOW.",
+      "error": "AKTEUR_NICHT_ZUSTAENDIG, UEBERGANG_VERBOTEN, AKTEUR_VERBOTEN, ZUSTAND_UNBEKANNT (claim-core), KEIN_CLAIM",
       "trace": "judgementRecord trägt Vertrag, Aktion, Urteil, Gründe und die Zahl der Claims — keinen Claim-Text. observeJudgement schreibt nur Kürzel wie urteil:DENY in die Gründe des Selbstmodells.",
-      "replay": "canMoveClaim, judgeAction und adoptClaim sind rein: dieselben Eingaben ergeben dasselbe Ergebnis, und die Tests fahren alle Zustände gegen die Übergangstabelle.",
+      "replay": "canMoveClaim und judgeAction sind rein: dieselben Eingaben ergeben dasselbe Ergebnis, und die Tests fahren alle Zustände gegen die Übergangstabelle.",
       "invariant": "Kein Claim ist ohne Entscheidung akzeptiert; kein Urteil lautet ALLOW bei einem offenen Sicherheitskonflikt im selben Bereich."
     }
   ]
