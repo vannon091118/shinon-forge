@@ -717,7 +717,7 @@ Das ist die Formulierung, die in den Plan gehört, weil sie **prüfbar** ist: de
 
 | ID | Task | Dateien (exklusiv) | Akzeptanz | Owner | |
 |---|---|---|---|---|---|
-| **T3-0** | **Gemessen 2026-10-23, weiter offen:** es gibt **keine** `pre-step.test.mjs`, `runtime-state.test.mjs` oder `trace-report.test.mjs`; die Prompter-Suiten prüfen das Verhalten über den Eintrag, nicht die drei Kerne direkt. | `packages/prompter/test/*` | 3 Tests existieren | C | ⬤ |
+| **T3-0** | **Erledigt 2026-10-27:** Direkte Tests der drei Kerne prüfen Pre-Step-Durchreichen und Fehler, Intent- und Salvage-Zustand sowie Trace-Puffer, Zustellung und Fehlerisolation. Keine Modell- oder Browser-Abnahme behauptet. | `packages/prompter/test/pre-step.test.mjs`, `packages/prompter/test/runtime-state.test.mjs`, `packages/prompter/test/trace-report.test.mjs` | `npm run test:prompter`, `npm run gate:test`, `npm test` Exit 0 | C | ✅ |
 | **T3-1** | **Erledigt (gemessen 2026-10-22):** `pre-step.js` steht bei 648 Zeilen unter der Kerngrenze 650; der Riegel (`structureIssues()` auf dem Echtbaum) ist grün. | `packages/prompter/assets/pre-step.js` | 648 ≤ 650 | C | ✅ |
 | **T3-2** | **Erledigt (gemessen 2026-10-22):** `runtime-state.js` steht bei 549 Zeilen unter der Kerngrenze 650. | `packages/prompter/assets/runtime-state.js` | 549 ≤ 650 | C | ✅ |
 | **T3-3** | **Erledigt (gemessen 2026-10-22):** `mode-core.js` steht bei 317 Zeilen unter der Kerngrenze 650. | `packages/prompter/assets/mode-core.js` | 317 ≤ 650 | C | ✅ |

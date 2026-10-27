@@ -180,7 +180,7 @@ nennt ihre Abnahme, und keine gilt ohne Exit-Code und benannten Lauf.
 - **Offen — die Werkzeugwahl ohne Ansage (2026-10-23):** `tool-turn-werkzeugwahl-ohne-ansage` ist `WIDERSPRUCH`. Ohne ausdrückliche Anweisung ruft das Modell `shinon_goal_micro_state` nicht auf: „Wo stehe ich gerade?“ ergibt 0 Werkzeugaufrufe (22 303 ms), „Bin ich irgendwo blockiert …?“ zwei `bash`-Aufrufe, beide am fehlenden Sandbox-Backend gescheitert (16 268 ms), keinen shinon-Aufruf. Erreichbarkeit ist belegt, Entdeckbarkeit nicht.
   Abnahme: die Werkzeugbeschreibung (609 Bytes) so ändern, dass die Frage auf sie zeigt, dann dieselben zwei Fragen erneut fahren; belegt ist es erst, wenn ein `tool/call` mit shinon-Namen OHNE Anweisung in der Sitzung steht — Ergebnis in `docs/probes/tool-turn.json` nachziehen.
 - **Etappe 8 — restliche Audit-Tiers:** die offenen Zeilen aus
-  `docs/CLEANREPO-AUDIT.md` §8.1 abarbeiten (u. a. T2-6, T2-7, T3-0, T3-5, T3-6)
+  `docs/CLEANREPO-AUDIT.md` §8.1 abarbeiten (u. a. T2-6, T2-7)
   und die Audit-Tabelle auf den gemessenen Stand ziehen.
   Abnahme: `npm run gate:test` Exit 0, `npm test` Exit 0, Audit-Zeile mit Beleg.
 
@@ -279,7 +279,7 @@ nur im Kopfkommentar und nur für die Client-Hälfte. Geschützt durch
 `scripts/gate/tests/client-montage.test.mjs` (11 Fälle: Echtbaum,
 Miniatur-Baum, verschluckende Marke, unbalancierter Split) und
 `scripts/gate/tests/structure.test.mjs` (14 Fälle).- **Weiterhin offen:** Etappe 8 (restliche Audit-Tiers aus
-  `docs/CLEANREPO-AUDIT.md` §8.1: u. a. T2-4, T2-7, T2-8 und T3-0).
+  `docs/CLEANREPO-AUDIT.md` §8.1: u. a. T2-4, T2-7 und T2-8).
   Etappe 6 ist mit Etappe 3 erledigt, Etappe 7 mit diesem Stand (siehe
   `docs/CHANGELOG.md`).
 

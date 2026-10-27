@@ -2427,4 +2427,11 @@ lesen den Header; ob ein Wechsel den richtigen Projektkontext erreicht, braucht
 eine eigene Sitzungsprobe mit dem echten Dienst. Die vorhandenen Persona-Tests
 laufen grün; sie belegen keinen solchen Verzeichniswechsel.
 
+T3-0 verlangte direkte Tests der drei Prompter-Eigentümer statt ausschließlich
+indirekter Tests über den Paket-Einstieg. Die neuen Tests fahren den Pre-Step,
+den Runtime-Zustand und die Trace-Ausgabe direkt: Durchreichen und Fehler,
+Sitzungszählung und Speicherung sowie Puffer und Zustellfehler. Die Paket-Suite
+und die lokale Gate-Bahn bestehen; ein Modell- oder Browserlauf ist nicht Teil
+dieser Abnahme.
+
 **Anker:** `eebe7b8` · Pfade: `AGENTS.md`, `docs/CHANGELOG.md`, `docs/TAGEBUCH.md`, `docs/CLEANREPO-AUDIT.md`, `packages/prompter/assets/pre-step.js`, `scripts/gate/tests/skill-discovery.test.mjs`
