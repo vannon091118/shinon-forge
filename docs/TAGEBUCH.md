@@ -2394,3 +2394,18 @@ gemessene Zahl eines Agenten. Der Tag `v0.5.0` bleibt ausdrücklich offen.
 `npm test` Exit 0 (statisches Gate 127/127, Engine PASS), `npm run gate:test` 971/971
 (Exit 0), `npm audit --omit=dev --audit-level=high` „found 0 vulnerabilities" (Exit 0),
 `npm run zahlen:check` Exit 0.
+
+---
+
+## 2026-10-27 — Die Arbeitsregeln bleiben im Repository
+
+Die Arbeitsanweisung verlangte einen Notion-Abgleich und eine lokale Kopie,
+bevor ein Agent beginnen durfte. Der Betreiber hat diesen Abgleich als Altlast
+benannt und seine Entfernung beauftragt. `AGENTS.md` verweist jetzt auf die
+verbindlichen Regeln im Repository und die verlinkten Dokumente; eine bloße
+Chatnotiz wird dadurch nicht zur dauerhaften Regel. Historische Belege und
+bestehende Sicherheits- und Commit-Regeln bleiben erhalten. Die Änderung betrifft
+keine DSH-Laufzeit. Der schreibgeschützte Dokumentations-Preflight und `npm test`
+endeten vor dem Sach-Commit jeweils mit Exit 0; ein CI-Ergebnis steht noch aus.
+
+**Anker:** `eebe7b8` · Pfade: `AGENTS.md`, `docs/CHANGELOG.md`, `docs/TAGEBUCH.md`
