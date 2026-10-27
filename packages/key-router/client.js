@@ -16,8 +16,7 @@
  * deshalb ein Werkzeug des Hosts (`key_router_status`) — und ein Panel, das diese
  * Zahl nur behaupten könnte, wird nicht gebaut.
  *
- * Was bleibt: ein Eintrag in `__shinonPluginCatalog` und eine Zeile in der
- * Sidebar-Liste. Beide behaupten nichts über eine Oberfläche, die es nicht gibt.
+ * Was bleibt: ein Eintrag in der Dashboard-Registry, ohne ein Panel zu behaupten.
  */
 window.__ModuleLoader__.load({
   id: '@shinon/key-router',
@@ -41,6 +40,9 @@ window.__ModuleLoader__.load({
         mounted: new Date().toISOString()
       };
       window.dispatchEvent(new CustomEvent('shinon:plugin-registered', { detail: { id: PLUGIN } }));
+      const registry = (window.__shinonPlugins ??= new Map());
+      registry.set(PLUGIN, { label: LABEL, kind: 'client', panel: null, detail });
+      window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: PLUGIN } }));
     }
 
     return {

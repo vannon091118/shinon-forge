@@ -141,8 +141,8 @@
           h('tbody', null,
             EXPECTED.map((entry) => {
               const announced = map.get(entry.id);
-              const state = !entry.active ? 'inactive' : (announced ? 'live' : 'silent');
-              const text = state === 'inactive' ? 'inaktiv (nicht im Profil)' : state === 'live' ? 'laeuft' : 'STILL — nicht geladen';
+              const state = announced ? 'live' : (entry.active ? 'silent' : 'inactive');
+              const text = state === 'inactive' ? 'inaktiv (nicht im Profil)' : state === 'live' ? (entry.active ? 'laeuft' : 'laeuft (nicht im Profil erwartet)') : 'STILL — nicht geladen';
               return h('tr', { key: entry.id },
                 h('td', null, [
                   h('div', null, announced?.label ?? entry.label),
@@ -167,7 +167,7 @@
         h('h2', null, 'Shinon Forge'),
         h('p', { className: 'shinon-dashboard__sub' }, 'Sichtbarkeit, Erfahrung und Zustand — was laeuft, steht hier.'),
         h('div', { className: 'shinon-dashboard__cards' },
-          h(Card, { label: 'Angemeldet', value: `${map.size} / ${EXPECTED.filter((entry) => entry.active).length}` }),
+          h(Card, { label: 'Angemeldet', value: `${EXPECTED.filter((entry) => entry.active && map.has(entry.id)).length} / ${EXPECTED.filter((entry) => entry.active).length}` }),
           h(Card, { label: 'Codemon', value: pet === null ? '—' : `${pet.species} · L${pet.level}` }),
           h(Card, { label: 'Siege', value: pet === null ? '—' : String(pet.wins) }),
           h(Card, { label: 'Workspaces', value: surfaces.hasWorkspaces ? String(surfaces.items.length) : '—' }),

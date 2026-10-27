@@ -58,8 +58,8 @@ window.__ModuleLoader__.load({
     let channels = () => ({ workspaces: undefined, sessions: undefined });
 
     /**
-     * Die erwarteten Bundles in Profilreihenfolge. `active: false` heisst
-     * bewusst abwesend (openapi ist im Profil nicht eingetragen, nicht kaputt).
+     * Pakete und erwartete Bundles des Shinon-Profils. `active: false` heisst
+     * bewusst nicht im Profil, nicht kaputt.
      */
     const EXPECTED = [
       { id: '@shinon/persona', label: 'Persona', active: true },
@@ -76,7 +76,15 @@ window.__ModuleLoader__.load({
       { id: '@shinon/task-router', label: 'Task Router', active: true },
       { id: '@shinon/codingmon', label: 'Codingmon', active: true },
       { id: '@shinon/diff-overview', label: 'Änderungen', active: true },
-      { id: '@shinon/widget-dock', label: 'Shinon', active: true }, { id: '@shinon/popup', label: 'Shinon Popup', active: true }, { id: '@shinon/traceability', label: 'Traceability-Toasts', active: true },
+      { id: '@shinon/widget-dock', label: 'Shinon', active: true },
+      { id: '@shinon/popup', label: 'Shinon Popup', active: true },
+      { id: '@shinon/traceability', label: 'Traceability-Toasts', active: true },
+      { id: '@shinon/key-router', label: 'Key-Router', active: true },
+      { id: '@shinon/narrative', label: 'Narrative', active: true },
+      { id: '@shinon/scoring', label: 'Scoring', active: true },
+      { id: '@shinon/version', label: 'Shinon Version', active: true },
+      { id: '@shinon/mobile', label: 'Mobile', active: false },
+      { id: '@shinon/seams', label: 'Seams', active: false },
     ];
 
     function insertStyles(tag, css) {
@@ -376,8 +384,8 @@ window.__ModuleLoader__.load({
           h('tbody', null,
             EXPECTED.map((entry) => {
               const announced = map.get(entry.id);
-              const state = !entry.active ? 'inactive' : (announced ? 'live' : 'silent');
-              const text = state === 'inactive' ? 'inaktiv (nicht im Profil)' : state === 'live' ? 'laeuft' : 'STILL — nicht geladen';
+              const state = announced ? 'live' : (entry.active ? 'silent' : 'inactive');
+              const text = state === 'inactive' ? 'inaktiv (nicht im Profil)' : state === 'live' ? (entry.active ? 'laeuft' : 'laeuft (nicht im Profil erwartet)') : 'STILL — nicht geladen';
               return h('tr', { key: entry.id },
                 h('td', null, [
                   h('div', null, announced?.label ?? entry.label),
@@ -402,7 +410,7 @@ window.__ModuleLoader__.load({
         h('h2', null, 'Shinon Forge'),
         h('p', { className: 'shinon-dashboard__sub' }, 'Sichtbarkeit, Erfahrung und Zustand — was laeuft, steht hier.'),
         h('div', { className: 'shinon-dashboard__cards' },
-          h(Card, { label: 'Angemeldet', value: `${map.size} / ${EXPECTED.filter((entry) => entry.active).length}` }),
+          h(Card, { label: 'Angemeldet', value: `${EXPECTED.filter((entry) => entry.active && map.has(entry.id)).length} / ${EXPECTED.filter((entry) => entry.active).length}` }),
           h(Card, { label: 'Codemon', value: pet === null ? '—' : `${pet.species} · L${pet.level}` }),
           h(Card, { label: 'Siege', value: pet === null ? '—' : String(pet.wins) }),
           h(Card, { label: 'Workspaces', value: surfaces.hasWorkspaces ? String(surfaces.items.length) : '—' }),

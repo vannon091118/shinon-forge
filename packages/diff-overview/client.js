@@ -242,6 +242,9 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
+        const registry = (window.__shinonPlugins ??= new Map());
+        registry.set(PLUGIN, { label: 'Änderungen', kind: 'client', panel: PANEL_ID });
+        window.dispatchEvent(new CustomEvent('shinon:plugin', { detail: { id: PLUGIN } }));
         ctx.slots.inject(SLOT, () => ctx.slots.register({ name: SLOT, id: PANEL_ID, order: 30 }, Chip));
       },
     };

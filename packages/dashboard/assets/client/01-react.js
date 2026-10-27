@@ -22,8 +22,8 @@
     let channels = () => ({ workspaces: undefined, sessions: undefined });
 
     /**
-     * Die erwarteten Bundles in Profilreihenfolge. `active: false` heisst
-     * bewusst abwesend (openapi ist im Profil nicht eingetragen, nicht kaputt).
+     * Pakete und erwartete Bundles des Shinon-Profils. `active: false` heisst
+     * bewusst nicht im Profil, nicht kaputt.
      */
     const EXPECTED = [
       { id: '@shinon/persona', label: 'Persona', active: true },
@@ -40,7 +40,15 @@
       { id: '@shinon/task-router', label: 'Task Router', active: true },
       { id: '@shinon/codingmon', label: 'Codingmon', active: true },
       { id: '@shinon/diff-overview', label: 'Änderungen', active: true },
-      { id: '@shinon/widget-dock', label: 'Shinon', active: true }, { id: '@shinon/popup', label: 'Shinon Popup', active: true }, { id: '@shinon/traceability', label: 'Traceability-Toasts', active: true },
+      { id: '@shinon/widget-dock', label: 'Shinon', active: true },
+      { id: '@shinon/popup', label: 'Shinon Popup', active: true },
+      { id: '@shinon/traceability', label: 'Traceability-Toasts', active: true },
+      { id: '@shinon/key-router', label: 'Key-Router', active: true },
+      { id: '@shinon/narrative', label: 'Narrative', active: true },
+      { id: '@shinon/scoring', label: 'Scoring', active: true },
+      { id: '@shinon/version', label: 'Shinon Version', active: true },
+      { id: '@shinon/mobile', label: 'Mobile', active: false },
+      { id: '@shinon/seams', label: 'Seams', active: false },
     ];
 
     function insertStyles(tag, css) {

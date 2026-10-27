@@ -2434,4 +2434,9 @@ Sitzungszählung und Speicherung sowie Puffer und Zustellfehler. Die Paket-Suite
 und die lokale Gate-Bahn bestehen; ein Modell- oder Browserlauf ist nicht Teil
 dieser Abnahme.
 
-**Anker:** `eebe7b8` · Pfade: `AGENTS.md`, `docs/CHANGELOG.md`, `docs/TAGEBUCH.md`, `docs/CLEANREPO-AUDIT.md`, `packages/prompter/assets/pre-step.js`, `scripts/gate/tests/skill-discovery.test.mjs`
+Audit T2-8 behebt ein unvollständiges Dashboard-Inventar: Der Test vergleicht
+die Tabelle mit Paketbestand und Profil, und die Client-Hälften von Key-Router
+und Diff-Übersicht melden sich über die bestehende Dashboard-Registry. Der
+Client-Test und das Slice-Gate sind grün; ein Browserlauf wurde nicht ausgeführt.
+
+**Anker:** `eebe7b8` · Pfade: `AGENTS.md`, `docs/CHANGELOG.md`, `docs/TAGEBUCH.md`, `docs/CLEANREPO-AUDIT.md`, `packages/prompter/assets/pre-step.js`, `scripts/gate/tests/skill-discovery.test.mjs`, `packages/dashboard/client.js`, `scripts/gate/tests/dashboard-registry.test.mjs`
