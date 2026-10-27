@@ -1,13 +1,8 @@
 #!/usr/bin/env node
 /**
- * Skill-Injektion und Fallback-Eskalation — Testfuer die neuen Features.
- *
- * Belegt wird:
- *   - renderSkillsBlock: Skills werden als XML-Block gerendert
- *   - Skills werden IMMER injiziert (unabhaengig vom Modus)
- *   - Bei Verwerfung: Fallback-Prompt mit Feedback-Frage
- *
- * Läuft mit `node --test` — kein DSH, kein Netz.
+ * Der weiterhin öffentliche Skill-Renderer: reine Formatprüfung, kein Beleg
+ * für eine produktive Injektion. Der Veredler injiziert keine Skill-Blöcke;
+ * den Laufzeitpfad prüft scripts/gate/tests/prompter-contract.part4.test.mjs.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

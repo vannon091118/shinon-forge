@@ -511,6 +511,8 @@ Der teuerste Test ist `project-index.test.mjs`: **296,8 s solo** — fast 5 Minu
 
 ### 6.1 Was vorhanden ist — und was **wirklich** verdrahtet ist
 
+> **Nachtrag 2026-10-27:** Die folgenden Befunde sind ein historischer Auditstand, kein aktueller Nachweis für zwei aktive Skill-Wege. Seit `96c193f` injiziert der Veredler keine Skill-Blöcke; T3b-3 unten dokumentiert den überprüften Ist-Zustand. Der native DSH-Katalog verwendet `description`, nicht das Shinon-Feld `use-when`; dessen Wirkung im Modell bleibt eine eigene offene Frage.
+
 > **Erst die beruhigende Nachricht, dann der Haken.** Der **Generations-Pfad** ist vollständig verdrahtet — er funktioniert. Was nicht klappt, ist der **Ladepfad** (zwei konkurrierende Wege) und ein **toter dritter Mechanismus** daneben.
 
 | Baustein | Ort | Zustand — **gemessen** |
@@ -733,7 +735,7 @@ Das ist die Formulierung, die in den Plan gehört, weil sie **prüfbar** ist: de
 |---|---|---|---|---|---|
 | **T3b-1** | **Erledigt (gemessen 2026-10-23):** alle **6 von 6** Projekt-Skills tragen `use-when` (mit T0-15 eingeführt und gepinnt: `skill-selection.test.mjs` wählt allein über den Trigger). | `.agents/skills/*/SKILL.md` | 6× Trigger vorhanden | C | ✅ |
 | **T3b-2** | Der Prompter liest `use-when` **vor** `description` — **S1** | `packages/prompter/assets/prompt-files.js` | Auswahl greift am Trigger | C | ◆ |
-| **T3b-3** | **Einen** Weg festlegen: DSH-Katalog **oder** Prompter-Injektion — **S2** (der teuerste Skill-Schritt) | `packages/prompter/assets/pre-step.js` | ein Weg, kein doppelter | C | ⬤ |
+| **T3b-3** | **Belegt 2026-10-27:** Der Hauptagent nutzt den nativen DSH-Skill-Katalog und das Skill-Werkzeug; der Veredler injiziert seit `96c193f` keine Skill-Blöcke. Der DSH-Provider entdeckt und lädt einen vom Lernzyklus geschriebenen Skill; der separate Veredler-Test prüft trotz passender Skills den Request ohne Skill-Block. Kein Live-Modellturn behauptet. `use-when` ist kein DSH-Katalogfeld; DSH verwendet die Beschreibung. | `profiles/shinon/fragments/40-agent-model.yml`, `packages/prompter/assets/pre-step.js`, `scripts/gate/tests/skill-discovery.test.mjs`, `scripts/gate/tests/prompter-contract.part4.test.mjs` | `node scripts/run-with-node.mjs node --test scripts/gate/tests/skill-discovery.test.mjs scripts/gate/tests/prompter-contract.part4.test.mjs` Exit 0, kein Skip | C | ✅ |
 | **T3b-4** | Den Weg vom Ledger zurück in die Auswahl bauen — **S4** | `packages/prompter/assets/prompt-files.js` | Ledger → Katalog ist spielbar | C | ◆ |
 | **T3b-5** | Format-Regeln auch auf handgeschriebene Skills anwenden — **S5** | `scripts/gate/plugins/` | Gate prüft `use-when` | G | ◆ |
 | **T3b-6** | `generated-skills/` aus dem Baum nehmen (RETIRED, nur README übrig) — **S6** | `generated-skills/` | Ordner weg | A | ○ |

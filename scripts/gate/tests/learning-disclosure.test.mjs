@@ -5,8 +5,8 @@
  *
  * Drei Stufen, drei Nachweise, alle am Quelltext bzw. an der Profildatei:
  *
- *   1. UEBERSICHT: der Skills-Block im Prompt traegt Name und Beschreibung,
- *      NIE den Rumpf — und bleibt auch bei vielen Skills gedeckelt.
+ *   1. FORMAT: der öffentliche Skill-Renderer verarbeitet Name und Beschreibung,
+ *      nicht den Rumpf. Das belegt keine Injektion im Veredler.
  *   2. PROZEDUR: der Rumpf kommt auf Abruf (`tool-skill` im Profil), nicht
  *      vorab; dieselbe Datei ist die Quelle, die DSH nativ entdeckt.
  *   3. ARCHIV: die Sitzungssuche (`dsh-experimental-session-search`) ist im
@@ -41,7 +41,7 @@ const MANY = Array.from({ length: 60 }, (_, index) => ({
   description: `Nutzen wenn Aufgabe ${index} ansteht, damit der Ablauf aus dem Projekt gilt und nicht neu erfunden wird.`,
 }));
 
-test('stufe 1: der Uebersichtsblock traegt Name und Beschreibung, nie den Rumpf', () => {
+test('stufe 1: der Renderer verarbeitet Name und Beschreibung, nie den Rumpf', () => {
   const block = renderSkillsBlock([{ name: 'gedaechtnis', description: 'Nutzen wenn ein Ablauf wiederkehrt.' }]);
   assert.match(block, /^<shinon_skills>/);
   assert.match(block, /<skill name="gedaechtnis">Nutzen wenn ein Ablauf wiederkehrt\.<\/skill>/);
@@ -52,7 +52,7 @@ test('stufe 1: der Uebersichtsblock traegt Name und Beschreibung, nie den Rumpf'
   assert.equal(withBody.split('\n').length, 3, 'je Skill genau eine Zeile');
 });
 
-test('stufe 1: auch sechzig Skills bleiben eine gedeckelte Uebersicht', () => {
+test('stufe 1: die Ausgabe des Renderers bleibt fuer die Stichprobe begrenzt', () => {
   const block = renderSkillsBlock(MANY);
   assert.ok(typeof block === 'string' && block.length > 0);
   const lines = block.split('\n');

@@ -9,6 +9,7 @@
 
 ## Arbeitsstand — 2026-10-27
 
+- Audit T3b-3 gegen den installierten DSH-Pin und bestehende Verhaltenstests nachgeprüft: Skill-Discovery und Abruf gehören DSH; der Veredler injiziert keine Skill-Blöcke. Die alte Gegenbehauptung im Audit und in Renderer-/Testkommentaren ist als historisch beziehungsweise als reine Formatprüfung eingeordnet. Der native Katalog verwendet `description` statt `use-when`; ein echter Modellnachweis bleibt offen. Belege: `node scripts/run-with-node.mjs node --test scripts/gate/tests/skill-discovery.test.mjs scripts/gate/tests/prompter-contract.part4.test.mjs scripts/gate/tests/learning-disclosure.test.mjs packages/prompter/test/skill-injection.test.mjs`, `npm run gate:test`, `npm test` jeweils Exit 0. CI- und PR-Abnahme: noch nicht belegt.
 - Die veraltete Notion-/Synchronisationspflicht ist aus `AGENTS.md` entfernt; verbindlich bleiben die Regeln und Dokumente im Repository. Belege vor dem Commit: `npm run preflight:docs:check` und `npm test` jeweils Exit 0. CI- und PR-Abnahme: noch nicht belegt.
 
 ## 0.5.0 — 2026-10-24

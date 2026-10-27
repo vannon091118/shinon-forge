@@ -1,9 +1,9 @@
 /**
  * @shinon/prompter — render-context.js
  *
- * Kontext-Rendering (Plan §15): den Kontext als markierten Datenblock, die Skills als
- * eigenen Block, dazu die Neutralisierung der Marken im Inhalt. Reine Textfunktionen
- * ohne Host und ohne Dateisystem.
+ * Kontext-Rendering (Plan §15) und Neutralisierung der Marken im Inhalt.
+ * Der frühere Skill-Renderer bleibt als öffentliche Hilfsfunktion erhalten;
+ * im Veredler wird er nicht aufgerufen. Reine Textfunktionen ohne Host und Datei.
  */
 import { CONTEXT_CONTRACT, CONTEXT_TAG } from './mode-core.js';
 
@@ -42,12 +42,9 @@ export function neutralizeMarkers(text) {
 }
 
 /**
- * Einen Skills-Block rendern — unabhaengig vom Modus.
- *
- * Skills werden IMMER injiziert (Zug 6): unabhaengig davon, ob der Kontext
- * geliefert wurde oder nicht. Sie geben dem Modell Zugriff auf projekspezifisches
- * Wissen (Best Practices, Architekturregeln, veraltete Patterns) — immer, nicht
- * nur in MAX.
+ * Einen Skills-Block rendern. Die Funktion bleibt als öffentlicher Export
+ * erhalten, ist aber kein produktiver Injektionspfad: Der Veredler übergibt
+ * keine Skill-Blöcke; der Hauptagent nutzt die native DSH-Skill-Discovery.
  */
 export function renderSkillsBlock(skills) {
   if (!Array.isArray(skills) || skills.length === 0) return null;

@@ -2408,4 +2408,14 @@ bestehende Sicherheits- und Commit-Regeln bleiben erhalten. Die Änderung betrif
 keine DSH-Laufzeit. Der schreibgeschützte Dokumentations-Preflight und `npm test`
 endeten vor dem Sach-Commit jeweils mit Exit 0; ein CI-Ergebnis steht noch aus.
 
-**Anker:** `eebe7b8` · Pfade: `AGENTS.md`, `docs/CHANGELOG.md`, `docs/TAGEBUCH.md`
+Der alte Audit-Eintrag T3b-3 meldete noch zwei konkurrierende Skill-Wege.
+Der Stand von `96c193f` und der erneut geprüfte DSH-Pin zeigen etwas anderes:
+Der Veredler injiziert keinen Skill-Block; der native Provider entdeckt und
+lädt veröffentlichte Skills. Der Provider-Test und der Veredler-Vertragstest
+laufen ohne Skip. DSH stellt im Modellkatalog die Beschreibung bereit, nicht
+Shinons `use-when`; die tatsächliche Werkzeugwahl ohne Namensnennung bleibt
+unbewiesen und steht in `docs/ROADMAP.md`. Auch die Kommentare am alten,
+weiterhin öffentlich exportierten Renderer nennen ihn nicht mehr als
+produktive Injektion. Ein Modellturn wurde dafür nicht ausgeführt.
+
+**Anker:** `eebe7b8` · Pfade: `AGENTS.md`, `docs/CHANGELOG.md`, `docs/TAGEBUCH.md`, `docs/CLEANREPO-AUDIT.md`, `packages/prompter/assets/pre-step.js`, `scripts/gate/tests/skill-discovery.test.mjs`
